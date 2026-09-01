@@ -1,20 +1,27 @@
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
 
 jobs:
-  # Ground truth until the Gradle build exists (Phase 02+): keep repo
-  # hygiene + doc-link checks green. Replaced by real build+test jobs in
-  # Phase 02 per MASTER_PROMPT.md.
-  hygiene:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Markdown link check (internal links)
-        run: |
-          ! grep -rnE '\]\(([^)h]+)\.md\)' --include='*.md' . \
-            | grep -vE 'https?://' || true
-      - name: No TODO/FIXME in production docs
-        run: ! grep -rn 'TODO: implement' --include='*.md' .
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Unit tests (shared domain: queue, parsers, resolvers)
+        run: ./gradlew :shared:jvmTest --no-daemon
+
+      - name: Android debug build
+        run: ./gradlew :app-android:assembleDebug --no-daemon
+
+      - name: Probe compiles
+        run: ./gradlew :tools:playback-probe:compileKotlin --no-daemon
