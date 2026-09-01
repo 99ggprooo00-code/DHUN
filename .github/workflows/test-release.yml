@@ -1,0 +1,53 @@
+name: test-release
+
+# ONE rolling test release, by policy (user decision 2026-09-01):
+#  - a single release tagged `test`, asset always named dhun-test.apk
+#  - every push to main REPLACES it (old release, tag and assets deleted)
+#  - no version numbers, no release history for unfinished builds
+# The stable download URL never changes:
+#   https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: test-release
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Build debug APK
+        run: ./gradlew :app-android:assembleDebug --no-daemon
+
+      - name: Replace the rolling test release (delete old, publish new)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # one-time cleanup: remove the historical dev-v* releases and tags
+          gh release delete dev-v0.1.0 --yes --cleanup-tag || true
+          gh release delete dev-v0.1.1 --yes --cleanup-tag || true
+          # rolling slot: always exactly one
+          gh release delete test --yes --cleanup-tag || true
+          git push origin :refs/tags/test || true
+
+          cp app-android/build/outputs/apk/debug/app-android-debug.apk dhun-test.apk
+          sha256sum dhun-test.apk > dhun-test.apk.sha256
+          gh release create test dhun-test.apk dhun-test.apk.sha256 \
+            --title "DHUN test build (auto-replaced on every update)" \
+            --notes "Rolling UNVERIFIED development build of main. Nothing here is stable, signed for stores, or recommended for daily-driver devices. Install only where that is acceptable. Current open checks: docs/verification/03-android-skeleton.md" \
+            --prerelease
