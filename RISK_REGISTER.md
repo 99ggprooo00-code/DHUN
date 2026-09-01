@@ -2,8 +2,9 @@
 
 | Risk | Likelihood | Detects via | Pre-agreed response |
 |---|---|---|---|
-| NewPipe Extractor breaks (PO token / SABR change) | High, recurring | rot-drill CI red | Pin last-good extractor; adopt upstream patch; patch release within 72h |
-| Upstream fix slow (>14 days) | Medium | rot-drill red ≥14d | Desktop: enable yt-dlp fallback; Android: document impact + user decision (pivot criteria) |
+| NewPipe Extractor breaks (PO token / SABR change) | **REALIZED 2026-09-01** — v0.26.5 broken, no upstream fix yet (see ADR-001) | probe WATCH line / rot-drill | Two-tier resolver (ADR-001): own-client + yt-dlp carry traffic; NewPipe re-enters when drill-green |
+| vision_platform client (current yt-dlp path) gated | High, recurring | rot-drill red on resolve step | Follow yt-dlp's active client; patch release within 72h |
+| All maintained engines broken simultaneously | Low (never yet observed) | rot-drill red on every path ≥14d | Stop-and-decide per MASTER_PROMPT kill switch |
 | SMTC via JNA unstable | Medium | Phase 12 spike (3-day time-box) | Ship fallback: tray controls + media keys; record in KNOWN_LIMITATIONS.md |
 | Real blur unavailable | Certain (<Android 12) | Phase 06 | Scrim+translucency fallback; note per-platform in limitations |
 | Compose MP / Ktor / Coil regression | Low | CI | Pin versions; upgrade one dependency at a time |

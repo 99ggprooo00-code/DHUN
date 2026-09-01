@@ -2,7 +2,7 @@
 
 | # | Phase | Status | Verification evidence |
 |---|-------|--------|----------------------|
-| 01 | Extraction spike | 🟨 IN PROGRESS — metadata path verified live (search 200/20 items, radio 200/50 tracks); stream-resolution probe next | docs/research/01-extraction-spike.md + tests/fixtures/|
+| 01 | Extraction spike | ✅ CODE COMPLETE — probe PASS end-to-end (search 20 + resolve + audio bytes verified + related 50); NewPipe v0.26.5 broken upstream -> ADR-001 two-tier resolver; on-device audible check rides Phase 03 | docs/research/01-extraction-spike.md · docs/verification/01-extraction-spike.md · ADR-001 |
 | 02 | Provider & domain core (entities, InnerTube metadata client, StreamResolver, QueueManager) | ⬜ not started | — |
 | 03 | Android skeleton + Media3 playback + lock screen | ⬜ not started | — |
 | 04 | Desktop skeleton + vlcj playback | ⬜ not started | — |
