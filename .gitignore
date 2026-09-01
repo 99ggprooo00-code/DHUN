@@ -1,0 +1,35 @@
+# Gradle/Kotlin/JVM
+.gradle/
+build/
+out/
+local.properties
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Android
+app-android/build/
+captures/
+*.apk.idsig
+
+# Desktop
+app-desktop/build/
+release/
+
+# Secrets/keys — never commit
+*.jks
+*.keystore
+keystore.properties
+cookies.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+/tests/fixtures/tmp/

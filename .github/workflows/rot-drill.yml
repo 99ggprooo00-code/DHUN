@@ -1,0 +1,16 @@
+name: rot-drill
+# Daily extraction health check vs live YouTube. Wired to the
+# tools/playback-probe suite in Phase 01; until then this is a placeholder
+# that must FAIL LOUD when someone removes this comment and ships no probe.
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder — replaced by playback-probe run in Phase 01
+        run: echo "rot-drill activates in Phase 01 (see MASTER_PROMPT.md)"
