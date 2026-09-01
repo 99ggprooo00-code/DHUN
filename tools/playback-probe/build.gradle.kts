@@ -8,20 +8,27 @@ kotlin {
 }
 
 dependencies {
-    // Stream extraction engine (GPL-3.0). Runs on any JVM — this same
-    // dependency resolves streams for the Android and Desktop apps later.
-    // NOTE: its POM scopes ALL dependencies to runtime-only, so anything the
-    // probe needs at compile time must be declared here explicitly.
+    implementation(project(":shared"))
+    // shared exposes coroutines/ktor as `implementation` (not `api`) — the
+    // probe touches those types directly, so declare them explicitly.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation("io.ktor:ktor-client-core:3.1.3")
+    implementation("io.ktor:ktor-client-cio:3.1.3")
+    // Stream extraction engine (GPL-3.0). NOTE: its POM scopes ALL deps to
+    // runtime-only — anything needed at compile time must be declared here.
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
-    implementation("com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996")
 }
 
 application {
-    mainClass.set("dev.dhun.tools.playbackprobe.MainKt")
+    // `gradle :tools:playback-probe:run -PmainClass=...` switches entry points:
+    //  - MainKt        = Phase 01 extraction kill-switch probe (default)
+    //  - SmokeMainKt   = Phase 02 provider-level live smoke
+    mainClass.set(
+        providers.gradleProperty("mainClass")
+            .getOrElse("dev.dhun.tools.playbackprobe.MainKt")
+    )
 }
 
-// Copies the resolved runtime classpath to disk — used by the findings step
-// to inspect extractor internals, and by rot-drill debugging.
 tasks.register<Copy>("resolveRuntime") {
     from(configurations.runtimeClasspath)
     into(layout.buildDirectory.dir("runtime-libs"))

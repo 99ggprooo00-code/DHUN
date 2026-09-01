@@ -15,3 +15,9 @@ Updated every phase. Nothing hidden.
   aggressively than residential IPs; the rot drill may show resolve-step
   failures on CI runners that do not affect normal users. Repeated red +
   local green = investigate; both red = rot.
+- YTM lyrics via InnerTube are unsynced text only; synced lyrics arrive in
+  Phase 11 via LRCLIB.
+- The PLAYLISTS search filter returns mixed result types from YouTube;
+  classification routes them by browseId prefix (harmless, refined later).
+- The shared module currently builds the JVM target only; the Android target
+  (same commonMain sources) is added with the AGP/SDK setup in Phase 03.

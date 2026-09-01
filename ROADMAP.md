@@ -3,7 +3,7 @@
 | # | Phase | Status | Verification evidence |
 |---|-------|--------|----------------------|
 | 01 | Extraction spike | ✅ CODE COMPLETE — probe PASS end-to-end (search 20 + resolve + audio bytes verified + related 50); NewPipe v0.26.5 broken upstream -> ADR-001 two-tier resolver; on-device audible check rides Phase 03 | docs/research/01-extraction-spike.md · docs/verification/01-extraction-spike.md · ADR-001 |
-| 02 | Provider & domain core (entities, InnerTube metadata client, StreamResolver, QueueManager) | ⬜ not started | — |
+| 02 | Provider & domain core | ✅ CODE COMPLETE — 34/34 unit tests (fixtures, queue, failover); live smoke PASS (all filters, suggestions, radio 50, lyrics 27 lines, stream via yt-dlp failover) | docs/verification/02-provider-core.md |
 | 03 | Android skeleton + Media3 playback + lock screen | ⬜ not started | — |
 | 04 | Desktop skeleton + vlcj playback | ⬜ not started | — |
 | 05 | Data layer (SQLDelight, repositories, use cases) | ⬜ not started | — |

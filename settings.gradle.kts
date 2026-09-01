@@ -15,4 +15,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "dhun"
 
+include(":shared")
 include(":tools:playback-probe")
