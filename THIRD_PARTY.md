@@ -14,6 +14,9 @@ GPL-3.0-compatible. Reused code gets: project, file, license, commit, date.
 | SQLDelight | Apache-2.0 | persistence | Phase 05 |
 | Ktor | Apache-2.0 | networking | Phase 02 |
 | Koin | Apache-2.0 | DI | Phase 03 |
+| Jetpack Compose / activity-compose | Apache-2.0 | Android UI | Phase 03 |
+| kotlinx-coroutines / serialization | Apache-2.0 | concurrency + JSON | Phase 02 |
+| nanojson (TeamNewPipe fork) | Apache-2.0 | extractor's JSON parser | Phase 01 |
 | Coil 3 | Apache-2.0 | images | Phase 06 |
 | Kermit | Apache-2.0 | logging | Phase 02 |
 | LRCLIB (API/service) | open API | synced lyrics source | Phase 11 |

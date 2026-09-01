@@ -1,11 +1,17 @@
 plugins {
-    kotlin("multiplatform") version "2.1.20"
+    kotlin("multiplatform")
+    id("com.android.library")
 }
 
 kotlin {
-    // Phase 02: JVM target (Desktop + the probe). The Android target is added
-    // in Phase 03 together with the AGP/SDK setup it requires — commonMain is
-    // written target-agnostic (no JVM APIs) so nothing is rewritten then.
+    // Desktop (JVM) + Android. commonMain stays target-agnostic: no JVM APIs.
+    androidTarget {
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
     jvm()
 
     sourceSets {
@@ -23,6 +29,21 @@ kotlin {
         }
         // NOTE: NewPipeExtractor scopes its deps to runtime — declare compile-
         // time needs explicitly if common/jvm code references them directly.
+    }
+}
+
+android {
+    namespace = "dev.dhun.shared"
+    compileSdk = 35
+    defaultConfig {
+        minSdk = 26
+    }
+    lint {
+        abortOnError = false
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 

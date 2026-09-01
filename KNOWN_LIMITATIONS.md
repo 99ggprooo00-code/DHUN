@@ -21,3 +21,9 @@ Updated every phase. Nothing hidden.
   classification routes them by browseId prefix (harmless, refined later).
 - The shared module currently builds the JVM target only; the Android target
   (same commonMain sources) is added with the AGP/SDK setup in Phase 03.
+- Android: harness UI is a throwaway Compose screen (replaced in Phase 06+);
+  app icon is a framework placeholder until the design phase.
+- Android: stream resolution is the own-client only (ADR-001). On networks
+  where YouTube gates WEB_REMIX player calls, playback shows a typed
+  "needs signed-in session" error instead of audio until upstream engines
+  are drill-green.

@@ -24,13 +24,18 @@ Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 GPL-3.0 — required for legitimate reuse of the ecosystem's maintained
 extractors (NewPipe Extractor is GPL-3.0). See THIRD_PARTY.md.
 
-## Build (once Phase 03 lands — until then the plan is the deliverable)
+## Build (real, as of Phase 03)
+
+Requires JDK 17 and an Android SDK (`ANDROID_HOME`).
 
 ```bash
-./gradlew :app-android:assembleDebug     # Android
-./gradlew :app-desktop:packageDistributionForCurrentOS  # Desktop installers
-./gradlew :tools:playback-probe:run      # extraction spike CLI
+./gradlew :app-android:assembleDebug   # Android debug APK
+./gradlew :shared:jvmTest              # domain + parser + queue unit tests
+./gradlew :tools:playback-probe:run    # extraction probe (needs PYTHONPATH w/ yt-dlp for the resolve step)
+./gradlew :tools:playback-probe:run -PmainClass=dev.dhun.tools.smoke.SmokeMainKt  # live provider smoke
 ```
+
+APK output: `app-android/build/outputs/apk/debug/app-android-debug.apk`
 
 ## Repo map
 
