@@ -2,7 +2,7 @@
 
 | # | Phase | Status | Verification evidence |
 |---|-------|--------|----------------------|
-| 01 | Extraction spike (probe CLI: search→resolve→audible audio) | ⬜ not started | — |
+| 01 | Extraction spike | 🟨 IN PROGRESS — metadata path verified live (search 200/20 items, radio 200/50 tracks); stream-resolution probe next | docs/research/01-extraction-spike.md + tests/fixtures/|
 | 02 | Provider & domain core (entities, InnerTube metadata client, StreamResolver, QueueManager) | ⬜ not started | — |
 | 03 | Android skeleton + Media3 playback + lock screen | ⬜ not started | — |
 | 04 | Desktop skeleton + vlcj playback | ⬜ not started | — |
