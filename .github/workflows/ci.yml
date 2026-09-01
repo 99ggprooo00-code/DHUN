@@ -17,7 +17,7 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Unit tests (shared domain: queue, parsers, resolvers)
+      - name: "Unit tests — shared domain (queue, parsers, resolvers)"
         run: ./gradlew :shared:jvmTest --no-daemon
 
       - name: Android debug build
