@@ -37,6 +37,13 @@ Requires JDK 17 and an Android SDK (`ANDROID_HOME`).
 
 APK output: `app-android/build/outputs/apk/debug/app-android-debug.apk`
 
+## Test builds policy
+
+ONE rolling test release exists — tag `test`, asset `dhun-test.apk`,
+auto-replaced on every push to main. No versioned releases for unfinished
+builds; nothing in Releases is stable or store-ready. Install test builds
+only on devices where that is acceptable (not your daily phone).
+
 ## Repo map
 
 - `MASTER_PROMPT.md` — the 14-phase engineering plan (the contract)
