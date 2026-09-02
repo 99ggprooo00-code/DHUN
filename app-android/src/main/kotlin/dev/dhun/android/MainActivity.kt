@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -91,6 +92,10 @@ class MainActivity : ComponentActivity() {
         connectWithFallback()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
+                // Music-app back behavior: BACK from any screen sends the app
+                // to the background with playback alive (service keeps
+                // playing) instead of finishing the activity.
+                BackHandler { moveTaskToBack(true) }
                 val ui by connectState.collectAsState()
                 when (val s = ui) {
                     is ConnectUi.Connecting -> ConnectingScreen(

@@ -4,7 +4,7 @@
 |---|-------|--------|----------------------|
 | 01 | Extraction spike | ✅ CODE COMPLETE — probe PASS end-to-end (search 20 + resolve + audio bytes verified + related 50); NewPipe v0.26.5 broken upstream -> ADR-001 two-tier resolver; on-device audible check rides Phase 03 | docs/research/01-extraction-spike.md · docs/verification/01-extraction-spike.md · ADR-001 |
 | 02 | Provider & domain core | ✅ CODE COMPLETE — 34/34 unit tests (fixtures, queue, failover); live smoke PASS (all filters, suggestions, radio 50, lyrics 27 lines, stream via yt-dlp failover) | docs/verification/02-provider-core.md |
-| 03 | Android skeleton + Media3 playback + lock screen | 🟨 CODE COMPLETE — APK builds (15.4MB), manifest+service verified, 34/34 tests; ON-DEVICE audible check pending (APK: /dhun-debug.apk) | docs/verification/03-android-skeleton.md |
+| 03 | Android skeleton + Media3 playback + lock screen | 🟨 CODE COMPLETE — APK builds, manifest+service verified, unit tests green; ON-DEVICE: v0.1.3 installs, search works live; playback blocked by WEB_REMIX-only /player → v0.1.4 adds WEB_REMIX→VISIONOS→TVHTML5 resolver chain, stable test signing, richer on-device error evidence + BACK=moveTaskToBack | docs/verification/03-android-skeleton.md |
 | 04 | Desktop skeleton + vlcj playback | ⬜ not started | — |
 | 05 | Data layer (SQLDelight, repositories, use cases) | ⬜ not started | — |
 | 06 | Design system (tokens, GlassCard, artwork colors, catalogue) | ⬜ not started | — |

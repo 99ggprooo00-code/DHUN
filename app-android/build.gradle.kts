@@ -12,11 +12,35 @@ android {
         applicationId = "dev.dhun.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
+    }
+
+    signingConfigs {
+        // Stable signing for debug/test builds.
+        //
+        // WHY: with no explicit config, AGP signs debug builds with a
+        // per-machine ~/.android/debug.keystore. CI runners are ephemeral, so
+        // every CI-built dhun-test.apk had a DIFFERENT signature and Android
+        // refused updates over an existing install ("package conflicts with an
+        // existing package"). This committed key makes all debug/test builds —
+        // CI or local — share one signature so updates install cleanly.
+        //
+        // It is a PUBLIC throwaway test key (passwords 'android', repo is
+        // public, test builds only). Real release signing is Phase 14
+        // (see ROADMAP.md); .gitignore keeps real *.jks/*.keystore out.
+        create("testBuild") {
+            storeFile = file("keystores/dhun-test.p12")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("testBuild")
+        }
         release {
             isMinifyEnabled = false
         }

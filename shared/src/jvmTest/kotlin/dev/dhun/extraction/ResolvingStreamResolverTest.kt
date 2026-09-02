@@ -35,7 +35,7 @@ class ResolvingStreamResolverTest {
 
     @Test
     fun primaryFailureFallsBack() = kotlinx.coroutines.runBlocking {
-        val primary = FakeResolver("primary") { fail(DhunError.AuthRequired) }
+        val primary = FakeResolver("primary") { fail(DhunError.AuthRequired()) }
         val fallback = FakeResolver("fallback") { ok("v2") }
         val r = ResolvingStreamResolver(primary, fallback).resolve("vid")
         assertTrue(r is DhunResult.Success)
@@ -45,7 +45,7 @@ class ResolvingStreamResolverTest {
 
     @Test
     fun doubleFailureReportsPrimaryError() = kotlinx.coroutines.runBlocking {
-        val primary = FakeResolver("primary") { fail(DhunError.AuthRequired) }
+        val primary = FakeResolver("primary") { fail(DhunError.AuthRequired()) }
         val fallback = FakeResolver("fallback") { fail(DhunError.Unknown("fallback died")) }
         val r = ResolvingStreamResolver(primary, fallback).resolve("vid")
         assertTrue(r is DhunResult.Failure)

@@ -63,3 +63,45 @@ docs/verification/01-extraction-spike.md.
   doctrine says not to do. It is limited to one endpoint, kept tiny, and
   loses its job the moment a maintained engine (NewPipe fixed, or yt-dlp
   via any future in-JVM story) tests healthy on Android.
+
+## Addendum — 2026-09-02 (v0.1.4): own-client /player identity chain
+
+**Context:** First real-device test (Android 14+ phone, residential IP):
+InnerTube search/browse via WEB_REMIX worked (metadata), but every
+/playback failed with a generic ExoPlayer "Source error". Root causes
+identified in code review:
+
+1. The own-client resolver implemented in Phase 02 used WEB_REMIX for
+   `/player` only — but the web-music client demands sign-in / PO token
+   for streaming on most networks. The ADR's original intent ("implement
+   the resolver using the client shape yt-dlp currently rides —
+   vision_platform") was never carried into the code.
+2. When formats arrive ciphered/withheld, the parser crashed with a bare
+   `require()` and the UI surfaced only "Source error" — the per-client
+   evidence was discarded.
+
+**Decision:**
+
+- `OwnClientStreamResolver` now runs a 3-identity chain, in order:
+  `WEB_REMIX` (cheap, sometimes enough) → `VISIONOS` (Phase-01 spike R5:
+  tokenless even from a flagged datacenter IP; yt-dlp master 2026-08 lists
+  it with the DEFAULT not-required GVS PO-token policy) → `TVHTML5`
+  (spike R3: gated from datacenter, fine from residential). Shapes copied
+  verbatim from yt-dlp master `INNERTUBE_CLIENTS` (VISIONOS 1.02 / id 101,
+  TVHTML5 7.20260707.07.00 / id 7), pinned — the rot drill watches them.
+  ANDROID/IOS identities are deliberately NOT used: yt-dlp master marks
+  both as PO-token-required for GVS streams.
+- Still no URL signing, no challenge deciphering, no attestation spoofing.
+  If every identity is gated, the resolver returns one typed error whose
+  `detail` names each identity's outcome (`web_remix=AUTH_REQUIRED(…);
+  visionos=PARSE(…); tv=…`) — surfaced on the diagnostics harness screen
+  and in logcat (tag `DHUN`), never in the final Phase-06 UI.
+- Parser: prefers audio-only adaptive formats with direct URLs, falls
+  back to progressive muxed formats (itag-18-style; ExoPlayer plays the
+  audio track), and types the remaining failure cases distinctly
+  (no-formats / all-ciphered / no-audio-capable).
+
+**Consequences:** stream resolution now matches the ADR's original
+two-tier intent with a maintenance-cheap lever (edit the identity list)
+instead of an engine dependency on Android. The chain order is evidence-
+driven and may be reordered by future drill results.

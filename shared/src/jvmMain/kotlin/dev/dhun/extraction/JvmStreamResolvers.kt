@@ -52,7 +52,7 @@ class YtDlpStreamResolver(
                     val message = stderr.lineSequence().lastOrNull { it.isNotBlank() } ?: ""
                     return@withContext DhunResult.Failure(
                         when {
-                            message.contains("Sign in to confirm", ignoreCase = true) -> DhunError.AuthRequired
+                            message.contains("Sign in to confirm", ignoreCase = true) -> DhunError.AuthRequired()
                             message.contains("Video unavailable", ignoreCase = true) -> DhunError.Unavailable
                             else -> DhunError.Unknown(message.take(200))
                         }

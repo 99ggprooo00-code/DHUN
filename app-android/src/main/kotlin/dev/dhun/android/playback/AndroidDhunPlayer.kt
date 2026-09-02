@@ -126,8 +126,11 @@ class AndroidDhunPlayer(
         _queue.value = (0 until player.mediaItemCount)
             .mapNotNull { trackOf(player.getMediaItemAt(it)) }
         _state.value = when {
-            player.playerError != null ->
-                PlaybackState.Error(track, player.playerError?.message ?: "Playback error")
+            player.playerError != null -> {
+                val message = player.playerError?.let { describeErrorChain(it) } ?: "Playback error"
+                android.util.Log.e("DHUN", "playback error: $message")
+                PlaybackState.Error(track, message)
+            }
             player.isPlaying -> PlaybackState.Playing(track ?: UNKNOWN)
             player.playbackState == Player.STATE_BUFFERING ->
                 PlaybackState.Buffering(track ?: UNKNOWN)
@@ -135,6 +138,28 @@ class AndroidDhunPlayer(
                 PlaybackState.Paused(track ?: UNKNOWN)
             else -> PlaybackState.Idle
         }
+    }
+
+    /**
+     * Diagnostics harness helper: renders the FULL error chain, not just
+     * ExoPlayer's generic "Source error". The resolver deliberately puts
+     * per-client evidence (web_remix=…; android=…) into its exception, and
+     * this is what surfaces it on screen when playback fails on a device.
+     */
+    private fun describeErrorChain(error: PlaybackException): String {
+        val parts = mutableListOf(
+            (if (error.errorCodeName.isNotBlank()) error.errorCodeName + " " else "") +
+                error.javaClass.simpleName,
+        )
+        var cause: Throwable? = error
+        var depth = 0
+        while (cause != null && depth < 5) {
+            val msg = cause.message?.take(160)?.trim()
+            if (!msg.isNullOrEmpty()) parts.add(msg)
+            cause = cause.cause
+            depth++
+        }
+        return parts.joinToString(" ← ").take(400)
     }
 
     private fun trackOf(item: MediaItem?): Track? {

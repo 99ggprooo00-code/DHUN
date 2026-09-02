@@ -1,6 +1,7 @@
 package dev.dhun.extraction
 
 import dev.dhun.core.DhunError
+import dev.dhun.core.DhunException
 import dev.dhun.core.getOrNull
 import dev.dhun.core.DhunResult
 import dev.dhun.core.StreamInfo
@@ -35,6 +36,9 @@ class OwnClientStreamResolverTest {
 
     private fun formatsJson(vararg entries: String) =
         "{\"streamingData\":{\"adaptiveFormats\":[" + entries.joinToString(",") + "]}}"
+
+    private fun progressiveJson(vararg entries: String) =
+        "{\"streamingData\":{\"formats\":[" + entries.joinToString(",") + "]}}"
 
     /** YouTube-style mime value WITH embedded quotes: codecs="opus" */
     private fun youtubeMime(container: String, codec: String): String =
@@ -98,7 +102,71 @@ class OwnClientStreamResolverTest {
             parseStreamInfo("v", root(formatsJson(audioFormat(500, "video/mp4"))))
         }
         assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        val e = result.exceptionOrNull()
+        assertTrue(e is DhunException)
+        assertTrue((e as DhunException).error is DhunError.Parse)
+    }
+
+    // ---- v0.1.4: progressive fallback + ciphered/protected responses ----
+
+    @Test
+    fun progressiveMuxedFallbackWhenAdaptiveHasNoUrls() {
+        val muxed = "{\"itag\":18,\"mimeType\":\"" +
+            youtubeMime("video/mp4", "avc1.42001E, mp4a.40.2") +
+            "\",\"bitrate\":400000,\"url\":\"https://gvs.example/stream?itag=18\"}"
+        // adaptive audio exists but has no direct url; muxed progressive carries audio
+        val json = "{\"streamingData\":{" +
+            "\"adaptiveFormats\":[" + audioFormat(129, "audio/webm", withUrl = false) + "]," +
+            "\"formats\":[" + muxed + "]}}"
+        val info = parseStreamInfo("v", root(json))
+        assertEquals("video/mp4", info.mimeType)
+        assertTrue(info.audioUrl.endsWith("itag=18"))
+    }
+
+    @Test
+    fun cipheredOnlyResponseIsTypedAsProtected() {
+        val ciphered = "{\"itag\":140,\"mimeType\":\"audio/mp4; codecs=\\\"mp4a.40.2\\\"\"," +
+            "\"signatureCipher\":\"s=AAA&url=https%3A%2F%2Fprotected\",\"bitrate\":129000}"
+        val result = runCatching { parseStreamInfo("v", root(formatsJson(ciphered))) }
+        assertTrue(result.isFailure)
+        val e = result.exceptionOrNull() as DhunException
+        val detail = (e.error as DhunError.Parse).detail ?: ""
+        assertTrue(detail.contains("lack direct urls"), "detail was: $detail")
+    }
+
+    @Test
+    fun emptyStreamingDataIsTypedAsEmpty() {
+        val result = runCatching { parseStreamInfo("v", root("{\"streamingData\":{}}")) }
+        assertTrue(result.isFailure)
+        val e = result.exceptionOrNull() as DhunException
+        val detail = (e.error as DhunError.Parse).detail ?: ""
+        assertTrue(detail.contains("no formats"), "detail was: $detail")
+    }
+
+    @Test
+    fun aggregatePrefersActionableTypeAndCarriesSummary() {
+        val aggregated = aggregateResolveFailures(
+            linkedMapOf(
+                "web_remix" to DhunError.AuthRequired("Sign in to confirm you're not a bot"),
+                "visionos" to DhunError.Parse("all 8 formats lack direct urls (ciphered/protected response)"),
+            ),
+        )
+        val error = aggregated as DhunError.AuthRequired
+        val detail = error.detail ?: ""
+        assertTrue(detail.contains("web_remix=AUTH_REQUIRED"), "detail was: $detail")
+        assertTrue(detail.contains("visionos=PARSE"), "detail was: $detail")
+    }
+
+    @Test
+    fun aggregateAllParseErrorsStaysParse() {
+        val aggregated = aggregateResolveFailures(
+            linkedMapOf(
+                "web_remix" to DhunError.Parse("a"),
+                "visionos" to DhunError.Parse("b"),
+            ),
+        )
+        assertTrue(aggregated is DhunError.Parse)
+        assertTrue((aggregated as DhunError.Parse).detail!!.contains("visionos"))
     }
 
     @Test
@@ -107,7 +175,7 @@ class OwnClientStreamResolverTest {
             StreamInfo("id", "url", "audio/webm", 128)
         )
         assertEquals("url", ok.getOrNull()?.audioUrl)
-        val bad: DhunResult<StreamInfo> = DhunResult.Failure(DhunError.AuthRequired)
+        val bad: DhunResult<StreamInfo> = DhunResult.Failure(DhunError.AuthRequired())
         assertNull(bad.getOrNull())
         assertEquals(
             "This content needs a signed-in session.",
