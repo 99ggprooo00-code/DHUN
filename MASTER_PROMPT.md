@@ -5,6 +5,9 @@
 > Summary of what changed: 30 phases → 14 · 3 platforms → 2 (Web deferred) ·
 > hand-rolled InnerTube extraction → maintained extractors + daily rot drill ·
 > docs-first → code-first · license ambiguity → GPL-3.0.
+> The full audit of the original 30-phase prompt set and the rewritten,
+> fully-detailed phase-by-phase prompts live in
+> [PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md).
 
 ---
 
