@@ -41,6 +41,8 @@ jobs:
           # one-time cleanup: remove the historical dev-v* releases and tags
           gh release delete dev-v0.1.0 --yes --cleanup-tag || true
           gh release delete dev-v0.1.1 --yes --cleanup-tag || true
+          gh release delete dev --yes --cleanup-tag || true
+          git push origin :refs/tags/dev || true
           # rolling slot: always exactly one
           gh release delete test --yes --cleanup-tag || true
           git push origin :refs/tags/test || true
