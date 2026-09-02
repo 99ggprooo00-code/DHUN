@@ -33,6 +33,8 @@ Requires JDK 17 and an Android SDK (`ANDROID_HOME`).
 ./gradlew :shared:jvmTest              # domain + parser + queue unit tests
 ./gradlew :tools:playback-probe:run    # extraction probe (needs PYTHONPATH w/ yt-dlp for the resolve step)
 ./gradlew :tools:playback-probe:run -PmainClass=dev.dhun.tools.smoke.SmokeMainKt  # live provider smoke
+# Desktop (Phase 04): first uncomment include(":app-desktop") in settings.gradle.kts
+./gradlew :app-desktop:run             # desktop app (needs libVLC + yt-dlp; see KNOWN_LIMITATIONS.md)
 ```
 
 APK output: `app-android/build/outputs/apk/debug/app-android-debug.apk`

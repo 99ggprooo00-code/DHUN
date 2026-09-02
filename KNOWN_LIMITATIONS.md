@@ -27,3 +27,12 @@ Updated every phase. Nothing hidden.
   where YouTube gates WEB_REMIX player calls, playback shows a typed
   "needs signed-in session" error instead of audio until upstream engines
   are drill-green.
+- Desktop (Phase 04): module code is committed but CI-opt-in —
+  `include(":app-desktop")` is commented in settings.gradle.kts pending a
+  toolchain fix; applying a second Kotlin Gradle plugin flavor (kotlin
+  "jvm" or org.jetbrains.compose) alongside :shared's kotlin
+  "multiplatform" breaks Gradle configuration of every task in this repo's
+  CI (full bisection evidence: docs/verification/04-desktop.md). Runs
+  locally via `./gradlew :app-desktop:run` after uncommenting.
+- Desktop (Phase 04) runtime needs a system libVLC install and `yt-dlp` on
+  PATH (streams resolve own-client first, yt-dlp failover — ADR-001).
