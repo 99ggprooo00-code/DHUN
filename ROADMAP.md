@@ -1,5 +1,8 @@
 # ROADMAP — live status
 
+> Operational phase-by-phase prompts (audit + rewritten sequence):
+> [PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md).
+
 | # | Phase | Status | Verification evidence |
 |---|-------|--------|----------------------|
 | 01 | Extraction spike | ✅ CODE COMPLETE — probe PASS end-to-end (search 20 + resolve + audio bytes verified + related 50); NewPipe v0.26.5 broken upstream -> ADR-001 two-tier resolver; on-device audible check rides Phase 03 | docs/research/01-extraction-spike.md · docs/verification/01-extraction-spike.md · ADR-001 |

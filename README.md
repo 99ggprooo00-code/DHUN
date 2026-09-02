@@ -47,6 +47,7 @@ only on devices where that is acceptable (not your daily phone).
 ## Repo map
 
 - `MASTER_PROMPT.md` — the 14-phase engineering plan (the contract)
+- `PROMPT_SEQUENCE.md` — audit of the original 30-phase prompt set + the rewritten phase-by-phase prompts
 - `PROBLEMS_AND_FIXES.md` — audit of the original plan + evidence
 - `RISK_REGISTER.md` — what will go wrong and the pre-agreed responses
 - `ROADMAP.md` — live phase status
