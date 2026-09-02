@@ -75,6 +75,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private val connectState = MutableStateFlow<ConnectUi>(ConnectUi.Connecting)
+    private val connectLog = MutableStateFlow<List<String>>(emptyList())
+
+    private fun logLine(line: String) {
+        connectLog.value = connectLog.value + line
+        Log.i(TAG, line)
+    }
 
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -87,7 +93,10 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 val ui by connectState.collectAsState()
                 when (val s = ui) {
-                    is ConnectUi.Connecting -> ConnectingScreen()
+                    is ConnectUi.Connecting -> ConnectingScreen(
+                        log = connectLog.collectAsState().value,
+                        version = appVersionName(),
+                    )
                     is ConnectUi.Ready -> androidx.compose.foundation.layout.Box(
                         modifier = Modifier.fillMaxSize(),
                     ) {
@@ -136,7 +145,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private suspend fun attemptControllerConnect(attempt: Int) {
-        Log.i(TAG, "controller connect attempt $attempt")
+        logLine("attempt $attempt: connecting to playback service…")
         var future: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
         try {
             val token = SessionToken(this, ComponentName(this, DhunPlaybackService::class.java))
@@ -147,10 +156,14 @@ class MainActivity : ComponentActivity() {
             }
             attach(AndroidDhunPlayer(controller, activityScope))
             connectState.value = ConnectUi.Ready(reason = null)
-            Log.i(TAG, "controller connected")
+            logLine("connected to playback service")
             return
         } catch (t: Throwable) {
             runCatching { future?.let { MediaController.releaseFuture(it) } }
+            logLine(
+                "attempt $attempt failed: " + (t.javaClass.simpleName) +
+                    ((t.message?.take(90))?.let { ": $it" } ?: "")
+            )
             Log.w(TAG, "controller connect attempt $attempt failed", t)
             if (attempt < MAX_CONNECT_ATTEMPTS) {
                 delay(1_500L * attempt)
@@ -161,15 +174,18 @@ class MainActivity : ComponentActivity() {
             // lock-screen controls degraded). Any construction error lands
             // in the same catch below.
             try {
+                logLine("starting LOCAL fallback player…")
                 val cache = GlobalContext.get().get<dev.dhun.android.playback.DhunStreamCache>()
                 val local = PlaybackGraph.buildExoPlayer(applicationContext, cache)
                 attach(AndroidDhunPlayer(local, activityScope))
+                logLine("local player ready — audio will play; session controls degraded")
                 connectState.value = ConnectUi.Ready(
                     reason = "Background/media-session controls unavailable on this device " +
                         "(${t.javaClass.simpleName}); playing in local mode.",
                 )
                 Log.w(TAG, "session-less fallback active")
             } catch (t2: Throwable) {
+                logLine("LOCAL player also failed: " + t2.javaClass.simpleName + ": " + (t2.message?.take(90) ?: ""))
                 Log.e(TAG, "all playback paths failed", t2)
                 connectState.value = ConnectUi.Failed(
                     t2.toDhunStyleMessage().ifBlank { t2.javaClass.simpleName },
@@ -185,6 +201,12 @@ class MainActivity : ComponentActivity() {
 
     private fun Throwable.toDhunStyleMessage(): String =
         message?.take(200) ?: ""
+
+    private fun appVersionName(): String = try {
+        packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
+    } catch (_: Exception) {
+        "?"
+    }
 
     /* ---------------- permissions ---------------- */
 
@@ -206,14 +228,34 @@ class MainActivity : ComponentActivity() {
 /* ---------------- screens ---------------- */
 
 @Composable
-private fun ConnectingScreen() {
+private fun ConnectingScreen(log: List<String>, version: String) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("DHUN", fontSize = 30.sp, fontWeight = FontWeight.Bold)
-        Text("connecting to the playback service…", color = Color(0xFF888888))
+        Text(
+            "starting playback engine… (v$version)",
+            fontSize = 12.sp,
+            color = Color(0xFF888888),
+        )
+        if (log.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .padding(top = 20.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                log.takeLast(8).forEach { line ->
+                    Text(
+                        "· " + line,
+                        fontSize = 11.sp,
+                        color = Color(0xFFBBBBBB),
+                    )
+                }
+            }
+        }
     }
 }
 
