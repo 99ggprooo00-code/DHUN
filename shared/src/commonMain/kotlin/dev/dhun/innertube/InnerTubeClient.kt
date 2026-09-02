@@ -58,12 +58,17 @@ internal fun HttpRequestBuilder.browserHeaders() {
 
 /**
  * DHUN's own InnerTube client — METADATA ONLY (search / suggestions /
- * related / lyrics browse / player-response parsing for the own-client
- * resolver). Per the extraction doctrine and ADR-001: this client never
- * signs URLs and never pretends to be a native device client.
+ * related / lyrics browse) plus RAW PLAYER RESPONSES for the own-client
+ * resolver. Per the extraction doctrine and ADR-001: this client never
+ * signs URLs, never deciphers challenges, never spoofs attestation. It
+ * speaks a small, drill-watched set of InnerTube client identities
+ * (WEB_REMIX for metadata; WEB_REMIX + VISIONOS + TVHTML5 for /player) —
+ * the client identity list is maintenance surface, deliberately explicit.
  *
- * The client version is scraped fresh from the music.youtube.com homepage
- * HTML — the exact discovery step NewPipeExtractor v0.26.5 got wrong.
+ * The WEB_REMIX client version is scraped fresh from the music.youtube.com
+ * homepage HTML — the exact discovery step NewPipeExtractor v0.26.5 got
+ * wrong. The alternate identities use pinned shapes copied from yt-dlp
+ * master (versions rotate slowly; the rot drill watches them).
  */
 class InnerTubeClient(
     private val httpClient: HttpClient = defaultHttpClient(),
@@ -136,7 +141,8 @@ class InnerTubeClient(
             )
         }
 
-    /** Raw player response for [dev.dhun.extraction.OwnClientStreamResolver]. */
+    /** Raw player response as WEB_REMIX (music.youtube.com) for the
+     *  own-client resolver. */
     suspend fun playerResponse(videoId: String): DhunResult<JsonObject> =
         resultify {
             val root = postJson("player", buildJsonObject {
@@ -145,17 +151,97 @@ class InnerTubeClient(
                 put("contentCheckOk", true)
                 put("racyCheckOk", true)
             })
-            when (root.obj("playabilityStatus").str("status")) {
-                "OK", "LIVE_STREAM_OFFLINE" -> root
-                "LOGIN_REQUIRED" -> throw DhunException(DhunError.AuthRequired)
-                "UNPLAYABLE", "ERROR" -> throw DhunException(DhunError.Unavailable)
-                else -> throw DhunException(
-                    DhunError.Parse("playabilityStatus=${root.obj("playabilityStatus").str("status")}")
-                )
-            }
+            checkPlayability(root)
+        }
+
+    /**
+     * Raw player response under an ALTERNATE InnerTube client identity
+     * (see [AltInnertubeClient]) — VISIONOS / TVHTML5 have different, laxer
+     * bot-gating profiles than web clients and no PO-token requirement
+     * (per yt-dlp master 2026-08 policies). Fallback strategies of the
+     * own-client chain (ADR-001 addendum 2026-09-02).
+     */
+    suspend fun altPlayerResponse(
+        videoId: String,
+        alt: AltInnertubeClient,
+    ): DhunResult<JsonObject> =
+        resultify {
+            val root = postAltJson("player", buildJsonObject {
+                put("context", altContext(alt))
+                put("videoId", videoId)
+                put("contentCheckOk", true)
+                put("racyCheckOk", true)
+            }, alt)
+            checkPlayability(root)
         }
 
     /* ---------------- internals ------------------------------------------ */
+
+    /** Classifies playabilityStatus, keeping YouTube's own `reason` text —
+     *  it is the single most useful on-device diagnostic ("Sign in to
+     *  confirm you're not a bot" etc). */
+    private fun checkPlayability(root: JsonObject): JsonObject {
+        val status = root.obj("playabilityStatus").str("status")
+        val reason = root.obj("playabilityStatus").str("reason")?.take(120)
+        return when (status) {
+            "OK", "LIVE_STREAM_OFFLINE" -> root
+            "LOGIN_REQUIRED" -> throw DhunException(DhunError.AuthRequired(reason))
+            "UNPLAYABLE", "ERROR" -> throw DhunException(DhunError.Unavailable)
+            else -> throw DhunException(
+                DhunError.Parse("playabilityStatus=$status${reason?.let { " ($it)" } ?: ""}")
+            )
+        }
+    }
+
+    private fun altContext(alt: AltInnertubeClient): JsonObject = buildJsonObject {
+        putJsonObject("client") {
+            put("clientName", alt.name)
+            put("clientVersion", alt.version)
+            put("hl", "en")
+            put("gl", country)
+            alt.contextExtras.forEach { (key, value) -> put(key, value) }
+        }
+    }
+
+    /** POST under an alternate client identity. No version scrape (pinned
+     *  shapes), fewer retries — these are FALLBACK strategies, not primary. */
+    private suspend fun postAltJson(
+        endpoint: String,
+        body: JsonObject,
+        alt: AltInnertubeClient,
+    ): JsonObject {
+        var lastError: DhunError = DhunError.Network
+        repeat(ALT_MAX_ATTEMPTS) { attempt ->
+            if (attempt > 0) delay(backoffMillis(attempt, lastError))
+            try {
+                val response = httpClient.post("$WWW_BASE/youtubei/v1/$endpoint?prettyPrint=false") {
+                    headers {
+                        append(HttpHeaders.UserAgent, alt.userAgent)
+                        append(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9")
+                        append("X-YouTube-Client-Name", alt.headerId)
+                        append("X-YouTube-Client-Version", alt.version)
+                        append(HttpHeaders.ContentType, "application/json")
+                    }
+                    timeout { requestTimeoutMillis = 12_000 }
+                    setBody(body.toString())
+                }
+                val code = response.status.value
+                when {
+                    code == 429 -> lastError = DhunError.RateLimited()
+                    code in 500..599 -> lastError = DhunError.Network
+                    code != 200 -> throw DhunException(DhunError.Parse("HTTP $code from ${alt.label} /$endpoint"))
+                    else -> return Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: DhunException) {
+                throw e
+            } catch (t: Throwable) {
+                lastError = classify(t)
+            }
+        }
+        throw DhunException(lastError)
+    }
 
     private fun context(): JsonObject = buildJsonObject {
         putJsonObject("client") {
@@ -227,9 +313,50 @@ class InnerTubeClient(
 
     companion object {
         const val MUSIC_BASE = "https://music.youtube.com"
+        const val WWW_BASE = "https://www.youtube.com"
         const val CLIENT_NAME_WEB_REMIX = "67"
         const val CLIENT_VERSION_FALLBACK = "1.20250310.01.00"
         private const val MAX_ATTEMPTS = 3
+        private const val ALT_MAX_ATTEMPTS = 2
+
+        /**
+         * Alternate /player identities, shapes copied verbatim from yt-dlp
+         * master (2026-08) `INNERTUBE_CLIENTS`. Both have the DEFAULT (i.e.
+         * not-required) GVS PO-token policy there — the property that makes
+         * them tokenless-viable. Evidence for the picks: Phase-01 spike R5
+         * (VISIONOS tokenless even from a flagged datacenter IP) and R3
+         * (TVHTML5 gated from datacenter but fine from residential IPs).
+         * Pinned versions rotate slowly; the rot drill watches them.
+         */
+        val ALT_CLIENT_VISIONOS = AltInnertubeClient(
+            label = "visionos",
+            name = "VISIONOS",
+            version = "1.02",
+            headerId = "101",
+            userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) " +
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+            contextExtras = buildJsonObject {
+                put("deviceMake", "Apple")
+                put("deviceModel", "RealityDevice17,1")
+                put("osName", "visionOS")
+                put("osVersion", "26.5.23O471")
+                put(
+                    "userAgent",
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) " +
+                        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+                )
+            },
+        )
+
+        val ALT_CLIENT_TV = AltInnertubeClient(
+            label = "tv",
+            name = "TVHTML5",
+            version = "7.20260707.07.00",
+            headerId = "7",
+            userAgent = "Mozilla/5.0 (ChromiumStylePlatform) " +
+                "Cobalt/25.lts.30.1034943-gold (unlike Gecko), " +
+                "Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)",
+        )
 
         fun defaultHttpClient(): HttpClient = HttpClient(CIO) {
             expectSuccess = false
@@ -240,3 +367,13 @@ class InnerTubeClient(
         }
     }
 }
+
+/** An alternate InnerTube client identity for /player calls. */
+class AltInnertubeClient(
+    val label: String,
+    internal val name: String,
+    internal val version: String,
+    internal val headerId: String,
+    internal val userAgent: String,
+    internal val contextExtras: JsonObject = JsonObject(emptyMap()),
+)

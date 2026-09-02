@@ -40,8 +40,10 @@ sealed interface DhunError {
     /** HTTP 429 — global backoff required. */
     data class RateLimited(val retryAfterSeconds: Int? = null) : DhunError
 
-    /** Bot-gating / sign-in required for this action. */
-    data object AuthRequired : DhunError
+    /** Bot-gating / sign-in required for this action. [detail] carries the
+     *  per-attempt evidence (which InnerTube client, what YouTube said) —
+     *  logged and shown on the diagnostics harness screen, never in final UI. */
+    data class AuthRequired(val detail: String? = null) : DhunError
 
     data class Unknown(val causeMessage: String? = null) : DhunError
 }
@@ -54,6 +56,15 @@ fun DhunError.toUserMessage(): String = when (this) {
     is DhunError.RateLimited -> "Too many requests. Waiting a moment before retrying…"
     is DhunError.AuthRequired -> "This content needs a signed-in session."
     is DhunError.Unknown -> "Something went wrong. Try again."
+}
+
+/** Technical companion to [toUserMessage] for logs and diagnostics screens. */
+fun DhunError.detailString(): String? = when (this) {
+    is DhunError.Parse -> detail
+    is DhunError.AuthRequired -> detail
+    is DhunError.RateLimited -> "retryAfter=${retryAfterSeconds ?: "?"}s"
+    is DhunError.Unknown -> causeMessage
+    DhunError.Network, DhunError.Unavailable -> null
 }
 
 /** Thrown by internals; carries the taxonomy value. */
