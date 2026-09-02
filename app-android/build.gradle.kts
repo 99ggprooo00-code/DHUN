@@ -12,8 +12,8 @@ android {
         applicationId = "dev.dhun.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
     }
 
     buildTypes {
@@ -57,6 +57,7 @@ dependencies {
 
     implementation("io.insert-koin:koin-android:4.0.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.10.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

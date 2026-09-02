@@ -5,7 +5,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.session.MediaController
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
@@ -27,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
  * projects controller events into StateFlows for Compose.
  */
 class AndroidDhunPlayer(
-    private val controller: MediaController,
+    private val player: Player,
     private val scope: CoroutineScope,
 ) : DhunPlayer {
 
@@ -50,9 +49,9 @@ class AndroidDhunPlayer(
 
     private val pollJob: Job = scope.launch {
         while (isActive) {
-            if (controller.isPlaying) {
-                _positionMs.value = controller.currentPosition.coerceAtLeast(0)
-                val d = controller.duration
+            if (player.isPlaying) {
+                _positionMs.value = player.currentPosition.coerceAtLeast(0)
+                val d = player.duration
                 if (d > 0) _durationMs.value = d
             }
             delay(500)
@@ -67,37 +66,37 @@ class AndroidDhunPlayer(
     }
 
     init {
-        controller.addListener(listener)
+        player.addListener(listener)
         refresh()
     }
 
     override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int) {
         tracks.forEach { trackMap[it.id] = it }
-        controller.setMediaItems(tracks.map { it.toMediaItem() }, startIndex, 0L)
-        controller.prepare()
-        controller.play()
+        player.setMediaItems(tracks.map { it.toMediaItem() }, startIndex, 0L)
+        player.prepare()
+        player.play()
         refresh()
     }
 
     override fun playPause() {
-        if (controller.isPlaying) controller.pause() else controller.play()
+        if (player.isPlaying) player.pause() else player.play()
     }
 
     override fun next() {
-        if (controller.hasNextMediaItem()) controller.seekToNextMediaItem()
+        if (player.hasNextMediaItem()) player.seekToNextMediaItem()
     }
 
     override fun previous() {
-        if (controller.hasPreviousMediaItem()) controller.seekToPreviousMediaItem()
+        if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem()
     }
 
     override fun seekTo(positionMs: Long) {
-        controller.seekTo(positionMs)
+        player.seekTo(positionMs)
         _positionMs.value = positionMs
     }
 
     override fun setRepeatMode(mode: RepeatMode) {
-        controller.repeatMode = when (mode) {
+        player.repeatMode = when (mode) {
             RepeatMode.OFF -> Player.REPEAT_MODE_OFF
             RepeatMode.ALL -> Player.REPEAT_MODE_ALL
             RepeatMode.ONE -> Player.REPEAT_MODE_ONE
@@ -105,34 +104,34 @@ class AndroidDhunPlayer(
     }
 
     override fun setShuffle(enabled: Boolean) {
-        controller.shuffleModeEnabled = enabled
+        player.shuffleModeEnabled = enabled
     }
 
     override fun stop() {
-        controller.stop()
+        player.stop()
         refresh()
     }
 
     fun release() {
         pollJob.cancel()
-        controller.removeListener(listener)
-        controller.release()
+        player.removeListener(listener)
+        player.release()
     }
 
     /* ---------------- internals ---------------- */
 
     private fun refresh() {
-        val track = trackOf(controller.currentMediaItem)
+        val track = trackOf(player.currentMediaItem)
         _currentTrack.value = track
-        _queue.value = (0 until controller.mediaItemCount)
-            .mapNotNull { trackOf(controller.getMediaItemAt(it)) }
+        _queue.value = (0 until player.mediaItemCount)
+            .mapNotNull { trackOf(player.getMediaItemAt(it)) }
         _state.value = when {
-            controller.playerError != null ->
-                PlaybackState.Error(track, controller.playerError?.message ?: "Playback error")
-            controller.isPlaying -> PlaybackState.Playing(track ?: UNKNOWN)
-            controller.playbackState == Player.STATE_BUFFERING ->
+            player.playerError != null ->
+                PlaybackState.Error(track, player.playerError?.message ?: "Playback error")
+            player.isPlaying -> PlaybackState.Playing(track ?: UNKNOWN)
+            player.playbackState == Player.STATE_BUFFERING ->
                 PlaybackState.Buffering(track ?: UNKNOWN)
-            controller.playbackState == Player.STATE_READY ->
+            player.playbackState == Player.STATE_READY ->
                 PlaybackState.Paused(track ?: UNKNOWN)
             else -> PlaybackState.Idle
         }
