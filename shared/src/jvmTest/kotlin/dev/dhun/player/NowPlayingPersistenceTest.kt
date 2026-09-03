@@ -36,7 +36,7 @@ class NowPlayingPersistenceTest {
         override val positionMs = MutableStateFlow(0L)
         override val durationMs = MutableStateFlow(0L)
         var repeat = RepeatMode.OFF
-        var shuffle = false
+        var shuffleOn = false
         var seeks = mutableListOf<Long>()
         var playPauseCalls = 0
 
@@ -54,7 +54,7 @@ class NowPlayingPersistenceTest {
         override fun previous() = Unit
         override fun seekTo(positionMs: Long) { seeks += positionMs; this.positionMs.value = positionMs }
         override fun setRepeatMode(mode: RepeatMode) { repeat = mode }
-        override fun setShuffle(enabled: Boolean) { shuffle = enabled }
+        override fun setShuffle(enabled: Boolean) { shuffleOn = enabled }
         override fun stop() { state.value = PlaybackState.Idle }
     }
 
