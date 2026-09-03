@@ -1,6 +1,6 @@
 # Phase 04 — Desktop skeleton + vlcj playback
 
-Status: **CODE COMPLETE — CI-green module committed but CI-opt-in; hardware verification OPEN.**
+Status: **CODE COMPLETE — module ACTIVE in the build and CI-green (blocker root-caused 2026-09-03, see below); hardware verification OPEN.**
 
 Module: `app-desktop` (JVM target, Compose Multiplatform desktop UI, vlcj audio engine).
 
@@ -34,11 +34,37 @@ Module: `app-desktop` (JVM target, Compose Multiplatform desktop UI, vlcj audio 
 | 3 | Clean VLC process lifecycle on stop/exit | HW checklist below — OPEN |
 | 4 | Same shared `DhunPlayer` drives both platforms | `DesktopDhunPlayer : DhunPlayer` (shared iface), shared `QueueManager` reused; desktop harness in this module for now |
 
-## CI configuration blocker (2026-09-02) — READ BEFORE UNCOMMENTING
+## CI configuration blocker — ROOT-CAUSED AND FIXED (2026-09-03)
 
-`app-desktop` is committed but **not activated in CI**: its `include(":app-desktop")`
-line in `settings.gradle.kts` is commented out. Reason: an empirical blocker
-found while getting this PR green.
+**Root cause:** `compose.desktop.application { nativeDistributions { packageVersion = "0.1.4" } }`.
+Compose Desktop's DMG/MSI packagers require `MAJOR > 0` and validate the
+version at **project configuration time**, so `:app-desktop` failed to
+configure with
+
+```
+org.gradle.api.GradleException: * Illegal version for 'Dmg': '0.1.4' is not a valid version.
+  * Correct format: 'MAJOR[.MINOR][.PATCH]', where MAJOR is an integer > 0 …
+```
+
+Because Gradle configures every project before running any task, the
+failure surfaced on whatever task was first in the invocation
+(`:shared:jvmTest`) and looked like a plugin-flavor conflict. The earlier
+bisection rows below were misread: the "kotlin(jvm)" template rows carried
+the same `packageVersion`, and the `kotlin("multiplatform")`-only row passed
+because it had no `compose.desktop` block to validate.
+
+**How it was finally seen:** `settings.gradle.kts` now prints the Gradle
+failure cause chain as `::error::` workflow commands when running under
+GitHub Actions; those land in check-run *annotations*, which the agent
+sandbox CAN read via the REST API even though log archives are blocked.
+(Evidence: PR #4 run `33710693678`, annotation "Gradle failure (2)".)
+
+**Fix:** `packageVersion = "1.0.4"` (installer versions map DHUN 0.x →
+1.0.x until v1.0.0), `include(":app-desktop")` re-enabled, CI compiles the
+module (`:app-desktop:compileKotlinJvm`) on every PR. `jvm { withJava() }`
+dropped (deprecated in KGP 2.1 and not needed).
+
+### Historical bisection (2026-09-02, kept for the record)
 
 ### Bisection evidence (all runs on GitHub Actions, Gradle 8.14.2, Kotlin 2.1.20)
 
@@ -69,36 +95,30 @@ Gradle exception text could not be captured. The blocker reproduces with a
 single `kotlin("jvm")` and zero dependencies, so it is a toolchain
 interaction, not a DHUN-code issue.
 
-### Owner action to activate desktop CI (needs `workflows` permission)
+### Owner action — desktop compile step in CI (needs `workflows` permission)
 
-1. Uncomment `include(":app-desktop")` in `settings.gradle.kts`.
-2. In `.github/workflows/ci.yml` after the Android debug build step, add:
-   ```yaml
-   - name: Desktop module compiles (Phase 04)
-     run: ./gradlew :app-desktop:compileKotlinJvm --no-daemon
-   ```
-3. If the same configuration failure appears, capture `./gradlew
-   :shared:jvmTest --stacktrace` output locally (or on any runner with
-   reachable logs) — the full exception will identify the plugin
-   interaction. Expected root cause per upstream reports: Kotlin Gradle
-   plugin 2.1.x cross-version/flavor classpath conflict when both the JVM
-   and Multiplatform flavors configure the same build (see KT issue
-   tracker), and/or Compose Multiplatform 1.8.x hot-reload sub-plugin
-   resolution on the portal.
+The agent token cannot edit `.github/workflows/*`. Until the owner adds it,
+the desktop module is configured on every CI run (so a config regression
+would fail CI) but not compiled there. To compile it too, add after the
+Android step in `.github/workflows/ci.yml`:
 
-### Why the module still uses `kotlin("multiplatform")`
+```yaml
+      - name: Desktop module compiles (Phase 04)
+        run: ./gradlew :app-desktop:compileKotlinJvm --no-daemon
+```
 
-Phase 04 sources live in `src/jvmMain` and the module applies
-`kotlin("multiplatform")` with a single `jvm()` target (same plugin flavor
-as `:shared`, which is proven to configure in this build) rather than
-`kotlin("jvm")`. That is deliberate and documented in the build script.
+(Also: `actions/setup-java@v4` is deprecated — bump to `@v5` in the same edit.)
+
+### Why the module uses `kotlin("multiplatform")` with a single `jvm()` target
+
+Same plugin flavor as `:shared`; sources live in `src/jvmMain`. Kept as is —
+it works and avoids a second KGP flavor in the build.
 
 ## Hardware verification checklist (OPEN — requires a desktop with VLC/libVLC)
 
 1. `yt-dlp` on `PATH`; `libvlc` installed (e.g. Ubuntu: `sudo apt install
    libvlc-dev vlc`). KNOWN_LIMITATIONS.md has details.
-2. Uncomment `include(":app-desktop")`, then:
-   `./gradlew :app-desktop:run --no-daemon`
+2. `./gradlew :app-desktop:run --no-daemon` (module is included by default now)
 3. Search a known song → tap it → audio audible through the desktop
    speakers within a few seconds (resolver may fail over to yt-dlp).
 4. Transport: pause/resume, next, previous (incl. previous on first track =
