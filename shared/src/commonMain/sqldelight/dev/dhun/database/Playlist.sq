@@ -3,7 +3,7 @@ CREATE TABLE Playlist (
     name TEXT NOT NULL,
     description TEXT,
     thumbnailUrl TEXT,
-    isLocal INTEGER AS Boolean NOT NULL DEFAULT 1,
+    isLocal INTEGER AS kotlin.Boolean NOT NULL DEFAULT 1,
     youtubePlaylistId TEXT,
     createdAt INTEGER NOT NULL,
     updatedAt INTEGER NOT NULL

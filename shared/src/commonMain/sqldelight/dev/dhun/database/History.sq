@@ -3,7 +3,7 @@ CREATE TABLE History (
     trackId TEXT NOT NULL REFERENCES Track(id),
     playedAt INTEGER NOT NULL,
     playedFromContext TEXT,
-    completedPlayback INTEGER AS Boolean NOT NULL DEFAULT 0
+    completedPlayback INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0
 );
 
 CREATE INDEX History_playedAt ON History(playedAt DESC);

@@ -7,7 +7,7 @@ CREATE TABLE Track (
     albumId TEXT,
     durationSeconds INTEGER,
     thumbnailUrl TEXT,
-    explicit INTEGER AS Boolean NOT NULL DEFAULT 0,
+    explicit INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
     cachedAt INTEGER,
     updatedAt INTEGER NOT NULL
 );
