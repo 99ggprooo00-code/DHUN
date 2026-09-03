@@ -42,3 +42,23 @@ if (System.getenv("GITHUB_ACTIONS") == "true") {
         }
     }
 }
+
+// Failing tests → annotations (name + first lines of the failure message).
+if (System.getenv("GITHUB_ACTIONS") == "true") {
+    allprojects {
+        tasks.withType<Test>().configureEach {
+            addTestListener(object : TestListener {
+                override fun beforeSuite(suite: TestDescriptor) {}
+                override fun afterSuite(suite: TestDescriptor, result: TestResult) {}
+                override fun beforeTest(testDescriptor: TestDescriptor) {}
+                override fun afterTest(desc: TestDescriptor, result: TestResult) {
+                    if (result.resultType != TestResult.ResultType.FAILURE) return
+                    val ex = result.exception
+                    val msg = (ex?.toString() ?: "failed").replace("\n", " ⏎ ").take(700)
+                    val frame = ex?.stackTrace?.firstOrNull { it.className.startsWith("dev.dhun") }
+                    println("::error title=Test failed: ${desc.className}.${desc.name}::$msg  @ ${frame ?: "?"}")
+                }
+            })
+        }
+    }
+}
