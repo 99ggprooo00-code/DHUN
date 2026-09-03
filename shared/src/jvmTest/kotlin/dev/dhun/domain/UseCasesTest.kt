@@ -123,9 +123,10 @@ class UseCasesTest {
 
     @Test
     fun recentSearchesUseCase(): Unit = runBlocking {
-        val d = data()
+        val clock = FakeClock()
+        val d = data(clock)
         val uc = RecentSearchesUseCase(d.search)
-        uc.record("queen"); uc.record("abba")
+        uc.record("queen"); clock.now += 1000; uc.record("abba")
         assertEquals(listOf("abba", "queen"), uc.observe().first())
         uc.remove("abba")
         assertEquals(listOf("queen"), uc.observe().first())
