@@ -55,7 +55,7 @@ class NowPlayingPersistence(
         if (jobs.isNotEmpty()) return
         jobs = listOf(
             scope.launch {
-                player.queue.distinctUntilChanged().collect { snapshot() }
+                player.queue.collect { snapshot() } // StateFlow is already distinct
             },
             scope.launch {
                 player.currentTrack.distinctUntilChanged { a, b -> a?.id == b?.id }.collect { onTrackChanged(it) }
