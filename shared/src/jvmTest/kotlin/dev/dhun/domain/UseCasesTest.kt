@@ -36,7 +36,7 @@ class UseCasesTest {
     private fun track(id: String) = Track(id = id, title = "T$id", artistName = "A$id")
 
     @Test
-    fun toggleFavoriteFlipsAndReports() = runBlocking {
+    fun toggleFavoriteFlipsAndReports(): Unit = runBlocking {
         val d = data()
         val toggle = ToggleFavoriteUseCase(d.library)
         val observe = ObserveFavoritesUseCase(d.library)
@@ -48,7 +48,7 @@ class UseCasesTest {
     }
 
     @Test
-    fun playlistUseCasesEnforceRules() = runBlocking {
+    fun playlistUseCasesEnforceRules(): Unit = runBlocking {
         val d = data()
         val pl = CreatePlaylistUseCase(d.playlists)("Mix")
         val add = AddToPlaylistUseCase(d.playlists)
@@ -71,7 +71,7 @@ class UseCasesTest {
     }
 
     @Test
-    fun recordPlayThenCompleteMarksOnlyThatRow() = runBlocking {
+    fun recordPlayThenCompleteMarksOnlyThatRow(): Unit = runBlocking {
         val clock = FakeClock()
         val d = data(clock)
         val record = RecordPlayUseCase(d.history)
@@ -107,7 +107,7 @@ class UseCasesTest {
     }
 
     @Test
-    fun settingsUseCasesValidateKeysAndApplyDefaults() = runBlocking {
+    fun settingsUseCasesValidateKeysAndApplyDefaults(): Unit = runBlocking {
         val d = data()
         val get = GetSettingUseCase(d.settings)
         val set = UpdateSettingUseCase(d.settings)
@@ -122,7 +122,7 @@ class UseCasesTest {
     }
 
     @Test
-    fun recentSearchesUseCase() = runBlocking {
+    fun recentSearchesUseCase(): Unit = runBlocking {
         val d = data()
         val uc = RecentSearchesUseCase(d.search)
         uc.record("queen"); uc.record("abba")
@@ -134,7 +134,7 @@ class UseCasesTest {
     }
 
     @Test
-    fun nowPlayingSaveAndRestoreHonoursResumeSetting() = runBlocking {
+    fun nowPlayingSaveAndRestoreHonoursResumeSetting(): Unit = runBlocking {
         val d = data()
         val save = SaveNowPlayingUseCase(d.nowPlaying)
         val restore = RestoreNowPlayingUseCase(d.nowPlaying, d.settings)

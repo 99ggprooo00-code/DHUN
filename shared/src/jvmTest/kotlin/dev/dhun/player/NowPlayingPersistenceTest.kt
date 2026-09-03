@@ -77,7 +77,7 @@ class NowPlayingPersistenceTest {
     }
 
     @Test
-    fun queueAndProgressArePersistedThenRestoredPaused() = runBlocking {
+    fun queueAndProgressArePersistedThenRestoredPaused(): Unit = runBlocking {
         val d = data()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
@@ -120,7 +120,7 @@ class NowPlayingPersistenceTest {
     }
 
     @Test
-    fun naturalCompletionMarksHistoryRow() = runBlocking {
+    fun naturalCompletionMarksHistoryRow(): Unit = runBlocking {
         val d = data()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
@@ -144,7 +144,7 @@ class NowPlayingPersistenceTest {
     }
 
     @Test
-    fun restoreIsNoOpWhenNothingSavedOrPlayerBusy() = runBlocking {
+    fun restoreIsNoOpWhenNothingSavedOrPlayerBusy(): Unit = runBlocking {
         val d = data()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {

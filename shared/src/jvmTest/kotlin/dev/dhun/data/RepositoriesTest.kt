@@ -31,7 +31,7 @@ class RepositoriesTest {
     /* ---------------- Track ---------------- */
 
     @Test
-    fun trackUpsertRoundTripsEveryField() = runBlocking {
+    fun trackUpsertRoundTripsEveryField(): Unit = runBlocking {
         val repo = SqlDelightTrackRepository(newDb(), FakeClock(), Dispatchers.Unconfined)
         val t = track("a1x")
         repo.save(t)
@@ -43,7 +43,7 @@ class RepositoriesTest {
     }
 
     @Test
-    fun trackObserveEmitsOnChange() = runBlocking {
+    fun trackObserveEmitsOnChange(): Unit = runBlocking {
         val repo = SqlDelightTrackRepository(newDb(), FakeClock(), Dispatchers.Unconfined)
         assertNull(repo.observe("z").first())
         repo.save(track("z"))
@@ -53,7 +53,7 @@ class RepositoriesTest {
     /* ---------------- Favorites ---------------- */
 
     @Test
-    fun favoriteAddObserveRemove() = runBlocking {
+    fun favoriteAddObserveRemove(): Unit = runBlocking {
         val db = newDb()
         val clock = FakeClock()
         val lib = SqlDelightLibraryRepository(db, clock, Dispatchers.Unconfined)
@@ -75,7 +75,7 @@ class RepositoriesTest {
     /* ---------------- Playlists ---------------- */
 
     @Test
-    fun playlistCreateAddReorderRemoveDelete() = runBlocking {
+    fun playlistCreateAddReorderRemoveDelete(): Unit = runBlocking {
         val clock = FakeClock()
         val repo = SqlDelightPlaylistRepository(newDb(), clock, Dispatchers.Unconfined, idGenerator = { "pl1" })
         val pl = repo.create("  Road trip  ")
@@ -112,7 +112,7 @@ class RepositoriesTest {
     }
 
     @Test
-    fun playlistsOrderedByMostRecentlyUpdated() = runBlocking {
+    fun playlistsOrderedByMostRecentlyUpdated(): Unit = runBlocking {
         val clock = FakeClock()
         var n = 0
         val repo = SqlDelightPlaylistRepository(newDb(), clock, Dispatchers.Unconfined, idGenerator = { "p${n++}" })
@@ -126,7 +126,7 @@ class RepositoriesTest {
     /* ---------------- History ---------------- */
 
     @Test
-    fun historyRecordsObservesAndClears() = runBlocking {
+    fun historyRecordsObservesAndClears(): Unit = runBlocking {
         val clock = FakeClock()
         val repo = SqlDelightHistoryRepository(newDb(), clock, Dispatchers.Unconfined)
         val at1 = repo.recordPlay(track("h1"), PlayContext.SEARCH); clock.tick()
@@ -153,7 +153,7 @@ class RepositoriesTest {
     }
 
     @Test
-    fun historyLimitIsRespected() = runBlocking {
+    fun historyLimitIsRespected(): Unit = runBlocking {
         val clock = FakeClock()
         val repo = SqlDelightHistoryRepository(newDb(), clock, Dispatchers.Unconfined)
         repeat(30) { repo.recordPlay(track("t$it"), PlayContext.UNKNOWN); clock.tick() }
@@ -164,7 +164,7 @@ class RepositoriesTest {
     /* ---------------- Settings ---------------- */
 
     @Test
-    fun settingsAllTypesRoundTrip() = runBlocking {
+    fun settingsAllTypesRoundTrip(): Unit = runBlocking {
         val repo = SqlDelightSettingsRepository(newDb(), Dispatchers.Unconfined)
         assertNull(repo.getString(SettingsKeys.THEME))
         assertEquals("dark", repo.getString(SettingsKeys.THEME) ?: SettingsKeys.THEME_DEFAULT)
@@ -190,7 +190,7 @@ class RepositoriesTest {
     /* ---------------- Recent searches ---------------- */
 
     @Test
-    fun recentSearchesDedupeOrderAndTrim() = runBlocking {
+    fun recentSearchesDedupeOrderAndTrim(): Unit = runBlocking {
         val clock = FakeClock()
         val repo = SqlDelightSearchRepository(newDb(), clock, Dispatchers.Unconfined, maxEntries = 3)
         repo.recordSearch("queen"); clock.tick()
@@ -210,7 +210,7 @@ class RepositoriesTest {
     /* ---------------- Now playing ---------------- */
 
     @Test
-    fun nowPlayingQueueRoundTrip() = runBlocking {
+    fun nowPlayingQueueRoundTrip(): Unit = runBlocking {
         val clock = FakeClock()
         val repo = SqlDelightNowPlayingRepository(newDb(), clock, Dispatchers.Unconfined)
         assertNull(repo.load())
