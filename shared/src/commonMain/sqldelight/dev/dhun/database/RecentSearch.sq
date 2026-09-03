@@ -17,5 +17,5 @@ deleteAll:
 DELETE FROM RecentSearch;
 
 -- keep the table bounded
-trim:
+trimTo:
 DELETE FROM RecentSearch WHERE query NOT IN (SELECT query FROM RecentSearch ORDER BY searchedAt DESC LIMIT ?);

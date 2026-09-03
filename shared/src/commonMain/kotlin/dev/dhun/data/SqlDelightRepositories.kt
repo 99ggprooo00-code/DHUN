@@ -68,17 +68,17 @@ class SqlDelightTrackRepository(
         db.trackQueries.selectById(id).executeAsOneOrNull()?.toDomain()
     }
 
-    override suspend fun save(track: Track) = withContext(io) {
+    override suspend fun save(track: Track): Unit = withContext(io) {
         val now = clock.nowMs()
         db.transaction { db.upsertTrack(track, now) }
     }
 
-    override suspend fun saveAll(tracks: List<Track>) = withContext(io) {
+    override suspend fun saveAll(tracks: List<Track>): Unit = withContext(io) {
         val now = clock.nowMs()
         db.transaction { tracks.forEach { db.upsertTrack(it, now) } }
     }
 
-    override suspend fun delete(id: String) = withContext(io) { db.trackQueries.deleteById(id) }
+    override suspend fun delete(id: String): Unit = withContext(io) { db.trackQueries.deleteById(id) }
 
     override fun observe(id: String): Flow<Track?> =
         db.trackQueries.selectById(id).asFlow().mapToOneOrNull(io).map { it?.toDomain() }
@@ -104,7 +104,7 @@ class SqlDelightLibraryRepository(
         db.favoriteQueries.isFavorite(trackId).executeAsOne() > 0L
     }
 
-    override suspend fun addFavorite(track: Track) = withContext(io) {
+    override suspend fun addFavorite(track: Track): Unit = withContext(io) {
         val now = clock.nowMs()
         db.transaction {
             db.upsertTrack(track, now)
@@ -112,7 +112,7 @@ class SqlDelightLibraryRepository(
         }
     }
 
-    override suspend fun removeFavorite(trackId: String) = withContext(io) { db.favoriteQueries.delete(trackId) }
+    override suspend fun removeFavorite(trackId: String): Unit = withContext(io) { db.favoriteQueries.delete(trackId) }
 }
 
 /* ---------------- Playlists ---------------------------------------------- */
@@ -148,11 +148,11 @@ class SqlDelightPlaylistRepository(
         LocalPlaylist(id, cleanName, description, null, 0, now, now)
     }
 
-    override suspend fun rename(id: String, newName: String) = withContext(io) {
+    override suspend fun rename(id: String, newName: String): Unit = withContext(io) {
         db.playlistQueries.rename(newName.trim().take(MAX_NAME), clock.nowMs(), id)
     }
 
-    override suspend fun delete(id: String) = withContext(io) {
+    override suspend fun delete(id: String): Unit = withContext(io) {
         db.transaction {
             db.playlistQueries.deleteAllTracks(id) // explicit: not every driver enforces FK cascade
             db.playlistQueries.delete(id)
@@ -174,7 +174,7 @@ class SqlDelightPlaylistRepository(
         }
     }
 
-    override suspend fun removeTrack(playlistId: String, trackId: String) = withContext(io) {
+    override suspend fun removeTrack(playlistId: String, trackId: String): Unit = withContext(io) {
         db.transaction {
             db.playlistQueries.deleteTrack(playlistId, trackId)
             renumberLocked(playlistId)
@@ -182,7 +182,7 @@ class SqlDelightPlaylistRepository(
         }
     }
 
-    override suspend fun move(playlistId: String, fromIndex: Int, toIndex: Int) = withContext(io) {
+    override suspend fun move(playlistId: String, fromIndex: Int, toIndex: Int): Unit = withContext(io) {
         db.transaction {
             val ids = db.playlistQueries.selectTrackIdsOrdered(playlistId).executeAsList().toMutableList()
             if (fromIndex !in ids.indices || toIndex !in ids.indices || fromIndex == toIndex) return@transaction
@@ -228,7 +228,7 @@ class SqlDelightHistoryRepository(
         now
     }
 
-    override suspend fun markCompleted(trackId: String, playedAtEpochMs: Long) = withContext(io) {
+    override suspend fun markCompleted(trackId: String, playedAtEpochMs: Long): Unit = withContext(io) {
         db.historyQueries.markCompleted(trackId, playedAtEpochMs)
     }
 
@@ -257,9 +257,9 @@ class SqlDelightHistoryRepository(
         db.historyQueries.playCount(trackId).executeAsOne()
     }
 
-    override suspend fun remove(entryId: Long) = withContext(io) { db.historyQueries.deleteById(entryId) }
+    override suspend fun remove(entryId: Long): Unit = withContext(io) { db.historyQueries.deleteById(entryId) }
 
-    override suspend fun clear() = withContext(io) { db.historyQueries.deleteAll() }
+    override suspend fun clear(): Unit = withContext(io) { db.historyQueries.deleteAll() }
 }
 
 /* ---------------- Settings ----------------------------------------------- */
@@ -272,7 +272,7 @@ class SqlDelightSettingsRepository(
         db.settingsQueries.get(key).executeAsOneOrNull()
     }
 
-    override suspend fun putString(key: String, value: String) = withContext(io) { db.settingsQueries.put(key, value) }
+    override suspend fun putString(key: String, value: String): Unit = withContext(io) { db.settingsQueries.put(key, value) }
 
     override suspend fun getBoolean(key: String, default: Boolean): Boolean =
         getString(key)?.toBooleanStrictOrNull() ?: default
@@ -283,7 +283,7 @@ class SqlDelightSettingsRepository(
 
     override suspend fun putInt(key: String, value: Int) = putString(key, value.toString())
 
-    override suspend fun remove(key: String) = withContext(io) { db.settingsQueries.delete(key) }
+    override suspend fun remove(key: String): Unit = withContext(io) { db.settingsQueries.delete(key) }
 
     override fun observeString(key: String): Flow<String?> =
         db.settingsQueries.get(key).asFlow().mapToOneOrNull(io)
@@ -300,18 +300,18 @@ class SqlDelightSearchRepository(
     override fun observeRecentSearches(limit: Int): Flow<List<String>> =
         db.recentSearchQueries.selectRecent(limit.toLong()).asFlow().mapToList(io)
 
-    override suspend fun recordSearch(query: String) = withContext(io) {
+    override suspend fun recordSearch(query: String): Unit = withContext(io) {
         val q = query.trim()
         if (q.isEmpty()) return@withContext
         db.transaction {
             db.recentSearchQueries.upsert(q, clock.nowMs())
-            db.recentSearchQueries.trim(maxEntries.toLong())
+            db.recentSearchQueries.trimTo(maxEntries.toLong())
         }
     }
 
-    override suspend fun removeSearch(query: String) = withContext(io) { db.recentSearchQueries.delete(query.trim()) }
+    override suspend fun removeSearch(query: String): Unit = withContext(io) { db.recentSearchQueries.delete(query.trim()) }
 
-    override suspend fun clearRecentSearches() = withContext(io) { db.recentSearchQueries.deleteAll() }
+    override suspend fun clearRecentSearches(): Unit = withContext(io) { db.recentSearchQueries.deleteAll() }
 }
 
 /* ---------------- Now playing persistence ------------------------------- */
@@ -324,7 +324,7 @@ class SqlDelightNowPlayingRepository(
 
     override suspend fun saveQueue(
         queue: List<Track>, currentIndex: Int, positionMs: Long, repeatMode: RepeatMode, shuffle: Boolean,
-    ) = withContext(io) {
+    ): Unit = withContext(io) {
         val now = clock.nowMs()
         db.transaction {
             db.nowPlayingQueries.clearQueue()
@@ -346,7 +346,7 @@ class SqlDelightNowPlayingRepository(
         }
     }
 
-    override suspend fun updateProgress(currentIndex: Int, positionMs: Long) = withContext(io) {
+    override suspend fun updateProgress(currentIndex: Int, positionMs: Long): Unit = withContext(io) {
         db.nowPlayingQueries.updatePosition(positionMs.coerceAtLeast(0), currentIndex.toLong(), clock.nowMs())
     }
 
@@ -364,7 +364,7 @@ class SqlDelightNowPlayingRepository(
         )
     }
 
-    override suspend fun clear() = withContext(io) {
+    override suspend fun clear(): Unit = withContext(io) {
         db.transaction {
             db.nowPlayingQueries.clearQueue()
             db.nowPlayingQueries.clearState()
