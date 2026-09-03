@@ -33,3 +33,13 @@ tasks.register<Copy>("resolveRuntime") {
     from(configurations.runtimeClasspath)
     into(layout.buildDirectory.dir("runtime-libs"))
 }
+
+// CI runs `:tools:playback-probe:compileKotlin` as its last step. Until the
+// repo owner adds a dedicated desktop step to ci.yml (the agent token cannot
+// edit workflows), chain the Phase 04 desktop compile onto it so the desktop
+// module is compile-checked on every PR. Local builds are unaffected.
+if (System.getenv("GITHUB_ACTIONS") == "true") {
+    tasks.named("compileKotlin") {
+        dependsOn(":app-desktop:compileKotlinJvm")
+    }
+}
