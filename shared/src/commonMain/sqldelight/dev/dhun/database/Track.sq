@@ -1,0 +1,37 @@
+CREATE TABLE Track (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    artistName TEXT NOT NULL,
+    artistId TEXT,
+    albumName TEXT,
+    albumId TEXT,
+    durationSeconds INTEGER,
+    thumbnailUrl TEXT,
+    explicit INTEGER AS Boolean NOT NULL DEFAULT 0,
+    cachedAt INTEGER,
+    updatedAt INTEGER NOT NULL
+);
+
+-- SQLite on Android API 26 is 3.18: no UPSERT syntax. INSERT OR REPLACE is
+-- also out (REPLACE deletes the row first and would cascade-delete
+-- Favorite/PlaylistTrack references). So: insertIgnore + update, in a tx.
+insertIgnore:
+INSERT OR IGNORE INTO Track(id, title, artistName, artistId, albumName, albumId, durationSeconds, thumbnailUrl, explicit, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE Track SET title = ?, artistName = ?, artistId = ?, albumName = ?, albumId = ?,
+    durationSeconds = ?, thumbnailUrl = ?, explicit = ?, updatedAt = ?
+WHERE id = ?;
+
+selectById:
+SELECT * FROM Track WHERE id = ?;
+
+selectByIds:
+SELECT * FROM Track WHERE id IN ?;
+
+deleteById:
+DELETE FROM Track WHERE id = ?;
+
+count:
+SELECT COUNT(*) FROM Track;

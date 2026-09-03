@@ -8,10 +8,7 @@ plugins {
 
 kotlin {
     // Desktop app = JVM-only multiplatform target (src/jvmMain).
-    // Uses kotlin("multiplatform") like :shared — see NOTE below.
-    jvm {
-        withJava()
-    }
+    jvm()
     sourceSets {
         val jvmMain by getting {
             dependencies {
@@ -36,7 +33,12 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "dev.dhun.desktop"
-            packageVersion = "0.1.4"
+            // WHY 1.x: Compose Desktop's DMG/MSI packagers reject MAJOR == 0
+            // ("'0.1.4' is not a valid version"). Configuration of THIS project
+            // then fails, which takes down every Gradle task in the build —
+            // that was the "desktop CI blocker" (docs/verification/04-desktop.md).
+            // Installer versions map DHUN 0.x -> 1.0.x until v1.0.0 ships.
+            packageVersion = "1.0.4"
         }
     }
 }

@@ -55,6 +55,8 @@ data class HistoryEntry(
     val playedAtEpochMs: Long,
     val playedFromContext: String? = null,
     val completedPlayback: Boolean = false,
+    /** Database row id (null when the entry is not persisted). */
+    val entryId: Long? = null,
 )
 
 /** Resolved playback information for one track. */

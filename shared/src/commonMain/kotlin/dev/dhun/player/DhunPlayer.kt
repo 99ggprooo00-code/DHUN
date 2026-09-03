@@ -18,8 +18,12 @@ interface DhunPlayer {
     val positionMs: StateFlow<Long>
     val durationMs: StateFlow<Long>
 
-    /** Loads [tracks] as the queue and starts playing at [startIndex]. */
-    suspend fun prepareQueue(tracks: List<Track>, startIndex: Int = 0)
+    /**
+     * Loads [tracks] as the queue positioned at [startIndex]. With
+     * [playWhenReady] = true (the default) playback starts immediately;
+     * false loads the queue paused — used when restoring the last session.
+     */
+    suspend fun prepareQueue(tracks: List<Track>, startIndex: Int = 0, playWhenReady: Boolean = true)
 
     fun playPause()
     fun next()
