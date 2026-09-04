@@ -17,11 +17,10 @@ import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.search.SearchResultsUiState
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -72,6 +71,12 @@ class SearchViewModelTest {
         override suspend fun getLyrics(videoId: String) = DhunResult.Success(Lyrics.NotAvailable)
     }
 
+    private suspend fun eventually(timeoutMs: Long = 5_000, check: suspend () -> Boolean) {
+        withTimeout(timeoutMs) {
+            while (!check()) delay(10)
+        }
+    }
+
     @Test
     fun searchExecutionAndResults(): Unit = runBlocking {
         val data = testData()
@@ -81,20 +86,20 @@ class SearchViewModelTest {
             searchRepository = data.search,
             libraryRepository = data.library,
             playlistRepository = data.playlists,
-            scope = CoroutineScope(Dispatchers.Unconfined),
+            scope = this,
         )
 
         vm.performSearch("bohemian", SearchFilter.SONGS)
-        val state = vm.resultsState.value
-        assertTrue(state is SearchResultsUiState.Success)
-        val results = (state as SearchResultsUiState.Success).results
+        eventually { vm.resultsState.value is SearchResultsUiState.Success }
+        val state = vm.resultsState.value as SearchResultsUiState.Success
+        val results = state.results
         assertEquals(1, results.songs.size)
         assertEquals("s1", results.songs[0].id)
         assertEquals("token_123", results.continuationToken)
 
         // Recent searches recorded
-        val recents = vm.recentSearches.value
-        assertTrue("bohemian" in recents)
+        eventually { vm.recentSearches.value.contains("bohemian") }
+        assertTrue("bohemian" in vm.recentSearches.value)
     }
 
     @Test
@@ -106,15 +111,16 @@ class SearchViewModelTest {
             searchRepository = data.search,
             libraryRepository = data.library,
             playlistRepository = data.playlists,
-            scope = CoroutineScope(Dispatchers.Unconfined),
+            scope = this,
         )
 
         vm.performSearch("queen")
+        eventually { vm.resultsState.value is SearchResultsUiState.Success }
         vm.loadMore()
+        eventually { (vm.resultsState.value as? SearchResultsUiState.Success)?.results?.songs?.size == 2 }
 
-        val state = vm.resultsState.value
-        assertTrue(state is SearchResultsUiState.Success)
-        val results = (state as SearchResultsUiState.Success).results
+        val state = vm.resultsState.value as SearchResultsUiState.Success
+        val results = state.results
         assertEquals(2, results.songs.size)
         assertEquals("s1", results.songs[0].id)
         assertEquals("s2", results.songs[1].id)
@@ -129,12 +135,13 @@ class SearchViewModelTest {
             searchRepository = data.search,
             libraryRepository = data.library,
             playlistRepository = data.playlists,
-            scope = CoroutineScope(Dispatchers.Unconfined),
+            scope = this,
         )
 
         vm.onQueryChange("coldplay")
         vm.onFilterSelected(SearchFilter.ALBUMS)
         assertEquals(SearchFilter.ALBUMS, vm.selectedFilter.value)
+        eventually { provider.lastFilter == SearchFilter.ALBUMS }
         assertEquals(SearchFilter.ALBUMS, provider.lastFilter)
     }
 
@@ -147,14 +154,18 @@ class SearchViewModelTest {
             searchRepository = data.search,
             libraryRepository = data.library,
             playlistRepository = data.playlists,
-            scope = CoroutineScope(Dispatchers.Unconfined),
+            scope = this,
         )
 
         vm.performSearch("query1")
+        eventually { vm.recentSearches.value.contains("query1") }
         vm.performSearch("query2")
+        eventually { vm.recentSearches.value.contains("query2") }
 
         vm.deleteRecentSearch("query1")
+        eventually { !vm.recentSearches.value.contains("query1") }
         vm.clearAllRecentSearches()
+        eventually { vm.recentSearches.value.isEmpty() }
     }
 
     @Test
@@ -166,7 +177,7 @@ class SearchViewModelTest {
             searchRepository = data.search,
             libraryRepository = data.library,
             playlistRepository = data.playlists,
-            scope = CoroutineScope(Dispatchers.Unconfined),
+            scope = this,
         )
 
         val pl = data.playlists.create("Test Playlist")

@@ -16,10 +16,10 @@ import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.provider.MusicProvider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -41,6 +41,12 @@ class HomeViewModelTest {
         override suspend fun relatedTracks(videoId: String) = DhunResult.Success(emptyList<Track>())
         override suspend fun getStreamInfo(videoId: String) = DhunResult.Failure(DhunError.Unavailable)
         override suspend fun getLyrics(videoId: String) = DhunResult.Success(Lyrics.NotAvailable)
+    }
+
+    private suspend fun eventually(timeoutMs: Long = 5_000, check: suspend () -> Boolean) {
+        withTimeout(timeoutMs) {
+            while (!check()) delay(10)
+        }
     }
 
     @Test
@@ -81,12 +87,12 @@ class HomeViewModelTest {
             getHomeFeed = useCase,
             historyRepository = data.history,
             libraryRepository = data.library,
-            scope = CoroutineScope(Dispatchers.Unconfined),
+            scope = this,
         )
 
-        val state = vm.uiState.value
-        assertTrue(state is HomeUiState.Success)
-        val feed = (state as HomeUiState.Success).feed
+        eventually { vm.uiState.value is HomeUiState.Success }
+        val state = vm.uiState.value as HomeUiState.Success
+        val feed = state.feed
         assertEquals(3, feed.quickPicks.size)
         assertEquals(2, feed.sections.size)
         assertEquals("Track 1", feed.quickPicks[0].title)
@@ -102,11 +108,11 @@ class HomeViewModelTest {
             getHomeFeed = useCase,
             historyRepository = data.history,
             libraryRepository = data.library,
-            scope = CoroutineScope(Dispatchers.Unconfined),
+            scope = this,
         )
 
-        val state = vm.uiState.value
-        assertTrue(state is HomeUiState.Error)
+        eventually { vm.uiState.value is HomeUiState.Error }
+        assertTrue(vm.uiState.value is HomeUiState.Error)
     }
 
     @Test
@@ -119,11 +125,13 @@ class HomeViewModelTest {
             getHomeFeed = useCase,
             historyRepository = data.history,
             libraryRepository = data.library,
-            scope = CoroutineScope(Dispatchers.Unconfined),
+            scope = this,
         )
 
         val track = sampleTrack("fav1")
         vm.toggleFavorite(track)
+        eventually { data.library.isFavorite("fav1") }
+        eventually { vm.favoriteIds.value.contains("fav1") }
         assertEquals(setOf("fav1"), vm.favoriteIds.value)
     }
 }

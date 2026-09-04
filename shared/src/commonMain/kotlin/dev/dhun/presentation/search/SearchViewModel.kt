@@ -63,10 +63,10 @@ class SearchViewModel(
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
     val recentSearches: StateFlow<List<String>> = recentSearchesUseCase.observe(15)
-        .stateIn(scope, SharingStarted.Lazily, emptyList())
+        .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     val favoriteIds: StateFlow<Set<String>> = libraryRepository.observeFavoriteIds()
-        .stateIn(scope, SharingStarted.Lazily, emptySet())
+        .stateIn(scope, SharingStarted.Eagerly, emptySet())
 
     private var searchJob: Job? = null
     private var suggestionJob: Job? = null
