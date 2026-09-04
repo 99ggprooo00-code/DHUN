@@ -7,6 +7,7 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
+import dev.dhun.data.PlayContext
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.provider.MusicProvider
@@ -189,6 +190,20 @@ class PlayerViewModel(
 
     fun setVolume(volume: Float) = player.setVolume(volume)
 
+    /** Phase 10: caller primes history context before any queue handoff. */
+    fun setPlayContext(context: PlayContext) {
+        persistence?.setPlayContext(context)
+    }
+
+    /** Helper for screens that don't go through [playTracks] (e.g. Home/Search shell). */
+    fun playQueue(tracks: List<Track>, index: Int, context: PlayContext = PlayContext.UNKNOWN) {
+        if (tracks.isEmpty()) return
+        persistence?.setPlayContext(context)
+        _skipDirection.value = SkipDirection.FORWARD
+        // Fire in scope so caller needn't be suspend.
+        scope.launch { player.prepareQueue(tracks, index.coerceIn(0, tracks.size - 1), playWhenReady = true) }
+    }
+
     /* ---------------- queue ---------------- */
 
     fun playQueueAt(index: Int) {
@@ -206,18 +221,20 @@ class PlayerViewModel(
     /* ---------------- tab actions ---------------- */
 
     /** Plays the related list (radio queue) from [index]. Suspends: caller launches. */
-    suspend fun playRelatedAt(index: Int) {
+    suspend fun playRelatedAt(index: Int, context: PlayContext = PlayContext.QUEUE) {
         val tracks = (relatedState.value as? RelatedUiState.Success)?.tracks ?: return
+        persistence?.setPlayContext(context)
         player.prepareQueue(tracks, index, playWhenReady = true)
         _skipDirection.value = SkipDirection.FORWARD
     }
 
     /** "Start radio": the whole related list from the top. */
-    suspend fun startRadio() = playRelatedAt(0)
+    suspend fun startRadio(context: PlayContext = PlayContext.QUEUE) = playRelatedAt(0, context)
 
     /** Loads an arbitrary track list as the queue (album/playlist/artist actions). */
-    suspend fun playTracks(tracks: List<Track>, startIndex: Int = 0) {
+    suspend fun playTracks(tracks: List<Track>, startIndex: Int = 0, context: PlayContext = PlayContext.UNKNOWN) {
         if (tracks.isEmpty()) return
+        persistence?.setPlayContext(context)
         player.prepareQueue(tracks, startIndex, playWhenReady = true)
         _skipDirection.value = SkipDirection.FORWARD
     }
