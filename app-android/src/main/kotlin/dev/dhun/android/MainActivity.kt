@@ -39,6 +39,7 @@ import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
+import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.DhunAppShell
@@ -103,12 +104,14 @@ class MainActivity : ComponentActivity() {
                             val searchViewModel: SearchViewModel = koin.get()
                             val dataLayer: DataLayer = koin.get()
                             val provider: MusicProvider = koin.get()
+                            val lyricsRepository: LyricsRepository = koin.get()
                             val playerViewModel = androidx.compose.runtime.remember(p) {
                                 PlayerViewModel(
                                     player = p,
                                     provider = provider,
                                     scope = activityScope,
                                     persistence = persistence,
+                                    lyricsRepository = lyricsRepository,
                                 )
                             }
 

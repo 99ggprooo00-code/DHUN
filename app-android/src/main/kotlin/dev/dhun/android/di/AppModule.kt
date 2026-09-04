@@ -13,6 +13,9 @@ import dev.dhun.extraction.StreamResolver
 import dev.dhun.innertube.InnerTubeClient
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.search.SearchViewModel
+import dev.dhun.lyrics.LrcLibSource
+import dev.dhun.lyrics.LyricsRepository
+import dev.dhun.lyrics.YouTubeLyricsSource
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +42,14 @@ val appModule = module {
     single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
     single { RecordPlayUseCase(get<DataLayer>().history) }
     single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
+
+    // Phase 11 lyrics — cache → YTM → LRCLIB
+    single { LrcLibSource() }
+    single { YouTubeLyricsSource(get()) }
+    single {
+        val data: DataLayer = get()
+        LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get())
+    }
 
     single { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
 

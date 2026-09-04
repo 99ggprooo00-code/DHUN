@@ -1,0 +1,21 @@
+CREATE TABLE LyricsCache (
+    trackId TEXT NOT NULL PRIMARY KEY,
+    isSynced INTEGER AS Boolean NOT NULL,
+    content TEXT NOT NULL,
+    cachedAt INTEGER NOT NULL
+);
+
+insert:
+INSERT OR REPLACE INTO LyricsCache(trackId, isSynced, content, cachedAt) VALUES (?, ?, ?, ?);
+
+selectByTrackId:
+SELECT * FROM LyricsCache WHERE trackId = ?;
+
+deleteByTrackId:
+DELETE FROM LyricsCache WHERE trackId = ?;
+
+clear:
+DELETE FROM LyricsCache;
+
+selectAll:
+SELECT * FROM LyricsCache;

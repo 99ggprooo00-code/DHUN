@@ -22,6 +22,9 @@ import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
+import dev.dhun.lyrics.LrcLibSource
+import dev.dhun.lyrics.LyricsRepository
+import dev.dhun.lyrics.YouTubeLyricsSource
 import dev.dhun.provider.YouTubeMusicProvider
 import dev.dhun.provider.forDesktop
 import dev.dhun.ui.shell.AppNavState
@@ -103,13 +106,22 @@ private val desktopModule = module {
 
     single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
 
-    // Phase 08 player UI model (queue ops, related/lyrics tabs, hold-to-seek).
+    // Phase 11 lyrics — cache → YTM → LRCLIB → NotAvailable, persisted in SQLDelight
+    single { LrcLibSource() }
+    single { YouTubeLyricsSource(get()) }
+    single {
+        val data: DataLayer = get()
+        LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get())
+    }
+
+    // Phase 08 player UI model (queue ops, related/lyrics tabs, hold-to-seek) + Phase 11 lyrics repo.
     single {
         PlayerViewModel(
             player = get<DesktopDhunPlayer>(),
             provider = get(),
             scope = get(),
             persistence = get(),
+            lyricsRepository = get(),
         )
     }
 
