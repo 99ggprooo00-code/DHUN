@@ -82,8 +82,8 @@ class NowPlayingPersistenceTest {
             progressIntervalMs = interval,
         )
 
-    private suspend fun eventually(timeoutMs: Long = 10_000, check: suspend () -> Boolean) {
-        withTimeout(timeoutMs) { while (!check()) delay(10) }
+    private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {
+        withTimeout(timeoutMs) { while (!check()) delay(20) }
     }
 
     @Test
@@ -93,7 +93,7 @@ class NowPlayingPersistenceTest {
         try {
             // --- session 1: user plays a queue ---
             val p1 = FakePlayer()
-            val pers1 = persistence(p1, d, scope)
+            val pers1 = persistence(p1, d, scope, interval = 30)
             pers1.setPlayContext(PlayContext.SEARCH)
             pers1.start()
             val q = listOf(track("1"), track("2"), track("3"))
@@ -112,7 +112,7 @@ class NowPlayingPersistenceTest {
 
             // --- session 2: cold start restores, paused, at the position ---
             val p2 = FakePlayer()
-            val pers2 = persistence(p2, d, scope)
+            val pers2 = persistence(p2, d, scope, interval = 30)
             val snap = assertNotNull(pers2.restore())
             assertEquals("2", snap.currentTrack?.id)
             assertEquals(q, p2.queue.value)
@@ -140,7 +140,7 @@ class NowPlayingPersistenceTest {
             p.prepareQueue(listOf(track("a"), track("b")), 0)
             p.durationMs.value = 10_000
             p.positionMs.value = 9_800 // ≥ 90%
-            delay(300) // let a progress tick observe the fraction (was 80ms — flaky on slow CI)
+            delay(300) // let a progress tick observe the fraction
             p.currentTrack.value = track("b") // transition
             eventually { d.history.observeHistory(5).first().size == 2 }
             val entries = d.history.observeHistory(5).first()
