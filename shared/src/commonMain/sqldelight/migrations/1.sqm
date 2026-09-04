@@ -1,6 +1,6 @@
-CREATE TABLE IF NOT EXISTS LyricsCache (
+CREATE TABLE LyricsCache (
     trackId TEXT NOT NULL PRIMARY KEY,
-    isSynced INTEGER AS Boolean NOT NULL,
+    isSynced INTEGER AS kotlin.Boolean NOT NULL,
     content TEXT NOT NULL,
     cachedAt INTEGER NOT NULL
 );
