@@ -176,7 +176,7 @@ fun DhunAppShell(
                         AlbumScreen(
                             viewModel = vm,
                             onBack = { nav.closeTop() },
-                            onTrackPlay = onTrackPlay,
+                            onTrackPlay = onPlayTrack,
                             onArtistClick = { nav.push(DetailRoute.ArtistPage(it.id)) },
                             onTrackOverflow = { overflowTrack = it },
                         )
