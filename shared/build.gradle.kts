@@ -1,6 +1,8 @@
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
+    id("org.jetbrains.compose")
+    kotlin("plugin.compose")
     id("app.cash.sqldelight")
 }
 
@@ -25,6 +27,15 @@ kotlin {
             // `api`: DataLayer/DhunDatabase types appear in shared's public API
             api("app.cash.sqldelight:runtime:2.1.0")
             api("app.cash.sqldelight:coroutines-extensions:2.1.0")
+            // Phase 06 design system — Compose Multiplatform (android+jvm)
+            api(compose.runtime)
+            api(compose.foundation)
+            api(compose.material3)
+            api(compose.ui)
+            // Coil 3 — CMP artwork loading (common, no platform file needed)
+            // Keep the version in sync with THIRD_PARTY.md.
+            implementation("io.coil-kt.coil3:coil-compose:3.1.0")
+            implementation("io.coil-kt.coil3:coil-network-ktor3:3.1.0")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
