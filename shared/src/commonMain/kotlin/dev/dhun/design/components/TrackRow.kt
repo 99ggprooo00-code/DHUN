@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunSpacing
@@ -30,6 +31,7 @@ fun TrackRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     showArtist: Boolean = true,
+    onOverflowClick: (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
 ) {
     Row(
@@ -67,7 +69,20 @@ fun TrackRow(
                 )
             }
         }
-        if (trailing != null) trailing()
+        if (trailing != null) {
+            trailing()
+        } else if (onOverflowClick != null) {
+            DhunIconButton(
+                onClick = onOverflowClick,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Text(
+                    text = "⋮",
+                    color = DhunColors.textTertiary,
+                    fontSize = 20.sp,
+                )
+            }
+        }
     }
 }
 
@@ -103,6 +118,7 @@ fun TrackRowCompact(
                 style = MaterialTheme.typography.labelSmall,
                 color = DhunColors.textTertiary,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

@@ -1,6 +1,9 @@
 package dev.dhun.domain
 
+import dev.dhun.core.DhunResult
 import dev.dhun.core.HistoryEntry
+import dev.dhun.core.HomeFeed
+import dev.dhun.core.HomeSection
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.data.HistoryRepository
@@ -13,12 +16,64 @@ import dev.dhun.data.PlaylistRepository
 import dev.dhun.data.SearchRepository
 import dev.dhun.data.SettingsKeys
 import dev.dhun.data.SettingsRepository
+import dev.dhun.data.SystemClock
+import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Phase 05 use cases: the verbs the application layer (view models) calls.
+ * Phase 05 + Phase 07 use cases: the verbs the application layer (view models) calls.
  * Thin on purpose — business rules live here, storage details never do.
  */
+
+/* ---------------- home feed ---------------- */
+
+class GetHomeFeedUseCase(
+    private val provider: MusicProvider,
+    private val history: HistoryRepository,
+) {
+    suspend operator fun invoke(): DhunResult<HomeFeed> {
+        val greeting = greetingForCurrentTime()
+        return when (val r = provider.homeFeed()) {
+            is DhunResult.Success -> {
+                val sections = r.value
+                val quickPicks = extractQuickPicks(sections)
+                DhunResult.Success(
+                    HomeFeed(
+                        greeting = greeting,
+                        quickPicks = quickPicks,
+                        sections = sections,
+                    )
+                )
+            }
+            is DhunResult.Failure -> {
+                DhunResult.Failure(r.error)
+            }
+        }
+    }
+
+    private fun extractQuickPicks(sections: List<HomeSection>): List<Track> {
+        val quickSection = sections.firstOrNull { it.title.contains("quick", ignoreCase = true) }
+        val tracks = quickSection?.tracks?.takeIf { it.isNotEmpty() }
+            ?: sections.flatMap { it.tracks }
+        return tracks.distinctBy { it.id }.take(6)
+    }
+
+    companion object {
+        fun greetingForHour(hour24: Int): String = when (hour24) {
+            in 5..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            in 17..21 -> "Good evening"
+            else -> "Good night"
+        }
+
+        fun greetingForCurrentTime(): String {
+            val epochMs = SystemClock.nowEpochMs()
+            val totalHours = (epochMs / 3_600_000L)
+            val utcHour = ((totalHours % 24) + 24) % 24
+            return greetingForHour(utcHour.toInt())
+        }
+    }
+}
 
 /* ---------------- favorites ---------------- */
 

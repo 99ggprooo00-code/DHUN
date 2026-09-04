@@ -3,6 +3,7 @@ package dev.dhun.innertube
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunException
 import dev.dhun.core.DhunResult
+import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
 import dev.dhun.core.SearchResults
 import dev.dhun.core.Track
@@ -58,17 +59,11 @@ internal fun HttpRequestBuilder.browserHeaders() {
 
 /**
  * DHUN's own InnerTube client — METADATA ONLY (search / suggestions /
- * related / lyrics browse) plus RAW PLAYER RESPONSES for the own-client
- * resolver. Per the extraction doctrine and ADR-001: this client never
- * signs URLs, never deciphers challenges, never spoofs attestation. It
- * speaks a small, drill-watched set of InnerTube client identities
- * (WEB_REMIX for metadata; WEB_REMIX + VISIONOS + TVHTML5 for /player) —
- * the client identity list is maintenance surface, deliberately explicit.
- *
- * The WEB_REMIX client version is scraped fresh from the music.youtube.com
- * homepage HTML — the exact discovery step NewPipeExtractor v0.26.5 got
- * wrong. The alternate identities use pinned shapes copied from yt-dlp
- * master (versions rotate slowly; the rot drill watches them).
+ * related / lyrics browse / home feed) plus RAW PLAYER RESPONSES for the
+ * own-client resolver. Per the extraction doctrine and ADR-001: this client
+ * never signs URLs, never deciphers challenges, never spoofs attestation.
+ * It speaks a small, drill-watched set of InnerTube client identities
+ * (WEB_REMIX for metadata; WEB_REMIX + VISIONOS + TVHTML5 for /player).
  */
 class InnerTubeClient(
     private val httpClient: HttpClient = defaultHttpClient(),
@@ -105,6 +100,15 @@ class InnerTubeClient(
             parseSearchResults(query, postJson("search", body))
         }
 
+    suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults> =
+        resultify {
+            val body = buildJsonObject {
+                put("context", context())
+                put("continuation", continuationToken)
+            }
+            parseSearchResults("", postJson("search", body))
+        }
+
     suspend fun searchSuggestions(query: String): DhunResult<List<String>> =
         resultify {
             val body = buildJsonObject {
@@ -112,6 +116,16 @@ class InnerTubeClient(
                 put("input", query)
             }
             parseSuggestions(postJson("music/get_search_suggestions", body))
+        }
+
+    /** Home feed (browseId = FEmusic_home) for the Home screen. */
+    suspend fun homeFeed(): DhunResult<List<HomeSection>> =
+        resultify {
+            val body = buildJsonObject {
+                put("context", context())
+                put("browseId", "FEmusic_home")
+            }
+            parseHomeSections(postJson("browse", body))
         }
 
     /** Radio queue for a track (RDAMVM playlist = "start radio from this"). */
@@ -157,9 +171,7 @@ class InnerTubeClient(
     /**
      * Raw player response under an ALTERNATE InnerTube client identity
      * (see [AltInnertubeClient]) — VISIONOS / TVHTML5 have different, laxer
-     * bot-gating profiles than web clients and no PO-token requirement
-     * (per yt-dlp master 2026-08 policies). Fallback strategies of the
-     * own-client chain (ADR-001 addendum 2026-09-02).
+     * bot-gating profiles than web clients and no PO-token requirement.
      */
     suspend fun altPlayerResponse(
         videoId: String,
@@ -177,9 +189,6 @@ class InnerTubeClient(
 
     /* ---------------- internals ------------------------------------------ */
 
-    /** Classifies playabilityStatus, keeping YouTube's own `reason` text —
-     *  it is the single most useful on-device diagnostic ("Sign in to
-     *  confirm you're not a bot" etc). */
     private fun checkPlayability(root: JsonObject): JsonObject {
         val status = root.obj("playabilityStatus").str("status")
         val reason = root.obj("playabilityStatus").str("reason")?.take(120)
@@ -203,8 +212,6 @@ class InnerTubeClient(
         }
     }
 
-    /** POST under an alternate client identity. No version scrape (pinned
-     *  shapes), fewer retries — these are FALLBACK strategies, not primary. */
     private suspend fun postAltJson(
         endpoint: String,
         body: JsonObject,
@@ -278,7 +285,7 @@ class InnerTubeClient(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: DhunException) {
-                throw e // Parse/AuthRequired/Unavailable are never retried
+                throw e
             } catch (t: Throwable) {
                 lastError = classify(t)
             }
@@ -319,15 +326,6 @@ class InnerTubeClient(
         private const val MAX_ATTEMPTS = 3
         private const val ALT_MAX_ATTEMPTS = 2
 
-        /**
-         * Alternate /player identities, shapes copied verbatim from yt-dlp
-         * master (2026-08) `INNERTUBE_CLIENTS`. Both have the DEFAULT (i.e.
-         * not-required) GVS PO-token policy there — the property that makes
-         * them tokenless-viable. Evidence for the picks: Phase-01 spike R5
-         * (VISIONOS tokenless even from a flagged datacenter IP) and R3
-         * (TVHTML5 gated from datacenter but fine from residential IPs).
-         * Pinned versions rotate slowly; the rot drill watches them.
-         */
         val ALT_CLIENT_VISIONOS = AltInnertubeClient(
             label = "visionos",
             name = "VISIONOS",

@@ -1,6 +1,7 @@
 package dev.dhun.provider
 
 import dev.dhun.core.DhunResult
+import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
 import dev.dhun.core.SearchResults
 import dev.dhun.core.StreamInfo
@@ -14,7 +15,9 @@ import dev.dhun.innertube.SearchFilter
  */
 interface MusicProvider {
     suspend fun search(query: String, filter: SearchFilter = SearchFilter.SONGS): DhunResult<SearchResults>
+    suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults>
     suspend fun searchSuggestions(query: String): DhunResult<List<String>>
+    suspend fun homeFeed(): DhunResult<List<HomeSection>>
     suspend fun relatedTracks(videoId: String): DhunResult<List<Track>>
     suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo>
     suspend fun getLyrics(videoId: String): DhunResult<Lyrics>
@@ -34,8 +37,14 @@ class YouTubeMusicProvider(
     override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> =
         client.search(query, filter)
 
+    override suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults> =
+        client.searchContinuation(continuationToken)
+
     override suspend fun searchSuggestions(query: String): DhunResult<List<String>> =
         client.searchSuggestions(query)
+
+    override suspend fun homeFeed(): DhunResult<List<HomeSection>> =
+        client.homeFeed()
 
     override suspend fun relatedTracks(videoId: String): DhunResult<List<Track>> =
         client.relatedTracks(videoId)

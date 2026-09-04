@@ -1,7 +1,7 @@
 package dev.dhun.core
 
 /**
- * DHUN core entities (Phase 02). Plain data, zero platform or framework
+ * DHUN core entities (Phase 02 + Phase 07). Plain data, zero platform or framework
  * dependencies. IDs are YouTube/YouTube-Music ids.
  */
 
@@ -48,6 +48,33 @@ data class SearchResults(
     val artists: List<Artist> = emptyList(),
     val albums: List<Album> = emptyList(),
     val playlists: List<Playlist> = emptyList(),
+    val continuationToken: String? = null,
+)
+
+/* ---------------- Home / Browse feed ------------------------------------ */
+
+sealed interface HomeItem {
+    data class TrackItem(val track: Track) : HomeItem
+    data class AlbumItem(val album: Album) : HomeItem
+    data class PlaylistItem(val playlist: Playlist) : HomeItem
+    data class ArtistItem(val artist: Artist) : HomeItem
+}
+
+data class HomeSection(
+    val title: String,
+    val subtitle: String? = null,
+    val items: List<HomeItem> = emptyList(),
+) {
+    /** Helper to extract all tracks in this section (e.g. for queue context). */
+    val tracks: List<Track>
+        get() = items.mapNotNull { (it as? HomeItem.TrackItem)?.track }
+}
+
+data class HomeFeed(
+    val greeting: String,
+    val quickPicks: List<Track> = emptyList(),
+    val listenAgain: List<Track> = emptyList(),
+    val sections: List<HomeSection> = emptyList(),
 )
 
 data class HistoryEntry(

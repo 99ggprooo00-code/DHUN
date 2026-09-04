@@ -2,6 +2,9 @@ package dev.dhun.innertube
 
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
+import dev.dhun.core.HomeFeed
+import dev.dhun.core.HomeItem
+import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
 import dev.dhun.core.Playlist
 import dev.dhun.core.SearchResults
@@ -32,7 +35,7 @@ internal fun JsonObject.searchVideoId(): String? = obj("playlistItemData")?.str(
 
 internal fun JsonObject.searchBrowseId(): String? =
     (descend(this, listOf("navigationEndpoint", "browseEndpoint", "browseId"))
-        as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+        as? JsonPrimitive)?.contentOrNull
 
 private fun trailingDuration(item: JsonObject): Int? {
     val cols = item.arr("flexColumns") ?: return null
@@ -48,10 +51,22 @@ private fun trailingDuration(item: JsonObject): Int? {
 
 private fun thumbnailOf(item: JsonObject): String? =
     ((descend(item, listOf("thumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"))
+        as? JsonArray ?: descend(item, listOf("thumbnailRenderer", "musicThumbnailRenderer", "thumbnail", "thumbnails"))
+        as? JsonArray ?: descend(item, listOf("thumbnail", "thumbnails"))
         as? JsonArray)?.firstOrNull() as? JsonObject)
         ?.str("url")
         ?.replace("w60-h60", "w544-h544")
         ?.replace("w120-h120", "w544-h544")
+
+internal fun parseContinuationToken(root: JsonObject): String? {
+    val continuations = mutableListOf<JsonObject>()
+    root.collectObjects("nextContinuationData", continuations)
+    for (c in continuations) {
+        val token = c.str("continuation")
+        if (!token.isNullOrBlank()) return token
+    }
+    return null
+}
 
 internal fun parseSearchResults(query: String, root: JsonObject): SearchResults {
     val items = mutableListOf<JsonObject>()
@@ -101,7 +116,156 @@ internal fun parseSearchResults(query: String, root: JsonObject): SearchResults 
             )
         }
     }
-    return SearchResults(query, songs, videos, artists, albums, playlists)
+    val continuationToken = parseContinuationToken(root)
+    return SearchResults(
+        query = query,
+        songs = songs,
+        videos = videos,
+        artists = artists,
+        albums = albums,
+        playlists = playlists,
+        continuationToken = continuationToken,
+    )
+}
+
+/* ---------------- Home / Browse sections -------------------------------- */
+
+internal fun parseHomeSections(root: JsonObject): List<HomeSection> {
+    val shelves = mutableListOf<JsonObject>()
+    root.collectObjects("musicCarouselShelfRenderer", shelves)
+    root.collectObjects("musicImmersiveCarouselShelfRenderer", shelves)
+
+    val sections = mutableListOf<HomeSection>()
+
+    for (shelf in shelves) {
+        val header = shelf.obj("header")?.obj("musicCarouselShelfBasicHeaderRenderer")
+            ?: shelf.obj("header")?.obj("musicImmersiveCarouselShelfBasicHeaderRenderer")
+        val title = header?.firstRunText("title", "runs")
+            ?: header?.allRunsText("title", "runs")
+            ?: ""
+        val strapline = header?.firstRunText("strapline", "runs")
+            ?: header?.allRunsText("strapline", "runs")
+
+        val contents = shelf.arr("contents") ?: continue
+        val items = mutableListOf<HomeItem>()
+
+        for (el in contents) {
+            val itemObj = el as? JsonObject ?: continue
+            val responsive = itemObj.obj("musicResponsiveListItemRenderer")
+            val twoRow = itemObj.obj("musicTwoRowItemRenderer")
+
+            when {
+                responsive != null -> {
+                    val trackTitle = responsive.columnText(0) ?: continue
+                    val subtitle = responsive.columnText(1)
+                    val parts = subtitle?.split("•")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+                    val videoId = responsive.searchVideoId()
+                        ?: (descend(responsive, listOf("navigationEndpoint", "watchEndpoint", "videoId")) as? JsonPrimitive)?.contentOrNull
+                    val browseId = responsive.searchBrowseId()
+                    val thumb = thumbnailOf(responsive)
+
+                    when {
+                        videoId != null -> items += HomeItem.TrackItem(
+                            Track(
+                                id = videoId,
+                                title = trackTitle,
+                                artistName = parts.firstOrNull() ?: "Unknown artist",
+                                albumName = parts.getOrNull(1),
+                                durationSeconds = trailingDuration(responsive),
+                                thumbnailUrl = thumb,
+                            )
+                        )
+                        browseId != null && browseId.startsWith("MPREb") -> items += HomeItem.AlbumItem(
+                            Album(
+                                id = browseId,
+                                title = trackTitle,
+                                artistName = parts.firstOrNull(),
+                                year = parts.lastOrNull()?.takeIf { it.length == 4 && it.all(Char::isDigit) },
+                                thumbnailUrl = thumb,
+                            )
+                        )
+                        browseId != null && browseId.startsWith("VL") -> items += HomeItem.PlaylistItem(
+                            Playlist(
+                                id = browseId,
+                                title = trackTitle,
+                                authorName = parts.firstOrNull(),
+                                trackCountText = parts.getOrNull(1),
+                                thumbnailUrl = thumb,
+                            )
+                        )
+                        browseId != null && browseId.startsWith("UC") -> items += HomeItem.ArtistItem(
+                            Artist(
+                                id = browseId,
+                                name = trackTitle,
+                                subscriberCountText = parts.firstOrNull(),
+                                thumbnailUrl = thumb,
+                            )
+                        )
+                    }
+                }
+                twoRow != null -> {
+                    val itemTitle = twoRow.firstRunText("title", "runs")
+                        ?: twoRow.allRunsText("title", "runs")
+                        ?: continue
+                    val subtitle = twoRow.allRunsText("subtitle", "runs")
+                    val parts = subtitle?.split("•")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+                    val videoId = (descend(twoRow, listOf("navigationEndpoint", "watchEndpoint", "videoId")) as? JsonPrimitive)?.contentOrNull
+                        ?: (descend(twoRow, listOf("onTap", "watchEndpoint", "videoId")) as? JsonPrimitive)?.contentOrNull
+                    val browseId = (descend(twoRow, listOf("navigationEndpoint", "browseEndpoint", "browseId")) as? JsonPrimitive)?.contentOrNull
+                        ?: (descend(twoRow, listOf("onTap", "browseEndpoint", "browseId")) as? JsonPrimitive)?.contentOrNull
+                    val thumb = thumbnailOf(twoRow)
+
+                    when {
+                        videoId != null -> items += HomeItem.TrackItem(
+                            Track(
+                                id = videoId,
+                                title = itemTitle,
+                                artistName = parts.firstOrNull() ?: "Unknown artist",
+                                albumName = parts.getOrNull(1),
+                                thumbnailUrl = thumb,
+                            )
+                        )
+                        browseId != null && browseId.startsWith("MPREb") -> items += HomeItem.AlbumItem(
+                            Album(
+                                id = browseId,
+                                title = itemTitle,
+                                artistName = parts.firstOrNull(),
+                                year = parts.lastOrNull()?.takeIf { it.length == 4 && it.all(Char::isDigit) },
+                                thumbnailUrl = thumb,
+                            )
+                        )
+                        browseId != null && browseId.startsWith("UC") -> items += HomeItem.ArtistItem(
+                            Artist(
+                                id = browseId,
+                                name = itemTitle,
+                                subscriberCountText = parts.firstOrNull(),
+                                thumbnailUrl = thumb,
+                            )
+                        )
+                        browseId != null -> items += HomeItem.PlaylistItem(
+                            Playlist(
+                                id = browseId,
+                                title = itemTitle,
+                                authorName = parts.firstOrNull(),
+                                trackCountText = parts.getOrNull(1),
+                                thumbnailUrl = thumb,
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        if (items.isNotEmpty()) {
+            sections += HomeSection(
+                title = title.ifBlank { "Recommended" },
+                subtitle = strapline,
+                items = items,
+            )
+        }
+    }
+
+    return sections
 }
 
 /* ---------------- /next (radio queue) ----------------------------------- */

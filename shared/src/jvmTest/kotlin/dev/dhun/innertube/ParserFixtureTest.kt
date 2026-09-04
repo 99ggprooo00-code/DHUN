@@ -1,8 +1,13 @@
 package dev.dhun.innertube
 
+import dev.dhun.core.Album
+import dev.dhun.core.Artist
+import dev.dhun.core.HomeItem
 import dev.dhun.core.Lyrics
+import dev.dhun.core.Playlist
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -41,6 +46,39 @@ class ParserFixtureTest {
     }
 
     @Test
+    fun parsesHomeBrowseFixture() {
+        val sections = parseHomeSections(obj(fixture("browse-home.json")))
+        assertEquals(2, sections.size)
+
+        // Section 1: Quick picks (responsive items)
+        val quickPicks = sections[0]
+        assertEquals("Quick picks", quickPicks.title)
+        assertEquals("Start radio with songs you like", quickPicks.subtitle)
+        assertEquals(2, quickPicks.items.size)
+        val track1 = (quickPicks.items[0] as HomeItem.TrackItem).track
+        assertEquals("Starboy", track1.title)
+        assertEquals("34Na4j8AVgA", track1.id)
+        assertEquals("The Weeknd", track1.artistName)
+        assertEquals(230, track1.durationSeconds) // 3:50
+
+        // Section 2: Recommended albums / items (two-row items)
+        val section2 = sections[1]
+        assertEquals("Recommended albums", section2.title)
+        assertEquals(3, section2.items.size)
+        val album = (section2.items[0] as HomeItem.AlbumItem).album
+        assertEquals("After Hours", album.title)
+        assertEquals("MPREb_album_after_hours", album.id)
+
+        val playlist = (section2.items[1] as HomeItem.PlaylistItem).playlist
+        assertEquals("Today's Hits", playlist.title)
+        assertEquals("VLPL_todays_hits", playlist.id)
+
+        val artist = (section2.items[2] as HomeItem.ArtistItem).artist
+        assertEquals("Dua Lipa", artist.name)
+        assertEquals("UC_dua_lipa", artist.id)
+    }
+
+    @Test
     fun parsesSuggestionsShape() {
         val json = """
             {"contents":[{"searchSuggestionRenderer":{"suggestion":{"runs":[{"text":"yellow"},{"bold":"true","text":" coldplay"}]}}},
@@ -72,5 +110,14 @@ class ParserFixtureTest {
     fun missingLyricsShelfIsNotAvailable() {
         val lyrics = parseLyricsBrowse(obj("{\"contents\":{}}"))
         assertEquals(Lyrics.NotAvailable, lyrics)
+    }
+
+    @Test
+    fun parsesContinuationToken() {
+        val json = """
+            {"contents":{"sectionListRenderer":{"contents":[],"continuations":[{"nextContinuationData":{"continuation":"4smCG...=="}}]}}}
+        """.trimIndent()
+        val token = parseContinuationToken(obj(json))
+        assertEquals("4smCG...==", token)
     }
 }

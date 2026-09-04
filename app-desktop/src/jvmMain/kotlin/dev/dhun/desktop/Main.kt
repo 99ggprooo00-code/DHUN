@@ -1,39 +1,28 @@
 package dev.dhun.desktop
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import dev.dhun.data.DataLayer
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.design.DhunTheme
-import dev.dhun.design.catalog.ComponentCatalogScreen
+import dev.dhun.desktop.player.DesktopDhunPlayer
+import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
 import dev.dhun.domain.SaveNowPlayingUseCase
 import dev.dhun.player.NowPlayingPersistence
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
-import dev.dhun.desktop.player.DesktopDhunPlayer
-import dev.dhun.desktop.ui.DesktopHarnessScreen
-import dev.dhun.desktop.ui.DesktopHarnessViewModel
+import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
 import dev.dhun.provider.forDesktop
+import dev.dhun.ui.shell.DhunAppShell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,19 +31,20 @@ import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
 /**
- * Phase 04 desktop entry point (code-complete; hardware verification is the
- * phase's remaining step — see docs/verification/04-desktop.md). Window
- * 1200x780, Koin graph, vlcj-backed player, throwaway harness screen — the
- * same verification loop as Phase 03 Android.
+ * Phase 04 + 07 Desktop entry point.
+ * Window 1200x780, Koin graph, vlcj-backed player, full shared DhunAppShell UI
+ * (Home, Search, MiniPlayer, Catalog).
  */
 fun main() = application {
     val koin = startKoin { modules(desktopModule) }.koin
     val appScope: CoroutineScope = koin.get()
     val player: DesktopDhunPlayer = koin.get()
-    val viewModel: DesktopHarnessViewModel = koin.get()
+    val homeViewModel: HomeViewModel = koin.get()
+    val searchViewModel: SearchViewModel = koin.get()
+    val dataLayer: DataLayer = koin.get()
     val persistence: NowPlayingPersistence = koin.get()
 
-    // Phase 05: restore the last session (paused) then keep persisting.
+    // Restore the last session (paused) then keep persisting.
     LaunchedEffect(Unit) {
         runCatching { persistence.restore() }.onFailure { System.err.println("DHUN restore failed: $it") }
         persistence.start()
@@ -71,17 +61,13 @@ fun main() = application {
         title = "DHUN",
     ) {
         DhunTheme {
-            var showCatalog by remember { mutableStateOf(false) }
-            if (showCatalog) {
-                ComponentCatalogScreen(onClose = { showCatalog = false }, modifier = Modifier.fillMaxSize())
-            } else {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showCatalog = true }) { Text("Catalog", fontSize = 11.sp) }
-                    }
-                    DesktopHarnessScreen(player = player, viewModel = viewModel)
-                }
-            }
+            DhunAppShell(
+                player = player,
+                homeViewModel = homeViewModel,
+                searchViewModel = searchViewModel,
+                dataLayer = dataLayer,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -90,6 +76,7 @@ private val desktopModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
     single<MusicProvider> { YouTubeMusicProvider.forDesktop() }
     single { DesktopDhunPlayer(provider = get(), scope = get()) }
+
     // Phase 05 data layer — SQLite file in the per-OS user data dir.
     single { DataLayer(DatabaseFactory.create(DatabaseDriverFactory().createDriver())) }
     single {
@@ -103,5 +90,25 @@ private val desktopModule = module {
             log = { println("DHUN persistence: $it") },
         )
     }
-    single { DesktopHarnessViewModel(provider = get(), data = get(), scope = get()) }
+
+    single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
+
+    single {
+        HomeViewModel(
+            getHomeFeed = get(),
+            historyRepository = get<DataLayer>().history,
+            libraryRepository = get<DataLayer>().library,
+            scope = get(),
+        )
+    }
+
+    single {
+        SearchViewModel(
+            provider = get(),
+            searchRepository = get<DataLayer>().search,
+            libraryRepository = get<DataLayer>().library,
+            playlistRepository = get<DataLayer>().playlists,
+            scope = get(),
+        )
+    }
 }

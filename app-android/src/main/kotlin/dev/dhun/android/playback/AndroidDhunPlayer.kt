@@ -78,6 +78,19 @@ class AndroidDhunPlayer(
         refresh()
     }
 
+    override fun addNext(track: Track) {
+        trackMap[track.id] = track
+        val nextIndex = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
+        player.addMediaItem(nextIndex, track.toMediaItem())
+        refresh()
+    }
+
+    override fun addToQueue(track: Track) {
+        trackMap[track.id] = track
+        player.addMediaItem(track.toMediaItem())
+        refresh()
+    }
+
     override fun playPause() {
         if (player.isPlaying) player.pause() else player.play()
     }
