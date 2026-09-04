@@ -45,6 +45,16 @@ class NowPlayingPersistenceTest {
             currentTrack.value = tracks.getOrNull(startIndex)
             state.value = if (playWhenReady) PlaybackState.Playing(tracks[startIndex]) else PlaybackState.Paused(tracks[startIndex])
         }
+        override fun addNext(track: Track) {
+            val list = queue.value.toMutableList()
+            list.add(track)
+            queue.value = list
+        }
+        override fun addToQueue(track: Track) {
+            val list = queue.value.toMutableList()
+            list.add(track)
+            queue.value = list
+        }
         override fun playPause() {
             playPauseCalls++
             val t = currentTrack.value ?: return
