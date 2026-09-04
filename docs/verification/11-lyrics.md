@@ -45,14 +45,34 @@ After: `PlayerViewModel(..., lyricsRepository)` → `lyricsRepository.getLyrics(
 - `isSyncedHeuristic` — `[00:10.00]Hello` true, plain/metadata false
 - `parseBlankLines` — `[00:10.00]` → `""` (UI placeholder “♪”) + next line
 
+## Verified test track list (pre-verified against the live LRCLIB API, 2026-09-04)
+
+Session `arena/01a06b14-dhun` pre-verified each of these against
+`GET https://lrclib.net/api/get` (live HTTP from the sandbox — no fixtures,
+no assumptions):
+
+| # | Track | Language / script | LRCLIB result |
+|---|---|---|---|
+| 1 | Queen — Bohemian Rhapsody | EN · long (5:55) | ✅ `syncedLyrics` — 60+ timestamped lines; **blank-line stamps** (`[02:35.66]` → “♪” placeholder test) + Arabic-script lines (Unicode render check) |
+| 2 | Arijit Singh — Channa Mereya | HI (3:50) | ✅ `syncedLyrics` — Devanagari script |
+| 3 | PSY — Gangnam Style | KR (3:39) | ✅ `syncedLyrics` — Hangul script |
+| 4 | Luis Fonsi — Despacito | ES (3:49) | ✅ `syncedLyrics` — accented Latin |
+| 5 | YOASOBI — 夜に駆ける | JP (4:19) | ⚠️ `plainLyrics` only, `syncedLyrics: null` → this is the **Unsynced** test track (scrollable plain-text branch) |
+| — | Jyoti Sahar — Tanka Tanka · Hari Saraswoti — Ma Ta Kaha · Dipesh Panta — Jhumka | NE | ❌ 404 `TrackNotFound` — Nepali coverage gap on LRCLIB (live finding). Consequence: (a) a Nepali track *without* YTM lyrics is the **Empty-state** test candidate; (b) the **LRCLIB-fallback** test needs a track absent from YTM but present on LRCLIB — confirm the candidate at `lrclib.net/api/get` at run time, not from memory |
+
+**Acceptance 1 (5 diverse synced) mapping:** tracks 1–4 above + one more
+synced track (track 1 doubles as the “long track” — 5:55). For the 5th,
+verify live at `https://lrclib.net/search` immediately before the run
+(synced presence is community-maintained and can change).
+
 ## On-hardware checklist (OPEN)
 
 - [ ] **Install**: `./gradlew :app-android:assembleDebug` or `:app-desktop:run` — play any track → FullPlayer → Lyrics tab
-- [ ] **Synced — 5 diverse tracks** (must span languages/scripts — e.g. English, Hindi, Nepali, Japanese/Korean + one long track): pick 5 tracks known to have LRCLIB synced LRC (verify at `https://lrclib.net/api/get?artist_name=&track_name=&duration=` or via search `https://lrclib.net/search`). For each: start playback → open Lyrics (should show synced list within ~1 s; first open hits network, second is instant) → verify active line is larger/brighter/centered, others dim, list auto-scrolls as the song plays (no manual scroll needed), seek via progress bar → active line jumps correctly
+- [ ] **Synced — 5 diverse tracks** (use the verified list above: Queen / Arijit Singh / PSY / Luis Fonsi + one live-confirmed 5th): for each — start playback → open Lyrics (should show synced list within ~1 s; first open hits network, second is instant) → verify active line is larger/brighter/centered, others dim, list auto-scrolls as the song plays (no manual scroll needed), seek via progress bar → active line jumps correctly. Queen = blank “♪” lines + long-track scroll
 - [ ] **Tap-to-seek ±1s**: in Synced state, tap any non-active line → playback jumps to that line's timestamp (±1 s audible/positionMs), active highlight updates within ~300 ms, `animateScrollToItem` scrolls smoothly. Tap blank “♪” lines also seeks. Unsynced text taps do nothing (no crash)
 - [ ] **LRCLIB fallback verified**: find a track where YTM has no lyrics (FullPlayer previously showed “No lyrics” from YTM alone) but LRCLIB does (e.g. indie/Nepali track not on YTM lyrics DB). Play → Lyrics should now show Synced (from LRCLIB) or Unsynced, proving `cache→YTM→LRCLIB` fallback. Kill data `cache.clear()` → replay same track → still resolves via LRCLIB (not cache)
-- [ ] **Unsynced**: track with only YTM/plain LRCLIB lyrics (e.g. fresh release) → Lyrics shows scrollable plain `Text` (no timestamps, no highlight), vertical scroll works with touch/mouse, `Error` shows retry button and `refreshLyrics` re-fetches
-- [ ] **Empty**: track with no lyrics on either source → `EmptyView("No lyrics", "Lyrics aren't available for this track yet.")` — no spinner, no crash. Works after airplane-mode (both sources `NotAvailable` → same empty state, not `Error`)
+- [ ] **Unsynced**: YOASOBI — 夜に駆ける (verified: `plainLyrics` only on LRCLIB) → Lyrics shows scrollable plain `Text` (no timestamps, no highlight), vertical scroll works with touch/mouse, `Error` shows retry button and `refreshLyrics` re-fetches
+- [ ] **Empty**: track with no lyrics on either source (Nepali track without YTM lyrics is the leading candidate — see NE 404 finding above) → `EmptyView("No lyrics", "Lyrics aren't available for this track yet.")` — no spinner, no crash. Works after airplane-mode (both sources `NotAvailable` → same empty state, not `Error`)
 - [ ] **Second open = instant (cache hit)**: play track A → Lyrics loads (network, ~800 ms) → collapse FullPlayer → reopen → Lyrics shows instantly (<100 ms, no shimmer). Verify via `adb shell` / desktop log: second `getLyrics` should be `cache hit` (no LRCLIB/YTM HTTP). After `clearCache` or fresh install, first open is network again
 - [ ] **Parser edge cases live**: track whose LRC has multi-timestamps, `[mm:ss]` without fraction, and enhanced `<mm:ss.xx>` (e.g. LRCLIB “enhanced” tracks) — all render as single lines, not duplicated word entries, metadata headers hidden
 - [ ] **Desktop mouse**: sync scroll via wheel/trackpad, tap seeks with click, unsynced scrolls with wheel; no hover crash
