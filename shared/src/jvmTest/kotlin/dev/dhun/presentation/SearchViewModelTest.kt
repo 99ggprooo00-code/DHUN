@@ -17,6 +17,10 @@ import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.search.SearchResultsUiState
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -33,8 +37,8 @@ class SearchViewModelTest {
     private fun sampleTrack(id: String) = Track(id = id, title = "Song $id", artistName = "Artist $id")
 
     private class FakeSearchMusicProvider : MusicProvider {
-        var lastFilter: SearchFilter? = null
-        var lastQuery: String? = null
+        @Volatile var lastFilter: SearchFilter? = null
+        @Volatile var lastQuery: String? = null
 
         override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> {
             lastQuery = query
@@ -79,114 +83,161 @@ class SearchViewModelTest {
 
     @Test
     fun searchExecutionAndResults(): Unit = runBlocking {
-        val data = testData()
-        val provider = FakeSearchMusicProvider()
-        val vm = SearchViewModel(
-            provider = provider,
-            searchRepository = data.search,
-            libraryRepository = data.library,
-            playlistRepository = data.playlists,
-            scope = this,
-        )
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            val vm = SearchViewModel(
+                provider = provider,
+                searchRepository = data.search,
+                libraryRepository = data.library,
+                playlistRepository = data.playlists,
+                scope = testScope,
+            )
 
-        vm.performSearch("bohemian", SearchFilter.SONGS)
-        eventually { vm.resultsState.value is SearchResultsUiState.Success }
-        val state = vm.resultsState.value as SearchResultsUiState.Success
-        val results = state.results
-        assertEquals(1, results.songs.size)
-        assertEquals("s1", results.songs[0].id)
-        assertEquals("token_123", results.continuationToken)
+            vm.performSearch("bohemian", SearchFilter.SONGS)
+            eventually { vm.resultsState.value is SearchResultsUiState.Success }
+            val state = vm.resultsState.value as SearchResultsUiState.Success
+            val results = state.results
+            assertEquals(1, results.songs.size)
+            assertEquals("s1", results.songs[0].id)
+            assertEquals("token_123", results.continuationToken)
 
-        // Recent searches recorded
-        eventually { vm.recentSearches.value.contains("bohemian") }
-        assertTrue("bohemian" in vm.recentSearches.value)
+            // Recent searches recorded
+            eventually { vm.recentSearches.value.contains("bohemian") }
+            assertTrue("bohemian" in vm.recentSearches.value)
+        } finally {
+            testScope.cancel()
+        }
     }
 
     @Test
     fun searchContinuationInfiniteScroll(): Unit = runBlocking {
-        val data = testData()
-        val provider = FakeSearchMusicProvider()
-        val vm = SearchViewModel(
-            provider = provider,
-            searchRepository = data.search,
-            libraryRepository = data.library,
-            playlistRepository = data.playlists,
-            scope = this,
-        )
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            val vm = SearchViewModel(
+                provider = provider,
+                searchRepository = data.search,
+                libraryRepository = data.library,
+                playlistRepository = data.playlists,
+                scope = testScope,
+            )
 
-        vm.performSearch("queen")
-        eventually { vm.resultsState.value is SearchResultsUiState.Success }
-        vm.loadMore()
-        eventually { (vm.resultsState.value as? SearchResultsUiState.Success)?.results?.songs?.size == 2 }
+            vm.performSearch("queen")
+            eventually { vm.resultsState.value is SearchResultsUiState.Success }
+            vm.loadMore()
+            eventually { (vm.resultsState.value as? SearchResultsUiState.Success)?.results?.songs?.size == 2 }
 
-        val state = vm.resultsState.value as SearchResultsUiState.Success
-        val results = state.results
-        assertEquals(2, results.songs.size)
-        assertEquals("s1", results.songs[0].id)
-        assertEquals("s2", results.songs[1].id)
+            val state = vm.resultsState.value as SearchResultsUiState.Success
+            val results = state.results
+            assertEquals(2, results.songs.size)
+            assertEquals("s1", results.songs[0].id)
+            assertEquals("s2", results.songs[1].id)
+        } finally {
+            testScope.cancel()
+        }
     }
 
     @Test
     fun filterSelectionUpdatesSearch(): Unit = runBlocking {
-        val data = testData()
-        val provider = FakeSearchMusicProvider()
-        val vm = SearchViewModel(
-            provider = provider,
-            searchRepository = data.search,
-            libraryRepository = data.library,
-            playlistRepository = data.playlists,
-            scope = this,
-        )
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            val vm = SearchViewModel(
+                provider = provider,
+                searchRepository = data.search,
+                libraryRepository = data.library,
+                playlistRepository = data.playlists,
+                scope = testScope,
+            )
 
-        vm.onQueryChange("coldplay")
-        vm.onFilterSelected(SearchFilter.ALBUMS)
-        assertEquals(SearchFilter.ALBUMS, vm.selectedFilter.value)
-        eventually { provider.lastFilter == SearchFilter.ALBUMS }
-        assertEquals(SearchFilter.ALBUMS, provider.lastFilter)
+            vm.onQueryChange("coldplay")
+            vm.onFilterSelected(SearchFilter.ALBUMS)
+            assertEquals(SearchFilter.ALBUMS, vm.selectedFilter.value)
+            eventually { provider.lastFilter == SearchFilter.ALBUMS }
+            assertEquals(SearchFilter.ALBUMS, provider.lastFilter)
+        } finally {
+            testScope.cancel()
+        }
+    }
+
+    @Test
+    fun suggestionsDebounce(): Unit = runBlocking {
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            val vm = SearchViewModel(
+                provider = provider,
+                searchRepository = data.search,
+                libraryRepository = data.library,
+                playlistRepository = data.playlists,
+                scope = testScope,
+            )
+
+            vm.onQueryChange("cold")
+            eventually(timeoutMs = 3000) { vm.suggestions.value.isNotEmpty() }
+            assertEquals(listOf("cold one", "cold two"), vm.suggestions.value)
+        } finally {
+            testScope.cancel()
+        }
     }
 
     @Test
     fun recentSearchesManagement(): Unit = runBlocking {
-        val data = testData()
-        val provider = FakeSearchMusicProvider()
-        val vm = SearchViewModel(
-            provider = provider,
-            searchRepository = data.search,
-            libraryRepository = data.library,
-            playlistRepository = data.playlists,
-            scope = this,
-        )
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            val vm = SearchViewModel(
+                provider = provider,
+                searchRepository = data.search,
+                libraryRepository = data.library,
+                playlistRepository = data.playlists,
+                scope = testScope,
+            )
 
-        vm.performSearch("query1")
-        eventually { vm.recentSearches.value.contains("query1") }
-        vm.performSearch("query2")
-        eventually { vm.recentSearches.value.contains("query2") }
+            vm.performSearch("query1")
+            eventually { vm.recentSearches.value.contains("query1") }
+            vm.performSearch("query2")
+            eventually { vm.recentSearches.value.contains("query2") }
 
-        vm.deleteRecentSearch("query1")
-        eventually { !vm.recentSearches.value.contains("query1") }
-        vm.clearAllRecentSearches()
-        eventually { vm.recentSearches.value.isEmpty() }
+            vm.deleteRecentSearch("query1")
+            eventually { !vm.recentSearches.value.contains("query1") }
+            vm.clearAllRecentSearches()
+            eventually { vm.recentSearches.value.isEmpty() }
+        } finally {
+            testScope.cancel()
+        }
     }
 
     @Test
     fun addToPlaylistAction(): Unit = runBlocking {
-        val data = testData()
-        val provider = FakeSearchMusicProvider()
-        val vm = SearchViewModel(
-            provider = provider,
-            searchRepository = data.search,
-            libraryRepository = data.library,
-            playlistRepository = data.playlists,
-            scope = this,
-        )
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            val vm = SearchViewModel(
+                provider = provider,
+                searchRepository = data.search,
+                libraryRepository = data.library,
+                playlistRepository = data.playlists,
+                scope = testScope,
+            )
 
-        val pl = data.playlists.create("Test Playlist")
-        val track = sampleTrack("track_xyz")
-        val added = vm.addToPlaylist(pl.id, track)
-        assertTrue(added)
+            val pl = data.playlists.create("Test Playlist")
+            val track = sampleTrack("track_xyz")
+            val added = vm.addToPlaylist(pl.id, track)
+            assertTrue(added)
 
-        val tracks = data.playlists.observeTracks(pl.id).first()
-        assertEquals(1, tracks.size)
-        assertEquals("track_xyz", tracks[0].id)
+            val tracks = data.playlists.observeTracks(pl.id).first()
+            assertEquals(1, tracks.size)
+            assertEquals("track_xyz", tracks[0].id)
+        } finally {
+            testScope.cancel()
+        }
     }
 }

@@ -16,6 +16,10 @@ import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.provider.MusicProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -63,75 +67,90 @@ class HomeViewModelTest {
 
     @Test
     fun homeViewModelLoadsFeedAndExtractsQuickPicks(): Unit = runBlocking {
-        val data = testData()
-        val sections = listOf(
-            HomeSection(
-                title = "Quick picks",
-                items = listOf(
-                    HomeItem.TrackItem(sampleTrack("1")),
-                    HomeItem.TrackItem(sampleTrack("2")),
-                    HomeItem.TrackItem(sampleTrack("3")),
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val sections = listOf(
+                HomeSection(
+                    title = "Quick picks",
+                    items = listOf(
+                        HomeItem.TrackItem(sampleTrack("1")),
+                        HomeItem.TrackItem(sampleTrack("2")),
+                        HomeItem.TrackItem(sampleTrack("3")),
+                    ),
                 ),
-            ),
-            HomeSection(
-                title = "Recommended",
-                items = listOf(
-                    HomeItem.TrackItem(sampleTrack("4")),
+                HomeSection(
+                    title = "Recommended",
+                    items = listOf(
+                        HomeItem.TrackItem(sampleTrack("4")),
+                    ),
                 ),
-            ),
-        )
-        val provider = FakeMusicProvider(DhunResult.Success(sections))
-        val useCase = GetHomeFeedUseCase(provider, data.history)
+            )
+            val provider = FakeMusicProvider(DhunResult.Success(sections))
+            val useCase = GetHomeFeedUseCase(provider, data.history)
 
-        val vm = HomeViewModel(
-            getHomeFeed = useCase,
-            historyRepository = data.history,
-            libraryRepository = data.library,
-            scope = this,
-        )
+            val vm = HomeViewModel(
+                getHomeFeed = useCase,
+                historyRepository = data.history,
+                libraryRepository = data.library,
+                scope = testScope,
+            )
 
-        eventually { vm.uiState.value is HomeUiState.Success }
-        val state = vm.uiState.value as HomeUiState.Success
-        val feed = state.feed
-        assertEquals(3, feed.quickPicks.size)
-        assertEquals(2, feed.sections.size)
-        assertEquals("Track 1", feed.quickPicks[0].title)
+            eventually { vm.uiState.value is HomeUiState.Success }
+            val state = vm.uiState.value as HomeUiState.Success
+            val feed = state.feed
+            assertEquals(3, feed.quickPicks.size)
+            assertEquals(2, feed.sections.size)
+            assertEquals("Track 1", feed.quickPicks[0].title)
+        } finally {
+            testScope.cancel()
+        }
     }
 
     @Test
     fun homeViewModelHandlesError(): Unit = runBlocking {
-        val data = testData()
-        val provider = FakeMusicProvider(DhunResult.Failure(DhunError.Network))
-        val useCase = GetHomeFeedUseCase(provider, data.history)
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeMusicProvider(DhunResult.Failure(DhunError.Network))
+            val useCase = GetHomeFeedUseCase(provider, data.history)
 
-        val vm = HomeViewModel(
-            getHomeFeed = useCase,
-            historyRepository = data.history,
-            libraryRepository = data.library,
-            scope = this,
-        )
+            val vm = HomeViewModel(
+                getHomeFeed = useCase,
+                historyRepository = data.history,
+                libraryRepository = data.library,
+                scope = testScope,
+            )
 
-        eventually { vm.uiState.value is HomeUiState.Error }
-        assertTrue(vm.uiState.value is HomeUiState.Error)
+            eventually { vm.uiState.value is HomeUiState.Error }
+            assertTrue(vm.uiState.value is HomeUiState.Error)
+        } finally {
+            testScope.cancel()
+        }
     }
 
     @Test
     fun homeViewModelTogglesFavorites(): Unit = runBlocking {
-        val data = testData()
-        val provider = FakeMusicProvider()
-        val useCase = GetHomeFeedUseCase(provider, data.history)
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeMusicProvider()
+            val useCase = GetHomeFeedUseCase(provider, data.history)
 
-        val vm = HomeViewModel(
-            getHomeFeed = useCase,
-            historyRepository = data.history,
-            libraryRepository = data.library,
-            scope = this,
-        )
+            val vm = HomeViewModel(
+                getHomeFeed = useCase,
+                historyRepository = data.history,
+                libraryRepository = data.library,
+                scope = testScope,
+            )
 
-        val track = sampleTrack("fav1")
-        vm.toggleFavorite(track)
-        eventually { data.library.isFavorite("fav1") }
-        eventually { vm.favoriteIds.value.contains("fav1") }
-        assertEquals(setOf("fav1"), vm.favoriteIds.value)
+            val track = sampleTrack("fav1")
+            vm.toggleFavorite(track)
+            eventually { data.library.isFavorite("fav1") }
+            eventually { vm.favoriteIds.value.contains("fav1") }
+            assertEquals(setOf("fav1"), vm.favoriteIds.value)
+        } finally {
+            testScope.cancel()
+        }
     }
 }
