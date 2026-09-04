@@ -16,19 +16,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.dhun.design.DhunTheme
+import dev.dhun.design.catalog.ComponentCatalogScreen
 import androidx.core.content.ContextCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -93,22 +96,39 @@ class MainActivity : ComponentActivity() {
         requestNotificationPermissionIfNeeded()
         connectWithFallback()
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            DhunTheme {
                 // Music-app back behavior: BACK from any screen sends the app
                 // to the background with playback alive (service keeps
                 // playing) instead of finishing the activity.
                 BackHandler { moveTaskToBack(true) }
+                // Phase 06 debug catalog toggle — visible on every build so
+                // verification (blur, tokens, extractor) can be exercised
+                // without searching. Harness is throwaway; catalog proves Phase 06.
+                var showCatalog by remember { mutableStateOf(false) }
                 val ui by connectState.collectAsState()
                 when (val s = ui) {
                     is ConnectUi.Connecting -> ConnectingScreen(
                         log = connectLog.collectAsState().value,
                         version = appVersionName(),
                     )
-                    is ConnectUi.Ready -> androidx.compose.foundation.layout.Box(
+                    is ConnectUi.Ready -> if (showCatalog) {
+                        ComponentCatalogScreen(onClose = { showCatalog = false })
+                    } else androidx.compose.foundation.layout.Box(
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         player?.let {
-                            HarnessScreen(player = it, viewModel = viewModel)
+                            // Thin harness overlay: catalog entry point
+                            androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
+                                androidx.compose.foundation.layout.Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    androidx.compose.material3.TextButton(onClick = { showCatalog = true }) {
+                                        Text("Catalog", fontSize = 11.sp)
+                                    }
+                                }
+                                HarnessScreen(player = it, viewModel = viewModel)
+                            }
                         }
                         s.reason?.let { reason ->
                             Surface(

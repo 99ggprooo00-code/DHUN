@@ -38,3 +38,10 @@ Updated every phase. Nothing hidden.
   Playback history is local-only; nothing leaves the device.
 - Desktop (Phase 04) runtime needs a system libVLC install and `yt-dlp` on
   PATH (streams resolve own-client first, yt-dlp failover — ADR-001).
+- Design system (Phase 06): `GlassCard` uses `Modifier.blur()` / `RenderEffect`
+  on Android 12+ (API 31+) and Desktop Skiko; below that floor it degrades to
+  a translucent scrim (`DhunColors.glass` 60% #99111111 + 10% white border) — still
+  glassy but not blurred. Verified via `ComponentCatalogScreen` over a gradient
+  backdrop; screenshot pending. The design tokens are the single source of
+  truth; throwaway harness screens still contain raw hex/dp (they are deleted in
+  Phase 07 when real Home/Search replace them — not counted as production code).
