@@ -2,7 +2,7 @@
 
 ## CURRENT ACTIVE TASK (updated 2026-09-04, session arena/01a06aaa-dhun)
 
-**Branch:** `arena/01a06aaa-dhun` · **PR:** TBD — "Phase 08/09: Player UI + browse pages"
+**Branch:** `arena/01a06aaa-dhun` · **PR:** #7 open — "Phase 08+09: Player UI + browse pages" (CI: compile+all-new-tests green; one pre-existing CI-timing flake in NowPlayingPersistenceTest under re-run)
 
 **Phase:** 08 (Player UI) + 09 (Artist/Album/Playlist pages) — code complete, pending CI.
 
