@@ -30,4 +30,5 @@ class DataLayer(val db: DhunDatabase, clock: EpochClock = EpochClock.System) {
     val settings: SettingsRepository = SqlDelightSettingsRepository(db)
     val search: SearchRepository = SqlDelightSearchRepository(db, clock)
     val nowPlaying: NowPlayingRepository = SqlDelightNowPlayingRepository(db, clock)
+    val lyricsCache: LyricsCacheRepository = SqlDelightLyricsCacheRepository(db, clock)
 }

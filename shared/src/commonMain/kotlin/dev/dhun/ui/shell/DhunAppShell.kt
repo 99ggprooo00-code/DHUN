@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
+import dev.dhun.data.PlayContext
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.catalog.ComponentCatalogScreen
@@ -40,6 +41,7 @@ import dev.dhun.presentation.browse.AlbumViewModel
 import dev.dhun.presentation.browse.ArtistViewModel
 import dev.dhun.presentation.browse.PlaylistViewModel
 import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
@@ -49,6 +51,7 @@ import dev.dhun.ui.browse.PlaylistScreen
 import dev.dhun.ui.components.AddToPlaylistDialog
 import dev.dhun.ui.components.TrackOverflowDialog
 import dev.dhun.ui.home.HomeScreen
+import dev.dhun.ui.library.LibraryScreen
 import dev.dhun.ui.player.FullPlayer
 import dev.dhun.ui.player.MiniPlayer
 import dev.dhun.ui.search.SearchScreen
@@ -57,6 +60,7 @@ import kotlinx.coroutines.launch
 enum class AppTab(val title: String, val icon: String) {
     HOME("Home", "🏠"),
     SEARCH("Search", "🔍"),
+    LIBRARY("Library", "📚"),
     CATALOG("Catalog", "🎨"),
 }
 
@@ -78,18 +82,39 @@ fun DhunAppShell(
     nav: AppNavState,
     modifier: Modifier = Modifier,
     isDesktop: Boolean = false,
+    libraryViewModel: LibraryViewModel? = null,
 ) {
     val scope = rememberCoroutineScope()
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
     var addToPlaylistTrack by remember { mutableStateOf<Track?>(null) }
     val favoriteIds by homeViewModel.favoriteIds.collectAsState()
     val currentTrack by playerViewModel.currentTrack.collectAsState()
-
-    val onPlayTrack: (Track, List<Track>, Int) -> Unit = { track, contextQueue, index ->
-        scope.launch {
-            player.prepareQueue(contextQueue, index, playWhenReady = true)
-        }
+    // Phase 10: library owns Playlists / Favorites / History tabs.
+    // If the host doesn't supply a ViewModel, create one from DataLayer.
+    // Wire play-context via PlayerViewModel so history rows are labeled
+    // LIBRARY/HISTORY/PLAYLIST instead of UNKNOWN.
+    val libraryVm = libraryViewModel ?: remember(dataLayer, player, scope, playerViewModel) {
+        LibraryViewModel(
+            dataLayer = dataLayer,
+            player = player,
+            scope = scope,
+            setContext = { ctx -> playerViewModel.setPlayContext(ctx) },
+        )
     }
+
+    // Phase 10: RecordPlay contexts — every queue handoff labels the history row.
+    val onPlayTrack: (Track, List<Track>, Int) -> Unit = { _, queue, index ->
+        val ctx = when (nav.selectedTab) {
+            AppTab.HOME -> PlayContext.HOME
+            AppTab.SEARCH -> PlayContext.SEARCH
+            AppTab.LIBRARY -> PlayContext.LIBRARY
+            else -> PlayContext.UNKNOWN
+        }
+        playerViewModel.playQueue(queue, index, ctx)
+    }
+    val onPlayArtist: (Track, List<Track>, Int) -> Unit = { _, q, i -> playerViewModel.playQueue(q, i, PlayContext.ARTIST) }
+    val onPlayAlbum: (Track, List<Track>, Int) -> Unit = { _, q, i -> playerViewModel.playQueue(q, i, PlayContext.ALBUM) }
+    val onPlayPlaylist: (Track, List<Track>, Int) -> Unit = { _, q, i -> playerViewModel.playQueue(q, i, PlayContext.PLAYLIST) }
 
     val openArtist: (Track) -> Unit = { track ->
         track.artistId?.let { nav.push(DetailRoute.ArtistPage(it)) }
@@ -153,6 +178,7 @@ fun DhunAppShell(
                         tab = nav.selectedTab,
                         homeViewModel = homeViewModel,
                         searchViewModel = searchViewModel,
+                        libraryViewModel = libraryVm,
                         onPlayTrack = onPlayTrack,
                         onNavigate = { nav.push(it) },
                         onTrackOverflow = { overflowTrack = it },
@@ -163,7 +189,7 @@ fun DhunAppShell(
                         ArtistScreen(
                             viewModel = vm,
                             onBack = { nav.closeTop() },
-                            onTrackPlay = onPlayTrack,
+                            onTrackPlay = onPlayArtist,
                             onAlbumClick = { nav.push(DetailRoute.AlbumPage(it.id)) },
                             onArtistClick = { nav.push(DetailRoute.ArtistPage(it.id)) },
                             onPlaylistClick = { nav.push(DetailRoute.PlaylistPage(it.id)) },
@@ -176,7 +202,7 @@ fun DhunAppShell(
                         AlbumScreen(
                             viewModel = vm,
                             onBack = { nav.closeTop() },
-                            onTrackPlay = onPlayTrack,
+                            onTrackPlay = onPlayAlbum,
                             onArtistClick = { nav.push(DetailRoute.ArtistPage(it.id)) },
                             onTrackOverflow = { overflowTrack = it },
                         )
@@ -189,7 +215,7 @@ fun DhunAppShell(
                         PlaylistScreen(
                             viewModel = vm,
                             onBack = { nav.closeTop() },
-                            onTrackPlay = onPlayTrack,
+                            onTrackPlay = onPlayPlaylist,
                             onTrackOverflow = { overflowTrack = it },
                             onDeleted = { nav.closeTop() },
                         )
@@ -280,6 +306,7 @@ private fun TabContent(
     tab: AppTab,
     homeViewModel: HomeViewModel,
     searchViewModel: SearchViewModel,
+    libraryViewModel: LibraryViewModel,
     onPlayTrack: (Track, List<Track>, Int) -> Unit,
     onNavigate: (DetailRoute) -> Unit,
     onTrackOverflow: (Track) -> Unit,
@@ -303,6 +330,14 @@ private fun TabContent(
                 onPlaylistClick = { onNavigate(DetailRoute.PlaylistPage(it.id)) },
                 onArtistClick = { onNavigate(DetailRoute.ArtistPage(it.id)) },
                 onTrackOverflow = onTrackOverflow,
+            )
+        }
+        AppTab.LIBRARY -> {
+            LibraryScreen(
+                viewModel = libraryViewModel,
+                onPlaylistClick = { onNavigate(DetailRoute.PlaylistPage(it.id, isLocal = true)) },
+                onTrackOverflow = onTrackOverflow,
+                modifier = Modifier.fillMaxSize(),
             )
         }
         AppTab.CATALOG -> {

@@ -250,7 +250,7 @@ class RepositoriesTest {
     /* ---------------- Schema ---------------- */
 
     @Test
-    fun schemaVersionIsOne() {
-        assertEquals(1L, DhunDatabase.Schema.version)
+    fun schemaVersionIsTwo() {
+        assertEquals(2L, DhunDatabase.Schema.version)
     }
 }
