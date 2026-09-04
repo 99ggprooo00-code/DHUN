@@ -11,13 +11,21 @@ import dev.dhun.provider.forDesktop
 import kotlinx.coroutines.runBlocking
 
 /**
- * Phase 02 live smoke — drives the REAL provider stack end-to-end:
- * search (every filter) -> suggestions -> radio -> lyrics -> stream info,
+ * Live smoke — drives the REAL provider stack end-to-end:
+ * home feed -> search (every filter) -> suggestions -> radio -> lyrics -> stream info,
  * plus a QueueManager sanity pass. On-network verification, not a unit test.
  */
 fun main() = runBlocking {
     val provider = YouTubeMusicProvider.forDesktop()
-    println("=== Phase 02 smoke (live) ===")
+    println("=== Phase 02+07 smoke (live) ===")
+
+    when (val r = provider.homeFeed()) {
+        is DhunResult.Success -> {
+            val sections = r.value
+            println("SMOKE|home-feed|PASS|${sections.size} sections; top: ${sections.firstOrNull()?.title}")
+        }
+        is DhunResult.Failure -> println("SMOKE|home-feed|FAIL|${r.error}")
+    }
 
     when (val r = provider.search("coldplay", SearchFilter.SONGS)) {
         is DhunResult.Success -> {

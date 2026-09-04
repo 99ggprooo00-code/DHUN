@@ -25,6 +25,12 @@ interface DhunPlayer {
      */
     suspend fun prepareQueue(tracks: List<Track>, startIndex: Int = 0, playWhenReady: Boolean = true)
 
+    /** Inserts [track] immediately after the currently playing track. */
+    fun addNext(track: Track)
+
+    /** Appends [track] to the end of the current queue. */
+    fun addToQueue(track: Track)
+
     fun playPause()
     fun next()
     fun previous()

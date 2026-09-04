@@ -21,55 +21,36 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.dhun.design.DhunTheme
-import dev.dhun.design.catalog.ComponentCatalogScreen
 import androidx.core.content.ContextCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import dev.dhun.android.playback.AndroidDhunPlayer
 import dev.dhun.android.playback.DhunPlaybackService
 import dev.dhun.android.playback.PlaybackGraph
-import dev.dhun.android.ui.HarnessScreen
-import dev.dhun.core.toUserMessage
-import dev.dhun.player.DhunPlayer
+import dev.dhun.data.DataLayer
+import dev.dhun.design.DhunTheme
 import dev.dhun.player.NowPlayingPersistence
+import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.search.SearchViewModel
+import dev.dhun.ui.shell.DhunAppShell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
-import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.koin.core.context.GlobalContext
 
-/**
- * PHASE 03 TEST HARNESS — throwaway verification screen (search -> play ->
- * transport controls). Explicitly scheduled for replacement by the real UI
- * phases (MASTER_PROMPT.md Phase 06+). Do not polish this.
- *
- * Playback connection strategy (never an eternal spinner):
- *  1. Try MediaController (full experience: lock screen, notification).
- *  2. Retry up to [MAX_CONNECT_ATTEMPTS] times.
- *  3. Fall back to a session-less local ExoPlayer — audio still plays;
- *     only lock-screen/notification controls are degraded.
- *  4. If even that fails, show the actual error + a Retry button.
- */
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: dev.dhun.android.ui.HarnessViewModel by viewModel()
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var player: AndroidDhunPlayer? = null
     private var persistence: NowPlayingPersistence? = null
@@ -101,40 +82,35 @@ class MainActivity : ComponentActivity() {
                 // to the background with playback alive (service keeps
                 // playing) instead of finishing the activity.
                 BackHandler { moveTaskToBack(true) }
-                // Phase 06 debug catalog toggle — visible on every build so
-                // verification (blur, tokens, extractor) can be exercised
-                // without searching. Harness is throwaway; catalog proves Phase 06.
-                var showCatalog by remember { mutableStateOf(false) }
+
                 val ui by connectState.collectAsState()
+                val koin = GlobalContext.get()
+
                 when (val s = ui) {
                     is ConnectUi.Connecting -> ConnectingScreen(
                         log = connectLog.collectAsState().value,
                         version = appVersionName(),
                     )
-                    is ConnectUi.Ready -> if (showCatalog) {
-                        ComponentCatalogScreen(onClose = { showCatalog = false })
-                    } else androidx.compose.foundation.layout.Box(
+                    is ConnectUi.Ready -> androidx.compose.foundation.layout.Box(
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        player?.let {
-                            // Thin harness overlay: catalog entry point
-                            androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
-                                androidx.compose.foundation.layout.Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.End,
-                                ) {
-                                    androidx.compose.material3.TextButton(onClick = { showCatalog = true }) {
-                                        Text("Catalog", fontSize = 11.sp)
-                                    }
-                                }
-                                HarnessScreen(player = it, viewModel = viewModel)
-                            }
+                        player?.let { p ->
+                            val homeViewModel: HomeViewModel = koin.get()
+                            val searchViewModel: SearchViewModel = koin.get()
+                            val dataLayer: DataLayer = koin.get()
+
+                            DhunAppShell(
+                                player = p,
+                                homeViewModel = homeViewModel,
+                                searchViewModel = searchViewModel,
+                                dataLayer = dataLayer,
+                            )
                         }
                         s.reason?.let { reason ->
                             Surface(
                                 color = Color(0xFF2A1A00),
                                 modifier = Modifier
-                                    .align(Alignment.BottomCenter)
+                                    .align(Alignment.TopCenter)
                                     .fillMaxWidth(),
                             ) {
                                 Text(
@@ -199,8 +175,7 @@ class MainActivity : ComponentActivity() {
                 return
             }
             // Final fallback: session-less local player (audio works,
-            // lock-screen controls degraded). Any construction error lands
-            // in the same catch below.
+            // lock-screen controls degraded).
             try {
                 logLine("starting LOCAL fallback player…")
                 val cache = GlobalContext.get().get<dev.dhun.android.playback.DhunStreamCache>()
@@ -226,7 +201,7 @@ class MainActivity : ComponentActivity() {
         player?.release()
         persistence?.stop()
         player = p
-        // Phase 05: persist queue/position/history, restore the last session
+        // Persist queue/position/history, restore the last session
         // when the engine is idle (cold start). Restored = paused, never autoplay.
         val koin = GlobalContext.get()
         val pers = NowPlayingPersistence(

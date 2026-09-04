@@ -93,6 +93,24 @@ class DesktopDhunPlayer(
         }
     }
 
+    override fun addNext(track: Track) {
+        scope.launch {
+            opMutex.withLock {
+                queueManager.addNext(track)
+                _queue.value = queueManager.snapshot
+            }
+        }
+    }
+
+    override fun addToQueue(track: Track) {
+        scope.launch {
+            opMutex.withLock {
+                queueManager.addToQueue(track)
+                _queue.value = queueManager.snapshot
+            }
+        }
+    }
+
     override fun playPause() {
         if (pendingLazyStart) {
             scope.launch { opMutex.withLock { if (pendingLazyStart) playCurrentLocked(true) } }
