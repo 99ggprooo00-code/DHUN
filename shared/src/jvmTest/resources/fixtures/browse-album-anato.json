@@ -1,0 +1,447 @@
+{
+ "header": {
+  "musicResponsiveHeaderRenderer": {
+   "title": {
+    "runs": [
+     {
+      "text": "A Night at the Opera (Deluxe Remastered Version)"
+     }
+    ]
+   },
+   "subtitle": {
+    "runs": [
+     {
+      "text": "Queen",
+      "navigationEndpoint": {
+       "browseEndpoint": {
+        "browseId": "UC_queen"
+       }
+      }
+     },
+     {
+      "text": " \u2022 Album \u2022 1975"
+     }
+    ]
+   },
+   "secondSubtitle": {
+    "runs": [
+     {
+      "text": "12 songs \u2022 43 minutes"
+     }
+    ]
+   },
+   "description": {
+    "musicDescriptionShelfRenderer": {
+     "description": {
+      "runs": [
+       {
+        "text": "A Night at the Opera is the fourth studio album by the British rock band Queen."
+       }
+      ]
+     }
+    }
+   },
+   "thumbnail": {
+    "croppedSquareThumbnailRenderer": {
+     "thumbnail": {
+      "thumbnails": [
+       {
+        "url": "https://lh3.googleusercontent.com/anato_544.jpg",
+        "width": 544,
+        "height": 544
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ "contents": {
+  "twoColumnBrowseResultsRenderer": {
+   "secondaryContents": {
+    "sectionListRenderer": {
+     "contents": [
+      {
+       "musicShelfRenderer": {
+        "title": {
+         "runs": [
+          {
+           "text": "Songs"
+          }
+         ]
+        },
+        "contents": [
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Death on Two Legs"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Queen",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 3:43"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "dRRtKqO5UpY"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/anato_track_0.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Lazing on a Sunday Afternoon"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Queen",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 1:08"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "lPphkgVf7fQ"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/anato_track_1.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "I'm in Love with My Car"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Queen",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 3:05"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "qu4QYv1Yfqk"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/anato_track_2.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "You're My Best Friend"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Queen",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 2:50"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "HaZpZQG2z10"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/anato_track_3.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "39"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Queen",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 3:30"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "kUE8UjN5jDM"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/anato_track_4.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Bohemian Rhapsody (Remastered)"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Queen",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 5:55"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "fJ9rUzIMcZQ"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/anato_track_5.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      },
+      {
+       "musicCarouselShelfRenderer": {
+        "header": {
+         "musicCarouselShelfBasicHeaderRenderer": {
+          "title": {
+           "runs": [
+            {
+             "text": "More by Queen"
+            }
+           ]
+          }
+         }
+        },
+        "contents": [
+         {
+          "musicTwoRowItemRenderer": {
+           "title": {
+            "runs": [
+             {
+              "text": "News of the World"
+             }
+            ]
+           },
+           "subtitle": {
+            "runs": [
+             {
+              "text": "Album \u2022 1977"
+             }
+            ]
+           },
+           "navigationEndpoint": {
+            "browseEndpoint": {
+             "browseId": "MPREb_notw"
+            }
+           },
+           "thumbnailRenderer": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/notw.jpg",
+                "width": 226,
+                "height": 226
+               }
+              ]
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

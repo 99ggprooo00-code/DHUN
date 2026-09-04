@@ -2,6 +2,7 @@ package dev.dhun.desktop
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -18,10 +19,12 @@ import dev.dhun.domain.RestoreNowPlayingUseCase
 import dev.dhun.domain.SaveNowPlayingUseCase
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
 import dev.dhun.provider.forDesktop
+import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.DhunAppShell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,9 +34,9 @@ import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
 /**
- * Phase 04 + 07 Desktop entry point.
+ * Phase 04 + 07 + 08 Desktop entry point.
  * Window 1200x780, Koin graph, vlcj-backed player, full shared DhunAppShell UI
- * (Home, Search, MiniPlayer, Catalog).
+ * (Home, Search, full Player with volume slider, Catalog).
  */
 fun main() = application {
     val koin = startKoin { modules(desktopModule) }.koin
@@ -41,6 +44,8 @@ fun main() = application {
     val player: DesktopDhunPlayer = koin.get()
     val homeViewModel: HomeViewModel = koin.get()
     val searchViewModel: SearchViewModel = koin.get()
+    val playerViewModel: PlayerViewModel = koin.get()
+    val provider: MusicProvider = koin.get()
     val dataLayer: DataLayer = koin.get()
     val persistence: NowPlayingPersistence = koin.get()
 
@@ -61,11 +66,16 @@ fun main() = application {
         title = "DHUN",
     ) {
         DhunTheme {
+            val nav = remember { AppNavState() }
             DhunAppShell(
                 player = player,
                 homeViewModel = homeViewModel,
                 searchViewModel = searchViewModel,
+                playerViewModel = playerViewModel,
+                provider = provider,
                 dataLayer = dataLayer,
+                nav = nav,
+                isDesktop = true,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -92,6 +102,16 @@ private val desktopModule = module {
     }
 
     single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
+
+    // Phase 08 player UI model (queue ops, related/lyrics tabs, hold-to-seek).
+    single {
+        PlayerViewModel(
+            player = get<DesktopDhunPlayer>(),
+            provider = get(),
+            scope = get(),
+            persistence = get(),
+        )
+    }
 
     single {
         HomeViewModel(

@@ -128,6 +128,38 @@ class InnerTubeClient(
             parseHomeSections(postJson("browse", body))
         }
 
+    /* ---------------- browse pages (Phase 09) ---------------------------- */
+
+    /** Full artist page: top songs, albums, singles, related artists, about. */
+    suspend fun artistPage(browseId: String): DhunResult<dev.dhun.core.ArtistPage> =
+        resultify {
+            val body = buildJsonObject {
+                put("context", context())
+                put("browseId", browseId)
+            }
+            parseArtistPage(postJson("browse", body), browseId)
+        }
+
+    /** Full album page (browseId = MPREb…). */
+    suspend fun albumPage(browseId: String): DhunResult<dev.dhun.core.AlbumDetail> =
+        resultify {
+            val body = buildJsonObject {
+                put("context", context())
+                put("browseId", browseId)
+            }
+            parseAlbumPage(postJson("browse", body), browseId)
+        }
+
+    /** Full YTM playlist page (browseId = VL…). */
+    suspend fun playlistPage(browseId: String): DhunResult<dev.dhun.core.PlaylistDetail> =
+        resultify {
+            val body = buildJsonObject {
+                put("context", context())
+                put("browseId", browseId)
+            }
+            parsePlaylistPage(postJson("browse", body), browseId)
+        }
+
     /** Radio queue for a track (RDAMVM playlist = "start radio from this"). */
     suspend fun relatedTracks(videoId: String): DhunResult<List<Track>> =
         resultify {

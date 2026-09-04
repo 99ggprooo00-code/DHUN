@@ -35,8 +35,8 @@ fun TrackOverflowDialog(
     isFavorite: Boolean,
     onToggleFavorite: (Track) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
-    onNavigateToArtist: ((artistName: String) -> Unit)? = null,
-    onNavigateToAlbum: ((albumName: String) -> Unit)? = null,
+    onNavigateToArtist: ((track: Track) -> Unit)? = null,
+    onNavigateToAlbum: ((track: Track) -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -122,17 +122,17 @@ fun TrackOverflowDialog(
                         label = "Go to artist (${track.artistName})",
                         onClick = {
                             onDismiss()
-                            onNavigateToArtist(track.artistName)
+                            onNavigateToArtist(track)
                         },
                     )
                 }
-                if (!track.albumName.isNullOrBlank() && onNavigateToAlbum != null) {
+                if ((!track.albumName.isNullOrBlank() || track.albumId != null) && onNavigateToAlbum != null) {
                     OverflowActionRow(
                         icon = "💿",
-                        label = "Go to album (${track.albumName})",
+                        label = "Go to album (${track.albumName ?: "Album"})",
                         onClick = {
                             onDismiss()
-                            onNavigateToAlbum(track.albumName)
+                            onNavigateToAlbum(track)
                         },
                     )
                 }

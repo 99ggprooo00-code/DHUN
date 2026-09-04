@@ -37,7 +37,7 @@ internal fun JsonObject.searchBrowseId(): String? =
     (descend(this, listOf("navigationEndpoint", "browseEndpoint", "browseId"))
         as? JsonPrimitive)?.contentOrNull
 
-private fun trailingDuration(item: JsonObject): Int? {
+internal fun trailingDuration(item: JsonObject): Int? {
     val cols = item.arr("flexColumns") ?: return null
     for (i in cols.indices.reversed()) {
         val col = cols[i] as? JsonObject ?: continue
@@ -49,7 +49,7 @@ private fun trailingDuration(item: JsonObject): Int? {
     return null
 }
 
-private fun thumbnailOf(item: JsonObject): String? =
+internal fun thumbnailOf(item: JsonObject): String? =
     ((descend(item, listOf("thumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"))
         as? JsonArray ?: descend(item, listOf("thumbnailRenderer", "musicThumbnailRenderer", "thumbnail", "thumbnails"))
         as? JsonArray ?: descend(item, listOf("thumbnail", "thumbnails"))
@@ -86,14 +86,20 @@ internal fun parseSearchResults(query: String, root: JsonObject): SearchResults 
         val browseId = item.searchBrowseId()
 
         when {
-            videoId != null -> songs += Track(
-                id = videoId,
-                title = title,
-                artistName = parts.firstOrNull() ?: "Unknown artist",
-                albumName = parts.getOrNull(1),
-                durationSeconds = trailingDuration(item),
-                thumbnailUrl = thumbnailOf(item),
-            )
+            videoId != null -> {
+                val idsArtist = browseIdsOf(item.searchColumn(1))
+                val idsAlbum = browseIdsOf(item.searchColumn(2))
+                songs += Track(
+                    id = videoId,
+                    title = title,
+                    artistName = parts.firstOrNull() ?: "Unknown artist",
+                    artistId = idsArtist.first,
+                    albumName = parts.getOrNull(1),
+                    albumId = idsAlbum.second ?: idsArtist.second,
+                    durationSeconds = trailingDuration(item),
+                    thumbnailUrl = thumbnailOf(item),
+                )
+            }
             browseId != null && browseId.startsWith("MPREb") -> albums += Album(
                 id = browseId,
                 title = title,
@@ -165,16 +171,22 @@ internal fun parseHomeSections(root: JsonObject): List<HomeSection> {
                     val thumb = thumbnailOf(responsive)
 
                     when {
-                        videoId != null -> items += HomeItem.TrackItem(
-                            Track(
-                                id = videoId,
-                                title = trackTitle,
-                                artistName = parts.firstOrNull() ?: "Unknown artist",
-                                albumName = parts.getOrNull(1),
-                                durationSeconds = trailingDuration(responsive),
-                                thumbnailUrl = thumb,
+                        videoId != null -> {
+                            val idsArtist = browseIdsOf(responsive.searchColumn(1))
+                            val idsAlbum = browseIdsOf(responsive.searchColumn(2))
+                            items += HomeItem.TrackItem(
+                                Track(
+                                    id = videoId,
+                                    title = trackTitle,
+                                    artistName = parts.firstOrNull() ?: "Unknown artist",
+                                    artistId = idsArtist.first,
+                                    albumName = parts.getOrNull(1),
+                                    albumId = idsAlbum.second ?: idsArtist.second,
+                                    durationSeconds = trailingDuration(responsive),
+                                    thumbnailUrl = thumb,
+                                )
                             )
-                        )
+                        }
                         browseId != null && browseId.startsWith("MPREb") -> items += HomeItem.AlbumItem(
                             Album(
                                 id = browseId,
@@ -216,15 +228,20 @@ internal fun parseHomeSections(root: JsonObject): List<HomeSection> {
                     val thumb = thumbnailOf(twoRow)
 
                     when {
-                        videoId != null -> items += HomeItem.TrackItem(
-                            Track(
-                                id = videoId,
-                                title = itemTitle,
-                                artistName = parts.firstOrNull() ?: "Unknown artist",
-                                albumName = parts.getOrNull(1),
-                                thumbnailUrl = thumb,
+                        videoId != null -> {
+                            val ids = browseIdsOf(twoRow.obj("subtitle"))
+                            items += HomeItem.TrackItem(
+                                Track(
+                                    id = videoId,
+                                    title = itemTitle,
+                                    artistName = parts.firstOrNull() ?: "Unknown artist",
+                                    artistId = ids.first,
+                                    albumName = parts.getOrNull(1),
+                                    albumId = ids.second,
+                                    thumbnailUrl = thumb,
+                                )
                             )
-                        )
+                        }
                         browseId != null && browseId.startsWith("MPREb") -> items += HomeItem.AlbumItem(
                             Album(
                                 id = browseId,
@@ -281,11 +298,14 @@ internal fun parseRelatedTracks(root: JsonObject): List<Track> {
         val duration = p.firstRunText("lengthText", "runs")
             ?.let { durationRegex.find(it)?.destructured }
             ?.let { (mm, ss) -> mm.toInt() * 60 + ss.toInt() }
+        val bylineIds = browseIdsOf(descend(p, listOf("longBylineText", "runs")))
         Track(
             id = id,
             title = title,
             artistName = byline?.firstOrNull() ?: "Unknown artist",
+            artistId = bylineIds.first,
             albumName = byline?.getOrNull(1),
+            albumId = bylineIds.second,
             durationSeconds = duration,
             thumbnailUrl = (descend(p, listOf("thumbnail", "thumbnails"))
                 as? JsonArray)?.firstOrNull()?.let { (it as? JsonObject)?.str("url") },
