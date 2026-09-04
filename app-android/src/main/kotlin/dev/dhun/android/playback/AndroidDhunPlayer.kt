@@ -70,11 +70,11 @@ class AndroidDhunPlayer(
         refresh()
     }
 
-    override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int) {
+    override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
         tracks.forEach { trackMap[it.id] = it }
         player.setMediaItems(tracks.map { it.toMediaItem() }, startIndex, 0L)
+        player.playWhenReady = playWhenReady
         player.prepare()
-        player.play()
         refresh()
     }
 
@@ -135,6 +135,10 @@ class AndroidDhunPlayer(
             player.playbackState == Player.STATE_BUFFERING ->
                 PlaybackState.Buffering(track ?: UNKNOWN)
             player.playbackState == Player.STATE_READY ->
+                PlaybackState.Paused(track ?: UNKNOWN)
+            // Restored-but-not-prepared queue (playWhenReady=false before
+            // buffering) is still a paused session, not an idle player.
+            player.mediaItemCount > 0 && player.playbackState != Player.STATE_IDLE ->
                 PlaybackState.Paused(track ?: UNKNOWN)
             else -> PlaybackState.Idle
         }

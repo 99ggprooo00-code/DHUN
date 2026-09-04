@@ -30,11 +30,11 @@ Requires JDK 17 and an Android SDK (`ANDROID_HOME`).
 
 ```bash
 ./gradlew :app-android:assembleDebug   # Android debug APK
-./gradlew :shared:jvmTest              # domain + parser + queue unit tests
+./gradlew :shared:jvmTest              # domain + parser + queue + data-layer unit tests
 ./gradlew :tools:playback-probe:run    # extraction probe (needs PYTHONPATH w/ yt-dlp for the resolve step)
 ./gradlew :tools:playback-probe:run -PmainClass=dev.dhun.tools.smoke.SmokeMainKt  # live provider smoke
-# Desktop (Phase 04): first uncomment include(":app-desktop") in settings.gradle.kts
 ./gradlew :app-desktop:run             # desktop app (needs libVLC + yt-dlp; see KNOWN_LIMITATIONS.md)
+./gradlew :app-desktop:compileKotlinJvm  # desktop compile check (what CI should run)
 ```
 
 APK output: `app-android/build/outputs/apk/debug/app-android-debug.apk`

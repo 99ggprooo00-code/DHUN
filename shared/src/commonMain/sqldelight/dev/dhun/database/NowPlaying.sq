@@ -1,0 +1,39 @@
+-- Persisted queue + position so a cold start restores where the user was.
+CREATE TABLE NowPlayingQueue (
+    position INTEGER NOT NULL PRIMARY KEY,
+    trackId TEXT NOT NULL REFERENCES Track(id)
+);
+
+CREATE TABLE NowPlayingState (
+    id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+    currentIndex INTEGER NOT NULL,
+    positionMs INTEGER NOT NULL,
+    repeatMode TEXT NOT NULL,
+    shuffle INTEGER AS kotlin.Boolean NOT NULL,
+    savedAt INTEGER NOT NULL
+);
+
+clearQueue:
+DELETE FROM NowPlayingQueue;
+
+insertQueueItem:
+INSERT INTO NowPlayingQueue(position, trackId) VALUES (?, ?);
+
+selectQueueTracks:
+SELECT Track.* FROM NowPlayingQueue
+JOIN Track ON Track.id = NowPlayingQueue.trackId
+ORDER BY NowPlayingQueue.position ASC;
+
+-- REPLACE is safe here: single row, no FKs point at NowPlayingState.
+upsertState:
+INSERT OR REPLACE INTO NowPlayingState(id, currentIndex, positionMs, repeatMode, shuffle, savedAt)
+VALUES (1, ?, ?, ?, ?, ?);
+
+updatePosition:
+UPDATE NowPlayingState SET positionMs = ?, currentIndex = ?, savedAt = ? WHERE id = 1;
+
+selectState:
+SELECT * FROM NowPlayingState WHERE id = 1;
+
+clearState:
+DELETE FROM NowPlayingState;

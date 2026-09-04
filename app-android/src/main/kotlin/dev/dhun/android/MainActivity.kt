@@ -38,6 +38,7 @@ import dev.dhun.android.playback.PlaybackGraph
 import dev.dhun.android.ui.HarnessScreen
 import dev.dhun.core.toUserMessage
 import dev.dhun.player.DhunPlayer
+import dev.dhun.player.NowPlayingPersistence
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: dev.dhun.android.ui.HarnessViewModel by viewModel()
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var player: AndroidDhunPlayer? = null
+    private var persistence: NowPlayingPersistence? = null
 
     private sealed interface ConnectUi {
         data object Connecting : ConnectUi
@@ -137,6 +139,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        persistence?.stop()
         player?.release()
         player = null
         activityScope.cancel()
@@ -201,7 +204,26 @@ class MainActivity : ComponentActivity() {
 
     private fun attach(p: AndroidDhunPlayer) {
         player?.release()
+        persistence?.stop()
         player = p
+        // Phase 05: persist queue/position/history, restore the last session
+        // when the engine is idle (cold start). Restored = paused, never autoplay.
+        val koin = GlobalContext.get()
+        val pers = NowPlayingPersistence(
+            player = p,
+            save = koin.get(),
+            restore = koin.get(),
+            recordPlay = koin.get(),
+            scope = activityScope,
+            log = { Log.i(TAG, "persistence: $it") },
+        )
+        persistence = pers
+        activityScope.launch {
+            runCatching { pers.restore() }
+                .onFailure { Log.w(TAG, "queue restore failed", it) }
+                .onSuccess { snap -> if (snap != null) logLine("restored ${snap.queue.size} tracks (paused)") }
+            pers.start()
+        }
     }
 
     private fun Throwable.toDhunStyleMessage(): String =

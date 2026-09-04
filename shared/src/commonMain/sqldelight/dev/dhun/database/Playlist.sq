@@ -1,0 +1,70 @@
+CREATE TABLE Playlist (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    thumbnailUrl TEXT,
+    isLocal INTEGER AS kotlin.Boolean NOT NULL DEFAULT 1,
+    youtubePlaylistId TEXT,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL
+);
+
+CREATE TABLE PlaylistTrack (
+    playlistId TEXT NOT NULL REFERENCES Playlist(id) ON DELETE CASCADE,
+    trackId TEXT NOT NULL REFERENCES Track(id),
+    position INTEGER NOT NULL,
+    addedAt INTEGER NOT NULL,
+    PRIMARY KEY (playlistId, trackId)
+);
+
+CREATE INDEX PlaylistTrack_playlist_position ON PlaylistTrack(playlistId, position);
+
+insert:
+INSERT INTO Playlist(id, name, description, thumbnailUrl, isLocal, youtubePlaylistId, createdAt, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+rename:
+UPDATE Playlist SET name = ?, updatedAt = ? WHERE id = ?;
+
+touch:
+UPDATE Playlist SET updatedAt = ? WHERE id = ?;
+
+delete:
+DELETE FROM Playlist WHERE id = ?;
+
+selectAll:
+SELECT Playlist.*, (SELECT COUNT(*) FROM PlaylistTrack WHERE PlaylistTrack.playlistId = Playlist.id) AS trackCount
+FROM Playlist ORDER BY updatedAt DESC;
+
+selectById:
+SELECT Playlist.*, (SELECT COUNT(*) FROM PlaylistTrack WHERE PlaylistTrack.playlistId = Playlist.id) AS trackCount
+FROM Playlist WHERE id = ?;
+
+-- Playlist tracks -----------------------------------------------------------
+
+insertTrack:
+INSERT OR IGNORE INTO PlaylistTrack(playlistId, trackId, position, addedAt) VALUES (?, ?, ?, ?);
+
+maxPosition:
+SELECT MAX(position) FROM PlaylistTrack WHERE playlistId = ?;
+
+deleteTrack:
+DELETE FROM PlaylistTrack WHERE playlistId = ? AND trackId = ?;
+
+deleteAllTracks:
+DELETE FROM PlaylistTrack WHERE playlistId = ?;
+
+updatePosition:
+UPDATE PlaylistTrack SET position = ? WHERE playlistId = ? AND trackId = ?;
+
+selectTrackIdsOrdered:
+SELECT trackId FROM PlaylistTrack WHERE playlistId = ? ORDER BY position ASC;
+
+selectTracks:
+SELECT Track.* FROM PlaylistTrack
+JOIN Track ON Track.id = PlaylistTrack.trackId
+WHERE PlaylistTrack.playlistId = ?
+ORDER BY PlaylistTrack.position ASC;
+
+containsTrack:
+SELECT COUNT(*) FROM PlaylistTrack WHERE playlistId = ? AND trackId = ?;

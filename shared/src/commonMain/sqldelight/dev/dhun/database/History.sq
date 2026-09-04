@@ -1,0 +1,35 @@
+CREATE TABLE History (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trackId TEXT NOT NULL REFERENCES Track(id),
+    playedAt INTEGER NOT NULL,
+    playedFromContext TEXT,
+    completedPlayback INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0
+);
+
+CREATE INDEX History_playedAt ON History(playedAt DESC);
+
+insert:
+INSERT INTO History(trackId, playedAt, playedFromContext, completedPlayback) VALUES (?, ?, ?, 0);
+
+markCompleted:
+UPDATE History SET completedPlayback = 1 WHERE trackId = ? AND playedAt = ?;
+
+selectRecent:
+SELECT History.id AS entryId, History.playedAt, History.playedFromContext, History.completedPlayback, Track.*
+FROM History JOIN Track ON Track.id = History.trackId
+ORDER BY History.playedAt DESC LIMIT ?;
+
+-- Distinct tracks, most-recent play first ("Listen again").
+selectRecentlyPlayedTracks:
+SELECT Track.* FROM Track
+JOIN (SELECT trackId, MAX(playedAt) AS lastPlayed FROM History GROUP BY trackId) H ON H.trackId = Track.id
+ORDER BY H.lastPlayed DESC LIMIT ?;
+
+deleteById:
+DELETE FROM History WHERE id = ?;
+
+deleteAll:
+DELETE FROM History;
+
+playCount:
+SELECT COUNT(*) FROM History WHERE trackId = ?;

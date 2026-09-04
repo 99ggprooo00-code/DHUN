@@ -1,6 +1,13 @@
 package dev.dhun.android.di
 
 import dev.dhun.android.playback.DhunStreamCache
+import dev.dhun.data.DataLayer
+import dev.dhun.data.DatabaseDriverFactory
+import dev.dhun.data.DatabaseFactory
+import dev.dhun.domain.RecordPlayUseCase
+import dev.dhun.domain.RestoreNowPlayingUseCase
+import dev.dhun.domain.SaveNowPlayingUseCase
+import org.koin.android.ext.koin.androidContext
 import dev.dhun.extraction.OwnClientStreamResolver
 import dev.dhun.extraction.StreamResolver
 import dev.dhun.innertube.InnerTubeClient
@@ -21,5 +28,12 @@ val appModule = module {
     single<StreamResolver> { OwnClientStreamResolver(get()) }
     single<MusicProvider> { YouTubeMusicProvider(get(), get()) }
     single { DhunStreamCache(get()) }
-    viewModel { dev.dhun.android.ui.HarnessViewModel(get()) }
+
+    // Phase 05 data layer: one SQLite database, repositories + use cases.
+    single { DataLayer(DatabaseFactory.create(DatabaseDriverFactory(androidContext()).createDriver())) }
+    single { SaveNowPlayingUseCase(get<DataLayer>().nowPlaying) }
+    single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
+    single { RecordPlayUseCase(get<DataLayer>().history) }
+
+    viewModel { dev.dhun.android.ui.HarnessViewModel(get(), get()) }
 }

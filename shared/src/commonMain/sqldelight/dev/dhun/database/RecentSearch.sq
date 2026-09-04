@@ -1,0 +1,21 @@
+CREATE TABLE RecentSearch (
+    query TEXT NOT NULL PRIMARY KEY,
+    searchedAt INTEGER NOT NULL
+);
+
+-- REPLACE is safe here: no FKs point at RecentSearch.
+upsert:
+INSERT OR REPLACE INTO RecentSearch(query, searchedAt) VALUES (?, ?);
+
+selectRecent:
+SELECT query FROM RecentSearch ORDER BY searchedAt DESC LIMIT ?;
+
+delete:
+DELETE FROM RecentSearch WHERE query = ?;
+
+deleteAll:
+DELETE FROM RecentSearch;
+
+-- keep the table bounded
+trimTo:
+DELETE FROM RecentSearch WHERE query NOT IN (SELECT query FROM RecentSearch ORDER BY searchedAt DESC LIMIT ?);

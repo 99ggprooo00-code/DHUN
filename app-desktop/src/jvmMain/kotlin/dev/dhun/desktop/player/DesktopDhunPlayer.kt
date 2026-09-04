@@ -56,6 +56,8 @@ class DesktopDhunPlayer(
     override val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
 
     private var pollJob: Job? = null
+    private var pendingLazyStart = false // restored queue, not yet resolved
+    private var pendingSeekMs = 0L
 
     init {
         mediaPlayer.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
@@ -83,15 +85,19 @@ class DesktopDhunPlayer(
         })
     }
 
-    override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int) {
+    override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
         opMutex.withLock {
             queueManager.setQueue(tracks, startIndex)
             _queue.value = queueManager.snapshot
-            playCurrentLocked()
+            playCurrentLocked(playWhenReady)
         }
     }
 
     override fun playPause() {
+        if (pendingLazyStart) {
+            scope.launch { opMutex.withLock { if (pendingLazyStart) playCurrentLocked(true) } }
+            return
+        }
         when (_state.value) {
             is PlaybackState.Playing -> mediaPlayer.controls().pause()
             is PlaybackState.Paused, is PlaybackState.Buffering -> mediaPlayer.controls().play()
@@ -129,8 +135,26 @@ class DesktopDhunPlayer(
 
     override fun seekTo(positionMs: Long) {
         val safe = positionMs.coerceAtLeast(0)
+        if (pendingLazyStart) {
+            // Nothing loaded yet: remember it and apply once playback starts.
+            pendingSeekMs = safe
+            _positionMs.value = safe
+            return
+        }
         mediaPlayer.controls().setTime(safe)
         _positionMs.value = safe
+    }
+
+    /** libVLC ignores setTime before the media is actually playing. */
+    private suspend fun seekWhenPlaying(positionMs: Long) {
+        repeat(40) {
+            if (_state.value is PlaybackState.Playing) {
+                mediaPlayer.controls().setTime(positionMs)
+                _positionMs.value = positionMs
+                return
+            }
+            delay(100)
+        }
     }
 
     override fun setRepeatMode(mode: RepeatMode) {
@@ -165,19 +189,30 @@ class DesktopDhunPlayer(
         }
     }
 
-    private suspend fun playCurrentLocked() {
+    private suspend fun playCurrentLocked(playWhenReady: Boolean = true) {
         val track = queueManager.current ?: run {
             _state.value = PlaybackState.Idle
             return
         }
         _currentTrack.value = track
+        _durationMs.value = (track.durationSeconds ?: 0) * 1000L
+        if (!playWhenReady) {
+            // Restored session: do not resolve or touch libVLC until the user
+            // presses play (stream URLs expire anyway). playPause() handles it.
+            pendingLazyStart = true
+            _state.value = PlaybackState.Paused(track)
+            return
+        }
+        pendingLazyStart = false
         _state.value = PlaybackState.Resolving(track)
         when (val result = provider.getStreamInfo(track.id)) {
             is DhunResult.Success -> {
-                _durationMs.value = (track.durationSeconds ?: 0) * 1000L
                 mediaPlayer.media().play(result.value.audioUrl)
                 startPolling()
                 _state.value = PlaybackState.Buffering(track)
+                val resume = pendingSeekMs
+                pendingSeekMs = 0
+                if (resume > 0) scope.launch { seekWhenPlaying(resume) }
             }
             is DhunResult.Failure -> {
                 _state.value = PlaybackState.Error(track, result.error.toUserMessage())

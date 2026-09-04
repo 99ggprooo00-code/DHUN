@@ -1,0 +1,21 @@
+CREATE TABLE Favorite (
+    trackId TEXT NOT NULL PRIMARY KEY REFERENCES Track(id) ON DELETE CASCADE,
+    addedAt INTEGER NOT NULL
+);
+
+insert:
+INSERT OR IGNORE INTO Favorite(trackId, addedAt) VALUES (?, ?);
+
+delete:
+DELETE FROM Favorite WHERE trackId = ?;
+
+isFavorite:
+SELECT COUNT(*) FROM Favorite WHERE trackId = ?;
+
+selectAllTracks:
+SELECT Track.* FROM Favorite
+JOIN Track ON Track.id = Favorite.trackId
+ORDER BY Favorite.addedAt DESC;
+
+selectIds:
+SELECT trackId FROM Favorite;

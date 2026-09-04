@@ -3,6 +3,10 @@ package dev.dhun.desktop.ui
 import dev.dhun.core.DhunResult
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
+import dev.dhun.data.DataLayer
+import dev.dhun.domain.ToggleFavoriteUseCase
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
@@ -18,6 +22,7 @@ import kotlinx.coroutines.launch
  */
 class DesktopHarnessViewModel(
     private val provider: MusicProvider,
+    private val data: DataLayer,
     private val scope: CoroutineScope,
 ) {
 
@@ -31,6 +36,21 @@ class DesktopHarnessViewModel(
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    /* ---- Phase 05 hooks (verification of the data layer in-app) ---- */
+
+    val favoriteIds: StateFlow<Set<String>> = data.library.observeFavoriteIds()
+        .stateIn(scope, SharingStarted.Eagerly, emptySet())
+
+    val recentlyPlayed: StateFlow<List<Track>> = data.history.observeRecentlyPlayed(10)
+        .stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    val recentSearches: StateFlow<List<String>> = data.search.observeRecentSearches(8)
+        .stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    fun toggleFavorite(track: Track) {
+        scope.launch { ToggleFavoriteUseCase(data.library)(track) }
+    }
+
     fun onQueryChange(query: String) {
         _state.value = _state.value.copy(query = query, error = null)
     }
@@ -40,6 +60,7 @@ class DesktopHarnessViewModel(
         if (query.isEmpty()) return
         _state.value = _state.value.copy(loading = true, error = null)
         scope.launch {
+            data.search.recordSearch(query)
             when (val result = provider.search(query, SearchFilter.SONGS)) {
                 is DhunResult.Success -> _state.value = _state.value.copy(
                     loading = false,

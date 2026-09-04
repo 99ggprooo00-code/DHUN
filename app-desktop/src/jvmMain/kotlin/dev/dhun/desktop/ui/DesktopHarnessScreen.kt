@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +46,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun DesktopHarnessScreen(player: DhunPlayer, viewModel: DesktopHarnessViewModel) {
     val ui by viewModel.state.collectAsState()
+    val favoriteIds by viewModel.favoriteIds.collectAsState()
+    val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
+    val recentSearches by viewModel.recentSearches.collectAsState()
     val state by player.state.collectAsState()
     val current by player.currentTrack.collectAsState()
     val position by player.positionMs.collectAsState()
@@ -81,6 +86,26 @@ fun DesktopHarnessScreen(player: DhunPlayer, viewModel: DesktopHarnessViewModel)
                     Text(it, color = Color(0xFFCF6679), modifier = Modifier.padding(top = 8.dp))
                 }
 
+                // Phase 05 verification strip: recent searches + "listen again"
+                // come from the local database and must survive a restart.
+                if (recentSearches.isNotEmpty()) {
+                    Text("Recent: " + recentSearches.joinToString(" · "), fontSize = 11.sp, color = Color(0xFF777777))
+                }
+                if (recentlyPlayed.isNotEmpty()) {
+                    Text("Listen again", fontSize = 12.sp, color = Color(0xFF888888), modifier = Modifier.padding(top = 6.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(recentlyPlayed, key = { it.id }) { t ->
+                            Surface(
+                                color = Color(0xFF1E1E1E),
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.clickable { scope.launch { player.prepareQueue(recentlyPlayed, recentlyPlayed.indexOf(t)) } },
+                            ) {
+                                Text(t.title.take(22), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                            }
+                        }
+                    }
+                }
+
                 if (ui.loading) {
                     CircularProgressIndicator(
                         modifier = Modifier.padding(top = 16.dp).size(28.dp),
@@ -92,20 +117,27 @@ fun DesktopHarnessScreen(player: DhunPlayer, viewModel: DesktopHarnessViewModel)
                     modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp),
                 ) {
                     itemsIndexed(ui.tracks) { index, track ->
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { scope.launch { player.prepareQueue(ui.tracks, index) } }
                                 .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(track.title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                            Text(
-                                "${track.artistName}" +
-                                    (track.albumName?.let { " • $it" } ?: "") +
-                                    (track.durationSeconds?.let { " • ${formatSeconds(it)}" } ?: ""),
-                                fontSize = 12.sp,
-                                color = Color(0xFFAAAAAA),
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(track.title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                                Text(
+                                    "${track.artistName}" +
+                                        (track.albumName?.let { " • $it" } ?: "") +
+                                        (track.durationSeconds?.let { " • ${formatSeconds(it)}" } ?: ""),
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFAAAAAA),
+                                )
+                            }
+                            val fav = track.id in favoriteIds
+                            TextButton(onClick = { viewModel.toggleFavorite(track) }) {
+                                Text(if (fav) "♥" else "♡", fontSize = 20.sp, color = if (fav) Color(0xFFBB86FC) else Color(0xFF777777))
+                            }
                         }
                         HorizontalDivider(color = Color(0xFF222222))
                     }

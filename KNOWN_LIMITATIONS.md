@@ -27,12 +27,14 @@ Updated every phase. Nothing hidden.
   where YouTube gates WEB_REMIX player calls, playback shows a typed
   "needs signed-in session" error instead of audio until upstream engines
   are drill-green.
-- Desktop (Phase 04): module code is committed but CI-opt-in —
-  `include(":app-desktop")` is commented in settings.gradle.kts pending a
-  toolchain fix; applying a second Kotlin Gradle plugin flavor (kotlin
-  "jvm" or org.jetbrains.compose) alongside :shared's kotlin
-  "multiplatform" breaks Gradle configuration of every task in this repo's
-  CI (full bisection evidence: docs/verification/04-desktop.md). Runs
-  locally via `./gradlew :app-desktop:run` after uncommenting.
+- Desktop (Phase 04): module is in the build; CI configures it on every
+  run but only compiles it once the owner adds the workflow step (agent
+  token lacks `workflows` permission — see docs/verification/04-desktop.md).
+  Installer `packageVersion` is 1.0.x (Compose packagers reject MAJOR 0).
+- Data layer (Phase 05): schema is v1 with no migrations yet; the DB file is
+  `dhun.db` (Android app data dir; desktop per-OS user data dir). Restored
+  sessions come back **paused** at the saved position — stream URLs expire,
+  so the desktop player re-resolves lazily on the first play press.
+  Playback history is local-only; nothing leaves the device.
 - Desktop (Phase 04) runtime needs a system libVLC install and `yt-dlp` on
   PATH (streams resolve own-client first, yt-dlp failover — ADR-001).
