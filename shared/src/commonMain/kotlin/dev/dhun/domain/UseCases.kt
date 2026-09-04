@@ -6,6 +6,7 @@ import dev.dhun.core.HomeFeed
 import dev.dhun.core.HomeSection
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
+import dev.dhun.data.EpochClock
 import dev.dhun.data.HistoryRepository
 import dev.dhun.data.LibraryRepository
 import dev.dhun.data.LocalPlaylist
@@ -16,7 +17,6 @@ import dev.dhun.data.PlaylistRepository
 import dev.dhun.data.SearchRepository
 import dev.dhun.data.SettingsKeys
 import dev.dhun.data.SettingsRepository
-import dev.dhun.data.SystemClock
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.flow.Flow
 
@@ -30,9 +30,10 @@ import kotlinx.coroutines.flow.Flow
 class GetHomeFeedUseCase(
     private val provider: MusicProvider,
     private val history: HistoryRepository,
+    private val clock: EpochClock = EpochClock.System,
 ) {
     suspend operator fun invoke(): DhunResult<HomeFeed> {
-        val greeting = greetingForCurrentTime()
+        val greeting = greetingForCurrentTime(clock)
         return when (val r = provider.homeFeed()) {
             is DhunResult.Success -> {
                 val sections = r.value
@@ -66,8 +67,8 @@ class GetHomeFeedUseCase(
             else -> "Good night"
         }
 
-        fun greetingForCurrentTime(): String {
-            val epochMs = SystemClock.nowEpochMs()
+        fun greetingForCurrentTime(clock: EpochClock = EpochClock.System): String {
+            val epochMs = clock.nowMs()
             val totalHours = (epochMs / 3_600_000L)
             val utcHour = ((totalHours % 24) + 24) % 24
             return greetingForHour(utcHour.toInt())
