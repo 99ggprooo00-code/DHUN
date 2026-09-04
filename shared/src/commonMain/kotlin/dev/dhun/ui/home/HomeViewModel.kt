@@ -2,7 +2,6 @@ package dev.dhun.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.HomeItem
 import dev.dhun.core.HomeSection
@@ -10,8 +9,6 @@ import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
 import dev.dhun.data.DataLayer
 import dev.dhun.domain.AddToPlaylistUseCase
-import dev.dhun.domain.RecordPlayUseCase
-import dev.dhun.domain.RecentlySearchesUseCase
 import dev.dhun.domain.ToggleFavoriteUseCase
 import dev.dhun.innertube.InnerTubeClient
 import dev.dhun.innertube.parseHomeSections
