@@ -11,13 +11,13 @@ import dev.dhun.domain.SaveNowPlayingUseCase
 import dev.dhun.player.NowPlayingPersistence
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import androidx.compose.ui.window.exitApplication
 import androidx.compose.ui.window.rememberWindowState
 import dev.dhun.desktop.player.DesktopDhunPlayer
 import dev.dhun.desktop.ui.DesktopHarnessScreen
 import dev.dhun.desktop.ui.DesktopHarnessViewModel
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
+import dev.dhun.provider.forDesktop
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

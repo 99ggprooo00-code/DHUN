@@ -1,5 +1,50 @@
 # ROADMAP — live status
 
+## CURRENT ACTIVE TASK (updated 2026-09-04, end of session)
+
+**Branch:** `arena/01a06537-dhun` · **PR:** [#4](https://github.com/99ggprooo00-code/DHUN/pull/4) (draft) — "Phase 05: data layer + desktop CI activation"
+
+**Phase:** 05 — Data layer (SQLDelight, repositories, use cases). Code is complete; the PR is one CI fix away from mergeable.
+
+**File we were working on:** `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt`
+
+**Last error (CI run `33713453544` on commit `f8a3958`, step "Probe compiles", which now also compiles `:app-desktop`):**
+```
+app-desktop/.../Main.kt:63  Unresolved reference 'forDesktop'
+app-desktop/.../Main.kt:14  Unresolved reference 'exitApplication'
+```
+Cause: `forDesktop` is an extension on `YouTubeMusicProvider.Companion` living in `shared/jvmMain/.../ProviderFactoriesJvm.kt` and needs its own import; `exitApplication` is a member of `ApplicationScope`, not a top-level import (that import line was never valid — the desktop module had simply never been compiled in CI before this session). Shared tests (55) and the Android build were **green** in that same run.
+
+**Fix already applied in this commit (unverified by CI yet):** added `import dev.dhun.provider.forDesktop`, removed the bogus `exitApplication` import.
+
+**Exact next step tomorrow:**
+1. `gh run list --branch arena/01a06537-dhun --limit 1` → confirm the run for THIS commit is green. If not, read the annotations (`gh api repos/99ggprooo00-code/DHUN/check-runs/<job-id>/annotations`) — the build scripts now publish Gradle causes, Kotlin `e:` lines and failing test names there, since CI logs are unreachable from the sandbox.
+2. Mark PR #4 ready (`gh pr ready 4`) and merge it (squash) → Phase 05 code lands on `main`; the rolling `test` release rebuilds the APK.
+3. Ask the user for the hardware checks listed in `docs/verification/05-data-layer.md` (favorite survives restart; queue restored paused at position) plus the still-open Phase 03-C / Phase 04 checklists. These do not block Phase 06.
+4. Start **Phase 06 — Design system** (`PROMPT_SEQUENCE.md`): new `shared/design/` tokens, GlassCard with real blur, ArtworkImage (Coil 3), ComponentCatalogScreen. One PR.
+
+**Note for whoever resumes:** the sandbox git history was reset to `f215a1e` between turns while the files were kept; `git reset --hard origin/arena/01a06537-dhun` restored it. Always trust the remote branch.
+
+### Phase 05 step-by-step status
+
+| Step (PROMPT_SEQUENCE.md Phase 05 "Build") | Status |
+|---|---|
+| SQLDelight schema v1: Track, Playlist, PlaylistTrack, Favorite, History, Settings, RecentSearch (+ NowPlayingQueue/State), `cachedAt` reserved | ✅ done (`shared/src/commonMain/sqldelight/dev/dhun/database/*.sq`) |
+| Migrations from v1 onward | ✅ infrastructure in place (schema v1, no `.sqm` yet — first needed at v2; `verifyMigrations` to enable then) |
+| Drivers: Android `AndroidSqliteDriver`, JVM `JdbcSqliteDriver` | ✅ done, FKs on, per-OS DB path on desktop |
+| Repositories: Track, Library, Playlist, History, Settings, Search (+ NowPlaying) | ✅ done (`dev.dhun.data`) |
+| Use cases: ToggleFavorite, CreatePlaylist, AddToPlaylist, RemoveFromPlaylist, RecordPlay, GetRecentlyPlayed, GetHistory, UpdateSetting, … | ✅ done (`dev.dhun.domain`) |
+| Settings keys object | ✅ done (`SettingsKeys`) |
+| Now-playing persistence: restore last queue + position on cold start, both platforms | ✅ done (shared `NowPlayingPersistence`, wired in Android `MainActivity` + desktop `Main.kt`; restores **paused**) |
+| Tests: every repository on in-memory DB, every use case, queue-restore round-trip | ✅ done, 21 new tests green in CI (run `33713067921`) |
+| THIRD_PARTY: SQLDelight row | ✅ already present |
+| Acceptance 1 — repo tests green | ✅ JVM in CI; Android target compiles the same code |
+| Acceptance 2 — favorite round-trip verified in-app, both platforms | ⬜ OPEN — user hardware check |
+| Acceptance 3 — queue survives app restart on Android | ⬜ OPEN — user hardware check |
+| PR #4 CI fully green + merged | ⬜ OPEN — desktop compile fix pushed, awaiting CI |
+
+---
+
 > Operational phase-by-phase prompts (audit + rewritten sequence):
 > [PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md).
 
