@@ -10,9 +10,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.px
-import androidx.compose.ui.window.ComposeWindow
-import androidx.compose.ui.window.LocalWindow
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -72,8 +69,10 @@ import java.util.concurrent.atomic.AtomicReference
  *    Ctrl+Q quit
  *
  * NOTE (1.8.2 API): `Window`'s content lambda takes NO receiver
- * (WindowScope landed later) — the AWT/Compose window handle comes from
- * [LocalWindow] (`ComposeWindow.show/hide/requestFocus`).
+ * (WindowScope landed later) and `LocalWindow` is INTERNAL in 1.8.2 —
+ * so the AWT window handles come from the public JDK API
+ * `java.awt.Frame.getFrames()` with an exact-title lookup (both DHUN
+ * windows are plain `java.awt.Frame`s created by Compose Desktop).
  */
 fun main() = application {
     val koin = startKoin { modules(desktopModule) }.koin
@@ -108,31 +107,33 @@ fun main() = application {
         }.getOrDefault(true)
     }
 
-    val mainWindowRef = AtomicReference<ComposeWindow>()
-    val miniWindowRef = AtomicReference<ComposeWindow>()
-    var miniVisible = true
+    /**
+     * Live AWT frame lookup by exact title (Compose Desktop windows are
+     * java.awt.Frame; `LocalWindow` is internal in Compose Desktop 1.8.2).
+     */
+    fun findFrame(title: String): java.awt.Frame? =
+        runCatching { java.awt.Frame.getFrames() }.getOrNull()
+            ?.firstOrNull { it.title == title }
 
     fun showMainWindow() {
-        val w = mainWindowRef.get() ?: return
-        w.show()
-        w.requestFocus()
+        val f = findFrame("DHUN") ?: return
+        f.isVisible = true
+        f.toFront()
+        f.requestFocus()
     }
 
     fun toggleMiniPlayer() {
-        val w = miniWindowRef.get() ?: return
-        miniVisible = !miniVisible
-        if (miniVisible) {
-            w.show()
-            w.requestFocus()
-        } else {
-            w.hide()
+        val f = findFrame("DHUN mini-player") ?: return
+        f.isVisible = !f.isVisible
+        if (f.isVisible) {
+            f.toFront()
+            f.requestFocus()
         }
     }
 
-    /** Windows px rect of the main window (null off-Windows / not found). */
     fun saveGeometry() {
-        val rect = Smct.windowRect("DHUN") ?: return
-        val geo = "${rect[0]},${rect[1]},${rect[2]},${rect[3]}"
+        val f = findFrame("DHUN") ?: return
+        val geo = "${f.x},${f.y},${f.width},${f.height}"
         appScope.launch { runCatching { settings.putString(SettingsKeys.WINDOW_GEOMETRY, geo) } }
     }
 
@@ -187,8 +188,7 @@ fun main() = application {
     Window(
         onCloseRequest = {
             // X hides (not disposes) — Ctrl+M / tray "Open" always work.
-            miniVisible = false
-            miniWindowRef.get()?.hide()
+            findFrame("DHUN mini-player")?.isVisible = false
         },
         state = rememberWindowState(
             width = 320.dp,
@@ -200,10 +200,6 @@ fun main() = application {
         resizable = false,
         skipTaskbar = true,
     ) {
-        val miniWindow = LocalWindow.current
-        LaunchedEffect(miniWindow) {
-            miniWindowRef.set(miniWindow)
-        }
         DhunTheme {
             MiniPlayerContent(
                 viewModel = playerViewModel,
@@ -218,14 +214,16 @@ fun main() = application {
             if (closeToTray) {
                 // Phase 12: close → tray (default on). Tray "Quit" exits.
                 saveGeometry()
-                mainWindowRef.get()?.hide()
+                findFrame("DHUN")?.isVisible = false
             } else {
                 quit()
             }
         },
         state = rememberWindowState(
-            width = initialGeometry?.let { it.w.toFloat().px } ?: 1200.dp,
-            height = initialGeometry?.let { it.h.toFloat().px } ?: 780.dp,
+            // saved px interpreted as dp: exact at 100% scaling, off by the
+            // display scale factor on HiDPI (harmless; re-saved on next close)
+            width = initialGeometry?.let { it.w.dp } ?: 1200.dp,
+            height = initialGeometry?.let { it.h.dp } ?: 780.dp,
             position = initialGeometry?.let { Offset(it.x.toFloat(), it.y.toFloat()) }
                 ?: Offset.Unspecified,
         ),
@@ -282,10 +280,6 @@ fun main() = application {
             }
         },
     ) {
-        val mainWindow = LocalWindow.current
-        LaunchedEffect(mainWindow) {
-            mainWindowRef.set(mainWindow)
-        }
         DhunTheme {
             DhunAppShell(
                 player = player,

@@ -157,23 +157,6 @@ object Smct {
     }.getOrNull()
 
     /**
-     * Screen rect (x, y, width, height in px) of the top-level AWT window
-     * [windowTitle]. Windows-only (JNA User32); null elsewhere or if not
-     * found. Used by the window-geometry persistence.
-     */
-    fun windowRect(windowTitle: String): IntArray? = if (!isWindows) null else runCatching {
-        val hwnd = User32.INSTANCE.FindWindowW("SunAwtFrame", windowTitle) ?: return@runCatching null
-        val rect = User32.RECT()
-        if (!User32.INSTANCE.GetWindowRect(hwnd, rect)) return@runCatching null
-        intArrayOf(
-            rect.left,
-            rect.top,
-            rect.right - rect.left,
-            rect.bottom - rect.top,
-        )
-    }.getOrNull()
-
-    /**
      * Moves the top-level AWT window [windowTitle] by (dx, dy) px.
      * Windows-only (JNA SetWindowPos, no size/z-order/activation changes);
      * used by the mini-player's in-content drag.

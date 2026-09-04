@@ -1,16 +1,29 @@
 # ROADMAP — live status
 
-## CURRENT ACTIVE TASK (updated 2026-09-04, session arena/01a06b14-dhun)
+## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a06b14-dhun)
 
-**Branch:** `arena/01a06b14-dhun` · **PR:** #8 **MERGED** @ `d27eb37` — "Merge PR #8: Library & History + synced Lyrics (Phase 10+11)" (CI green on head: `33842104141` 3m24s) — the merge commit is the current `main`
+**Branch:** `arena/01a06b14-dhun` · **PR:** **#9 OPEN** (head `f50dba4`) — "feat(desktop): Phase 12 — desktop native integrations (tray, mini-player, shortcuts, close-to-tray, SMTC spike phase 1)". PR #8 (Phases 10+11) is already **MERGED** @ `d27eb37` = current `main`.
 
-**Phase:** 12 — Desktop Native Integrations — 🟨 CODE COMPLETE (spike phase 1: tray + mini-player + shortcuts + close-to-tray/geometry + SMTC activation probe); CI gate + Windows on-hardware probe OPEN. Phases 10+11 ✅ **MERGED** — code + unit tests in `main`; **on-hardware verification OPEN** (physical Android/desktop run, like the Phases 08/09 checklists).
+**Phase:** 12 — Desktop Native Integrations — 🟨 IN PROGRESS (all code pushed; CI compile gate running; hardware OPEN). Phases 10+11 ✅ **MERGED** — **on-hardware verification OPEN** (user's physical run; concrete tracks ready in `docs/verification/11-lyrics.md`).
 
-**Files this session:** verification prep — `docs/verification/11-lyrics.md` gained a live-pre-verified test track list (LRCLIB API checked from sandbox via fetch_page: Queen–Bohemian Rhapsody synced EN/long + blanks, Arijit Singh–Channa Mereya synced HI, PSY–Gangnam Style synced KR, Luis Fonsi–Despacito synced ES, YOASOBI–夜に駆ける unsynced JP; 3 NE candidates 404 = coverage finding). Phase 12 code — `app-desktop`: `native/TrayIcons.kt` (in-code tray glyphs), `native/DhunTray.kt` (AWT SystemTray, EDT-marshaled, headless-safe), `ui/MiniPlayerWindow.kt` (320×88 content + `dragWindow` click-vs-drag), `smct/Smct.kt` (JNA/WinRT probe phase 1 — activation + GetForWindow + live check, GUIDs cross-referenced), `Main.kt` (two windows, shortcuts `onKeyEvent`, close-to-tray, geometry, clean quit), `build.gradle.kts` (+JNA 5.17.0), `THIRD_PARTY.md`, `KNOWN_LIMITATIONS.md`, `docs/verification/12-desktop-native.md`.
+**File we were working on:** `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt` (primary), plus `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/smct/Smct.kt` and `.../ui/MiniPlayerWindow.kt` — Compose Desktop **1.8.2 API fixes** for the Phase 12 code.
 
-**Last error:** none. Sandbox notes: no local JDK (CI is the compile gate, annotations on); no device/adb/display (on-hardware items are the user's physical run); direct `curl` has no egress but `fetch_page` does — use it for live API pre-verification.
+**Last error:** CI run `33887658349` (pushed `ffa138b`) — **FAILED** (7m11s), `:app-desktop` compile errors from the annotations:
+1. `Unresolved reference 'window'` (+ `Cannot infer type for this parameter` ×2) — `Window`'s content lambda has **no `WindowScope` receiver in Compose Desktop 1.8.2**; the code used `windowScope.window`
+2. `Argument type mismatch: actual type is 'Dp', but 'Float' was expected` ×2 — `rememberWindowState(position = Offset(…))` takes **px Floats** (code passed `.dp`)
+3. `Unresolved reference 'quitRef'` — forward reference to a local val (tray constructed before `quitRef` declared)
+4. `No value passed for parameter 'value'` + `None of the following candidates is applicable` ×2 — cascades of (1) (unresolved `Window(...)` call left the trailing `content` lambda unbound)
 
-**Exact next step:** push → CI green (expect: `:app-desktop` compiles with JNA + new files; `:shared:jvmTest` unchanged) → read annotations, fix any compile error → **user's Windows machine**: run the `docs/verification/12-desktop-native.md` checklist (tray, close-to-tray, geometry, mini-player, shortcuts, `SMTC probe` console line, `createMsi` + clean-VM install) → per the probe result, either implement SMTC spike **phase 2** (`UpdateMetadata` + `ButtonPressed` events — IIDs pulled on-machine per the doc's procedure) or lock in the documented fallback → Phase 13 (Android polish) or Phase 14 items per the dependency map. In parallel: user runs the Phase 10+11 on-hardware checklists (concrete track list ready in `docs/verification/11-lyrics.md`).
+**Fix (pushed `f50dba4`):** window handle via `LocalWindow.current` (`ComposeWindow.show/hide/requestFocus`) for close-to-tray / tray "Open" / Ctrl+M; positions+sizes in px (`.px`); `quitRef` declared before the tray; window ops (SMTC probe, geometry save via `GetWindowRect`, mini drag via `SetWindowPos`) title-based via JNA (`FindWindowW("SunAwtFrame", …)` — Windows; decorated title bar drags natively elsewhere); shortcuts stay on `Window(onKeyEvent)` (window scope, unconsumed keys only).
+
+**Exact next step:**
+1. Read CI for `f50dba4` — run **`33928843140`** (in progress at writing): `gh pr checks 9`; if red, `gh api repos/99ggprooo00-code/DHUN/check-runs/<id>/annotations` → fix remaining compile errors, re-push (loop until green).
+2. CI green → **merge PR #9**.
+3. **User's Windows machine** (`docs/verification/12-desktop-native.md` checklist): tray (icon variants + 6-item menu), close-to-tray ≠ quit + clean quit (no zombie vlc), window geometry restore, mini-player (always-on-top / drag / click-opens-main / Ctrl+M), all 7 shortcuts + text-field negative check, **`SMTC probe` console line**, `:app-desktop:createMsi` + clean-VM install.
+4. Per SMTC probe result → implement spike **phase 2** (`UpdateMetadata` + `ButtonPressed` events; IIDs pulled on-machine per the doc's procedure) or lock in the documented fallback (tray + shortcuts — already the shipping path).
+5. In parallel (any machine): user runs the Phase 10+11 on-hardware checklists.
+
+**Standing sandbox notes:** no local JDK (CI is the compile gate, annotations on); no device/adb/display (on-hardware items are the user's physical run); direct `curl` has no egress but `fetch_page` does; **GitHub token in this sandbox expires between turns — if a push/gh call returns "Invalid username or token", reconnect GitHub in Arena**.
 
 ### Phase 11 step-by-step status — ✅ MERGED @ `d27eb37` (PR #8) — on-hardware verification OPEN (test track list pre-verified against live LRCLIB)
 
@@ -38,17 +51,18 @@
 | Acceptance 2 — History grouping/timestamps correct; clear works | 🟨 OPEN — code done, on-hardware: play 5 tracks → Library→History shows grouped Today/Yesterday/date with relative `"just now"/"5m ago"` + long-press remove + `Clear all` confirm |
 | Acceptance 3 — Empty states for all tabs | ✅ done (`EmptyView` for Playlists/Favorites/History empty + `Create playlist` action) — on-hardware visual check OPEN |
 
-### Phase 12 step-by-step status — CURRENT PHASE (🟨 CODE COMPLETE spike phase 1 — Windows probe + phase 2 OPEN)
+### Phase 12 step-by-step status — CURRENT PHASE (🟨 IN PROGRESS — code pushed `f50dba4`, CI compile gate running `33928843140`; nothing counts done until CI green + hardware)
 
 | Step (PROMPT_SEQUENCE.md Phase 12 "Build") | Status |
 |---|---|
-| SMTC spike (3-day timebox): now-playing tile, artwork, media keys; stable → integrate, else documented fallback | 🟨 phase 1 done — `smct/Smct.kt` probe (WinRT activation via JNA/combase → `ISystemMediaTransportControlsInterop` ddb0472d-… → `GetForWindow` (slot 6, offset 48 cross-checked vs ctypes impl) → `IsTransportControlsButtonVisible` live check); HRESULT-logged, `-Ddhun.smct=false` off; phase 2 (UpdateMetadata + ButtonPressed; IIDs via on-machine winmd pull) + fallback decision OPEN on Windows |
-| System tray: icon playing/paused variants; menu track title / play-pause / next / prev / open / quit | ✅ code — `native/DhunTray.kt` + `native/TrayIcons.kt` (AWT, EDT-marshaled, headless-safe) |
-| Mini-player window: 320×88 always-on-top; artwork/title/transport/progress; draggable; click opens main | ✅ code — `ui/MiniPlayerWindow.kt` + second Compose `Window` in `Main.kt` (hide-not-close, Ctrl+M toggle) |
-| Keyboard shortcuts: Space, ←/→ seek 5s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+M mini-player, Ctrl+Q quit | ✅ code — `Main.kt` `onKeyEvent` (press-only, text-field-safe) |
-| Close-to-tray (default on), remembered window state | ✅ code — `SettingsKeys.CLOSE_TO_TRAY`/`WINDOW_GEOMETRY` read/save in `Main.kt`; `DO_NOTHING_ON_CLOSE` + hide; geometry restored via `rememberWindowState(position=…)` |
-| Packaging: jpackage `.msi` with app icon; clean-VM install test | 🟨 code ready (Phase 04 `createMsi` target, `packageVersion` 1.0.x) — icon + clean-VM install OPEN on Windows |
-| Acceptance 1 — media keys control playback (SMTC or documented fallback) | 🟨 OPEN — probe on hardware; fallback (tray + shortcuts) already ships |
+| SMTC spike (3-day timebox): now-playing tile, artwork, media keys; stable → integrate, else documented fallback | 🟨 **phase 1 code pushed** (`smct/Smct.kt` — WinRT activation via JNA/combase → `ISystemMediaTransportControlsInterop` ddb0472d-… → `GetForWindow` (slot 6, offset 48 cross-checked vs ctypes impl) → `IsTransportControlsButtonVisible` live check; HRESULT-logged, `-Ddhun.smct=false` off) — CI compile pending; **on-Windows probe OPEN**; phase 2 (UpdateMetadata + ButtonPressed; IIDs via on-machine winmd pull) + fallback decision OPEN |
+| System tray: icon playing/paused variants; menu track title / play-pause / next / prev / open / quit | 🟨 **code pushed** (`native/DhunTray.kt` + `native/TrayIcons.kt` — AWT, EDT-marshaled, headless-safe) — CI compile pending (first push `ffa138b` was RED); hardware OPEN |
+| Mini-player window: 320×88 always-on-top; artwork/title/transport/progress; draggable; click opens main | 🟨 **code pushed** (`ui/MiniPlayerWindow.kt` + second Compose `Window` in `Main.kt` — hide-not-close, Ctrl+M toggle, JNA drag on Windows) — CI compile pending; hardware OPEN |
+| Keyboard shortcuts: Space, ←/→ seek 5s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+M mini-player, Ctrl+Q quit | 🟨 **code pushed** (`Main.kt` `Window(onKeyEvent)` — KeyDown-only, text-field-safe) — CI compile pending; hardware OPEN |
+| Close-to-tray (default on), remembered window state | 🟨 **code pushed** (`SettingsKeys.CLOSE_TO_TRAY`/`WINDOW_GEOMETRY` read/save in `Main.kt`; `ComposeWindow.hide` + geometry via JNA `GetWindowRect`, restored via `rememberWindowState(position=…)` px) — CI compile pending; hardware OPEN |
+| Packaging: jpackage `.msi` with app icon; clean-VM install test | 🟨 `createMsi` target exists (Phase 04, CI-green then, `packageVersion` 1.0.x) — app icon + clean-VM install OPEN on Windows |
+| Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY (code-level, auditable) | ✅ **done + pushed** (`docs/verification/12-desktop-native.md` code-audit table + phase-2 procedure + hardware checklist; KNOWN_LIMITATIONS SMTC/media-keys honesty note; THIRD_PARTY JNA 5.17.0 — all in `ffa138b`) |
+| Acceptance 1 — media keys control playback (SMTC or documented fallback) | 🟨 OPEN — on hardware; fallback (tray + shortcuts) already ships |
 | Acceptance 2 — tray fully functional; close-to-tray ≠ quit; tray quit exits clean (no zombies) | 🟨 OPEN — `docs/verification/12-desktop-native.md` checklist |
 | Acceptance 3 — mini-player mirrors state live | 🟨 OPEN — flows-driven (`currentTrack`/`positionMs`/`state`) — visual check on hardware |
 | Acceptance 4 — installer installs and runs on a clean machine | 🟨 OPEN — `:app-desktop:createMsi` on Windows |
@@ -114,7 +128,7 @@ All Phase 07 items complete and verified; kept below for history:
 | 09 | Artist / Album / Playlist pages | ✅ MERGED — PR #7 @ `3fce5e5` (same CI); browse parsers (artist/album/playlist) + client/provider endpoints, entities, VMs, screens (parallax artist, tinted album, editable local playlist), AppNavState detail-stack navigation wired everywhere; fixture tests + BrowseViewModelTest green; `docs/verification/09-browse-pages.md` (hardware OPEN: 3 artists / 3 albums / local CRUD) | docs/verification/09-browse-pages.md |
 | 10 | Library & history screens | ✅ MERGED — PR #8 @ `d27eb37` (CI green `33842104141`); LibraryViewModel + LibraryScreen (3 tabs, swipe/long-press, relative times, clear-all), PlayerViewModel + DhunAppShell RecordPlay wiring, LibraryViewModelTest (7 tests); on-hardware checklist OPEN (`docs/verification/10-library.md`) | docs/verification/10-library.md |
 | 11 | Lyrics (LRCLIB + YTM, synced) | ✅ MERGED — PR #8 @ `d27eb37` (same CI); `LrcParser` + `LrcLibSource`/`YouTubeLyricsSource`/`LyricsRepository` (cache→YTM→LRCLIB), `LyricsCache` v2 + `LyricsCacheRepository`, Koin wiring (android+desktop), `LyricsTabContent` (synced scroll/tap-seek/unsynced/empty), `LrcParserTest` (10 tests); test track list live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); on-hardware checklist OPEN | docs/verification/11-lyrics.md |
-| 12 | Desktop native (SMTC spike, tray, mini-player, jpackage) | 🟨 CODE COMPLETE (spike phase 1) — AWT tray (playing/paused icons, spec menu, headless-safe), mini-player window (320×88 always-on-top, drag + click-to-open), keyboard shortcuts (Space/←→/Ctrl+←→/Ctrl+F/Ctrl+M/Ctrl+Q, text-field-safe), close-to-tray (default on) + window geometry persistence, clean-quit path, SMTC JNA probe phase 1 (WinRT activation + GetForWindow, GUIDs cross-referenced, `-Ddhun.smct=false` off-switch); jpackage/MSI + SMTC phase 2 (metadata + media keys) OPEN on hardware | docs/verification/12-desktop-native.md |
+| 12 | Desktop native (SMTC spike, tray, mini-player, jpackage) | 🟨 IN PROGRESS — all code pushed (`f50dba4` on PR #9): AWT tray (playing/paused icons, spec menu, headless-safe), mini-player window (320×88 always-on-top, drag + click-to-open), keyboard shortcuts (Space/←→/Ctrl+←→/Ctrl+F/Ctrl+M/Ctrl+Q, text-field-safe), close-to-tray (default on) + window geometry persistence, clean-quit path, SMTC JNA probe phase 1 (WinRT activation + GetForWindow, GUIDs cross-referenced, `-Ddhun.smct=false` off-switch); **CI compile gate running** (`33928843140`; first push was RED — 1.8.2 API fixes applied); jpackage/MSI + SMTC phase 2 (metadata + media keys) OPEN on hardware | docs/verification/12-desktop-native.md |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | ⬜ not started | — |
 | 14 | Robustness + rot-drill CI + release v0.1.0 | ⬜ not started | — |
 
