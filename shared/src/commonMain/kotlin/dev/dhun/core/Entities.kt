@@ -86,6 +86,49 @@ data class HistoryEntry(
     val entryId: Long? = null,
 )
 
+/* ---------------- Browse pages (Phase 09) --------------------------------- */
+
+/** Full artist page model from InnerTube browse. */
+data class ArtistPage(
+    val artist: Artist,
+    val monthlyListeners: String? = null,
+    val description: String? = null,
+    val topSongs: List<Track> = emptyList(),
+    /** browseId of the "Songs" playlist page (watched "show all" target), if any. */
+    val topSongsPlaylistId: String? = null,
+    val albums: List<Album> = emptyList(),
+    val singles: List<Album> = emptyList(),
+    val featuredPlaylists: List<Playlist> = emptyList(),
+    val relatedArtists: List<Artist> = emptyList(),
+)
+
+/** Full album page model from InnerTube browse. */
+data class AlbumDetail(
+    val id: String, // MPREb…
+    val title: String,
+    val artistName: String? = null,
+    val artistId: String? = null,
+    val year: String? = null,
+    val trackCountText: String? = null,
+    val durationText: String? = null,
+    val thumbnailUrl: String? = null,
+    val description: String? = null,
+    val tracks: List<Track> = emptyList(),
+    /** "More by …" carousel target (usually a playlist browse id). */
+    val moreByArtistBrowseId: String? = null,
+)
+
+/** Full (remote) playlist page model from InnerTube browse. */
+data class PlaylistDetail(
+    val id: String, // VL…
+    val title: String,
+    val authorName: String? = null,
+    val trackCountText: String? = null,
+    val description: String? = null,
+    val thumbnailUrl: String? = null,
+    val tracks: List<Track> = emptyList(),
+)
+
 /** Resolved playback information for one track. */
 data class StreamInfo(
     val videoId: String,

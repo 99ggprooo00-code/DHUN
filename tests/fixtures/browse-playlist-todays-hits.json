@@ -1,0 +1,335 @@
+{
+ "header": {
+  "musicResponsiveHeaderRenderer": {
+   "title": {
+    "runs": [
+     {
+      "text": "Today's Hits"
+     }
+    ]
+   },
+   "subtitle": {
+    "runs": [
+     {
+      "text": "YouTube Music \u2022 50 songs"
+     }
+    ]
+   },
+   "description": {
+    "musicDescriptionShelfRenderer": {
+     "description": {
+      "runs": [
+       {
+        "text": "The hottest tracks right now, updated daily."
+       }
+      ]
+     }
+    }
+   },
+   "thumbnail": {
+    "musicThumbnailRenderer": {
+     "thumbnail": {
+      "thumbnails": [
+       {
+        "url": "https://lh3.googleusercontent.com/todays_hits_544.jpg",
+        "width": 544,
+        "height": 544
+       }
+      ]
+     }
+    }
+   }
+  }
+ },
+ "contents": {
+  "twoColumnBrowseResultsRenderer": {
+   "secondaryContents": {
+    "sectionListRenderer": {
+     "contents": [
+      {
+       "musicPlaylistShelfRenderer": {
+        "contents": [
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Espresso"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Sabrina Carpenter",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 Short n' Sweet"
+                },
+                {
+                 "text": " \u2022 2:55"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "eVli-tstMns"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/pl_track_0.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Billie Jean"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Michael Jackson",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 Thriller 25"
+                },
+                {
+                 "text": " \u2022 4:53"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "Zi_XLOBDo_Y"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/pl_track_1.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Die With A Smile"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Lady Gaga & Bruno Mars",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 Mayhem"
+                },
+                {
+                 "text": " \u2022 4:11"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "kPa7bsKwL-c"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/pl_track_2.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Nights"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Frank Ocean",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 Blonde"
+                },
+                {
+                 "text": " \u2022 5:07"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "r4l9bFuaMa0"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/pl_track_3.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicResponsiveListItemRenderer": {
+           "flexColumns": [
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "Mr. Brightside"
+                }
+               ]
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+               "runs": [
+                {
+                 "text": "The Killers",
+                 "navigationEndpoint": {
+                  "browseEndpoint": {
+                   "browseId": "UC_queen"
+                  }
+                 }
+                },
+                {
+                 "text": " \u2022 Hot Fuss"
+                },
+                {
+                 "text": " \u2022 3:43"
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "playlistItemData": {
+            "videoId": "gGdGFtwCNBE"
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://lh3.googleusercontent.com/pl_track_4.jpg",
+                "width": 60,
+                "height": 60
+               }
+              ]
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

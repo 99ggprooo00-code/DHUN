@@ -1,10 +1,13 @@
 package dev.dhun.presentation
 
+import dev.dhun.core.AlbumDetail
+import dev.dhun.core.ArtistPage
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.HomeItem
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
+import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.SearchResults
 import dev.dhun.core.StreamInfo
 import dev.dhun.core.Track
@@ -45,6 +48,13 @@ class HomeViewModelTest {
         override suspend fun relatedTracks(videoId: String) = DhunResult.Success(emptyList<Track>())
         override suspend fun getStreamInfo(videoId: String) = DhunResult.Failure(DhunError.Unavailable)
         override suspend fun getLyrics(videoId: String) = DhunResult.Success(Lyrics.NotAvailable)
+
+        override suspend fun artistPage(browseId: String): DhunResult<ArtistPage> =
+            DhunResult.Failure(DhunError.Unavailable)
+        override suspend fun albumPage(browseId: String): DhunResult<AlbumDetail> =
+            DhunResult.Failure(DhunError.Unavailable)
+        override suspend fun playlistPage(browseId: String): DhunResult<PlaylistDetail> =
+            DhunResult.Failure(DhunError.Unavailable)
     }
 
     private suspend fun eventually(timeoutMs: Long = 5_000, check: suspend () -> Boolean) {

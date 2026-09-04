@@ -55,11 +55,25 @@ class DesktopDhunPlayer(
     private val _durationMs = MutableStateFlow(0L)
     override val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
 
+    private val _currentQueueIndex = MutableStateFlow(-1)
+    override val currentQueueIndex: StateFlow<Int> = _currentQueueIndex.asStateFlow()
+
+    private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
+    override val repeatMode: StateFlow<RepeatMode> = _repeatMode.asStateFlow()
+
+    private val _shuffleEnabled = MutableStateFlow(false)
+    override val shuffleEnabled: StateFlow<Boolean> = _shuffleEnabled.asStateFlow()
+
+    private val _volume = MutableStateFlow(1f)
+    override val volume: StateFlow<Float> = _volume.asStateFlow()
+
     private var pollJob: Job? = null
     private var pendingLazyStart = false // restored queue, not yet resolved
     private var pendingSeekMs = 0L
 
     init {
+        _volume.value =
+            runCatching { mediaPlayer.audio().volume() / 100f }.getOrDefault(1f).coerceIn(0f, 1f)
         mediaPlayer.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
             override fun playing(mediaPlayer: MediaPlayer) {
                 _state.value = PlaybackState.Playing(_currentTrack.value ?: UNKNOWN)
@@ -88,7 +102,9 @@ class DesktopDhunPlayer(
     override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
         opMutex.withLock {
             queueManager.setQueue(tracks, startIndex)
-            _queue.value = queueManager.snapshot
+            _repeatMode.value = queueManager.repeatMode
+            _shuffleEnabled.value = queueManager.shuffleEnabled
+            publishQueueLocked()
             playCurrentLocked(playWhenReady)
         }
     }
@@ -97,7 +113,7 @@ class DesktopDhunPlayer(
         scope.launch {
             opMutex.withLock {
                 queueManager.addNext(track)
-                _queue.value = queueManager.snapshot
+                publishQueueLocked()
             }
         }
     }
@@ -106,7 +122,38 @@ class DesktopDhunPlayer(
         scope.launch {
             opMutex.withLock {
                 queueManager.addToQueue(track)
-                _queue.value = queueManager.snapshot
+                publishQueueLocked()
+            }
+        }
+    }
+
+    override fun playAt(index: Int) {
+        scope.launch {
+            opMutex.withLock {
+                if (queueManager.playAt(index) != null) playCurrentLocked()
+            }
+        }
+    }
+
+    override fun removeFromQueue(index: Int) {
+        scope.launch {
+            opMutex.withLock {
+                val removingCurrent = index == queueManager.currentIndex
+                if (!queueManager.removeAt(index)) return@withLock
+                publishQueueLocked()
+                if (removingCurrent) {
+                    // Removing the playing entry advances to whatever now
+                    // sits at its position; empty queue stops the player.
+                    if (queueManager.isEmpty) stopLocked() else playCurrentLocked()
+                }
+            }
+        }
+    }
+
+    override fun moveInQueue(from: Int, to: Int) {
+        scope.launch {
+            opMutex.withLock {
+                if (queueManager.move(from, to)) publishQueueLocked()
             }
         }
     }
@@ -177,13 +224,21 @@ class DesktopDhunPlayer(
 
     override fun setRepeatMode(mode: RepeatMode) {
         queueManager.setRepeatMode(mode)
+        _repeatMode.value = queueManager.repeatMode
     }
 
     override fun setShuffle(enabled: Boolean) {
         if (queueManager.shuffleEnabled != enabled) {
             queueManager.toggleShuffle()
-            _queue.value = queueManager.snapshot
+            _shuffleEnabled.value = queueManager.shuffleEnabled
+            publishQueueLocked()
         }
+    }
+
+    override fun setVolume(volume: Float) {
+        val v = volume.coerceIn(0f, 1f)
+        _volume.value = v
+        runCatching { mediaPlayer.audio().setVolume((v * 100).toInt()) }
     }
 
     override fun stop() {
@@ -213,6 +268,7 @@ class DesktopDhunPlayer(
             return
         }
         _currentTrack.value = track
+        publishQueueLocked()
         _durationMs.value = (track.durationSeconds ?: 0) * 1000L
         if (!playWhenReady) {
             // Restored session: do not resolve or touch libVLC until the user
@@ -243,6 +299,7 @@ class DesktopDhunPlayer(
         pollJob = null
         mediaPlayer.controls().stop()
         _positionMs.value = 0
+        publishQueueLocked()
         _state.value = PlaybackState.Idle
     }
 
@@ -257,6 +314,12 @@ class DesktopDhunPlayer(
                 delay(POLL_MS)
             }
         }
+    }
+
+    /** Publishes queue + current-index flows. Call only while holding [opMutex]. */
+    private fun publishQueueLocked() {
+        _queue.value = queueManager.snapshot
+        _currentQueueIndex.value = queueManager.currentIndex
     }
 
     companion object {

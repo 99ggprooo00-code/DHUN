@@ -45,6 +45,8 @@ fun AddToPlaylistDialog(
     playlistRepository: PlaylistRepository,
     onDismiss: () -> Unit,
     onAdded: (playlistName: String) -> Unit,
+    /** Phase 09: breadcrumb into the local playlist page after adding. */
+    onOpenPlaylist: ((playlistId: String) -> Unit)? = null,
 ) {
     val playlists by playlistRepository.observePlaylists().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -169,6 +171,13 @@ fun AddToPlaylistDialog(
                                             style = MaterialTheme.typography.labelSmall,
                                             color = DhunColors.textTertiary,
                                         )
+                                    }
+                                    if (onOpenPlaylist != null) {
+                                        DhunTextButton(
+                                            onClick = { onOpenPlaylist(playlist.id) },
+                                        ) {
+                                            Text("Open", fontSize = 12.sp)
+                                        }
                                     }
                                 }
                             }

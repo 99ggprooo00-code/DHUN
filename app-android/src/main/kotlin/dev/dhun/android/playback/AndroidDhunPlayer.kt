@@ -47,6 +47,18 @@ class AndroidDhunPlayer(
     private val _durationMs = MutableStateFlow(0L)
     override val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
 
+    private val _currentQueueIndex = MutableStateFlow(-1)
+    override val currentQueueIndex: StateFlow<Int> = _currentQueueIndex.asStateFlow()
+
+    private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
+    override val repeatMode: StateFlow<RepeatMode> = _repeatMode.asStateFlow()
+
+    private val _shuffleEnabled = MutableStateFlow(false)
+    override val shuffleEnabled: StateFlow<Boolean> = _shuffleEnabled.asStateFlow()
+
+    private val _volume = MutableStateFlow(1f)
+    override val volume: StateFlow<Float> = _volume.asStateFlow()
+
     private val pollJob: Job = scope.launch {
         while (isActive) {
             if (player.isPlaying) {
@@ -63,6 +75,10 @@ class AndroidDhunPlayer(
         override fun onIsPlayingChanged(isPlaying: Boolean) = refresh()
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = refresh()
         override fun onPlayerError(error: PlaybackException) = refresh()
+        override fun onRepeatModeChanged(repeatMode: Int) = refresh()
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) = refresh()
+        override fun onVolumeChanged(volume: Float) = refresh()
+        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) = refresh()
     }
 
     init {
@@ -91,6 +107,25 @@ class AndroidDhunPlayer(
         refresh()
     }
 
+    override fun playAt(index: Int) {
+        if (index !in 0 until player.mediaItemCount) return
+        player.seekTo(index, androidx.media3.common.C.TIME_UNSET)
+        player.play()
+        refresh()
+    }
+
+    override fun removeFromQueue(index: Int) {
+        if (index !in 0 until player.mediaItemCount) return
+        player.removeMediaItem(index)
+        refresh()
+    }
+
+    override fun moveInQueue(from: Int, to: Int) {
+        if (from !in 0 until player.mediaItemCount || to !in 0 until player.mediaItemCount || from == to) return
+        player.moveMediaItem(from, to)
+        refresh()
+    }
+
     override fun playPause() {
         if (player.isPlaying) player.pause() else player.play()
     }
@@ -114,10 +149,17 @@ class AndroidDhunPlayer(
             RepeatMode.ALL -> Player.REPEAT_MODE_ALL
             RepeatMode.ONE -> Player.REPEAT_MODE_ONE
         }
+        refresh()
     }
 
     override fun setShuffle(enabled: Boolean) {
         player.shuffleModeEnabled = enabled
+        refresh()
+    }
+
+    override fun setVolume(volume: Float) {
+        player.volume = volume.coerceIn(0f, 1f)
+        refresh()
     }
 
     override fun stop() {
@@ -138,6 +180,14 @@ class AndroidDhunPlayer(
         _currentTrack.value = track
         _queue.value = (0 until player.mediaItemCount)
             .mapNotNull { trackOf(player.getMediaItemAt(it)) }
+        _currentQueueIndex.value = player.currentMediaItemIndex
+        _repeatMode.value = when (player.repeatMode) {
+            Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+            Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+            else -> RepeatMode.OFF
+        }
+        _shuffleEnabled.value = player.shuffleModeEnabled
+        _volume.value = player.volume.coerceIn(0f, 1f)
         _state.value = when {
             player.playerError != null -> {
                 val message = player.playerError?.let { describeErrorChain(it) } ?: "Playback error"

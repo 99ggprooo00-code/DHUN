@@ -35,6 +35,10 @@ class NowPlayingPersistenceTest {
         override val queue = MutableStateFlow<List<Track>>(emptyList())
         override val positionMs = MutableStateFlow(0L)
         override val durationMs = MutableStateFlow(0L)
+        override val currentQueueIndex = MutableStateFlow(-1)
+        override val repeatMode = MutableStateFlow(RepeatMode.OFF)
+        override val shuffleEnabled = MutableStateFlow(false)
+        override val volume = MutableStateFlow(1f)
         var repeat = RepeatMode.OFF
         var shuffleOn = false
         var seeks = mutableListOf<Long>()
@@ -43,6 +47,7 @@ class NowPlayingPersistenceTest {
         override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
             queue.value = tracks
             currentTrack.value = tracks.getOrNull(startIndex)
+            currentQueueIndex.value = startIndex
             state.value = if (playWhenReady) PlaybackState.Playing(tracks[startIndex]) else PlaybackState.Paused(tracks[startIndex])
         }
         override fun addNext(track: Track) {
@@ -55,6 +60,24 @@ class NowPlayingPersistenceTest {
             list.add(track)
             queue.value = list
         }
+        override fun playAt(index: Int) {
+            val t = queue.value.getOrNull(index) ?: return
+            currentQueueIndex.value = index
+            currentTrack.value = t
+            state.value = PlaybackState.Playing(t)
+        }
+        override fun removeFromQueue(index: Int) {
+            val list = queue.value.toMutableList()
+            if (index !in list.indices) return
+            list.removeAt(index)
+            queue.value = list
+        }
+        override fun moveInQueue(from: Int, to: Int) {
+            val list = queue.value.toMutableList()
+            if (from !in list.indices || to !in list.indices) return
+            list.add(to, list.removeAt(from))
+            queue.value = list
+        }
         override fun playPause() {
             playPauseCalls++
             val t = currentTrack.value ?: return
@@ -63,8 +86,9 @@ class NowPlayingPersistenceTest {
         override fun next() = Unit
         override fun previous() = Unit
         override fun seekTo(positionMs: Long) { seeks += positionMs; this.positionMs.value = positionMs }
-        override fun setRepeatMode(mode: RepeatMode) { repeat = mode }
-        override fun setShuffle(enabled: Boolean) { shuffleOn = enabled }
+        override fun setRepeatMode(mode: RepeatMode) { repeat = mode; repeatMode.value = mode }
+        override fun setShuffle(enabled: Boolean) { shuffleOn = enabled; shuffleEnabled.value = enabled }
+        override fun setVolume(volume: Float) { this.volume.value = volume.coerceIn(0f, 1f) }
         override fun stop() { state.value = PlaybackState.Idle }
     }
 

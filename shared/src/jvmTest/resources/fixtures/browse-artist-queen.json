@@ -1,0 +1,554 @@
+{
+ "header": {
+  "musicImmersiveHeaderRenderer": {
+   "title": {
+    "runs": [
+     {
+      "text": "Queen"
+     }
+    ]
+   },
+   "thumbnail": {
+    "musicThumbnailRenderer": {
+     "thumbnail": {
+      "thumbnails": [
+       {
+        "url": "https://lh3.googleusercontent.com/queen_60.jpg",
+        "width": 60,
+        "height": 60
+       },
+       {
+        "url": "https://lh3.googleusercontent.com/queen_1440.jpg",
+        "width": 1440,
+        "height": 720
+       }
+      ]
+     }
+    }
+   },
+   "secondSubtitle": {
+    "runs": [
+     {
+      "text": "48.5M monthly listeners"
+     }
+    ]
+   }
+  }
+ },
+ "contents": {
+  "singleColumnBrowseResultsRenderer": {
+   "tabs": [
+    {
+     "tabRenderer": {
+      "content": {
+       "sectionListRenderer": {
+        "contents": [
+         {
+          "musicShelfRenderer": {
+           "title": {
+            "runs": [
+             {
+              "text": "Top songs"
+             }
+            ]
+           },
+           "bottomEndpoint": {
+            "browseEndpoint": {
+             "browseId": "VLPL_queen_top_songs"
+            }
+           },
+           "contents": [
+            {
+             "musicResponsiveListItemRenderer": {
+              "flexColumns": [
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Bohemian Rhapsody"
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Queen",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "UC_queen"
+                     }
+                    }
+                   },
+                   {
+                    "text": " \u2022 A Night at the Opera",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "MPREb_anato"
+                     }
+                    }
+                   },
+                   {
+                    "text": " \u2022 5:55"
+                   }
+                  ]
+                 }
+                }
+               }
+              ],
+              "playlistItemData": {
+               "videoId": "fJ9rUzIMcZQ"
+              },
+              "thumbnail": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://lh3.googleusercontent.com/bohemian.jpg",
+                   "width": 60,
+                   "height": 60
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemRenderer": {
+              "flexColumns": [
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Don't Stop Me Now"
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Queen",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "UC_queen"
+                     }
+                    }
+                   },
+                   {
+                    "text": " \u2022 Jazz",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "MPREb_jazz"
+                     }
+                    }
+                   },
+                   {
+                    "text": " \u2022 3:29"
+                   }
+                  ]
+                 }
+                }
+               }
+              ],
+              "playlistItemData": {
+               "videoId": "HgzGwKwLmgM"
+              },
+              "thumbnail": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://lh3.googleusercontent.com/dontstop.jpg",
+                   "width": 60,
+                   "height": 60
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemRenderer": {
+              "flexColumns": [
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Another One Bites the Dust"
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Queen",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "UC_queen"
+                     }
+                    }
+                   },
+                   {
+                    "text": " \u2022 The Game",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "MPREb_game"
+                     }
+                    }
+                   },
+                   {
+                    "text": " \u2022 3:34"
+                   }
+                  ]
+                 }
+                }
+               }
+              ],
+              "playlistItemData": {
+               "videoId": "rY0WxgSXdEE"
+              },
+              "thumbnail": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://lh3.googleusercontent.com/anotherone.jpg",
+                   "width": 60,
+                   "height": 60
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "musicCarouselShelfRenderer": {
+           "header": {
+            "musicCarouselShelfBasicHeaderRenderer": {
+             "title": {
+              "runs": [
+               {
+                "text": "Albums"
+               }
+              ]
+             }
+            }
+           },
+           "contents": [
+            {
+             "musicTwoRowItemRenderer": {
+              "title": {
+               "runs": [
+                {
+                 "text": "A Night at the Opera"
+                }
+               ]
+              },
+              "subtitle": {
+               "runs": [
+                {
+                 "text": "Queen \u2022 1975"
+                }
+               ]
+              },
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "MPREb_anato"
+               }
+              },
+              "thumbnailRenderer": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://lh3.googleusercontent.com/anato.jpg",
+                   "width": 226,
+                   "height": 226
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            },
+            {
+             "musicTwoRowItemRenderer": {
+              "title": {
+               "runs": [
+                {
+                 "text": "Greatest Hits"
+                }
+               ]
+              },
+              "subtitle": {
+               "runs": [
+                {
+                 "text": "Queen \u2022 1981"
+                }
+               ]
+              },
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "MPREb_gh1"
+               }
+              },
+              "thumbnailRenderer": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://lh3.googleusercontent.com/gh1.jpg",
+                   "width": 226,
+                   "height": 226
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "musicCarouselShelfRenderer": {
+           "header": {
+            "musicCarouselShelfBasicHeaderRenderer": {
+             "title": {
+              "runs": [
+               {
+                "text": "Singles & EPs"
+               }
+              ]
+             }
+            }
+           },
+           "contents": [
+            {
+             "musicTwoRowItemRenderer": {
+              "title": {
+               "runs": [
+                {
+                 "text": "Bohemian Rhapsody"
+                }
+               ]
+              },
+              "subtitle": {
+               "runs": [
+                {
+                 "text": "Queen \u2022 1975"
+                }
+               ]
+              },
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "MPREb_bo_single"
+               }
+              },
+              "thumbnailRenderer": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://lh3.googleusercontent.com/bo_single.jpg",
+                   "width": 226,
+                   "height": 226
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "musicCarouselShelfRenderer": {
+           "header": {
+            "musicCarouselShelfBasicHeaderRenderer": {
+             "title": {
+              "runs": [
+               {
+                "text": "Featured on"
+               }
+              ]
+             }
+            }
+           },
+           "contents": [
+            {
+             "musicTwoRowItemRenderer": {
+              "title": {
+               "runs": [
+                {
+                 "text": "Classic Rock"
+                }
+               ]
+              },
+              "subtitle": {
+               "runs": [
+                {
+                 "text": "YouTube Music \u2022 100 tracks"
+                }
+               ]
+              },
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "VLPL_classic_rock"
+               }
+              },
+              "thumbnailRenderer": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://lh3.googleusercontent.com/classicrock.jpg",
+                   "width": 226,
+                   "height": 226
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "musicCarouselShelfRenderer": {
+           "header": {
+            "musicCarouselShelfBasicHeaderRenderer": {
+             "title": {
+              "runs": [
+               {
+                "text": "Fans might also like"
+               }
+              ]
+             }
+            }
+           },
+           "contents": [
+            {
+             "musicTwoRowItemRenderer": {
+              "title": {
+               "runs": [
+                {
+                 "text": "Led Zeppelin"
+                }
+               ]
+              },
+              "subtitle": {
+               "runs": [
+                {
+                 "text": "33.2M subscribers"
+                }
+               ]
+              },
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "UC_ledzeppelin"
+               }
+              },
+              "thumbnailRenderer": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://lh3.googleusercontent.com/zeppelin.jpg",
+                   "width": 226,
+                   "height": 226
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            },
+            {
+             "musicTwoRowItemRenderer": {
+              "title": {
+               "runs": [
+                {
+                 "text": "David Bowie"
+                }
+               ]
+              },
+              "subtitle": {
+               "runs": [
+                {
+                 "text": "21.7M subscribers"
+                }
+               ]
+              },
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "UC_davidbowie"
+               }
+              },
+              "thumbnailRenderer": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://lh3.googleusercontent.com/bowie.jpg",
+                   "width": 226,
+                   "height": 226
+                  }
+                 ]
+                }
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "musicDescriptionShelfRenderer": {
+           "header": {
+            "runs": [
+             {
+              "text": "About"
+             }
+            ]
+           },
+           "description": {
+            "runs": [
+             {
+              "text": "Queen are a British rock band formed in London in 1970."
+             }
+            ]
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   ]
+  }
+ }
+}

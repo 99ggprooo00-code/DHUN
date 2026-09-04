@@ -45,3 +45,14 @@ Updated every phase. Nothing hidden.
   backdrop; screenshot pending. The design tokens are the single source of
   truth; throwaway harness screens still contain raw hex/dp (they are deleted in
   Phase 07 when real Home/Search replace them — not counted as production code).
+- Player UI (Phase 08): FullPlayer background blur has the same <API 31 floor —
+  below it the artwork sharpens and the scrim carries legibility. Swipe-remove
+  is horizontal-drag–based so it works with a mouse on desktop as well as touch.
+  Volume slider is desktop-only; Android relies on hardware volume keys.
+  Synced-lyrics UI exists but lines only sync after Phase 11 (LRCLIB).
+- Browse pages (Phase 09): artist/album/playlist parsers cover the current
+  YTM browse layouts (single/two-column, legacy + responsive headers); the
+  companion fixtures are schema-authored in the sandbox (YT egress blocked
+  there) and scheduled for live re-capture in the Phase 09 hardware pass on a
+  network-capable machine — the rot drill guards drift. "Videos" shelves on
+  artist pages are intentionally skipped in v1.

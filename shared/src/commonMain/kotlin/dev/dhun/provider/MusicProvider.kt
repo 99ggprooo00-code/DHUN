@@ -21,6 +21,11 @@ interface MusicProvider {
     suspend fun relatedTracks(videoId: String): DhunResult<List<Track>>
     suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo>
     suspend fun getLyrics(videoId: String): DhunResult<Lyrics>
+
+    /** Phase 09 browse pages. Ids are YTM browse ids (UC… / MPREb… / VL…). */
+    suspend fun artistPage(browseId: String): DhunResult<dev.dhun.core.ArtistPage>
+    suspend fun albumPage(browseId: String): DhunResult<dev.dhun.core.AlbumDetail>
+    suspend fun playlistPage(browseId: String): DhunResult<dev.dhun.core.PlaylistDetail>
 }
 
 /**
@@ -54,6 +59,15 @@ class YouTubeMusicProvider(
 
     override suspend fun getLyrics(videoId: String): DhunResult<Lyrics> =
         client.getLyrics(videoId)
+
+    override suspend fun artistPage(browseId: String): DhunResult<dev.dhun.core.ArtistPage> =
+        client.artistPage(browseId)
+
+    override suspend fun albumPage(browseId: String): DhunResult<dev.dhun.core.AlbumDetail> =
+        client.albumPage(browseId)
+
+    override suspend fun playlistPage(browseId: String): DhunResult<dev.dhun.core.PlaylistDetail> =
+        client.playlistPage(browseId)
 
     companion object
 }

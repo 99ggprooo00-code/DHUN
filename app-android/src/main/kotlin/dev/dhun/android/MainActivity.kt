@@ -37,7 +37,10 @@ import dev.dhun.data.DataLayer
 import dev.dhun.design.DhunTheme
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
+import dev.dhun.provider.MusicProvider
+import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.DhunAppShell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,10 +81,11 @@ class MainActivity : ComponentActivity() {
         connectWithFallback()
         setContent {
             DhunTheme {
-                // Music-app back behavior: BACK from any screen sends the app
-                // to the background with playback alive (service keeps
-                // playing) instead of finishing the activity.
-                BackHandler { moveTaskToBack(true) }
+                // Music-app back behavior: FullPlayer collapses first, then
+                // detail pages pop; only when nothing overlays do we park the
+                // app — BACK never kills the player.
+                val nav = androidx.compose.runtime.remember { AppNavState() }
+                BackHandler { if (!nav.closeTop()) moveTaskToBack(true) }
 
                 val ui by connectState.collectAsState()
                 val koin = GlobalContext.get()
@@ -98,12 +102,25 @@ class MainActivity : ComponentActivity() {
                             val homeViewModel: HomeViewModel = koin.get()
                             val searchViewModel: SearchViewModel = koin.get()
                             val dataLayer: DataLayer = koin.get()
+                            val provider: MusicProvider = koin.get()
+                            val playerViewModel = androidx.compose.runtime.remember(p) {
+                                PlayerViewModel(
+                                    player = p,
+                                    provider = provider,
+                                    scope = activityScope,
+                                    persistence = persistence,
+                                )
+                            }
 
                             DhunAppShell(
                                 player = p,
                                 homeViewModel = homeViewModel,
                                 searchViewModel = searchViewModel,
+                                playerViewModel = playerViewModel,
+                                provider = provider,
                                 dataLayer = dataLayer,
+                                nav = nav,
+                                isDesktop = false,
                             )
                         }
                         s.reason?.let { reason ->
