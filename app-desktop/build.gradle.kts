@@ -21,6 +21,8 @@ kotlin {
                 implementation("uk.co.caprica:vlcj:4.8.2")
                 implementation("io.insert-koin:koin-core:4.0.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                // Phase 12: SMTC spike (JNA WinRT interop, Windows-only paths)
+                implementation("net.java.dev.jna:jna:5.17.0")
             }
         }
     }
