@@ -10,6 +10,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.px
+import androidx.compose.ui.window.ComposeWindow
+import androidx.compose.ui.window.LocalWindow
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -48,7 +51,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
-import java.awt.event.WindowConstants
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -62,10 +64,16 @@ import java.util.concurrent.atomic.AtomicReference
  *    playing/paused icon variants — the documented SMTC fallback path
  *  - close-to-tray (setting [SettingsKeys.CLOSE_TO_TRAY], default on): the
  *    main window's X hides to tray; tray "Quit" exits clean
- *  - window geometry persisted to [SettingsKeys.WINDOW_GEOMETRY] ("x,y,w,h")
- *  - keyboard shortcuts (main window focused): Space play/pause,
+ *  - window geometry persisted to [SettingsKeys.WINDOW_GEOMETRY] ("x,y,w,h",
+ *    px; read via JNA GetWindowRect on Windows — the primary desktop OS)
+ *  - keyboard shortcuts (window-scope [Window.onKeyEvent], which receives
+ *    only keys the focused node didn't consume): Space play/pause,
  *    ←/→ seek ±5 s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+M mini-player,
  *    Ctrl+Q quit
+ *
+ * NOTE (1.8.2 API): `Window`'s content lambda takes NO receiver
+ * (WindowScope landed later) — the AWT/Compose window handle comes from
+ * [LocalWindow] (`ComposeWindow.show/hide/requestFocus`).
  */
 fun main() = application {
     val koin = startKoin { modules(desktopModule) }.koin
@@ -100,50 +108,54 @@ fun main() = application {
         }.getOrDefault(true)
     }
 
-    val mainFrameRef = AtomicReference<java.awt.Frame>()
-    val miniFrameRef = AtomicReference<java.awt.Frame>()
+    val mainWindowRef = AtomicReference<ComposeWindow>()
+    val miniWindowRef = AtomicReference<ComposeWindow>()
+    var miniVisible = true
 
     fun showMainWindow() {
-        val f = mainFrameRef.get() ?: return
-        f.isVisible = true
-        f.toFront()
-        f.requestFocus()
-    }
-
-    fun saveGeometry(f: java.awt.Frame) {
-        val geo = "${f.x},${f.y},${f.width},${f.height}"
-        appScope.launch { runCatching { settings.putString(SettingsKeys.WINDOW_GEOMETRY, geo) } }
+        val w = mainWindowRef.get() ?: return
+        w.show()
+        w.requestFocus()
     }
 
     fun toggleMiniPlayer() {
-        val f = miniFrameRef.get() ?: return
-        f.isVisible = !f.isVisible
-        if (f.isVisible) {
-            f.toFront()
-            f.requestFocus()
+        val w = miniWindowRef.get() ?: return
+        miniVisible = !miniVisible
+        if (miniVisible) {
+            w.show()
+            w.requestFocus()
+        } else {
+            w.hide()
         }
     }
+
+    /** Windows px rect of the main window (null off-Windows / not found). */
+    fun saveGeometry() {
+        val rect = Smct.windowRect("DHUN") ?: return
+        val geo = "${rect[0]},${rect[1]},${rect[2]},${rect[3]}"
+        appScope.launch { runCatching { settings.putString(SettingsKeys.WINDOW_GEOMETRY, geo) } }
+    }
+
+    val quitRef = AtomicReference<() -> Unit>({ System.exit(0) })
 
     val tray = DhunTray(
         onPlayPause = { player.playPause() },
         onNext = { player.next() },
         onPrevious = { player.previous() },
         onOpen = { showMainWindow() },
-        // quit() is defined just below; the tray is constructed first, so
-        // the handler goes through a ref set immediately after.
         onQuit = { quitRef.get().invoke() },
     )
 
     /** Tray "Quit" and Ctrl+Q converge here — one clean exit, no zombies. */
     fun quit() {
-        mainFrameRef.get()?.let { saveGeometry(it) }
+        saveGeometry()
         runCatching { tray.stop() }
         runCatching { persistence.stop() }
         runCatching { player.release() }
         appScope.cancel()
         System.exit(0)
     }
-    val quitRef = AtomicReference<() -> Unit>(::quit)
+    quitRef.set(::quit)
 
     tray.start()
 
@@ -158,11 +170,8 @@ fun main() = application {
     // spike phase 2, see docs/verification/12-desktop-native.md).
     appScope.launch {
         kotlinx.coroutines.delay(2_000)
-        val f = mainFrameRef.get()
-        if (f != null) {
-            runCatching { Smct.probeForWindow(f) }
-                .onFailure { System.err.println("DHUN SMTC probe error: $it") }
-        }
+        runCatching { Smct.probe("DHUN") }
+            .onFailure { System.err.println("DHUN SMTC probe error: $it") }
     }
 
     // Restore the last session (paused) then keep persisting.
@@ -171,57 +180,54 @@ fun main() = application {
         persistence.start()
     }
 
+    val nav = remember { AppNavState() }
+
     // ---- Phase 12 mini-player window (declared first so the main window   //
     // ---- owns the startup focus) ------------------------------------------ //
     Window(
         onCloseRequest = {
             // X hides (not disposes) — Ctrl+M / tray "Open" always work.
-            miniFrameRef.get()?.isVisible = false
+            miniVisible = false
+            miniWindowRef.get()?.hide()
         },
         state = rememberWindowState(
             width = 320.dp,
             height = 88.dp,
-            position = Offset(96.dp, 72.dp),
+            position = Offset(96f, 72f),
             alwaysOnTopValue = true,
         ),
         title = "DHUN mini-player",
         resizable = false,
         skipTaskbar = true,
-    ) { windowScope ->
-        val miniFrame = windowScope.window as? java.awt.Frame
-        LaunchedEffect(miniFrame) {
-            miniFrame?.let {
-                miniFrameRef.set(it)
-                it.defaultCloseOperation = WindowConstants.DO_NOTHING_ON_CLOSE
-            }
+    ) {
+        val miniWindow = LocalWindow.current
+        LaunchedEffect(miniWindow) {
+            miniWindowRef.set(miniWindow)
         }
         DhunTheme {
             MiniPlayerContent(
                 viewModel = playerViewModel,
-                awtWindow = windowScope.window,
                 onOpenMain = { showMainWindow() },
             )
         }
     }
 
     // ---- main window ------------------------------------------------------- //
-    val nav = remember { AppNavState() }
     Window(
         onCloseRequest = {
             if (closeToTray) {
                 // Phase 12: close → tray (default on). Tray "Quit" exits.
-                mainFrameRef.get()?.let {
-                    saveGeometry(it)
-                    it.isVisible = false
-                }
+                saveGeometry()
+                mainWindowRef.get()?.hide()
             } else {
                 quit()
             }
         },
         state = rememberWindowState(
-            width = 1200.dp,
-            height = 780.dp,
-            position = initialGeometry?.let { Offset(it.x.dp, it.y.dp) } ?: Offset.Unspecified,
+            width = initialGeometry?.let { it.w.toFloat().px } ?: 1200.dp,
+            height = initialGeometry?.let { it.h.toFloat().px } ?: 780.dp,
+            position = initialGeometry?.let { Offset(it.x.toFloat(), it.y.toFloat()) }
+                ?: Offset.Unspecified,
         ),
         title = "DHUN",
         // Window-scope shortcuts. onKeyEvent (NOT onPreviewKeyEvent) receives
@@ -275,13 +281,10 @@ fun main() = application {
                 else -> false
             }
         },
-    ) { windowScope ->
-        val mainFrame = windowScope.window as? java.awt.Frame
-        LaunchedEffect(mainFrame) {
-            mainFrame?.let {
-                mainFrameRef.set(it)
-                it.defaultCloseOperation = WindowConstants.DO_NOTHING_ON_CLOSE
-            }
+    ) {
+        val mainWindow = LocalWindow.current
+        LaunchedEffect(mainWindow) {
+            mainWindowRef.set(mainWindow)
         }
         DhunTheme {
             DhunAppShell(
@@ -301,7 +304,7 @@ fun main() = application {
 
 private const val SEEK_STEP_MS = 5_000L
 
-/** Restored "x,y,w,h" from [SettingsKeys.WINDOW_GEOMETRY]. */
+/** Restored "x,y,w,h" (px) from [SettingsKeys.WINDOW_GEOMETRY]. */
 private data class WindowGeometry(val x: Long, val y: Long, val w: Long, val h: Long)
 
 private val desktopModule = module {

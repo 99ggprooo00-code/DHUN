@@ -31,21 +31,22 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypography
 import dev.dhun.design.components.DhunIconButton
+import dev.dhun.desktop.smct.Smct
 import dev.dhun.presentation.player.PlayerViewModel
-import java.awt.Window as AwtWindow
 import kotlin.math.roundToInt
 
 /**
  * Phase 12 — mini-player window content (hosted at 320×88, always on top).
  *
- * The artwork+title region drags the whole window; a release WITHOUT drag
- * opens the main window (spec: "click opens main window"). Transport
- * buttons keep their own click targets outside the drag region.
+ * The artwork+title region drags the whole window (Windows — JNA
+ * SetWindowPos by window title; elsewhere the decorated title bar still
+ * provides native drag) and a release WITHOUT drag opens the main window
+ * (spec: "click opens main window"). Transport buttons keep their own
+ * click targets outside the drag region.
  */
 @Composable
 fun MiniPlayerContent(
     viewModel: PlayerViewModel,
-    awtWindow: AwtWindow?,
     onOpenMain: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -74,7 +75,7 @@ fun MiniPlayerContent(
                 modifier = Modifier
                     .weight(1f)
                     .padding(vertical = DhunSpacing.sm)
-                    .dragWindow(awtWindow, onReleasedWithoutDrag = onOpenMain),
+                    .dragWindow(onReleasedWithoutDrag = onOpenMain),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
             ) {
@@ -141,12 +142,14 @@ fun MiniPlayerContent(
 }
 
 /**
- * Drags the [awtWindow] by pointer movement over this region. A release
- * with no movement is a "click" → [onReleasedWithoutDrag].
+ * Drags this window (title "DHUN mini-player") by pointer movement over
+ * this region, via JNA SetWindowPos (Windows). A release with no movement
+ * is a "click" → [onReleasedWithoutDrag]. Off-Windows the modifier is inert
+ * (the decorated title bar still drags natively).
  */
-private fun Modifier.dragWindow(window: AwtWindow?, onReleasedWithoutDrag: () -> Unit): Modifier =
-    this.pointerInput(window) {
-        if (window == null) return@pointerInput
+private fun Modifier.dragWindow(onReleasedWithoutDrag: () -> Unit): Modifier =
+    this.pointerInput(Unit) {
+        if (!Smct.isWindows) return@pointerInput
         awaitPointerEventScope {
             while (true) {
                 val down = awaitFirstDown(requireCapture = true)
@@ -163,10 +166,12 @@ private fun Modifier.dragWindow(window: AwtWindow?, onReleasedWithoutDrag: () ->
                     last = pos
                     if (dx != 0 || dy != 0) {
                         moved = true
-                        window.setLocation(window.x + dx, window.y + dy)
+                        Smct.moveWindow(MINI_WINDOW_TITLE, dx, dy)
                     }
                 }
                 if (!moved) onReleasedWithoutDrag()
             }
         }
     }
+
+private const val MINI_WINDOW_TITLE = "DHUN mini-player"

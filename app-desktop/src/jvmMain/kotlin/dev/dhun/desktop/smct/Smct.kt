@@ -8,7 +8,6 @@ import com.sun.jna.Pointer
 import com.sun.jna.WString
 import com.sun.jna.platform.win32.GUID
 import com.sun.jna.platform.win32.User32
-import java.awt.Frame
 import java.util.UUID
 
 /**
@@ -57,10 +56,12 @@ object Smct {
     data class ProbeResult(val step: String, val ok: Boolean, val detail: String)
 
     /**
-     * Runs the full phase-1 probe for [mainFrame]'s window.
+     * Runs the full phase-1 probe for the top-level AWT window titled
+     * [windowTitle] (DHUN's main window; AWT creates Frame windows under
+     * class "SunAwtFrame" on Windows).
      * @return true only if every step returned S_OK. Never throws.
      */
-    fun probeForWindow(mainFrame: Frame, log: (String) -> Unit = ::println): Boolean {
+    fun probe(windowTitle: String, log: (String) -> Unit = ::println): Boolean {
         if (!isWindows) {
             log("SMTC probe: skipped (not Windows)")
             return false
@@ -71,12 +72,10 @@ object Smct {
         }
         val steps = ArrayList<ProbeResult>()
         try {
-            // 0. HWND of the main window. AWT doesn't expose HWND publicly;
-            // Java 17 Windows creates Frame windows under class "SunAwtFrame".
-            // DHUN's main window is the only top-level window titled "DHUN".
-            val hwnd = findHwnd(mainFrame)
+            // 0. HWND of the main window (title-unique: "DHUN").
+            val hwnd = findHwnd(windowTitle)
             if (hwnd == null) {
-                steps += ProbeResult("hwnd", false, "FindWindowW(SunAwtFrame, \"${mainFrame.title}\") = NULL")
+                steps += ProbeResult("hwnd", false, "FindWindowW(SunAwtFrame, \"$windowTitle\") = NULL")
                 report(steps, log)
                 return false
             }
@@ -152,10 +151,41 @@ object Smct {
         .recoverCatching { Native.load("WindowsCore", WinRt::class.java) }
         .getOrThrow()
 
-    private fun findHwnd(frame: Frame): Long? = runCatching {
-        val h = User32.INSTANCE.FindWindowW("SunAwtFrame", frame.title)
+    private fun findHwnd(windowTitle: String): Long? = runCatching {
+        val h = User32.INSTANCE.FindWindowW("SunAwtFrame", windowTitle)
         if (h == null) null else h.toLong()
     }.getOrNull()
+
+    /**
+     * Screen rect (x, y, width, height in px) of the top-level AWT window
+     * [windowTitle]. Windows-only (JNA User32); null elsewhere or if not
+     * found. Used by the window-geometry persistence.
+     */
+    fun windowRect(windowTitle: String): IntArray? = if (!isWindows) null else runCatching {
+        val hwnd = User32.INSTANCE.FindWindowW("SunAwtFrame", windowTitle) ?: return@runCatching null
+        val rect = User32.RECT()
+        if (!User32.INSTANCE.GetWindowRect(hwnd, rect)) return@runCatching null
+        intArrayOf(
+            rect.left,
+            rect.top,
+            rect.right - rect.left,
+            rect.bottom - rect.top,
+        )
+    }.getOrNull()
+
+    /**
+     * Moves the top-level AWT window [windowTitle] by (dx, dy) px.
+     * Windows-only (JNA SetWindowPos, no size/z-order/activation changes);
+     * used by the mini-player's in-content drag.
+     */
+    fun moveWindow(windowTitle: String, dx: Int, dy: Int): Boolean = if (!isWindows) false else
+        runCatching {
+            val hwnd = User32.INSTANCE.FindWindowW("SunAwtFrame", windowTitle) ?: return false
+            val rect = User32.RECT()
+            User32.INSTANCE.GetWindowRect(hwnd, rect) || return false
+            val flags = User32.SWP_NOSIZE or User32.SWP_NOZORDER or User32.SWP_NOACTIVATE
+            User32.INSTANCE.SetWindowPos(hwnd, null, rect.left + dx, rect.top + dy, 0, 0, flags)
+        }.getOrDefault(false)
 
     /**
      * Calls vtable slot [slot] of [obj] (WinRT object = IInspectable*).
