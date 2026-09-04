@@ -41,6 +41,22 @@ data class Playlist(
     val thumbnailUrl: String? = null,
 )
 
+/* ---------------- home sections ------------------------------------------ */
+
+/** A horizontal shelf on the YTM home feed. */
+data class HomeSection(
+    val title: String,
+    val browseId: String?, // for "see all" navigation
+    val items: List<HomeItem>,
+)
+
+sealed interface HomeItem {
+    data class TrackItem(val track: Track) : HomeItem
+    data class AlbumItem(val album: Album) : HomeItem
+    data class ArtistItem(val artist: Artist) : HomeItem
+    data class PlaylistItem(val playlist: Playlist) : HomeItem
+}
+
 data class SearchResults(
     val query: String,
     val songs: List<Track> = emptyList(),

@@ -141,6 +141,42 @@ class InnerTubeClient(
             )
         }
 
+    /** YTM home feed (sectionListRenderer). Returns raw JSON — caller parses. */
+    suspend fun homeFeed(): DhunResult<JsonObject> = resultify {
+        postJson("browse", buildJsonObject {
+            put("context", context())
+            put("browseId", BROWSE_ID_HOME)
+        })
+    }
+
+    /** Artist page (MUSIC_PAGE_TYPE_ARTIST). */
+    suspend fun artist(browseId: String): DhunResult<JsonObject> = resultify {
+        postJson("browse", buildJsonObject {
+            put("context", context())
+            put("browseId", browseId)
+        })
+    }
+
+    /** Album / playlist browse (MPREb… / VL…). */
+    suspend fun browse(browseId: String): DhunResult<JsonObject> = resultify {
+        postJson("browse", buildJsonObject {
+            put("context", context())
+            put("browseId", browseId)
+        })
+    }
+
+    /**
+     * Search continuation — YTM returns a `continuation` token in the response
+     * when more results are available. Feed that token back here.
+     */
+    suspend fun searchContinuation(token: String): DhunResult<JsonObject> = resultify {
+        val body = buildJsonObject {
+            put("context", context())
+            put("continuation", token)
+        }
+        postJson("search", body)
+    }
+
     /** Raw player response as WEB_REMIX (music.youtube.com) for the
      *  own-client resolver. */
     suspend fun playerResponse(videoId: String): DhunResult<JsonObject> =
@@ -314,6 +350,8 @@ class InnerTubeClient(
     companion object {
         const val MUSIC_BASE = "https://music.youtube.com"
         const val WWW_BASE = "https://www.youtube.com"
+        /** Root browseId for the YTM home feed. */
+        const val BROWSE_ID_HOME = "FEmusic_home"
         const val CLIENT_NAME_WEB_REMIX = "67"
         const val CLIENT_VERSION_FALLBACK = "1.20250310.01.00"
         private const val MAX_ATTEMPTS = 3

@@ -31,9 +31,12 @@ import androidx.compose.ui.window.rememberWindowState
 import dev.dhun.desktop.player.DesktopDhunPlayer
 import dev.dhun.desktop.ui.DesktopHarnessScreen
 import dev.dhun.desktop.ui.DesktopHarnessViewModel
+import dev.dhun.innertube.InnerTubeClient
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
-import dev.dhun.provider.forDesktop
+import dev.dhun.ui.home.HomeViewModel
+import dev.dhun.ui.navigation.AppShell
+import dev.dhun.ui.search.SearchViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -75,12 +78,27 @@ fun main() = application {
             if (showCatalog) {
                 ComponentCatalogScreen(onClose = { showCatalog = false }, modifier = Modifier.fillMaxSize())
             } else {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showCatalog = true }) { Text("Catalog", fontSize = 11.sp) }
-                    }
-                    DesktopHarnessScreen(player = player, viewModel = viewModel)
+                val homeViewModel = remember {
+                    HomeViewModel(
+                        innerTubeClient = koin.get(),
+                        player = player,
+                        data = koin.get(),
+                        scope = appScope,
+                    )
                 }
+                val searchViewModel = remember {
+                    SearchViewModel(
+                        innerTubeClient = koin.get(),
+                        player = player,
+                        data = koin.get(),
+                        scope = appScope,
+                    )
+                }
+                AppShell(
+                    homeViewModel = homeViewModel,
+                    searchViewModel = searchViewModel,
+                    player = player,
+                )
             }
         }
     }
@@ -88,6 +106,7 @@ fun main() = application {
 
 private val desktopModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
+    single { InnerTubeClient() }
     single<MusicProvider> { YouTubeMusicProvider.forDesktop() }
     single { DesktopDhunPlayer(provider = get(), scope = get()) }
     // Phase 05 data layer — SQLite file in the per-OS user data dir.

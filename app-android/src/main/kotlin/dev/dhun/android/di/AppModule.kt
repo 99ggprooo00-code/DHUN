@@ -1,19 +1,26 @@
 package dev.dhun.android.di
 
 import dev.dhun.android.playback.DhunStreamCache
+import dev.dhun.android.ui.MainActivity
 import dev.dhun.data.DataLayer
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
 import dev.dhun.domain.SaveNowPlayingUseCase
-import org.koin.android.ext.koin.androidContext
 import dev.dhun.extraction.OwnClientStreamResolver
 import dev.dhun.extraction.StreamResolver
 import dev.dhun.innertube.InnerTubeClient
+import dev.dhun.player.DhunPlayer
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
+import dev.dhun.ui.home.HomeViewModel
+import dev.dhun.ui.home.HomeViewModelFactory
+import dev.dhun.ui.search.SearchViewModel
+import dev.dhun.ui.search.SearchViewModelFactory
+import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
+import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
 
 /**
@@ -34,6 +41,10 @@ val appModule = module {
     single { SaveNowPlayingUseCase(get<DataLayer>().nowPlaying) }
     single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
     single { RecordPlayUseCase(get<DataLayer>().history) }
+
+    // Phase 07: ViewModels
+    factoryOf(::HomeViewModelFactory)
+    factoryOf(::SearchViewModelFactory)
 
     viewModel { dev.dhun.android.ui.HarnessViewModel(get(), get()) }
 }

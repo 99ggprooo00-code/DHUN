@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dhun.design.DhunTheme
 import dev.dhun.design.catalog.ComponentCatalogScreen
+import dev.dhun.ui.navigation.AppShell
 import androidx.core.content.ContextCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -42,6 +43,8 @@ import dev.dhun.android.ui.HarnessScreen
 import dev.dhun.core.toUserMessage
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.NowPlayingPersistence
+import dev.dhun.ui.home.HomeViewModel
+import dev.dhun.ui.search.SearchViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -70,6 +73,8 @@ import org.koin.core.context.GlobalContext
 class MainActivity : ComponentActivity() {
 
     private val viewModel: dev.dhun.android.ui.HarnessViewModel by viewModel()
+    private val homeViewModel: HomeViewModel by viewModel()
+    private val searchViewModel: SearchViewModel by viewModel()
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var player: AndroidDhunPlayer? = null
     private var persistence: NowPlayingPersistence? = null
@@ -113,22 +118,14 @@ class MainActivity : ComponentActivity() {
                     )
                     is ConnectUi.Ready -> if (showCatalog) {
                         ComponentCatalogScreen(onClose = { showCatalog = false })
-                    } else androidx.compose.foundation.layout.Box(
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        player?.let {
-                            // Thin harness overlay: catalog entry point
-                            androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
-                                androidx.compose.foundation.layout.Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.End,
-                                ) {
-                                    androidx.compose.material3.TextButton(onClick = { showCatalog = true }) {
-                                        Text("Catalog", fontSize = 11.sp)
-                                    }
-                                }
-                                HarnessScreen(player = it, viewModel = viewModel)
-                            }
+                    } else androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
+                        player?.let { p ->
+                            // Phase 07: AppShell replaces the Phase 03 harness.
+                            AppShell(
+                                homeViewModel = homeViewModel,
+                                searchViewModel = searchViewModel,
+                                player = p,
+                            )
                         }
                         s.reason?.let { reason ->
                             Surface(

@@ -93,3 +93,20 @@ fun DhunInputChip(
         ),
     )
 }
+
+/**
+ * A simple text chip for recent searches on the home screen.
+ * Uses DhunAssistChip as the base for a tappable text pill.
+ */
+@Composable
+fun SearchChip(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DhunAssistChip(
+        onClick = onClick,
+        label = { androidx.compose.material3.Text(label) },
+        modifier = modifier,
+    )
+}
