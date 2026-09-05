@@ -7,6 +7,22 @@ Rules (permanent, from the user):
   (where the phase says so) on-hardware verified.** Unpushed or
   CI-unverified work is NOT done, no matter how good it looks locally.
 - Update this file every phase and every session.
+- **Pre-push / pre-merge ritual (every time, no exceptions — user rule
+  2026-09-05):**
+  1. Verify state **on GitHub, not locally** (`git fetch`, `gh pr checks`,
+     `gh run list`): which steps of the current Phase are actually pushed
+     and CI-green.
+  2. Rewrite **CURRENT ACTIVE TASK** at the very top: exact file(s) being
+     worked on · last error (or "none") · exact next step.
+  3. Mark the Phase step table from step 1's evidence only.
+  4. Commit **everything** (no dirty tree left behind) and push to the
+     session branch. **Also push any unpushed commits** found on the
+     branch, and carry over (cherry-pick) any unmerged commit stranded
+     on a previous session branch — nothing gets left behind.
+  5. After the push, re-check CI and update the marks again if the
+     status changed (a commit can't truthfully mark *itself* as pushed
+     and green — the ROADMAP always lags the push by one small commit).
+  Only then open/merge the PR.
 
 ---
 
@@ -75,7 +91,7 @@ be stored permanently in `.ai/`).
 |---|---|---|
 | 1 | **Boot protocol:** no code before boot — MASTER_PROMPT → ROADMAP → `git log`; reply = phase summary + exact next step + permission ask. | `.ai/README.md` boot protocol |
 | 2 | **"do it accordingly" = execute the documented plan autonomously**, no multiple-choice questions. | Session behavior |
-| 3 | **ROADMAP maintenance:** CURRENT ACTIVE TASK at top; exact step marks; **unpushed/unverified = undone**. | Rules block above |
+| 3 | **ROADMAP maintenance:** CURRENT ACTIVE TASK at top; exact step marks; **unpushed/unverified = undone**. **Pre-push/pre-merge ritual** (verify on GitHub → rewrite CURRENT ACTIVE TASK → mark steps → commit all + push, incl. stranded unpushed commits → re-check CI). | Rules block above |
 | 4 | **Code-first** (MASTER_PROMPT AI rules): no stubs, no TODOs in production, hardware verification before a phase is done, small commits, update ROADMAP + KNOWN_LIMITATIONS each phase, report stalls (>30 min no progress), ADR before changing a locked decision. | `.ai/MASTER_PROMPT.md` §AI Behavior Rules |
 | 5 | **Rolling test release policy** (2026-09-01): exactly ONE release tagged `test`, asset `dhun-test.apk` always that name, every push to main REPLACES it, no version numbers/history for unfinished builds. Stable URLs never change. | `.github/workflows/test-release.yml` (header comment); extended 2026-09-05 with `dhun-test.msi` |
 | 6 | **2026-09-05 Phase 1 (critical):** fix MediaController thread violation (ALL controller methods on main/UI thread); background/power-saver resilience across MIUI/HyperOS/OneUI; audio playback audit (InnerTube extraction, seamless playback desktop+mobile). | Done this session: crash fix + FGS/battery (items 1–3 above); audit findings below |

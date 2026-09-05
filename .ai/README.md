@@ -30,6 +30,12 @@ directory — the content is branch-ready as-is.
   `.ai/KNOWN_LIMITATIONS.md` (honest > complete).
 - **Done = pushed + CI green + (where specified) on-hardware verified.**
   Unpushed or CI-unverified work is marked NOT done.
+- **Before every push / PR merge:** run the pre-push ritual at the top of
+  `.ai/ROADMAP.md` — verify on GitHub (not locally) what is pushed and
+  green, rewrite CURRENT ACTIVE TASK (file · last error · exact next
+  step), mark steps from that evidence, commit everything and push
+  (including any stranded unpushed commits), then re-check CI and fix
+  the marks in a follow-up commit if they changed.
 - **Incidents:** every significant crash / CI red / environment trap gets
   an entry in `.ai/DEBUG_LOG.md` (symptom with stack → root cause → fix →
   verification state).
