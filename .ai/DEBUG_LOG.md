@@ -6,6 +6,82 @@ read this entry before re-diagnosing.
 
 ---
 
+## 2026-09-05 · rot-drill run 33961533965 FAILED — first live drill red (yt-dlp bot-gated from CI IP)
+
+**Symptom** (job 101295458477, step "Fail the workflow after alerting"):
+`Process completed with exit code 1.` — that step is the INTENTIONAL
+kill switch (`exit 1` when `steps.probe.outcome == 'failure'`), so it is
+the alert, not the cause. Real failure output, from issue #14 (tail of the
+run's `rot-drill.log` artifact):
+
+```
+PROBE|version|PASS|WEB_REMIX 1.20260901.12.00 (scraped from homepage HTML)
+PROBE|search|PASS|20 music-song results
+PROBE|resolve+stream|FAIL|IllegalStateException: resolve: AuthRequired(detail=null)
+PROBE|related|PASS|50 related tracks
+WATCH|newpipe-stream|BROKEN|Parse(detail=JSON response is too short)
+PROBE|verdict|FAIL|extraction-pipeline-broken
+```
+
+**Root cause** (chain of evidence, no guessing):
+1. `PROBE|resolve+stream` failed inside `YtDlpStreamResolver.resolve`:
+   that mapping fires ONLY when yt-dlp's last non-blank stderr line contains
+   "Sign in to confirm" — YouTube's bot-gate text
+   (`JvmStreamResolvers.kt: message.contains("Sign in to confirm") →
+   DhunError.AuthRequired()`).
+2. CI installed yt-dlp **2026.08.19** (latest on PyPI today — verified from
+   this sandbox), the exact version ADR-001 measured tokenless-working from
+   a hostile datacenter IP on 2026-09-01 ⇒ not a version regression;
+   YouTube tightened player-endpoint gating for the Actions runner IP class
+   between 09-01 and 09-05.
+3. Metadata endpoints kept working from the SAME runner in the SAME run
+   (version scrape, 20 search results, 50 related) ⇒ player-endpoint
+   gating, not a blanket IP block, not an InnerTube-shape break.
+4. Classification: **YouTube/datacenter-IP bot blocking (category 8)**.
+   Residential impact unproven either way — this is CI-network evidence.
+
+**Aggravating defects found while diagnosing (all real, all to fix):**
+- Probe misalignment: fatal step drove `YtDlpStreamResolver` ALONE (the
+  desktop FALLBACK per ADR-001), never the production primary
+  (`OwnClientStreamResolver`, the ONLY engine Android ships). The drill
+  gated the verdict on an engine production uses second.
+- Diagnostics loss: yt-dlp's stderr line was discarded when typing
+  `AuthRequired` → printed `detail=null`, violating ADR-001's
+  "detail carries the per-attempt evidence" contract. We had to infer the
+  trigger text from the code path instead of reading it in the log.
+- Workflow quoting bug: `` `rot-drill-${GITHUB_RUN_ID}` `` inside the
+  double-quoted bash issue body executed as command substitution → issue
+  #14 shows "The attached  artifact" with the name swallowed.
+- Evidence gap: `yt-dlp --version` printed only to the step log; the
+  `rot-drill.log` artifact starts at Gradle, so the artifact cannot prove
+  which engine version ran.
+
+**Environment traps re-confirmed this session:** this sandbox has no JDK
+(CI is the compile gate) and YouTube egress is TLS-blocked here
+(`yt-dlp` fails `TLS/SSL connection has been closed (EOF)`) — live
+reproduction must happen on GitHub Actions, not locally.
+
+**Fix (this session, small commits):**
+1. `YtDlpStreamResolver`: carry yt-dlp's last stderr line into
+   `AuthRequired(detail=…)` / `Unknown(causeMessage=…)` — typed errors and
+   fail-loud behavior unchanged.
+2. Probe `Main.kt`: fatal `resolve+stream` step now drives the REAL
+   production chain (`ResolvingStreamResolver(OwnClientStreamResolver →
+   YtDlpStreamResolver)`, identical to `forDesktop`), with new per-engine
+   `WATCH` lines (`WATCH|own-client`, `WATCH|ytdlp`) alongside the existing
+   NewPipe watch. NOT a weakening: audio bytes still HTTP-fetched and
+   magic-byte-verified; both engines gated ⇒ verdict still FAIL.
+3. `rot-drill.yml`: quote the issue body safely (no backtick execution),
+   append `yt-dlp --version` into `rot-drill.log`.
+
+**Verification state:** pending — PR CI (tests+builds) then re-dispatch the
+drill; green requires a real `PROBE|verdict|PASS` line. If the own-client
+tier is ALSO gated from CI, the drill stays red (CI-network gating
+evidence — see KNOWN_LIMITATIONS "CI-network vs residential" note) and
+residential verification moves to real hardware.
+
+---
+
 ## 2026-09-05 · Android FATAL: `MediaController method is called from a wrong thread`
 
 **Symptom** (user-reported crash, artist page → shuffle play):

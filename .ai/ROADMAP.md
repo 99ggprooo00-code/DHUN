@@ -10,73 +10,102 @@ Rules (permanent, from the user):
 
 ---
 
-## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
+## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07141-dhun — Phase 14 rot-drill live failure)
 
-**Branch:** `arena/01a070b3-dhun` has the latest Phase 14 rot-drill code and
-roadmap pushed; PR CI run `33960134771` is green. Phase 13 Android
-native-polish code remains CI-verified by run `33959217371` (shared tests,
-Android debug build, Desktop/probe compilation). PR #13 remains OPEN. The
-rolling `test` pre-release is healthy: run `33952291659` passed `apk`, `msi`,
-and `publish`; all four assets are present.
+**Files under investigation:** `.github/workflows/rot-drill.yml` (workflow) and
+the probe files it runs — `tools/playback-probe/src/main/kotlin/dev/dhun/tools/playbackprobe/Main.kt`
+plus the resolver it drives,
+`shared/src/jvmMain/kotlin/dev/dhun/extraction/JvmStreamResolvers.kt`.
 
-**Current files:** `.github/workflows/rot-drill.yml` (primary),
-`docs/verification/14-release.md`, `.ai/KNOWN_LIMITATIONS.md`, and
-`README.md`.
+**Failed run:** `rot-drill` run **33961533965**, job **101295458477**
+(`probe`), first-ever LIVE run of the drill — `workflow_dispatch` on merge
+commit `a554594` right after PR #13 merged
+(https://github.com/99ggprooo00-code/DHUN/actions/runs/33961533965).
+Conclusion: **failure**. Failed step name: **"Fail the workflow after
+alerting"** — red text `Process completed with exit code 1.`
 
-**User 2026-09-05 directive — status:**
-1. **Release verification — DONE (rolling test artifacts only):**
-   `dhun-test.apk`, `dhun-test.apk.sha256`, `dhun-test.msi`, and
-   `dhun-test.msi.sha256` are uploaded by successful run `33952291659`.
-   This is not the signed/stable v0.1.0 release.
-2. **Hardware gates — OPEN:** Android rotation/soak/lock-screen/OEM checks,
-   Windows tray/close-to-tray/geometry/mini-player/shortcuts/SMTC/MSI
-   clean-VM checks, and the Phase 10/11 checklists remain open below.
-3. **Phase 13 native polish — CODE + CI GREEN, HARDWARE OPEN:** `8669e09`
-   plus `c2a86df` and `4de9795` implement safe-drawing insets, saved Android
-   navigation state, Search/Resume/Library shortcuts, a battery rationale,
-   and the 840dp navigation rail with docked rail MiniPlayer. No hardware
-   acceptance item is complete.
-4. **Phase 14 rot-drill — CODE STAGED, LIVE RUN OPEN:** `5897c5c` replaces
-   the placeholder workflow with a scheduled/manual live probe, log artifact,
-   failure issue alert, and automatic recovery close; `29326cc` removes the
-   missing pip-cache input. A dispatch attempt was
-   blocked by GitHub `HTTP 403: Resource not accessible by integration`; the
-   workflow is not yet available from the default branch.
+**Last error (copied from GitHub, issue #14 body = tail of the run's
+`rot-drill.log` artifact):**
 
-**Last error:** `gh workflow run rot-drill.yml --ref arena/01a070b3-dhun`
-returned `HTTP 403: Resource not accessible by integration`; `gh workflow
-view` confirms the default branch still exposes the old placeholder workflow.
-No live probe verdict exists. Local Gradle verification is also unavailable
-because this sandbox has no `JAVA_HOME` and no `java` executable.
+```
+PROBE|version|PASS|WEB_REMIX 1.20260901.12.00 (scraped from homepage HTML)
+PROBE|search|PASS|20 music-song results
+PROBE|resolve+stream|FAIL|IllegalStateException: resolve: AuthRequired(detail=null)
+PROBE|related|PASS|50 related tracks
+WATCH|newpipe-stream|BROKEN|Parse(detail=JSON response is too short)
+PROBE|verdict|FAIL|extraction-pipeline-broken
+```
+
+**Classification (GitHub evidence, not local guess):** Category **8 —
+YouTube/datacenter-IP bot blocking** hitting yt-dlp's default player path on
+the Actions runner — NOT a workflow bug, NOT Gradle/JDK, NOT a yt-dlp
+install failure, NOT InnerTube metadata (version/search/related all PASS
+from the same runner), NOT related-track, NOT a permissions problem (issue
+#14 opened correctly; the earlier dispatch 403 is gone). Evidence chain:
+`YtDlpStreamResolver` returns `AuthRequired` only when yt-dlp's last stderr
+line contains "Sign in to confirm" (YouTube's bot-gate text); installed
+yt-dlp is 2026.08.19 — the exact version ADR-001 measured tokenless-working
+from a hostile datacenter IP on 2026-09-01 — so gating tightened between
+09-01 and 09-05 for the runner's IP class, not a version regression. The
+final `exit 1` is the workflow's INTENTIONAL kill switch firing after the
+alert (by design — do not "fix" it away). Secondary real defects exposed:
+(1) **probe misalignment** — the fatal `resolve+stream` step drives
+`YtDlpStreamResolver` alone (the desktop FALLBACK per ADR-001), while
+production ships `OwnClientStreamResolver` primary (Android exclusively,
+desktop first tier) — so the drill gates the verdict on an engine
+production only uses as failover and never exercises the production primary
+live; (2) **lost diagnostics** — `YtDlpStreamResolver` discards yt-dlp's
+stderr when typing `AuthRequired` (printed `detail=null`), against ADR-001's
+"detail carries per-attempt evidence" contract; (3) **workflow quoting bug**
+— backticks inside the double-quoted bash issue body execute as command
+substitution, swallowing the artifact name (issue #14 shows "The attached
+artifact" with an empty name); (4) evidence gap — `yt-dlp --version` prints
+to the step log but not into the `rot-drill.log` artifact.
 
 **Exact next step:**
-1. Once the workflow is available on the default branch or Actions dispatch
-   permission is restored, run `.github/workflows/rot-drill.yml` and inspect
-   its `PROBE|verdict`, artifact, issue-alert, and recovery behavior.
-2. If the live workflow exposes a probe or YAML error, fix it and rerun; keep
-   the rot-drill step open until a real green run is recorded.
-3. Continue Phase 14 with the error-taxonomy/audio-cache work only while
-   keeping soak, clean-target, and v0.1.0 release gates explicitly open; do
-   not mark Phase 12–14 complete from CI alone.
+1. Fix `YtDlpStreamResolver` to carry yt-dlp's stderr line into
+   `AuthRequired(detail=…)` (typed errors kept, fail-loud kept).
+2. Align the probe's fatal step with the real production chain
+   (`ResolvingStreamResolver(OwnClientStreamResolver → YtDlpStreamResolver)`
+   = `forDesktop` wiring) and add per-engine `WATCH` evidence lines
+   (own-client / yt-dlp / newpipe). NOT a weakening: stream bytes are still
+   HTTP+magic-byte verified, a PASS still requires a real resolved URL
+   through shipped code, and both engines gated ⇒ verdict stays FAIL. The
+   CI-network vs residential distinction is documented in
+   `.ai/KNOWN_LIMITATIONS.md` (kill switch preserved).
+3. Fix the rot-drill issue-body quoting + record `yt-dlp --version` into the
+   artifact log.
+4. Re-dispatch the drill on this branch; require a real `PROBE|verdict|PASS`
+   before the rot-drill step may be marked green. If the own-client tier is
+   ALSO gated from CI (both engines red), keep the drill red and treat it as
+   CI-network gating evidence — do not fake a pass; verify separately on
+   residential hardware.
 
-**CI trail (prior 9 rounds plus Phase 13 rounds, all in DEBUG_LOG):**
-`33941799559`→android media3 APIs · `33942371150`/`33942622916`→
-no CATEGORY_MEDIA, artworkData ByteArray · `33943041377`→desktop
-round 1 (Long.dp etc.) · `33944244828`→JNA GUID/Memory ·
-`33944782718`→JNA platform helpers fragile → self-contained rewrite ·
-`33945300702`→JNA 5.17 API + MiniPlayer imports (annotations capped at
-10 — harness Color errors were hiding behind the cap) ·
-`33945909159`/`33946130860`→harness 12× Long-hex Color ·
-`33946527454` (`3cd4bf8`) → **GREEN** · `33958894084` (`9dc77c3`) →
-**Phase 13 GREEN** (scope-correct navigation helpers, Android build, tests,
-probe) · `33959076412` (`e679c00`) → **GREEN** · `33959922661` (`5573f9a`)
-→ **Phase 14 code GREEN** · `33960134771` (`4e6bf54`) → **GREEN** after the
-rot-drill dispatch-gate documentation.
+**Phase 14 step status after this failure:**
+
+| Step | Status |
+|---|---|
+| Error taxonomy / actionable UX | 🟨 partial — typed `DhunError`s exist, but this failure proved evidence is dropped (`AuthRequired(detail=null)`); full sweep open |
+| Bounded audio cache / offline replay | ⬜ open |
+| Daily live rot-drill | 🔴 **FAILED first live run** — yt-dlp default path bot-gated from runner IP (category 8) + probe tested only the fallback engine; fixes in flight, no green verdict exists |
+| Android 30-min soak | ⬜ open (no hardware evidence) |
+| Desktop 30-min soak | ⬜ open (no hardware evidence) |
+| v0.1.0 APK/AAB/MSI + clean-target release | ⬜ open (no release evidence) |
+| Phase 14 acceptance 1–4 | ⬜ open — none complete |
+
+**Prior-session state (context):** PR #13 (`arena/01a070b3-dhun`) MERGED at
+`a554594` — Phase 13 polish + rot-drill workflow (`5897c5c`+`29326cc`) are on
+main; PR CI was green (`33960134771`); rolling `test` pre-release healthy
+(run `33952291659`, apk+msi). Sandbox: no local JDK (CI is the compile
+gate), no device/adb, YouTube TLS-blocked from sandbox (live probe must run
+on GitHub), GitHub token can flap.
 
 **Standing sandbox notes:** no local JDK (CI is the compile gate); no
-device/adb/display; direct `curl` mostly blocked, `fetch_page` works;
-repo can be reset between turns (re-verify + re-push); GitHub token
-flaps — "Invalid username or token" = reconnect GitHub in Arena.
+device/adb/display; YouTube egress TLS-blocked from this sandbox (verified
+2026-09-05: `yt-dlp` fails with `TLS/SSL connection has been closed (EOF)`),
+so live verdicts can only come from GitHub Actions; repo can be reset
+between turns (re-verify + re-push); GitHub token flaps — "Invalid username
+or token" = reconnect GitHub in Arena.
 
 ---
 
@@ -180,13 +209,13 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
-### Phase 14 step status — 🟨 IN PROGRESS @ `5897c5c` + `29326cc` (live/hardware/release gates OPEN)
+### Phase 14 step status — 🟨 IN PROGRESS (first live drill FAILED — run 33961533965)
 
 | Step | Status |
 |---|---|
-| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Existing typed `DhunResult`/`DhunError` paths and 403 recovery are present; full network/db/playback sweep and offline-banner review are not complete |
+| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Existing typed `DhunResult`/`DhunError` paths and 403 recovery are present, but run 33961533965 exposed dropped evidence (`AuthRequired(detail=null)` from `YtDlpStreamResolver`); full network/db/playback sweep and offline-banner review remain |
 | Bounded audio cache and offline replay | ⬜ Not started; current Android cache is stream-URL-only with TTL/403 invalidation |
-| Daily live rot-drill | 🟨 Workflow code staged in `.github/workflows/rot-drill.yml`; dispatch attempt hit GitHub 403, cache-input review fix is pushed, and no live verdict exists |
+| Daily live rot-drill | 🔴 First live run **33961533965 FAILED**: yt-dlp default player path bot-gated ("Sign in to confirm" → `AuthRequired`) from the Actions runner's datacenter IP (category 8), while the probe's fatal step tested only the desktop-fallback engine instead of the production own-client→yt-dlp chain; issue #14 auto-opened, kill switch fired correctly. Fixes + rerun in flight; no `PROBE|verdict|PASS` exists yet |
 | Android 30-minute soak | ⬜ Open — requires unrestricted-battery physical device evidence |
 | Desktop 30-minute soak | ⬜ Open — requires libVLC/tray/SMTC-capable desktop evidence |
 | v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open — rolling `test` artifacts are not the stable release; signing, clean installs, and release tag are gated |
