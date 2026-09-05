@@ -15,6 +15,24 @@ Updated every phase. Nothing hidden.
   aggressively than residential IPs; the rot drill may show resolve-step
   failures on CI runners that do not affect normal users. Repeated red +
   local green = investigate; both red = rot.
+- **CI-network vs residential gating (measured 2026-09-05, rot-drill run
+  33961533965):** yt-dlp 2026.08.19's default player path — proven
+  tokenless from a datacenter IP on 2026-09-01 (ADR-001) — was bot-gated
+  ("Sign in to confirm" → `AuthRequired`) from the GitHub Actions runner
+  IP on 2026-09-05, while InnerTube metadata (WEB_REMIX search/version/
+  related) passed in the same run. Interpretation rule for red drills:
+  metadata PASS + resolve gated ⇒ CI-network gating, verify on residential
+  hardware before declaring rot; metadata ALSO failing ⇒ real rot. The
+  drill's kill switch stays ON for both cases — a CI red is never
+  auto-dismissed, and residential green + CI red is recorded here rather
+  than converted to a false pass.
+- **Rot-drill probe coverage limitation (fixed in flight 2026-09-05):**
+  until this fix, the drill's fatal resolve step exercised
+  `YtDlpStreamResolver` alone — the desktop FALLBACK engine — so a CI red
+  could fire while the production primary (`OwnClientStreamResolver`,
+  Android's only engine) was healthy, and vice versa the primary could rot
+  unnoticed. The drill now gates on the production own-client→yt-dlp chain
+  and WATCHes each engine separately.
 - YTM lyrics via InnerTube are unsynced text only; synced lyrics are now via LRCLIB fallback (`LrcLibSource` + `LyricsRepository` cache→YTM→LRCLIB, see Lyrics bullet above) — YTM remains primary unsynced fallback.
 - The PLAYLISTS search filter returns mixed result types from YouTube;
   classification routes them by browseId prefix (harmless, refined later).

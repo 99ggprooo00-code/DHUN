@@ -9,9 +9,9 @@ Desktop soak, clean-install, or release checks below.
 
 | Step | Current status | Evidence / remaining gate |
 |---|---|---|
-| Typed error taxonomy and actionable user messages | 🟨 Existing `DhunResult`/`DhunError` paths and playback recovery are in place; complete network/db/playback sweep and offline-banner review remain | `shared/src/commonMain/kotlin/dev/dhun/core/DhunResult.kt`, `app-android/.../PlaybackGraph.kt`; manual error-path review OPEN |
+| Typed error taxonomy and actionable user messages | 🟨 Existing `DhunResult`/`DhunError` paths and playback recovery are in place, but run 33961533965 showed evidence being dropped (`AuthRequired(detail=null)`); full sweep + offline-banner review remain | `shared/src/commonMain/kotlin/dev/dhun/core/DhunResult.kt`, `app-android/.../PlaybackGraph.kt`, `JvmStreamResolvers.kt` detail fix in flight; manual error-path review OPEN |
 | Bounded audio cache and offline replay | ⬜ Not implemented | Android currently has a 5-hour stream-URL cache with 403 invalidation; played audio segment caching and offline replay are still required |
-| Daily live rot-drill | 🟨 Workflow wired in `.github/workflows/rot-drill.yml` | Requires a successful scheduled or manual live run; CI compile does not exercise YouTube/network extraction |
+| Daily live rot-drill | 🔴 Workflow is wired and its FAILURE path is proven (run 33961533965, issue #14, artifact, kill switch) — but the first live run FAILED: yt-dlp bot-gated from the runner IP and the probe tested only the fallback engine; no green verdict exists | `.github/workflows/rot-drill.yml`; rerun required after the probe-alignment/diagnostics fixes; a real `PROBE|verdict|PASS` gates this row |
 | Android 30-minute soak | ⬜ Open | Requires a physical device with unrestricted battery mode, lock-screen playback, and zero-crash/leak evidence |
 | Desktop 30-minute soak | ⬜ Open | Requires a desktop with libVLC and tray/SMTC-capable runtime |
 | Release v0.1.0 artifacts | ⬜ Open | Rolling `test` APK/MSI is not the signed/stable v0.1.0 release; clean-target installation and release evidence are required |
@@ -37,14 +37,37 @@ for upstream recovery.
 
 ### Rot-drill
 
+- [x] **Failure path exercised for real — run 33961533965 (2026-09-05,
+      workflow_dispatch on `a554594`, job 101295458477): FAILED as
+      designed.** Verdict line: `PROBE|verdict|FAIL|extraction-pipeline-broken`.
+      Root cause: yt-dlp's default player path was bot-gated
+      ("Sign in to confirm" → `AuthRequired(detail=null)`) from the Actions
+      runner's datacenter IP, while InnerTube metadata (version/search/
+      related) passed in the same run — i.e. YouTube player-endpoint
+      datacenter-IP gating, not extractor-shape rot. Issue [#14](https://github.com/99ggprooo00-code/DHUN/issues/14)
+      auto-opened with the log tail; artifact `rot-drill-33961533965`
+      uploaded; kill-switch step fired. Secondary defects found and logged
+      in `.ai/DEBUG_LOG.md`: probe gated the verdict on the desktop-fallback
+      engine only (not the production own-client→yt-dlp chain), yt-dlp
+      stderr evidence was dropped, and the issue body swallowed the artifact
+      name through a bash backtick bug.
 - [ ] Manual run from the Phase 14 branch completes with `PROBE|verdict|PASS`.
 - [ ] First scheduled run completes on the default branch.
-- [ ] Failure path creates or updates one `[rot-drill]` issue and uploads the
-      log artifact.
+- [x] Failure path creates or updates one `[rot-drill]` issue and uploads the
+      log artifact. (done in 33961533965 — though the artifact name was
+      mangled in the issue text by the quoting bug; fix in flight)
 - [ ] Recovery path comments on and closes the open issue.
-- Run URL / date: ____________________
-- Verdict line: ____________________
-- Issue number (if exercised): ____________________
+- Run URL / date: https://github.com/99ggprooo00-code/DHUN/actions/runs/33961533965 · 2026-09-05
+- Verdict line: `PROBE|verdict|FAIL|extraction-pipeline-broken`
+- Issue number (if exercised): #14 (OPEN — auto-close awaits a green run)
+
+**CI-network vs residential (kill-switch policy, do not weaken):** a red
+drill caused by `AuthRequired`/bot-gate text on a GitHub runner is
+CI-network evidence only. It must NOT be converted to a pass by removing
+stream validation, skipping the byte check, or making the probe tolerate
+resolve failures. Distinguish: metadata PASS + resolve gated ⇒ datacenter
+gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
+(pin last-good, patch, release ≤72h per RISK_REGISTER).
 
 ### Android soak
 
