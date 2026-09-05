@@ -10,59 +10,36 @@ Rules (permanent, from the user):
 
 ---
 
-## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a06b14-dhun)
+## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a06b14-dhun` at `f955e6d` · **PR #9 (Phase 12 +
-Phase 1 fixes) MERGED @ `697cf54`** = `main` · **PR #10 OPEN** =
-workflow patch (MSI job + rolling publish) — CI pending, merge after
-green.
+**Branch:** `arena/01a070b3-dhun` at `345c45a` (= `origin/main`, PRs #9–#12
+merged). The current `test` pre-release is healthy: run `33952291659`
+passed `apk`, `msi`, and `publish`; all four rolling assets are present.
+The referenced unpushed icon/handoff commits `3bcca3b` and `f469605` are not
+present in this checkout or on the fetched remote refs, so this session is
+recreating the icon handoff on the fixed branch.
 
 **User 2026-09-05 directive — status:**
-1. **Phase 1 critical fixes — DONE (pushed + CI green + merged):**
-   (a) fatal artist-shuffle crash (MediaController off-main-thread)
-   fixed in `AndroidDhunPlayer`; (b) background/OEM resilience:
-   `DhunPlaybackService` = true foreground service
-   (`FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK`), media notification,
-   one-shot battery-exemption dialog, `ic_notification` icon —
-   compile-verified; on-device behavior = OPEN hardware checklist;
-   (c) audio audit: Android path sound, `DesktopDhunPlayer` (vlcj)
-   reviewed against javadoc — no blocking defect.
-2. **Phase 2 docs — DONE:** `.ai/` on the session branch (session is
-   pinned to one branch; a real `.ai` branch = one git command after
-   merge if still wanted). DEBUG_LOG has all 9 CI red rounds.
-3. **Phase 3 builds — 95%:** rolling `test` pre-release with
-   `dhun-test.apk` EXISTS (published by the PR #9 merge); the
-   **MSI** half is in PR #10 (apk+msi+publish jobs,
-   `:app-desktop:createMsi` on windows-latest). Merging PR #10
-   publishes both assets.
-4. **Phase 12 (desktop) — CI-DONE, hardware-OPEN:** first fully green
-   CI on the branch (run `33946527454` @ `3cd4bf8`): shared tests ✓,
-   android assembleDebug ✓, probe + desktop compile ✓ (9 fix rounds,
-   all logged in DEBUG_LOG: 1.8.2 Window/WindowState/Key API from
-   source, no `Long.dp`, Long-hex `Color(0xFF…)` literals,
-   `MenuItem.label`, `noinline` for EDT marshaling, JNA win32 helpers
-   are version-fragile → self-contained Structures, JNA 5.17
-   `getPointer(long)`/`invokeInt(array)`, vlcj `finished` event,
-   `awaitFirstDown()` no params in 1.8.2).
+1. **Release verification — DONE (CI + GitHub release):** `dhun-test.apk`,
+   `dhun-test.apk.sha256`, `dhun-test.msi`, and `dhun-test.msi.sha256` are
+   uploaded and checksum-staged by successful run `33952291659`.
+2. **Hardware gates — OPEN:** Android crash/soak/lock-screen/OEM checks,
+   Windows tray/close-to-tray/geometry/mini-player/shortcuts/SMTC/MSI
+   clean-VM checks, and the Phase 10/11 checklists remain open as recorded
+   below.
+3. **Icon pass — IN PROGRESS:** `DhunIcons.kt` is being recreated with 24
+   embedded Apache-2.0 Material paths, a common SVG path parser, and
+   accessible `DhunIconView`; attribution is staged in `THIRD_PARTY.md`.
 
 **Exact next step:**
-1. PR #10 CI green → merge → watch the `test-release` run (first
-   apk+msi publish) → verify the `test` release has
-   `dhun-test.apk` + `dhun-test.msi` + both `.sha256` files.
-2. **User's hardware** (OPEN, parallel — the phase-completion gate):
-   - Android: crash repro (artist shuffle) no longer crashes;
-     30-min background soak; lock-screen controls; MIUI/HyperOS
-     auto-start manual toggle; battery-exemption dialog once.
-   - Windows (`docs/verification/12-desktop-native.md`): tray,
-     close-to-tray, geometry persistence, mini-player drag, 7
-     shortcuts, `SMTC probe` console line (PASS expected; the REFIID
-     by-value marshaling caveat in DEBUG_LOG may show up here),
-     `dhun-test.msi` clean-VM install (needs VLC).
-   - Phases 10+11 checklists (`docs/verification/10-library.md`,
-     `11-lyrics.md`).
-3. Then: SMTC phase 2 (on-machine IID pull → metadata + media keys) or
-   lock in the documented tray fallback; Phase 13 (Android polish),
-   Phase 14 (rot-drill live wiring + GA).
+1. Commit the dependency-free icon set + attribution + this handoff,
+   push `arena/01a070b3-dhun`, open the icon PR, and wait for CI.
+2. Replace every raw icon/emoji glyph in shared UI, Android/Desktop
+   harnesses, and the mini-player; make icon-only controls accessible and
+   at least 48dp.
+3. Apply the token/radius/selected-state polish, remove raw dp/sp from the
+   touched platform UI, run the available checks, update this file after
+   every commit, then push the complete PR for CI verification.
 
 **CI trail (this session, 9 rounds — all in DEBUG_LOG):**
 `33941799559`→android media3 APIs · `33942371150`/`33942622916`→
