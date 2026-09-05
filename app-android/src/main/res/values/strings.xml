@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DHUN</string>
+    <string name="shortcut_search">Search</string>
+    <string name="shortcut_search_long">Search DHUN</string>
+    <string name="shortcut_resume">Resume</string>
+    <string name="shortcut_resume_long">Resume your last queue</string>
+    <string name="shortcut_library">Library</string>
+    <string name="shortcut_library_long">Open your library</string>
+</resources>

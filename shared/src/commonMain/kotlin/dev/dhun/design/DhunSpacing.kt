@@ -34,6 +34,7 @@ object DhunSpacing {
     val transportTarget = 52.dp
     val artworkMini = 56.dp
     val navigationBarContent = 64.dp
+    val navigationRailBreakpoint = 840.dp
     val listRowHeight = 68.dp
     val miniPlayerHeight = 72.dp
     val bottomNavHeight = 80.dp

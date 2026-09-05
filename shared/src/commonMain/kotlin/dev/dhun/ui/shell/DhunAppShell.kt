@@ -6,16 +6,22 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import dev.dhun.core.Track
@@ -126,68 +133,37 @@ fun DhunAppShell(
         track.albumId?.let { nav.push(DetailRoute.AlbumPage(it)) }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val useNavigationRail = maxWidth >= DhunSpacing.navigationRailBreakpoint
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = DhunColors.background,
-            bottomBar = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    // Docked MiniPlayer (Phase 08) — hidden while the FullPlayer covers.
-                    if (!nav.playerExpanded) {
-                        MiniPlayer(
-                            viewModel = playerViewModel,
-                            onExpand = { nav.playerExpanded = true },
-                        )
-                    }
-
-                    GlassBottomBar(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = DhunShapes.bottomSheet,
-                    ) {
-                        NavigationBar(
-                            containerColor = Color.Transparent,
-                            contentColor = DhunColors.textPrimary,
-                            modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
-                        ) {
-                            AppTab.entries.forEach { tab ->
-                                val selected = nav.selectedTab == tab && nav.detailStack.isEmpty()
-                                NavigationBarItem(
-                                    selected = selected,
-                                    onClick = {
-                                        nav.selectedTab = tab
-                                        nav.detailStack.clear()
-                                    },
-                                    icon = {
-                                        DhunIconView(
-                                            icon = tab.icon,
-                                            contentDescription = "${tab.title} tab",
-                                            modifier = Modifier.size(DhunSpacing.iconSize),
-                                            tint = if (selected) DhunColors.accent else DhunColors.textTertiary,
-                                        )
-                                    },
-                                    label = {
-                                        Text(text = tab.title, style = MaterialTheme.typography.labelSmall)
-                                    },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = DhunColors.accent,
-                                        selectedTextColor = DhunColors.accent,
-                                        unselectedIconColor = DhunColors.textTertiary,
-                                        unselectedTextColor = DhunColors.textTertiary,
-                                        indicatorColor = DhunColors.accentContainer,
-                                    ),
-                                )
-                            }
-                        }
-                    }
+            bottomBar = if (useNavigationRail) {
+                {}
+            } else {
+                {
+                    BottomNavigationBar(
+                        nav = nav,
+                        playerViewModel = playerViewModel,
+                    )
                 }
             },
         ) { innerPadding ->
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
-                when (val route = nav.detailStack.lastOrNull()) {
+                if (useNavigationRail) {
+                    AppNavigationRail(nav = nav)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        when (val route = nav.detailStack.lastOrNull()) {
                     null -> TabContent(
                         tab = nav.selectedTab,
                         homeViewModel = homeViewModel,
@@ -232,6 +208,17 @@ fun DhunAppShell(
                             onTrackPlay = onPlayPlaylist,
                             onTrackOverflow = { overflowTrack = it },
                             onDeleted = { nav.closeTop() },
+                        )
+                    }
+                        }
+                    }
+                    if (useNavigationRail && !nav.playerExpanded) {
+                        MiniPlayer(
+                            viewModel = playerViewModel,
+                            onExpand = { nav.playerExpanded = true },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
                         )
                     }
                 }
@@ -312,6 +299,111 @@ fun DhunAppShell(
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun BottomNavigationBar(
+    nav: AppNavState,
+    playerViewModel: PlayerViewModel,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (!nav.playerExpanded) {
+            MiniPlayer(
+                viewModel = playerViewModel,
+                onExpand = { nav.playerExpanded = true },
+            )
+        }
+        GlassBottomBar(
+            modifier = Modifier.fillMaxWidth(),
+            shape = DhunShapes.bottomSheet,
+        ) {
+            NavigationBar(
+                containerColor = Color.Transparent,
+                contentColor = DhunColors.textPrimary,
+                modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
+            ) {
+                AppTab.entries.forEach { tab ->
+                    AppNavigationItem(
+                        tab = tab,
+                        selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
+                        onClick = {
+                            nav.selectedTab = tab
+                            nav.detailStack.clear()
+                        },
+                        rail = false,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppNavigationRail(nav: AppNavState) {
+    NavigationRail(
+        containerColor = DhunColors.surface,
+        contentColor = DhunColors.textPrimary,
+        modifier = Modifier.fillMaxHeight(),
+    ) {
+        AppTab.entries.forEach { tab ->
+            AppNavigationItem(
+                tab = tab,
+                selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
+                onClick = {
+                    nav.selectedTab = tab
+                    nav.detailStack.clear()
+                },
+                rail = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppNavigationItem(
+    tab: AppTab,
+    selected: Boolean,
+    onClick: () -> Unit,
+    rail: Boolean,
+) {
+    val icon: @Composable () -> Unit = {
+        DhunIconView(
+            icon = tab.icon,
+            contentDescription = "${tab.title} tab",
+            modifier = Modifier.size(DhunSpacing.iconSize),
+            tint = if (selected) DhunColors.accent else DhunColors.textTertiary,
+        )
+    }
+    if (rail) {
+        NavigationRailItem(
+            selected = selected,
+            onClick = onClick,
+            icon = icon,
+            label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
+            alwaysShowLabel = true,
+            colors = NavigationRailItemDefaults.colors(
+                selectedIconColor = DhunColors.accent,
+                selectedTextColor = DhunColors.accent,
+                unselectedIconColor = DhunColors.textTertiary,
+                unselectedTextColor = DhunColors.textTertiary,
+                indicatorColor = DhunColors.accentContainer,
+            ),
+        )
+    } else {
+        NavigationBarItem(
+            selected = selected,
+            onClick = onClick,
+            icon = icon,
+            label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = DhunColors.accent,
+                selectedTextColor = DhunColors.accent,
+                unselectedIconColor = DhunColors.textTertiary,
+                unselectedTextColor = DhunColors.textTertiary,
+                indicatorColor = DhunColors.accentContainer,
+            ),
+        )
     }
 }
 
