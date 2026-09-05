@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Text
@@ -44,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -255,7 +258,7 @@ fun <T> ReorderableList(
     }
 }
 
-/** Standard drag handle grip ("≡"-ish) used by both queue and playlist rows. */
+/** Standard drag handle grip used by both queue and playlist rows. */
 @Composable
 fun DragHandleGrip(modifier: Modifier = Modifier) {
     Box(
@@ -264,6 +267,11 @@ fun DragHandleGrip(modifier: Modifier = Modifier) {
             .fillMaxHeight(),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = "≡", color = DhunColors.textTertiary, fontSize = 20.sp)
+        DhunIconView(
+            icon = DhunIcon.QueueMusic,
+            contentDescription = "Reorder",
+            modifier = Modifier.size(DhunSpacing.iconSize),
+            tint = DhunColors.textTertiary,
+        )
     }
 }

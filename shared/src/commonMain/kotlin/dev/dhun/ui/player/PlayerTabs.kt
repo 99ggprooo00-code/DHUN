@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.sp
 import dev.dhun.core.Track
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.ArtworkImage
@@ -129,7 +131,7 @@ internal fun PlayerTabContent(
 /* ---------------- queue ---------------------------------------------------- */
 
 /**
- * Queue tab: drag-reorder (long-press the ≡ handle), swipe-left remove,
+ * Queue tab: drag-reorder (long-press the reorder handle), swipe-left remove,
  * tap-to-jump. The playing row is tinted + shows the equalizer animation.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -359,7 +361,7 @@ internal fun LyricsTabContent(
                         label = "lyricColor$index",
                     )
                     Text(
-                        text = line.text.ifBlank { "♪" },
+                        text = line.text.ifBlank { " " },
                         style = if (active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
                         color = color,
                         textAlign = TextAlign.Center,
@@ -437,7 +439,13 @@ internal fun RelatedTabContent(
                         DhunTonalButton(
                             onClick = { scope.launch { viewModel.startRadio() } },
                         ) {
-                            Text("▶  Play radio (${tracks.size})")
+                            DhunIconView(
+                                icon = DhunIcon.Play,
+                                contentDescription = null,
+                                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            )
+                            Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                            Text("Play radio (${tracks.size})")
                         }
                     }
                 }
@@ -486,8 +494,17 @@ private fun RelatedRow(track: Track, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        DhunIconButton(onClick = onClick, modifier = Modifier.size(32.dp)) {
-            Text("▶", fontSize = 14.sp, color = DhunColors.textSecondary)
+        DhunIconButton(
+            onClick = onClick,
+            modifier = Modifier.size(DhunSpacing.touchTarget),
+            contentDescription = "Play ${track.title}",
+        ) {
+            DhunIconView(
+                icon = DhunIcon.Play,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                tint = DhunColors.textSecondary,
+            )
         }
     }
 }

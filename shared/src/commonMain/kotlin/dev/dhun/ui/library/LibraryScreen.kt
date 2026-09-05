@@ -43,6 +43,8 @@ import dev.dhun.core.Track
 import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlayContext
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.ArtworkImage
@@ -265,7 +267,12 @@ private fun PlaylistRow(
                     .background(DhunColors.surfaceElevated),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("♫", fontSize = 22.sp, color = DhunColors.textTertiary)
+                DhunIconView(
+                    icon = DhunIcon.LibraryMusic,
+                    contentDescription = "Playlist",
+                    modifier = Modifier.size(DhunSpacing.iconSizeLg),
+                    tint = DhunColors.textTertiary,
+                )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -284,8 +291,17 @@ private fun PlaylistRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            DhunIconButton(onClick = onPlay, modifier = Modifier.size(36.dp)) {
-                Text("▶", fontSize = 14.sp, color = DhunColors.accent)
+            DhunIconButton(
+                onClick = onPlay,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Play ${playlist.name}",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = DhunColors.accent,
+                )
             }
         }
     }
@@ -366,7 +382,15 @@ private fun FavoritesTab(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("${favorites.size} favorite${if (favorites.size == 1) "" else "s"}", style = MaterialTheme.typography.labelMedium, color = DhunColors.textSecondary)
-            DhunButton(onClick = onPlayAll, enabled = favorites.isNotEmpty()) { Text("▶  Play all") }
+            DhunButton(onClick = onPlayAll, enabled = favorites.isNotEmpty()) {
+                DhunIconView(
+                    icon = DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                )
+                Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                Text("Play all")
+            }
         }
         // Swipe-to-remove via ReorderableList (drag disabled by not exposing handle reorder? we keep handle but reorder is no-op grouped by favorites? Actually favorites are ordered by addedAt DESC, reordering not supported for now; we expose drag handle but move is no-op — swipe is the primary action.)
         ReorderableList(
@@ -386,8 +410,17 @@ private fun FavoritesTab(
                     Text(track.title, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(track.artistName, style = MaterialTheme.typography.labelSmall, color = DhunColors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                DhunIconButton(onClick = { onTrackOverflow(track) }, modifier = Modifier.size(32.dp)) {
-                    Text("⋮", color = DhunColors.textTertiary, fontSize = 18.sp)
+                DhunIconButton(
+                    onClick = { onTrackOverflow(track) },
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = "More actions for ${track.title}",
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.MoreVert,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.textTertiary,
+                    )
                 }
                 Box(modifier = dragHandle) { DragHandleGrip() }
             }
@@ -498,8 +531,17 @@ private fun HistoryRow(
             )
         }
         // Long-press hint affordance (desktop fallback)
-        DhunIconButton(onClick = onLongPressRemove, modifier = Modifier.size(32.dp)) {
-            Text("✕", fontSize = 14.sp, color = DhunColors.textTertiary)
+        DhunIconButton(
+            onClick = onLongPressRemove,
+            modifier = Modifier.size(DhunSpacing.touchTarget),
+            contentDescription = "Remove ${entry.track.title} from history",
+        ) {
+            DhunIconView(
+                icon = DhunIcon.Close,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                tint = DhunColors.textTertiary,
+            )
         }
     }
 }

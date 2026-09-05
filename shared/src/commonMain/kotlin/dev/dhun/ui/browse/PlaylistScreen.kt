@@ -37,6 +37,8 @@ import androidx.compose.ui.window.Dialog
 import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.ArtworkImage
@@ -114,8 +116,17 @@ fun PlaylistScreen(
 
         // Floating back
         Box(modifier = Modifier.padding(DhunSpacing.xs)) {
-            DhunIconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
-                Text("←", fontSize = 22.sp, color = DhunColors.textPrimary)
+            DhunIconButton(
+                onClick = onBack,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Back",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.ArrowBack,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
+                )
             }
         }
     }
@@ -198,8 +209,17 @@ private fun RemoteTrackRow(index: Int, track: Track, onClick: () -> Unit, onOver
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        DhunIconButton(onClick = onOverflow, modifier = Modifier.size(36.dp)) {
-            Text("⋮", color = DhunColors.textTertiary, fontSize = 18.sp)
+        DhunIconButton(
+            onClick = onOverflow,
+            modifier = Modifier.size(DhunSpacing.touchTarget),
+            contentDescription = "More actions for ${track.title}",
+        ) {
+            DhunIconView(
+                icon = DhunIcon.MoreVert,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.iconSize),
+                tint = DhunColors.textTertiary,
+            )
         }
     }
 }
@@ -360,8 +380,24 @@ private fun PlaylistHeader(
         }
         Spacer(modifier = Modifier.height(DhunSpacing.md))
         Row(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md)) {
-            DhunButton(onClick = onPlayAll, enabled = trackCount > 0) { Text("▶  Play") }
-            DhunOutlinedButton(onClick = onShuffle, enabled = trackCount > 0) { Text("🔀  Shuffle") }
+            DhunButton(onClick = onPlayAll, enabled = trackCount > 0) {
+                DhunIconView(
+                    icon = DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                )
+                Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                Text("Play")
+            }
+            DhunOutlinedButton(onClick = onShuffle, enabled = trackCount > 0) {
+                DhunIconView(
+                    icon = DhunIcon.Shuffle,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                )
+                Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                Text("Shuffle")
+            }
         }
         actions?.let {
             Spacer(modifier = Modifier.height(DhunSpacing.sm))

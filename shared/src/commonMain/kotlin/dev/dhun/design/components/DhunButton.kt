@@ -13,6 +13,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
@@ -127,11 +129,21 @@ fun DhunIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    contentDescription: String? = null,
     content: @Composable () -> Unit,
 ) {
     IconButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier
+            .sizeIn(
+                minWidth = DhunSpacing.touchTarget,
+                minHeight = DhunSpacing.touchTarget,
+            )
+            .then(
+                if (contentDescription == null) Modifier else Modifier.semantics {
+                    this.contentDescription = contentDescription
+                },
+            ),
         enabled = enabled,
         content = content,
     )

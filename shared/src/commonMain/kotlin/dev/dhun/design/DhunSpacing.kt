@@ -21,6 +21,7 @@ object DhunSpacing {
     val cardPadding = md
     val sectionSpacing = xxl
     val itemSpacing = sm
+    val touchTarget = 48.dp
     val iconSize = 24.dp
     val iconSizeSm = 18.dp
     val iconSizeLg = 32.dp

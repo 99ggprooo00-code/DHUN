@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
 
 /**
@@ -74,12 +76,14 @@ fun TrackRow(
         } else if (onOverflowClick != null) {
             DhunIconButton(
                 onClick = onOverflowClick,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "More actions for ${track.title}",
             ) {
-                Text(
-                    text = "⋮",
-                    color = DhunColors.textTertiary,
-                    fontSize = 20.sp,
+                DhunIconView(
+                    icon = DhunIcon.MoreVert,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textTertiary,
                 )
             }
         }

@@ -31,6 +31,8 @@ import dev.dhun.core.Track
 import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunButton
@@ -154,11 +156,13 @@ fun AddToPlaylistDialog(
                                         .padding(vertical = DhunSpacing.sm),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(
-                                        text = "☰",
-                                        color = DhunColors.accent,
-                                        fontSize = 18.sp,
-                                        modifier = Modifier.padding(end = DhunSpacing.md),
+                                    DhunIconView(
+                                        icon = DhunIcon.QueueMusic,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .padding(end = DhunSpacing.md)
+                                            .size(DhunSpacing.iconSize),
+                                        tint = DhunColors.accent,
                                     )
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(

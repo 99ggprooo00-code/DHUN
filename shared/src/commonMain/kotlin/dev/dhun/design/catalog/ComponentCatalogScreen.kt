@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -33,6 +34,8 @@ import dev.dhun.core.Track
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.ArtworkColors
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTheme
 import dev.dhun.design.components.AlbumCard
@@ -252,8 +255,22 @@ private fun ButtonStates() {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
             Text("IconButtons:", style = MaterialTheme.typography.labelMedium, color = DhunColors.textTertiary)
-            DhunIconButton(onClick = {}) { Text("♥", color = DhunColors.accent) }
-            DhunIconButton(onClick = {}, enabled = false) { Text("♡", color = DhunColors.textDisabled) }
+            DhunIconButton(onClick = {}, contentDescription = "Favorite") {
+                DhunIconView(
+                    icon = DhunIcon.Favorite,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.accent,
+                )
+            }
+            DhunIconButton(onClick = {}, enabled = false, contentDescription = "Favorite disabled") {
+                DhunIconView(
+                    icon = DhunIcon.FavoriteBorder,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textDisabled,
+                )
+            }
         }
     }
 }
@@ -315,7 +332,7 @@ private fun ErrorEmptyDemo() {
             ErrorView(message = "You look offline. Check your connection and try again.", onRetry = {})
         }
         GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(DhunSpacing.lg)) {
-            EmptyView(message = "No favorites yet. Tap ♥ on any track to save it here.", title = "No favorites", actionLabel = "Browse", onAction = {})
+            EmptyView(message = "No favorites yet. Tap the favorite icon on any track to save it here.", title = "No favorites", actionLabel = "Browse", onAction = {})
         }
     }
 }

@@ -45,6 +45,8 @@ import dev.dhun.core.ArtistPage
 import dev.dhun.core.Playlist
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.AlbumCard
@@ -130,8 +132,17 @@ fun ArtistScreen(
                     .padding(horizontal = DhunSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DhunIconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                    Text("←", fontSize = 22.sp, color = DhunColors.textPrimary)
+                DhunIconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = "Back",
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.ArrowBack,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.textPrimary,
+                    )
                 }
                 Spacer(modifier = Modifier.width(DhunSpacing.sm))
                 Text(
@@ -230,14 +241,26 @@ private fun ArtistContent(
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
             ) {
                 DhunTonalButton(onClick = onShuffle, enabled = page.topSongs.isNotEmpty()) {
-                    Text("🔀  Shuffle")
+                    DhunIconView(
+                        icon = DhunIcon.Shuffle,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    )
+                    Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                    Text("Shuffle")
                 }
                 DhunTonalButton(onClick = onRadio, enabled = !radioLoading && page.topSongs.isNotEmpty()) {
                     if (radioLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(DhunSpacing.iconSizeSm), strokeWidth = 2.dp)
                     } else {
-                        Text("📻  Radio")
+                        DhunIconView(
+                            icon = DhunIcon.Play,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        )
                     }
+                    Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                    Text("Radio")
                 }
             }
         }
@@ -371,8 +394,17 @@ private fun ArtistContent(
 
 @Composable
 private fun TrackOverflowIcon(onClick: () -> Unit) {
-    DhunIconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
-        Text("⋮", color = DhunColors.textTertiary, fontSize = 20.sp)
+    DhunIconButton(
+        onClick = onClick,
+        modifier = Modifier.size(DhunSpacing.touchTarget),
+        contentDescription = "More actions for ${track.title}",
+    ) {
+        DhunIconView(
+            icon = DhunIcon.MoreVert,
+            contentDescription = null,
+            modifier = Modifier.size(DhunSpacing.iconSize),
+            tint = DhunColors.textTertiary,
+        )
     }
 }
 

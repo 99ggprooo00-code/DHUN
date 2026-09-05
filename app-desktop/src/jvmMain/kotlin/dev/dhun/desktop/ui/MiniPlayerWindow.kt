@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dhun.core.PlaybackState
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypography
@@ -104,22 +106,26 @@ fun MiniPlayerContent(
             }
             DhunIconButton(
                 onClick = { viewModel.togglePlay() },
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = if (state is PlaybackState.Playing) "Pause" else "Play",
             ) {
-                Text(
-                    text = if (state is PlaybackState.Playing) "⏸" else "▶",
-                    fontSize = 22.sp,
-                    color = DhunColors.textPrimary,
+                DhunIconView(
+                    icon = if (state is PlaybackState.Playing) DhunIcon.Pause else DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
                 )
             }
             DhunIconButton(
                 onClick = { viewModel.next() },
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Next track",
             ) {
-                Text(
-                    text = "⏭",
-                    fontSize = 18.sp,
-                    color = DhunColors.textSecondary,
+                DhunIconView(
+                    icon = DhunIcon.SkipNext,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = DhunColors.textSecondary,
                 )
             }
         }

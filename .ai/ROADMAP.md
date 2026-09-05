@@ -12,12 +12,11 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at `345c45a` (= `origin/main`, PRs #9–#12
-merged). The current `test` pre-release is healthy: run `33952291659`
-passed `apk`, `msi`, and `publish`; all four rolling assets are present.
-The referenced unpushed icon/handoff commits `3bcca3b` and `f469605` are not
-present in this checkout or on the fetched remote refs, so this session is
-recreating the icon handoff on the fixed branch.
+**Branch:** `arena/01a070b3-dhun` at `a9a8628` (icon handoff pushed; PR #13
+OPEN). The current `test` pre-release is healthy: run `33952291659` passed
+`apk`, `msi`, and `publish`; all four rolling assets are present. The
+referenced `3bcca3b` / `f469605` objects were absent, so the handoff was
+recreated here.
 
 **User 2026-09-05 directive — status:**
 1. **Release verification — DONE (CI + GitHub release):** `dhun-test.apk`,
@@ -27,19 +26,24 @@ recreating the icon handoff on the fixed branch.
    Windows tray/close-to-tray/geometry/mini-player/shortcuts/SMTC/MSI
    clean-VM checks, and the Phase 10/11 checklists remain open as recorded
    below.
-3. **Icon pass — IN PROGRESS:** `DhunIcons.kt` is being recreated with 24
-   embedded Apache-2.0 Material paths, a common SVG path parser, and
-   accessible `DhunIconView`; attribution is staged in `THIRD_PARTY.md`.
+3. **Icon pass — CODE DONE, CI UNVERIFIED:** `DhunIcons.kt` has 24 embedded
+   Apache-2.0 Material paths, a common SVG path parser, and accessible
+   `DhunIconView`; attribution is in `THIRD_PARTY.md`. PR #13 run
+   `33955728824` failed in the pre-existing `NowPlayingPersistenceTest`
+   timeout before any UI compile; the completion transition race is now
+   fixed in the unpushed worktree.
+4. **Raw glyph purge — CODE IN PROGRESS:** shared UI, dialogs, catalog,
+   Android/Desktop harnesses, and the desktop mini-player now use
+   `DhunIconView`; target icon grep is clean. Token scaling and broader
+   non-icon typography cleanup remain.
 
 **Exact next step:**
-1. Commit the dependency-free icon set + attribution + this handoff,
-   push `arena/01a070b3-dhun`, open the icon PR, and wait for CI.
-2. Replace every raw icon/emoji glyph in shared UI, Android/Desktop
-   harnesses, and the mini-player; make icon-only controls accessible and
-   at least 48dp.
-3. Apply the token/radius/selected-state polish, remove raw dp/sp from the
-   touched platform UI, run the available checks, update this file after
-   every commit, then push the complete PR for CI verification.
+1. Commit the raw glyph purge plus the completion-race fix and roadmap,
+   push the branch, then inspect PR #13 CI annotations and rerun if needed.
+2. Resolve any compiler diagnostics, then finish token/radius/selected-state
+   polish and eliminate raw dp/sp from touched platform UI.
+3. Keep hardware verification open; after CI is green continue with SMTC
+   phase 2 or the documented tray fallback, then Phase 13/14.
 
 **CI trail (this session, 9 rounds — all in DEBUG_LOG):**
 `33941799559`→android media3 APIs · `33942371150`/`33942622916`→

@@ -40,6 +40,8 @@ import dev.dhun.core.HomeSection
 import dev.dhun.core.Playlist
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.AlbumCard
@@ -154,11 +156,13 @@ private fun HomeFeedContent(
                 DhunIconButton(
                     onClick = onRefresh,
                     enabled = !isRefreshing,
+                    contentDescription = if (isRefreshing) "Refreshing" else "Refresh home",
                 ) {
-                    Text(
-                        text = if (isRefreshing) "…" else "↻",
-                        fontSize = 20.sp,
-                        color = DhunColors.textSecondary,
+                    DhunIconView(
+                        icon = DhunIcon.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.textSecondary,
                     )
                 }
             }
@@ -332,12 +336,14 @@ private fun QuickPickItem(
             }
             DhunIconButton(
                 onClick = onOverflow,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "More actions for ${track.title}",
             ) {
-                Text(
-                    text = "⋮",
-                    color = DhunColors.textTertiary,
-                    fontSize = 18.sp,
+                DhunIconView(
+                    icon = DhunIcon.MoreVert,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textTertiary,
                 )
             }
         }

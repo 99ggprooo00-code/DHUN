@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -34,6 +35,9 @@ import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunSpacing
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.player.DhunPlayer
@@ -57,11 +61,11 @@ import dev.dhun.ui.player.MiniPlayer
 import dev.dhun.ui.search.SearchScreen
 import kotlinx.coroutines.launch
 
-enum class AppTab(val title: String, val icon: String) {
-    HOME("Home", "🏠"),
-    SEARCH("Search", "🔍"),
-    LIBRARY("Library", "📚"),
-    CATALOG("Catalog", "🎨"),
+enum class AppTab(val title: String, val icon: DhunIcon) {
+    HOME("Home", DhunIcon.Home),
+    SEARCH("Search", DhunIcon.Search),
+    LIBRARY("Library", DhunIcon.LibraryMusic),
+    CATALOG("Catalog", DhunIcon.Palette),
 }
 
 /**
@@ -150,7 +154,14 @@ fun DhunAppShell(
                                         nav.selectedTab = tab
                                         nav.detailStack.clear()
                                     },
-                                    icon = { Text(text = tab.icon, fontSize = 18.sp) },
+                                    icon = {
+                                        DhunIconView(
+                                            icon = tab.icon,
+                                            contentDescription = "${tab.title} tab",
+                                            modifier = Modifier.size(DhunSpacing.iconSize),
+                                            tint = if (nav.selectedTab == tab) DhunColors.accent else DhunColors.textTertiary,
+                                        )
+                                    },
                                     label = {
                                         Text(text = tab.title, style = MaterialTheme.typography.labelSmall)
                                     },

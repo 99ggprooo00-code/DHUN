@@ -132,7 +132,13 @@ class NowPlayingPersistence(
     private suspend fun onTrackChanged(track: Track?) {
         // finish the previous entry if it played (almost) to the end
         val previous = lastHandle
-        if (previous != null && lastProgressFraction >= COMPLETION_FRACTION) {
+        val transitionFraction = player.durationMs.value.takeIf { it > 0L }?.let { duration ->
+            player.positionMs.value.toFloat() / duration.toFloat()
+        } ?: 0f
+        // Read the player once more at the transition. A progress tick can be
+        // delayed by a busy dispatcher, so completion must not depend solely
+        // on the periodic observer having won the scheduling race.
+        if (previous != null && maxOf(lastProgressFraction, transitionFraction) >= COMPLETION_FRACTION) {
             runCatching { recordPlay.complete(previous) }
         }
         lastHandle = null

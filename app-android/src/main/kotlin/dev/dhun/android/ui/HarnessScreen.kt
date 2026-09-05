@@ -20,7 +20,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,6 +31,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dhun.core.PlaybackState
+import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunSpacing
+import dev.dhun.design.components.DhunIconButton
 import dev.dhun.player.DhunPlayer
 import kotlinx.coroutines.launch
 
@@ -132,8 +136,17 @@ fun HarnessScreen(player: DhunPlayer, viewModel: HarnessViewModel) {
                                 )
                             }
                             val fav = track.id in favoriteIds
-                            TextButton(onClick = { viewModel.toggleFavorite(track) }) {
-                                Text(if (fav) "♥" else "♡", fontSize = 20.sp, color = if (fav) Color(0xFFBB86FC) else Color(0xFF777777))
+                            DhunIconButton(
+                                onClick = { viewModel.toggleFavorite(track) },
+                                modifier = Modifier.size(DhunSpacing.touchTarget),
+                                contentDescription = if (fav) "Remove ${track.title} from favorites" else "Add ${track.title} to favorites",
+                            ) {
+                                DhunIconView(
+                                    icon = if (fav) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(DhunSpacing.iconSize),
+                                    tint = if (fav) DhunColors.accent else DhunColors.textTertiary,
+                                )
                             }
                         }
                         HorizontalDivider(color = Color(0xFF222222))
@@ -169,11 +182,11 @@ private fun NowPlayingBar(
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Text(
             when (state) {
-                is PlaybackState.Playing -> "▶ playing"
-                is PlaybackState.Paused -> "⏸ paused"
-                is PlaybackState.Buffering -> "… buffering"
-                is PlaybackState.Resolving -> "… resolving"
-                is PlaybackState.Error -> "✕ ${state.message}"
+                is PlaybackState.Playing -> "Playing"
+                is PlaybackState.Paused -> "Paused"
+                is PlaybackState.Buffering -> "Buffering"
+                is PlaybackState.Resolving -> "Resolving"
+                is PlaybackState.Error -> "Error: ${state.message}"
                 PlaybackState.Idle -> "idle"
             },
             fontSize = 12.sp,
@@ -194,14 +207,42 @@ private fun NowPlayingBar(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            TextButton(onClick = onPrevious) { Text("⏮", fontSize = 20.sp) }
-            TextButton(onClick = onPlayPause) {
-                Text(
-                    if (state is PlaybackState.Playing) "⏸" else "▶",
-                    fontSize = 24.sp,
+            DhunIconButton(
+                onClick = onPrevious,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Previous track",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.SkipPrevious,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
                 )
             }
-            TextButton(onClick = onNext) { Text("⏭", fontSize = 20.sp) }
+            DhunIconButton(
+                onClick = onPlayPause,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = if (state is PlaybackState.Playing) "Pause" else "Play",
+            ) {
+                DhunIconView(
+                    icon = if (state is PlaybackState.Playing) DhunIcon.Pause else DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeLg),
+                    tint = DhunColors.textPrimary,
+                )
+            }
+            DhunIconButton(
+                onClick = onNext,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Next track",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.SkipNext,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
+                )
+            }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatMs(position), fontSize = 11.sp, color = Color(0xFF777777))
