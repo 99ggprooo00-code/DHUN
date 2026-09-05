@@ -62,24 +62,28 @@ substitution, swallowing the artifact name (issue #14 shows "The attached
 artifact" with an empty name); (4) evidence gap — `yt-dlp --version` prints
 to the step log but not into the `rot-drill.log` artifact.
 
+**Fix state (this session, branch `arena/01a07141-dhun`):**
+- `735c609` docs — this failure record (pushed first, per protocol).
+- `9be04ab` `JvmStreamResolvers.kt` — `AuthRequired` now carries yt-dlp's
+  stderr line (was `detail=null` in run 33961533965).
+- `afe017d` probe `Main.kt` — fatal `resolve+stream` step now drives the
+  production chain `ResolvingStreamResolver(OwnClientStreamResolver →
+  YtDlpStreamResolver)` (= `forDesktop` wiring); new per-engine WATCH lines
+  `WATCH|own-client`, `WATCH|ytdlp` beside the NewPipe watch. Fail-loud and
+  stream-byte verification unchanged.
+- `c038295` `rot-drill.yml` — issue-body backtick bug fixed; `yt-dlp
+  --version` now recorded into the `rot-drill.log` artifact (`tee -a`).
+
 **Exact next step:**
-1. Fix `YtDlpStreamResolver` to carry yt-dlp's stderr line into
-   `AuthRequired(detail=…)` (typed errors kept, fail-loud kept).
-2. Align the probe's fatal step with the real production chain
-   (`ResolvingStreamResolver(OwnClientStreamResolver → YtDlpStreamResolver)`
-   = `forDesktop` wiring) and add per-engine `WATCH` evidence lines
-   (own-client / yt-dlp / newpipe). NOT a weakening: stream bytes are still
-   HTTP+magic-byte verified, a PASS still requires a real resolved URL
-   through shipped code, and both engines gated ⇒ verdict stays FAIL. The
-   CI-network vs residential distinction is documented in
-   `.ai/KNOWN_LIMITATIONS.md` (kill switch preserved).
-3. Fix the rot-drill issue-body quoting + record `yt-dlp --version` into the
-   artifact log.
-4. Re-dispatch the drill on this branch; require a real `PROBE|verdict|PASS`
-   before the rot-drill step may be marked green. If the own-client tier is
-   ALSO gated from CI (both engines red), keep the drill red and treat it as
-   CI-network gating evidence — do not fake a pass; verify separately on
-   residential hardware.
+1. Push branch → open PR → require green CI (shared unit tests, Android
+   debug build, probe compile — sandbox has no JDK, CI is the gate).
+2. Dispatch the rot-drill on this branch (`workflow_dispatch`); require a
+   real `PROBE|verdict|PASS` line before the rot-drill step may be marked
+   green. Reading the new WATCH lines: own-client OK ⇒ production primary
+   healthy even if `WATCH|ytdlp` shows CI-IP gating; both BROKEN ⇒ verdict
+   FAIL stands as CI-network gating evidence — do NOT fake a pass;
+   residential verification then moves to real hardware.
+3. Comment the outcome on issue #14 (it auto-closes only on a green run).
 
 **Phase 14 step status after this failure:**
 
