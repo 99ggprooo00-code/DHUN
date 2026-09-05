@@ -116,9 +116,9 @@ fun main() = application {
     // Window states (hoisted so close-to-tray/quit can read the live geometry:
     // Compose keeps position/size current via the AWT component listener).
     val mainState = rememberWindowState(
-        width = initialGeometry?.w?.dp ?: 1200.dp,
-        height = initialGeometry?.h?.dp ?: 780.dp,
-        position = initialGeometry?.let { WindowPosition(it.x.dp, it.y.dp) }
+        width = (initialGeometry?.w?.toFloat() ?: 1200f).dp,
+        height = (initialGeometry?.h?.toFloat() ?: 780f).dp,
+        position = initialGeometry?.let { WindowPosition(it.x.toFloat().dp, it.y.toFloat().dp) }
             ?: WindowPosition.PlatformDefault,
     )
     val miniState = rememberWindowState(

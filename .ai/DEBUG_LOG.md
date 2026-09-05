@@ -111,6 +111,26 @@ Round-3 fix `a20165b` was source-verified against the above; its CI
 verification was blocked by the test race (previous entry) — confirmed only
 when a CI run reaches step 6 green.
 
+Round 4 (run 33943041377 on `4602d9d`) finally reached the desktop module
+and exposed 8 more — all small API/type mixups:
+- `Main.kt` `rememberWindowState(width/height/position=…)`: **`Long.dp`
+  does not exist** (Int/Float/Double do) — the persisted geometry is `Long`
+  (px) → convert with `.toFloat()` before `.dp`. (miniState with Int args
+  compiled fine — the failing args were exactly the Long-derived ones.)
+- `TrayIcons.kt`: `0xFF161616` / `0xFFBB86FC` are **Long literals** in
+  Kotlin (> Int.MAX) → `Color(Int)` mismatch → `.toInt()`.
+  `(s * 0.12f).coerceAtLeast(1)` — Float receiver got an Int →
+  `.toInt().coerceAtLeast(1)`.
+- `DhunTray.kt`: `java.awt.MenuItem` has **`label`**, not `text`
+  (getLabel/setLabel); and an `inline` lambda passed to
+  `SwingUtilities.invokeLater` needs **`noinline`**.
+
+Also settled from the v1.8.2 source (use as reference): `application { }`
+**IS a composable context** (KDoc: `fun main() = application { Window … }`),
+and the `Window` overload with `undecorated: Boolean = false` has defaults
+for every parameter (state/title/resizable/alwaysOnTop/onKeyEvent/content
+all named-safe).
+
 ---
 
 ## 2026-09-05 · Background playback killed by OEM battery savers (MIUI/HyperOS/OneUI)

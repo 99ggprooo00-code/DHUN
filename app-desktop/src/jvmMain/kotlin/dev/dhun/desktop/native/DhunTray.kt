@@ -57,7 +57,7 @@ class DhunTray(
             } else {
                 "DHUN — nothing playing"
             }
-            trackItem?.text = text
+            trackItem?.label = text
         }
     }
 
@@ -66,7 +66,7 @@ class DhunTray(
         onEdt {
             val icon = trayIcon ?: return@onEdt
             icon.image = if (playing) TrayIcons.playing() else TrayIcons.paused()
-            playItem?.text = if (playing) "Pause" else "Play"
+            playItem?.label = if (playing) "Pause" else "Play"
         }
     }
 
@@ -121,7 +121,7 @@ class DhunTray(
         trayIcon = icon
     }
 
-    private inline fun onEdt(block: () -> Unit) {
+    private inline fun onEdt(noinline block: () -> Unit) {
         if (SwingUtilities.isEventDispatchThread()) block() else SwingUtilities.invokeLater(block)
     }
 }

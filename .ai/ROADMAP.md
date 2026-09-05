@@ -57,15 +57,18 @@ until CI green):**
    published by a `publish` job. (Satisfies Phase 3 of the directive; the
    sandbox has no JDK/Windows host, so CI IS the build.)
 
-**Last CI error (pushed `fa53643`, run `33941799559`):** step 4 (tests)
-**PASSED** — the Mutex fix worked. Step 5 `:app-android:compileDebugKotlin`
-FAILED — my `DhunPlaybackService` used media3 APIs that don't exist in
-1.5.1 (`MediaSession.startForeground`, `MediaSession.sessionId`, static
-`MediaStyleNotificationHelper.createNotification`) + one null-safety miss.
-Corrected to the real 1.5.1 pattern (plain `Service.startForeground` +
-nested `MediaStyleNotificationHelper.MediaStyle(session)`). Note for the
-record: the round-3 DESKTOP code is now compile-checked only if this run's
-step 6 gets reached.
+**CI state (this session's run trail):**
+- `33941799559` (fa53643): step 4 tests **PASSED** (Mutex fix confirmed);
+  step 5 android compile FAILED (media3 1.5.1 API mixups in my new service).
+- `33942371150` / `33942622916`: two more small android compile rounds
+  (NotificationCompat.CATEGORY_MEDIA doesn't exist; artworkData = ByteArray;
+  no framework CATEGORY_MEDIA at all) — all fixed.
+- `33943041377` (4602d9d): **step 5 (Android, incl. crash fix + FGS) GREEN**;
+  step 6 (probe + desktop) FAILED on 8 small desktop errors (Long.dp,
+  Long hex literals → Color, MenuItem.label vs text, noinline,
+  Float.coerceAtLeast) — **fixed in this push**; full details in
+  `.ai/DEBUG_LOG.md` (round 4 block). If this next run is green →
+  **first fully green CI on this branch → merge PR #9**.
 
 **Exact next step:**
 1. Commit the session's work (small commits) → push

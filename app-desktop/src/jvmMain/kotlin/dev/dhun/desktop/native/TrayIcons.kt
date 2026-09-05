@@ -15,9 +15,9 @@ import java.awt.image.BufferedImage
  */
 object TrayIcons {
 
-    private val background = Color(0xFF161616)
+    private val background = Color(0xFF161616.toInt())
     private val border = Color(0x33FFFFFF)
-    private val accent = Color(0xFFBB86FC)
+    private val accent = Color(0xFFBB86FC.toInt())
 
     fun playing(size: Int = 32): BufferedImage = draw(size) { g, s ->
         tile(g, s)
@@ -36,8 +36,8 @@ object TrayIcons {
     fun paused(size: Int = 32): BufferedImage = draw(size) { g, s ->
         tile(g, s)
         g.color = accent
-        val barW = (s * 0.12f).coerceAtLeast(1)
-        val gap = (s * 0.09f).coerceAtLeast(1)
+        val barW = (s * 0.12f).toInt().coerceAtLeast(1)
+        val gap = (s * 0.09f).toInt().coerceAtLeast(1)
         val h = (s * 0.40f).toInt()
         val top = (s - h) / 2
         val mid = s / 2
