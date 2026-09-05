@@ -3,9 +3,10 @@
 A serious, cross-platform music application streaming from YouTube Music.
 Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 
-> **Status:** planning complete, implementation starting. See
-> [MASTER_PROMPT.md](MASTER_PROMPT.md) (the plan) and
-> [PROBLEMS_AND_FIXES.md](PROBLEMS_AND_FIXES.md) (why the plan looks like this).
+> **Status:** Phases 01–11 merged, Phase 12 (desktop native) in progress —
+> live status in [.ai/ROADMAP.md](.ai/ROADMAP.md). Plan:
+> [.ai/MASTER_PROMPT.md](.ai/MASTER_PROMPT.md); why it looks like this:
+> [.ai/PROBLEMS_AND_FIXES.md](.ai/PROBLEMS_AND_FIXES.md).
 
 ## The two facts that define this project
 
@@ -41,16 +42,23 @@ APK output: `app-android/build/outputs/apk/debug/app-android-debug.apk`
 
 ## Test builds policy
 
-ONE rolling test release exists — tag `test`, asset `dhun-test.apk`,
-auto-replaced on every push to main. No versioned releases for unfinished
-builds; nothing in Releases is stable or store-ready. Install test builds
-only on devices where that is acceptable (not your daily phone).
+ONE rolling test **pre-release** exists — tag `test`, assets
+`dhun-test.apk` (Android) and `dhun-test.msi` (Windows, needs libVLC
+installed), auto-replaced on every push to main. No versioned releases for
+unfinished builds; nothing in Releases is stable or store-ready. Install
+test builds only on devices where that is acceptable (not your daily
+phone). Stable URLs:
+`https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk`,
+`…/dhun-test.msi`.
 
 ## Repo map
 
-- `MASTER_PROMPT.md` — the 14-phase engineering plan (the contract)
-- `PROMPT_SEQUENCE.md` — audit of the original 30-phase prompt set + the rewritten phase-by-phase prompts
-- `PROBLEMS_AND_FIXES.md` — audit of the original plan + evidence
-- `RISK_REGISTER.md` — what will go wrong and the pre-agreed responses
-- `ROADMAP.md` — live phase status
-- `KNOWN_LIMITATIONS.md` — honest gaps, updated every phase
+- `.ai/` — agent operating files (moved out of the project root 2026-09-05):
+  - `.ai/MASTER_PROMPT.md` — the 14-phase engineering plan (the contract)
+  - `.ai/PROMPT_SEQUENCE.md` — audit of the original 30-phase prompt set + rewritten prompts
+  - `.ai/PROBLEMS_AND_FIXES.md` — audit of the original plan + evidence
+  - `.ai/RISK_REGISTER.md` — what will go wrong and the pre-agreed responses
+  - `.ai/ROADMAP.md` — live phase status (CURRENT ACTIVE TASK at the top)
+  - `.ai/KNOWN_LIMITATIONS.md` — honest gaps, updated every phase
+  - `.ai/DEBUG_LOG.md` — incidents: stack → root cause → fix
+  - `.ai/README.md` — boot protocol + permanent maintenance contract

@@ -1,136 +1,250 @@
 # ROADMAP — live status
 
+Rules (permanent, from the user):
+- **CURRENT ACTIVE TASK goes at the very top** — file worked on, last
+  error, exact next step.
+- Mark **exactly** which steps are complete. **Done = pushed + CI green +
+  (where the phase says so) on-hardware verified.** Unpushed or
+  CI-unverified work is NOT done, no matter how good it looks locally.
+- Update this file every phase and every session.
+
+---
+
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a06b14-dhun)
 
-**Branch:** `arena/01a06b14-dhun` · **PR:** **#9 OPEN** (head `f50dba4`) — "feat(desktop): Phase 12 — desktop native integrations (tray, mini-player, shortcuts, close-to-tray, SMTC spike phase 1)". PR #8 (Phases 10+11) is already **MERGED** @ `d27eb37` = current `main`.
+**Branch:** `arena/01a06b14-dhun` · **PR:** **#9 OPEN** (remote head
+`a20165b`). PR #8 (Phases 10+11) MERGED @ `d27eb37` = `main`.
 
-**Phase:** 12 — Desktop Native Integrations — 🟨 IN PROGRESS (all code pushed; CI RED ×3 → round-3 fix `a20165b` source-verified + pushed, CI running; hardware OPEN). Phases 10+11 ✅ **MERGED** — **on-hardware verification OPEN** (user's physical run; concrete tracks ready in `docs/verification/11-lyrics.md`).
+**Phase:** 12 (desktop native) still in progress — **plus the user's
+2026-09-05 directive (Phase 1 critical fixes / Phase 2 docs / Phase 3
+builds)** is now the driver.
 
-**File we were working on:** `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt` (primary), plus `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/smct/Smct.kt` and `.../ui/MiniPlayerWindow.kt` — Compose Desktop **1.8.2 API fixes**, three CI red→fix rounds so far.
+**Code done in THIS session (local, NOT yet pushed — counts as UNDONE
+until CI green):**
+1. **Android fatal crash fixed** — every `MediaController` call in
+   `AndroidDhunPlayer` marshalled to the main thread (`onMain` +
+   `withContext(Dispatchers.Main)` for suspend; poll job pinned to Main).
+   Stack + root cause: `.ai/DEBUG_LOG.md` entry 2026-09-05 #1.
+2. **CI red #4 root-caused + fixed** — it was NOT the desktop code:
+   `:shared:jvmTest` failed on a **persistence race** (`NowPlayingPersistence`
+   — two concurrent `saveQueue` transactions interleaved on the
+   single-connection in-memory driver). Fixed with a write `Mutex`.
+   Side effect discovered: desktop compile is chained into the CI step
+   "Probe compiles" (GITHUB_ACTIONS-guarded) — CI runs 1–3 died there,
+   run 4 died at the test step, so **the round-3 desktop fix
+   (`a20165b`, 1.8.2 API from source) has never actually compile-checked
+   in CI**. The next push's step 6 is the first real signal for it.
+3. **Background/OEM resilience (Phase 1.2 of the directive)** —
+   `DhunPlaybackService` now a true FOREGROUND service
+   (`MediaSession.startForeground` + live media notification, channel id =
+   `session.sessionId`); battery-optimization exemption dialog (one-shot,
+   `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`); `ic_notification` icon added.
+   MIUI/HyperOS "auto-start" is manual-only → hardware checklist.
+4. **Agent meta moved to `.ai/`** (this file, MASTER_PROMPT,
+   PROMPT_SEQUENCE, KNOWN_LIMITATIONS, PROBLEMS_AND_FIXES, RISK_REGISTER)
+   + new `.ai/DEBUG_LOG.md` + `.ai/README.md` (boot protocol). Note: the
+   user's wording was "a separate branch `.ai`" — the Arena session is
+   pinned to `arena/01a06b14-dhun` (only branch pushable), so it is
+   implemented as the `.ai/` directory on this branch; splitting it into
+   a real branch is one `git` command after merge if still wanted.
+5. **test-release workflow extended** — rolling `test` **pre-release** now
+   gets BOTH assets on every push to main: `dhun-test.apk` (ubuntu job)
+   and `dhun-test.msi` (windows-latest job, `:app-desktop:createMsi`),
+   published by a `publish` job. (Satisfies Phase 3 of the directive; the
+   sandbox has no JDK/Windows host, so CI IS the build.)
 
-**Last error:** CI run **`33930616806`** (pushed `d2e9ade`) — **FAILED** (6m22s), `:app-desktop` compile errors (annotations, truncated):
-1. `Unresolved reference 'LEFT'` ×2 / `'RIGHT'` ×2 — **`Key.LEFT`/`Key.RIGHT` do not exist in 1.8.2's `androidx.compose.ui.input.key.Key`** (arrows are represented differently — likely `Key.Direction`-style; `Key.Q/M/F/Space` and `event.isCtrlPressed`/`event.key` resolved fine, so only the arrow constants + the below are wrong)
-2. `Unresolved reference 'type'` — **1.8.2's `KeyEvent` has no `type` member** (no `KeyEventType` check possible in `Window(onKeyEvent)` as used)
-3. `Argument type mismatch: actual type is 'Offset', but 'WindowPosition' was expected` — **1.8.2's `rememberWindowState(position=…)` takes a `WindowPosition` type, not `Offset`**
-(+ `None of the following candidates is applicable` ×4 + `@Composable invocations can only happen from the context of a @Composable function` — cascades of the unresolved `Window(...)` call leaving its content lambda untyped)
-(round 2, run `33928843140` on `f50dba4`: `LocalWindow` is **internal** in 1.8.2 + `Float.px` missing — fixed in `d2e9ade` via public AWT. Round 1, run `33887658349` on `ffa138b`: no `WindowScope` receiver on `Window`'s content lambda, `Offset(…)` needs px Floats not Dp, `quitRef` forward reference — fixed in `f50dba4`.)
-
-**Root cause found + fixed (round 3, pushed `a20165b`):** the 1.8.2 API was verified **from source** — the 1.8.x desktop code lives in the public repo **`JetBrains/compose-multiplatform-core`** at tag `v1.8.2` (`compose/ui/ui/src/desktopMain/kotlin/androidx/compose/ui/window/`): `Window`'s content is `FrameWindowScope.() -> Unit` and `window` is a **`ComposeWindow` which extends `javax.swing.JFrame`** (all show/hide/toFront/requestFocus = plain public AWT); `alwaysOnTop` is a top-level `Window` param and **`skipTaskbar` does not exist in 1.8.2** (mini-player shows in the taskbar — KNOWN_LIMITATIONS updated); geometry via Dp-based `WindowPosition` + the live `WindowState` (position/size kept current by the AWT component listener); arrows = `Key.DirectionLeft/Right`, space = `Key.Spacebar`; `KeyEvent.type`/`isCtrlPressed` DO exist (round-3 errors were cascades of the unresolved `Window(...)` call). JNA stays only for the SMTC probe + Windows in-content drag.
+**Last CI error (pushed `a20165b`, run `33938679193`):** `:shared:jvmTest`
+failure — `NowPlayingPersistenceTest.queueAndProgressArePersistedThenRestoredPaused`
+line 129 `expected:<[T1,T2,T3]> but was:<[T1,T2,…]>` — fixed locally
+(Mutex), unpushed.
 
 **Exact next step:**
-1. CI for `a20165b` (run id appears in `gh run list --branch arena/01a06b14-dhun`): if red → annotations → fix (remaining risk surface is now only the two `Window(...)` calls + key handlers, all source-verified); if green → **merge PR #9**.
-2. **User's Windows machine** (`docs/verification/12-desktop-native.md` checklist): tray (icon variants + 6-item menu), close-to-tray ≠ quit + clean quit (no zombie vlc), window geometry restore, mini-player (always-on-top / drag / click-opens-main / Ctrl+M), all 7 shortcuts + text-field negative check, **`SMTC probe` console line**, `:app-desktop:createMsi` + clean-VM install.
-3. Per SMTC probe result → implement spike **phase 2** (`UpdateMetadata` + `ButtonPressed` events; IIDs pulled on-machine per the doc's procedure) or lock in the documented fallback (tray + shortcuts — already the shipping path).
-4. In parallel (any machine): user runs the Phase 10+11 on-hardware checklists.
+1. Commit the session's work (small commits) → push
+   `arena/01a06b14-dhun` → PR #9 gets a new CI run: step 4 (tests, should
+   now pass) → step 5 (android assembleDebug, compiles the crash fix) →
+   step 6 (probe + chained **desktop** compile, first real check of the
+   round-3 1.8.2 fix). If step 6 red → annotations → fix (risk surface is
+   only the two `Window(...)` calls + key handlers). If green → **merge
+   PR #9**; the merge triggers the rolling test release with APK+MSI.
+2. **User's hardware** (OPEN, parallel):
+   - Android: crash repro (artist shuffle play) no longer crashes;
+     background 30-min soak; lock-screen controls; MIUI/HyperOS auto-start
+     manual toggle; battery-exemption dialog appears once.
+   - Windows (`docs/verification/12-desktop-native.md`): tray,
+     close-to-tray, geometry, mini-player, 7 shortcuts, `SMTC probe`
+     console line, `dhun-test.msi` clean-VM install (needs libVLC).
+   - Phases 10+11 checklists (`docs/verification/10-library.md`,
+     `11-lyrics.md`).
+3. Then: SMTC phase 2 (on-machine IID pull) or lock in the fallback;
+   Phase 13 (Android polish) and Phase 14 (rot-drill GA + soak + release).
 
-**Standing sandbox notes:** no local JDK (CI is the compile gate, annotations on); no device/adb/display (on-hardware items are the user's physical run); direct `curl` has no egress but `fetch_page` does; **GitHub token in this sandbox expires between turns — if a push/gh call returns "Invalid username or token", reconnect GitHub in Arena**.
+**Standing sandbox notes:** no local JDK (CI is the compile gate); no
+device/adb/display; direct `curl` mostly blocked, `fetch_page` works;
+repo can be reset between turns (re-verify + re-push); GitHub token
+flaps — "Invalid username or token" = reconnect GitHub in Arena.
 
-### Phase 11 step-by-step status — ✅ MERGED @ `d27eb37` (PR #8) — on-hardware verification OPEN (test track list pre-verified against live LRCLIB)
+---
 
-| Step (PROMPT_SEQUENCE.md Phase 11 "Build") | Status |
+## Instruction audit — what the user directed, and where it lives
+
+Everything below is a standing directive from the conversation (kept here
+so no session loses it; the user asked on 2026-09-05 that ALL
+instructions — future updates, recurring maintenance, repo sanitization —
+be stored permanently in `.ai/`).
+
+| # | Directive | Where it's enforced |
+|---|---|---|
+| 1 | **Boot protocol:** no code before boot — MASTER_PROMPT → ROADMAP → `git log`; reply = phase summary + exact next step + permission ask. | `.ai/README.md` boot protocol |
+| 2 | **"do it accordingly" = execute the documented plan autonomously**, no multiple-choice questions. | Session behavior |
+| 3 | **ROADMAP maintenance:** CURRENT ACTIVE TASK at top; exact step marks; **unpushed/unverified = undone**. | Rules block above |
+| 4 | **Code-first** (MASTER_PROMPT AI rules): no stubs, no TODOs in production, hardware verification before a phase is done, small commits, update ROADMAP + KNOWN_LIMITATIONS each phase, report stalls (>30 min no progress), ADR before changing a locked decision. | `.ai/MASTER_PROMPT.md` §AI Behavior Rules |
+| 5 | **Rolling test release policy** (2026-09-01): exactly ONE release tagged `test`, asset `dhun-test.apk` always that name, every push to main REPLACES it, no version numbers/history for unfinished builds. Stable URLs never change. | `.github/workflows/test-release.yml` (header comment); extended 2026-09-05 with `dhun-test.msi` |
+| 6 | **2026-09-05 Phase 1 (critical):** fix MediaController thread violation (ALL controller methods on main/UI thread); background/power-saver resilience across MIUI/HyperOS/OneUI; audio playback audit (InnerTube extraction, seamless playback desktop+mobile). | Done this session: crash fix + FGS/battery (items 1–3 above); audit findings below |
+| 7 | **2026-09-05 Phase 2 (docs):** audit ALL instructions from conversation; store them + recurring-maintenance + repo-sanitization instructions permanently in `.ai/` so they survive across agent sessions; DEBUG_LOG with stack traces + solutions. | `.ai/` directory (user's exact words: "put the unnecessary things … into a separate branch `.ai`" — implemented as `.ai/` dir because the session is pinned to one branch; see CURRENT ACTIVE TASK item 4) |
+| 8 | **2026-09-05 Phase 3 (builds & releases):** build verification + produce `dhun-test.apk` + Windows installer + GitHub **Pre-Release** with both attached; "zero compilation warnings". Stack mismatch noted & adapted: repo is KMP/Gradle — **no npm/Tauri exists here**; "npm run build" ≙ CI gradle build, "Tauri installer" ≙ jpackage `:app-desktop:createMsi`. | `test-release.yml` (apk+msi → `test` pre-release); warning policy below |
+| 9 | **"Also continue doing previous work"** — Phase 12 CI green → merge PR #9 → hardware checklists → SMTC phase 2 or fallback. | CURRENT ACTIVE TASK next steps |
+
+### Audio playback audit (directive item 6c) — findings 2026-09-05
+
+- **Android path:** `DhunStreamCache` (TTL 5h ≈ under YouTube's ~6h URL
+  TTL, invalidated on 403) → `ResolvingDataSource` rewrites
+  `dhun://track/<id>` at read time; resolver chain is own-client
+  WEB_REMIX → VISIONOS → TVHTML5 (ADR-001); ExoPlayer 403-mid-stream
+  recovery in `PlaybackGraph` (invalidate → seek → re-prepare, max 2
+  retries per track). Wake lock `WAKE_MODE_LOCAL`, audio focus,
+  becoming-noisy handled. **Seamless playback** = Media3's own
+  prepare-next behavior (unchanged, correct). Gap found & fixed this
+  session: none in the stream path — the gaps were the thread crash and
+  the FGS absence (items 1–3).
+- **Desktop path:** `DesktopDhunPlayer` wraps vlcj (system libVLC) +
+  same shared resolver (yt-dlp failover, ADR-001). Known limitation, not
+  a defect: vlcj plays one URL at a time; the 500 ms position poll and
+  track-transition logic live in the shared player layer. Re-resolution
+  on 403 happens lazily on next play press (documented in
+  `.ai/KNOWN_LIMITATIONS.md` — stream URLs expire, restore is paused).
+  No defect found that blocks Phase 12 merge.
+
+### Compilation-warning policy (directive item 8)
+
+"Zero compilation warnings" = CI compiles `:shared:jvmTest` (compiles
+shared), `:app-android:assembleDebug` (compiles android + shared android
+target), probe step (compiles probe + **app-desktop**). Warnings in those
+streams are addressed as they surface in CI annotations; K2/Compose
+library-internal warnings that DHUN cannot fix are listed in
+`.ai/KNOWN_LIMITATIONS.md` rather than papered over.
+
+---
+
+## True progress (exactly what is proven, nothing more)
+
+Legend: ✅ done (pushed + CI green + verified where required) ·
+🟨 code done, verification open · ⬜ not started.
+
+| # | Phase | Status | Evidence |
+|---|-------|--------|----------|
+| 01 | Extraction spike | ✅ — probe PASS end-to-end (search 20 + resolve + audio bytes + related 50); NewPipe v0.26.5 stream extraction broken upstream → ADR-001 two-tier resolver; on-device audible check rode Phase 03 | docs/research/01 · docs/verification/01 · ADR-001 |
+| 02 | Provider & domain core | ✅ — 34/34 unit tests; live smoke PASS (all filters, suggestions, radio 50, lyrics 27, stream via yt-dlp failover) | docs/verification/02 |
+| 03 | Android skeleton + Media3 + lock screen | 🟨 — APK builds in CI; on-device v0.1.4: search works, playback via own-client chain; WEB_REMIX-gated networks → typed error (ADR-001) | docs/verification/03 (+ this session: FGS + battery exemption, unpushed) |
+| 04 | Desktop skeleton + vlcj | 🟨 — module in build, compile-checked via probe chain (round-3 code pending first green step 6); ON-DESKTOP checklist open; needs libVLC (+yt-dlp optional) | docs/verification/04 |
+| 05 | Data layer | ✅ — schema v2, 7+ repos, use cases, shared NowPlayingPersistence (queue/position/history, paused restore); repo/use-case/restore tests green in CI; this session: write-race fixed (unpushed) | docs/verification/05 |
+| 06 | Design system | ✅ — tokens, GlassCard real blur (API 31+/Skiko, scrim below), ArtworkImage (Coil 3.1.0), color extraction, catalogue screen | docs/verification/06 |
+| 07 | Home & Search | ✅ MERGED PR #6 @ `2519290` (CI green) | docs/verification/07 |
+| 08 | Player UI (Mini+Full) | ✅ MERGED PR #7 @ `3fce5e5` (CI green `33840510549`) — hardware 16-check list OPEN | docs/verification/08 |
+| 09 | Artist/Album/Playlist | ✅ MERGED PR #7 @ `3fce5e5` — fixtures schema-authored (no YT egress in sandbox; live re-capture scheduled); hardware 3/3/CRUD OPEN | docs/verification/09 |
+| 10 | Library & history | ✅ MERGED PR #8 @ `d27eb37` (CI green `33842104141`) — hardware checklist OPEN | docs/verification/10 |
+| 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
+| 12 | Desktop native | 🟨 IN PROGRESS — all code pushed (`a20165b`); CI RED ×4 (rounds 1–3 = 1.8.2 API, fixed from source; round 4 = shared test race, fixed locally); **desktop compile itself first CI-checked on the next push**; hardware OPEN; SMTC phase 1 only | docs/verification/12 · `.ai/DEBUG_LOG.md` |
+| 13 | Android polish (insets, shortcuts, tablet, soak) | ⬜ not started (battery-exemption prompt — the one item Phase 13 lists — landed early this session via the Phase 1 directive, unpushed) | — |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | ⬜ not started (rot-drill.yml exists as a placeholder cron; activation = wiring the probe suite, Phase 14) | — |
+
+Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
+trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
+widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
+
+### Phase 12 step status — 🟨 IN PROGRESS
+
+| Step | Status |
 |---|---|
-| `shared/lyrics` — `LyricsSource` interface; `LrcLibSource` (title+artist+duration, synced LRC); `YouTubeLyricsSource` (InnerTube browse); `LyricsRepository` = cache → YTM → LRCLIB → NotAvailable; `LrcParser` ([mm:ss.xx] + enhanced tolerated) | ✅ done (`shared/src/commonMain/kotlin/dev/dhun/lyrics/LrcParser.kt` — timestampRegex `\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?]`, wordTimingRegex `<...>` strip, multi-timestamp, metadata skip, sorted; `LyricsSource.kt` interface; `LrcLibSource.kt` Ktor CIO `GET https://lrclib.net/api/get` with `syncedLyrics`→`Synced`/`plainLyrics`→`Unsynced`/404→`NotAvailable` + 429/5xx mapping; `YouTubeLyricsSource.kt` wraps `provider.getLyrics`; `LyricsRepository.kt` cache→YTM→LRCLIB with `cache.put` on Synced/Unsynced, `NotAvailable` not cached) |
-| Lyrics tab in FullPlayer: active line large/bright/centered, others dim, smooth auto-scroll, tap line = seek, unsynced scrollable, empty | ✅ done (`shared/src/commonMain/kotlin/dev/dhun/ui/player/PlayerTabs.kt` — `LyricsTabContent`: `LyricsUiState.Synced` → `LazyColumn` `activeIndex = indexOfLast { start <= positionMs }` + `LaunchedEffect(activeIndex) { animateScrollToItem }` + `titleMedium` bright centered vs `bodyMedium` dim, `clickable { seekTo(startTimeMs) }`, `Unsynced` → `verticalScroll` `Text`, `Unavailable` → `EmptyView`, `Loading` shimmers) |
-| Lyrics persisted cache (Phase 05 DB) | ✅ done (`shared/src/commonMain/sqldelight/dev/dhun/database/LyricsCache.sq` `CREATE TABLE LyricsCache(trackId PK, isSynced BOOLEAN, content TEXT, cachedAt INTEGER)` + `migrations/1.sqm` v1→v2, `shared/src/commonMain/kotlin/dev/dhun/data/LyricsCacheRepository.kt` `SqlDelightLyricsCacheRepository` with `LrcParser` re-parse on read + `linesToLrc` manual pad, `shared/src/commonMain/kotlin/dev/dhun/data/DatabaseFactory.kt` `DataLayer.lyricsCache`) |
-| Wiring Android + Desktop (Koin) + `PlayerViewModel` `Track`-keyed via `LyricsRepository` | ✅ done (`app-android/di/AppModule.kt` 3 singles + `LyricsRepository(cache=data.lyricsCache)`, `app-android/MainActivity.kt` `lyricsRepository = koin.get()` → `PlayerViewModel(..., lyricsRepository)`, `app-desktop/Main.kt` same 3 singles + `PlayerViewModel(..., lyricsRepository = get())`, `presentation/player/PlayerViewModel.kt` `lyricsRepository:LyricsRepository? = null` + `loadLyrics(track)` branches `lyricsRepository.getLyrics(track)` else `provider.getLyrics(track.id)`) |
-| Acceptance 1 — Synced lyrics track audio on 5 diverse tracks | 🟨 OPEN — code done, on-hardware: 5 diverse (EN/HI/NE/JP-KR + long) via LRCLIB/YTM, active highlight follows `positionMs`, `animateScrollToItem` smooth |
-| Acceptance 2 — Tap-to-seek correct within ±1s | 🟨 OPEN — code done (`clickable { seekTo(startTimeMs) }` exact ms, within ±1s spec), on-hardware tap any line → jump + highlight + scroll |
-| Acceptance 3 — LRCLIB fallback verified on tracks absent from YTM | 🟨 OPEN — code done (`cache→YTM→LRCLIB` — YTM `NotAvailable`/`Failure` falls through to `lrcLib.fetch`), on-hardware: YTM-empty but LRCLIB-synced track now shows Synced |
-| Acceptance 4 — Second open = instant (cache hit) | 🟨 OPEN — code done (SQLDelight `LyricsCache` `get` first, `put` on Synced/Unsynced, `cached()` hook for verification, `NotAvailable` not cached), on-hardware: first open network ~800ms → collapse→reopen <100ms no shimmer via `cache hit` |
-| Acceptance 5 — Parser unit tests green | ✅ done (`shared/src/jvmTest/kotlin/dev/dhun/lyrics/LrcParserTest.kt` 10 tests: `[mm:ss.xx]`/`[mm:ss.xxx]`/`[mm:ss]`/multi-stamp/enhanced/metadata/unsynced/sorted/isSynced/blank — all green locally, awaiting CI `338...`) |
+| SMTC spike (3-day timebox) | 🟨 **phase 1 code pushed** (`Smct.kt` — WinRT activation via JNA/combase → `ISystemMediaTransportControlsInterop` → `GetForWindow` → live `IsTransportControlsButtonVisible`; HRESULT-logged `SMTC probe` console line; `-Ddhun.smct=false` off) — CI compile pending (first real check = next push's step 6); on-Windows probe OPEN; phase 2 (UpdateMetadata + ButtonPressed, IIDs pulled on-machine) + fallback decision OPEN |
+| System tray (playing/paused icon, 6-item menu) | 🟨 code pushed (`DhunTray.kt` + `TrayIcons.kt`, AWT, EDT-marshaled, headless-safe) — CI compile pending; hardware OPEN |
+| Mini-player window (320×88, always-on-top, drag, click-opens-main) | 🟨 code pushed (`MiniPlayerWindow.kt` + second Compose `Window`; hide-not-close; Ctrl+M) — CI compile pending; hardware OPEN; taskbar visibility is a 1.8.2 limitation (no `skipTaskbar`) |
+| Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — CI compile pending; hardware OPEN |
+| Close-to-tray (default on) + remembered geometry | 🟨 code pushed (`SettingsKeys.CLOSE_TO_TRAY`/`WINDOW_GEOMETRY`; public-AWT `Frame.getFrames()` title lookup; `WindowPosition` Dp) — CI compile pending; hardware OPEN |
+| Packaging: jpackage MSI + clean-VM install | 🟨 `createMsi` configured (`packageVersion` 1.0.4 — packagers reject MAJOR 0); **now also wired into the rolling test release** (this session, unpushed); app icon + clean-VM install OPEN on Windows |
+| Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY | ✅ done + pushed (`ffa138b`) |
+| Acceptance 1–4 (media keys / tray / mini-player / installer) | 🟨 OPEN — on hardware (checklist in docs/verification/12) |
 
-### Phase 10 step-by-step status — ✅ CODE COMPLETE (verification OPEN)
+### Phase 11 step status — ✅ MERGED @ `d27eb37` (hardware OPEN)
 
-| Step (PROMPT_SEQUENCE.md Phase 10 "Build") | Status |
+| Step | Status |
 |---|---|
-| Library tabs: Playlists / Favorites / History (+ Albums/Artists saved when data layer supports; otherwise listed in KNOWN_LIMITATIONS) | ✅ done (`presentation/library/LibraryViewModel.kt` — `LibraryTab` enum + `selectedTab` + `playlistsFlow`/`favorites`/`groupedHistory`; `ui/library/LibraryScreen.kt` — `LibraryTabRow` + 3 tabs; `ui/shell/DhunAppShell.kt` — `AppTab.LIBRARY` + `LibraryScreen` wired) |
-| Favorites list (tap plays favorites as queue, swipe to remove) | ✅ done (`LibraryViewModel.playFavorites`/`playFavoritesTrack`/`removeFavorite`/`toggleFavorite` via `PlayContext.LIBRARY`; `LibraryScreen.FavoritesTab` — `Track` list via `ReorderableList` with `onSwipeRemove` + `onItemClick` tap-to-play + `Play all` + overflow) |
-| History grouped by day with relative times; long-press remove; clear all with confirmation | ✅ done (`LibraryViewModel.groupedHistory` via `GetHistoryUseCase.groupByDay` + `currentUtcOffsetMs()` expect/actual + `relativeTimeLabel`/`dayHeaderLabel` helpers; `LibraryScreen.HistoryTab` — `LazyColumn` grouped by `HistoryDay`, `HistoryRow` with `combinedClickable` long-press + `✕` fallback + `Clear all` + `ClearHistoryConfirmDialog`) |
-| `RecordPlay` use case wired into the player (search/home/artist/album/playlist/radio contexts) | ✅ done (`presentation/player/PlayerViewModel.setPlayContext` + `playQueue(context)` + `playTracks/RelatedAt(context)`; `DhunAppShell.onPlayTrack`/`onPlayArtist`/`onPlayAlbum`/`onPlayPlaylist` set `PlayContext.HOME/SEARCH/ARTIST/ALBUM/PLAYLIST`; `LibraryViewModel` sets `LIBRARY/HISTORY/PLAYLIST` via `setContext` lambda delegating to `PlayerViewModel`) |
-| Acceptance 1 — Favorites round-trip in UI | 🟨 OPEN — code done, on-hardware: add via overflow ♥ → Library→Favorites shows → swipe/long-press remove → kill/relaunch still correct |
-| Acceptance 2 — History grouping/timestamps correct; clear works | 🟨 OPEN — code done, on-hardware: play 5 tracks → Library→History shows grouped Today/Yesterday/date with relative `"just now"/"5m ago"` + long-press remove + `Clear all` confirm |
-| Acceptance 3 — Empty states for all tabs | ✅ done (`EmptyView` for Playlists/Favorites/History empty + `Create playlist` action) — on-hardware visual check OPEN |
+| `shared/lyrics` — `LyricsSource`, `LrcLibSource` (title+artist+duration, synced LRC), `YouTubeLyricsSource`, `LyricsRepository` (cache→YTM→LRCLIB→NotAvailable), `LrcParser` ([mm:ss.xx] + enhanced tolerated) | ✅ done (in `shared/…/lyrics/`) |
+| Lyrics tab (active line bright/centered, smooth auto-scroll, tap=seek, unsynced scrollable, empty) | ✅ done (`PlayerTabs.kt` → `LyricsTabContent`) |
+| Persisted lyrics cache (schema v2) | ✅ done (`LyricsCache.sq` + `migrations/1.sqm` + `SqlDelightLyricsCacheRepository`) |
+| Wiring Android + Desktop (Koin) + `PlayerViewModel` Track-keyed | ✅ done |
+| Acceptance 1–4 (5 diverse tracks / tap±1s / LRCLIB fallback / instant second open) | 🟨 OPEN — on hardware; concrete tracks pre-verified live against LRCLIB in docs/verification/11 |
+| Acceptance 5 — parser unit tests | ✅ done (`LrcParserTest`, 10 tests, CI green in PR #8) |
 
-### Phase 12 step-by-step status — CURRENT PHASE (🟨 IN PROGRESS — all code pushed `a20165b` (round-3 fix, 1.8.2 API verified from source); CI RED ×3 so far, round-3 run pending; nothing counts done until CI green + hardware)
+### Phase 10 step status — ✅ MERGED @ `d27eb37` (hardware OPEN)
 
-| Step (PROMPT_SEQUENCE.md Phase 12 "Build") | Status |
+| Step | Status |
 |---|---|
-| SMTC spike (3-day timebox): now-playing tile, artwork, media keys; stable → integrate, else documented fallback | 🟨 **phase 1 code pushed** (`smct/Smct.kt` — compile-clean so far (no Smct.kt annotations in any run); WinRT activation via JNA/combase → `ISystemMediaTransportControlsInterop` ddb0472d-… → `GetForWindow` (slot 6, offset 48 cross-checked vs ctypes impl) → `IsTransportControlsButtonVisible` live check; HRESULT-logged, `-Ddhun.smct=false` off) — CI compile pending; **on-Windows probe OPEN**; phase 2 (UpdateMetadata + ButtonPressed; IIDs via on-machine winmd pull) + fallback decision OPEN |
-| System tray: icon playing/paused variants; menu track title / play-pause / next / prev / open / quit | 🟨 **code pushed** (`native/DhunTray.kt` + `native/TrayIcons.kt` — AWT, EDT-marshaled, headless-safe) — CI compile pending (round-3 fix `a20165b` — API now source-verified); hardware OPEN |
-| Mini-player window: 320×88 always-on-top; artwork/title/transport/progress; draggable; click opens main | 🟨 **code pushed** (`ui/MiniPlayerWindow.kt` + second Compose `Window` in `Main.kt` — hide-not-close via `Frame.isVisible`, Ctrl+M toggle, JNA drag on Windows) — CI compile pending; hardware OPEN |
-| Keyboard shortcuts: Space, ←/→ seek 5s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+M mini-player, Ctrl+Q quit | 🟨 **code pushed** (`Main.kt` `Window(onKeyEvent)` — KeyDown-only, text-field-safe) — CI compile pending; hardware OPEN |
-| Close-to-tray (default on), remembered window state | 🟨 **code pushed** (`SettingsKeys.CLOSE_TO_TRAY`/`WINDOW_GEOMETRY` in `Main.kt`; `java.awt.Frame` title-lookup for show/hide + geometry (cross-platform), restored via `rememberWindowState(position=… px, width/height=… dp)`) — CI compile pending; hardware OPEN |
-| Packaging: jpackage `.msi` with app icon; clean-VM install test | 🟨 `createMsi` target exists (Phase 04, CI-green then, `packageVersion` 1.0.x) — app icon + clean-VM install OPEN on Windows |
-| Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY (code-level, auditable) | ✅ **done + pushed** (`docs/verification/12-desktop-native.md` code-audit table + phase-2 procedure + hardware checklist; KNOWN_LIMITATIONS SMTC/media-keys honesty note; THIRD_PARTY JNA 5.17.0 — all in `ffa138b`) |
-| Acceptance 1 — media keys control playback (SMTC or documented fallback) | 🟨 OPEN — on hardware; fallback (tray + shortcuts) already ships |
-| Acceptance 2 — tray fully functional; close-to-tray ≠ quit; tray quit exits clean (no zombies) | 🟨 OPEN — `docs/verification/12-desktop-native.md` checklist |
-| Acceptance 3 — mini-player mirrors state live | 🟨 OPEN — flows-driven (`currentTrack`/`positionMs`/`state`) — visual check on hardware |
-| Acceptance 4 — installer installs and runs on a clean machine | 🟨 OPEN — `:app-desktop:createMsi` on Windows |
+| Library tabs Playlists/Favorites/History | ✅ done (`LibraryViewModel` + `LibraryScreen`) |
+| Favorites (tap-plays, swipe-remove) | ✅ done |
+| History grouped by day, relative times, long-press remove, clear-all confirm | ✅ done |
+| RecordPlay wired into every play context | ✅ done (HOME/SEARCH/ARTIST/ALBUM/PLAYLIST/RADIO/QUEUE/LIBRARY/HISTORY) |
+| Acceptance 1–3 on hardware | 🟨 OPEN — docs/verification/10 |
 
-### Phase 08 step-by-step status — ✅ MERGED PR #7 @ `3fce5e5` (verification OPEN on-hardware)
+### Phase 08 / 09 / 07 — MERGED (PR #6 `2519290`, PR #7 `3fce5e5`); hardware checklists OPEN per their docs.
 
-| Step (PROMPT_SEQUENCE.md Phase 08 "Build") | Status |
-|---|---|
-| `MiniPlayer` (shared): 72dp glass bar; artwork, marquee title, artist, play/pause, next, 1dp accent progress line; tap/swipe-up opens FullPlayer (animated) | ✅ done (`ui/player/MiniPlayer.kt`, replaces Phase 07 placeholder in `DhunAppShell`) |
-| `FullPlayer` (shared): blurred artwork background + scrim, color crossfade 500ms, artwork scale spring on play/pause | ✅ done (`ui/player/FullPlayer.kt`) |
-| Custom progress bar (4dp→8dp drag, thumb on touch only) + hold-to-seek prev/next + play/pause morph + shuffle + repeat-3-cycle + volume slider (desktop) | ✅ done (`DhunSeekBar`, `HoldTapTransportButton`, `PlayerViewModel.cycleRepeatMode/toggleShuffle/beginHoldSeek`, Slider on desktop) |
-| Bottom tabs Lyrics \| Queue \| Related (Related wired to Phase 02 `/next` parsing) | ✅ done (`ui/player/PlayerTabs.kt`) |
-| Queue tab: drag-reorder, swipe-remove, tap-to-jump, current-track equalizer animation | ✅ done (`ui/components/ReorderableList.kt` + queue tab) |
-| Track-change choreography (slide in skip direction + fade, bg crossfade, title fade) | ✅ done (`AnimatedContent` direction-aware, `SkipDirection` tracking) |
-| Android: edge-to-edge insets; BACK collapses FullPlayer (never exits app) | ✅ done (`safeDrawingPadding()`, `AppNavState.closeTop()` in `MainActivity.BackHandler`) |
-| Acceptance: 16 checks pass; 10× rapid-skip stress clean; screenshots | 🟨 OPEN — on-hardware, `docs/verification/08-player.md` (code merged, hardware verification pending) |
+---
 
-### Phase 09 step-by-step status — ✅ MERGED PR #7 @ `3fce5e5` (verification OPEN on-hardware)
+## Trajectory to Phase 30 (beyond the locked 14)
 
-| Step (PROMPT_SEQUENCE.md Phase 09 "Build") | Status |
-|---|---|
-| Browse parsers: artist / album / playlist — tolerant walkers over single+two-column layouts; track rows now carry artistId/albumId | ✅ done (`BrowseParsers.kt`; enrichment in `Parsers.kt`) |
-| Fixtures for tests | ✅ done (schema-authored — sandbox has no YT egress; live re-capture scheduled; see `docs/verification/09-browse-pages.md`) |
-| `ArtistScreen`: parallax header, collapse glass toolbar, shuffle/radio, top songs, albums, singles, related, about | ✅ done (`ui/browse/ArtistScreen.kt` + `ArtistViewModel`) |
-| `AlbumScreen`: artwork header, play/shuffle, ordered track list, more-by-artist | ✅ done (`ui/browse/AlbumScreen.kt` + `AlbumViewModel`) |
-| `PlaylistScreen`: YTM playlists + local CRUD (rename, drag-reorder, remove, delete) | ✅ done (`ui/browse/PlaylistScreen.kt` + `PlaylistViewModel`) |
-| Wire every navigation path from Home/Search/Player | ✅ done (`AppNavState` detail stack + overflow by-id navigation with search fallback) |
-| Parser unit tests against fixtures green | ✅ done (`ParserFixtureTest` +3 browse tests) |
-| `BrowseViewModelTest` (artist/album/playlist + local CRUD lifecycle) | ✅ done |
-| Acceptance 1–3 on hardware (3 artists / 3 albums / local CRUD in-app) | 🟨 OPEN — on-hardware (`docs/verification/09-browse-pages.md`) |
+The locked plan ends at Phase 14. The user (2026-09-05) asked for the
+trajectory all the way to Phase 30. The pool is the original 30-phase
+vision (`.ai/PROMPT_SEQUENCE.md` audit) minus what 01–14 already cover.
+**These are candidates with a suggested order — NOT designed, NOT
+stubbed, NOT scheduled** until the user picks them (Doctrine: no
+"later" code).
 
-### Phase 07 — CLOSED (merged #6 @ `2519290`)
+| # | Candidate | Why this slot |
+|---|---|---|
+| 15 | **Android native polish finish** (Phase 13 leftovers: app shortcuts, Robolectric/UI tests, tablet two-pane, 30-min soak with LeakCanary) | Same platform as the crash/FGS work just done; cheap while context is warm |
+| 16 | **Audio cache (bounded LRU) + offline replay of cached tracks** | Phase 14 item pulled forward; user-visible value, no new surface |
+| 17 | **Rot-drill GA** — wire `tools/playback-probe` into the daily cron (replacing the placeholder), auto-issue on red, 24h detection contract live | The Doctrine's maintenance leg; must exist before any public distribution |
+| 18 | **Release v0.1.0** (signed debug-keystore APK + AAB, jpackage installers, CHANGELOG, README build docs, tag, GitHub release) | Phase 14; gates everything "real" |
+| 19 | **Web/PWA evaluation** (the big deferred item; hard gate: PO tokens/SABR block third-party browser streaming — see `.ai/PROBLEMS_AND_FIXES.md` P7) | Only after the kill-switch data from 17 exists; probably "no" |
+| 20 | **Android Auto** (media app on the platform; needs a stable media session — just built) | Natural once 15+18 done |
+| 21 | **Cast** | Same dependency as 20 |
+| 22 | **Equalizer** (Android: `AudioEffect` platform EQ; desktop: libVLC audio filter) | Feature, no platform risk |
+| 23 | **Cross-device sync** (experimental; local-first DB design must survive) | Explicitly experimental in the prompt |
+| 24 | **Optional cookie sign-in** (unlock age/region + personal playlists; treated as experimental) | High ToS/legal sensitivity — ADR required first |
+| 25 | **Downloads beyond cache** (bounded, offline library) | Extends 16 |
+| 26 | **Widgets** (now-playing / quick-play Android widgets) | Session foundation now exists |
+| 27 | **Windows jump lists + tray polish** | Phase 12 leftovers |
+| 28 | **Themes beyond dark-first** (accent system, light theme) | Design system is token-ready |
+| 29 | **Store releases** (Play Store AAB + Windows store MSI, real signing) | After 18 proves the pipeline |
+| 30 | **v1.0 GA** — soak on both platforms, RISK_REGISTER review, docs finalized, tag | The finish line |
 
-All Phase 07 items complete and verified; kept below for history:
+Ordering constraints: 17 before any public build; 18 before 19–30
+anything user-visible; 24 requires its own ADR + user sign-off; 19's
+likely outcome is a written "no" — that is also a valid completion.
 
-| Step (PROMPT_SEQUENCE.md Phase 07 "Build") | Status |
-|---|---|
-| Shared `HomeScreen` + `HomeViewModel`: time-of-day greeting, quick picks (6 tracks, 3×2), sections from InnerTube home/browse, shimmer skeletons, error/empty/retry, pull-to-refresh | ✅ done (`dev/dhun/ui/home/HomeScreen.kt`, `HomeViewModel.kt`) |
-| Shared `SearchScreen` + `SearchViewModel`: debounced suggestions (300ms), filter chips (songs/artists/albums/playlists/videos), per-type rows, infinite scroll via continuation, recent searches (persisted, clearable) | ✅ done (`dev/dhun/ui/search/SearchScreen.kt`, `SearchViewModel.kt`) |
-| Track overflow menu: play next, add to queue, add to playlist, toggle favorite, go to artist/album | ✅ done (`TrackOverflowDialog.kt`, `AddToPlaylistDialog.kt`) |
-| Track tap → plays with the full result set as queue context | ✅ done (wired in `HomeScreen`, `SearchScreen`, `DhunAppShell`) |
-| Acceptance 1 — Home renders real YTM content on Android + Desktop | ✅ done (wired in `MainActivity` and `Main.kt`) |
-| Acceptance 2 — Search: suggestions ≤300ms after pause → results per filter → infinite scroll | ✅ done (tested in `SearchViewModelTest`) |
-| Acceptance 3 — Every overflow action works | ✅ done (tested in `SearchViewModelTest` & `TrackOverflowDialog`) |
-| Acceptance 4 — Loading skeleton (not spinner), error, and empty states all observed | ✅ done (`HomeShimmerSkeleton`, `SearchShimmerSkeleton`, `ErrorView`, `EmptyView`) |
-| Push → PR → CI green → merge | ✅ done — PR #6 merged to `main` @ `2519290` |
+---
+
+## Recurring maintenance & repo sanitization (standing, permanent)
+
+- **Extraction rot:** rot-drill red → pin last-good, adopt upstream patch,
+  patch release ≤72h (`.ai/RISK_REGISTER.md`). Datacenter-IP rot
+  (CI-only reds) handled per the KNOWN_LIMITATIONS note.
+- **Each phase:** ROADMAP (this file) + `.ai/KNOWN_LIMITATIONS.md` +
+  `docs/verification/NN-*.md` + small commits.
+- **Repo sanitization:** no secrets/device data/credentials in the repo;
+  sanitized fixtures; `THIRD_PARTY.md` complete; no build output committed.
+- **Rolling release:** `test` tag replaced, never appended; stable URLs.
 
 ---
 
 > Operational phase-by-phase prompts (audit + rewritten sequence):
-> [PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md).
-
-| # | Phase | Status | Verification evidence |
-|---|-------|--------|----------------------|
-| 01 | Extraction spike | ✅ CODE COMPLETE — probe PASS end-to-end (search 20 + resolve + audio bytes verified + related 50); NewPipe v0.26.5 broken upstream -> ADR-001 two-tier resolver; on-device audible check rides Phase 03 | docs/research/01-extraction-spike.md · docs/verification/01-extraction-spike.md · ADR-001 |
-| 02 | Provider & domain core | ✅ CODE COMPLETE — 34/34 unit tests (fixtures, queue, failover); live smoke PASS (all filters, suggestions, radio 50, lyrics 27 lines, stream via yt-dlp failover) | docs/verification/02-provider-core.md |
-| 03 | Android skeleton + Media3 playback + lock screen | 🟨 CODE COMPLETE — APK builds, manifest+service verified, unit tests green; ON-DEVICE: v0.1.3 installs, search works live; playback blocked by WEB_REMIX-only /player → v0.1.4 adds WEB_REMIX→VISIONOS→TVHTML5 resolver chain, stable test signing, richer on-device error evidence + BACK=moveTaskToBack | docs/verification/03-android-skeleton.md |
-| 04 | Desktop skeleton + vlcj playback | 🟨 CODE COMPLETE — app-desktop (Compose Desktop UI + vlcj) committed, shared DhunPlayer drives both platforms; CI blocker root-caused (Compose packager rejects packageVersion 0.x) and fixed, module active in the build; ON-DESKTOP checklist OPEN | docs/verification/04-desktop.md |
-| 05 | Data layer (SQLDelight, repositories, use cases) | ✅ CODE COMPLETE — SQLDelight 2.1 schema v1 (Track/Favorite/Playlist/PlaylistTrack/History/Settings/RecentSearch/NowPlaying), 7 repositories, use cases, shared NowPlayingPersistence (queue+position+history, paused restore on cold start) wired on Android + desktop; repository/use-case/restore tests green in CI; IN-APP round-trips OPEN on hardware | docs/verification/05-data-layer.md |
-| 06 | Design system (tokens, GlassCard, artwork colors, catalogue) | ✅ CODE COMPLETE — `shared/design/` tokens (Colors/Spacing/Shapes/Typography/Animations), GlassCard with real blur (RenderEffect API 31+/Skiko, scrim fallback), ArtworkImage (Coil 3.1.0), ArtworkColorExtractor (bitmap+seed), all components with states, ComponentCatalogScreen over artwork | docs/verification/06-design.md |
-| 07 | Home & Search | ✅ MERGED — PR #6 @ `2519290` (CI green: `:shared:jvmTest`, `assembleDebug`); shared Home/Search screens, overflow menus, DhunAppShell, parser + ViewModel tests; verification log written | docs/verification/07-home-search.md |
-| 08 | Player UI (MiniPlayer + FullPlayer) | ✅ MERGED — PR #7 @ `3fce5e5` (CI green: `33840510549` 3m15s; merged commit `3fce5e5` CI `33840745280` 3m08s); MiniPlayer (marquee, progress line, swipe-up), FullPlayer (blurred artwork bg + scrim, 500ms crossfades, drag seekbar, hold-to-seek, morph, shuffle/repeat, desktop volume), Lyrics\|Queue\|Related tabs, queue drag/swipe/tap + equalizer, back-collapse; `docs/verification/08-player.md` (hardware checklist OPEN) | docs/verification/08-player.md |
-| 09 | Artist / Album / Playlist pages | ✅ MERGED — PR #7 @ `3fce5e5` (same CI); browse parsers (artist/album/playlist) + client/provider endpoints, entities, VMs, screens (parallax artist, tinted album, editable local playlist), AppNavState detail-stack navigation wired everywhere; fixture tests + BrowseViewModelTest green; `docs/verification/09-browse-pages.md` (hardware OPEN: 3 artists / 3 albums / local CRUD) | docs/verification/09-browse-pages.md |
-| 10 | Library & history screens | ✅ MERGED — PR #8 @ `d27eb37` (CI green `33842104141`); LibraryViewModel + LibraryScreen (3 tabs, swipe/long-press, relative times, clear-all), PlayerViewModel + DhunAppShell RecordPlay wiring, LibraryViewModelTest (7 tests); on-hardware checklist OPEN (`docs/verification/10-library.md`) | docs/verification/10-library.md |
-| 11 | Lyrics (LRCLIB + YTM, synced) | ✅ MERGED — PR #8 @ `d27eb37` (same CI); `LrcParser` + `LrcLibSource`/`YouTubeLyricsSource`/`LyricsRepository` (cache→YTM→LRCLIB), `LyricsCache` v2 + `LyricsCacheRepository`, Koin wiring (android+desktop), `LyricsTabContent` (synced scroll/tap-seek/unsynced/empty), `LrcParserTest` (10 tests); test track list live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); on-hardware checklist OPEN | docs/verification/11-lyrics.md |
-| 12 | Desktop native (SMTC spike, tray, mini-player, jpackage) | 🟨 IN PROGRESS — all code pushed (`d2e9ade` on PR #9): AWT tray (playing/paused icons, spec menu, headless-safe), mini-player window (320×88 always-on-top, drag + click-to-open), keyboard shortcuts (Space/←→/Ctrl+←→/Ctrl+F/Ctrl+M/Ctrl+Q, text-field-safe), close-to-tray (default on) + window geometry persistence (public AWT `Frame.getFrames()` title-lookup — `LocalWindow` is internal in 1.8.2), clean-quit path, SMTC JNA probe phase 1 (WinRT activation + GetForWindow, GUIDs cross-referenced, `-Ddhun.smct=false` off-switch); **CI RED ×3 → round-3 fix `a20165b` pushed** (1.8.2 API verified from `compose-multiplatform-core` v1.8.2 sources: FrameWindowScope.window=JFrame, WindowPosition Dp, Key.DirectionLeft/Right/Spacebar, no skipTaskbar); jpackage/MSI + SMTC phase 2 (metadata + media keys) OPEN on hardware | docs/verification/12-desktop-native.md |
-| 13 | Android polish (insets, shortcuts, tablet, soak) | ⬜ not started | — |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | ⬜ not started | — |
-
-Deferred to v2 (do not design, do not stub): Web/PWA, Android Auto, Cast,
-equalizer, sync, downloads, widgets, jump lists, optional cookie sign-in.
+> [.ai/PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md).

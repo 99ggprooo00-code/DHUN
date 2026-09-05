@@ -26,6 +26,18 @@ Updated every phase. Nothing hidden.
   where YouTube gates WEB_REMIX player calls, playback shows a typed
   "needs signed-in session" error instead of audio until upstream engines
   are drill-green.
+- Android background playback (Phase 1 directive, 2026-09-05): the
+  `MediaSessionService` is now a genuine FOREGROUND service with the live
+  media notification (`MediaSession.startForeground`; notification channel
+  id = `session.sessionId`, i.e. what the Media3 helper uses), and the app
+  asks the user once per process for the battery-optimization exemption
+  (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) while in use. What Android does
+  NOT let any app request programmatically: MIUI/HyperOS "Auto-start" +
+  "lock in recent apps", and OneUI "Unrestricted" battery setting — those
+  are manual per-device toggles. If background music still stops on a
+  user's device, that is the cause (checklist:
+  docs/verification/03-android-skeleton.md). Until toggled, aggressive OEM
+  cleaners can still kill the service.
 - Desktop (Phase 04): module is in the build; CI configures it on every
   run but only compiles it once the owner adds the workflow step (agent
   token lacks `workflows` permission — see docs/verification/04-desktop.md).
