@@ -12,12 +12,13 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at local commit `8669e09` (Phase 13 Android
-native-polish code; **not pushed and not CI-verified yet**). The previous
-pushed baseline is `7ca2f5d`; CI run `33958287878` is green through shared
-tests, Android debug build, and Desktop/probe compilation. PR #13 remains
-OPEN. The current `test` pre-release is healthy: run `33952291659` passed
-`apk`, `msi`, and `publish`; all four rolling assets are present.
+**Branch:** `arena/01a070b3-dhun` at local commit `c2a86df` (Phase 13 Android
+native-polish code plus a CI compile fix; **not pushed and not CI-verified
+yet**). The previous pushed baseline is `7ca2f5d`; CI run `33958287878` is
+green through shared tests, Android debug build, and Desktop/probe
+compilation. PR #13 remains OPEN. The current `test` pre-release is healthy:
+run `33952291659` passed `apk`, `msi`, and `publish`; all four rolling assets
+are present.
 
 **User 2026-09-05 directive — status:**
 1. **Release verification — DONE (CI + GitHub release):** `dhun-test.apk`,
@@ -42,22 +43,25 @@ OPEN. The current `test` pre-release is healthy: run `33952291659` passed
    fallback remains active. Windows media-key round-trip, tray,
    mini-player, and MSI checks remain open; no phase is hardware-done here.
 6. **Phase 13 native polish — CODE STAGED, CI/HARDWARE OPEN:** `8669e09`
-   adds edge-to-edge safe-drawing insets, saved Android navigation state for
-   rotation, static Search/Resume/Library shortcuts with routing, a battery
-   exemption rationale, and an 840dp navigation rail with a docked rail
-   MiniPlayer. No acceptance item is complete until CI and real-device/OEM
-   evidence exist.
+   plus `c2a86df` adds edge-to-edge safe-drawing insets, saved Android
+   navigation state for rotation, static Search/Resume/Library shortcuts with
+   routing, a battery exemption rationale, and an 840dp navigation rail with
+   a docked rail MiniPlayer. No acceptance item is complete until CI and
+   real-device/OEM evidence exist.
 
-**Last error:** local Gradle verification could not start because this
-sandbox has no `JAVA_HOME` and no `java` executable; CI remains the compilation
-gate.
+**Last error:** CI run `33958722933` reached `:shared:compileKotlinJvm` but
+reported `NavigationBarItem` unresolved in the new shared navigation helper;
+`c2a86df` aliases that existing Material3 symbol. Local Gradle verification
+also cannot start because this sandbox has no `JAVA_HOME` and no `java`
+executable; CI remains the compilation gate.
 
 **Exact next step:**
-1. Push `8669e09` (and this roadmap update) to
+1. Push `c2a86df` (and this roadmap update) to
    `origin/arena/01a070b3-dhun`, then inspect the PR CI annotations.
-2. Fix any Android/Compose/XML/API errors; after CI is green, run the Android
-   rotation/back-stack/shortcut/insets and 30-minute OEM/background-playback
-   checklist on real hardware. Keep all hardware gates open here.
+2. If CI is green, run the Android rotation/back-stack/shortcut/insets and
+   30-minute OEM/background-playback checklist on real hardware. Keep all
+   hardware gates open here; if CI finds another API error, fix it before
+   claiming code complete.
 3. Keep the Windows checklist open; then wire the Phase 14 rot-drill and
    release evidence only after Phase 13 code is CI-green. Do not call GA
    complete without hardware logs.
@@ -148,7 +152,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 10 | Library & history | ✅ MERGED PR #8 @ `d27eb37` (CI green `33842104141`) — hardware checklist OPEN | docs/verification/10 |
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
-| 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code staged in `8669e09`; CI + rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
+| 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code staged in `8669e09` + `c2a86df`; CI + rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
 | 14 | Robustness + rot-drill CI + release v0.1.0 | ⬜ not started (rot-drill.yml exists as a placeholder cron; activation = wiring the probe suite, Phase 14) | — |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
@@ -168,7 +172,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY | ✅ done + pushed (`ffa138b`) |
 | Acceptance 1–4 (media keys / tray / mini-player / installer) | 🟨 OPEN — on hardware (checklist in docs/verification/12) |
 
-### Phase 13 step status — 🟨 CODE STAGED @ `8669e09` (CI + hardware OPEN)
+### Phase 13 step status — 🟨 CODE STAGED @ `8669e09` + `c2a86df` (CI + hardware OPEN)
 
 | Step | Status |
 |---|---|
