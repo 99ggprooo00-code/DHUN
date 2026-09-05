@@ -3,8 +3,11 @@ package dev.dhun.android.playback
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.MediaStyleNotificationHelper
@@ -16,11 +19,14 @@ import org.koin.core.context.GlobalContext
  * controls + media keys, via Media3. The player engine construction is
  * shared with the session-less fallback path (see [PlaybackGraph]).
  *
- * Runs as a FOREGROUND service with the live media notification. This is
- * not cosmetic: a background-only service is a first-class target of OEM
- * battery savers (MIUI/HyperOS/OneUI) and gets killed within minutes of
- * idle, which reads to the user as "music stops in the background".
- * See `.ai/DEBUG_LOG.md` → "Background playback killed by OEM battery savers".
+ * Runs as a FOREGROUND service (mediaPlayback) — required to survive OEM
+ * battery savers (MIUI/HyperOS/OneUI): a background-only service gets
+ * killed on idle, which reads to the user as "music stops in the
+ * background". The media notification is styled with
+ * [MediaStyleNotificationHelper.MediaStyle] bound to the session, so the
+ * system drives the transport state, and a player listener keeps the
+ * title/artwork current. See `.ai/DEBUG_LOG.md` →
+ * "Background playback killed by OEM battery savers".
  */
 class DhunPlaybackService : MediaSessionService() {
 
@@ -30,9 +36,17 @@ class DhunPlaybackService : MediaSessionService() {
         GlobalContext.get().get()
     }
 
+    /** Keeps the notification's title/artwork in step with the session. */
+    private val notificationUpdater = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = updateNotification()
+        override fun onIsPlayingChanged(isPlaying: Boolean) = updateNotification()
+        override fun onPlaybackStateChanged(playbackState: Int) = updateNotification()
+    }
+
     override fun onCreate() {
         super.onCreate()
         val player = PlaybackGraph.buildExoPlayer(this, streamCache)
+        player.addListener(notificationUpdater)
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(PlaybackGraph.sessionActivityIntent(this))
             .build()
@@ -40,45 +54,61 @@ class DhunPlaybackService : MediaSessionService() {
     }
 
     /**
-     * Promote to foreground with the session's live media notification
-     * (title/artwork/transport update as the player changes). The channel
-     * id is the session's own [MediaSession.sessionId] — the same id
-     * MediaStyleNotificationHelper uses for the notification, so exactly
-     * one channel is needed and they always match.
+     * Promote to foreground with the live media notification. Android 14
+     * (and targetSdk 34 builds) requires the foreground-service TYPE to be
+     * passed to startForeground when the manifest declares one — hence the
+     * version-branched calls.
      */
     private fun startMediaForeground() {
         val session = mediaSession ?: return
-        ensureChannel(session.sessionId)
-        val notification = MediaStyleNotificationHelper.createNotification(
-            session,
-            R.drawable.ic_notification,
-            PlaybackGraph.sessionActivityIntent(this),
-        ) ?: fallbackNotification(session)
-        session.startForeground(NOTIFICATION_ID, notification)
+        ensureChannel()
+        val notification = buildMediaNotification(session)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
-    private fun ensureChannel(channelId: String) {
+    private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(channelId) != null) return
+        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
         manager.createNotificationChannel(
-            NotificationChannel(channelId, "Media playback", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "DHUN now-playing controls"
-            },
+            NotificationChannel(CHANNEL_ID, "Media playback", NotificationManager.IMPORTANCE_LOW)
+                .apply { description = "DHUN now-playing controls" },
         )
     }
 
-    /** Only used if the Media3 helper unexpectedly returns null. */
-    private fun fallbackNotification(session: MediaSession): Notification {
+    private fun buildMediaNotification(session: MediaSession): Notification {
         val metadata = session.player.currentMediaItem?.mediaMetadata
-        return NotificationCompat.Builder(this, session.sessionId)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(metadata.title?.toString() ?: "DHUN")
-            .setContentText(metadata.artist?.toString())
+            .setContentTitle(metadata?.title?.toString() ?: "DHUN")
+            .setContentText(metadata?.artist?.toString())
+            .setLargeIcon(metadata?.artworkData?.toBitmap())
             .setContentIntent(PlaybackGraph.sessionActivityIntent(this))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_MEDIA)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setStyle(
+                MediaStyleNotificationHelper.MediaStyle(session)
+                    .setShowActionsInCompactView(0, 1, 2),
+            )
             .build()
+    }
+
+    private fun updateNotification() {
+        val session = mediaSession ?: return
+        runCatching {
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(NOTIFICATION_ID, buildMediaNotification(session))
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
@@ -86,6 +116,7 @@ class DhunPlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         mediaSession?.run {
+            player.removeListener(notificationUpdater)
             player.release()
             release()
         }
@@ -95,5 +126,6 @@ class DhunPlaybackService : MediaSessionService() {
 
     private companion object {
         const val NOTIFICATION_ID = 1
+        const val CHANNEL_ID = "dhun_playback"
     }
 }

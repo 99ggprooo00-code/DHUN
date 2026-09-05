@@ -35,11 +35,15 @@ until CI green):**
    (`a20165b`, 1.8.2 API from source) has never actually compile-checked
    in CI**. The next push's step 6 is the first real signal for it.
 3. **Background/OEM resilience (Phase 1.2 of the directive)** —
-   `DhunPlaybackService` now a true FOREGROUND service
-   (`MediaSession.startForeground` + live media notification, channel id =
-   `session.sessionId`); battery-optimization exemption dialog (one-shot,
-   `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`); `ic_notification` icon added.
-   MIUI/HyperOS "auto-start" is manual-only → hardware checklist.
+   `DhunPlaybackService` now a true FOREGROUND service (plain
+   `Service.startForeground` + `FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK` on
+   API 29+, media notification via nested
+   `MediaStyleNotificationHelper.MediaStyle(session)` — first attempt used
+   APIs that don't exist in media3 1.5.1 and failed CI compile, corrected,
+   see `.ai/DEBUG_LOG.md`); battery-optimization exemption dialog
+   (one-shot, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`); `ic_notification`
+   icon added. MIUI/HyperOS "auto-start" is manual-only → hardware
+   checklist.
 4. **Agent meta moved to `.ai/`** (this file, MASTER_PROMPT,
    PROMPT_SEQUENCE, KNOWN_LIMITATIONS, PROBLEMS_AND_FIXES, RISK_REGISTER)
    + new `.ai/DEBUG_LOG.md` + `.ai/README.md` (boot protocol). Note: the
@@ -53,10 +57,15 @@ until CI green):**
    published by a `publish` job. (Satisfies Phase 3 of the directive; the
    sandbox has no JDK/Windows host, so CI IS the build.)
 
-**Last CI error (pushed `a20165b`, run `33938679193`):** `:shared:jvmTest`
-failure — `NowPlayingPersistenceTest.queueAndProgressArePersistedThenRestoredPaused`
-line 129 `expected:<[T1,T2,T3]> but was:<[T1,T2,…]>` — fixed locally
-(Mutex), unpushed.
+**Last CI error (pushed `fa53643`, run `33941799559`):** step 4 (tests)
+**PASSED** — the Mutex fix worked. Step 5 `:app-android:compileDebugKotlin`
+FAILED — my `DhunPlaybackService` used media3 APIs that don't exist in
+1.5.1 (`MediaSession.startForeground`, `MediaSession.sessionId`, static
+`MediaStyleNotificationHelper.createNotification`) + one null-safety miss.
+Corrected to the real 1.5.1 pattern (plain `Service.startForeground` +
+nested `MediaStyleNotificationHelper.MediaStyle(session)`). Note for the
+record: the round-3 DESKTOP code is now compile-checked only if this run's
+step 6 gets reached.
 
 **Exact next step:**
 1. Commit the session's work (small commits) → push

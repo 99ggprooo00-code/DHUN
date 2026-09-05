@@ -27,10 +27,10 @@ Updated every phase. Nothing hidden.
   "needs signed-in session" error instead of audio until upstream engines
   are drill-green.
 - Android background playback (Phase 1 directive, 2026-09-05): the
-  `MediaSessionService` is now a genuine FOREGROUND service with the live
-  media notification (`MediaSession.startForeground`; notification channel
-  id = `session.sessionId`, i.e. what the Media3 helper uses), and the app
-  asks the user once per process for the battery-optimization exemption
+  `MediaSessionService` is now a genuine FOREGROUND service (mediaPlayback
+  type) with the live media notification
+  (`MediaStyleNotificationHelper.MediaStyle(session)`), and the app asks
+  the user once per process for the battery-optimization exemption
   (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) while in use. What Android does
   NOT let any app request programmatically: MIUI/HyperOS "Auto-start" +
   "lock in recent apps", and OneUI "Unrestricted" battery setting — those

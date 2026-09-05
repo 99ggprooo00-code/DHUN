@@ -126,13 +126,24 @@ already had `FOREGROUND_SERVICE(_MEDIA_PLAYBACK)` + `mediaPlayback` type —
 the runtime call was missing.
 
 **Fix:**
-- `DhunPlaybackService.onCreate` → `session.startForeground(1,
-  MediaStyleNotificationHelper.createNotification(session, R.drawable.ic_notification,
-  sessionActivityIntent))`. Notification channel is created with id =
-  `session.sessionId` — the same id the Media3 helper uses, so they match
-  by construction (no hardcoded channel-id guessing; raw fetches of the
-  media3 source were 404 in this sandbox, so the code avoids depending on
-  the helper's internals beyond the documented API).
+- `DhunPlaybackService.onCreate` → plain `Service.startForeground(1,
+  notification)` — with `ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK`
+  on API 29+ (targetSdk 35 REQUIRES the type on Android 14+). The
+  notification uses `NotificationCompat` +
+  `MediaStyleNotificationHelper.MediaStyle(session)` (the media3 1.5.x
+  helper's NESTED MediaStyle bound to the session — the system drives the
+  transport state from it) + `setShowActionsInCompactView(0,1,2)`; a
+  Player.Listener re-posts on track transition / play-state change so
+  title/artwork stay live. Channel `dhun_playback`, `ic_notification`
+  vector (minSdk 26 → vectors are fine).
+
+**API correction (learned the hard way, do NOT repeat):** in media3 **1.5.1**
+there is NO `MediaSession.startForeground(...)`, NO `MediaSession.sessionId`,
+and NO static `MediaStyleNotificationHelper.createNotification(session,
+icon, intent)` — first attempt failed CI compile on exactly those. The real
+pattern is Service.startForeground + the nested
+`MediaStyleNotificationHelper.MediaStyle(session)`. When a source fetch is
+not available, verify small API surfaces against the compiler, not memory.
 - `MainActivity.attach()` → one-shot (per process) system dialog via
   `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + `package:` URI
   (needs `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission, added to
