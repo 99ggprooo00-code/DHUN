@@ -52,10 +52,12 @@ for upstream recovery.
       stderr evidence was dropped, and the issue body swallowed the artifact
       name through a bash backtick bug.
 - [ ] Manual run from the Phase 14 branch completes with `PROBE|verdict|PASS`.
-      Fixes for run 33961533965 are on PR #15 (commits `9be04ab`,
-      `afe017d`, `c038295`); CI run `33963002355` green. Rerun requires a
-      UI/manual dispatch (agent token lacks `actions:write`): Actions →
-      rot-drill → Run workflow → ref `arena/01a07141-dhun`.
+      Fixes for run 33961533965 are now on session branch `arena/01a07170-dhun`
+      (cherry-picks ending at `39cc924`; equivalent to PR #15 head `5dabdfa`).
+      This-push CI pending. Live rerun requires UI/manual dispatch when the
+      agent token lacks `actions:write`: Actions → rot-drill → Run workflow →
+      ref `arena/01a07170-dhun`. Do not mark green from CI alone.
+
 - [ ] First scheduled run completes on the default branch.
 - [x] Failure path creates or updates one `[rot-drill]` issue and uploads the
       log artifact. (done in 33961533965 — though the artifact name was
