@@ -51,6 +51,15 @@ for upstream recovery.
       engine only (not the production own-client→yt-dlp chain), yt-dlp
       stderr evidence was dropped, and the issue body swallowed the artifact
       name through a bash backtick bug.
+
+- [x] **Second live dispatch on wrong ref — run 33968612285 (2026-09-05,
+      workflow_dispatch on `main` @ `a554594`): FAILED, identical pattern.**
+      Same `AuthRequired(detail=null)` / no `WATCH|own-client`. Confirms the
+      user UI defaulted to main (pre-fix). Kill switch step "Fail the
+      workflow after alerting" is intentional. Issue #14 updated with
+      diagnosis comment. **Not a regression of PR #16** — that code was not
+      checked out.
+
 - [ ] Manual run from the Phase 14 branch completes with `PROBE|verdict|PASS`.
       Fixes for run 33961533965 are now on session branch `arena/01a07170-dhun`
       (cherry-picks ending at `39cc924`; equivalent to PR #15 head `5dabdfa`).

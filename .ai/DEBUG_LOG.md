@@ -6,6 +6,31 @@ read this entry before re-diagnosing.
 
 ---
 
+## 2026-09-05 · rot-drill run 33968612285 FAILED on main@a554594 — wrong ref, not a fix regression
+
+**Symptom:** User saw step **"Fail the workflow after alerting" → `exit 1`**
+and concluded nothing updated. Run:
+https://github.com/99ggprooo00-code/DHUN/actions/runs/33968612285
+
+**Root cause:** `workflow_dispatch` targeted **`main` @ `a554594`** (PR #13
+merge), which still has the pre-fix probe (yt-dlp alone, `AuthRequired()`
+with null detail, issue-body backtick bug). Probe output is a byte-for-byte
+repeat of run 33961533965. The `exit 1` step is the intentional kill switch
+after `steps.probe.outcome == failure` — not a new defect.
+
+**Not the cause:** PR #16 / branch `arena/01a07170-dhun` code was never
+checked out. Agent still cannot dispatch (`HTTP 403` on
+`actions/workflows/.../dispatches`).
+
+**Response:** Comment on issue #14 with the wrong-ref diagnosis. ROADMAP
+CURRENT ACTIVE TASK updated. Next human action: dispatch rot-drill with
+branch **`arena/01a07170-dhun`**, or merge PR #16 then re-run on main.
+
+**Verification state:** PR #16 CI remains GREEN (`33967339900`). Live green
+verdict still does not exist.
+
+---
+
 ## 2026-09-05 · CI red on PR #16 (run 33967027211): NowPlayingPersistenceTest 15s timeout
 
 **Symptom** (CI step "Unit tests — shared domain"):

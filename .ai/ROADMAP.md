@@ -12,31 +12,23 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
-**Session branch:** `arena/01a07170-dhun` (pinned). PR #15 Phase 14 fixes
-are now **on this branch** via cherry-pick of
-`735c609…5dabdfa` → local HEADs `90dec9b…39cc924`.
+**Session branch:** `arena/01a07170-dhun` @ `d6d19c9` · **PR #16 OPEN**, CI
+**GREEN** (`33967339900` @ `60e5631`).
 
 **Phase:** 14 — Robustness, rot-drill, release v0.1.0 (🟨 IN PROGRESS).
 
-**Files worked on this session:**
-- Cherry-picked onto this branch (code already CI-proven on PR #15):
-  - `shared/src/jvmMain/kotlin/dev/dhun/extraction/JvmStreamResolvers.kt`
-    (`42b32df` — AuthRequired.detail carries yt-dlp stderr)
-  - `tools/playback-probe/.../Main.kt`
-    (`0dc9d00` — production own-client→yt-dlp chain + WATCH lines)
-  - `.github/workflows/rot-drill.yml`
-    (`666a8a1` — issue-body backtick fix + yt-dlp version in artifact)
-  - `shared/.../core/RateLimitGate.kt` + test (`8f3cbc6`)
-  - `ConnectivityMonitor` + Android/JVM actuals + shell banner (`d2152f9`)
-  - `InnerTubeClient.onRateLimited` suspend fix (`39cc924`)
-- Docs: this file, `docs/verification/14-release.md`,
-  `.ai/KNOWN_LIMITATIONS.md`.
+**Files:** `.github/workflows/rot-drill.yml`,
+`tools/playback-probe/.../Main.kt`,
+`shared/.../extraction/JvmStreamResolvers.kt`, plus taxonomy + DataLayer
+dbIo fix already on this branch.
 
-**Last error (still open — first live rot-drill, not yet re-run):**
+**Last error — run 33968612285 (user-dispatched, just now):**
 
 ```
-rot-drill run 33961533965 · job 101295458477 · workflow_dispatch on a554594
-https://github.com/99ggprooo00-code/DHUN/actions/runs/33961533965
+https://github.com/99ggprooo00-code/DHUN/actions/runs/33968612285
+ref: main @ a554594   ← NOT arena/01a07170-dhun
+event: workflow_dispatch
+step "Fail the workflow after alerting" → exit 1   (intentional kill switch)
 
 PROBE|version|PASS|WEB_REMIX 1.20260901.12.00
 PROBE|search|PASS|20 music-song results
@@ -46,41 +38,45 @@ WATCH|newpipe-stream|BROKEN|Parse(detail=JSON response is too short)
 PROBE|verdict|FAIL|extraction-pipeline-broken
 ```
 
-Classification: **category 8 — YouTube datacenter-IP bot gating** of
-yt-dlp from the Actions runner. Issue #14 OPEN. Kill switch fired by
-design. Secondary defects (probe fallback-only, detail=null, issue-body
-backtick, missing yt-dlp version in artifact) are fixed in the commits
-above.
+**Why it looks like “no update”:** this dispatch checked out **pre-fix
+`main`**. On `a554594` the probe still drives **yt-dlp alone**, still drops
+stderr (`detail=null`), and the issue body still swallows the artifact name
+(backtick bug). Issue #14 got another comment with the same FAIL pattern.
+The kill switch doing `exit 1` is correct — it is not the bug.
+
+**What IS updated (this branch / PR #16, not yet on main):**
+- Production chain own-client → yt-dlp + `WATCH|own-client` / `WATCH|ytdlp`
+- `AuthRequired(detail=yt-dlp stderr)`
+- Issue-body + yt-dlp version-in-artifact fixes
+- 429 gate, offline banner, single-thread DataLayer dbIo
+- CI green on PR #16
 
 **Exact next step:**
-1. ~~Cherry-pick PR #15 onto this session branch~~ — **DONE**.
-2. ~~Push + open PR #16~~ — **DONE**.
-3. ~~CI green on fix~~ — **DONE: run `33967339900` GREEN** @ `60e5631`
-   (shared unit tests ✓ including NowPlayingPersistence, Android debug ✓,
-   probe compile ✓). Prior red `33967027211` fixed by single-thread dbIo.
-4. **Live rot-drill dispatch** on this branch (agent token lacks
-   `actions:write` → UI: Actions → rot-drill → Run workflow → ref
-   `arena/01a07170-dhun`). Require real `PROBE|verdict` +
-   `WATCH|own-client` / `WATCH|ytdlp`; comment on issue #14. Never fake a
-   pass for CI-IP gating.
-5. After live gate recorded: 403-recovery "Reconnecting…" UX, then bounded
-   audio cache. Soak / clean-target / v0.1.0 stay OPEN.
+1. ~~Code + CI on this branch~~ DONE (PR #16, `33967339900` GREEN).
+2. **Re-dispatch rot-drill on the FIXED ref** (agent token still 403 on
+   `workflow_dispatch`):
+   - **Preferred:** Actions → rot-drill → Run workflow → branch
+     **`arena/01a07170-dhun`**
+   - **Or:** merge PR #16 → main, then dispatch on `main` / wait for cron
+3. Read new lines: `WATCH|own-client`, `WATCH|ytdlp`, `PROBE|verdict`.
+   Comment outcome on issue #14. Never fake a PASS for CI-IP gating.
+4. Then: 403 "Reconnecting…" UX → audio cache. Soaks / v0.1.0 stay OPEN.
 
 **Phase 14 step marks (exact):**
 
 | Step | Status |
 |---|---|
-| Error taxonomy / actionable offline/429/403 UX | 🟨 typed errors + `toUserMessage` ✓ · per-request retry ✓ · 429 global gate ✓ (`8f3cbc6`) · offline banner ✓ (`d2152f9`, hardware airplane-mode OPEN) · AuthRequired detail ✓ (`42b32df`) · 403 "Reconnecting…" UX ⬜ · db-path review ⬜ — **code on this branch; CI `33967339900` GREEN @ `60e5631`** |
-| Bounded audio cache / offline replay | ⬜ not started (stream-URL TTL cache only) |
-| Daily live rot-drill | 🔴 first live run **33961533965 FAILED** (cat. 8); failure path proven (issue #14); probe/workflow fixes on this branch; **no green live verdict yet** |
+| Error taxonomy / offline/429/403 UX | 🟨 typed + 429 gate + offline banner + AuthRequired detail on branch/CI green; 403 "Reconnecting…" UX ⬜; hardware offline check ⬜; db review ⬜ |
+| Bounded audio cache / offline replay | ⬜ not started |
+| Daily live rot-drill | 🔴 still RED — runs **33961533965** and **33968612285** both on `main@a554594` (old probe). Fixes not exercised live. Failure path + kill switch proven twice. **No green verdict. No run yet on `arena/01a07170-dhun`.** |
 | Android 30-min soak | ⬜ open |
 | Desktop 30-min soak | ⬜ open |
-| v0.1.0 APK/AAB/MSI + clean-target release | ⬜ open (rolling `test` ≠ stable) |
+| v0.1.0 release + clean-target | ⬜ open |
 | Phase 14 acceptance 1–4 | ⬜ none complete |
 
-**Standing sandbox notes:** no local JDK; no device/adb; YouTube TLS-blocked
-from sandbox; agent token often lacks `actions:write` (dispatch 403);
-"Invalid username or token" = reconnect GitHub in Arena.
+**Standing sandbox notes:** no local JDK; no device; YouTube TLS-blocked
+here; agent cannot `workflow_dispatch` (HTTP 403); live drill must be
+started from the GitHub UI on the **correct branch**.
 
 ---
 
@@ -154,7 +150,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 CI GREEN (`33967339900` @ `60e5631`); first live drill **33961533965 FAILED** (cat. 8); live rerun + audio cache + soaks + v0.1.0 OPEN | PR #16, issue #14, `docs/verification/14-release.md` |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 CI GREEN; live drills **33961533965** + **33968612285** both ran on `main@a554594` (old probe) → still RED; need dispatch on `arena/01a07170-dhun` or merge #16 first | PR #16, issue #14 |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -184,17 +180,17 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
-### Phase 14 step status — 🟨 IN PROGRESS (first live drill FAILED — run 33961533965; fixes on this branch @ `39cc924`)
+### Phase 14 step status — 🟨 IN PROGRESS (live drills still on pre-fix main)
 
 | Step | Status |
 |---|---|
-| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 On this branch: typed errors + `toUserMessage`, per-request retry, **429 global backoff (`8f3cbc6`)**, **offline banner (`d2152f9`)**, **AuthRequired detail (`42b32df`)**. Still open: 403-recovery "Reconnecting…" UX, offline-banner hardware check, db-path review. CI `33967339900` GREEN @ `60e5631` |
-| Bounded audio cache and offline replay | ⬜ Not started; current Android cache is stream-URL-only with TTL/403 invalidation |
-| Daily live rot-drill | 🔴 First live run **33961533965 FAILED** (category 8 CI-IP bot-gate). Failure path proven (issue #14 + artifact + kill switch). Probe/workflow fixes on this branch (`0dc9d00`, `666a8a1`); **no `PROBE|verdict|PASS` yet** — live dispatch still required |
-| Android 30-minute soak | ⬜ Open — requires unrestricted-battery physical device evidence |
-| Desktop 30-minute soak | ⬜ Open — requires libVLC/tray/SMTC-capable desktop evidence |
-| v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open — rolling `test` artifacts are not the stable release; signing, clean installs, and release tag are gated |
-| Phase 14 acceptance 1–4 | ⬜ None complete; `docs/verification/14-release.md` is a checklist only until live/hardware evidence is recorded |
+| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 On branch + CI green: typed errors, 429 global gate, offline banner, AuthRequired detail. Open: 403 "Reconnecting…" UX, airplane-mode check, db-path review |
+| Bounded audio cache and offline replay | ⬜ Not started |
+| Daily live rot-drill | 🔴 Runs **33961533965** and **33968612285** FAILED on `main@a554594` (fallback-only probe, `detail=null`). Kill switch correct. **Fixes on PR #16 never run live.** Need UI dispatch on `arena/01a07170-dhun` or merge #16 then re-run |
+| Android 30-minute soak | ⬜ Open |
+| Desktop 30-minute soak | ⬜ Open |
+| v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open |
+| Phase 14 acceptance 1–4 | ⬜ None complete |
 
 ### Phase 11 step status — ✅ MERGED @ `d27eb37` (hardware OPEN)
 
