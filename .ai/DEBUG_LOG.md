@@ -140,9 +140,13 @@ the runtime call was missing.
 **API correction (learned the hard way, do NOT repeat):** in media3 **1.5.1**
 there is NO `MediaSession.startForeground(...)`, NO `MediaSession.sessionId`,
 and NO static `MediaStyleNotificationHelper.createNotification(session,
-icon, intent)` — first attempt failed CI compile on exactly those. The real
-pattern is Service.startForeground + the nested
-`MediaStyleNotificationHelper.MediaStyle(session)`. When a source fetch is
+icon, intent)` — first attempt failed CI compile on exactly those (run
+33941799559). The real pattern is Service.startForeground + the nested
+`MediaStyleNotificationHelper.MediaStyle(session)`. Second compile round
+(run 33942371150) — smaller mixups: `NotificationCompat.CATEGORY_MEDIA`
+does not exist (it is `android.app.Notification.CATEGORY_MEDIA`), and
+`MediaMetadata.artworkData` is a `ByteArray` — no `toBitmap()`, use
+`BitmapFactory.decodeByteArray(data, 0, data.size)`. When a source fetch is
 not available, verify small API surfaces against the compiler, not memory.
 - `MainActivity.attach()` → one-shot (per process) system dialog via
   `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + `package:` URI

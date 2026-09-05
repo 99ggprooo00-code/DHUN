@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.pm.ServiceInfo
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.MediaItem
@@ -90,11 +91,15 @@ class DhunPlaybackService : MediaSessionService() {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(metadata?.title?.toString() ?: "DHUN")
             .setContentText(metadata?.artist?.toString())
-            .setLargeIcon(metadata?.artworkData?.toBitmap())
+            .setLargeIcon(
+                metadata?.artworkData?.let { data ->
+                    runCatching { BitmapFactory.decodeByteArray(data, 0, data.size) }.getOrNull()
+                },
+            )
             .setContentIntent(PlaybackGraph.sessionActivityIntent(this))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_MEDIA)
+            .setCategory(Notification.CATEGORY_MEDIA)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setStyle(
                 MediaStyleNotificationHelper.MediaStyle(session)
