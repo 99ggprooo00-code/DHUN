@@ -54,7 +54,7 @@ for upstream recovery.
 - [ ] Manual run from the Phase 14 branch completes with `PROBE|verdict|PASS`.
       Fixes for run 33961533965 are now on session branch `arena/01a07170-dhun`
       (cherry-picks ending at `39cc924`; equivalent to PR #15 head `5dabdfa`).
-      This-push CI pending. Live rerun requires UI/manual dispatch when the
+      CI run **`33967339900` GREEN** @ `60e5631`. Live rerun requires UI/manual dispatch when the
       agent token lacks `actions:write`: Actions → rot-drill → Run workflow →
       ref `arena/01a07170-dhun`. Do not mark green from CI alone.
 

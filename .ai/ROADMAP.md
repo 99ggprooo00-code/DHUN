@@ -53,25 +53,24 @@ backtick, missing yt-dlp version in artifact) are fixed in the commits
 above.
 
 **Exact next step:**
-1. ~~Cherry-pick PR #15 onto this session branch~~ — **DONE** (HEAD was
-   `39cc924`; session docs at `5a9d061`).
-2. ~~Push + open PR #16~~ — **DONE**. CI run **33967027211 FAILED** on
-   flaky `NowPlayingPersistenceTest` 15s timeout (JDBC concurrency — see
-   DEBUG_LOG). Fix in flight: DataLayer single-thread `dbIo` + resilient
-   `updateProgress` + test ordering.
-3. **Require green CI on the fix push**, then **live rot-drill dispatch**
-   on this branch (agent token lacks `actions:write` → UI: Actions →
-   rot-drill → Run workflow → ref `arena/01a07170-dhun`). Require real
-   `PROBE|verdict` + `WATCH|own-client` / `WATCH|ytdlp`; comment on issue
-   #14. Never fake a pass for CI-IP gating.
-4. After live gate recorded: 403-recovery "Reconnecting…" UX, then bounded
+1. ~~Cherry-pick PR #15 onto this session branch~~ — **DONE**.
+2. ~~Push + open PR #16~~ — **DONE**.
+3. ~~CI green on fix~~ — **DONE: run `33967339900` GREEN** @ `60e5631`
+   (shared unit tests ✓ including NowPlayingPersistence, Android debug ✓,
+   probe compile ✓). Prior red `33967027211` fixed by single-thread dbIo.
+4. **Live rot-drill dispatch** on this branch (agent token lacks
+   `actions:write` → UI: Actions → rot-drill → Run workflow → ref
+   `arena/01a07170-dhun`). Require real `PROBE|verdict` +
+   `WATCH|own-client` / `WATCH|ytdlp`; comment on issue #14. Never fake a
+   pass for CI-IP gating.
+5. After live gate recorded: 403-recovery "Reconnecting…" UX, then bounded
    audio cache. Soak / clean-target / v0.1.0 stay OPEN.
 
 **Phase 14 step marks (exact):**
 
 | Step | Status |
 |---|---|
-| Error taxonomy / actionable offline/429/403 UX | 🟨 typed errors + `toUserMessage` ✓ · per-request retry ✓ · 429 global gate ✓ (`8f3cbc6`) · offline banner ✓ (`d2152f9`, hardware airplane-mode OPEN) · AuthRequired detail ✓ (`42b32df`) · 403 "Reconnecting…" UX ⬜ · db-path review ⬜ — **code on this branch; CI of this push pending** |
+| Error taxonomy / actionable offline/429/403 UX | 🟨 typed errors + `toUserMessage` ✓ · per-request retry ✓ · 429 global gate ✓ (`8f3cbc6`) · offline banner ✓ (`d2152f9`, hardware airplane-mode OPEN) · AuthRequired detail ✓ (`42b32df`) · 403 "Reconnecting…" UX ⬜ · db-path review ⬜ — **code on this branch; CI `33967339900` GREEN @ `60e5631`** |
 | Bounded audio cache / offline replay | ⬜ not started (stream-URL TTL cache only) |
 | Daily live rot-drill | 🔴 first live run **33961533965 FAILED** (cat. 8); failure path proven (issue #14); probe/workflow fixes on this branch; **no green live verdict yet** |
 | Android 30-min soak | ⬜ open |
@@ -155,7 +154,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 in progress: PR #15 fixes cherry-picked onto `arena/01a07170-dhun` (HEAD `39cc924`); first live drill **33961533965 FAILED** (cat. 8); live rerun + audio cache + soaks + v0.1.0 OPEN; this-push CI pending | cherry-picks `90dec9b…39cc924`, issue #14, `docs/verification/14-release.md` |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 CI GREEN (`33967339900` @ `60e5631`); first live drill **33961533965 FAILED** (cat. 8); live rerun + audio cache + soaks + v0.1.0 OPEN | PR #16, issue #14, `docs/verification/14-release.md` |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -189,7 +188,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 
 | Step | Status |
 |---|---|
-| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 On this branch: typed errors + `toUserMessage`, per-request retry, **429 global backoff (`8f3cbc6`)**, **offline banner (`d2152f9`)**, **AuthRequired detail (`42b32df`)**. Still open: 403-recovery "Reconnecting…" UX, offline-banner hardware check, db-path review. This-push CI pending |
+| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 On this branch: typed errors + `toUserMessage`, per-request retry, **429 global backoff (`8f3cbc6`)**, **offline banner (`d2152f9`)**, **AuthRequired detail (`42b32df`)**. Still open: 403-recovery "Reconnecting…" UX, offline-banner hardware check, db-path review. CI `33967339900` GREEN @ `60e5631` |
 | Bounded audio cache and offline replay | ⬜ Not started; current Android cache is stream-URL-only with TTL/403 invalidation |
 | Daily live rot-drill | 🔴 First live run **33961533965 FAILED** (category 8 CI-IP bot-gate). Failure path proven (issue #14 + artifact + kill switch). Probe/workflow fixes on this branch (`0dc9d00`, `666a8a1`); **no `PROBE|verdict|PASS` yet** — live dispatch still required |
 | Android 30-minute soak | ⬜ Open — requires unrestricted-battery physical device evidence |
