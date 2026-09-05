@@ -180,18 +180,31 @@ internal fun QueueTabContent(
         highlightIndex = currentIndex,
         modifier = modifier.fillMaxSize(),
     ) { index, track, dragHandle, isDragging, isHighlighted ->
+        val rowBg = if (isHighlighted) {
+            Brush.horizontalGradient(
+                listOf(accent.copy(alpha = 0.22f), DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.4f)),
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.45f)),
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.xs)
+                .clip(DhunShapes.large)
+                .background(rowBg)
                 .padding(horizontal = DhunSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
-            Box(modifier = Modifier.size(DhunSpacing.compactTarget)) {
+            Box(modifier = Modifier.size(DhunSpacing.compactTarget).clip(DhunShapes.medium)) {
                 ArtworkImage(
                     imageUrl = track.thumbnailUrl,
                     contentDescription = track.title,
                     modifier = Modifier.fillMaxSize(),
+                    shape = DhunShapes.medium,
                 )
                 if (isHighlighted) {
                     Box(
@@ -212,7 +225,7 @@ internal fun QueueTabContent(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = track.title,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = if (isHighlighted) accent else DhunColors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -509,8 +522,15 @@ private fun RelatedRow(track: Track, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.xs)
+            .clip(DhunShapes.large)
+            .background(
+                Brush.verticalGradient(
+                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.45f)),
+                ),
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.xs),
+            .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
@@ -518,11 +538,12 @@ private fun RelatedRow(track: Track, onClick: () -> Unit) {
             imageUrl = track.thumbnailUrl,
             contentDescription = track.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
+            shape = DhunShapes.medium,
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = DhunColors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

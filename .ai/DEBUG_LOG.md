@@ -1,5 +1,10 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — Browse + queue glass rows
+
+Artist toolbar / Album+Playlist frosted track rows / floating back chips /
+FullPlayer Queue+Related glass cells. Same glass-morphism language app-wide.
+
 ## 2026-09-05 — M3 glass lists + lyrics motion
 
 Search frosted field, Library pill tabs, TrackRow glass cells, airier spacing,

@@ -13,25 +13,23 @@ Rules (permanent, from the user):
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
 **Branch:** `arena/01a07170-dhun` · **PR #16**.
-**User lock:** Material 3 glass-morphism OK (translucent frosted chrome).
-**No Liquid Glass.** Content stays sharp. Sans UI type; brand = wordmark only.
+**User lock:** M3 glass-morphism (translucent frosted chrome). **No Liquid Glass.**
+Sans UI type; brand wordmark only.
 
-**Phase:** M3 glass polish — Search / Library / TrackRow / lyrics motion.
+**Phase:** M3 glass polish — browse pages + player queue/related.
 
 **Just implemented (this push):**
-1. **TrackRow** frosted glass cells (default) — airier list density.
-2. **Search** frosted XL field + glass container colors; airier filter chips.
-3. **Library** frosted pill tabs + brand wordmark type; no solid flat header bg.
-4. **Player tabs** frosted selected state; **lyrics** active-line scale + accent
-   wash (ADR-002 P8 lightweight motion).
-5. Spacing: screenPadding 20dp, contentBottomInset 112dp (less cramped).
+1. Artist frosted collapse toolbar gradient; bottom content inset.
+2. Album/Playlist frosted track rows + floating frosted back chip.
+3. FullPlayer **Queue** glass rows (NOW = accent wash); **Related** glass rows.
+4. Sans headlines on album/playlist (no Bold-as-decorative substitute).
 
-**Prior:** Home depth, GlassCard/BottomBar, ambient shell, sleep timer, cache.
+**Prior:** Home depth, Search/Library glass, lyrics motion, GlassCard rewrite,
+audio cache, Recovering chip.
 
-**Exact next step:** push → CI green; device visual pass when available.
+**Exact next step:** push → CI; device visual pass when available.
 
-**Marks:** M3 glass 🟨 Search/Library/lists · Home 🟨 · player 🟨 · rot-drill 🔴 ·
-Liquid Glass 🚫
+**Marks:** browse glass 🟨 · lists glass 🟨 · Home 🟨 · rot-drill 🔴 · Liquid Glass 🚫
 
 **Sandbox:** no JDK/device; agent no workflow_dispatch.
 
