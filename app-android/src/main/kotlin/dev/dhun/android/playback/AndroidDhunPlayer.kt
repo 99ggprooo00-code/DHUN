@@ -1,6 +1,8 @@
 package dev.dhun.android.playback
 
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -10,6 +12,7 @@ import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.player.DhunPlayer
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -24,11 +28,29 @@ import java.util.concurrent.ConcurrentHashMap
  * Resolution lives service-side (see [DhunPlaybackService]); this class only
  * translates between the shared DhunPlayer API and the controller, and
  * projects controller events into StateFlows for Compose.
+ *
+ * THREADING (fatal if violated): the [player] is normally a
+ * [androidx.media3.session.MediaController], which enforces main-thread
+ * access on EVERY method (verifyApplicationThread — setters, getters and
+ * events alike). Calling it from a background dispatcher throws
+ * `IllegalStateException: MediaController method is called from a wrong
+ * thread` and crashes the app (observed: artist shuffle-play from a
+ * Dispatchers.Default ViewModel — full entry in `.ai/DEBUG_LOG.md`).
+ * Every controller call in this class is therefore marshalled to the main
+ * looper ([onMain] / [Dispatchers.Main]); the session-less ExoPlayer
+ * fallback path stays correct through the same route.
  */
 class AndroidDhunPlayer(
     private val player: Player,
     private val scope: CoroutineScope,
 ) : DhunPlayer {
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Run on the main thread; inline when already there (keeps FIFO order). */
+    private fun onMain(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) block() else mainHandler.post(block)
+    }
 
     private val trackMap = ConcurrentHashMap<String, Track>()
 
@@ -59,7 +81,9 @@ class AndroidDhunPlayer(
     private val _volume = MutableStateFlow(1f)
     override val volume: StateFlow<Float> = _volume.asStateFlow()
 
-    private val pollJob: Job = scope.launch {
+    // Main-pinned: the getters below hit the MediaController, which requires
+    // the application thread regardless of the caller's scope.
+    private val pollJob: Job = scope.launch(Dispatchers.Main) {
         while (isActive) {
             if (player.isPlaying) {
                 _positionMs.value = player.currentPosition.coerceAtLeast(0)
@@ -88,122 +112,142 @@ class AndroidDhunPlayer(
 
     override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
         tracks.forEach { trackMap[it.id] = it }
-        player.setMediaItems(tracks.map { it.toMediaItem() }, startIndex, 0L)
-        player.playWhenReady = playWhenReady
-        player.prepare()
+        // Suspend-aware: runs on main AND waits, so callers that chain
+        // calls (e.g. restore() → seekTo) keep their order.
+        withContext(Dispatchers.Main) {
+            player.setMediaItems(tracks.map { it.toMediaItem() }, startIndex, 0L)
+            player.playWhenReady = playWhenReady
+            player.prepare()
+        }
         refresh()
     }
 
     override fun addNext(track: Track) {
         trackMap[track.id] = track
-        val nextIndex = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
-        player.addMediaItem(nextIndex, track.toMediaItem())
+        onMain {
+            val nextIndex = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
+            player.addMediaItem(nextIndex, track.toMediaItem())
+        }
         refresh()
     }
 
     override fun addToQueue(track: Track) {
         trackMap[track.id] = track
-        player.addMediaItem(track.toMediaItem())
+        onMain { player.addMediaItem(track.toMediaItem()) }
         refresh()
     }
 
     override fun playAt(index: Int) {
-        if (index !in 0 until player.mediaItemCount) return
-        player.seekTo(index, androidx.media3.common.C.TIME_UNSET)
-        player.play()
+        onMain {
+            if (index !in 0 until player.mediaItemCount) return@onMain
+            player.seekTo(index, androidx.media3.common.C.TIME_UNSET)
+            player.play()
+        }
         refresh()
     }
 
     override fun removeFromQueue(index: Int) {
-        if (index !in 0 until player.mediaItemCount) return
-        player.removeMediaItem(index)
+        onMain {
+            if (index !in 0 until player.mediaItemCount) return@onMain
+            player.removeMediaItem(index)
+        }
         refresh()
     }
 
     override fun moveInQueue(from: Int, to: Int) {
-        if (from !in 0 until player.mediaItemCount || to !in 0 until player.mediaItemCount || from == to) return
-        player.moveMediaItem(from, to)
+        onMain {
+            if (from !in 0 until player.mediaItemCount || to !in 0 until player.mediaItemCount || from == to) return@onMain
+            player.moveMediaItem(from, to)
+        }
         refresh()
     }
 
     override fun playPause() {
-        if (player.isPlaying) player.pause() else player.play()
+        // The isPlaying read must happen on main too (controller getter).
+        onMain { if (player.isPlaying) player.pause() else player.play() }
     }
 
     override fun next() {
-        if (player.hasNextMediaItem()) player.seekToNextMediaItem()
+        onMain { if (player.hasNextMediaItem()) player.seekToNextMediaItem() }
     }
 
     override fun previous() {
-        if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem()
+        onMain { if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem() }
     }
 
     override fun seekTo(positionMs: Long) {
-        player.seekTo(positionMs)
+        onMain { player.seekTo(positionMs) }
         _positionMs.value = positionMs
     }
 
     override fun setRepeatMode(mode: RepeatMode) {
-        player.repeatMode = when (mode) {
-            RepeatMode.OFF -> Player.REPEAT_MODE_OFF
-            RepeatMode.ALL -> Player.REPEAT_MODE_ALL
-            RepeatMode.ONE -> Player.REPEAT_MODE_ONE
+        onMain {
+            player.repeatMode = when (mode) {
+                RepeatMode.OFF -> Player.REPEAT_MODE_OFF
+                RepeatMode.ALL -> Player.REPEAT_MODE_ALL
+                RepeatMode.ONE -> Player.REPEAT_MODE_ONE
+            }
         }
         refresh()
     }
 
     override fun setShuffle(enabled: Boolean) {
-        player.shuffleModeEnabled = enabled
+        onMain { player.shuffleModeEnabled = enabled }
         refresh()
     }
 
     override fun setVolume(volume: Float) {
-        player.volume = volume.coerceIn(0f, 1f)
+        onMain { player.volume = volume.coerceIn(0f, 1f) }
         refresh()
     }
 
     override fun stop() {
-        player.stop()
+        onMain { player.stop() }
         refresh()
     }
 
     fun release() {
         pollJob.cancel()
-        player.removeListener(listener)
-        player.release()
+        onMain {
+            player.removeListener(listener)
+            player.release()
+        }
     }
 
     /* ---------------- internals ---------------- */
 
+    /** Listener callbacks already arrive on main; init may run anywhere. */
     private fun refresh() {
-        val track = trackOf(player.currentMediaItem)
-        _currentTrack.value = track
-        _queue.value = (0 until player.mediaItemCount)
-            .mapNotNull { trackOf(player.getMediaItemAt(it)) }
-        _currentQueueIndex.value = player.currentMediaItemIndex
-        _repeatMode.value = when (player.repeatMode) {
-            Player.REPEAT_MODE_ALL -> RepeatMode.ALL
-            Player.REPEAT_MODE_ONE -> RepeatMode.ONE
-            else -> RepeatMode.OFF
-        }
-        _shuffleEnabled.value = player.shuffleModeEnabled
-        _volume.value = player.volume.coerceIn(0f, 1f)
-        _state.value = when {
-            player.playerError != null -> {
-                val message = player.playerError?.let { describeErrorChain(it) } ?: "Playback error"
-                android.util.Log.e("DHUN", "playback error: $message")
-                PlaybackState.Error(track, message)
+        onMain {
+            val track = trackOf(player.currentMediaItem)
+            _currentTrack.value = track
+            _queue.value = (0 until player.mediaItemCount)
+                .mapNotNull { trackOf(player.getMediaItemAt(it)) }
+            _currentQueueIndex.value = player.currentMediaItemIndex
+            _repeatMode.value = when (player.repeatMode) {
+                Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+                Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+                else -> RepeatMode.OFF
             }
-            player.isPlaying -> PlaybackState.Playing(track ?: UNKNOWN)
-            player.playbackState == Player.STATE_BUFFERING ->
-                PlaybackState.Buffering(track ?: UNKNOWN)
-            player.playbackState == Player.STATE_READY ->
-                PlaybackState.Paused(track ?: UNKNOWN)
-            // Restored-but-not-prepared queue (playWhenReady=false before
-            // buffering) is still a paused session, not an idle player.
-            player.mediaItemCount > 0 && player.playbackState != Player.STATE_IDLE ->
-                PlaybackState.Paused(track ?: UNKNOWN)
-            else -> PlaybackState.Idle
+            _shuffleEnabled.value = player.shuffleModeEnabled
+            _volume.value = player.volume.coerceIn(0f, 1f)
+            _state.value = when {
+                player.playerError != null -> {
+                    val message = player.playerError?.let { describeErrorChain(it) } ?: "Playback error"
+                    android.util.Log.e("DHUN", "playback error: $message")
+                    PlaybackState.Error(track, message)
+                }
+                player.isPlaying -> PlaybackState.Playing(track ?: UNKNOWN)
+                player.playbackState == Player.STATE_BUFFERING ->
+                    PlaybackState.Buffering(track ?: UNKNOWN)
+                player.playbackState == Player.STATE_READY ->
+                    PlaybackState.Paused(track ?: UNKNOWN)
+                // Restored-but-not-prepared queue (playWhenReady=false before
+                // buffering) is still a paused session, not an idle player.
+                player.mediaItemCount > 0 && player.playbackState != Player.STATE_IDLE ->
+                    PlaybackState.Paused(track ?: UNKNOWN)
+                else -> PlaybackState.Idle
+            }
         }
     }
 
