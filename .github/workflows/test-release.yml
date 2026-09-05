@@ -70,11 +70,28 @@ jobs:
       - name: Build MSI (jpackage)
         run: ./gradlew :app-desktop:packageMsi --no-daemon
 
+      # Recurse the whole compose build tree (run 33951385012: the MSI was
+      # NOT where the old hardcoded path expected — and job logs were
+      # unreadable from the agent, so the step now self-diagnoses by
+      # dumping the tree it searched).
       - name: Stage + checksum
         shell: pwsh
         run: |
-          $msi = Get-ChildItem -Path app-desktop/build/compose/binaries/mainMsi -Filter *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $msi) { throw "No .msi found under app-desktop/build/compose/binaries/mainMsi" }
+          $ErrorActionPreference = 'Stop'
+          $tree = "app-desktop/build/compose"
+          $msi = $null
+          if (Test-Path $tree) {
+            $msi = Get-ChildItem -Path $tree -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $msi) {
+            Write-Host "::error file=.github/workflows/test-release.yml,title=MSI staging::No .msi under app-desktop/build/compose (tree follows)"
+            if (Test-Path "app-desktop/build") {
+              Get-ChildItem -Path "app-desktop/build" -Recurse -ErrorAction SilentlyContinue |
+                Select-Object -First 300 | ForEach-Object { Write-Host $_.FullName }
+            }
+            throw "No .msi found under $tree (tree dumped above)"
+          }
+          Write-Host ("Found MSI: " + $msi.FullName)
           New-Item -ItemType Directory -Force -Path out | Out-Null
           Copy-Item $msi.FullName out/dhun-test.msi
           $hash = (Get-FileHash out/dhun-test.msi -Algorithm SHA256).Hash.ToLower()
