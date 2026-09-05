@@ -1,5 +1,10 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — PR #16 merged to main
+
+`gh pr merge 16 --merge` succeeded. Bundle: Phase 14 robustness + M3 glass UI.
+Residential stream / soaks / v0.1.0 still human gates — merge ≠ product done.
+
 ## 2026-09-05 — PR #16 ready for pull
 
 Title/body refreshed for full scope (Phase 14 + M3 glass UI). CI green,
