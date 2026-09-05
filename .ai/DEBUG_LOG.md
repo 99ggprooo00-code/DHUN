@@ -74,11 +74,18 @@ reproduction must happen on GitHub Actions, not locally.
 3. `rot-drill.yml`: quote the issue body safely (no backtick execution),
    append `yt-dlp --version` into `rot-drill.log`.
 
-**Verification state:** pending — PR CI (tests+builds) then re-dispatch the
-drill; green requires a real `PROBE|verdict|PASS` line. If the own-client
-tier is ALSO gated from CI, the drill stays red (CI-network gating
-evidence — see KNOWN_LIMITATIONS "CI-network vs residential" note) and
-residential verification moves to real hardware.
+**Verification state:** code fixes are CI-verified — PR #15, run
+`33963002355` GREEN 2026-09-05 (shared unit tests, Android debug build,
+probe compile; sandbox has no JDK so CI is the compile gate). Live rerun
+still PENDING: the sandbox token cannot dispatch workflows
+(`HTTP 403: Resource not accessible by integration`, re-confirmed) — the
+drill must be re-dispatched from the GitHub UI on ref
+`arena/01a07141-dhun` (exactly how run 33961533965 was dispatched) or left
+to the 04:17 UTC cron after PR #15 merges. Green requires a real
+`PROBE|verdict|PASS`; if the own-client tier is ALSO gated from CI, the
+drill stays red (CI-network gating evidence — see the
+"CI-network vs residential" note in KNOWN_LIMITATIONS) and residential
+verification moves to real hardware.
 
 ---
 
