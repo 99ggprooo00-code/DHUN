@@ -327,3 +327,19 @@ build, and the Desktop/probe compilation.
 `JAVA_HOME`/`java`; CI is the compile gate. Device rotation, gesture-nav,
 shortcut launcher, battery/OEM, and 30-minute playback soak evidence remain
 open and must not be inferred from CI.
+
+## 2026-09-05 · Phase 14 rot-drill dispatch gate
+
+**Attempt:** After pushing `5897c5c` + `5573f9a`, a manual dispatch was
+requested with `gh workflow run rot-drill.yml --ref arena/01a070b3-dhun`.
+
+**Result:** GitHub returned `HTTP 403: Resource not accessible by integration`.
+The authenticated GitHub bot is valid and PR CI is green, but the workflow is
+not on the default branch yet; `gh workflow view rot-drill.yml` still shows
+the old placeholder definition from `main`. No live probe verdict or issue
+alert/recovery exercise can be claimed from this attempt.
+
+**Next action:** Keep the workflow code staged and run it once the workflow is
+available on the default branch or Actions dispatch permission is restored.
+Until then, the Phase 14 rot-drill step remains open; do not mark it green
+because the YAML has not been live-executed.

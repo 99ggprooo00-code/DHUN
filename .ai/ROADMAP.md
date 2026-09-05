@@ -12,11 +12,10 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at local commit `5897c5c` (Phase 14
-rot-drill activation; **not pushed and not CI-verified yet**). The last
-pushed head is `6a00fd2`; Phase 13 Android native-polish code is CI-verified
-by run `33959217371` (shared tests, Android debug build, Desktop/probe
-compilation). PR #13 remains OPEN. The rolling `test` pre-release is healthy:
+**Branch:** `arena/01a070b3-dhun` at pushed commit `5573f9a` (Phase 14
+rot-drill activation + roadmap; PR CI run `33959922661` is green). Phase 13
+Android native-polish code remains CI-verified by run `33959217371` (shared
+tests, Android debug build, Desktop/probe compilation). PR #13 remains OPEN. The rolling `test` pre-release is healthy:
 run `33952291659` passed `apk`, `msi`, and `publish`; all four assets are
 present.
 
@@ -39,21 +38,25 @@ present.
    acceptance item is complete.
 4. **Phase 14 rot-drill — CODE STAGED, LIVE RUN OPEN:** `5897c5c` replaces
    the placeholder workflow with a scheduled/manual live probe, log artifact,
-   failure issue alert, and automatic recovery close. The workflow has not
-   yet run successfully from this branch.
+   failure issue alert, and automatic recovery close. A dispatch attempt was
+   blocked by GitHub `HTTP 403: Resource not accessible by integration`; the
+   workflow is not yet available from the default branch.
 
-**Last error:** No new source or workflow error after the Phase 13
-`RowScope` navigation fix. Local Gradle verification is unavailable because
-this sandbox has no `JAVA_HOME` and no `java` executable; the new rot-drill
-workflow is also not live-verified until it runs on GitHub.
+**Last error:** `gh workflow run rot-drill.yml --ref arena/01a070b3-dhun`
+returned `HTTP 403: Resource not accessible by integration`; `gh workflow
+view` confirms the default branch still exposes the old placeholder workflow.
+No live probe verdict exists. Local Gradle verification is also unavailable
+because this sandbox has no `JAVA_HOME` and no `java` executable.
 
 **Exact next step:**
-1. Update and commit this roadmap, push `5897c5c` plus the roadmap commit,
-   then manually dispatch `.github/workflows/rot-drill.yml` on the branch.
-2. Inspect the live probe verdict, artifact, and issue-alert path; fix any
-   workflow/probe error and rerun until the workflow itself is green.
-3. Keep Phase 14 soak, audio-cache, clean-target, and v0.1.0 release gates
-   explicitly open; do not mark Phase 12–14 complete from CI alone.
+1. Once the workflow is available on the default branch or Actions dispatch
+   permission is restored, run `.github/workflows/rot-drill.yml` and inspect
+   its `PROBE|verdict`, artifact, issue-alert, and recovery behavior.
+2. If the live workflow exposes a probe or YAML error, fix it and rerun; keep
+   the rot-drill step open until a real green run is recorded.
+3. Continue Phase 14 with the error-taxonomy/audio-cache work only while
+   keeping soak, clean-target, and v0.1.0 release gates explicitly open; do
+   not mark Phase 12–14 complete from CI alone.
 
 **CI trail (prior 9 rounds plus Phase 13 rounds, all in DEBUG_LOG):**
 `33941799559`→android media3 APIs · `33942371150`/`33942622916`→
@@ -181,7 +184,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 |---|---|
 | Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Existing typed `DhunResult`/`DhunError` paths and 403 recovery are present; full network/db/playback sweep and offline-banner review are not complete |
 | Bounded audio cache and offline replay | ⬜ Not started; current Android cache is stream-URL-only with TTL/403 invalidation |
-| Daily live rot-drill | 🟨 Workflow code staged in `.github/workflows/rot-drill.yml`; scheduled/manual live run and issue-alert/recovery exercise OPEN |
+| Daily live rot-drill | 🟨 Workflow code staged in `.github/workflows/rot-drill.yml`; dispatch attempt hit GitHub 403 and no live verdict exists |
 | Android 30-minute soak | ⬜ Open — requires unrestricted-battery physical device evidence |
 | Desktop 30-minute soak | ⬜ Open — requires libVLC/tray/SMTC-capable desktop evidence |
 | v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open — rolling `test` artifacts are not the stable release; signing, clean installs, and release tag are gated |
