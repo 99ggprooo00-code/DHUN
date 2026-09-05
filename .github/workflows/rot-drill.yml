@@ -1,7 +1,9 @@
 name: rot-drill
-# Daily extraction health check vs live YouTube. Wired to the
-# tools/playback-probe suite in Phase 01; until then this is a placeholder
-# that must FAIL LOUD when someone removes this comment and ships no probe.
+# Daily extraction health check vs live YouTube. The tools/playback-probe
+# suite exists and compiles in CI (step "Probe compiles"); the scheduled
+# LIVE run is still pending wiring (needs a real networked run + alerting).
+# Until then this is a placeholder that must FAIL LOUD when someone
+# removes this comment and ships no probe.
 on:
   schedule:
     - cron: '17 4 * * *'
