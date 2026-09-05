@@ -28,46 +28,39 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07287-dhun)
 
-**Branch:** `arena/01a07287-dhun` · **PR #17 → main, MERGING NOW.**
-**GitHub state at this commit (verified `gh`/`git fetch`):** branch head
-`f70e3f9`, CI run `33980933493` ✅ (Unit tests · Android debug · Probe ·
-**Desktop compiles**); prior runs `33980627234`/`33980343727` also ✅.
-PR #15 **closed** as superseded (all 10 commits patch-identical to main).
-Local tree clean; local == remote; no unpushed commits.
+**PR #17 MERGED → `main@29eeb93`.** Verified on GitHub: CI `33981426540` ✅
+· test-release `33981426608` ✅ → `test` pre-release republished 17:38 UTC
+(`dhun-test.apk` + `dhun-test.msi` now contain the desktop cache).
+PR #15 closed (superseded). Session branch fast-forwarded to main; tree
+clean; no unpushed commits anywhere (stranded-commit audit: clean).
 
-**Phase:** 14 — Robustness + rot-drill + v0.1.0.
+**Phase:** 14 — Robustness + rot-drill + v0.1.0. **All code slices of
+Phase 14 are now merged**; what remains is evidence, not code.
 
-**Files worked on (this session, all on PR #17):**
-- `shared/src/jvmMain/kotlin/dev/dhun/player/AudioFileCache.kt` (new)
-- `shared/src/jvmTest/kotlin/dev/dhun/player/AudioFileCacheTest.kt` (new, 9)
-- `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/player/DesktopDhunPlayer.kt`
-- `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt` (Koin wiring)
-- `.github/workflows/ci.yml` (+ `Desktop compiles` step)
-- `CHANGELOG.md` (new) · `README.md` · `.ai/KNOWN_LIMITATIONS.md` ·
-  `docs/verification/14-release.md` · `.ai/DEBUG_LOG.md` · this file
-  (+ pre-push ritual rule).
+**Last file worked on:** `.ai/ROADMAP.md` (this post-merge mark flip).
+Last code files: `shared/src/jvmMain/.../player/AudioFileCache.kt`,
+`app-desktop/.../player/DesktopDhunPlayer.kt` (merged in #17).
 
-**Last error:** none. (Sandbox: no JDK, no egress — CI is the compiler.)
+**Last error:** none.
 
-**Stranded-commit audit (rule step 4):** 7 old session branches are
-"ahead" of main by count only — every commit is patch-identical to main
-(`git cherry` = 0 unique) or a pre-merge draft of a merged PR
-(01a06a42 = Phase 07 draft, PR #6 landed it). `faf8d03` from 01a07170 was
-cherry-picked here (`1eb377c`). Nothing left behind.
+**Exact next step — human/hardware gates (agent cannot do these from the
+sandbox: no device, no libVLC, no residential IP):**
+1. Install `dhun-test.apk` on a phone on a residential network → play a
+   track (residential extraction truth) → play it fully → airplane mode
+   → replay (Android offline-cache smoke).
+2. Install `dhun-test.msi` on Windows with VLC → same sequence; expect
+   `DHUN cache: cached <id>` then `DHUN cache: cache hit` in the log
+   (checklist: `docs/verification/14-release.md`).
+3. Record results in `docs/verification/14-release.md`; then 30-min soaks
+   on both; only then v0.1.0 (tag, AAB, signed artifacts, CHANGELOG
+   `[0.1.0]` section).
+Agent-doable follow-ups on request: `cache_size_mb` Settings UI (both
+platforms read the DB key only), live re-capture of Phase 09 fixtures.
 
-**Exact next step:**
-1. `gh pr merge 17 --merge` → main gets desktop cache + CHANGELOG + rules.
-   test-release then rebuilds `dhun-test.apk`/`.msi` from main.
-2. Post-merge follow-up commit: flip desktop-cache / CHANGELOG rows to ✅
-   (merged + CI green), HW columns stay OPEN.
-3. Human/hardware gates: residential play + offline-cache smoke (Android
-   + libVLC desktop; checklist in `docs/verification/14-release.md`),
-   30-min soaks, then v0.1.0.
-
-**Marks (GitHub):** PR #16 ✅ · PR #17 CI ✅ (merge in progress) · Android
-cache ✅ (HW ⬜) · desktop cache 🟨→✅ on merge (HW ⬜) · CHANGELOG 🟨→✅ on
-merge · rot-drill live 🔴 · soaks ⬜ · v0.1.0 ⬜ · Liquid Glass 🚫 · PR #15
-closed (superseded).
+**Marks (GitHub main):** PR #16 ✅ · PR #17 ✅ · Android cache ✅ code
+(HW ⬜) · **desktop cache ✅ code** (HW ⬜) · **CHANGELOG ✅** · pre-push
+ritual rule ✅ · rot-drill live 🔴 (cat.8 CI-IP) · residential ⬜ · soaks ⬜
+· v0.1.0 ⬜ · Liquid Glass 🚫.
 
 ---
 
@@ -141,7 +134,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 **MERGED** @ `290e0f6` (CI green `33979260227`); live drills RED (cat.8 CI-IP auth); Android audio cache merged (HW OPEN); **desktop cache 🟨 PR #17 · CHANGELOG 🟨 PR #17**; Recovering UX merged; residential + soaks + v0.1.0 OPEN | issue #14, PR #16, `DhunAudioSegmentCache` |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 **MERGED** @ `290e0f6` (CI green `33979260227`); live drills RED (cat.8 CI-IP auth); Android audio cache merged (HW OPEN); **desktop cache ✅ merged PR #17 · CHANGELOG ✅**; Recovering UX merged; residential + soaks + v0.1.0 OPEN | issue #14, PR #16, `DhunAudioSegmentCache` |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -176,9 +169,9 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Step | Status |
 |---|---|
 | Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Typed errors, 429 gate, offline banner, **403 Reconnecting…** (`PlaybackState.Recovering`). Open: airplane-mode HW check, db-path review |
-| Bounded audio cache — Android (Media3 SimpleCache LRU) | 🟨 code **merged to main** (`0f88026`, PR #16, CI green); HW offline replay OPEN |
-| Bounded audio cache — Desktop (vlcj path) | 🟨 PR #17 **CI green** `33980343727` (`AudioFileCache` + `DesktopDhunPlayer` wiring + 9 unit tests + new desktop compile step); ✅ on merge; desktop offline HW check OPEN |
-| `CHANGELOG.md` | 🟨 PR #17 CI green (Unreleased only, v0.1.0 not claimed); ✅ on merge |
+| Bounded audio cache — Android (Media3 SimpleCache LRU) | ✅ code **MERGED** (`0f88026`, PR #16, CI green) — HW offline replay OPEN |
+| Bounded audio cache — Desktop (vlcj path) | ✅ code **MERGED** PR #17 @ `29eeb93` (CI `33981426540` green; `AudioFileCache` + `DesktopDhunPlayer` + 9 unit tests + desktop compile step) — desktop offline HW check OPEN |
+| `CHANGELOG.md` | ✅ **MERGED** PR #17 (Unreleased only; `[0.1.0]` section written at release time) |
 | Daily live rot-drill | 🔴 Run **33968950214** on `arena/01a07170-dhun@10ad025`: production chain exercised; `WATCH\|own-client` + `WATCH\|ytdlp` both `AuthRequired` (Sign in to confirm you're not a bot) from Actions IP; metadata PASS; kill switch correct. **Category 8 CI-network evidence — not extractor-shape rot.** No PASS. Residential verification required before any "playback broken for users" claim |
 | Android 30-minute soak | ⬜ Open |
 | Desktop 30-minute soak | ⬜ Open |
