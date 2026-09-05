@@ -4,13 +4,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.dhun.core.PlaybackState
@@ -61,18 +63,22 @@ import java.util.concurrent.atomic.AtomicReference
  *    playing/paused icon variants — the documented SMTC fallback path
  *  - close-to-tray (setting [SettingsKeys.CLOSE_TO_TRAY], default on): the
  *    main window's X hides to tray; tray "Quit" exits clean
- *  - window geometry persisted to [SettingsKeys.WINDOW_GEOMETRY] ("x,y,w,h",
- *    px; read via JNA GetWindowRect on Windows — the primary desktop OS)
- *  - keyboard shortcuts (window-scope [Window.onKeyEvent], which receives
- *    only keys the focused node didn't consume): Space play/pause,
- *    ←/→ seek ±5 s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+M mini-player,
- *    Ctrl+Q quit
+ *  - window geometry persisted to [SettingsKeys.WINDOW_GEOMETRY] ("x,y,w,h"
+ *    px) — read from the live [WindowState] (position is kept current by the
+ *    Compose window's component listener), restored via WindowPosition
+ *  - keyboard shortcuts (window-scope [Window.onKeyEvent], receives only keys
+ *    the focused node didn't consume): Space play/pause, ←/→ seek ±5 s,
+ *    Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+M mini-player, Ctrl+Q quit
  *
- * NOTE (1.8.2 API): `Window`'s content lambda takes NO receiver
- * (WindowScope landed later) and `LocalWindow` is INTERNAL in 1.8.2 —
- * so the AWT window handles come from the public JDK API
- * `java.awt.Frame.getFrames()` with an exact-title lookup (both DHUN
- * windows are plain `java.awt.Frame`s created by Compose Desktop).
+ * Compose Desktop 1.8.2 API notes (verified against
+ * JetBrains/compose-multiplatform-core v1.8.2 sources):
+ *  - `Window` content is `FrameWindowScope.() -> Unit`; `window` is a
+ *    [ComposeWindow] which extends `javax.swing.JFrame` — all window control
+ *    (show/hide/toFront/requestFocus) is plain public AWT on it.
+ *  - `alwaysOnTop` is a top-level `Window` parameter (not in WindowState).
+ *  - `WindowPosition` (Dp-based) for position; no `skipTaskbar` parameter
+ *    in 1.8.2 (mini-player shows in the taskbar — see KNOWN_LIMITATIONS).
+ *  - Arrows are `Key.DirectionLeft/DirectionRight`; space is `Key.Spacebar`.
  */
 fun main() = application {
     val koin = startKoin { modules(desktopModule) }.koin
@@ -94,10 +100,10 @@ fun main() = application {
             ?.takeIf { it.size == 4 }
             ?.let { (x, y, w, h) ->
                 WindowGeometry(
-                    x = x.toLongOrNull() ?: 0L,
-                    y = y.toLongOrNull() ?: 0L,
-                    w = w.toLongOrNull() ?: 1200L,
-                    h = h.toLongOrNull() ?: 780L,
+                    x = (x.toFloatOrNull() ?: 0f).toLong(),
+                    y = (y.toFloatOrNull() ?: 0f).toLong(),
+                    w = (w.toFloatOrNull() ?: 1200f).toLong(),
+                    h = (h.toFloatOrNull() ?: 780f).toLong(),
                 )
             }
     }
@@ -107,33 +113,44 @@ fun main() = application {
         }.getOrDefault(true)
     }
 
-    /**
-     * Live AWT frame lookup by exact title (Compose Desktop windows are
-     * java.awt.Frame; `LocalWindow` is internal in Compose Desktop 1.8.2).
-     */
-    fun findFrame(title: String): java.awt.Frame? =
-        runCatching { java.awt.Frame.getFrames() }.getOrNull()
-            ?.firstOrNull { it.title == title }
+    // Window states (hoisted so close-to-tray/quit can read the live geometry:
+    // Compose keeps position/size current via the AWT component listener).
+    val mainState = rememberWindowState(
+        width = initialGeometry?.w?.dp ?: 1200.dp,
+        height = initialGeometry?.h?.dp ?: 780.dp,
+        position = initialGeometry?.let { WindowPosition(it.x.dp, it.y.dp) }
+            ?: WindowPosition.PlatformDefault,
+    )
+    val miniState = rememberWindowState(
+        width = 320.dp,
+        height = 88.dp,
+        position = WindowPosition(96.dp, 72.dp),
+    )
+
+    val mainWindowRef = AtomicReference<ComposeWindow>()
+    val miniWindowRef = AtomicReference<ComposeWindow>()
 
     fun showMainWindow() {
-        val f = findFrame("DHUN") ?: return
-        f.isVisible = true
-        f.toFront()
-        f.requestFocus()
+        val w = mainWindowRef.get() ?: return
+        w.isVisible = true
+        w.toFront()
+        w.requestFocus()
     }
 
     fun toggleMiniPlayer() {
-        val f = findFrame("DHUN mini-player") ?: return
-        f.isVisible = !f.isVisible
-        if (f.isVisible) {
-            f.toFront()
-            f.requestFocus()
+        val w = miniWindowRef.get() ?: return
+        w.isVisible = !w.isVisible
+        if (w.isVisible) {
+            w.toFront()
+            w.requestFocus()
         }
     }
 
     fun saveGeometry() {
-        val f = findFrame("DHUN") ?: return
-        val geo = "${f.x},${f.y},${f.width},${f.height}"
+        val p = mainState.position
+        if (p !is WindowPosition.Absolute) return
+        val s = mainState.size
+        val geo = "${p.x.value},${p.y.value},${s.width.value},${s.height.value}"
         appScope.launch { runCatching { settings.putString(SettingsKeys.WINDOW_GEOMETRY, geo) } }
     }
 
@@ -187,19 +204,19 @@ fun main() = application {
     // ---- owns the startup focus) ------------------------------------------ //
     Window(
         onCloseRequest = {
-            // X hides (not disposes) — Ctrl+M / tray "Open" always work.
-            findFrame("DHUN mini-player")?.isVisible = false
+            // X hides (not disposes; 1.8.2 sets DO_NOTHING_ON_CLOSE itself) —
+            // Ctrl+M / tray "Open" always work.
+            miniWindowRef.get()?.isVisible = false
         },
-        state = rememberWindowState(
-            width = 320.dp,
-            height = 88.dp,
-            position = Offset(96f, 72f),
-            alwaysOnTopValue = true,
-        ),
+        state = miniState,
         title = "DHUN mini-player",
         resizable = false,
-        skipTaskbar = true,
+        alwaysOnTop = true,
     ) {
+        // FrameWindowScope: `window` is the ComposeWindow (a JFrame).
+        LaunchedEffect(window) {
+            miniWindowRef.set(window)
+        }
         DhunTheme {
             MiniPlayerContent(
                 viewModel = playerViewModel,
@@ -214,19 +231,12 @@ fun main() = application {
             if (closeToTray) {
                 // Phase 12: close → tray (default on). Tray "Quit" exits.
                 saveGeometry()
-                findFrame("DHUN")?.isVisible = false
+                mainWindowRef.get()?.isVisible = false
             } else {
                 quit()
             }
         },
-        state = rememberWindowState(
-            // saved px interpreted as dp: exact at 100% scaling, off by the
-            // display scale factor on HiDPI (harmless; re-saved on next close)
-            width = initialGeometry?.let { it.w.dp } ?: 1200.dp,
-            height = initialGeometry?.let { it.h.dp } ?: 780.dp,
-            position = initialGeometry?.let { Offset(it.x.toFloat(), it.y.toFloat()) }
-                ?: Offset.Unspecified,
-        ),
+        state = mainState,
         title = "DHUN",
         // Window-scope shortcuts. onKeyEvent (NOT onPreviewKeyEvent) receives
         // only keys the focused node didn't consume — so typing Space /
@@ -247,21 +257,21 @@ fun main() = application {
                     nav.selectedTab = AppTab.SEARCH
                     true
                 }
-                event.isCtrlPressed && event.key == Key.LEFT -> {
+                event.isCtrlPressed && event.key == Key.DirectionLeft -> {
                     playerViewModel.previous()
                     true
                 }
-                event.isCtrlPressed && event.key == Key.RIGHT -> {
+                event.isCtrlPressed && event.key == Key.DirectionRight -> {
                     playerViewModel.next()
                     true
                 }
-                event.key == Key.LEFT -> {
+                event.key == Key.DirectionLeft -> {
                     playerViewModel.seekTo(
                         (playerViewModel.positionMs.value - SEEK_STEP_MS).coerceAtLeast(0L),
                     )
                     true
                 }
-                event.key == Key.RIGHT -> {
+                event.key == Key.DirectionRight -> {
                     val duration = playerViewModel.durationMs.value
                     if (duration > 0) {
                         playerViewModel.seekTo(
@@ -272,7 +282,7 @@ fun main() = application {
                         false
                     }
                 }
-                event.key == Key.Space && !event.isCtrlPressed -> {
+                event.key == Key.Spacebar && !event.isCtrlPressed -> {
                     playerViewModel.togglePlay()
                     true
                 }
@@ -280,6 +290,10 @@ fun main() = application {
             }
         },
     ) {
+        // FrameWindowScope: `window` is the ComposeWindow (a JFrame).
+        LaunchedEffect(window) {
+            mainWindowRef.set(window)
+        }
         DhunTheme {
             DhunAppShell(
                 player = player,
