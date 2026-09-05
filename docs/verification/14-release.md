@@ -145,6 +145,21 @@ taxonomy, Recovering UX, audio-segment cache (Android), M3 glass UI, ADR-002 pla
 
 **Still OPEN:** residential rot-drill/stream, Android/Desktop soaks, v0.1.0 artifacts.
 
+## Install / uninstall hygiene (2026-09-06, session arena/01a073c3-dhun)
+
+Code-level audit of the rolling `test` artifacts. Not a malware scan of
+the bytes (sandbox cannot fetch GitHub release assets); provenance is
+`test-release.yml` on `main`.
+
+| Surface | On install | On uninstall |
+|---|---|---|
+| Android `dev.dhun.android` | Sideload debug APK, public test key, permissions listed in README. Data only in app-private storage. `allowBackup=false`, `hasFragileUserData=false`, no cleartext HTTP. | Settings / launcher Uninstall deletes `/data/data/dev.dhun.android` (DB + `cache/audio-segments` + Coil). No shared-storage writes exist in the code. |
+| Windows MSI | Per-user (`%LOCALAPPDATA%\DHUN`), no UAC. Unsigned → SmartScreen. Needs a preinstalled VLC. | Settings → Apps → DHUN removes the install dir including `userdata/` (DB + `cache/audio`). VLC is left installed (it is not ours). |
+
+Hardware confirmation of the Windows row still OPEN (needs a real MSI
+install/uninstall). Android uninstall cleanliness is platform-guaranteed
+for private storage.
+
 ## Desktop audio cache (2026-09-05, session arena/01a07287-dhun)
 
 Code: `shared/src/jvmMain/kotlin/dev/dhun/player/AudioFileCache.kt`,

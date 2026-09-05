@@ -56,6 +56,41 @@ phone). Stable URLs:
 `…/dhun-test.msi`. What is in a build: [`CHANGELOG.md`](CHANGELOG.md)
 (`Unreleased` until `v0.1.0` earns its tag).
 
+### Install / uninstall (test builds)
+
+These are **unsigned/debug test artifacts**, not store releases. Sideload
+only on a device you are willing to experiment with.
+
+**Android (`dhun-test.apk`, package `dev.dhun.android`)**
+- Permissions: Internet, notifications, media-playback foreground
+  service, wake lock, and a one-shot battery-optimisation exemption
+  dialog (needed so OEM savers don't kill background music). No
+  contacts, SMS, location, camera, microphone, storage, overlay, or
+  accessibility.
+- `allowBackup=false` and `hasFragileUserData=false` — Android does not
+  cloud-backup DHUN data and does not offer to keep it on uninstall.
+- All files live in app-private storage (`/data/data/dev.dhun.android`:
+  `databases/dhun.db`, `cache/audio-segments`, Coil cache). **Uninstall
+  from the launcher or Settings → Apps → DHUN deletes that tree.**
+  Nothing is written to shared storage.
+- Signed with the public throwaway test key in
+  `app-android/keystores/dhun-test.p12` (password `android`) so CI
+  updates install over each other. Anyone with the repo can mint a
+  same-key APK — only install from the GitHub `test` pre-release URL.
+
+**Windows (`dhun-test.msi`)**
+- Per-user install (no Administrator prompt) to `%LOCALAPPDATA%\DHUN`.
+  Uninstall: Settings → Apps → DHUN → Uninstall (or Start menu → DHUN
+  folder). That removes the program **and** `<installDir>/userdata`
+  (SQLite + audio cache). No leftover `%APPDATA%\DHUN`.
+- The MSI is **not Authenticode-signed** — SmartScreen will warn
+  ("Windows protected your PC"). That is expected for a test build,
+  not a virus. Needs a system VLC/libVLC install for playback; DHUN
+  does not install or uninstall VLC.
+- Unsigned / SmartScreen + debug APK are why these are not
+  daily-driver builds. Source of both artifacts is this repo via
+  `.github/workflows/test-release.yml`.
+
 ## Repo map
 
 - `CHANGELOG.md` — Keep-a-Changelog; no versioned release yet

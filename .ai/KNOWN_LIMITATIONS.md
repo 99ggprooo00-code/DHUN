@@ -67,7 +67,10 @@ Updated every phase. Nothing hidden.
   token lacks `workflows` permission — see docs/verification/04-desktop.md).
   Installer `packageVersion` is 1.0.x (Compose packagers reject MAJOR 0).
 - Data layer (Phase 05+11): schema is now v2 (v1 + `LyricsCache` via `migrations/1.sqm`); the DB file is
-  `dhun.db` (Android app data dir; desktop per-OS user data dir). Restored
+  `dhun.db` (Android app-private storage — deleted with the app;
+  desktop packaged = `<installDir>/userdata`, also deleted with the
+  MSI/DMG/DEB; desktop `gradle run` = `%APPDATA%\DHUN` /
+  `~/Library/Application Support/DHUN` / `~/.local/share/dhun`). Restored
   sessions come back **paused** at the saved position — stream URLs expire,
   so the desktop player re-resolves lazily on the first play press.
   Playback history is local-only; nothing leaves the device.
@@ -118,7 +121,10 @@ Updated every phase. Nothing hidden.
   (`SettingsKeys.WINDOW_GEOMETRY`) persists across restarts. The mini-player
   window shows in the OS taskbar (Compose Desktop 1.8.2's `Window` has no
   `skipTaskbar` parameter — hiding via Ctrl+M/X is the supported way to get it
-  out of the way). jpackage installers use `packageVersion` 1.0.x (packager
+  out of the way). jpackage MSI is **per-user** (`perUserInstall`, upgradeUuid
+  `31ddb86b-9666-4071-b11c-45f16fa4682d`), not Authenticode-signed (SmartScreen
+  warn is expected). Runtime data is `<installDir>/userdata` so Apps-and-Features
+  uninstall removes DB + audio cache. `packageVersion` is 1.0.x (packager
   rejects MAJOR 0); clean-VM install test OPEN on hardware.
 
 ## Phase 14 — robustness / rot-drill / release (2026-09-05)

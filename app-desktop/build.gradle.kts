@@ -37,13 +37,28 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "dev.dhun.desktop"
+            packageName = "DHUN"
+            description = "DHUN — YouTube Music player (test build)"
+            vendor = "DHUN"
+            copyright = "© DHUN contributors. GPL-3.0."
             // WHY 1.x: Compose Desktop's DMG/MSI packagers reject MAJOR == 0
             // ("'0.1.4' is not a valid version"). Configuration of THIS project
             // then fails, which takes down every Gradle task in the build —
             // that was the "desktop CI blocker" (docs/verification/04-desktop.md).
             // Installer versions map DHUN 0.x -> 1.0.x until v1.0.0 ships.
             packageVersion = "1.0.4"
+            windows {
+                // Per-user = no admin UAC, install under %LOCALAPPDATA%\DHUN,
+                // uninstall from Settings → Apps. Runtime data lives in
+                // <installDir>/userdata (see DhunUserDirs) so uninstall
+                // removes the DB + audio cache — no leftover %APPDATA%\DHUN.
+                perUserInstall = true
+                dirChooser = false
+                menuGroup = "DHUN"
+                // Stable across every test/release MSI. Changing it orphans
+                // the previous install in Apps & Features.
+                upgradeUuid = "31ddb86b-9666-4071-b11c-45f16fa4682d"
+            }
         }
     }
 }
