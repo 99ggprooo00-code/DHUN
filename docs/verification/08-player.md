@@ -63,3 +63,11 @@ physical run on Android + desktop, like Phases 03/04/05 checklists).
 | BlurredArtworkCache once-per-track | 🟨 code + unit tests |
 | Reconnecting chip (`PlaybackState.Recovering`) | 🟨 code — Android 403 path |
 | Hardware re-check of 16-item list | ⬜ still OPEN |
+
+## Lyrics motion (ADR-002 P8) — 2026-09-05
+
+| Item | Status |
+|---|---|
+| Active line scale + accent wash | 🟨 code |
+| Frosted player tab selected state | 🟨 |
+| Hardware lyric sync check | ⬜ |

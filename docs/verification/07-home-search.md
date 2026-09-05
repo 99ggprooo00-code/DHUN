@@ -132,3 +132,12 @@ Unit tests cover:
 | Classified shelves (mix/charts/albums) | 🟨 code — depends on feed titles |
 | Ambient shell wash | 🟨 lightweight seed tint |
 | Hardware visual pass | ⬜ OPEN |
+
+## M3 glass Search/lists (2026-09-05)
+
+| Item | Status |
+|---|---|
+| Frosted XL search field | 🟨 |
+| Frosted TrackRow cells | 🟨 |
+| Airier screen padding (20dp) | 🟨 |
+| Hardware visual pass | ⬜ |

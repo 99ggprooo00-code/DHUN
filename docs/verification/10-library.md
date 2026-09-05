@@ -72,3 +72,11 @@ Status: 🟨 **CODE COMPLETE** — units tested in CI; on-hardware acceptance OP
 - Library header + 3 pill tabs (Playlists selected) + empty / populated
 - Favorites populated (3 tracks) + swipe-reveal + `Play all` affordance
 - History grouped “Today” (3 entries) + “Yesterday” (1) with relative timestamps + `Clear all` dialog
+
+## M3 glass Library (2026-09-05)
+
+| Item | Status |
+|---|---|
+| Frosted pill tabs | 🟨 |
+| Brand wordmark type | 🟨 |
+| Hardware checklist | ⬜ still OPEN |

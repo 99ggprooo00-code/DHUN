@@ -13,24 +13,24 @@ Rules (permanent, from the user):
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
 **Branch:** `arena/01a07170-dhun` · **PR #16**.
-**User lock:** Material 3 only. **No Liquid Glass.** Glass-morphism OK:
-translucent frosted chrome + backdrop blur on artwork layers; content sharp.
+**User lock:** Material 3 glass-morphism OK (translucent frosted chrome).
+**No Liquid Glass.** Content stays sharp. Sans UI type; brand = wordmark only.
 
-**Phase:** M3 frosted UI polish on Home/shell/player.
+**Phase:** M3 glass polish — Search / Library / TrackRow / lyrics motion.
 
 **Just implemented (this push):**
-1. GlassCard rewrite — translucent multi-stop + sheen + edge; **never** blur
-   content (fixed prior GlassCard bug that blurred text).
-2. GlassBottomBar frosted dock for MiniPlayer + bottom nav; richer shell
-   ambient wash (vertical + radial seed tint).
-3. Frosted chips / Quick Picks / lyrics-dominant panel / reconnect chip.
-4. FullPlayer sheet drag handle + stronger once-per-track backdrop blur.
+1. **TrackRow** frosted glass cells (default) — airier list density.
+2. **Search** frosted XL field + glass container colors; airier filter chips.
+3. **Library** frosted pill tabs + brand wordmark type; no solid flat header bg.
+4. **Player tabs** frosted selected state; **lyrics** active-line scale + accent
+   wash (ADR-002 P8 lightweight motion).
+5. Spacing: screenPadding 20dp, contentBottomInset 112dp (less cramped).
 
-**Prior:** Home depth, sans type, sleep timer, audio cache, Recovering.
+**Prior:** Home depth, GlassCard/BottomBar, ambient shell, sleep timer, cache.
 
-**Exact next step:** push → CI; device visual pass when available.
+**Exact next step:** push → CI green; device visual pass when available.
 
-**Marks:** M3 glass-morph 🟨 · Home depth 🟨 · cache 🟨 · rot-drill 🔴 ·
+**Marks:** M3 glass 🟨 Search/Library/lists · Home 🟨 · player 🟨 · rot-drill 🔴 ·
 Liquid Glass 🚫
 
 **Sandbox:** no JDK/device; agent no workflow_dispatch.

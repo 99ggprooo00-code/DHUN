@@ -41,7 +41,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.Track
@@ -91,8 +94,22 @@ internal fun PlayerTabRow(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .clip(DhunShapes.medium)
-                    .background(if (selected) DhunColors.accent.copy(alpha = 0.12f) else Color.Transparent)
+                    .padding(horizontal = DhunSpacing.xs)
+                    .clip(DhunShapes.large)
+                    .background(
+                        if (selected) {
+                            Brush.verticalGradient(
+                                listOf(
+                                    DhunColors.glassHighlight,
+                                    accent.copy(alpha = 0.22f),
+                                ),
+                            )
+                        } else {
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Transparent),
+                            )
+                        },
+                    )
                     .clickable { onSelect(index) },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -106,7 +123,7 @@ internal fun PlayerTabRow(
                 Box(
                     modifier = Modifier
                         .height(DhunSpacing.iconStroke)
-                        .width(if (selected) DhunSpacing.xl else DhunSpacing.zero)
+                        .width(if (selected) DhunSpacing.xxl else DhunSpacing.zero)
                         .clip(DhunShapes.full)
                         .background(if (selected) accent else Color.Transparent),
                 )
@@ -357,22 +374,48 @@ internal fun LyricsTabContent(
                 itemsIndexed(lines) { index, line ->
                     val active = index == activeIndex
                     val color by animateColorAsState(
-                        targetValue = if (active) DhunColors.textPrimary else DhunColors.textTertiary,
-                        animationSpec = DhunAnimations.fastTween(),
+                        targetValue = if (active) accent else DhunColors.textTertiary,
+                        animationSpec = DhunAnimations.mediumTween(),
                         label = "lyricColor$index",
                     )
+                    // ADR-002 P8: spring-ish scale emphasis on the active line.
                     Text(
                         text = line.text.ifBlank { " " },
-                        style = if (active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                        style = if (active) {
+                            MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
+                        } else {
+                            MaterialTheme.typography.bodyLarge
+                        },
                         color = color,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(DhunShapes.small)
+                            .graphicsLayer {
+                                // Lightweight motion: active line pops; neighbors stay calm.
+                                scaleX = if (active) 1.04f else 1f
+                                scaleY = if (active) 1.04f else 1f
+                                alpha = if (active) 1f else 0.72f
+                            }
+                            .clip(DhunShapes.medium)
+                            .then(
+                                if (active) {
+                                    Modifier.background(
+                                        Brush.horizontalGradient(
+                                            listOf(
+                                                accent.copy(alpha = 0.12f),
+                                                Color.Transparent,
+                                                accent.copy(alpha = 0.12f),
+                                            ),
+                                        ),
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
                             .clickable(enabled = line.startTimeMs != null) {
                                 line.startTimeMs?.let(viewModel::seekTo)
                             }
-                            .padding(vertical = DhunSpacing.xs),
+                            .padding(vertical = DhunSpacing.sm),
                     )
                 }
             }

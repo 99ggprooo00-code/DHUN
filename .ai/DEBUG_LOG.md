@@ -1,5 +1,10 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — M3 glass lists + lyrics motion
+
+Search frosted field, Library pill tabs, TrackRow glass cells, airier spacing,
+synced lyrics active-line emphasis (ADR-002 P8 lightweight). Still no Liquid Glass.
+
 ## 2026-09-05 — M3 glass-morphism chrome (not Liquid Glass)
 
 User: want translucent blurry glass-morphism, still lightweight, not boring.

@@ -92,24 +92,21 @@ fun LibraryScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize().background(DhunColors.background)) {
-        // Header
+    Column(modifier = modifier.fillMaxSize()) {
+        // Header — brand wordmark + sans headline (M3 readable type)
         Column(
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md),
         ) {
             Text(
                 text = "DHUN",
-                style = MaterialTheme.typography.labelSmall,
+                style = DhunTypographyTokens.brand,
                 color = DhunColors.accent,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = DhunTypographyTokens.brand.letterSpacing,
             )
             Text(
                 text = "Your library",
                 style = MaterialTheme.typography.headlineMedium,
                 color = DhunColors.textPrimary,
-                fontWeight = FontWeight.Bold,
             )
         }
 
@@ -170,16 +167,21 @@ private fun LibraryTabRow(
                 modifier = Modifier
                     .fillMaxHeight()
                     .clip(DhunShapes.full)
-                    .background(if (selected) DhunColors.accentContainer else DhunColors.surfaceElevated)
+                    .background(
+                        if (selected) {
+                            DhunColors.accent.copy(alpha = 0.82f)
+                        } else {
+                            DhunColors.glassHighlight
+                        },
+                    )
                     .clickable { onSelect(tab) }
                     .padding(horizontal = DhunSpacing.lg, vertical = DhunSpacing.sm),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) DhunColors.onAccentContainer else DhunColors.textSecondary,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (selected) DhunColors.onAccent else DhunColors.textSecondary,
                 )
             }
         }
