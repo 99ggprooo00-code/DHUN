@@ -121,9 +121,16 @@ class NowPlayingPersistenceTest {
             pers1.setPlayContext(PlayContext.SEARCH)
             pers1.start()
             val q = listOf(track("1"), track("2"), track("3"))
-            p1.prepareQueue(q, 1)
+            // Position + duration BEFORE prepareQueue so the first snapshot
+            // (queue/currentTrack collectors) already sees 30s — otherwise a
+            // progress tick can race a concurrent history write and, before
+            // DataLayer serialized dbIo, hang the in-memory JDBC driver.
             p1.durationMs.value = 100_000
             p1.positionMs.value = 30_000
+            p1.prepareQueue(q, 1)
+            // Also wait for the queue itself, then the position — clearer
+            // failure mode if either half of the round-trip stalls.
+            eventually { d.nowPlaying.load()?.queue?.map { it.id } == listOf("1", "2", "3") }
             eventually { d.nowPlaying.load()?.positionMs == 30_000L }
             val saved = assertNotNull(d.nowPlaying.load())
             assertEquals(q, saved.queue)

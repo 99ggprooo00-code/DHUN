@@ -53,15 +53,17 @@ backtick, missing yt-dlp version in artifact) are fixed in the commits
 above.
 
 **Exact next step:**
-1. ~~Cherry-pick PR #15 onto this session branch~~ — **DONE** (10 commits,
-   clean; HEAD `39cc924`).
-2. **Push `arena/01a07170-dhun` → open PR → require green CI** (sandbox has
-   no JDK; CI is the compile gate).
-3. **Live rot-drill dispatch** on this branch (agent token typically lacks
-   `actions:write` → UI: Actions → rot-drill → Run workflow → ref
-   `arena/01a07170-dhun`). Require real `PROBE|verdict` +
-   `WATCH|own-client` / `WATCH|ytdlp`; comment on issue #14. Never fake a
-   pass for CI-IP gating.
+1. ~~Cherry-pick PR #15 onto this session branch~~ — **DONE** (HEAD was
+   `39cc924`; session docs at `5a9d061`).
+2. ~~Push + open PR #16~~ — **DONE**. CI run **33967027211 FAILED** on
+   flaky `NowPlayingPersistenceTest` 15s timeout (JDBC concurrency — see
+   DEBUG_LOG). Fix in flight: DataLayer single-thread `dbIo` + resilient
+   `updateProgress` + test ordering.
+3. **Require green CI on the fix push**, then **live rot-drill dispatch**
+   on this branch (agent token lacks `actions:write` → UI: Actions →
+   rot-drill → Run workflow → ref `arena/01a07170-dhun`). Require real
+   `PROBE|verdict` + `WATCH|own-client` / `WATCH|ytdlp`; comment on issue
+   #14. Never fake a pass for CI-IP gating.
 4. After live gate recorded: 403-recovery "Reconnecting…" UX, then bounded
    audio cache. Soak / clean-target / v0.1.0 stay OPEN.
 

@@ -6,6 +6,46 @@ read this entry before re-diagnosing.
 
 ---
 
+## 2026-09-05 · CI red on PR #16 (run 33967027211): NowPlayingPersistenceTest 15s timeout
+
+**Symptom** (CI step "Unit tests — shared domain"):
+```
+kotlinx.coroutines.TimeoutCancellationException: Timed out waiting for 15000 ms
+  @ NowPlayingPersistenceTest$eventually$2.invokeSuspend(NowPlayingPersistenceTest.kt:110)
+Test failed: NowPlayingPersistenceTest.queueAndProgressArePersistedThenRestoredPaused
+```
+Same code tree was GREEN on PR #15 run `33963828155` (identical persistence
++ JDBC path) → load/timing flake, not a rot-drill regression.
+
+**Root cause (two cooperating defects):**
+1. **JDBC single-connection concurrency.** `JdbcSqliteDriver.IN_MEMORY` is
+   one shared connection; every `SqlDelight*Repository` defaulted its `io`
+   dispatcher to `Dispatchers.Default` (multi-threaded). On track start,
+   `NowPlayingPersistence.onTrackChanged` does `recordPlay` (history write)
+   then `snapshot` (nowPlaying write) while the queue collector also fires
+   `snapshot`, and the progress loop may fire `updateProgress` — concurrent
+   JDBC access can hang or drop the position row so
+   `load()?.positionMs == 30_000` never becomes true.
+2. **Test ordering.** The test set `positionMs = 30_000` *after*
+   `prepareQueue`, so the first snapshots could persist `positionMs=0`; the
+   test then depended solely on a later progress tick winning against the
+   concurrent history write. `updateProgress` was also a pure `UPDATE … WHERE
+   id = 1` — a no-op if the state row was not yet committed.
+
+**Fix (this session, branch `arena/01a07170-dhun`):**
+- `DataLayer` now builds one `Dispatchers.Default.limitedParallelism(1)` and
+  hands it to every repository — one-connection SQLite is single-threaded
+  at the app boundary (correct for JVM file DB and in-memory tests).
+- `SqlDelightNowPlayingRepository.updateProgress` upserts state when the
+  row is missing (late tick still lands the heard position).
+- Test sets duration+position *before* `prepareQueue` and waits for the
+  queue ids first, then the position — clearer failure mode.
+
+**Verification:** push → require CI green on PR #16 (run after this commit).
+Sandbox has no JDK so CI is the compile/test gate.
+
+---
+
 ## 2026-09-05 · rot-drill run 33961533965 FAILED — first live drill red (yt-dlp bot-gated from CI IP)
 
 **Symptom** (job 101295458477, step "Fail the workflow after alerting"):
