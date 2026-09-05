@@ -134,8 +134,16 @@ Updated every phase. Nothing hidden.
   code: Media3 `SimpleCache` LRU under `cacheDir/audio-segments`, default
   1 GiB (`SettingsKeys.CACHE_SIZE_MB`), stable keys = video id, offline
   replay of already-downloaded spans when resolve fails. Hardware offline
-  check OPEN. Desktop (vlcj) has no segment cache yet. Cache budget changes
-  apply on next process start. The rolling `test` APK/MSI is not the signed
+  check OPEN. **Desktop audio cache** (Phase 14, `AudioFileCache` in
+  `shared/jvmMain`, wired into `DesktopDhunPlayer`): libVLC has no
+  data-source layer, so desktop caches **whole tracks** (`<data dir>/cache/
+  audio/<videoId>.audio`, LRU by last-used, same `CACHE_SIZE_MB` budget).
+  Consequences: a first play streams AND downloads (bandwidth ×2 for that
+  track); a track only becomes offline-playable once the background fill
+  completes (skipping mid-track cancels the fill, nothing is kept); cache
+  hits play the local file with no resolve. Desktop offline check on a real
+  machine OPEN. Cache budget changes apply on next process start (both
+  platforms). The rolling `test` APK/MSI is not the signed
   stable `v0.1.0` release.
 - Phase 14 Android/Desktop soak tests, clean-target installation checks, and
   release evidence remain open because this environment has no Android device,

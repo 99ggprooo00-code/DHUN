@@ -53,9 +53,12 @@ unfinished builds; nothing in Releases is stable or store-ready. Install
 test builds only on devices where that is acceptable (not your daily
 phone). Stable URLs:
 `https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk`,
-`…/dhun-test.msi`.
+`…/dhun-test.msi`. What is in a build: [`CHANGELOG.md`](CHANGELOG.md)
+(`Unreleased` until `v0.1.0` earns its tag).
 
 ## Repo map
+
+- `CHANGELOG.md` — Keep-a-Changelog; no versioned release yet
 
 - `.ai/` — agent operating files (moved out of the project root 2026-09-05):
   - `.ai/MASTER_PROMPT.md` — the 14-phase engineering plan (the contract)

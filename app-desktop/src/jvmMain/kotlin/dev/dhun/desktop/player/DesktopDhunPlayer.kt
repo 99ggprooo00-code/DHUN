@@ -5,10 +5,12 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
+import dev.dhun.player.AudioFileCache
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.QueueManager
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +23,7 @@ import kotlinx.coroutines.sync.withLock
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Phase 04 desktop player: vlcj (libVLC) audio engine behind the shared
@@ -29,10 +32,17 @@ import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
  * Media3's native queue; that divergence is documented in the Phase 03
  * verification log). Streams resolve via the desktop resolver chain
  * (own-client primary, yt-dlp failover — ADR-001).
+ *
+ * Phase 14 bounded audio cache ([AudioFileCache], optional): a cached track
+ * plays from the local file (no resolve, works offline); an uncached track
+ * streams immediately and is downloaded to the cache in the background
+ * (one download at a time, cancelled on track change). If resolve fails
+ * (offline / cat.8 gating) and the file is cached, playback still works.
  */
 class DesktopDhunPlayer(
     private val provider: MusicProvider,
     private val scope: CoroutineScope,
+    private val audioCache: AudioFileCache? = null,
 ) : DhunPlayer {
 
     private val factory = MediaPlayerFactory("--no-video", "--quiet")
@@ -70,6 +80,8 @@ class DesktopDhunPlayer(
     private var pollJob: Job? = null
     private var pendingLazyStart = false // restored queue, not yet resolved
     private var pendingSeekMs = 0L
+    private var cacheFillJob: Job? = null
+    private var cacheFillCancel: AtomicBoolean? = null
 
     init {
         _volume.value =
@@ -250,6 +262,7 @@ class DesktopDhunPlayer(
 
     /** Tears down libVLC resources. Call once when the app exits. */
     fun release() {
+        cancelCacheFill()
         pollJob?.cancel()
         pollJob = null
         mediaPlayer.release()
@@ -281,15 +294,21 @@ class DesktopDhunPlayer(
             return
         }
         pendingLazyStart = false
+        cancelCacheFill()
+
+        // Cache hit: local file, no network, no resolve (offline replay).
+        val cached = audioCache?.fileFor(track.id)
+        if (cached != null) {
+            log("cache hit ${track.id} (${cached.length()} bytes) — playing local file")
+            startMedia(track, cached.absolutePath)
+            return
+        }
+
         _state.value = PlaybackState.Resolving(track)
         when (val result = provider.getStreamInfo(track.id)) {
             is DhunResult.Success -> {
-                mediaPlayer.media().play(result.value.audioUrl)
-                startPolling()
-                _state.value = PlaybackState.Buffering(track)
-                val resume = pendingSeekMs
-                pendingSeekMs = 0
-                if (resume > 0) scope.launch { seekWhenPlaying(resume) }
+                startMedia(track, result.value.audioUrl)
+                startCacheFill(track.id, result.value.audioUrl, result.value.contentLengthBytes)
             }
             is DhunResult.Failure -> {
                 _state.value = PlaybackState.Error(track, result.error.toUserMessage())
@@ -297,7 +316,46 @@ class DesktopDhunPlayer(
         }
     }
 
+    private fun startMedia(track: Track, mrl: String) {
+        mediaPlayer.media().play(mrl)
+        startPolling()
+        _state.value = PlaybackState.Buffering(track)
+        val resume = pendingSeekMs
+        pendingSeekMs = 0
+        if (resume > 0) scope.launch { seekWhenPlaying(resume) }
+    }
+
+    /**
+     * Background fill of the bounded cache while the stream plays. Skipped
+     * when the cache is off or the stream is known to exceed the budget.
+     * Bandwidth is spent twice for a first play (stream + fill) — accepted
+     * v1 trade-off for a URL-only engine; documented in KNOWN_LIMITATIONS.
+     */
+    private fun startCacheFill(videoId: String, url: String, contentLength: Long?) {
+        val cache = audioCache ?: return
+        if (contentLength != null && contentLength > cache.maxBytes) return
+        val cancel = AtomicBoolean(false)
+        cacheFillCancel = cancel
+        cacheFillJob = scope.launch(Dispatchers.IO) {
+            val file = cache.download(videoId, url, expectedBytes = contentLength, cancel = cancel)
+            if (file != null) {
+                log("cached $videoId (${file.length()} bytes, total ${cache.totalBytes()} / ${cache.maxBytes})")
+            } else if (!cancel.get()) {
+                log("cache fill for $videoId did not complete (miss kept, playback unaffected)")
+            }
+        }
+    }
+
+    private fun cancelCacheFill() {
+        cacheFillCancel?.set(true)
+        cacheFillCancel = null
+        cacheFillJob = null
+    }
+
+    private fun log(message: String) = println("DHUN cache: $message")
+
     private fun stopLocked() {
+        cancelCacheFill()
         pollJob?.cancel()
         pollJob = null
         mediaPlayer.controls().stop()

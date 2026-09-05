@@ -10,7 +10,7 @@ Desktop soak, clean-install, or release checks below.
 | Step | Current status | Evidence / remaining gate |
 |---|---|---|
 | Typed error taxonomy and actionable user messages | 🟨 Typed `DhunResult`/`DhunError` + `toUserMessage` paths, per-request retry, 429 global backoff gate (`2932d57`, with unit tests), and offline banner (`fed1d54`) are implemented; CI verdict pending on the current push; 403 "Reconnecting…" UX, offline-banner hardware check, and the db-path review pass remain | `shared/.../core/RateLimitGate.kt`, `shared/.../core/ConnectivityMonitor.kt`, `DhunAppShell.kt`, hosts' Koin modules |
-| Bounded audio cache and offline replay | 🟨 Android code | Media3 `SimpleCache` LRU via `DhunAudioSegmentCache` + `CacheDataSource` (stable video-id keys); budget `SettingsKeys.CACHE_SIZE_MB` default 1024 MB (`AudioCacheBudget`); offline serve when resolve fails but spans exist. URL TTL cache still `DhunStreamCache`. Hardware offline-replay check OPEN. Desktop segment cache ⬜ (vlcj) |
+| Bounded audio cache and offline replay | 🟨 Android + Desktop code | Android: Media3 `SimpleCache` LRU via `DhunAudioSegmentCache` + `CacheDataSource` (stable video-id keys). Desktop: `AudioFileCache` whole-track LRU files under `<data dir>/cache/audio`, background fill during first play, local-file playback on hit (no resolve → offline). Both use `SettingsKeys.CACHE_SIZE_MB` default 1024 MB (`AudioCacheBudget`). URL TTL cache still `DhunStreamCache`. Unit tests: `AudioFileCacheTest` (9: hit/LRU victim/over-budget/short-read/cancel/unsafe id/partial sweep/shrink+clear). Hardware offline-replay check OPEN on both |
 | Daily live rot-drill | 🔴 Workflow + probe fixes LIVE on correct branch (run 33968950214 @ `10ad025`): both engines CI-IP bot-gated; metadata PASS; kill switch OK. No green verdict; residential verify OPEN | issue #14, artifact `rot-drill-33968950214` |
 | Android 30-minute soak | ⬜ Open | Requires a physical device with unrestricted battery mode, lock-screen playback, and zero-crash/leak evidence |
 | Desktop 30-minute soak | ⬜ Open | Requires a desktop with libVLC and tray/SMTC-capable runtime |
@@ -137,3 +137,27 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 - [ ] `KNOWN_LIMITATIONS.md`, `THIRD_PARTY.md`, `RISK_REGISTER.md`, README,
       and CHANGELOG are current.
 - [ ] Release is tagged `v0.1.0` only after all required evidence is real.
+
+## PR #16 merge (2026-09-05)
+
+Merged to `main` (session `arena/01a07170-dhun`). Code + CI complete for:
+taxonomy, Recovering UX, audio-segment cache (Android), M3 glass UI, ADR-002 player polish.
+
+**Still OPEN:** residential rot-drill/stream, Android/Desktop soaks, v0.1.0 artifacts.
+
+## Desktop audio cache (2026-09-05, session arena/01a07287-dhun)
+
+Code: `shared/src/jvmMain/kotlin/dev/dhun/player/AudioFileCache.kt`,
+`DesktopDhunPlayer` (cache-hit → local file; miss → stream + background
+fill; fill cancelled on skip/stop), Koin wiring in `Main.kt`. Test:
+`shared/src/jvmTest/.../AudioFileCacheTest.kt`. CI gains a
+`:app-desktop:compileKotlinJvm` step (previously desktop only compiled on
+main's MSI job).
+
+Desktop offline check to run on a machine with libVLC:
+- [ ] Play a track fully → log `DHUN cache: cached <id>`; file exists under
+      `<data dir>/cache/audio/<id>.audio`.
+- [ ] Disconnect network → play the same track → log `cache hit` and audio
+      plays; a non-cached track shows the typed network error.
+- [ ] Set `cache_size_mb` small, play several tracks → oldest evicted,
+      total stays under budget.

@@ -7,34 +7,67 @@ Rules (permanent, from the user):
   (where the phase says so) on-hardware verified.** Unpushed or
   CI-unverified work is NOT done, no matter how good it looks locally.
 - Update this file every phase and every session.
+- **Pre-push / pre-merge ritual (every time, no exceptions — user rule
+  2026-09-05):**
+  1. Verify state **on GitHub, not locally** (`git fetch`, `gh pr checks`,
+     `gh run list`): which steps of the current Phase are actually pushed
+     and CI-green.
+  2. Rewrite **CURRENT ACTIVE TASK** at the very top: exact file(s) being
+     worked on · last error (or "none") · exact next step.
+  3. Mark the Phase step table from step 1's evidence only.
+  4. Commit **everything** (no dirty tree left behind) and push to the
+     session branch. **Also push any unpushed commits** found on the
+     branch, and carry over (cherry-pick) any unmerged commit stranded
+     on a previous session branch — nothing gets left behind.
+  5. After the push, re-check CI and update the marks again if the
+     status changed (a commit can't truthfully mark *itself* as pushed
+     and green — the ROADMAP always lags the push by one small commit).
+  Only then open/merge the PR.
 
 ---
 
-## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
+## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07287-dhun)
 
-**Branch:** `arena/01a07170-dhun` · **PR #16 READY FOR REVIEW/MERGE**.
-**HEAD:** `1df07b3` (+ docs commit if any) · CI green · mergeable CLEAN.
+**Branch:** `arena/01a07287-dhun` · **PR #17 → main, MERGING NOW.**
+**GitHub state at this commit (verified `gh`/`git fetch`):** branch head
+`f70e3f9`, CI run `33980933493` ✅ (Unit tests · Android debug · Probe ·
+**Desktop compiles**); prior runs `33980627234`/`33980343727` also ✅.
+PR #15 **closed** as superseded (all 10 commits patch-identical to main).
+Local tree clean; local == remote; no unpushed commits.
 
-**User locks:** Material 3 glass-morphism OK · **No Liquid Glass** · no cookies
-without ADR · do not fake live rot-drill green · stay on session branch.
+**Phase:** 14 — Robustness + rot-drill + v0.1.0.
 
-**Phase bundle on PR #16 (code complete for review):**
-1. Phase 14: rot-drill honesty, taxonomy, Recovering UX, audio-segment cache
-2. ADR-002 FullPlayer: lyrics-dominant, blur cache, M3-only design lock
-3. M3 UI overhaul: sans type, Home depth, frosted chrome app-wide
-   (Home/Search/Library/browse/player lists)
+**Files worked on (this session, all on PR #17):**
+- `shared/src/jvmMain/kotlin/dev/dhun/player/AudioFileCache.kt` (new)
+- `shared/src/jvmTest/kotlin/dev/dhun/player/AudioFileCacheTest.kt` (new, 9)
+- `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/player/DesktopDhunPlayer.kt`
+- `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt` (Koin wiring)
+- `.github/workflows/ci.yml` (+ `Desktop compiles` step)
+- `CHANGELOG.md` (new) · `README.md` · `.ai/KNOWN_LIMITATIONS.md` ·
+  `docs/verification/14-release.md` · `.ai/DEBUG_LOG.md` · this file
+  (+ pre-push ritual rule).
 
-**Not claimed done by merge:** residential stream, hardware soaks, v0.1.0.
+**Last error:** none. (Sandbox: no JDK, no egress — CI is the compiler.)
 
-**Exact next step (post-merge / human):**
-1. Review + merge PR #16 when satisfied.
-2. Residential play + offline-cache smoke on device.
-3. Soaks → v0.1.0 when evidence exists.
+**Stranded-commit audit (rule step 4):** 7 old session branches are
+"ahead" of main by count only — every commit is patch-identical to main
+(`git cherry` = 0 unique) or a pre-merge draft of a merged PR
+(01a06a42 = Phase 07 draft, PR #6 landed it). `faf8d03` from 01a07170 was
+cherry-picked here (`1eb377c`). Nothing left behind.
 
-**Marks:** PR ready 🟨→✅ on merge · rot-drill live 🔴 · soaks ⬜ · v0.1.0 ⬜ ·
-Liquid Glass 🚫
+**Exact next step:**
+1. `gh pr merge 17 --merge` → main gets desktop cache + CHANGELOG + rules.
+   test-release then rebuilds `dhun-test.apk`/`.msi` from main.
+2. Post-merge follow-up commit: flip desktop-cache / CHANGELOG rows to ✅
+   (merged + CI green), HW columns stay OPEN.
+3. Human/hardware gates: residential play + offline-cache smoke (Android
+   + libVLC desktop; checklist in `docs/verification/14-release.md`),
+   30-min soaks, then v0.1.0.
 
-**Sandbox:** no JDK/device; agent no workflow_dispatch.
+**Marks (GitHub):** PR #16 ✅ · PR #17 CI ✅ (merge in progress) · Android
+cache ✅ (HW ⬜) · desktop cache 🟨→✅ on merge (HW ⬜) · CHANGELOG 🟨→✅ on
+merge · rot-drill live 🔴 · soaks ⬜ · v0.1.0 ⬜ · Liquid Glass 🚫 · PR #15
+closed (superseded).
 
 ---
 
@@ -49,7 +82,7 @@ be stored permanently in `.ai/`).
 |---|---|---|
 | 1 | **Boot protocol:** no code before boot — MASTER_PROMPT → ROADMAP → `git log`; reply = phase summary + exact next step + permission ask. | `.ai/README.md` boot protocol |
 | 2 | **"do it accordingly" = execute the documented plan autonomously**, no multiple-choice questions. | Session behavior |
-| 3 | **ROADMAP maintenance:** CURRENT ACTIVE TASK at top; exact step marks; **unpushed/unverified = undone**. | Rules block above |
+| 3 | **ROADMAP maintenance:** CURRENT ACTIVE TASK at top; exact step marks; **unpushed/unverified = undone**. **Pre-push/pre-merge ritual** (verify on GitHub → rewrite CURRENT ACTIVE TASK → mark steps → commit all + push, incl. stranded unpushed commits → re-check CI). | Rules block above |
 | 4 | **Code-first** (MASTER_PROMPT AI rules): no stubs, no TODOs in production, hardware verification before a phase is done, small commits, update ROADMAP + KNOWN_LIMITATIONS each phase, report stalls (>30 min no progress), ADR before changing a locked decision. | `.ai/MASTER_PROMPT.md` §AI Behavior Rules |
 | 5 | **Rolling test release policy** (2026-09-01): exactly ONE release tagged `test`, asset `dhun-test.apk` always that name, every push to main REPLACES it, no version numbers/history for unfinished builds. Stable URLs never change. | `.github/workflows/test-release.yml` (header comment); extended 2026-09-05 with `dhun-test.msi` |
 | 6 | **2026-09-05 Phase 1 (critical):** fix MediaController thread violation (ALL controller methods on main/UI thread); background/power-saver resilience across MIUI/HyperOS/OneUI; audio playback audit (InnerTube extraction, seamless playback desktop+mobile). | Done this session: crash fix + FGS/battery (items 1–3 above); audit findings below |
@@ -108,7 +141,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 CI green; live drills RED (cat.8 CDN/Auth); **audio-segment cache 🟨 Android code**; Recovering UX 🟨; residential + soaks + v0.1.0 OPEN | issue #14, PR #16, `DhunAudioSegmentCache` |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 **MERGED** @ `290e0f6` (CI green `33979260227`); live drills RED (cat.8 CI-IP auth); Android audio cache merged (HW OPEN); **desktop cache 🟨 PR #17 · CHANGELOG 🟨 PR #17**; Recovering UX merged; residential + soaks + v0.1.0 OPEN | issue #14, PR #16, `DhunAudioSegmentCache` |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -143,7 +176,9 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Step | Status |
 |---|---|
 | Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Typed errors, 429 gate, offline banner, **403 Reconnecting…** (`PlaybackState.Recovering`). Open: airplane-mode HW check, db-path review |
-| Bounded audio cache (Android SimpleCache) | 🟨 code (`DhunAudioSegmentCache`); HW offline OPEN; desktop ⬜ |
+| Bounded audio cache — Android (Media3 SimpleCache LRU) | 🟨 code **merged to main** (`0f88026`, PR #16, CI green); HW offline replay OPEN |
+| Bounded audio cache — Desktop (vlcj path) | 🟨 PR #17 **CI green** `33980343727` (`AudioFileCache` + `DesktopDhunPlayer` wiring + 9 unit tests + new desktop compile step); ✅ on merge; desktop offline HW check OPEN |
+| `CHANGELOG.md` | 🟨 PR #17 CI green (Unreleased only, v0.1.0 not claimed); ✅ on merge |
 | Daily live rot-drill | 🔴 Run **33968950214** on `arena/01a07170-dhun@10ad025`: production chain exercised; `WATCH\|own-client` + `WATCH\|ytdlp` both `AuthRequired` (Sign in to confirm you're not a bot) from Actions IP; metadata PASS; kill switch correct. **Category 8 CI-network evidence — not extractor-shape rot.** No PASS. Residential verification required before any "playback broken for users" claim |
 | Android 30-minute soak | ⬜ Open |
 | Desktop 30-minute soak | ⬜ Open |
