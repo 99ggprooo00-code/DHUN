@@ -35,6 +35,10 @@ val appModule = module {
     single<StreamResolver> { OwnClientStreamResolver(get()) }
     single<MusicProvider> { YouTubeMusicProvider(get(), get()) }
     single { DhunStreamCache(get()) }
+    // Phase 14: connectivity signal for the shared offline banner.
+    single<dev.dhun.core.ConnectivityMonitor> {
+        dev.dhun.core.AndroidConnectivityMonitor(androidContext())
+    }
 
     // Phase 05 data layer: one SQLite database, repositories + use cases.
     single { DataLayer(DatabaseFactory.create(DatabaseDriverFactory(androidContext()).createDriver())) }
