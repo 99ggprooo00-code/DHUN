@@ -12,12 +12,12 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at pushed commit `5573f9a` (Phase 14
-rot-drill activation + roadmap; PR CI run `33959922661` is green). Phase 13
-Android native-polish code remains CI-verified by run `33959217371` (shared
-tests, Android debug build, Desktop/probe compilation). PR #13 remains OPEN. The rolling `test` pre-release is healthy:
-run `33952291659` passed `apk`, `msi`, and `publish`; all four assets are
-present.
+**Branch:** `arena/01a070b3-dhun` has the latest Phase 14 rot-drill code and
+roadmap pushed; PR CI run `33960134771` is green. Phase 13 Android
+native-polish code remains CI-verified by run `33959217371` (shared tests,
+Android debug build, Desktop/probe compilation). PR #13 remains OPEN. The
+rolling `test` pre-release is healthy: run `33952291659` passed `apk`, `msi`,
+and `publish`; all four assets are present.
 
 **Current files:** `.github/workflows/rot-drill.yml` (primary),
 `docs/verification/14-release.md`, `.ai/KNOWN_LIMITATIONS.md`, and
@@ -68,8 +68,9 @@ round 1 (Long.dp etc.) · `33944244828`→JNA GUID/Memory ·
 `33945909159`/`33946130860`→harness 12× Long-hex Color ·
 `33946527454` (`3cd4bf8`) → **GREEN** · `33958894084` (`9dc77c3`) →
 **Phase 13 GREEN** (scope-correct navigation helpers, Android build, tests,
-probe) · `33959076412` (`e679c00`) → **GREEN** again after the AI log and
-roadmap update.
+probe) · `33959076412` (`e679c00`) → **GREEN** · `33959922661` (`5573f9a`)
+→ **Phase 14 code GREEN** · `33960134771` (`4e6bf54`) → **GREEN** after the
+rot-drill dispatch-gate documentation.
 
 **Standing sandbox notes:** no local JDK (CI is the compile gate); no
 device/adb/display; direct `curl` mostly blocked, `fetch_page` works;
