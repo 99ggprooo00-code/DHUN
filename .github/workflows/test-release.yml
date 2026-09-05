@@ -9,7 +9,7 @@ name: test-release
 #   https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk
 #   https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.msi
 #
-# Phase 12 (2026-09-05): Windows MSI added. `:app-desktop:createMsi` runs
+# Phase 12 (2026-09-05): Windows MSI added. `:app-desktop:packageMsi` runs
 # jpackage on a windows-latest runner (JDK 17 ships the WiX toolset). The
 # MSI needs a VLC install at runtime (vlcj dynamic link — see THIRD_PARTY).
 
@@ -63,10 +63,12 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      # packageMsi = Compose Desktop 1.8.2 task (NOT createMsi — that name
+      # doesn't exist in this plugin version; CI 33950291501 proved it).
       # jpackage creates the MSI; output lands in
       # app-desktop/build/compose/binaries/mainMsi/<name>.msi
       - name: Build MSI (jpackage)
-        run: ./gradlew :app-desktop:createMsi --no-daemon
+        run: ./gradlew :app-desktop:packageMsi --no-daemon
 
       - name: Stage + checksum
         shell: pwsh

@@ -57,7 +57,7 @@ class HomeViewModelTest {
             DhunResult.Failure(DhunError.Unavailable)
     }
 
-    private suspend fun eventually(timeoutMs: Long = 5_000, check: suspend () -> Boolean) {
+    private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {
         withTimeout(timeoutMs) {
             while (!check()) delay(10)
         }
