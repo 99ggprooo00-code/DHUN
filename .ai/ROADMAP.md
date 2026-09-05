@@ -13,8 +13,9 @@ Rules (permanent, from the user):
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07287-dhun)
 
 **Branch:** `arena/01a07287-dhun` (from `main@290e0f6`) · **PR #17** open →
-`main`. **Pushed, CI pending** at the time of writing — see the marks below;
-nothing here is ✅ until the PR #17 CI run is green.
+`main`. **CI GREEN** on `82ac4f0`: run `33980343727` — Unit tests ✅ ·
+Android debug build ✅ · Probe compiles ✅ · **Desktop compiles ✅ (new
+step)**. Ready for review/merge.
 
 **Phase:** 14 — Robustness + rot-drill + v0.1.0.
 
@@ -37,24 +38,24 @@ nothing here is ✅ until the PR #17 CI run is green.
 - `CHANGELOG.md` — NEW (Unreleased only; v0.1.0 NOT claimed); README link.
 - `.ai/KNOWN_LIMITATIONS.md`, `docs/verification/14-release.md` updated.
 
-**Last error:** none locally — **sandbox has no JDK and no egress to
-fetch one** (adoptium/gradle/maven all unreachable), so this code is
-CI-compiled only. If PR #17 CI is red, the first suspects are: (1) new
-`Desktop compiles` step exposing a pre-existing app-desktop issue,
-(2) `AudioFileCacheTest` filesystem `lastModified` granularity (touch() is
-made monotonic, so this should hold), (3) `Dispatchers.IO` import in
-app-desktop (coroutines-core is on its classpath — should be fine).
+**Last error:** none. Sandbox has no JDK and no egress (adoptium / gradle /
+maven / Actions log blobs all unreachable), so verification = CI step
+results (job `101344341802`, all steps success); per-test log lines could
+not be downloaded from the sandbox.
 
 **Exact next step:**
-1. Watch PR #17 CI (`gh pr checks 17`). Fix any red in a small commit.
-2. Green → merge PR #17 → rolling `test` MSI picks up the desktop cache.
-3. Then hardware gates (human): residential play + offline-cache smoke
-   on Android AND a desktop machine with libVLC (checklist in
+1. Human: review + merge PR #17 → rolling `test` MSI picks up the desktop
+   cache. Close PR #15 (superseded).
+2. Hardware gates (human): residential play + offline-cache smoke on
+   Android AND a desktop machine with libVLC (checklist in
    `docs/verification/14-release.md`), soaks, then v0.1.0.
+3. Agent follow-ups if asked: `cache_size_mb` UI in Settings (both
+   platforms currently read the DB key only), live re-capture of Phase 09
+   fixtures.
 
 **Marks (GitHub):** PR #16 ✅ merged · Android cache ✅ merged (HW ⬜) ·
-desktop cache 🟨 pushed on PR #17, CI pending · CHANGELOG 🟨 pushed on
-PR #17 · rot-drill live 🔴 · soaks ⬜ · v0.1.0 ⬜ · Liquid Glass 🚫 ·
+desktop cache 🟨 PR #17 CI green, awaiting merge (HW ⬜) · CHANGELOG 🟨
+PR #17 CI green · rot-drill live 🔴 · soaks ⬜ · v0.1.0 ⬜ · Liquid Glass 🚫 ·
 PR #15 superseded → close.
 
 **Session constraints:** pinned to `arena/01a07287-dhun`; `faf8d03` from
@@ -169,8 +170,8 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 |---|---|
 | Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Typed errors, 429 gate, offline banner, **403 Reconnecting…** (`PlaybackState.Recovering`). Open: airplane-mode HW check, db-path review |
 | Bounded audio cache — Android (Media3 SimpleCache LRU) | 🟨 code **merged to main** (`0f88026`, PR #16, CI green); HW offline replay OPEN |
-| Bounded audio cache — Desktop (vlcj path) | 🟨 code pushed on PR #17 (`AudioFileCache` + `DesktopDhunPlayer` wiring + 9 unit tests); **CI pending**; desktop offline HW check OPEN |
-| `CHANGELOG.md` | 🟨 created on PR #17 (Unreleased only, v0.1.0 not claimed); CI pending |
+| Bounded audio cache — Desktop (vlcj path) | 🟨 PR #17 **CI green** `33980343727` (`AudioFileCache` + `DesktopDhunPlayer` wiring + 9 unit tests + new desktop compile step); ✅ on merge; desktop offline HW check OPEN |
+| `CHANGELOG.md` | 🟨 PR #17 CI green (Unreleased only, v0.1.0 not claimed); ✅ on merge |
 | Daily live rot-drill | 🔴 Run **33968950214** on `arena/01a07170-dhun@10ad025`: production chain exercised; `WATCH\|own-client` + `WATCH\|ytdlp` both `AuthRequired` (Sign in to confirm you're not a bot) from Actions IP; metadata PASS; kill switch correct. **Category 8 CI-network evidence — not extractor-shape rot.** No PASS. Residential verification required before any "playback broken for users" claim |
 | Android 30-minute soak | ⬜ Open |
 | Desktop 30-minute soak | ⬜ Open |
