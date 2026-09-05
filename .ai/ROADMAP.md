@@ -12,24 +12,27 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
-**Branch:** `arena/01a07170-dhun` · **PR #16**.
-**User lock:** M3 glass-morphism (translucent frosted chrome). **No Liquid Glass.**
-Sans UI type; brand wordmark only.
+**Branch:** `arena/01a07170-dhun` · **PR #16 READY FOR REVIEW/MERGE**.
+**HEAD:** `1df07b3` (+ docs commit if any) · CI green · mergeable CLEAN.
 
-**Phase:** M3 glass polish — browse pages + player queue/related.
+**User locks:** Material 3 glass-morphism OK · **No Liquid Glass** · no cookies
+without ADR · do not fake live rot-drill green · stay on session branch.
 
-**Just implemented (this push):**
-1. Artist frosted collapse toolbar gradient; bottom content inset.
-2. Album/Playlist frosted track rows + floating frosted back chip.
-3. FullPlayer **Queue** glass rows (NOW = accent wash); **Related** glass rows.
-4. Sans headlines on album/playlist (no Bold-as-decorative substitute).
+**Phase bundle on PR #16 (code complete for review):**
+1. Phase 14: rot-drill honesty, taxonomy, Recovering UX, audio-segment cache
+2. ADR-002 FullPlayer: lyrics-dominant, blur cache, M3-only design lock
+3. M3 UI overhaul: sans type, Home depth, frosted chrome app-wide
+   (Home/Search/Library/browse/player lists)
 
-**Prior:** Home depth, Search/Library glass, lyrics motion, GlassCard rewrite,
-audio cache, Recovering chip.
+**Not claimed done by merge:** residential stream, hardware soaks, v0.1.0.
 
-**Exact next step:** push → CI; device visual pass when available.
+**Exact next step (post-merge / human):**
+1. Review + merge PR #16 when satisfied.
+2. Residential play + offline-cache smoke on device.
+3. Soaks → v0.1.0 when evidence exists.
 
-**Marks:** browse glass 🟨 · lists glass 🟨 · Home 🟨 · rot-drill 🔴 · Liquid Glass 🚫
+**Marks:** PR ready 🟨→✅ on merge · rot-drill live 🔴 · soaks ⬜ · v0.1.0 ⬜ ·
+Liquid Glass 🚫
 
 **Sandbox:** no JDK/device; agent no workflow_dispatch.
 

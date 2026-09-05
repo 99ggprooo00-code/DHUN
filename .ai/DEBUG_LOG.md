@@ -1,5 +1,10 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — PR #16 ready for pull
+
+Title/body refreshed for full scope (Phase 14 + M3 glass UI). CI green,
+mergeable CLEAN @ `1df07b3`. Human gates: residential stream, HW soaks, v0.1.0.
+
 ## 2026-09-05 — Browse + queue glass rows
 
 Artist toolbar / Album+Playlist frosted track rows / floating back chips /
