@@ -170,7 +170,7 @@ fun FullPlayer(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .blur(DhunSpacing.glassBlur * 3),
+                .blur(DhunSpacing.glassBlur * 4),  // richer frosted backdrop; still one layer
         ) {
             Crossfade(
                 targetState = current?.thumbnailUrl,
@@ -208,6 +208,21 @@ fun FullPlayer(
 
         // ---- foreground -------------------------------------------------------------
         Column(modifier = Modifier.fillMaxSize()) {
+            // Sheet drag handle — immersive bottom-sheet cue (M3 frosted pill).
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = DhunSpacing.sm),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(DhunSpacing.xxxl)
+                        .height(DhunSpacing.xsPlus)
+                        .clip(DhunShapes.full)
+                        .background(DhunColors.glassEdge),
+                )
+            }
             // Top bar: collapse / label / overflow
             Row(
                 modifier = Modifier
@@ -231,9 +246,8 @@ fun FullPlayer(
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = "NOW PLAYING",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = DhunTypographyTokens.brand,
                     color = DhunColors.textTertiary,
-                    letterSpacing = DhunTypographyTokens.brand.letterSpacing,
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 DhunIconButton(
@@ -320,8 +334,15 @@ fun FullPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.xs)
-                        .clip(DhunShapes.medium)
-                        .background(DhunColors.surfaceElevated.copy(alpha = 0.92f))
+                        .clip(DhunShapes.large)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    DhunColors.glassHighlight,
+                                    DhunColors.glass,
+                                ),
+                            ),
+                        )
                         .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -548,8 +569,15 @@ fun FullPlayer(
                         if (lyricsDominant) {
                             Modifier
                                 .padding(horizontal = DhunSpacing.sm)
-                                .clip(DhunShapes.large)
-                                .background(DhunColors.surfaceElevated.copy(alpha = 0.72f))
+                                .clip(DhunShapes.extraLarge)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            DhunColors.glassHighlight,
+                                            DhunColors.glassDeep,
+                                        ),
+                                    ),
+                                )
                         } else {
                             Modifier
                         },

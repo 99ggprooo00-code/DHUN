@@ -55,6 +55,7 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.catalog.ComponentCatalogScreen
+import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.player.DhunPlayer
 import dev.dhun.presentation.browse.AlbumViewModel
 import dev.dhun.presentation.browse.ArtistViewModel
@@ -163,16 +164,26 @@ fun DhunAppShell(
             animationSpec = DhunAnimations.slowTween(),
             label = "shellAmbient",
         )
-        // Soft top wash behind tabs — premium without Liquid Glass.
+        // Ambient glass wash from now-playing (seed tint — lightweight).
+        // FullPlayer still owns the real once-per-track artwork blur layer.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(DhunColors.background)
                 .background(
                     Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to ambient.copy(alpha = 0.42f),
+                            0.28f to ambient.copy(alpha = 0.14f),
+                            0.55f to Color.Transparent,
+                            1.0f to Color.Transparent,
+                        ),
+                    ),
+                )
+                .background(
+                    Brush.radialGradient(
                         colors = listOf(
-                            ambient.copy(alpha = 0.35f),
-                            Color.Transparent,
+                            ambient.copy(alpha = 0.18f),
                             Color.Transparent,
                         ),
                     ),
@@ -387,12 +398,9 @@ private fun BottomNavigationBar(
                 onExpand = { nav.playerExpanded = true },
             )
         }
-        // M3 bottom bar: tonal surfaceContainer + pill indicator (not Liquid Glass).
-        Surface(
+        // Frosted M3 bottom bar (glass-morphism dock — not Liquid Glass).
+        GlassBottomBar(
             modifier = Modifier.fillMaxWidth(),
-            color = DhunColors.surfaceContainer.copy(alpha = 0.94f),
-            tonalElevation = DhunSpacing.xs,
-            shadowElevation = DhunSpacing.xs,
             shape = DhunShapes.bottomSheet,
         ) {
             NavigationBar(
@@ -419,7 +427,7 @@ private fun BottomNavigationBar(
 @Composable
 private fun AppNavigationRail(nav: AppNavState) {
     NavigationRail(
-        containerColor = DhunColors.surface,
+        containerColor = DhunColors.glassStrong,
         contentColor = DhunColors.textPrimary,
         modifier = Modifier.fillMaxHeight(),
     ) {

@@ -22,11 +22,23 @@ object DhunColors {
     val surfaceHighest = Color(0xFF2A2A2A)
     val surfaceCard = Color(0xFF1E1E1E)
 
-    // Glass (frosted surfaces)
-    /** 60% #111111 — the primary glass fill (see GlassCard). */
-    val glass = Color(0x99111111)
-    /** Stronger glass for bottom bars / mini-player (80% #1A1A1A). */
-    val glassStrong = Color(0xCC1A1A1A)
+    // Glass-morphism tokens (M3 translucent atmosphere — not Liquid Glass).
+    // Stack: sheen → highlight → body → deep so backdrops read through.
+    /** Upper glass fill (~55% near-black with cool lift). */
+    val glassHighlight = Color(0x8C1C1C22)
+    /** Mid glass body (~62%). */
+    val glass = Color(0x9E14141A)
+    /** Lower glass depth (~72%). */
+    val glassDeep = Color(0xB80C0C10)
+    /** Stronger glass for bottom bars / mini-player (~82%). */
+    val glassStrong = Color(0xD1121218)
+    /** Top edge of docked bars — slightly lighter for separation. */
+    val glassBarTop = Color(0xE01A1A22)
+    /** Specular sheen painted on glass tops (cheap “frost” cue). */
+    val glassSheen = Color(0x28FFFFFF)
+    /** Hairline edge for frosted chrome. */
+    val glassEdge = Color(0x38FFFFFF)
+
     /** Subtle scrim behind full-bleed artwork (50% black). */
     val scrim = Color(0x80000000)
     val scrimStrong = Color(0xCC000000)

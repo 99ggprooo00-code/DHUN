@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
@@ -506,7 +507,11 @@ private fun QuickPickItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(DhunShapes.large)
-            .background(DhunColors.surfaceContainerHigh)
+            .background(
+                Brush.verticalGradient(
+                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep),
+                ),
+            )
             .clickable(onClick = onClick)
             .padding(DhunSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,

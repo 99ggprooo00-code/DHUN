@@ -1,5 +1,12 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — M3 glass-morphism chrome (not Liquid Glass)
+
+User: want translucent blurry glass-morphism, still lightweight, not boring.
+
+**Shipped:** GlassCard frosted fill (no content blur), GlassBottomBar dock,
+frosted chips/home/player panels, richer ambient wash, FullPlayer sheet handle.
+
 ## 2026-09-05 — M3 UI overhaul (Home depth + sans type)
 
 **User brief:** Expert M3 overhaul — readable sans, deep Home, M3 surfaces,

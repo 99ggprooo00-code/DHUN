@@ -13,30 +13,25 @@ Rules (permanent, from the user):
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
 **Branch:** `arena/01a07170-dhun` · **PR #16**.
-**User lock:** **No Liquid Glass. Material 3 only.** Sans-serif UI type only
-(brand wordmark = tracked sans, not a decorative display face).
+**User lock:** Material 3 only. **No Liquid Glass.** Glass-morphism OK:
+translucent frosted chrome + backdrop blur on artwork layers; content sharp.
 
-**Phase:** M3 UI overhaul (Home depth + tokens) on top of Phase 14 cache +
-ADR-002 player polish.
+**Phase:** M3 frosted UI polish on Home/shell/player.
 
 **Just implemented (this push):**
-1. **Typography:** `FontFamily.SansSerif` on all M3 roles; `brand` reserved
-   for "DHUN" wordmark only (wide tracking).
-2. **Home depth:** quick-action chips (Liked / Offline / Sleep timer), mood
-   filter chips, Quick Picks grid up to 12, Listen again 24, classified
-   shelves (mix / charts / albums / other) — scroll depth from feed.
-3. **M3 tokens:** tonal surface ladder, XL card corners, pill chips, nav
-   surfaceContainer bar, media cards with soft shadow.
-4. **Ambient shell wash** from now-playing seed colors (lightweight — not
-   continuous full-res blur). FullPlayer still owns real blur + lyrics-dominant.
-5. **Sleep timer** on PlayerViewModel (15→30→60→off, pauses on fire).
+1. GlassCard rewrite — translucent multi-stop + sheen + edge; **never** blur
+   content (fixed prior GlassCard bug that blurred text).
+2. GlassBottomBar frosted dock for MiniPlayer + bottom nav; richer shell
+   ambient wash (vertical + radial seed tint).
+3. Frosted chips / Quick Picks / lyrics-dominant panel / reconnect chip.
+4. FullPlayer sheet drag handle + stronger once-per-track backdrop blur.
 
-**Prior on branch:** audio-segment cache, Recovering chip, lyrics-dominant.
+**Prior:** Home depth, sans type, sleep timer, audio cache, Recovering.
 
-**Exact next step:** push → CI; residential smoke when device available.
+**Exact next step:** push → CI; device visual pass when available.
 
-**Marks:** M3 Home 🟨 code · ADR-002 P3/P4/P6 🟨 · cache 🟨 · rot-drill 🔴 ·
-soaks ⬜ · v0.1.0 ⬜ · Liquid Glass 🚫
+**Marks:** M3 glass-morph 🟨 · Home depth 🟨 · cache 🟨 · rot-drill 🔴 ·
+Liquid Glass 🚫
 
 **Sandbox:** no JDK/device; agent no workflow_dispatch.
 

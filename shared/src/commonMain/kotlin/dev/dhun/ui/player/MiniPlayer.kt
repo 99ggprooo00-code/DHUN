@@ -30,6 +30,7 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
@@ -37,8 +38,9 @@ import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.presentation.player.PlayerViewModel
 
 /**
- * MiniPlayer — 72dp M3 surface bar docked above the bottom nav (Android) or at the
- * window bottom (desktop). Translucent surfaceContainer (not Liquid Glass).
+ * MiniPlayer — frosted M3 glass bar docked above the bottom nav (Android) or at
+ * the window bottom (desktop). Translucent multi-stop fill + hairline edge
+ * (glass-morphism atmosphere — not Liquid Glass / continuous reblur).
  *
  * - 1dp accent progress line pinned to the top edge
  * - artwork (crossfades via Coil), marquee title, artist line with live
@@ -76,7 +78,7 @@ fun MiniPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(DhunSpacing.divider)
-                    .background(DhunColors.border),
+                    .background(DhunColors.glassEdge.copy(alpha = 0.35f)),
             ) {
                 if (progress > 0f) {
                     Box(
@@ -113,6 +115,7 @@ fun MiniPlayer(
                     imageUrl = track.thumbnailUrl,
                     contentDescription = track.title,
                     modifier = Modifier.size(DhunSpacing.touchTarget),
+                    shape = DhunShapes.medium,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
