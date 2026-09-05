@@ -137,3 +137,10 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 - [ ] `KNOWN_LIMITATIONS.md`, `THIRD_PARTY.md`, `RISK_REGISTER.md`, README,
       and CHANGELOG are current.
 - [ ] Release is tagged `v0.1.0` only after all required evidence is real.
+
+## PR #16 merge (2026-09-05)
+
+Merged to `main` (session `arena/01a07170-dhun`). Code + CI complete for:
+taxonomy, Recovering UX, audio-segment cache (Android), M3 glass UI, ADR-002 player polish.
+
+**Still OPEN:** residential rot-drill/stream, Android/Desktop soaks, v0.1.0 artifacts.
