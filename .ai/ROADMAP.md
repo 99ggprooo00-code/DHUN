@@ -12,13 +12,12 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at pushed commit `7ca2f5d` (SMTC phase-2
-code/docs pushed; icon handoff + raw-glyph purge + token polish are pushed;
-PR #13 OPEN). CI run `33958287878` is green through shared tests, Android
-debug build, and Desktop/probe compilation. The current `test` pre-release is
-healthy: run `33952291659` passed `apk`, `msi`, and `publish`; all four rolling
-assets are present. The referenced `3bcca3b` / `f469605` objects were absent,
-so the handoff was recreated here.
+**Branch:** `arena/01a070b3-dhun` at local commit `8669e09` (Phase 13 Android
+native-polish code; **not pushed and not CI-verified yet**). The previous
+pushed baseline is `7ca2f5d`; CI run `33958287878` is green through shared
+tests, Android debug build, and Desktop/probe compilation. PR #13 remains
+OPEN. The current `test` pre-release is healthy: run `33952291659` passed
+`apk`, `msi`, and `publish`; all four rolling assets are present.
 
 **User 2026-09-05 directive — status:**
 1. **Release verification — DONE (CI + GitHub release):** `dhun-test.apk`,
@@ -42,16 +41,26 @@ so the handoff was recreated here.
    a retained base-JNA `ButtonPressed` COM callback, while tray/keyboard
    fallback remains active. Windows media-key round-trip, tray,
    mini-player, and MSI checks remain open; no phase is hardware-done here.
+6. **Phase 13 native polish — CODE STAGED, CI/HARDWARE OPEN:** `8669e09`
+   adds edge-to-edge safe-drawing insets, saved Android navigation state for
+   rotation, static Search/Resume/Library shortcuts with routing, a battery
+   exemption rationale, and an 840dp navigation rail with a docked rail
+   MiniPlayer. No acceptance item is complete until CI and real-device/OEM
+   evidence exist.
+
+**Last error:** local Gradle verification could not start because this
+sandbox has no `JAVA_HOME` and no `java` executable; CI remains the compilation
+gate.
 
 **Exact next step:**
-1. Keep the Windows checklist open for real hardware; if no Windows machine
-   is available, retain the documented fallback and do not mark Phase 12
-   acceptance complete.
-2. Start Phase 13 Android native polish from the existing battery/FGS work:
-   audit insets/back stack, add shortcuts, rotation/UI tests, and tablet rail
-   behavior; keep hardware soak/lock-screen/OEM gates open.
-3. After Phase 13 code is CI-green, wire the Phase 14 rot-drill and release
-   evidence; do not call GA complete without hardware logs.
+1. Push `8669e09` (and this roadmap update) to
+   `origin/arena/01a070b3-dhun`, then inspect the PR CI annotations.
+2. Fix any Android/Compose/XML/API errors; after CI is green, run the Android
+   rotation/back-stack/shortcut/insets and 30-minute OEM/background-playback
+   checklist on real hardware. Keep all hardware gates open here.
+3. Keep the Windows checklist open; then wire the Phase 14 rot-drill and
+   release evidence only after Phase 13 code is CI-green. Do not call GA
+   complete without hardware logs.
 
 **CI trail (this session, 9 rounds — all in DEBUG_LOG):**
 `33941799559`→android media3 APIs · `33942371150`/`33942622916`→
@@ -139,7 +148,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 10 | Library & history | ✅ MERGED PR #8 @ `d27eb37` (CI green `33842104141`) — hardware checklist OPEN | docs/verification/10 |
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
-| 13 | Android polish (insets, shortcuts, tablet, soak) | ⬜ not started (battery-exemption prompt — the one item Phase 13 lists — landed early this session via the Phase 1 directive, unpushed) | — |
+| 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code staged in `8669e09`; CI + rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
 | 14 | Robustness + rot-drill CI + release v0.1.0 | ⬜ not started (rot-drill.yml exists as a placeholder cron; activation = wiring the probe suite, Phase 14) | — |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
@@ -158,6 +167,17 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Packaging: jpackage MSI + clean-VM install | 🟨 `createMsi` configured (`packageVersion` 1.0.4 — packagers reject MAJOR 0); **now also wired into the rolling test release** (this session, unpushed); app icon + clean-VM install OPEN on Windows |
 | Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY | ✅ done + pushed (`ffa138b`) |
 | Acceptance 1–4 (media keys / tray / mini-player / installer) | 🟨 OPEN — on hardware (checklist in docs/verification/12) |
+
+### Phase 13 step status — 🟨 CODE STAGED @ `8669e09` (CI + hardware OPEN)
+
+| Step | Status |
+|---|---|
+| Edge-to-edge and safe-drawing inset audit | 🟨 implemented in `MainActivity.kt` for connecting, ready, and failure roots; CI/device gesture-nav verification OPEN |
+| App shortcuts: Search / Resume / Library | 🟨 static XML resources plus `onCreate`/`onNewIntent` routing implemented; launcher verification OPEN |
+| Battery optimization rationale and exemption handoff | 🟨 in-app rationale plus guarded system settings handoff implemented; OEM behavior verification OPEN |
+| Rotation and back-stack state survival | 🟨 selected tab, expanded player, and detail routes saved/restored through `Bundle`; Robolectric/UI test coverage and device rotation check OPEN |
+| Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
+| Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
 ### Phase 11 step status — ✅ MERGED @ `d27eb37` (hardware OPEN)
 
