@@ -1,5 +1,21 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — Desktop audio cache (session arena/01a07287-dhun)
+
+**Environment trap:** sandbox has no JDK and *no egress* (adoptium,
+services.gradle.org, repo1.maven.org all return 000) — `scripts/
+restore-toolchain.sh` cannot run. Code on PR #17 is CI-compiled only.
+
+**Design note:** libVLC has no Media3-style data-source layer, so the desktop
+cache is whole-file (`AudioFileCache`), not segment-level. First play
+streams + fills in parallel; hit plays the local path. `.part` files are
+swept on open; `touch()` is made monotonic so LRU order is stable on
+coarse-`lastModified` filesystems (the test relies on it).
+
+**CI gap closed:** `app-desktop` was never compiled on PRs (only in the
+`test-release` MSI job on main) — added `:app-desktop:compileKotlinJvm`
+to `ci.yml`.
+
 ## 2026-09-05 — PR #16 merged to main
 
 `gh pr merge 16 --merge` succeeded. Bundle: Phase 14 robustness + M3 glass UI.
