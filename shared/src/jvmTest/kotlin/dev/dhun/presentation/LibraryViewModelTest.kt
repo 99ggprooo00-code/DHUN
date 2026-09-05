@@ -73,7 +73,12 @@ class LibraryViewModelTest {
 
     private fun dataLayer() = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
 
-    private suspend fun eventually(timeoutMs: Long = 5_000, check: suspend () -> Boolean) {
+    /**
+     * Async assertion deadline. 15s default: 5s was too tight on loaded CI
+     * runners (run 33950689637 flake — in-memory driver + polling under
+     * GitHub Actions load); a genuine stuck flow still fails within 15s.
+     */
+    private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {
         withTimeout(timeoutMs) { while (!check()) delay(20) }
     }
 
