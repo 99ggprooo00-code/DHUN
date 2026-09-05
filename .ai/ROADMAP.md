@@ -12,11 +12,12 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at `0afb084` (icon handoff + raw-glyph
-purge + token polish pushed; PR #13 OPEN). The current `test` pre-release is
-healthy: run `33952291659` passed `apk`, `msi`, and `publish`; all four rolling
-assets are present. The referenced `3bcca3b` / `f469605` objects were absent,
-so the handoff was recreated here.
+**Branch:** `arena/01a070b3-dhun` at local commit `b465abf` (SMTC phase-2
+code/docs committed but not pushed; icon handoff + raw-glyph purge + token
+polish are pushed; PR #13 OPEN). The current `test` pre-release is healthy:
+run `33952291659` passed `apk`, `msi`, and `publish`; all four rolling assets
+are present. The referenced `3bcca3b` / `f469605` objects were absent, so the
+handoff was recreated here.
 
 **User 2026-09-05 directive — status:**
 1. **Release verification — DONE (CI + GitHub release):** `dhun-test.apk`,
@@ -34,15 +35,16 @@ so the handoff was recreated here.
    dialogs, catalog, Android/Desktop harnesses, and the desktop mini-player
    use `DhunIconView`; target icon and numeric dp/sp greps are clean. CI run
    `33956457785` passed shared tests, Android debug build, and probe compiles.
-5. **SMTC phase 2 — CODE IN PROGRESS:** the current unpushed worktree adds
-   guarded WinRT metadata/artwork/playback-state integration and a retained
-   base-JNA `ButtonPressed` COM callback, while preserving tray/keyboard
-   fallback. Windows hardware round-trip, tray, mini-player, and MSI checks
-   remain open; docs were updated from the old phase-1-only procedure.
+5. **SMTC phase 2 — CODE COMMITTED, NOT VERIFIED:** local commit
+   `b465abf` adds guarded WinRT metadata/artwork/playback-state integration
+   and a retained base-JNA `ButtonPressed` COM callback, while preserving
+   tray/keyboard fallback. It is not pushed or CI-verified yet. Windows
+   hardware round-trip, tray, mini-player, and MSI checks remain open; docs
+   were updated from the old phase-1-only procedure.
 
 **Exact next step:**
-1. Commit the SMTC phase-2 code/docs + roadmap, push the branch, and inspect
-   PR #13 annotations; CI must compile the new JNA/WinRT path.
+1. Push `b465abf`, inspect PR #13 annotations, and fix any JNA/WinRT or
+   Compose diagnostics until CI is green.
 2. If CI is green, run the Windows checklist when hardware is available;
    record PASS/FAIL and choose integrated SMTC or documented fallback.
 3. Keep Android/desktop hardware gates open; then continue Phase 13 Android
@@ -145,7 +147,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 
 | Step | Status |
 |---|---|
-| SMTC spike (3-day timebox) | 🟨 **phase 2 code in current unpushed worktree** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — CI compile pending; Windows round-trip and fallback verdict OPEN |
+| SMTC spike (3-day timebox) | 🟨 **phase 2 code committed locally in `b465abf`, not pushed** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — CI compile pending; Windows round-trip and fallback verdict OPEN |
 | System tray (playing/paused icon, 6-item menu) | 🟨 code pushed (`DhunTray.kt` + `TrayIcons.kt`, AWT, EDT-marshaled, headless-safe) — CI compile pending; hardware OPEN |
 | Mini-player window (320×88, always-on-top, drag, click-opens-main) | 🟨 code pushed (`MiniPlayerWindow.kt` + second Compose `Window`; hide-not-close; Ctrl+M) — CI compile pending; hardware OPEN; taskbar visibility is a 1.8.2 limitation (no `skipTaskbar`) |
 | Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — CI compile pending; hardware OPEN |
