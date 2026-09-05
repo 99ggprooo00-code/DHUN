@@ -343,3 +343,9 @@ alert/recovery exercise can be claimed from this attempt.
 available on the default branch or Actions dispatch permission is restored.
 Until then, the Phase 14 rot-drill step remains open; do not mark it green
 because the YAML has not been live-executed.
+
+**Workflow review fix:** `29326cc` removes `cache: pip` from
+`actions/setup-python@v5`; this repository has no requirements file, so the
+rot-drill must install `yt-dlp` directly without asking the action to resolve a
+missing cache dependency. The live workflow remains unexecuted because the
+manual dispatch is still blocked by the GitHub 403 above.

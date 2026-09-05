@@ -38,7 +38,8 @@ and `publish`; all four assets are present.
    acceptance item is complete.
 4. **Phase 14 rot-drill — CODE STAGED, LIVE RUN OPEN:** `5897c5c` replaces
    the placeholder workflow with a scheduled/manual live probe, log artifact,
-   failure issue alert, and automatic recovery close. A dispatch attempt was
+   failure issue alert, and automatic recovery close; `29326cc` removes the
+   missing pip-cache input. A dispatch attempt was
    blocked by GitHub `HTTP 403: Resource not accessible by integration`; the
    workflow is not yet available from the default branch.
 
@@ -149,7 +150,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 in progress: rot-drill workflow staged in `5897c5c`; live run, audio cache, soak, clean-target, and v0.1.0 evidence OPEN | `.github/workflows/rot-drill.yml`, `docs/verification/14-release.md` |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 in progress: rot-drill workflow staged in `5897c5c` + `29326cc`; live run, audio cache, soak, clean-target, and v0.1.0 evidence OPEN | `.github/workflows/rot-drill.yml`, `docs/verification/14-release.md` |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -179,13 +180,13 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
-### Phase 14 step status — 🟨 IN PROGRESS @ `5897c5c` (live/hardware/release gates OPEN)
+### Phase 14 step status — 🟨 IN PROGRESS @ `5897c5c` + `29326cc` (live/hardware/release gates OPEN)
 
 | Step | Status |
 |---|---|
 | Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Existing typed `DhunResult`/`DhunError` paths and 403 recovery are present; full network/db/playback sweep and offline-banner review are not complete |
 | Bounded audio cache and offline replay | ⬜ Not started; current Android cache is stream-URL-only with TTL/403 invalidation |
-| Daily live rot-drill | 🟨 Workflow code staged in `.github/workflows/rot-drill.yml`; dispatch attempt hit GitHub 403 and no live verdict exists |
+| Daily live rot-drill | 🟨 Workflow code staged in `.github/workflows/rot-drill.yml`; dispatch attempt hit GitHub 403, cache-input review fix is pushed, and no live verdict exists |
 | Android 30-minute soak | ⬜ Open — requires unrestricted-battery physical device evidence |
 | Desktop 30-minute soak | ⬜ Open — requires libVLC/tray/SMTC-capable desktop evidence |
 | v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open — rolling `test` artifacts are not the stable release; signing, clean installs, and release tag are gated |
