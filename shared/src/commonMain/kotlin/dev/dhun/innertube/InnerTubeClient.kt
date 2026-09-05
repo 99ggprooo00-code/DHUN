@@ -65,7 +65,7 @@ internal fun HttpRequestBuilder.browserHeaders() {
  * own-client resolver. Per the extraction doctrine and ADR-001: this client
  * never signs URLs, never deciphers challenges, never spoofs attestation.
  * It speaks a small, drill-watched set of InnerTube client identities
- * (WEB_REMIX for metadata; WEB_REMIX + VISIONOS + TVHTML5 for /player).
+ * (WEB_REMIX for metadata; web_embedded/visionos/tv/tv_simply/mweb chain for /player).
  */
 class InnerTubeClient(
     private val httpClient: HttpClient = defaultHttpClient(),
@@ -244,6 +244,14 @@ class InnerTubeClient(
             put("gl", country)
             alt.contextExtras.forEach { (key, value) -> put(key, value) }
         }
+        // Embedded-player clients need a non-YouTube thirdParty.embedUrl
+        // (yt-dlp uses e.g. reddit.com). Without it WEB_EMBEDDED_PLAYER
+        // rejects the request even when the identity is otherwise fine.
+        alt.thirdPartyEmbedUrl?.let { embed ->
+            putJsonObject("thirdParty") {
+                put("embedUrl", embed)
+            }
+        }
     }
 
     private suspend fun postAltJson(
@@ -378,6 +386,26 @@ class InnerTubeClient(
         internal val globalRateGate = RateLimitGate()
         private val DEFAULT_429_COOLDOWN = 15.seconds
 
+        /**
+         * Client identities for /player, shapes pinned from yt-dlp master
+         * `INNERTUBE_CLIENTS` (2026-09-05). Order is chosen by OwnClientStreamResolver.
+         * No REQUIRE_AUTH clients. No ANDROID/IOS (GVS PO-token required).
+         *
+         * After rot-drill 33968950214 gated web_remix+visionos+tv from CI IPs,
+         * WEB_EMBEDDED_PLAYER + TVHTML5_SIMPLY + older TV + MWEB were added —
+         * still tokenless, still no cookies. Drill decides which survive.
+         */
+        val ALT_CLIENT_WEB_EMBEDDED = AltInnertubeClient(
+            label = "web_embedded",
+            name = "WEB_EMBEDDED_PLAYER",
+            version = "2.20260708.00.00",
+            headerId = "56",
+            userAgent = INNERTUBE_USER_AGENT,
+            // yt-dlp sets thirdParty.embedUrl to any non-YouTube origin so the
+            // embedded-player context is accepted without a site session.
+            thirdPartyEmbedUrl = "https://www.reddit.com/",
+        )
+
         val ALT_CLIENT_VISIONOS = AltInnertubeClient(
             label = "visionos",
             name = "VISIONOS",
@@ -408,6 +436,49 @@ class InnerTubeClient(
                 "Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)",
         )
 
+        /** Older Cobalt TVHTML5 — yt-dlp `tv_downgraded`; sometimes less gated. */
+        val ALT_CLIENT_TV_DOWNGRADED = AltInnertubeClient(
+            label = "tv_downgraded",
+            name = "TVHTML5",
+            version = "5.20260707",
+            headerId = "7",
+            userAgent = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version",
+        )
+
+        /** TVHTML5_SIMPLY — yt-dlp `tv_simply` (client id 75). */
+        val ALT_CLIENT_TV_SIMPLY = AltInnertubeClient(
+            label = "tv_simply",
+            name = "TVHTML5_SIMPLY",
+            version = "1.0",
+            headerId = "75",
+            userAgent = "Mozilla/5.0 (ChromiumStylePlatform) " +
+                "Cobalt/25.lts.30.1034943-gold (unlike Gecko), " +
+                "Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)",
+        )
+
+        /**
+         * Mobile web — yt-dlp `mweb`. GVS PO is marked required upstream for
+         * HTTPS, but HLS is not; we still try it for progressive/direct URLs
+         * that occasionally arrive without a token on some networks.
+         */
+        val ALT_CLIENT_MWEB = AltInnertubeClient(
+            label = "mweb",
+            name = "MWEB",
+            version = "2.20260708.05.00",
+            headerId = "2",
+            userAgent = "Mozilla/5.0 (iPad; CPU OS 16_7_10 like Mac OS X) " +
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 " +
+                "Mobile/15E148 Safari/604.1,gzip(gfe)",
+            contextExtras = buildJsonObject {
+                put(
+                    "userAgent",
+                    "Mozilla/5.0 (iPad; CPU OS 16_7_10 like Mac OS X) " +
+                        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 " +
+                        "Mobile/15E148 Safari/604.1,gzip(gfe)",
+                )
+            },
+        )
+
         fun defaultHttpClient(): HttpClient = HttpClient(CIO) {
             expectSuccess = false
             install(HttpTimeout) {
@@ -426,4 +497,6 @@ class AltInnertubeClient(
     internal val headerId: String,
     internal val userAgent: String,
     internal val contextExtras: JsonObject = JsonObject(emptyMap()),
+    /** When set, context includes `thirdParty.embedUrl` (WEB_EMBEDDED_PLAYER). */
+    internal val thirdPartyEmbedUrl: String? = null,
 )

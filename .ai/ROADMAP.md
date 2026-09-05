@@ -67,14 +67,17 @@ proven against the **production chain**, not just the fallback:
 receiver then a literal `.error`. Changing to `"${r.error}"`.
 
 **Exact next step:**
-1. ~~Dispatch on correct branch~~ DONE — run 33968950214.
-2. Push the WATCH string-template fix; require CI green on PR #16.
-3. **Rot-drill stays 🔴 for CI.** Residential hardware must verify whether
-   own-client and/or yt-dlp resolve off a normal IP (per KNOWN_LIMITATIONS
-   CI-network vs residential rule). Do **not** mark the daily drill green
-   from a CI red, and do **not** add cookies/sign-in without an ADR + user OK.
-4. Continue Phase 14 code that does not depend on a green CI drill:
-   403 "Reconnecting…" UX → bounded audio cache. Soaks / v0.1.0 stay OPEN.
+1. ~~Dispatch on correct branch~~ DONE — run 33968950214 (both engines gated).
+2. ~~WATCH string-template fix~~ DONE (`fedfaec`).
+3. **Proper extraction fix (this push, not a probe mask):** expand
+   tokenless own-client chain (web_embedded→visionos→tv→tv_downgraded→
+   tv_simply→mweb→web_remix) + yt-dlp explicit `player_client` list; no
+   cookies; kill switch preserved. ADR-001 2026-09-05 addendum.
+4. Push → CI green on PR #16 → **user re-dispatches rot-drill** on
+   `arena/01a07170-dhun`. Expect either a real PASS (bytes verified) or
+   the same category-8 FAIL with longer per-client detail — either is
+   honest. Residential check remains the user-impact gate.
+5. Then: 403 "Reconnecting…" UX → audio cache. Soaks / v0.1.0 stay OPEN.
 
 **Phase 14 step marks (exact):**
 

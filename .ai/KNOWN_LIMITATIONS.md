@@ -43,10 +43,13 @@ Updated every phase. Nothing hidden.
   (same commonMain sources) is added with the AGP/SDK setup in Phase 03.
 - Android: harness UI is a throwaway Compose screen (replaced in Phase 06+);
   app icon is a framework placeholder until the design phase.
-- Android: stream resolution is the own-client only (ADR-001). On networks
-  where YouTube gates WEB_REMIX player calls, playback shows a typed
-  "needs signed-in session" error instead of audio until upstream engines
-  are drill-green.
+- Android: stream resolution is the own-client only (ADR-001). The
+  2026-09-05 chain tries WEB_EMBEDDED → VISIONOS → TV → TV_DOWNGRADED →
+  TV_SIMPLY → MWEB → WEB_REMIX (tokenless, no cookies). On networks where
+  every identity is gated, playback shows a typed AuthRequired error with
+  per-client detail instead of audio. Rot-drill 33968950214 showed the
+  previous 3-identity chain fully gated from Actions IPs; residential
+  impact is verified on device, not assumed from CI red.
 - Android background playback (Phase 1 directive, 2026-09-05): the
   `MediaSessionService` is now a genuine FOREGROUND service (mediaPlayback
   type) with the live media notification

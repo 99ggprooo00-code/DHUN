@@ -6,6 +6,33 @@ read this entry before re-diagnosing.
 
 ---
 
+## 2026-09-05 · proper fix after 33968950214 — expand tokenless client chain (no probe mask)
+
+**Trigger:** User confirmed the job diagnosis: all three playback paths
+broken with AuthRequired / NewPipe Parse; asked for a proper fix on a
+branch, not masking the failing probe. Session is pinned to
+`arena/01a07170-dhun` (no new branch).
+
+**What we will NOT do:** cookies, PO tokens, attestation spoofing,
+skipping stream-byte checks, converting CI red into a synthetic pass.
+
+**What we will do (code):**
+1. `OwnClientStreamResolver` — 7-identity chain from yt-dlp master
+   INNERTUBE_CLIENTS: web_embedded (thirdParty.embedUrl) → visionos → tv →
+   tv_downgraded → tv_simply → mweb → web_remix. ANDROID/IOS still out.
+2. `YtDlpStreamResolver` — explicit
+   `youtube:player_client=web_embedded,tv,tv_downgraded,tv_simply,mweb,web_safari,android`
+   instead of default-only path that 33968950214 showed gated.
+3. ADR-001 addendum 2026-09-05; KNOWN_LIMITATIONS; setup-java@v5 bump
+   (Node 20 deprecation noise only).
+
+**Verification:** CI compile/tests on PR #16; live rot-drill re-dispatch
+on this branch (agent cannot dispatch). PASS only if real audio bytes
+verify. FAIL with fuller per-client detail is still an honest category-8
+result.
+
+---
+
 ## 2026-09-05 · rot-drill run 33968950214 — fixed branch LIVE; both engines CI-IP gated
 
 **Run:** https://github.com/99ggprooo00-code/DHUN/actions/runs/33968950214  
