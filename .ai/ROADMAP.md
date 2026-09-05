@@ -12,71 +12,85 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
-**Session branch:** `arena/01a07170-dhun` @ `d6d19c9` · **PR #16 OPEN**, CI
-**GREEN** (`33967339900` @ `60e5631`).
+**Session branch:** `arena/01a07170-dhun` · **PR #16 OPEN** · CI green
+(`33967339900` @ `60e5631`).
 
 **Phase:** 14 — Robustness, rot-drill, release v0.1.0 (🟨 IN PROGRESS).
 
-**Files:** `.github/workflows/rot-drill.yml`,
-`tools/playback-probe/.../Main.kt`,
-`shared/.../extraction/JvmStreamResolvers.kt`, plus taxonomy + DataLayer
-dbIo fix already on this branch.
-
-**Last error — run 33968612285 (user-dispatched, just now):**
+**Last live rot-drill — run 33968950214 (CORRECT branch, first real test of fixes):**
 
 ```
-https://github.com/99ggprooo00-code/DHUN/actions/runs/33968612285
-ref: main @ a554594   ← NOT arena/01a07170-dhun
+https://github.com/99ggprooo00-code/DHUN/actions/runs/33968950214
+ref: arena/01a07170-dhun @ 10ad025
 event: workflow_dispatch
-step "Fail the workflow after alerting" → exit 1   (intentional kill switch)
+kill switch: "Fail the workflow after alerting" → exit 1  (intentional)
+
+yt-dlp 2026.08.19   ← now in log artifact (fix worked)
+artifact name: rot-drill-33968950214  ← issue body names it (fix worked)
 
 PROBE|version|PASS|WEB_REMIX 1.20260901.12.00
 PROBE|search|PASS|20 music-song results
-PROBE|resolve+stream|FAIL|AuthRequired(detail=null)
+WATCH|own-client|BROKEN|AuthRequired(
+  web_remix=AUTH_REQUIRED(Sign in to confirm you're not a bot);
+  visionos=AUTH_REQUIRED(...);
+  tv=AUTH_REQUIRED(...))
+WATCH|ytdlp|BROKEN|AuthRequired(
+  ERROR: [youtube] utwMHfDZ6SA: Sign in to confirm you're not a bot.
+  Use --cookies-from-browser or --cookies ...)
+PROBE|resolve+stream|FAIL|resolve via resolving(own-innertube-player -> yt-dlp): AuthRequired(...)
 PROBE|related|PASS|50 related tracks
 WATCH|newpipe-stream|BROKEN|Parse(detail=JSON response is too short)
 PROBE|verdict|FAIL|extraction-pipeline-broken
 ```
 
-**Why it looks like “no update”:** this dispatch checked out **pre-fix
-`main`**. On `a554594` the probe still drives **yt-dlp alone**, still drops
-stderr (`detail=null`), and the issue body still swallows the artifact name
-(backtick bug). Issue #14 got another comment with the same FAIL pattern.
-The kill switch doing `exit 1` is correct — it is not the bug.
+**Classification:** still **category 8 — CI/datacenter-IP bot gating**, now
+proven against the **production chain**, not just the fallback:
+- Metadata (version/search/related) PASS from the same runner ⇒ not blanket
+  IP block, not InnerTube shape rot.
+- **Both** production engines gated (own-client all three strategies +
+  yt-dlp) with full `AuthRequired.detail` evidence.
+- NewPipe still upstream-broken (known, non-fatal watch).
+- Kill switch correctly kept the workflow red. **Do not weaken the probe
+  to manufacture a PASS.**
 
-**What IS updated (this branch / PR #16, not yet on main):**
-- Production chain own-client → yt-dlp + `WATCH|own-client` / `WATCH|ytdlp`
-- `AuthRequired(detail=yt-dlp stderr)`
-- Issue-body + yt-dlp version-in-artifact fixes
-- 429 gate, offline banner, single-thread DataLayer dbIo
-- CI green on PR #16
+**What the fixes proved (vs runs on main@a554594):**
+| Check | 33961533965 / 33968612285 (main) | 33968950214 (this branch) |
+|---|---|---|
+| Production chain exercised | ❌ yt-dlp alone | ✅ own-client → yt-dlp |
+| `WATCH\|own-client` / `WATCH\|ytdlp` | ❌ absent | ✅ both BROKEN w/ detail |
+| `AuthRequired.detail` | `null` | full bot-gate text |
+| Artifact name in issue #14 | swallowed | `rot-drill-33968950214` |
+| yt-dlp version in artifact | missing | `2026.08.19` |
+
+**Minor bug found in this run (fixing now):** WATCH/resolve lines printed
+`Failure(...).error` literally because Kotlin `"$r.error"` interpolates the
+receiver then a literal `.error`. Changing to `"${r.error}"`.
 
 **Exact next step:**
-1. ~~Code + CI on this branch~~ DONE (PR #16, `33967339900` GREEN).
-2. **Re-dispatch rot-drill on the FIXED ref** (agent token still 403 on
-   `workflow_dispatch`):
-   - **Preferred:** Actions → rot-drill → Run workflow → branch
-     **`arena/01a07170-dhun`**
-   - **Or:** merge PR #16 → main, then dispatch on `main` / wait for cron
-3. Read new lines: `WATCH|own-client`, `WATCH|ytdlp`, `PROBE|verdict`.
-   Comment outcome on issue #14. Never fake a PASS for CI-IP gating.
-4. Then: 403 "Reconnecting…" UX → audio cache. Soaks / v0.1.0 stay OPEN.
+1. ~~Dispatch on correct branch~~ DONE — run 33968950214.
+2. Push the WATCH string-template fix; require CI green on PR #16.
+3. **Rot-drill stays 🔴 for CI.** Residential hardware must verify whether
+   own-client and/or yt-dlp resolve off a normal IP (per KNOWN_LIMITATIONS
+   CI-network vs residential rule). Do **not** mark the daily drill green
+   from a CI red, and do **not** add cookies/sign-in without an ADR + user OK.
+4. Continue Phase 14 code that does not depend on a green CI drill:
+   403 "Reconnecting…" UX → bounded audio cache. Soaks / v0.1.0 stay OPEN.
 
 **Phase 14 step marks (exact):**
 
 | Step | Status |
 |---|---|
-| Error taxonomy / offline/429/403 UX | 🟨 typed + 429 gate + offline banner + AuthRequired detail on branch/CI green; 403 "Reconnecting…" UX ⬜; hardware offline check ⬜; db review ⬜ |
+| Error taxonomy / offline/429/403 UX | 🟨 typed + 429 gate + offline banner + AuthRequired detail ✓ (live-proven); 403 "Reconnecting…" UX ⬜; airplane-mode ⬜; db review ⬜ |
 | Bounded audio cache / offline replay | ⬜ not started |
-| Daily live rot-drill | 🔴 still RED — runs **33961533965** and **33968612285** both on `main@a554594` (old probe). Fixes not exercised live. Failure path + kill switch proven twice. **No green verdict. No run yet on `arena/01a07170-dhun`.** |
+| Daily live rot-drill | 🔴 **Workflow + fixes LIVE-PROVEN** on correct branch (33968950214). Verdict FAIL = category-8 CI-IP gating of **both** production engines. Failure/alert/kill-switch path proven. **No `PROBE\|verdict\|PASS`. Residential verification OPEN.** |
 | Android 30-min soak | ⬜ open |
 | Desktop 30-min soak | ⬜ open |
 | v0.1.0 release + clean-target | ⬜ open |
 | Phase 14 acceptance 1–4 | ⬜ none complete |
 
 **Standing sandbox notes:** no local JDK; no device; YouTube TLS-blocked
-here; agent cannot `workflow_dispatch` (HTTP 403); live drill must be
-started from the GitHub UI on the **correct branch**.
+here; agent cannot `workflow_dispatch` or comment on issues (403); PR
+comments work. Live drill UI dispatch only.
 
 ---
 
@@ -150,7 +164,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 CI GREEN; live drills **33961533965** + **33968612285** both ran on `main@a554594` (old probe) → still RED; need dispatch on `arena/01a07170-dhun` or merge #16 first | PR #16, issue #14 |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 CI green; live run **33968950214** on correct branch FAILED — both own-client + yt-dlp CI-IP bot-gated (cat. 8) with full detail; residential verify + audio cache + soaks + v0.1.0 OPEN | run 33968950214, issue #14, PR #16 |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -180,13 +194,13 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
-### Phase 14 step status — 🟨 IN PROGRESS (live drills still on pre-fix main)
+### Phase 14 step status — 🟨 IN PROGRESS (live drill on fixed branch = CI-IP gating of both engines)
 
 | Step | Status |
 |---|---|
-| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 On branch + CI green: typed errors, 429 global gate, offline banner, AuthRequired detail. Open: 403 "Reconnecting…" UX, airplane-mode check, db-path review |
+| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 On branch + CI green + live-proven AuthRequired detail: typed errors, 429 gate, offline banner. Open: 403 "Reconnecting…" UX, airplane-mode check, db-path review |
 | Bounded audio cache and offline replay | ⬜ Not started |
-| Daily live rot-drill | 🔴 Runs **33961533965** and **33968612285** FAILED on `main@a554594` (fallback-only probe, `detail=null`). Kill switch correct. **Fixes on PR #16 never run live.** Need UI dispatch on `arena/01a07170-dhun` or merge #16 then re-run |
+| Daily live rot-drill | 🔴 Run **33968950214** on `arena/01a07170-dhun@10ad025`: production chain exercised; `WATCH\|own-client` + `WATCH\|ytdlp` both `AuthRequired` (Sign in to confirm you're not a bot) from Actions IP; metadata PASS; kill switch correct. **Category 8 CI-network evidence — not extractor-shape rot.** No PASS. Residential verification required before any "playback broken for users" claim |
 | Android 30-minute soak | ⬜ Open |
 | Desktop 30-minute soak | ⬜ Open |
 | v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open |

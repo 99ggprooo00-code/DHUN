@@ -11,7 +11,7 @@ Desktop soak, clean-install, or release checks below.
 |---|---|---|
 | Typed error taxonomy and actionable user messages | 🟨 Typed `DhunResult`/`DhunError` + `toUserMessage` paths, per-request retry, 429 global backoff gate (`2932d57`, with unit tests), and offline banner (`fed1d54`) are implemented; CI verdict pending on the current push; 403 "Reconnecting…" UX, offline-banner hardware check, and the db-path review pass remain | `shared/.../core/RateLimitGate.kt`, `shared/.../core/ConnectivityMonitor.kt`, `DhunAppShell.kt`, hosts' Koin modules |
 | Bounded audio cache and offline replay | ⬜ Not implemented | Android currently has a 5-hour stream-URL cache with 403 invalidation; played audio segment caching and offline replay are still required |
-| Daily live rot-drill | 🔴 Workflow is wired and its FAILURE path is proven (run 33961533965, issue #14, artifact, kill switch) — but the first live run FAILED: yt-dlp bot-gated from the runner IP and the probe tested only the fallback engine; no green verdict exists | `.github/workflows/rot-drill.yml`; rerun required after the probe-alignment/diagnostics fixes; a real `PROBE|verdict|PASS` gates this row |
+| Daily live rot-drill | 🔴 Workflow + probe fixes LIVE on correct branch (run 33968950214 @ `10ad025`): both engines CI-IP bot-gated; metadata PASS; kill switch OK. No green verdict; residential verify OPEN | issue #14, artifact `rot-drill-33968950214` |
 | Android 30-minute soak | ⬜ Open | Requires a physical device with unrestricted battery mode, lock-screen playback, and zero-crash/leak evidence |
 | Desktop 30-minute soak | ⬜ Open | Requires a desktop with libVLC and tray/SMTC-capable runtime |
 | Release v0.1.0 artifacts | ⬜ Open | Rolling `test` APK/MSI is not the signed/stable v0.1.0 release; clean-target installation and release evidence are required |
@@ -60,7 +60,22 @@ for upstream recovery.
       diagnosis comment. **Not a regression of PR #16** — that code was not
       checked out.
 
-- [ ] Manual run from the Phase 14 branch completes with `PROBE|verdict|PASS`.
+
+- [x] **First live run on the FIXED branch — run 33968950214 (2026-09-05,
+      workflow_dispatch on `arena/01a07170-dhun` @ `10ad025`): FAILED as
+      designed (kill switch).** Production chain + per-engine WATCH lines
+      fired. Evidence:
+      - `WATCH|own-client|BROKEN|AuthRequired(web_remix/visionos/tv all
+        AUTH_REQUIRED Sign in to confirm you're not a bot)`
+      - `WATCH|ytdlp|BROKEN|AuthRequired(...Sign in to confirm you're not a
+        bot... --cookies...)` with yt-dlp **2026.08.19** in the artifact
+      - `PROBE|related|PASS|50` + search/version PASS ⇒ metadata healthy
+      - Artifact name `rot-drill-33968950214` correctly present in issue #14
+      - Classification: **category 8 CI/datacenter-IP bot gating of BOTH
+        production engines** — not shape rot. Residential verification OPEN.
+      - Do **not** convert this red into a pass.
+
+- [ ] Manual/scheduled run completes with `PROBE|verdict|PASS` (CI-IP may stay red under category-8 gating; residential green is the user-impact gate — see KNOWN_LIMITATIONS).
       Fixes for run 33961533965 are now on session branch `arena/01a07170-dhun`
       (cherry-picks ending at `39cc924`; equivalent to PR #15 head `5dabdfa`).
       CI run **`33967339900` GREEN** @ `60e5631`. Live rerun requires UI/manual dispatch when the

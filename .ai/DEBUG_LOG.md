@@ -6,6 +6,53 @@ read this entry before re-diagnosing.
 
 ---
 
+## 2026-09-05 · rot-drill run 33968950214 — fixed branch LIVE; both engines CI-IP gated
+
+**Run:** https://github.com/99ggprooo00-code/DHUN/actions/runs/33968950214  
+**Ref:** `arena/01a07170-dhun` @ `10ad025` (correct branch — first time)  
+**Conclusion:** failure via intentional kill switch after alert.
+
+**Probe evidence (from issue #14 comment, artifact `rot-drill-33968950214`):**
+```
+yt-dlp 2026.08.19
+PROBE|version|PASS|WEB_REMIX 1.20260901.12.00
+PROBE|search|PASS|20 music-song results
+WATCH|own-client|BROKEN|AuthRequired(web_remix/visionos/tv all AUTH_REQUIRED
+  Sign in to confirm you're not a bot)
+WATCH|ytdlp|BROKEN|AuthRequired(ERROR: [youtube] utwMHfDZ6SA: Sign in to
+  confirm you're not a bot. Use --cookies-from-browser or --cookies ...)
+PROBE|resolve+stream|FAIL|resolve via resolving(own-innertube-player -> yt-dlp)
+PROBE|related|PASS|50 related tracks
+WATCH|newpipe-stream|BROKEN|Parse(JSON response is too short)
+PROBE|verdict|FAIL|extraction-pipeline-broken
+```
+
+**Root cause:** Category **8 — YouTube datacenter-IP bot gating** of the
+player endpoint from the Actions runner. Now confirmed against the
+**production** chain: Android's only engine (own-client, all three
+strategies) and desktop primary+fallback (own-client + yt-dlp) are all
+gated. Metadata endpoints still work from the same IP. Not extractor-shape
+rot; not a workflow bug; kill switch correct.
+
+**Fixes verified live (vs main@a554594 runs):** production chain gate,
+per-engine WATCH lines, AuthRequired.detail populated, artifact name in
+issue body, yt-dlp version in artifact.
+
+**Minor defect found:** WATCH/resolve used Kotlin `"$r.error"` which prints
+`Failure(...).error` (receiver + literal). Fix: `"${r.error}"`.
+
+**Policy (do not violate):**
+- Do not weaken stream-byte verification or tolerate resolve failures to
+  get a green CI drill.
+- Do not add cookie/sign-in flows without ADR + user sign-off.
+- Residential hardware is the next evidence gate for user-facing impact.
+- CI red + residential green ⇒ record here; keep kill switch.
+
+**Next:** push string-template fix; continue Phase 14 taxonomy/audio-cache
+work; keep soaks/v0.1.0 open.
+
+---
+
 ## 2026-09-05 · rot-drill run 33968612285 FAILED on main@a554594 — wrong ref, not a fix regression
 
 **Symptom:** User saw step **"Fail the workflow after alerting" → `exit 1`**

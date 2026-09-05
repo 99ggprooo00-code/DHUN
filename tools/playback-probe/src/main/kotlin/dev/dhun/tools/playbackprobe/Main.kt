@@ -93,7 +93,9 @@ fun main(): Unit = runBlocking<Unit> {
             when (val r = resolver.resolve(topTrack.id)) {
                 is DhunResult.Success ->
                     println("WATCH|$label|OK|${r.value.bitrateKbps ?: "?"} kbps ${r.value.mimeType}")
-                is DhunResult.Failure -> println("WATCH|$label|BROKEN|$r.error")
+                // ${r.error} — bare $r.error interpolates the Failure receiver then
+                // a literal ".error" (seen in run 33968950214 WATCH lines).
+                is DhunResult.Failure -> println("WATCH|$label|BROKEN|${r.error}")
             }
         }.onFailure {
             println("WATCH|$label|BROKEN|${it.javaClass.simpleName}: ${it.message?.take(200)}")
@@ -105,7 +107,9 @@ fun main(): Unit = runBlocking<Unit> {
     pass = step("resolve+stream") {
         val info = when (val r = chain.resolve(topTrack.id)) {
             is DhunResult.Success -> r.value
-            is DhunResult.Failure -> throw IllegalStateException("resolve via ${chain.name}: $r.error")
+            is DhunResult.Failure -> throw IllegalStateException(
+                "resolve via ${chain.name}: ${r.error}",
+            )
         }
         val conn = URL(info.audioUrl).openConnection() as HttpURLConnection
         conn.setRequestProperty("User-Agent", "Mozilla/5.0")
@@ -159,6 +163,8 @@ fun main(): Unit = runBlocking<Unit> {
             is DhunResult.Success -> println("WATCH|newpipe-stream|OK|${r.value.bitrateKbps}kbps ${r.value.mimeType}")
             is DhunResult.Failure -> println("WATCH|newpipe-stream|BROKEN|${r.error}")
         }
+    }.onFailure {
+        println("WATCH|newpipe-stream|BROKEN|${it.javaClass.simpleName}: ${it.message?.take(200)}")
     }
 
     println("PROBE|verdict|${if (pass) "PASS" else "FAIL"}|extraction-pipeline-" +

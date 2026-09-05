@@ -15,24 +15,27 @@ Updated every phase. Nothing hidden.
   aggressively than residential IPs; the rot drill may show resolve-step
   failures on CI runners that do not affect normal users. Repeated red +
   local green = investigate; both red = rot.
-- **CI-network vs residential gating (measured 2026-09-05, rot-drill run
-  33961533965):** yt-dlp 2026.08.19's default player path — proven
-  tokenless from a datacenter IP on 2026-09-01 (ADR-001) — was bot-gated
-  ("Sign in to confirm" → `AuthRequired`) from the GitHub Actions runner
-  IP on 2026-09-05, while InnerTube metadata (WEB_REMIX search/version/
-  related) passed in the same run. Interpretation rule for red drills:
-  metadata PASS + resolve gated ⇒ CI-network gating, verify on residential
-  hardware before declaring rot; metadata ALSO failing ⇒ real rot. The
-  drill's kill switch stays ON for both cases — a CI red is never
-  auto-dismissed, and residential green + CI red is recorded here rather
-  than converted to a false pass.
-- **Rot-drill probe coverage limitation (fixed in flight 2026-09-05):**
-  until this fix, the drill's fatal resolve step exercised
-  `YtDlpStreamResolver` alone — the desktop FALLBACK engine — so a CI red
-  could fire while the production primary (`OwnClientStreamResolver`,
-  Android's only engine) was healthy, and vice versa the primary could rot
-  unnoticed. The drill now gates on the production own-client→yt-dlp chain
-  and WATCHes each engine separately.
+- **CI-network vs residential gating (measured 2026-09-05):**
+  - Run **33961533965** / **33968612285** (`main@a554594`, yt-dlp-only probe):
+    yt-dlp 2026.08.19 bot-gated ("Sign in to confirm" → `AuthRequired`) from
+    the Actions runner while metadata PASS.
+  - Run **33968950214** (`arena/01a07170-dhun@10ad025`, production chain):
+    **both** `OwnClientStreamResolver` (web_remix + visionos + tv all
+    `AUTH_REQUIRED`) **and** yt-dlp 2026.08.19 bot-gated from the same
+    runner class; metadata (version/search/related) still PASS; NewPipe
+    still `Parse(JSON too short)`. Full `AuthRequired.detail` now rides
+    along. This is stronger CI-network evidence: Android's only engine and
+    desktop's primary+fallback are all gated from GitHub-hosted runners as
+    of 2026-09-05.
+  - Interpretation rule for red drills: metadata PASS + resolve gated ⇒
+    **CI-network gating** — verify on residential hardware before declaring
+    user-facing rot; metadata ALSO failing ⇒ real rot (pin last-good, patch
+    ≤72h). Kill switch stays ON for both; never convert a CI red into a
+    pass; never add cookies/sign-in without an ADR + user sign-off.
+- **Rot-drill probe coverage (fixed and live-proven 2026-09-05):** the
+  fatal resolve step now drives the production own-client→yt-dlp chain and
+  emits `WATCH|own-client` / `WATCH|ytdlp` / `WATCH|newpipe-stream`. Run
+  33968950214 confirmed those lines fire on CI.
 - YTM lyrics via InnerTube are unsynced text only; synced lyrics are now via LRCLIB fallback (`LrcLibSource` + `LyricsRepository` cache→YTM→LRCLIB, see Lyrics bullet above) — YTM remains primary unsynced fallback.
 - The PLAYLISTS search filter returns mixed result types from YouTube;
   classification routes them by browseId prefix (harmless, refined later).
@@ -111,11 +114,12 @@ Updated every phase. Nothing hidden.
 
 ## Phase 14 — robustness / rot-drill / release (2026-09-05)
 
-- The daily live extraction workflow is now wired in
-  `.github/workflows/rot-drill.yml`, but it has not yet produced a green
-  scheduled/manual live-run record from this branch. Datacenter IPs can be
-  bot-flagged; a red CI probe is evidence to investigate, not by itself proof
-  that residential playback is broken.
+- The daily live extraction workflow is wired and **failure path is
+  live-proven** on the fixed branch (run 33968950214). It has **not**
+  produced a green `PROBE|verdict|PASS` from GitHub-hosted runners: both
+  production engines are CI-IP bot-gated (category 8). That is not by itself
+  proof residential playback is broken — residential verification is the
+  user-impact gate.
 - Android currently caches resolved stream URLs for five hours and invalidates
   them on HTTP 403. A bounded audio-segment cache and offline replay are not
   implemented yet; the rolling `test` APK/MSI is not the signed/stable
