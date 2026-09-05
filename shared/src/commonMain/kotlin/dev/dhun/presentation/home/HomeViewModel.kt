@@ -37,7 +37,7 @@ class HomeViewModel(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
-    val recentlyPlayed: StateFlow<List<Track>> = historyRepository.observeRecentlyPlayed(12)
+    val recentlyPlayed: StateFlow<List<Track>> = historyRepository.observeRecentlyPlayed(24)
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     val favoriteIds: StateFlow<Set<String>> = libraryRepository.observeFavoriteIds()

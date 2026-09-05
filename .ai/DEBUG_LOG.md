@@ -1,5 +1,14 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — M3 UI overhaul (Home depth + sans type)
+
+**User brief:** Expert M3 overhaul — readable sans, deep Home, M3 surfaces,
+ambient art wash, immersive player (already ADR-002), quick-action chips.
+Lightweight but not boring. No Liquid Glass.
+
+**Shipped:** typography lock, Home chips + classified shelves, M3 shapes/
+surfaces/nav, shell ambient, sleep timer.
+
 ## 2026-09-05 — Phase 14 audio-segment cache (Android)
 
 **Shipped:** Media3 SimpleCache LRU (`DhunAudioSegmentCache`), wired in

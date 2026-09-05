@@ -202,3 +202,12 @@ Shipped on `arena/01a07170-dhun` without Liquid Glass:
 
 Still OPEN: residential stream smoke, hardware Phase 08/11 checklists,
 audio-segment cache, soaks, v0.1.0.
+
+## Addendum — M3 product UI (2026-09-05)
+
+Cross-cutting with Home/shell (not Liquid Glass):
+
+- UI type = clean sans (`FontFamily.SansSerif`); brand tracking only on logo.
+- Shell ambient wash from now-playing seed colors (cheap); FullPlayer keeps
+  real once-per-track blur + lyrics-dominant.
+- Nav bar = M3 `surfaceContainer` tonal surface, not a glass renderer.

@@ -120,3 +120,15 @@ Unit tests cover:
 | 2 | Search: type → suggestions ≤300ms after pause → results per filter → infinite scroll | ✅ Ready | `SearchViewModel` has 300ms debounce flow, `SearchFilter` chips, and `searchContinuation` pagination |
 | 3 | Every overflow action works | ✅ Ready | `TrackOverflowDialog` wires Play next, Add to queue, Add to playlist, Favorite toggle, Go to artist/album |
 | 4 | Loading skeleton (not spinner), error, and empty states all observed | ✅ Ready | `HomeShimmerSkeleton`, `SearchShimmerSkeleton`, `ErrorView`, `EmptyView` |
+
+## M3 Home depth (2026-09-05)
+
+| Item | Status |
+|---|---|
+| Sans-serif UI type / brand wordmark only | 🟨 |
+| Quick-action chips (Liked, Offline, Sleep) | 🟨 |
+| Mood & genre filter chips | 🟨 |
+| Quick picks grid up to 12 | 🟨 |
+| Classified shelves (mix/charts/albums) | 🟨 code — depends on feed titles |
+| Ambient shell wash | 🟨 lightweight seed tint |
+| Hardware visual pass | ⬜ OPEN |

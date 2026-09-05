@@ -90,7 +90,56 @@ class PlayerViewModel(
     private var relatedJob: Job? = null
     private var lyricsJob: Job? = null
     private var holdSeekJob: Job? = null
+    private var sleepTimerJob: Job? = null
     private var lastSeenTrackId: String? = null
+
+    /* ---------------- Sleep timer (Home quick-action) ---------------- */
+
+    /** Remaining ms until auto-pause; null when inactive. */
+    private val _sleepTimerRemainingMs = MutableStateFlow<Long?>(null)
+    val sleepTimerRemainingMs: StateFlow<Long?> = _sleepTimerRemainingMs.asStateFlow()
+
+    /** Preset minutes the Home chip cycles through. 0 = cancel. */
+    fun cycleSleepTimer() {
+        val current = _sleepTimerRemainingMs.value
+        val nextMinutes = when {
+            current == null -> 15
+            current > 45 * 60_000L -> 0 // was 60 → off
+            current > 25 * 60_000L -> 60
+            current > 12 * 60_000L -> 30
+            else -> 60
+        }
+        if (nextMinutes == 0) cancelSleepTimer() else startSleepTimer(nextMinutes)
+    }
+
+    fun startSleepTimer(minutes: Int) {
+        if (minutes <= 0) {
+            cancelSleepTimer()
+            return
+        }
+        sleepTimerJob?.cancel()
+        val total = minutes * 60_000L
+        _sleepTimerRemainingMs.value = total
+        sleepTimerJob = scope.launch {
+            var left = total
+            while (left > 0) {
+                delay(1_000L)
+                left -= 1_000L
+                _sleepTimerRemainingMs.value = left.coerceAtLeast(0L)
+            }
+            _sleepTimerRemainingMs.value = null
+            // Pause if still playing — never stop/clear queue.
+            if (player.state.value is PlaybackState.Playing) {
+                player.playPause()
+            }
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerRemainingMs.value = null
+    }
 
     init {
         // Skip direction: forward on natural advance / next, backward on

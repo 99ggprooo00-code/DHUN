@@ -15,6 +15,7 @@ import dev.dhun.data.DataLayer
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.domain.GetHomeFeedUseCase
+import dev.dhun.domain.HomeShelfKind
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
@@ -162,5 +163,16 @@ class HomeViewModelTest {
         } finally {
             testScope.cancel()
         }
+    }
+
+    @Test
+    fun classifySectionMapsChartsAlbumsMix() {
+        assertEquals(HomeShelfKind.CHARTS, GetHomeFeedUseCase.classifySection("Top charts"))
+        assertEquals(HomeShelfKind.CHARTS, GetHomeFeedUseCase.classifySection("Trending"))
+        assertEquals(HomeShelfKind.ALBUMS, GetHomeFeedUseCase.classifySection("New releases"))
+        assertEquals(HomeShelfKind.MIX, GetHomeFeedUseCase.classifySection("Your mix"))
+        assertEquals(HomeShelfKind.MOOD, GetHomeFeedUseCase.classifySection("Moods & genres"))
+        assertEquals(HomeShelfKind.QUICK_PICKS, GetHomeFeedUseCase.classifySection("Quick picks"))
+        assertEquals(HomeShelfKind.OTHER, GetHomeFeedUseCase.classifySection("Something else"))
     }
 }

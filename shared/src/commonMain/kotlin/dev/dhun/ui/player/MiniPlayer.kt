@@ -37,8 +37,8 @@ import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.presentation.player.PlayerViewModel
 
 /**
- * MiniPlayer — 72dp glass bar docked above the bottom nav (Android) or at the
- * window bottom (desktop).
+ * MiniPlayer — 72dp M3 surface bar docked above the bottom nav (Android) or at the
+ * window bottom (desktop). Translucent surfaceContainer (not Liquid Glass).
  *
  * - 1dp accent progress line pinned to the top edge
  * - artwork (crossfades via Coil), marquee title, artist line with live

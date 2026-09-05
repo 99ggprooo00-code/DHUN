@@ -1,10 +1,12 @@
 package dev.dhun.ui.shell
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -37,12 +39,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import dev.dhun.core.AlwaysOnlineConnectivityMonitor
 import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
+import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
@@ -51,12 +55,12 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.catalog.ComponentCatalogScreen
-import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.player.DhunPlayer
 import dev.dhun.presentation.browse.AlbumViewModel
 import dev.dhun.presentation.browse.ArtistViewModel
 import dev.dhun.presentation.browse.PlaylistViewModel
 import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
@@ -145,9 +149,38 @@ fun DhunAppShell(
         // Phase 14 error taxonomy: offline banner. Rendered in the Scaffold
         // topBar slot so innerPadding pushes content down while it shows.
         val isOnline by connectivity.isOnline.collectAsState()
+        val sleepRemaining by playerViewModel.sleepTimerRemainingMs.collectAsState()
+        val sleepLabel = sleepRemaining?.let { ms ->
+            val mins = ((ms + 59_999L) / 60_000L).toInt().coerceAtLeast(1)
+            "Sleep · ${mins}m"
+        }
+        // Lightweight ambient wash from now-playing art (seed hash — no
+        // continuous full-res blur; FullPlayer still owns the real blur layer).
+        val ambient by animateColorAsState(
+            targetValue = currentTrack?.let {
+                ArtworkColorExtractor.extractFromSeed(it.thumbnailUrl ?: it.id).backgroundTint
+            } ?: Color.Transparent,
+            animationSpec = DhunAnimations.slowTween(),
+            label = "shellAmbient",
+        )
+        // Soft top wash behind tabs — premium without Liquid Glass.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(DhunColors.background)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            ambient.copy(alpha = 0.35f),
+                            Color.Transparent,
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = DhunColors.background,
+            containerColor = Color.Transparent,
             topBar = {
                 AnimatedVisibility(
                     visible = !isOnline,
@@ -198,6 +231,20 @@ fun DhunAppShell(
                         onPlayTrack = onPlayTrack,
                         onNavigate = { nav.push(it) },
                         onTrackOverflow = { overflowTrack = it },
+                        onOpenLiked = {
+                            libraryVm.selectTab(LibraryTab.FAVORITES)
+                            nav.selectedTab = AppTab.LIBRARY
+                            nav.detailStack.clear()
+                        },
+                        onOpenOffline = {
+                            // Segment cache lives under playback; Library is the
+                            // honest destination until a dedicated Offline page.
+                            libraryVm.selectTab(LibraryTab.PLAYLISTS)
+                            nav.selectedTab = AppTab.LIBRARY
+                            nav.detailStack.clear()
+                        },
+                        sleepTimerLabel = sleepLabel,
+                        onCycleSleepTimer = { playerViewModel.cycleSleepTimer() },
                     )
                     is DetailRoute.ArtistPage -> {
                         val vm = remember(route.id) { ArtistViewModel(provider, player, route.id) }
@@ -340,13 +387,18 @@ private fun BottomNavigationBar(
                 onExpand = { nav.playerExpanded = true },
             )
         }
-        GlassBottomBar(
+        // M3 bottom bar: tonal surfaceContainer + pill indicator (not Liquid Glass).
+        Surface(
             modifier = Modifier.fillMaxWidth(),
+            color = DhunColors.surfaceContainer.copy(alpha = 0.94f),
+            tonalElevation = DhunSpacing.xs,
+            shadowElevation = DhunSpacing.xs,
             shape = DhunShapes.bottomSheet,
         ) {
             NavigationBar(
                 containerColor = Color.Transparent,
                 contentColor = DhunColors.textPrimary,
+                tonalElevation = DhunSpacing.zero,
                 modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
             ) {
                 AppTab.entries.forEach { tab ->
@@ -428,7 +480,7 @@ private fun RowScope.AppBottomNavigationItem(
         icon = { AppNavigationIcon(tab, selected) },
         label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
         colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = DhunColors.accent,
+            selectedIconColor = DhunColors.onAccentContainer,
             selectedTextColor = DhunColors.accent,
             unselectedIconColor = DhunColors.textTertiary,
             unselectedTextColor = DhunColors.textTertiary,
@@ -446,6 +498,10 @@ private fun TabContent(
     onPlayTrack: (Track, List<Track>, Int) -> Unit,
     onNavigate: (DetailRoute) -> Unit,
     onTrackOverflow: (Track) -> Unit,
+    onOpenLiked: () -> Unit = {},
+    onOpenOffline: () -> Unit = {},
+    sleepTimerLabel: String? = null,
+    onCycleSleepTimer: () -> Unit = {},
 ) {
     when (tab) {
         AppTab.HOME -> {
@@ -456,6 +512,10 @@ private fun TabContent(
                 onPlaylistClick = { onNavigate(DetailRoute.PlaylistPage(it.id)) },
                 onArtistClick = { onNavigate(DetailRoute.ArtistPage(it.id)) },
                 onTrackOverflow = onTrackOverflow,
+                onOpenLiked = onOpenLiked,
+                onOpenOffline = onOpenOffline,
+                sleepTimerLabel = sleepTimerLabel,
+                onCycleSleepTimer = onCycleSleepTimer,
             )
         }
         AppTab.SEARCH -> {

@@ -13,29 +13,30 @@ Rules (permanent, from the user):
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
 **Branch:** `arena/01a07170-dhun` · **PR #16**.
-**User lock:** **No Liquid Glass. Material 3 only.**
+**User lock:** **No Liquid Glass. Material 3 only.** Sans-serif UI type only
+(brand wordmark = tracked sans, not a decorative display face).
 
-**Phase:** 14 robustness — audio-segment cache + prior M3 player polish.
+**Phase:** M3 UI overhaul (Home depth + tokens) on top of Phase 14 cache +
+ADR-002 player polish.
 
 **Just implemented (this push):**
-1. **Bounded audio-segment cache (Android):** `DhunAudioSegmentCache`
-   (Media3 SimpleCache + LRU) + `PlaybackGraph` pipeline
-   ResolvingDataSource → CacheDataSource → HTTP. Cache **key = video id**
-   (survives googlevideo URL rotation / 403). Budget from
-   `SettingsKeys.CACHE_SIZE_MB` (default 1024) via `AudioCacheBudget`.
-   Offline: if resolve fails but spans exist, serve from disk.
-2. Prior (still on branch): Recovering / Reconnecting…, lyrics-dominant
-   FullPlayer, BlurredArtworkCache, ADR-002 M3-only.
+1. **Typography:** `FontFamily.SansSerif` on all M3 roles; `brand` reserved
+   for "DHUN" wordmark only (wide tracking).
+2. **Home depth:** quick-action chips (Liked / Offline / Sleep timer), mood
+   filter chips, Quick Picks grid up to 12, Listen again 24, classified
+   shelves (mix / charts / albums / other) — scroll depth from feed.
+3. **M3 tokens:** tonal surface ladder, XL card corners, pill chips, nav
+   surfaceContainer bar, media cards with soft shadow.
+4. **Ambient shell wash** from now-playing seed colors (lightweight — not
+   continuous full-res blur). FullPlayer still owns real blur + lyrics-dominant.
+5. **Sleep timer** on PlayerViewModel (15→30→60→off, pauses on fire).
 
-**Last live rot-drill:** 33970045379 — URL then CDN 403 (cat.8). Kill switch OK.
+**Prior on branch:** audio-segment cache, Recovering chip, lyrics-dominant.
 
-**Exact next step:**
-1. Push → CI green on PR #16 (Media3 database dep + compile).
-2. Residential play + offline-replay smoke when device available.
-3. Soaks / v0.1.0 still OPEN. Desktop segment cache deferred.
+**Exact next step:** push → CI; residential smoke when device available.
 
-**Marks:** taxonomy 🟨 · **cache 🟨 Android code** · rot-drill 🔴 · soaks ⬜ ·
-v0.1.0 ⬜ · ADR-002 P3/P4/P6 🟨 · Liquid Glass 🚫
+**Marks:** M3 Home 🟨 code · ADR-002 P3/P4/P6 🟨 · cache 🟨 · rot-drill 🔴 ·
+soaks ⬜ · v0.1.0 ⬜ · Liquid Glass 🚫
 
 **Sandbox:** no JDK/device; agent no workflow_dispatch.
 

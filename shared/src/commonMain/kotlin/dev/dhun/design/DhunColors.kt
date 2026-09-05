@@ -71,20 +71,39 @@ object DhunColors {
     val shimmerBase = Color(0xFF1E1E1E)
     val shimmerHighlight = Color(0xFF2E2E2E)
 
+    /**
+     * Material 3 tonal surface ladder (dark). Prefer these over raw hex in
+     * new UI — keeps elevation readable without heavy shadows.
+     */
+    val surfaceContainerLowest = background
+    val surfaceContainerLow = surface
+    val surfaceContainer = surfaceElevated
+    val surfaceContainerHigh = surfaceHighest
+    val surfaceContainerHighest = Color(0xFF303030)
+
     /** Material3 dark scheme derived from the tokens (single source of truth). */
     val scheme: ColorScheme = darkColorScheme(
         primary = accent,
         onPrimary = onAccent,
         primaryContainer = accentContainer,
         onPrimaryContainer = onAccentContainer,
+        secondary = accent.copy(alpha = 0.85f),
+        onSecondary = onAccent,
+        secondaryContainer = accentContainer.copy(alpha = 0.7f),
+        onSecondaryContainer = onAccentContainer,
+        tertiary = Color(0xFF80CBC4),
+        onTertiary = Color(0xFF003732),
         background = background,
         onBackground = textPrimary,
         surface = surface,
         onSurface = textPrimary,
         surfaceVariant = surfaceVariant,
         onSurfaceVariant = textSecondary,
-        surfaceContainer = surfaceElevated,
-        surfaceContainerHigh = surfaceHighest,
+        surfaceContainerLowest = surfaceContainerLowest,
+        surfaceContainerLow = surfaceContainerLow,
+        surfaceContainer = surfaceContainer,
+        surfaceContainerHigh = surfaceContainerHigh,
+        surfaceContainerHighest = surfaceContainerHighest,
         error = error,
         onError = onError,
         errorContainer = errorContainer,
