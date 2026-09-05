@@ -21,4 +21,3 @@ GPL-3.0-compatible. Reused code gets: project, file, license, commit, date.
 | Kermit | Apache-2.0 | logging | Phase 02 |
 | LRCLIB (API/service) | open API | synced lyrics source | Phase 11 |
 | JNA | dual LGPL-2.1 / EPL-1.0 | SMTC spike WinRT interop (desktop, Windows paths) | Phase 12 |
-| jna-platform | dual LGPL-2.1 / EPL-1.0 | Win32 User32 interop (HWND lookup, mini-window drag) | Phase 12 |

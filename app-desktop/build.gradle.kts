@@ -22,10 +22,10 @@ kotlin {
                 implementation("io.insert-koin:koin-core:4.0.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 // Phase 12: SMTC spike (JNA WinRT interop, Windows-only paths).
-                // jna-platform = Win32 User32 (HWND lookup + mini-window drag);
-                // the GUID struct comes from base jna (com.sun.jna.win32.Guid).
+                // Base jna only — Smct.kt declares its own Structure/Library
+                // types over user32.dll/combase.dll (the platform artifact's
+                // win32 helpers proved version-fragile; see DEBUG_LOG r6).
                 implementation("net.java.dev.jna:jna:5.17.0")
-                implementation("net.java.dev.jna:jna-platform:5.17.0")
             }
         }
     }

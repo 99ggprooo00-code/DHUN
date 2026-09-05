@@ -5,9 +5,8 @@ import com.sun.jna.Library
 import com.sun.jna.Memory
 import com.sun.jna.Native
 import com.sun.jna.Pointer
+import com.sun.jna.Structure
 import com.sun.jna.WString
-import com.sun.jna.platform.win32.User32
-import com.sun.jna.win32.Guid
 import java.util.UUID
 
 /**
@@ -30,6 +29,15 @@ import java.util.UUID
  * the app. If the probe fails or proves flaky on the user's machine, the
  * documented fallback ships (RISK_REGISTER: "SMTC via JNA unstable → tray
  * + focused-window media keys" — see KNOWN_LIMITATIONS).
+ *
+ * Interop classes are SELF-CONTAINED (plain JNA `Structure`/`Library` over
+ * user32.dll + combase.dll) — deliberately NOT `com.sun.jna.platform.*`
+ * wrappers: the exact availability of the platform artifact's win32
+ * helper classes across JNA versions/artifact splits is version-fragile
+ * (CI round 5 + 6: `com.sun.jna.platform.win32.GUID` doesn't exist, and
+ * `win32.Guid` / `User32.FindWindowW` failed to resolve against the
+ * resolved artifacts). Plain structures + a local `Native.load("user32")`
+ * interface compile against base JNA only.
  *
  * GUID / vtable sources (cross-referenced from the sandbox, 2026-09-04):
  *  - `ISystemMediaTransportControlsInterop` ddb0472d-…: MS docs
@@ -85,13 +93,21 @@ object Smct {
             val lib = loadWinRt()
             steps += ProbeResult("abi", true, "RoGetActivationFactory resolved")
 
-            // 2. Interop activation factory.
-            val factoryOut = Memory(Native.POINTER_SIZE.toLong())
-            val hrFactory = lib.RoGetActivationFactory(
+            // 2. Interop activation factory (HSTRING handle + REFIID).
+            val classIdOut = Memory(Native.POINTER_SIZE.toLong())
+            val hrCreate = lib.WindowsCreateString(
                 WString(RUNTIME_CLASS_SMTC),
-                guidFromIid(IID_SMTC_INTEROP),
-                factoryOut,
+                RUNTIME_CLASS_SMTC.length,
+                classIdOut,
             )
+            val classId = classIdOut.getPointer(0)
+            val factoryOut = Memory(Native.POINTER_SIZE.toLong())
+            val hrFactory = if (classId != null) {
+                lib.RoGetActivationFactory(classId, guidFromIid(IID_SMTC_INTEROP), factoryOut)
+            } else {
+                hrCreate
+            }
+            if (classId != null) lib.WindowsDeleteString(classId)
             val factory = factoryOut.getPointer(0)
             if (hrFactory != 0 || factory == null) {
                 steps += ProbeResult("activate-factory", false, "HRESULT=0x${hrFactory.toString(16)}")
@@ -140,20 +156,92 @@ object Smct {
         }
     }
 
-    /* ---------------- internals ---------------- */
+    /* ---------------- JNA interop (base-JNA only) ---------------- */
 
-    /** RoGetActivationFactory(HSTRING classId, REFIID, void**) → HRESULT. */
-    private interface WinRt : Library {
-        fun RoGetActivationFactory(clsid: WString, iid: Guid.GUID, ppv: Pointer): Int
+    /** Win32 GUID (4+2+2+8 bytes; first three fields little-endian in memory). */
+    private class WinGuid : Structure() {
+        var data1: Int = 0
+        var data2: Short = 0
+        var data3: Short = 0
+        var data4: ByteArray = ByteArray(8)
+
+        override fun getFieldOrder(): List<String> = listOf("data1", "data2", "data3", "data4")
     }
 
+    /** Win32 RECT (pixels). */
+    private class WinRect : Structure() {
+        var left: Int = 0
+        var top: Int = 0
+        var right: Int = 0
+        var bottom: Int = 0
+
+        override fun getFieldOrder(): List<String> = listOf("left", "top", "right", "bottom")
+    }
+
+    /** Minimal user32.dll surface (HWND = Pointer; no jna-platform needed). */
+    private interface User32Lib : Library {
+        companion object {
+            val INSTANCE: User32Lib = Native.load("user32", User32Lib::class.java)
+        }
+
+        fun FindWindowW(lpClassName: WString?, lpWindowName: WString?): Pointer?
+        fun GetWindowRect(hWnd: Pointer?, rect: WinRect?): Int
+        fun SetWindowPos(
+            hWnd: Pointer?,
+            hWndInsertAfter: Pointer?,
+            x: Int,
+            y: Int,
+            cx: Int,
+            cy: Int,
+            uFlags: Int,
+        ): Int
+    }
+
+    private const val SWP_NOSIZE = 0x0001
+    private const val SWP_NOZORDER = 0x0004
+    private const val SWP_NOACTIVATE = 0x0010
+
     /**
-     * UUID string → Win32 GUID struct (base-jna `com.sun.jna.win32.Guid.GUID`).
-     * Layout: first 4 bytes as a little-endian int, next two shorts
-     * little-endian, last 8 bytes as-is (standard C GUID memory layout; the
-     * UUID string is big-endian 128-bit).
+     * combase.dll WinRT ABI. HSTRING is a **handle** (pointer-sized struct),
+     * not a raw string — build it with WindowsCreateString, free it with
+     * WindowsDeleteString (both also in combase.dll).
      */
-    private fun guidFromIid(iid: String): Guid.GUID {
+    private interface WinRt : Library {
+        fun WindowsCreateString(sourceString: WString?, length: Int, hstring: Pointer?): Int
+        fun WindowsDeleteString(hstring: Pointer?)
+        fun RoGetActivationFactory(classId: Pointer?, iid: WinGuid, ppv: Pointer): Int
+    }
+
+    private fun loadWinRt(): WinRt = runCatching { Native.load("combase", WinRt::class.java) }
+        .recoverCatching { Native.load("WindowsCore", WinRt::class.java) }
+        .getOrThrow()
+
+    private fun findHwnd(windowTitle: String): Long? = runCatching {
+        val h = User32Lib.INSTANCE.FindWindowW(WString("SunAwtFrame"), WString(windowTitle))
+        if (h == null) null else h.toLong()
+    }.getOrNull()
+
+    /**
+     * Moves the top-level AWT window [windowTitle] by (dx, dy) px.
+     * Windows-only (user32 SetWindowPos, no size/z-order/activation changes);
+     * used by the mini-player's in-content drag.
+     */
+    fun moveWindow(windowTitle: String, dx: Int, dy: Int): Boolean = if (!isWindows) false else
+        runCatching {
+            val hwnd = User32Lib.INSTANCE.FindWindowW(WString("SunAwtFrame"), WString(windowTitle))
+                ?: return false
+            val rect = WinRect()
+            if (User32Lib.INSTANCE.GetWindowRect(hwnd, rect) == 0) return false
+            val flags = SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE
+            User32Lib.INSTANCE.SetWindowPos(hwnd, null, rect.left + dx, rect.top + dy, 0, 0, flags)
+        }.getOrDefault(false)
+
+    /**
+     * UUID string → Win32 GUID structure. The Java UUID is big-endian 128-bit;
+     * the Win32 layout is the first 4 bytes as a little-endian int, the next
+     * two shorts little-endian, the last 8 bytes as-is.
+     */
+    private fun guidFromIid(iid: String): WinGuid {
         val u = UUID.fromString(iid)
         val b = ByteArray(16)
         val hi = u.mostSignificantBits
@@ -162,41 +250,18 @@ object Smct {
             b[i] = ((hi ushr ((7 - i) * 8)) and 0xFF).toByte()
             b[8 + i] = ((lo ushr ((7 - i) * 8)) and 0xFF).toByte()
         }
-        val g = Guid.GUID()
-        g.Data1 = ((b[0].toInt() and 0xFF) shl 24) or ((b[1].toInt() and 0xFF) shl 16) or
+        val g = WinGuid()
+        g.data1 = ((b[0].toInt() and 0xFF) shl 24) or ((b[1].toInt() and 0xFF) shl 16) or
             ((b[2].toInt() and 0xFF) shl 8) or (b[3].toInt() and 0xFF)
-        g.Data2 = (((b[4].toInt() and 0xFF) shl 8) or (b[5].toInt() and 0xFF)).toShort()
-        g.Data3 = (((b[6].toInt() and 0xFF) shl 8) or (b[7].toInt() and 0xFF)).toShort()
-        g.Data4 = b.copyOfRange(8, 16)
+        g.data2 = (((b[4].toInt() and 0xFF) shl 8) or (b[5].toInt() and 0xFF)).toShort()
+        g.data3 = (((b[6].toInt() and 0xFF) shl 8) or (b[7].toInt() and 0xFF)).toShort()
+        g.data4 = b.copyOfRange(8, 16)
         return g
     }
 
-    private fun loadWinRt(): WinRt = runCatching { Native.load("combase", WinRt::class.java) }
-        .recoverCatching { Native.load("WindowsCore", WinRt::class.java) }
-        .getOrThrow()
-
-    private fun findHwnd(windowTitle: String): Long? = runCatching {
-        val h = User32.INSTANCE.FindWindowW("SunAwtFrame", windowTitle)
-        if (h == null) null else h.toLong()
-    }.getOrNull()
-
-    /**
-     * Moves the top-level AWT window [windowTitle] by (dx, dy) px.
-     * Windows-only (JNA SetWindowPos, no size/z-order/activation changes);
-     * used by the mini-player's in-content drag.
-     */
-    fun moveWindow(windowTitle: String, dx: Int, dy: Int): Boolean = if (!isWindows) false else
-        runCatching {
-            val hwnd = User32.INSTANCE.FindWindowW("SunAwtFrame", windowTitle) ?: return false
-            val rect = User32.RECT()
-            User32.INSTANCE.GetWindowRect(hwnd, rect) || return false
-            val flags = User32.SWP_NOSIZE or User32.SWP_NOZORDER or User32.SWP_NOACTIVATE
-            User32.INSTANCE.SetWindowPos(hwnd, null, rect.left + dx, rect.top + dy, 0, 0, flags)
-        }.getOrDefault(false)
-
     /**
      * Calls vtable slot [slot] of [obj] (WinRT object = IInspectable*).
-     * Args are marshaled by JNA (Long = C long/HWND, GUID by value,
+     * Args are marshaled by JNA (Long = C long/HWND, WinGuid as a Structure,
      * Memory = out pointer slot).
      */
     private fun vtableCall(obj: Pointer, slot: Int, vararg args: Any?): Int {

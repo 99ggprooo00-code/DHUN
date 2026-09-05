@@ -149,6 +149,18 @@ compiled; errors moved to `Smct.kt` (JNA):
   machine. The probe is failure-isolated (logs HRESULT, never throws;
   documented fallback = tray path) so this can't break the app.
 
+Round 6 (run 33944782718 on `a47fd84`): `com.sun.jna.win32.Guid` STILL
+unresolved (import line!) and `User32.FindWindowW` / `User32.RECT`
+unresolved too — while the User32 *import* resolved and base-jna
+Function/Memory/Native all resolved. Conclusion: **the exact win32
+helper classes of the JNA artifacts are version/artifact-split fragile;
+do not build DHUN interop on them.** Rewrote `Smct.kt` fully
+self-contained on base JNA: own `WinGuid`/`WinRect` `Structure`s
+(explicit `getFieldOrder`), own `Native.load("user32")` interface with
+`Pointer`-typed HWND params, SWP_* as local consts. Dropped the
+jna-platform direct dep again (nothing references it; vlcj still pulls
+it transitively for itself).
+
 ---
 
 ## 2026-09-05 · Background playback killed by OEM battery savers (MIUI/HyperOS/OneUI)
