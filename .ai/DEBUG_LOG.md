@@ -144,10 +144,13 @@ icon, intent)` — first attempt failed CI compile on exactly those (run
 33941799559). The real pattern is Service.startForeground + the nested
 `MediaStyleNotificationHelper.MediaStyle(session)`. Second compile round
 (run 33942371150) — smaller mixups: `NotificationCompat.CATEGORY_MEDIA`
-does not exist (it is `android.app.Notification.CATEGORY_MEDIA`), and
-`MediaMetadata.artworkData` is a `ByteArray` — no `toBitmap()`, use
-`BitmapFactory.decodeByteArray(data, 0, data.size)`. When a source fetch is
-not available, verify small API surfaces against the compiler, not memory.
+does not exist, `MediaMetadata.artworkData` is a `ByteArray` (no
+`toBitmap()` — use `BitmapFactory.decodeByteArray(data, 0, data.size)`).
+Third round (run 33942622916): `android.app.Notification.CATEGORY_MEDIA`
+**also does not exist** — the framework has no media category constant at
+all (setCategory removed; MediaStyle + the mediaPlayback FGS type carry
+the semantics). Lesson, repeated twice: **verify small API surfaces
+against the compiler, not memory.**
 - `MainActivity.attach()` → one-shot (per process) system dialog via
   `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + `package:` URI
   (needs `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission, added to

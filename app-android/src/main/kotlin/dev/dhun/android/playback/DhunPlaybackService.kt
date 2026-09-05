@@ -99,7 +99,9 @@ class DhunPlaybackService : MediaSessionService() {
             .setContentIntent(PlaybackGraph.sessionActivityIntent(this))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setCategory(Notification.CATEGORY_MEDIA)
+            // No setCategory: the framework has no CATEGORY_MEDIA constant
+            // (verified by the compiler); MediaStyle + the mediaPlayback
+            // FGS type carry the media semantics.
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setStyle(
                 MediaStyleNotificationHelper.MediaStyle(session)
