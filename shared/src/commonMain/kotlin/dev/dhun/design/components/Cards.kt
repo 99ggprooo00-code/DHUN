@@ -10,6 +10,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.dhun.core.Album
@@ -17,6 +19,7 @@ import dev.dhun.core.Artist
 import dev.dhun.core.Playlist
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 
 @Composable
@@ -34,11 +37,16 @@ fun TrackCard(
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
             contentDescription = track.title,
-            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .shadow(6.dp, DhunShapes.cardLarge, clip = false)
+                .clip(DhunShapes.cardLarge),
+            shape = DhunShapes.cardLarge,
         )
         Text(
             track.title,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.titleSmall,
             color = DhunColors.textPrimary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -106,11 +114,16 @@ fun AlbumCard(
         ArtworkImage(
             imageUrl = album.thumbnailUrl,
             contentDescription = album.title,
-            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .shadow(6.dp, DhunShapes.cardLarge, clip = false)
+                .clip(DhunShapes.cardLarge),
+            shape = DhunShapes.cardLarge,
         )
         Text(
             album.title,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.titleSmall,
             color = DhunColors.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -140,11 +153,16 @@ fun PlaylistCard(
         ArtworkImage(
             imageUrl = playlist.thumbnailUrl,
             contentDescription = playlist.title,
-            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .shadow(6.dp, DhunShapes.cardLarge, clip = false)
+                .clip(DhunShapes.cardLarge),
+            shape = DhunShapes.cardLarge,
         )
         Text(
             playlist.title,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.titleSmall,
             color = DhunColors.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

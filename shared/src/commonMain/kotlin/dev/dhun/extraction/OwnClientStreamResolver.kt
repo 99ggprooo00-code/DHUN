@@ -15,15 +15,25 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * The own-client resolver (ADR-001 + addendum 2026-09-02): InnerTube /player
- * tried under a chain of client identities — WEB_REMIX first (music
- * context), then VISIONOS and TVHTML5 (tokenless per yt-dlp master 2026-08;
- * proven viable in the Phase-01 spike, R5/R3). Parses audio-only adaptive
- * formats with direct URLs; falls back to progressive muxed formats
- * (video+audio container — ExoPlayer plays the audio track fine) when
- * adaptive URLs are withheld. Never signs URLs, never deciphers challenges;
- * where YouTube demands that, returns typed errors carrying per-client
- * evidence so the diagnostics screen says exactly what happened.
+ * The own-client resolver (ADR-001 + addenda 2026-09-02 / 2026-09-05):
+ * InnerTube /player tried under a chain of tokenless client identities
+ * pinned from yt-dlp master `INNERTUBE_CLIENTS`. Never signs URLs, never
+ * deciphers challenges, never uses cookies / PO tokens.
+ *
+ * Chain order (evidence-driven, drill-reorderable):
+ *  1. WEB_EMBEDDED_PLAYER — no GVS PO policy in yt-dlp; embed thirdParty
+ *  2. VISIONOS            — spike R5 (was tokenless even from datacenter)
+ *  3. TVHTML5             — spike R3 / yt-dlp `tv`
+ *  4. TVHTML5 downgraded  — yt-dlp `tv_downgraded` (older Cobalt)
+ *  5. TVHTML5_SIMPLY      — yt-dlp `tv_simply`
+ *  6. MWEB                — mobile web; try for progressive/direct URLs
+ *  7. WEB_REMIX           — music context; often gated, last cheap try
+ *
+ * ANDROID/IOS deliberately omitted (yt-dlp marks GVS PO required).
+ * Rot-drill 33968950214 proved web_remix+visionos+tv all AuthRequired from
+ * Actions IPs — this expanded chain is the proper fix attempt, not a probe
+ * weaken. Parses audio-only adaptive formats with direct URLs; falls back
+ * to progressive muxed formats when adaptive URLs are withheld.
  */
 class OwnClientStreamResolver(
     private val client: InnerTubeClient,
@@ -62,9 +72,25 @@ class OwnClientStreamResolver(
 
     companion object {
         private val STRATEGIES = listOf(
+            Strategy("web_embedded") { c, id ->
+                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_WEB_EMBEDDED)
+            },
+            Strategy("visionos") { c, id ->
+                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_VISIONOS)
+            },
+            Strategy("tv") { c, id ->
+                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV)
+            },
+            Strategy("tv_downgraded") { c, id ->
+                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV_DOWNGRADED)
+            },
+            Strategy("tv_simply") { c, id ->
+                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV_SIMPLY)
+            },
+            Strategy("mweb") { c, id ->
+                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_MWEB)
+            },
             Strategy("web_remix") { c, id -> c.playerResponse(id) },
-            Strategy("visionos") { c, id -> c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_VISIONOS) },
-            Strategy("tv") { c, id -> c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV) },
         )
     }
 }
@@ -86,7 +112,7 @@ internal fun aggregateResolveFailures(outcomes: Map<String, DhunError>): DhunErr
             is DhunError.Unknown -> "UNKNOWN(${error.causeMessage ?: ""})"
         }
         "$label=$text"
-    }.take(200)
+    }.take(400)
     val preferred = outcomes.values.firstOrNull { it !is DhunError.Parse }
         ?: outcomes.values.firstOrNull()
         ?: DhunError.Parse("no attempts made")

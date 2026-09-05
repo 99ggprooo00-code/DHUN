@@ -1,6 +1,9 @@
 package dev.dhun.tools.playbackprobe
 
 import dev.dhun.core.DhunResult
+import dev.dhun.extraction.OwnClientStreamResolver
+import dev.dhun.extraction.ResolvingStreamResolver
+import dev.dhun.extraction.StreamResolver
 import dev.dhun.extraction.NewPipeStreamResolver
 import dev.dhun.extraction.YtDlpStreamResolver
 import dev.dhun.innertube.InnerTubeClient
@@ -15,10 +18,15 @@ import java.net.URL
  * apps will use, so a green drill means the shipped code path is healthy.
  *
  *   1. SEARCH   — own InnerTube client (WEB_REMIX, fresh-scraped version)
- *   2. RESOLVE  — yt-dlp subprocess (ADR-001 primary for desktop)
+ *   2. RESOLVE  — the PRODUCTION desktop chain (ADR-001: own-client
+ *                 primary, yt-dlp failover) — identical to forDesktop()
  *   3. STREAM   — HTTP range-fetch, container verified by magic bytes
  *   4. RELATED  — own InnerTube /next (radio queue)
- *   5. WATCH    — NewPipeExtractor health (non-fatal; upstream status)
+ *   5. WATCH    — per-engine health (own-client, yt-dlp, NewPipeExtractor):
+ *                 non-fatal evidence lines; the rot drill feeds them into
+ *                 ADR-001's evidence-driven engine priority. Added after
+ *                 run 33961533965 gated the verdict on the fallback engine
+ *                 alone while the production primary went untested.
  *
  * Exit 0 = pipeline healthy. Run with `PYTHONPATH` pointing at yt-dlp when
  * installed via `pip --target`.
@@ -68,11 +76,40 @@ fun main(): Unit = runBlocking<Unit> {
         kotlin.system.exitProcess(1)
     }
 
-    // ---- STEP 2+3: RESOLVE (yt-dlp) + STREAM (bytes verified) ---------------
+    // ---- STEP 2+3: RESOLVE (production chain) + STREAM (bytes verified) ----
+    // The fatal gate is the chain a shipped desktop app actually wires
+    // (ADR-001: own-client primary -> yt-dlp failover, same as
+    // YouTubeMusicProvider.forDesktop). NOT a weakening vs the old
+    // yt-dlp-only gate: the URL must still come from production code and
+    // real audio bytes must still stream (HTTP 200/206 + container magic).
+    // If every engine is gated (typical CI datacenter-IP case), the chain
+    // fails and the verdict stays FAIL — kill switch preserved.
+    val ownClient = OwnClientStreamResolver(client)
+    val ytDlp = YtDlpStreamResolver()
+    val chain = ResolvingStreamResolver(primary = ownClient, fallback = ytDlp)
+
+    suspend fun watchEngine(resolver: StreamResolver, label: String) {
+        runCatching {
+            when (val r = resolver.resolve(topTrack.id)) {
+                is DhunResult.Success ->
+                    println("WATCH|$label|OK|${r.value.bitrateKbps ?: "?"} kbps ${r.value.mimeType}")
+                // ${r.error} — bare $r.error interpolates the Failure receiver then
+                // a literal ".error" (seen in run 33968950214 WATCH lines).
+                is DhunResult.Failure -> println("WATCH|$label|BROKEN|${r.error}")
+            }
+        }.onFailure {
+            println("WATCH|$label|BROKEN|${it.javaClass.simpleName}: ${it.message?.take(200)}")
+        }
+    }
+    watchEngine(ownClient, "own-client")
+    watchEngine(ytDlp, "ytdlp")
+
     pass = step("resolve+stream") {
-        val info = when (val r = YtDlpStreamResolver().resolve(topTrack.id)) {
+        val info = when (val r = chain.resolve(topTrack.id)) {
             is DhunResult.Success -> r.value
-            is DhunResult.Failure -> throw IllegalStateException("resolve: ${r.error}")
+            is DhunResult.Failure -> throw IllegalStateException(
+                "resolve via ${chain.name}: ${r.error}",
+            )
         }
         val conn = URL(info.audioUrl).openConnection() as HttpURLConnection
         conn.setRequestProperty("User-Agent", "Mozilla/5.0")
@@ -100,7 +137,7 @@ fun main(): Unit = runBlocking<Unit> {
             String(bytes, 4, 4, Charsets.US_ASCII) == "ftyp" -> "MP4/M4A container"
             else -> error("unknown container: $magic")
         }
-        "PROBE|resolve|PASS|via yt-dlp (\"${topTrack.title}\" by ${topTrack.artistName})\n" +
+            "PROBE|resolve|PASS|via ${chain.name} (\"${topTrack.title}\" by ${topTrack.artistName})\n" +
             "PROBE|stream|PASS|HTTP $code | $ctype | ${bytes.size}B | $magic | $verdict"
     } && pass
 
@@ -126,6 +163,8 @@ fun main(): Unit = runBlocking<Unit> {
             is DhunResult.Success -> println("WATCH|newpipe-stream|OK|${r.value.bitrateKbps}kbps ${r.value.mimeType}")
             is DhunResult.Failure -> println("WATCH|newpipe-stream|BROKEN|${r.error}")
         }
+    }.onFailure {
+        println("WATCH|newpipe-stream|BROKEN|${it.javaClass.simpleName}: ${it.message?.take(200)}")
     }
 
     println("PROBE|verdict|${if (pass) "PASS" else "FAIL"}|extraction-pipeline-" +

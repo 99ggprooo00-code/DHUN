@@ -74,10 +74,12 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 
-    // Playback (Media3): ExoPlayer engine, session service, resolving data source
+    // Playback (Media3): ExoPlayer engine, session service, resolving data source,
+    // Phase 14 bounded audio-segment cache (SimpleCache + StandaloneDatabaseProvider).
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
     implementation("androidx.media3:media3-datasource:1.5.1")
+    implementation("androidx.media3:media3-database:1.5.1")
 
     implementation("io.insert-koin:koin-android:4.0.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")

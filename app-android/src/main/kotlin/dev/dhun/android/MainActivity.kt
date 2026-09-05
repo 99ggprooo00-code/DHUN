@@ -189,6 +189,7 @@ class MainActivity : ComponentActivity() {
                                 dataLayer = dataLayer,
                                 nav = nav,
                                 isDesktop = false,
+                                connectivity = koin.get(),
                             )
                         }
                         s.reason?.let { reason ->
@@ -347,7 +348,8 @@ class MainActivity : ComponentActivity() {
             try {
                 logLine("starting LOCAL fallback player…")
                 val cache = GlobalContext.get().get<dev.dhun.android.playback.DhunStreamCache>()
-                val local = PlaybackGraph.buildExoPlayer(applicationContext, cache)
+                val segments = GlobalContext.get().get<dev.dhun.android.playback.DhunAudioSegmentCache>()
+                val local = PlaybackGraph.buildExoPlayer(applicationContext, cache, segments)
                 attach(AndroidDhunPlayer(local, activityScope))
                 logLine("local player ready — audio will play; session controls degraded")
                 connectState.value = ConnectUi.Ready(

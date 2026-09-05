@@ -11,6 +11,7 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.player.DhunPlayer
+import dev.dhun.player.StreamRecoverySignal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -232,14 +233,24 @@ class AndroidDhunPlayer(
             _shuffleEnabled.value = player.shuffleModeEnabled
             _volume.value = player.volume.coerceIn(0f, 1f)
             _state.value = when {
-                player.playerError != null -> {
+                player.playerError != null && !StreamRecoverySignal.active.value -> {
                     val message = player.playerError?.let { describeErrorChain(it) } ?: "Playback error"
                     android.util.Log.e("DHUN", "playback error: $message")
                     PlaybackState.Error(track, message)
                 }
-                player.isPlaying -> PlaybackState.Playing(track ?: UNKNOWN)
+                // 403 mid-stream recovery in flight (PlaybackGraph set the signal).
+                StreamRecoverySignal.active.value && track != null ->
+                    PlaybackState.Recovering(track)
+                player.isPlaying -> {
+                    StreamRecoverySignal.end()
+                    PlaybackState.Playing(track ?: UNKNOWN)
+                }
                 player.playbackState == Player.STATE_BUFFERING ->
-                    PlaybackState.Buffering(track ?: UNKNOWN)
+                    if (StreamRecoverySignal.active.value && track != null) {
+                        PlaybackState.Recovering(track)
+                    } else {
+                        PlaybackState.Buffering(track ?: UNKNOWN)
+                    }
                 player.playbackState == Player.STATE_READY ->
                     PlaybackState.Paused(track ?: UNKNOWN)
                 // Restored-but-not-prepared queue (playWhenReady=false before

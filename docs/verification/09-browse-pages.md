@@ -69,3 +69,12 @@ flag drift.
   the sub-page itself is Phase-09 follow-up work.
 - YouTube browse layout drift risk is real; parsing is tolerant + rot drill
   watches endpoints.
+
+## M3 glass browse (2026-09-05)
+
+| Item | Status |
+|---|---|
+| Artist frosted collapse toolbar | 🟨 |
+| Album/Playlist frosted track rows | 🟨 |
+| Floating frosted back chip | 🟨 |
+| Hardware checklist | ⬜ still OPEN |

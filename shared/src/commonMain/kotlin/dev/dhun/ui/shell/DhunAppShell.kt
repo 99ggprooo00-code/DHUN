@@ -1,10 +1,12 @@
 package dev.dhun.ui.shell
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -25,6 +27,7 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,16 +39,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import dev.dhun.core.AlwaysOnlineConnectivityMonitor
+import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
+import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.player.DhunPlayer
@@ -53,6 +61,7 @@ import dev.dhun.presentation.browse.AlbumViewModel
 import dev.dhun.presentation.browse.ArtistViewModel
 import dev.dhun.presentation.browse.PlaylistViewModel
 import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
@@ -95,6 +104,7 @@ fun DhunAppShell(
     modifier: Modifier = Modifier,
     isDesktop: Boolean = false,
     libraryViewModel: LibraryViewModel? = null,
+    connectivity: ConnectivityMonitor = AlwaysOnlineConnectivityMonitor,
 ) {
     val scope = rememberCoroutineScope()
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
@@ -137,9 +147,67 @@ fun DhunAppShell(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val useNavigationRail = maxWidth >= DhunSpacing.navigationRailBreakpoint
+        // Phase 14 error taxonomy: offline banner. Rendered in the Scaffold
+        // topBar slot so innerPadding pushes content down while it shows.
+        val isOnline by connectivity.isOnline.collectAsState()
+        val sleepRemaining by playerViewModel.sleepTimerRemainingMs.collectAsState()
+        val sleepLabel = sleepRemaining?.let { ms ->
+            val mins = ((ms + 59_999L) / 60_000L).toInt().coerceAtLeast(1)
+            "Sleep · ${mins}m"
+        }
+        // Lightweight ambient wash from now-playing art (seed hash — no
+        // continuous full-res blur; FullPlayer still owns the real blur layer).
+        val ambient by animateColorAsState(
+            targetValue = currentTrack?.let {
+                ArtworkColorExtractor.extractFromSeed(it.thumbnailUrl ?: it.id).backgroundTint
+            } ?: Color.Transparent,
+            animationSpec = DhunAnimations.slowTween(),
+            label = "shellAmbient",
+        )
+        // Ambient glass wash from now-playing (seed tint — lightweight).
+        // FullPlayer still owns the real once-per-track artwork blur layer.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(DhunColors.background)
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to ambient.copy(alpha = 0.42f),
+                            0.28f to ambient.copy(alpha = 0.14f),
+                            0.55f to Color.Transparent,
+                            1.0f to Color.Transparent,
+                        ),
+                    ),
+                )
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            ambient.copy(alpha = 0.18f),
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = DhunColors.background,
+            containerColor = Color.Transparent,
+            topBar = {
+                AnimatedVisibility(
+                    visible = !isOnline,
+                    enter = slideInVertically { -it } + fadeIn(DhunAnimations.mediumTween()),
+                    exit = slideOutVertically { -it } + fadeOut(DhunAnimations.fastTween()),
+                ) {
+                    Surface(color = DhunColors.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "You're offline. Search and streaming are unavailable until the connection returns.",
+                            fontSize = DhunTypographyTokens.labelSmall.fontSize,
+                            color = DhunColors.warning,
+                            modifier = Modifier.padding(DhunSpacing.xsPlus),
+                        )
+                    }
+                }
+            },
             bottomBar = if (useNavigationRail) {
                 {}
             } else {
@@ -174,6 +242,20 @@ fun DhunAppShell(
                         onPlayTrack = onPlayTrack,
                         onNavigate = { nav.push(it) },
                         onTrackOverflow = { overflowTrack = it },
+                        onOpenLiked = {
+                            libraryVm.selectTab(LibraryTab.FAVORITES)
+                            nav.selectedTab = AppTab.LIBRARY
+                            nav.detailStack.clear()
+                        },
+                        onOpenOffline = {
+                            // Segment cache lives under playback; Library is the
+                            // honest destination until a dedicated Offline page.
+                            libraryVm.selectTab(LibraryTab.PLAYLISTS)
+                            nav.selectedTab = AppTab.LIBRARY
+                            nav.detailStack.clear()
+                        },
+                        sleepTimerLabel = sleepLabel,
+                        onCycleSleepTimer = { playerViewModel.cycleSleepTimer() },
                     )
                     is DetailRoute.ArtistPage -> {
                         val vm = remember(route.id) { ArtistViewModel(provider, player, route.id) }
@@ -316,6 +398,7 @@ private fun BottomNavigationBar(
                 onExpand = { nav.playerExpanded = true },
             )
         }
+        // Frosted M3 bottom bar (glass-morphism dock — not Liquid Glass).
         GlassBottomBar(
             modifier = Modifier.fillMaxWidth(),
             shape = DhunShapes.bottomSheet,
@@ -323,6 +406,7 @@ private fun BottomNavigationBar(
             NavigationBar(
                 containerColor = Color.Transparent,
                 contentColor = DhunColors.textPrimary,
+                tonalElevation = DhunSpacing.zero,
                 modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
             ) {
                 AppTab.entries.forEach { tab ->
@@ -343,7 +427,7 @@ private fun BottomNavigationBar(
 @Composable
 private fun AppNavigationRail(nav: AppNavState) {
     NavigationRail(
-        containerColor = DhunColors.surface,
+        containerColor = DhunColors.glassStrong,
         contentColor = DhunColors.textPrimary,
         modifier = Modifier.fillMaxHeight(),
     ) {
@@ -404,7 +488,7 @@ private fun RowScope.AppBottomNavigationItem(
         icon = { AppNavigationIcon(tab, selected) },
         label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
         colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = DhunColors.accent,
+            selectedIconColor = DhunColors.onAccentContainer,
             selectedTextColor = DhunColors.accent,
             unselectedIconColor = DhunColors.textTertiary,
             unselectedTextColor = DhunColors.textTertiary,
@@ -422,6 +506,10 @@ private fun TabContent(
     onPlayTrack: (Track, List<Track>, Int) -> Unit,
     onNavigate: (DetailRoute) -> Unit,
     onTrackOverflow: (Track) -> Unit,
+    onOpenLiked: () -> Unit = {},
+    onOpenOffline: () -> Unit = {},
+    sleepTimerLabel: String? = null,
+    onCycleSleepTimer: () -> Unit = {},
 ) {
     when (tab) {
         AppTab.HOME -> {
@@ -432,6 +520,10 @@ private fun TabContent(
                 onPlaylistClick = { onNavigate(DetailRoute.PlaylistPage(it.id)) },
                 onArtistClick = { onNavigate(DetailRoute.ArtistPage(it.id)) },
                 onTrackOverflow = onTrackOverflow,
+                onOpenLiked = onOpenLiked,
+                onOpenOffline = onOpenOffline,
+                sleepTimerLabel = sleepTimerLabel,
+                onCycleSleepTimer = onCycleSleepTimer,
             )
         }
         AppTab.SEARCH -> {

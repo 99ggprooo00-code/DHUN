@@ -347,7 +347,24 @@ class SqlDelightNowPlayingRepository(
     }
 
     override suspend fun updateProgress(currentIndex: Int, positionMs: Long): Unit = withContext(io) {
-        db.nowPlayingQueries.updatePosition(positionMs.coerceAtLeast(0), currentIndex.toLong(), clock.nowMs())
+        val pos = positionMs.coerceAtLeast(0)
+        val idx = currentIndex.toLong()
+        val now = clock.nowMs()
+        // updatePosition is a no-op when no state row exists yet (race: a
+        // progress tick before the first saveQueue commits). Upsert so a
+        // late tick still lands the position the user actually heard.
+        val existing = db.nowPlayingQueries.selectState().executeAsOneOrNull()
+        if (existing == null) {
+            db.nowPlayingQueries.upsertState(
+                currentIndex = idx,
+                positionMs = pos,
+                repeatMode = RepeatMode.OFF.name,
+                shuffle = false,
+                savedAt = now,
+            )
+        } else {
+            db.nowPlayingQueries.updatePosition(pos, idx, now)
+        }
     }
 
     override suspend fun load(): NowPlayingSnapshot? = withContext(io) {

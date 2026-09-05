@@ -105,3 +105,50 @@ identified in code review:
 two-tier intent with a maintenance-cheap lever (edit the identity list)
 instead of an engine dependency on Android. The chain order is evidence-
 driven and may be reordered by future drill results.
+
+## Addendum — 2026-09-05: expanded tokenless client chain (post rot-drill 33968950214)
+
+**Context:** Live rot-drill on the fixed production-chain probe
+(`arena/01a07170-dhun` @ `10ad025`, run 33968950214) returned:
+
+```
+WATCH|own-client|BROKEN|AuthRequired(web_remix + visionos + tv all
+  AUTH_REQUIRED — Sign in to confirm you're not a bot)
+WATCH|ytdlp|BROKEN|AuthRequired(... same bot gate ... --cookies ...)
+PROBE|related|PASS|50   (metadata still healthy)
+PROBE|verdict|FAIL
+```
+
+So as of 2026-09-05, the **three identities the 2026-09-02 addendum
+shipped** are all bot-gated from GitHub Actions datacenter IPs, and
+yt-dlp's **default** player path is too. Metadata WEB_REMIX is fine.
+This is category-8 CI-network evidence — not proof residential is dead,
+and **not** a reason to weaken the probe or add cookies without a
+separate ADR + user sign-off.
+
+**Decision (proper fix, not a mask):**
+
+1. Expand `OwnClientStreamResolver` to a 7-identity tokenless chain,
+   shapes pinned from yt-dlp master `INNERTUBE_CLIENTS` (2026-09-05):
+   `WEB_EMBEDDED_PLAYER` (with `thirdParty.embedUrl`) → `VISIONOS` →
+   `TVHTML5` → `TVHTML5` downgraded → `TVHTML5_SIMPLY` → `MWEB` →
+   `WEB_REMIX`. ANDROID/IOS still omitted (GVS PO required).
+2. `YtDlpStreamResolver` passes explicit
+   `--extractor-args youtube:player_client=web_embedded,tv,tv_downgraded,tv_simply,mweb,web_safari,android`
+   instead of relying on yt-dlp's default-only path. Still **no
+   `--cookies` / `--cookies-from-browser`**.
+3. Probe kill switch, stream-byte verification, and fail-loud
+   `AuthRequired.detail` stay unchanged. A CI red under category 8 is
+   still red; residential verification remains the user-impact gate.
+4. Action versions in rot-drill/CI may be bumped for Node 20 deprecation
+   noise — orthogonal to extraction.
+
+**Rejected for this change:** cookies/sign-in, PO-token minting,
+attestation spoofing, making the probe pass without a real audio URL,
+skipping the byte check.
+
+**Consequences:** more attempts per resolve (bounded, still typed
+errors with per-client detail). Drill reorders the chain when evidence
+shifts. If every identity stays gated from CI **and** residential,
+escalate via RISK_REGISTER (upstream recovery / user decision on pivot).
+

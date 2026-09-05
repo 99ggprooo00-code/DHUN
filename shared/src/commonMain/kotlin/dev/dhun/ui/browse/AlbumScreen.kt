@@ -85,8 +85,14 @@ fun AlbumScreen(
             )
         }
 
-        // Floating back
-        Box(modifier = Modifier.padding(DhunSpacing.xs)) {
+        // Floating frosted back chip
+        Box(
+            modifier = Modifier
+                .padding(DhunSpacing.sm)
+                .clip(DhunShapes.full)
+                .background(DhunColors.glassStrong)
+                .padding(DhunSpacing.xs),
+        ) {
             DhunIconButton(
                 onClick = onBack,
                 modifier = Modifier.size(DhunSpacing.touchTarget),
@@ -123,7 +129,7 @@ private fun AlbumContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = DhunSpacing.xxxl),
+        contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
         // Header: big artwork + meta over the artwork-tinted gradient
         item(key = "header") {
@@ -150,7 +156,6 @@ private fun AlbumContent(
                         text = detail.title,
                         style = MaterialTheme.typography.headlineSmall,
                         color = DhunColors.textPrimary,
-                        fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(horizontal = DhunSpacing.xxl),
@@ -259,9 +264,15 @@ private fun AlbumTrackRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(DhunShapes.small)
+            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs)
+            .clip(DhunShapes.large)
+            .background(
+                Brush.verticalGradient(
+                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.5f)),
+                ),
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.sm),
+            .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.smPlus),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -273,7 +284,7 @@ private fun AlbumTrackRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = DhunColors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

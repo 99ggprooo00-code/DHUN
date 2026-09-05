@@ -38,6 +38,8 @@ class GetHomeFeedUseCase(
             is DhunResult.Success -> {
                 val sections = r.value
                 val quickPicks = extractQuickPicks(sections)
+                // Keep remote shelves intact so Home can scroll deep; only
+                // promote quick-picks extraction for the grid hero.
                 DhunResult.Success(
                     HomeFeed(
                         greeting = greeting,
@@ -56,7 +58,8 @@ class GetHomeFeedUseCase(
         val quickSection = sections.firstOrNull { it.title.contains("quick", ignoreCase = true) }
         val tracks = quickSection?.tracks?.takeIf { it.isNotEmpty() }
             ?: sections.flatMap { it.tracks }
-        return tracks.distinctBy { it.id }.take(6)
+        // Responsive grid: up to 12 so Home can show 2×N without feeling short.
+        return tracks.distinctBy { it.id }.take(12)
     }
 
     companion object {
@@ -73,7 +76,38 @@ class GetHomeFeedUseCase(
             val utcHour = ((totalHours % 24) + 24) % 24
             return greetingForHour(utcHour.toInt())
         }
+
+        /**
+         * Lightweight Home shelf classifier — UI filters / labels without a
+         * second network hop. Keywords match InnerTube English shelf titles.
+         */
+        fun classifySection(title: String): HomeShelfKind {
+            val t = title.lowercase()
+            return when {
+                "chart" in t || "trending" in t || "top 100" in t || "top songs" in t ->
+                    HomeShelfKind.CHARTS
+                "mood" in t || "genre" in t || "feeling" in t ->
+                    HomeShelfKind.MOOD
+                "album" in t || "ep" in t || "single" in t || "new release" in t || "releases" in t ->
+                    HomeShelfKind.ALBUMS
+                "mix" in t || "radio" in t || "station" in t || "forgotten" in t ||
+                    "rediscover" in t || "for you" in t || "made for" in t ->
+                    HomeShelfKind.MIX
+                "quick" in t -> HomeShelfKind.QUICK_PICKS
+                else -> HomeShelfKind.OTHER
+            }
+        }
     }
+}
+
+/** Home shelf kinds used by mood chips and section grouping. */
+enum class HomeShelfKind {
+    QUICK_PICKS,
+    ALBUMS,
+    CHARTS,
+    MOOD,
+    MIX,
+    OTHER,
 }
 
 /* ---------------- favorites ---------------- */

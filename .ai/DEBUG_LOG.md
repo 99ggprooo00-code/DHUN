@@ -1,8 +1,292 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — PR #16 ready for pull
+
+Title/body refreshed for full scope (Phase 14 + M3 glass UI). CI green,
+mergeable CLEAN @ `1df07b3`. Human gates: residential stream, HW soaks, v0.1.0.
+
+## 2026-09-05 — Browse + queue glass rows
+
+Artist toolbar / Album+Playlist frosted track rows / floating back chips /
+FullPlayer Queue+Related glass cells. Same glass-morphism language app-wide.
+
+## 2026-09-05 — M3 glass lists + lyrics motion
+
+Search frosted field, Library pill tabs, TrackRow glass cells, airier spacing,
+synced lyrics active-line emphasis (ADR-002 P8 lightweight). Still no Liquid Glass.
+
+## 2026-09-05 — M3 glass-morphism chrome (not Liquid Glass)
+
+User: want translucent blurry glass-morphism, still lightweight, not boring.
+
+**Shipped:** GlassCard frosted fill (no content blur), GlassBottomBar dock,
+frosted chips/home/player panels, richer ambient wash, FullPlayer sheet handle.
+
+## 2026-09-05 — M3 UI overhaul (Home depth + sans type)
+
+**User brief:** Expert M3 overhaul — readable sans, deep Home, M3 surfaces,
+ambient art wash, immersive player (already ADR-002), quick-action chips.
+Lightweight but not boring. No Liquid Glass.
+
+**Shipped:** typography lock, Home chips + classified shelves, M3 shapes/
+surfaces/nav, shell ambient, sleep timer.
+
+## 2026-09-05 — Phase 14 audio-segment cache (Android)
+
+**Shipped:** Media3 SimpleCache LRU (`DhunAudioSegmentCache`), wired in
+`PlaybackGraph` with stable video-id keys; offline span replay when
+resolve fails; budget `CACHE_SIZE_MB` default 1 GiB.
+
+**Not claimed:** HW offline proof, desktop cache, soaks, v0.1.0, residential
+extraction (still CDN 403 on Actions).
+
+## 2026-09-05 — ADR-002 M3 polish + Recovering (no Liquid Glass)
+
+**User:** No Liquid Glass; Material 3 OK; plan + execute.
+
+**Shipped:**
+- `PlaybackState.Recovering` / `StreamRecoverySignal` / PlaybackGraph 403 → chip
+- FullPlayer lyrics-dominant (Lyrics tab) + BlurredArtworkCache
+- ADR-002 hardened M3-only
+
+**Not claimed done:** residential stream, hardware 08/11, soaks, v0.1.0.
+Live drill still 33970045379 URL→CDN 403.
+
 Format: date · title · symptom (with stack where available) · root cause ·
 fix · verification state. Newest first. If you hit one of these again,
 read this entry before re-diagnosing.
+
+---
+
+## 2026-09-05 · rot-drill 33970045379 — expanded chain got googlevideo URL, CDN 403 on bytes
+
+**Ref:** `d9f4083` on `arena/01a07170-dhun`.  
+**Evidence:** `PROBE|resolve+stream|FAIL|IOException: ... 403 ... googlevideo.com/videoplayback...itag=251`.  
+**Meaning:** client_client list produced a URL; Actions IP cannot fetch media bytes (category 8 CDN gate). Own-client WATCH `Unavailable`. Still not a green drill; still not a reason to skip byte checks or add cookies without ADR.
+
+**Next:** residential smoke; optional nsig research; ADR-002 player polish only after one real play.
+
+---
+
+## 2026-09-05 · proper fix after 33968950214 — expand tokenless client chain (no probe mask)
+
+**Trigger:** User confirmed the job diagnosis: all three playback paths
+broken with AuthRequired / NewPipe Parse; asked for a proper fix on a
+branch, not masking the failing probe. Session is pinned to
+`arena/01a07170-dhun` (no new branch).
+
+**What we will NOT do:** cookies, PO tokens, attestation spoofing,
+skipping stream-byte checks, converting CI red into a synthetic pass.
+
+**What we will do (code):**
+1. `OwnClientStreamResolver` — 7-identity chain from yt-dlp master
+   INNERTUBE_CLIENTS: web_embedded (thirdParty.embedUrl) → visionos → tv →
+   tv_downgraded → tv_simply → mweb → web_remix. ANDROID/IOS still out.
+2. `YtDlpStreamResolver` — explicit
+   `youtube:player_client=web_embedded,tv,tv_downgraded,tv_simply,mweb,web_safari,android`
+   instead of default-only path that 33968950214 showed gated.
+3. ADR-001 addendum 2026-09-05; KNOWN_LIMITATIONS; setup-java@v5 bump
+   (Node 20 deprecation noise only).
+
+**Verification:** CI compile/tests on PR #16; live rot-drill re-dispatch
+on this branch (agent cannot dispatch). PASS only if real audio bytes
+verify. FAIL with fuller per-client detail is still an honest category-8
+result.
+
+---
+
+## 2026-09-05 · rot-drill run 33968950214 — fixed branch LIVE; both engines CI-IP gated
+
+**Run:** https://github.com/99ggprooo00-code/DHUN/actions/runs/33968950214  
+**Ref:** `arena/01a07170-dhun` @ `10ad025` (correct branch — first time)  
+**Conclusion:** failure via intentional kill switch after alert.
+
+**Probe evidence (from issue #14 comment, artifact `rot-drill-33968950214`):**
+```
+yt-dlp 2026.08.19
+PROBE|version|PASS|WEB_REMIX 1.20260901.12.00
+PROBE|search|PASS|20 music-song results
+WATCH|own-client|BROKEN|AuthRequired(web_remix/visionos/tv all AUTH_REQUIRED
+  Sign in to confirm you're not a bot)
+WATCH|ytdlp|BROKEN|AuthRequired(ERROR: [youtube] utwMHfDZ6SA: Sign in to
+  confirm you're not a bot. Use --cookies-from-browser or --cookies ...)
+PROBE|resolve+stream|FAIL|resolve via resolving(own-innertube-player -> yt-dlp)
+PROBE|related|PASS|50 related tracks
+WATCH|newpipe-stream|BROKEN|Parse(JSON response is too short)
+PROBE|verdict|FAIL|extraction-pipeline-broken
+```
+
+**Root cause:** Category **8 — YouTube datacenter-IP bot gating** of the
+player endpoint from the Actions runner. Now confirmed against the
+**production** chain: Android's only engine (own-client, all three
+strategies) and desktop primary+fallback (own-client + yt-dlp) are all
+gated. Metadata endpoints still work from the same IP. Not extractor-shape
+rot; not a workflow bug; kill switch correct.
+
+**Fixes verified live (vs main@a554594 runs):** production chain gate,
+per-engine WATCH lines, AuthRequired.detail populated, artifact name in
+issue body, yt-dlp version in artifact.
+
+**Minor defect found:** WATCH/resolve used Kotlin `"$r.error"` which prints
+`Failure(...).error` (receiver + literal). Fix: `"${r.error}"`.
+
+**Policy (do not violate):**
+- Do not weaken stream-byte verification or tolerate resolve failures to
+  get a green CI drill.
+- Do not add cookie/sign-in flows without ADR + user sign-off.
+- Residential hardware is the next evidence gate for user-facing impact.
+- CI red + residential green ⇒ record here; keep kill switch.
+
+**Next:** push string-template fix; continue Phase 14 taxonomy/audio-cache
+work; keep soaks/v0.1.0 open.
+
+---
+
+## 2026-09-05 · rot-drill run 33968612285 FAILED on main@a554594 — wrong ref, not a fix regression
+
+**Symptom:** User saw step **"Fail the workflow after alerting" → `exit 1`**
+and concluded nothing updated. Run:
+https://github.com/99ggprooo00-code/DHUN/actions/runs/33968612285
+
+**Root cause:** `workflow_dispatch` targeted **`main` @ `a554594`** (PR #13
+merge), which still has the pre-fix probe (yt-dlp alone, `AuthRequired()`
+with null detail, issue-body backtick bug). Probe output is a byte-for-byte
+repeat of run 33961533965. The `exit 1` step is the intentional kill switch
+after `steps.probe.outcome == failure` — not a new defect.
+
+**Not the cause:** PR #16 / branch `arena/01a07170-dhun` code was never
+checked out. Agent still cannot dispatch (`HTTP 403` on
+`actions/workflows/.../dispatches`).
+
+**Response:** Comment on issue #14 with the wrong-ref diagnosis. ROADMAP
+CURRENT ACTIVE TASK updated. Next human action: dispatch rot-drill with
+branch **`arena/01a07170-dhun`**, or merge PR #16 then re-run on main.
+
+**Verification state:** PR #16 CI remains GREEN (`33967339900`). Live green
+verdict still does not exist.
+
+---
+
+## 2026-09-05 · CI red on PR #16 (run 33967027211): NowPlayingPersistenceTest 15s timeout
+
+**Symptom** (CI step "Unit tests — shared domain"):
+```
+kotlinx.coroutines.TimeoutCancellationException: Timed out waiting for 15000 ms
+  @ NowPlayingPersistenceTest$eventually$2.invokeSuspend(NowPlayingPersistenceTest.kt:110)
+Test failed: NowPlayingPersistenceTest.queueAndProgressArePersistedThenRestoredPaused
+```
+Same code tree was GREEN on PR #15 run `33963828155` (identical persistence
++ JDBC path) → load/timing flake, not a rot-drill regression.
+
+**Root cause (two cooperating defects):**
+1. **JDBC single-connection concurrency.** `JdbcSqliteDriver.IN_MEMORY` is
+   one shared connection; every `SqlDelight*Repository` defaulted its `io`
+   dispatcher to `Dispatchers.Default` (multi-threaded). On track start,
+   `NowPlayingPersistence.onTrackChanged` does `recordPlay` (history write)
+   then `snapshot` (nowPlaying write) while the queue collector also fires
+   `snapshot`, and the progress loop may fire `updateProgress` — concurrent
+   JDBC access can hang or drop the position row so
+   `load()?.positionMs == 30_000` never becomes true.
+2. **Test ordering.** The test set `positionMs = 30_000` *after*
+   `prepareQueue`, so the first snapshots could persist `positionMs=0`; the
+   test then depended solely on a later progress tick winning against the
+   concurrent history write. `updateProgress` was also a pure `UPDATE … WHERE
+   id = 1` — a no-op if the state row was not yet committed.
+
+**Fix (this session, branch `arena/01a07170-dhun`):**
+- `DataLayer` now builds one `Dispatchers.Default.limitedParallelism(1)` and
+  hands it to every repository — one-connection SQLite is single-threaded
+  at the app boundary (correct for JVM file DB and in-memory tests).
+- `SqlDelightNowPlayingRepository.updateProgress` upserts state when the
+  row is missing (late tick still lands the heard position).
+- Test sets duration+position *before* `prepareQueue` and waits for the
+  queue ids first, then the position — clearer failure mode.
+
+**Verification:** push → require CI green on PR #16 (run after this commit).
+Sandbox has no JDK so CI is the compile/test gate.
+
+---
+
+## 2026-09-05 · rot-drill run 33961533965 FAILED — first live drill red (yt-dlp bot-gated from CI IP)
+
+**Symptom** (job 101295458477, step "Fail the workflow after alerting"):
+`Process completed with exit code 1.` — that step is the INTENTIONAL
+kill switch (`exit 1` when `steps.probe.outcome == 'failure'`), so it is
+the alert, not the cause. Real failure output, from issue #14 (tail of the
+run's `rot-drill.log` artifact):
+
+```
+PROBE|version|PASS|WEB_REMIX 1.20260901.12.00 (scraped from homepage HTML)
+PROBE|search|PASS|20 music-song results
+PROBE|resolve+stream|FAIL|IllegalStateException: resolve: AuthRequired(detail=null)
+PROBE|related|PASS|50 related tracks
+WATCH|newpipe-stream|BROKEN|Parse(detail=JSON response is too short)
+PROBE|verdict|FAIL|extraction-pipeline-broken
+```
+
+**Root cause** (chain of evidence, no guessing):
+1. `PROBE|resolve+stream` failed inside `YtDlpStreamResolver.resolve`:
+   that mapping fires ONLY when yt-dlp's last non-blank stderr line contains
+   "Sign in to confirm" — YouTube's bot-gate text
+   (`JvmStreamResolvers.kt: message.contains("Sign in to confirm") →
+   DhunError.AuthRequired()`).
+2. CI installed yt-dlp **2026.08.19** (latest on PyPI today — verified from
+   this sandbox), the exact version ADR-001 measured tokenless-working from
+   a hostile datacenter IP on 2026-09-01 ⇒ not a version regression;
+   YouTube tightened player-endpoint gating for the Actions runner IP class
+   between 09-01 and 09-05.
+3. Metadata endpoints kept working from the SAME runner in the SAME run
+   (version scrape, 20 search results, 50 related) ⇒ player-endpoint
+   gating, not a blanket IP block, not an InnerTube-shape break.
+4. Classification: **YouTube/datacenter-IP bot blocking (category 8)**.
+   Residential impact unproven either way — this is CI-network evidence.
+
+**Aggravating defects found while diagnosing (all real, all to fix):**
+- Probe misalignment: fatal step drove `YtDlpStreamResolver` ALONE (the
+  desktop FALLBACK per ADR-001), never the production primary
+  (`OwnClientStreamResolver`, the ONLY engine Android ships). The drill
+  gated the verdict on an engine production uses second.
+- Diagnostics loss: yt-dlp's stderr line was discarded when typing
+  `AuthRequired` → printed `detail=null`, violating ADR-001's
+  "detail carries the per-attempt evidence" contract. We had to infer the
+  trigger text from the code path instead of reading it in the log.
+- Workflow quoting bug: `` `rot-drill-${GITHUB_RUN_ID}` `` inside the
+  double-quoted bash issue body executed as command substitution → issue
+  #14 shows "The attached  artifact" with the name swallowed.
+- Evidence gap: `yt-dlp --version` printed only to the step log; the
+  `rot-drill.log` artifact starts at Gradle, so the artifact cannot prove
+  which engine version ran.
+
+**Environment traps re-confirmed this session:** this sandbox has no JDK
+(CI is the compile gate) and YouTube egress is TLS-blocked here
+(`yt-dlp` fails `TLS/SSL connection has been closed (EOF)`) — live
+reproduction must happen on GitHub Actions, not locally.
+
+**Fix (this session, small commits):**
+1. `YtDlpStreamResolver`: carry yt-dlp's last stderr line into
+   `AuthRequired(detail=…)` / `Unknown(causeMessage=…)` — typed errors and
+   fail-loud behavior unchanged.
+2. Probe `Main.kt`: fatal `resolve+stream` step now drives the REAL
+   production chain (`ResolvingStreamResolver(OwnClientStreamResolver →
+   YtDlpStreamResolver)`, identical to `forDesktop`), with new per-engine
+   `WATCH` lines (`WATCH|own-client`, `WATCH|ytdlp`) alongside the existing
+   NewPipe watch. NOT a weakening: audio bytes still HTTP-fetched and
+   magic-byte-verified; both engines gated ⇒ verdict still FAIL.
+3. `rot-drill.yml`: quote the issue body safely (no backtick execution),
+   append `yt-dlp --version` into `rot-drill.log`.
+
+**Verification state:** code fixes are CI-verified — PR #15, run
+`33963002355` GREEN 2026-09-05 (shared unit tests, Android debug build,
+probe compile; sandbox has no JDK so CI is the compile gate). Live rerun
+still PENDING: the sandbox token cannot dispatch workflows
+(`HTTP 403: Resource not accessible by integration`, re-confirmed) — the
+drill must be re-dispatched from the GitHub UI on ref
+`arena/01a07141-dhun` (exactly how run 33961533965 was dispatched) or left
+to the 04:17 UTC cron after PR #15 merges. Green requires a real
+`PROBE|verdict|PASS`; if the own-client tier is ALSO gated from CI, the
+drill stays red (CI-network gating evidence — see the
+"CI-network vs residential" note in KNOWN_LIMITATIONS) and residential
+verification moves to real hardware.
 
 ---
 

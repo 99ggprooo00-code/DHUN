@@ -25,9 +25,9 @@ object DhunSpacing {
     val huge = 48.dp
 
     // Semantic aliases
-    val screenPadding = lg
+    val screenPadding = xl  // airier than Phase 07 (was 16dp)
     val cardPadding = md
-    val sectionSpacing = xxl
+    val sectionSpacing = xxxl
     val itemSpacing = sm
     val touchTarget = 48.dp
     val compactTarget = 44.dp
@@ -35,11 +35,11 @@ object DhunSpacing {
     val artworkMini = 56.dp
     val navigationBarContent = 64.dp
     val navigationRailBreakpoint = 840.dp
-    val listRowHeight = 68.dp
+    val listRowHeight = 72.dp
     val miniPlayerHeight = 72.dp
     val bottomNavHeight = 80.dp
     val transportRowHeight = 88.dp
-    val contentBottomInset = 96.dp
+    val contentBottomInset = 112.dp  // room above frosted mini+nav dock
     val skeletonCardHeight = 110.dp
     val skeletonTextWidth = 120.dp
     val skeletonMetaWidth = 140.dp

@@ -161,6 +161,11 @@ sealed interface PlaybackState {
     data object Idle : PlaybackState
     data class Resolving(val track: Track) : PlaybackState
     data class Buffering(val track: Track) : PlaybackState
+    /**
+     * Mid-stream URL recovery (e.g. HTTP 403 → invalidate cache → re-resolve).
+     * UI shows a brief "Reconnecting…" chip; not a hard error yet.
+     */
+    data class Recovering(val track: Track) : PlaybackState
     data class Playing(val track: Track) : PlaybackState
     data class Paused(val track: Track) : PlaybackState
     data class Error(val track: Track?, val message: String) : PlaybackState

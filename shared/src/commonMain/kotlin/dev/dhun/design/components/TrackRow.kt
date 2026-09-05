@@ -1,5 +1,6 @@
 package dev.dhun.design.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,19 +13,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 
 /**
- * TrackRow — the list workhorse (Home, Search, Queue, History).
- * States: normal, pressed (via clickable ripple), disabled (enabled=false),
- * loading (show shimmer instead of this).
+ * TrackRow — list workhorse (Search, Queue, History, Favorites).
+ *
+ * Frosted glass cell when [frosted] (default): translucent multi-stop fill so
+ * lists feel M3 glass-morphism without Liquid Glass or content blur.
+ * Spacing is intentionally airy (less cramped than Phase 07 defaults).
  */
 @Composable
 fun TrackRow(
@@ -35,12 +40,29 @@ fun TrackRow(
     showArtist: Boolean = true,
     onOverflowClick: (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
+    frosted: Boolean = true,
 ) {
-    Row(
-        modifier = modifier
+    val rowModifier = if (frosted) {
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs)
+            .clip(DhunShapes.large)
+            .background(
+                Brush.verticalGradient(
+                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.55f)),
+                ),
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.smPlus)
+    } else {
+        modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.sm),
+            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md)
+    }
+
+    Row(
+        modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
@@ -48,11 +70,12 @@ fun TrackRow(
             imageUrl = track.thumbnailUrl,
             contentDescription = track.title,
             modifier = Modifier.size(DhunSpacing.artworkThumb),
+            shape = DhunShapes.medium,
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = if (enabled) DhunColors.textPrimary else DhunColors.textDisabled,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -99,8 +122,10 @@ fun TrackRowCompact(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clip(DhunShapes.medium)
+            .background(DhunColors.glassHighlight.copy(alpha = 0.5f))
             .clickable(onClick = onClick)
-            .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.xs),
+            .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.xsPlus),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
@@ -108,6 +133,7 @@ fun TrackRowCompact(
             imageUrl = track.thumbnailUrl,
             contentDescription = null,
             modifier = Modifier.size(40.dp),
+            shape = DhunShapes.small,
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(

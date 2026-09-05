@@ -37,6 +37,10 @@ class DhunPlaybackService : MediaSessionService() {
         GlobalContext.get().get()
     }
 
+    private val audioCache: DhunAudioSegmentCache by lazy {
+        GlobalContext.get().get()
+    }
+
     /** Keeps the notification's title/artwork in step with the session. */
     private val notificationUpdater = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = updateNotification()
@@ -46,7 +50,7 @@ class DhunPlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val player = PlaybackGraph.buildExoPlayer(this, streamCache)
+        val player = PlaybackGraph.buildExoPlayer(this, streamCache, audioCache)
         player.addListener(notificationUpdater)
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(PlaybackGraph.sessionActivityIntent(this))

@@ -118,10 +118,15 @@ fun ArtistScreen(
                 .height(DhunSpacing.huge),
         ) {
             if (toolbarCollapsed) {
+                // Frosted collapse toolbar — multi-stop glass, not a solid slab.
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(DhunColors.glassStrong),
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(DhunColors.glassBarTop, DhunColors.glassStrong),
+                            ),
+                        ),
                 )
             }
             Row(
@@ -172,6 +177,7 @@ private fun ArtistContent(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
         // Parallax header artwork + name
         item(key = "header") {

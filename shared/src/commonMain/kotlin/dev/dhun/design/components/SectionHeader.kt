@@ -27,7 +27,7 @@ fun SectionHeader(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = DhunColors.textPrimary,
         )
         if (actionLabel != null && onAction != null) {

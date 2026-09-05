@@ -235,6 +235,7 @@ fun main() = application {
                         is PlaybackState.Playing -> Smct.PlaybackStatus.Playing
                         is PlaybackState.Resolving,
                         is PlaybackState.Buffering,
+                        is PlaybackState.Recovering,
                         -> Smct.PlaybackStatus.Changing
                         is PlaybackState.Paused -> Smct.PlaybackStatus.Paused
                         is PlaybackState.Idle,
@@ -371,6 +372,7 @@ fun main() = application {
                 nav = nav,
                 isDesktop = true,
                 modifier = Modifier.fillMaxSize(),
+                connectivity = koin.get(),
             )
         }
     }
@@ -385,6 +387,8 @@ private val desktopModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
     single<MusicProvider> { YouTubeMusicProvider.forDesktop() }
     single { DesktopDhunPlayer(provider = get(), scope = get()) }
+    // Phase 14: connectivity signal for the shared offline banner (5s poll).
+    single<dev.dhun.core.ConnectivityMonitor> { dev.dhun.core.DesktopConnectivityMonitor(get()) }
 
     // Phase 05 data layer — SQLite file in the per-OS user data dir.
     single { DataLayer(DatabaseFactory.create(DatabaseDriverFactory().createDriver())) }

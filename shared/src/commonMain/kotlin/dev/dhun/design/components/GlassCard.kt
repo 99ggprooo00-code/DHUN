@@ -5,54 +5,101 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 
 /**
- * GlassCard — the DHUN signature surface.
+ * Frosted Material 3 surface — **glass-morphism atmosphere**, not Liquid Glass.
  *
- * Real blur where the platform supports it (Android 12+ via RenderEffect,
- * Desktop Skiko). Below that floor we gracefully degrade to a translucent
- * scrim + hairline border — still glassy, never a solid card.
+ * Recipe (lightweight, battery-safe):
+ * 1. Soft elevation shadow
+ * 2. Translucent multi-stop fill (what’s behind peeks through)
+ * 3. Top-edge highlight hairline (fake specular)
+ * 4. Content stays **sharp** — we never `Modifier.blur` the content layer
  *
- * Blur is applied to the *background* layer so the content stays sharp
- * while the artwork behind the card appears frosted. The fallback is
- * flagged in KNOWN_LIMITATIONS.md.
+ * Backdrop blur lives on layers *behind* this surface (FullPlayer artwork,
+ * shell ambient wash). Blurring this box would smear titles/lyrics — banned.
+ *
+ * API 31+/Skiko still get real blur only on those backdrop layers.
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.glass,
-    blurRadius: androidx.compose.ui.unit.Dp = DhunSpacing.glassBlur,
+    /** Kept for call-site compatibility; ignored — content must stay sharp. */
+    blurRadius: Dp = DhunSpacing.glassBlur,
     contentPadding: androidx.compose.foundation.layout.PaddingValues? = null,
+    elevated: Boolean = true,
+    tint: Color = Color.Transparent,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val outer = modifier
-        .clip(shape)
-        // Glass fill + hairline border + real blur when available.
-        // `Modifier.blur` maps to RenderEffect on API 31+ and Skiko; on older
-        // runtimes it becomes a no-op — the translucent fill still reads as glass.
-        .background(DhunColors.glass, shape)
-        .blur(blurRadius)
-        .border(BorderStroke(DhunSpacing.border, DhunColors.border), shape)
+    @Suppress("UNUSED_VARIABLE")
+    val ignoredBlur = blurRadius
 
-    if (contentPadding != null) {
-        Box(modifier = outer.padding(contentPadding), content = content)
+    val base = if (elevated) {
+        modifier.shadow(DhunSpacing.sm, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.35f))
     } else {
-        Box(modifier = outer, content = content)
+        modifier
+    }
+
+    Box(
+        modifier = base
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        DhunColors.glassHighlight,
+                        DhunColors.glass,
+                        DhunColors.glassDeep,
+                    ),
+                ),
+                shape,
+            )
+            .then(
+                if (tint.alpha > 0.01f) {
+                    Modifier.background(tint.copy(alpha = tint.alpha.coerceIn(0f, 0.28f)), shape)
+                } else {
+                    Modifier
+                },
+            )
+            .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), shape),
+    ) {
+        // Specular top sheen — cheap glass cue without a blur pass.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to DhunColors.glassSheen,
+                            0.22f to Color.Transparent,
+                            1.0f to Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
+        if (contentPadding != null) {
+            Box(modifier = Modifier.padding(contentPadding), content = content)
+        } else {
+            Box(content = content)
+        }
     }
 }
 
 /**
- * Glass surface used for bottom bars (MiniPlayer, bottom nav): stronger scrim
- * so controls stay legible over artwork.
+ * Docked chrome (MiniPlayer, bottom nav): stronger frosted scrim so transport
+ * stays legible over Home/library content and ambient washes.
  */
 @Composable
 fun GlassBottomBar(
@@ -62,9 +109,55 @@ fun GlassBottomBar(
 ) {
     Box(
         modifier = modifier
+            .shadow(DhunSpacing.md, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.4f))
             .clip(shape)
-            .background(DhunColors.glassStrong, shape)
-            .border(BorderStroke(DhunSpacing.divider, DhunColors.border), shape),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        DhunColors.glassBarTop,
+                        DhunColors.glassStrong,
+                    ),
+                ),
+                shape,
+            )
+            .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), shape),
+        content = content,
+    )
+}
+
+/**
+ * Thin frosted panel for chips / compact chrome — translucent, pill-friendly.
+ */
+@Composable
+fun FrostedChipSurface(
+    modifier: Modifier = Modifier,
+    shape: Shape = DhunShapes.chip,
+    selected: Boolean = false,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val fill = if (selected) {
+        Brush.horizontalGradient(
+            listOf(
+                DhunColors.accent.copy(alpha = 0.88f),
+                DhunColors.accent.copy(alpha = 0.72f),
+            ),
+        )
+    } else {
+        Brush.verticalGradient(
+            listOf(DhunColors.glassHighlight, DhunColors.glass),
+        )
+    }
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(fill, shape)
+            .border(
+                BorderStroke(
+                    DhunSpacing.border,
+                    if (selected) DhunColors.accent.copy(alpha = 0.5f) else DhunColors.glassEdge,
+                ),
+                shape,
+            ),
         content = content,
     )
 }

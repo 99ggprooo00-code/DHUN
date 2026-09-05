@@ -28,6 +28,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -112,8 +114,14 @@ fun PlaylistScreen(
             }
         }
 
-        // Floating back
-        Box(modifier = Modifier.padding(DhunSpacing.xs)) {
+        // Floating frosted back chip
+        Box(
+            modifier = Modifier
+                .padding(DhunSpacing.sm)
+                .clip(DhunShapes.full)
+                .background(DhunColors.glassStrong)
+                .padding(DhunSpacing.xs),
+        ) {
             DhunIconButton(
                 onClick = onBack,
                 modifier = Modifier.size(DhunSpacing.touchTarget),
@@ -142,7 +150,7 @@ private fun RemotePlaylistContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = DhunSpacing.xxxl),
+        contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
         item(key = "header") {
             PlaylistHeader(
@@ -178,8 +186,15 @@ private fun RemoteTrackRow(index: Int, track: Track, onClick: () -> Unit, onOver
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs)
+            .clip(DhunShapes.large)
+            .background(
+                Brush.verticalGradient(
+                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.5f)),
+                ),
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.sm),
+            .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.smPlus),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
@@ -187,11 +202,12 @@ private fun RemoteTrackRow(index: Int, track: Track, onClick: () -> Unit, onOver
             imageUrl = track.thumbnailUrl,
             contentDescription = track.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
+            shape = DhunShapes.medium,
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = DhunColors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -354,7 +370,6 @@ private fun PlaylistHeader(
             text = title,
             style = MaterialTheme.typography.headlineSmall,
             color = DhunColors.textPrimary,
-            fontWeight = FontWeight.Bold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )

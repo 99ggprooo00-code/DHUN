@@ -10,73 +10,31 @@ Rules (permanent, from the user):
 
 ---
 
-## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
+## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
-**Branch:** `arena/01a070b3-dhun` has the latest Phase 14 rot-drill code and
-roadmap pushed; PR CI run `33960134771` is green. Phase 13 Android
-native-polish code remains CI-verified by run `33959217371` (shared tests,
-Android debug build, Desktop/probe compilation). PR #13 remains OPEN. The
-rolling `test` pre-release is healthy: run `33952291659` passed `apk`, `msi`,
-and `publish`; all four assets are present.
+**Branch:** `arena/01a07170-dhun` · **PR #16 READY FOR REVIEW/MERGE**.
+**HEAD:** `1df07b3` (+ docs commit if any) · CI green · mergeable CLEAN.
 
-**Current files:** `.github/workflows/rot-drill.yml` (primary),
-`docs/verification/14-release.md`, `.ai/KNOWN_LIMITATIONS.md`, and
-`README.md`.
+**User locks:** Material 3 glass-morphism OK · **No Liquid Glass** · no cookies
+without ADR · do not fake live rot-drill green · stay on session branch.
 
-**User 2026-09-05 directive — status:**
-1. **Release verification — DONE (rolling test artifacts only):**
-   `dhun-test.apk`, `dhun-test.apk.sha256`, `dhun-test.msi`, and
-   `dhun-test.msi.sha256` are uploaded by successful run `33952291659`.
-   This is not the signed/stable v0.1.0 release.
-2. **Hardware gates — OPEN:** Android rotation/soak/lock-screen/OEM checks,
-   Windows tray/close-to-tray/geometry/mini-player/shortcuts/SMTC/MSI
-   clean-VM checks, and the Phase 10/11 checklists remain open below.
-3. **Phase 13 native polish — CODE + CI GREEN, HARDWARE OPEN:** `8669e09`
-   plus `c2a86df` and `4de9795` implement safe-drawing insets, saved Android
-   navigation state, Search/Resume/Library shortcuts, a battery rationale,
-   and the 840dp navigation rail with docked rail MiniPlayer. No hardware
-   acceptance item is complete.
-4. **Phase 14 rot-drill — CODE STAGED, LIVE RUN OPEN:** `5897c5c` replaces
-   the placeholder workflow with a scheduled/manual live probe, log artifact,
-   failure issue alert, and automatic recovery close; `29326cc` removes the
-   missing pip-cache input. A dispatch attempt was
-   blocked by GitHub `HTTP 403: Resource not accessible by integration`; the
-   workflow is not yet available from the default branch.
+**Phase bundle on PR #16 (code complete for review):**
+1. Phase 14: rot-drill honesty, taxonomy, Recovering UX, audio-segment cache
+2. ADR-002 FullPlayer: lyrics-dominant, blur cache, M3-only design lock
+3. M3 UI overhaul: sans type, Home depth, frosted chrome app-wide
+   (Home/Search/Library/browse/player lists)
 
-**Last error:** `gh workflow run rot-drill.yml --ref arena/01a070b3-dhun`
-returned `HTTP 403: Resource not accessible by integration`; `gh workflow
-view` confirms the default branch still exposes the old placeholder workflow.
-No live probe verdict exists. Local Gradle verification is also unavailable
-because this sandbox has no `JAVA_HOME` and no `java` executable.
+**Not claimed done by merge:** residential stream, hardware soaks, v0.1.0.
 
-**Exact next step:**
-1. Once the workflow is available on the default branch or Actions dispatch
-   permission is restored, run `.github/workflows/rot-drill.yml` and inspect
-   its `PROBE|verdict`, artifact, issue-alert, and recovery behavior.
-2. If the live workflow exposes a probe or YAML error, fix it and rerun; keep
-   the rot-drill step open until a real green run is recorded.
-3. Continue Phase 14 with the error-taxonomy/audio-cache work only while
-   keeping soak, clean-target, and v0.1.0 release gates explicitly open; do
-   not mark Phase 12–14 complete from CI alone.
+**Exact next step (post-merge / human):**
+1. Review + merge PR #16 when satisfied.
+2. Residential play + offline-cache smoke on device.
+3. Soaks → v0.1.0 when evidence exists.
 
-**CI trail (prior 9 rounds plus Phase 13 rounds, all in DEBUG_LOG):**
-`33941799559`→android media3 APIs · `33942371150`/`33942622916`→
-no CATEGORY_MEDIA, artworkData ByteArray · `33943041377`→desktop
-round 1 (Long.dp etc.) · `33944244828`→JNA GUID/Memory ·
-`33944782718`→JNA platform helpers fragile → self-contained rewrite ·
-`33945300702`→JNA 5.17 API + MiniPlayer imports (annotations capped at
-10 — harness Color errors were hiding behind the cap) ·
-`33945909159`/`33946130860`→harness 12× Long-hex Color ·
-`33946527454` (`3cd4bf8`) → **GREEN** · `33958894084` (`9dc77c3`) →
-**Phase 13 GREEN** (scope-correct navigation helpers, Android build, tests,
-probe) · `33959076412` (`e679c00`) → **GREEN** · `33959922661` (`5573f9a`)
-→ **Phase 14 code GREEN** · `33960134771` (`4e6bf54`) → **GREEN** after the
-rot-drill dispatch-gate documentation.
+**Marks:** PR ready 🟨→✅ on merge · rot-drill live 🔴 · soaks ⬜ · v0.1.0 ⬜ ·
+Liquid Glass 🚫
 
-**Standing sandbox notes:** no local JDK (CI is the compile gate); no
-device/adb/display; direct `curl` mostly blocked, `fetch_page` works;
-repo can be reset between turns (re-verify + re-push); GitHub token
-flaps — "Invalid username or token" = reconnect GitHub in Arena.
+**Sandbox:** no JDK/device; agent no workflow_dispatch.
 
 ---
 
@@ -150,7 +108,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 in progress: rot-drill workflow staged in `5897c5c` + `29326cc`; live run, audio cache, soak, clean-target, and v0.1.0 evidence OPEN | `.github/workflows/rot-drill.yml`, `docs/verification/14-release.md` |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 CI green; live drills RED (cat.8 CDN/Auth); **audio-segment cache 🟨 Android code**; Recovering UX 🟨; residential + soaks + v0.1.0 OPEN | issue #14, PR #16, `DhunAudioSegmentCache` |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -180,17 +138,17 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
-### Phase 14 step status — 🟨 IN PROGRESS @ `5897c5c` + `29326cc` (live/hardware/release gates OPEN)
+### Phase 14 step status — 🟨 IN PROGRESS (live drill on fixed branch = CI-IP gating of both engines)
 
 | Step | Status |
 |---|---|
-| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Existing typed `DhunResult`/`DhunError` paths and 403 recovery are present; full network/db/playback sweep and offline-banner review are not complete |
-| Bounded audio cache and offline replay | ⬜ Not started; current Android cache is stream-URL-only with TTL/403 invalidation |
-| Daily live rot-drill | 🟨 Workflow code staged in `.github/workflows/rot-drill.yml`; dispatch attempt hit GitHub 403, cache-input review fix is pushed, and no live verdict exists |
-| Android 30-minute soak | ⬜ Open — requires unrestricted-battery physical device evidence |
-| Desktop 30-minute soak | ⬜ Open — requires libVLC/tray/SMTC-capable desktop evidence |
-| v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open — rolling `test` artifacts are not the stable release; signing, clean installs, and release tag are gated |
-| Phase 14 acceptance 1–4 | ⬜ None complete; `docs/verification/14-release.md` is a checklist only until live/hardware evidence is recorded |
+| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Typed errors, 429 gate, offline banner, **403 Reconnecting…** (`PlaybackState.Recovering`). Open: airplane-mode HW check, db-path review |
+| Bounded audio cache (Android SimpleCache) | 🟨 code (`DhunAudioSegmentCache`); HW offline OPEN; desktop ⬜ |
+| Daily live rot-drill | 🔴 Run **33968950214** on `arena/01a07170-dhun@10ad025`: production chain exercised; `WATCH\|own-client` + `WATCH\|ytdlp` both `AuthRequired` (Sign in to confirm you're not a bot) from Actions IP; metadata PASS; kill switch correct. **Category 8 CI-network evidence — not extractor-shape rot.** No PASS. Residential verification required before any "playback broken for users" claim |
+| Android 30-minute soak | ⬜ Open |
+| Desktop 30-minute soak | ⬜ Open |
+| v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open |
+| Phase 14 acceptance 1–4 | ⬜ None complete |
 
 ### Phase 11 step status — ✅ MERGED @ `d27eb37` (hardware OPEN)
 
@@ -228,6 +186,7 @@ stubbed, NOT scheduled** until the user picks them (Doctrine: no
 
 | # | Candidate | Why this slot |
 |---|---|---|
+| 15a | **Full-Screen player immersion polish (ADR-002 P3–P9)** — lyrics-dominant mode, blur-once cache, gesture simplicity; only after P0 extraction truth + Phase 08/11 hardware smoke | Signature UX; must not outrun streams |
 | 15 | **Android native polish finish** (Phase 13 leftovers: app shortcuts, Robolectric/UI tests, tablet two-pane, 30-min soak with LeakCanary) | Same platform as the crash/FGS work just done; cheap while context is warm |
 | 16 | **Audio cache (bounded LRU) + offline replay of cached tracks** | Phase 14 item pulled forward; user-visible value, no new surface |
 | 17 | **Rot-drill GA** — wire `tools/playback-probe` into the daily cron (replacing the placeholder), auto-issue on red, 24h detection contract live | The Doctrine's maintenance leg; must exist before any public distribution |

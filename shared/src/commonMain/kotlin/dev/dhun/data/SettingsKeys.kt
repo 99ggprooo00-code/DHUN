@@ -21,7 +21,11 @@ object SettingsKeys {
     const val LYRICS_ENABLED = "lyrics_enabled"
     const val LYRICS_ENABLED_DEFAULT = true
 
-    /** Audio/metadata cache budget in MB. 0 = unlimited. */
+    /**
+     * Phase 14 audio-segment cache budget in MB (Android Media3 SimpleCache
+     * LRU). 0 = effectively unlimited (capped internally). Default 1024.
+     * Applies on next process start if changed while running.
+     */
     const val CACHE_SIZE_MB = "cache_size_mb"
     const val CACHE_SIZE_MB_DEFAULT = 1024
 

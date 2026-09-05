@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -36,7 +36,9 @@ jobs:
       - name: Install live extraction tool
         run: |
           python -m pip install --upgrade pip yt-dlp
-          yt-dlp --version
+          # Record the engine version INTO the artifact log (run 33961533965's
+          # artifact started at Gradle, so it could not prove the yt-dlp version).
+          yt-dlp --version | tee rot-drill.log
 
       - name: Run live search, resolve, stream, and related probe
         id: probe
@@ -44,7 +46,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew :tools:playback-probe:run --no-daemon --console=plain 2>&1 | tee rot-drill.log
+          ./gradlew :tools:playback-probe:run --no-daemon --console=plain 2>&1 | tee -a rot-drill.log
 
       - name: Upload probe log
         if: always()
@@ -62,12 +64,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          issue_body="rot-drill failed on **${GITHUB_SHA}**.
+          # NOTE: no backticks anywhere in this body — inside a double-quoted
+          # bash string they execute as command substitution and swallow the
+          # text (run 33961533965's issue #14 lost the artifact name this way).
+          artifact="rot-drill-${GITHUB_RUN_ID}"
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          issue_body="rot-drill failed on ${GITHUB_SHA}
 
-          Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          Run: ${run_url}
           Trigger: ${GITHUB_EVENT_NAME}
 
-          The attached `rot-drill-${GITHUB_RUN_ID}` artifact contains the full Gradle/probe log.
+          The attached ${artifact} artifact contains the full engine-version + Gradle/probe log.
 
           Last probe output:
 

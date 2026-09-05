@@ -34,9 +34,17 @@ class YtDlpStreamResolver(
     override suspend fun resolve(videoId: String): DhunResult<StreamInfo> =
         withContext(Dispatchers.IO) {
             try {
+                // player_client order mirrors OwnClientStreamResolver + the
+                // clients yt-dlp currently lists as least PO-bound. Default
+                // yt-dlp path alone was AuthRequired from Actions IPs on
+                // 2026-09-05 (runs 33961533965 / 33968950214). Explicit
+                // clients are still tokenless — no --cookies.
                 val command = binary + listOf(
                     "--no-warnings", "--no-playlist",
-                    "-f", "bestaudio", "-g",
+                    "--extractor-args",
+                    "youtube:player_client=web_embedded,tv,tv_downgraded,tv_simply,mweb,web_safari,android",
+                    "-f", "bestaudio/bestaudio*,best",
+                    "-g",
                     "https://www.youtube.com/watch?v=$videoId",
                 )
                 val process = ProcessBuilder(command).start()
@@ -52,9 +60,13 @@ class YtDlpStreamResolver(
                     val message = stderr.lineSequence().lastOrNull { it.isNotBlank() } ?: ""
                     return@withContext DhunResult.Failure(
                         when {
-                            message.contains("Sign in to confirm", ignoreCase = true) -> DhunError.AuthRequired()
+                            // ADR-001 contract: detail carries the per-attempt evidence
+                            // (rot-drill 33961533965 failed with detail=null and the
+                            // actual yt-dlp stderr had to be inferred from code).
+                            message.contains("Sign in to confirm", ignoreCase = true) ->
+                                DhunError.AuthRequired(message.take(300))
                             message.contains("Video unavailable", ignoreCase = true) -> DhunError.Unavailable
-                            else -> DhunError.Unknown(message.take(200))
+                            else -> DhunError.Unknown(message.take(300))
                         }
                     )
                 }

@@ -1,5 +1,6 @@
 package dev.dhun.ui.search
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import dev.dhun.core.Album
@@ -211,14 +214,22 @@ private fun SearchBarSection(
                 }
             },
             singleLine = true,
-            shape = DhunShapes.medium,
+            shape = DhunShapes.extraLarge,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = DhunColors.surfaceElevated,
-                unfocusedContainerColor = DhunColors.surface,
-                focusedBorderColor = DhunColors.accent,
-                unfocusedBorderColor = DhunColors.border,
+                focusedContainerColor = DhunColors.glassHighlight,
+                unfocusedContainerColor = DhunColors.glass,
+                disabledContainerColor = DhunColors.glassDeep,
                 focusedTextColor = DhunColors.textPrimary,
                 unfocusedTextColor = DhunColors.textPrimary,
+                cursorColor = DhunColors.accent,
+                focusedBorderColor = DhunColors.glassEdge,
+                unfocusedBorderColor = DhunColors.border,
+                focusedLeadingIconColor = DhunColors.accent,
+                unfocusedLeadingIconColor = DhunColors.textTertiary,
+                focusedTrailingIconColor = DhunColors.textSecondary,
+                unfocusedTrailingIconColor = DhunColors.textTertiary,
+                focusedPlaceholderColor = DhunColors.textHint,
+                unfocusedPlaceholderColor = DhunColors.textHint,
             ),
             modifier = Modifier.weight(1f),
         )
@@ -238,7 +249,7 @@ private fun FilterChipsRow(
     LazyRow(
         contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-        modifier = Modifier.padding(bottom = DhunSpacing.xs),
+        modifier = Modifier.padding(bottom = DhunSpacing.sm, top = DhunSpacing.xs),
     ) {
         val filters = listOf(
             SearchFilter.SONGS to "Songs",
