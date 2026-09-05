@@ -10,61 +10,56 @@ Rules (permanent, from the user):
 
 ---
 
-## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a06b14-dhun)
+## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a06b14-dhun` at `f955e6d` · **PR #9 (Phase 12 +
-Phase 1 fixes) MERGED @ `697cf54`** = `main` · **PR #10 OPEN** =
-workflow patch (MSI job + rolling publish) — CI pending, merge after
-green.
+**Branch:** `arena/01a070b3-dhun` has the latest Phase 14 rot-drill code and
+roadmap pushed; PR CI run `33960134771` is green. Phase 13 Android
+native-polish code remains CI-verified by run `33959217371` (shared tests,
+Android debug build, Desktop/probe compilation). PR #13 remains OPEN. The
+rolling `test` pre-release is healthy: run `33952291659` passed `apk`, `msi`,
+and `publish`; all four assets are present.
+
+**Current files:** `.github/workflows/rot-drill.yml` (primary),
+`docs/verification/14-release.md`, `.ai/KNOWN_LIMITATIONS.md`, and
+`README.md`.
 
 **User 2026-09-05 directive — status:**
-1. **Phase 1 critical fixes — DONE (pushed + CI green + merged):**
-   (a) fatal artist-shuffle crash (MediaController off-main-thread)
-   fixed in `AndroidDhunPlayer`; (b) background/OEM resilience:
-   `DhunPlaybackService` = true foreground service
-   (`FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK`), media notification,
-   one-shot battery-exemption dialog, `ic_notification` icon —
-   compile-verified; on-device behavior = OPEN hardware checklist;
-   (c) audio audit: Android path sound, `DesktopDhunPlayer` (vlcj)
-   reviewed against javadoc — no blocking defect.
-2. **Phase 2 docs — DONE:** `.ai/` on the session branch (session is
-   pinned to one branch; a real `.ai` branch = one git command after
-   merge if still wanted). DEBUG_LOG has all 9 CI red rounds.
-3. **Phase 3 builds — 95%:** rolling `test` pre-release with
-   `dhun-test.apk` EXISTS (published by the PR #9 merge); the
-   **MSI** half is in PR #10 (apk+msi+publish jobs,
-   `:app-desktop:createMsi` on windows-latest). Merging PR #10
-   publishes both assets.
-4. **Phase 12 (desktop) — CI-DONE, hardware-OPEN:** first fully green
-   CI on the branch (run `33946527454` @ `3cd4bf8`): shared tests ✓,
-   android assembleDebug ✓, probe + desktop compile ✓ (9 fix rounds,
-   all logged in DEBUG_LOG: 1.8.2 Window/WindowState/Key API from
-   source, no `Long.dp`, Long-hex `Color(0xFF…)` literals,
-   `MenuItem.label`, `noinline` for EDT marshaling, JNA win32 helpers
-   are version-fragile → self-contained Structures, JNA 5.17
-   `getPointer(long)`/`invokeInt(array)`, vlcj `finished` event,
-   `awaitFirstDown()` no params in 1.8.2).
+1. **Release verification — DONE (rolling test artifacts only):**
+   `dhun-test.apk`, `dhun-test.apk.sha256`, `dhun-test.msi`, and
+   `dhun-test.msi.sha256` are uploaded by successful run `33952291659`.
+   This is not the signed/stable v0.1.0 release.
+2. **Hardware gates — OPEN:** Android rotation/soak/lock-screen/OEM checks,
+   Windows tray/close-to-tray/geometry/mini-player/shortcuts/SMTC/MSI
+   clean-VM checks, and the Phase 10/11 checklists remain open below.
+3. **Phase 13 native polish — CODE + CI GREEN, HARDWARE OPEN:** `8669e09`
+   plus `c2a86df` and `4de9795` implement safe-drawing insets, saved Android
+   navigation state, Search/Resume/Library shortcuts, a battery rationale,
+   and the 840dp navigation rail with docked rail MiniPlayer. No hardware
+   acceptance item is complete.
+4. **Phase 14 rot-drill — CODE STAGED, LIVE RUN OPEN:** `5897c5c` replaces
+   the placeholder workflow with a scheduled/manual live probe, log artifact,
+   failure issue alert, and automatic recovery close; `29326cc` removes the
+   missing pip-cache input. A dispatch attempt was
+   blocked by GitHub `HTTP 403: Resource not accessible by integration`; the
+   workflow is not yet available from the default branch.
+
+**Last error:** `gh workflow run rot-drill.yml --ref arena/01a070b3-dhun`
+returned `HTTP 403: Resource not accessible by integration`; `gh workflow
+view` confirms the default branch still exposes the old placeholder workflow.
+No live probe verdict exists. Local Gradle verification is also unavailable
+because this sandbox has no `JAVA_HOME` and no `java` executable.
 
 **Exact next step:**
-1. PR #10 CI green → merge → watch the `test-release` run (first
-   apk+msi publish) → verify the `test` release has
-   `dhun-test.apk` + `dhun-test.msi` + both `.sha256` files.
-2. **User's hardware** (OPEN, parallel — the phase-completion gate):
-   - Android: crash repro (artist shuffle) no longer crashes;
-     30-min background soak; lock-screen controls; MIUI/HyperOS
-     auto-start manual toggle; battery-exemption dialog once.
-   - Windows (`docs/verification/12-desktop-native.md`): tray,
-     close-to-tray, geometry persistence, mini-player drag, 7
-     shortcuts, `SMTC probe` console line (PASS expected; the REFIID
-     by-value marshaling caveat in DEBUG_LOG may show up here),
-     `dhun-test.msi` clean-VM install (needs VLC).
-   - Phases 10+11 checklists (`docs/verification/10-library.md`,
-     `11-lyrics.md`).
-3. Then: SMTC phase 2 (on-machine IID pull → metadata + media keys) or
-   lock in the documented tray fallback; Phase 13 (Android polish),
-   Phase 14 (rot-drill live wiring + GA).
+1. Once the workflow is available on the default branch or Actions dispatch
+   permission is restored, run `.github/workflows/rot-drill.yml` and inspect
+   its `PROBE|verdict`, artifact, issue-alert, and recovery behavior.
+2. If the live workflow exposes a probe or YAML error, fix it and rerun; keep
+   the rot-drill step open until a real green run is recorded.
+3. Continue Phase 14 with the error-taxonomy/audio-cache work only while
+   keeping soak, clean-target, and v0.1.0 release gates explicitly open; do
+   not mark Phase 12–14 complete from CI alone.
 
-**CI trail (this session, 9 rounds — all in DEBUG_LOG):**
+**CI trail (prior 9 rounds plus Phase 13 rounds, all in DEBUG_LOG):**
 `33941799559`→android media3 APIs · `33942371150`/`33942622916`→
 no CATEGORY_MEDIA, artworkData ByteArray · `33943041377`→desktop
 round 1 (Long.dp etc.) · `33944244828`→JNA GUID/Memory ·
@@ -72,7 +67,11 @@ round 1 (Long.dp etc.) · `33944244828`→JNA GUID/Memory ·
 `33945300702`→JNA 5.17 API + MiniPlayer imports (annotations capped at
 10 — harness Color errors were hiding behind the cap) ·
 `33945909159`/`33946130860`→harness 12× Long-hex Color ·
-`33946527454` (`3cd4bf8`) → **GREEN**.
+`33946527454` (`3cd4bf8`) → **GREEN** · `33958894084` (`9dc77c3`) →
+**Phase 13 GREEN** (scope-correct navigation helpers, Android build, tests,
+probe) · `33959076412` (`e679c00`) → **GREEN** · `33959922661` (`5573f9a`)
+→ **Phase 14 code GREEN** · `33960134771` (`4e6bf54`) → **GREEN** after the
+rot-drill dispatch-gate documentation.
 
 **Standing sandbox notes:** no local JDK (CI is the compile gate); no
 device/adb/display; direct `curl` mostly blocked, `fetch_page` works;
@@ -149,9 +148,9 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 09 | Artist/Album/Playlist | ✅ MERGED PR #7 @ `3fce5e5` — fixtures schema-authored (no YT egress in sandbox; live re-capture scheduled); hardware 3/3/CRUD OPEN | docs/verification/09 |
 | 10 | Library & history | ✅ MERGED PR #8 @ `d27eb37` (CI green `33842104141`) — hardware checklist OPEN | docs/verification/10 |
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
-| 12 | Desktop native | 🟨 IN PROGRESS — all code pushed (`a20165b`); CI RED ×4 (rounds 1–3 = 1.8.2 API, fixed from source; round 4 = shared test race, fixed locally); **desktop compile itself first CI-checked on the next push**; hardware OPEN; SMTC phase 1 only | docs/verification/12 · `.ai/DEBUG_LOG.md` |
-| 13 | Android polish (insets, shortcuts, tablet, soak) | ⬜ not started (battery-exemption prompt — the one item Phase 13 lists — landed early this session via the Phase 1 directive, unpushed) | — |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | ⬜ not started (rot-drill.yml exists as a placeholder cron; activation = wiring the probe suite, Phase 14) | — |
+| 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
+| 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 in progress: rot-drill workflow staged in `5897c5c` + `29326cc`; live run, audio cache, soak, clean-target, and v0.1.0 evidence OPEN | `.github/workflows/rot-drill.yml`, `docs/verification/14-release.md` |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -161,7 +160,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 
 | Step | Status |
 |---|---|
-| SMTC spike (3-day timebox) | 🟨 **phase 1 code pushed** (`Smct.kt` — WinRT activation via JNA/combase → `ISystemMediaTransportControlsInterop` → `GetForWindow` → live `IsTransportControlsButtonVisible`; HRESULT-logged `SMTC probe` console line; `-Ddhun.smct=false` off) — CI compile pending (first real check = next push's step 6); on-Windows probe OPEN; phase 2 (UpdateMetadata + ButtonPressed, IIDs pulled on-machine) + fallback decision OPEN |
+| SMTC spike (3-day timebox) | 🟨 **phase 2 code pushed in `7ca2f5d`, CI green `33958287878`** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — Windows round-trip and fallback verdict OPEN |
 | System tray (playing/paused icon, 6-item menu) | 🟨 code pushed (`DhunTray.kt` + `TrayIcons.kt`, AWT, EDT-marshaled, headless-safe) — CI compile pending; hardware OPEN |
 | Mini-player window (320×88, always-on-top, drag, click-opens-main) | 🟨 code pushed (`MiniPlayerWindow.kt` + second Compose `Window`; hide-not-close; Ctrl+M) — CI compile pending; hardware OPEN; taskbar visibility is a 1.8.2 limitation (no `skipTaskbar`) |
 | Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — CI compile pending; hardware OPEN |
@@ -169,6 +168,29 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Packaging: jpackage MSI + clean-VM install | 🟨 `createMsi` configured (`packageVersion` 1.0.4 — packagers reject MAJOR 0); **now also wired into the rolling test release** (this session, unpushed); app icon + clean-VM install OPEN on Windows |
 | Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY | ✅ done + pushed (`ffa138b`) |
 | Acceptance 1–4 (media keys / tray / mini-player / installer) | 🟨 OPEN — on hardware (checklist in docs/verification/12) |
+
+### Phase 13 step status — 🟨 CODE + CI GREEN @ `8669e09` + `c2a86df` + `4de9795` (hardware OPEN)
+
+| Step | Status |
+|---|---|
+| Edge-to-edge and safe-drawing inset audit | 🟨 implemented in `MainActivity.kt` for connecting, ready, and failure roots; CI/device gesture-nav verification OPEN |
+| App shortcuts: Search / Resume / Library | 🟨 static XML resources plus `onCreate`/`onNewIntent` routing implemented; launcher verification OPEN |
+| Battery optimization rationale and exemption handoff | 🟨 in-app rationale plus guarded system settings handoff implemented; OEM behavior verification OPEN |
+| Rotation and back-stack state survival | 🟨 selected tab, expanded player, and detail routes saved/restored through `Bundle`; Robolectric/UI test coverage and device rotation check OPEN |
+| Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
+| Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
+
+### Phase 14 step status — 🟨 IN PROGRESS @ `5897c5c` + `29326cc` (live/hardware/release gates OPEN)
+
+| Step | Status |
+|---|---|
+| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Existing typed `DhunResult`/`DhunError` paths and 403 recovery are present; full network/db/playback sweep and offline-banner review are not complete |
+| Bounded audio cache and offline replay | ⬜ Not started; current Android cache is stream-URL-only with TTL/403 invalidation |
+| Daily live rot-drill | 🟨 Workflow code staged in `.github/workflows/rot-drill.yml`; dispatch attempt hit GitHub 403, cache-input review fix is pushed, and no live verdict exists |
+| Android 30-minute soak | ⬜ Open — requires unrestricted-battery physical device evidence |
+| Desktop 30-minute soak | ⬜ Open — requires libVLC/tray/SMTC-capable desktop evidence |
+| v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open — rolling `test` artifacts are not the stable release; signing, clean installs, and release tag are gated |
+| Phase 14 acceptance 1–4 | ⬜ None complete; `docs/verification/14-release.md` is a checklist only until live/hardware evidence is recorded |
 
 ### Phase 11 step status — ✅ MERGED @ `d27eb37` (hardware OPEN)
 

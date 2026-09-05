@@ -37,14 +37,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
 import dev.dhun.core.ArtistPage
 import dev.dhun.core.Playlist
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.AlbumCard
@@ -130,8 +130,17 @@ fun ArtistScreen(
                     .padding(horizontal = DhunSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DhunIconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                    Text("←", fontSize = 22.sp, color = DhunColors.textPrimary)
+                DhunIconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = "Back",
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.ArrowBack,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.textPrimary,
+                    )
                 }
                 Spacer(modifier = Modifier.width(DhunSpacing.sm))
                 Text(
@@ -230,14 +239,26 @@ private fun ArtistContent(
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
             ) {
                 DhunTonalButton(onClick = onShuffle, enabled = page.topSongs.isNotEmpty()) {
-                    Text("🔀  Shuffle")
+                    DhunIconView(
+                        icon = DhunIcon.Shuffle,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    )
+                    Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                    Text("Shuffle")
                 }
                 DhunTonalButton(onClick = onRadio, enabled = !radioLoading && page.topSongs.isNotEmpty()) {
                     if (radioLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(DhunSpacing.iconSizeSm), strokeWidth = DhunSpacing.iconStroke)
                     } else {
-                        Text("📻  Radio")
+                        DhunIconView(
+                            icon = DhunIcon.Play,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        )
                     }
+                    Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                    Text("Radio")
                 }
             }
         }
@@ -263,7 +284,10 @@ private fun ArtistContent(
                                 color = DhunColors.textHint,
                                 modifier = Modifier.padding(end = DhunSpacing.xs),
                             )
-                            TrackOverflowIcon(onClick = { onTrackOverflow(track) })
+                            TrackOverflowIcon(
+                                trackTitle = track.title,
+                                onClick = { onTrackOverflow(track) },
+                            )
                         }
                     },
                 )
@@ -370,18 +394,27 @@ private fun ArtistContent(
 }
 
 @Composable
-private fun TrackOverflowIcon(onClick: () -> Unit) {
-    DhunIconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
-        Text("⋮", color = DhunColors.textTertiary, fontSize = 20.sp)
+private fun TrackOverflowIcon(trackTitle: String, onClick: () -> Unit) {
+    DhunIconButton(
+        onClick = onClick,
+        modifier = Modifier.size(DhunSpacing.touchTarget),
+        contentDescription = "More actions for $trackTitle",
+    ) {
+        DhunIconView(
+            icon = DhunIcon.MoreVert,
+            contentDescription = null,
+            modifier = Modifier.size(DhunSpacing.iconSize),
+            tint = DhunColors.textTertiary,
+        )
     }
 }
 
 @Composable
 private fun ArtistSkeleton() {
     Column(modifier = Modifier.fillMaxSize()) {
-        LoadingShimmer(modifier = Modifier.fillMaxWidth().height(240.dp))
+        LoadingShimmer(modifier = Modifier.fillMaxWidth().height(DhunSpacing.artistHeaderHeight))
         Spacer(modifier = Modifier.height(DhunSpacing.md))
-        LoadingShimmer(modifier = Modifier.width(150.dp).height(20.dp).padding(horizontal = DhunSpacing.screenPadding))
+        LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonArtistWidth).height(DhunSpacing.xl).padding(horizontal = DhunSpacing.screenPadding))
         SectionShimmer()
         SectionShimmer()
     }

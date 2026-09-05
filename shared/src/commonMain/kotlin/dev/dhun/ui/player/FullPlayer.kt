@@ -1,5 +1,6 @@
 package dev.dhun.ui.player
 
+import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -62,14 +63,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.ArtworkImage
@@ -194,23 +195,38 @@ fun FullPlayer(
                     .padding(horizontal = DhunSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DhunIconButton(onClick = onCollapse, modifier = Modifier.size(40.dp)) {
-                    Text("⌄", fontSize = 24.sp, color = DhunColors.textPrimary)
+                DhunIconButton(
+                    onClick = onCollapse,
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = "Collapse player",
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.ArrowBack,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.textPrimary,
+                    )
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = "NOW PLAYING",
                     style = MaterialTheme.typography.labelSmall,
                     color = DhunColors.textTertiary,
-                    letterSpacing = 2.sp,
+                    letterSpacing = DhunTypographyTokens.brand.letterSpacing,
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 DhunIconButton(
                     onClick = { current?.let(onOverflowTrack) },
                     enabled = current != null,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = "More player actions",
                 ) {
-                    Text("⋮", fontSize = 20.sp, color = DhunColors.textSecondary)
+                    DhunIconView(
+                        icon = DhunIcon.MoreVert,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.textSecondary,
+                    )
                 }
             }
 
@@ -328,26 +344,32 @@ fun FullPlayer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(88.dp)
+                    .height(DhunSpacing.transportRowHeight)
                     .padding(horizontal = DhunSpacing.lg),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 // Shuffle
-                Box(
+                DhunIconButton(
+                    onClick = { viewModel.toggleShuffle() },
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(DhunSpacing.touchTarget)
                         .clip(DhunShapes.full)
-                        .background(if (shuffleEnabled) accent.copy(alpha = 0.22f) else Color.Transparent)
-                        .clickable { viewModel.toggleShuffle() },
-                    contentAlignment = Alignment.Center,
+                        .background(if (shuffleEnabled) accent.copy(alpha = 0.22f) else Color.Transparent),
+                    contentDescription = if (shuffleEnabled) "Disable shuffle" else "Enable shuffle",
                 ) {
-                    Text("🔀", fontSize = 18.sp)
+                    DhunIconView(
+                        icon = DhunIcon.Shuffle,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = if (shuffleEnabled) accent else DhunColors.textPrimary,
+                    )
                 }
 
                 HoldTapTransportButton(
                     forward = false,
-                    icon = "⏮",
+                    icon = DhunIcon.SkipPrevious,
+                    contentDescription = "Previous track",
                     onTap = { viewModel.previous() },
                     onHold = { viewModel.beginHoldSeek(forward = false) },
                     onRelease = { viewModel.endHoldSeek() },
@@ -361,7 +383,7 @@ fun FullPlayer(
                 )
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(DhunSpacing.miniPlayerHeight)
                         .shadow(DhunSpacing.lg, DhunShapes.full, clip = false)
                         .clip(DhunShapes.full)
                         .background(accent)
@@ -381,46 +403,40 @@ fun FullPlayer(
                         animationSpec = DhunAnimations.mediumTween(),
                         label = "playPauseMorph",
                     ) { playing ->
-                        Text(
-                            text = if (playing) "⏸" else "▶",
-                            fontSize = 30.sp,
-                            color = DhunColors.onAccent,
+                        DhunIconView(
+                            icon = if (playing) DhunIcon.Pause else DhunIcon.Play,
+                            contentDescription = if (playing) "Pause" else "Play",
+                            modifier = Modifier.size(DhunSpacing.iconSizeLg),
+                            tint = DhunColors.onAccent,
                         )
                     }
                 }
 
                 HoldTapTransportButton(
                     forward = true,
-                    icon = "⏭",
+                    icon = DhunIcon.SkipNext,
+                    contentDescription = "Next track",
                     onTap = { viewModel.next() },
                     onHold = { viewModel.beginHoldSeek(forward = true) },
                     onRelease = { viewModel.endHoldSeek() },
                 )
 
                 // Repeat cycle: OFF → ALL → ONE
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(DhunShapes.full)
-                        .clickable { viewModel.cycleRepeatMode() },
-                    contentAlignment = Alignment.Center,
+                DhunIconButton(
+                    onClick = { viewModel.cycleRepeatMode() },
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = when (repeatMode) {
+                        RepeatMode.OFF -> "Repeat off"
+                        RepeatMode.ALL -> "Repeat all"
+                        RepeatMode.ONE -> "Repeat one"
+                    },
                 ) {
-                    Text(
-                        text = "↻",
-                        fontSize = 22.sp,
-                        color = if (repeatMode != RepeatMode.OFF) accent else DhunColors.textTertiary,
+                    DhunIconView(
+                        icon = if (repeatMode == RepeatMode.ONE) DhunIcon.RepeatOne else DhunIcon.Repeat,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = if (repeatMode != RepeatMode.OFF) accent else DhunColors.textTertiary,
                     )
-                    if (repeatMode == RepeatMode.ONE) {
-                        Text(
-                            text = "1",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = accent,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = (-6).dp, y = 6.dp),
-                        )
-                    }
                 }
             }
 
@@ -432,7 +448,12 @@ fun FullPlayer(
                         .padding(horizontal = DhunSpacing.xxl),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("🔊", fontSize = 14.sp)
+                    DhunIconView(
+                        icon = DhunIcon.VolumeUp,
+                        contentDescription = "Volume",
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        tint = DhunColors.textSecondary,
+                    )
                     Spacer(modifier = Modifier.width(DhunSpacing.sm))
                     Slider(
                         value = volume,
@@ -501,7 +522,7 @@ internal fun DhunSeekBar(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(28.dp),
+            .height(DhunSpacing.mediumLarge),
         contentAlignment = Alignment.CenterStart,
     ) {
         val widthPx = constraints.maxWidth.toFloat()
@@ -551,7 +572,7 @@ internal fun DhunSeekBar(
             )
             // Thumb — only while touching
             if (dragging) {
-                val thumbPx = 14.dp
+                val thumbPx = DhunSpacing.mdPlus
                 val thumbXPx = (effective * (widthPx)).toInt()
                 Box(
                     modifier = Modifier
@@ -570,7 +591,8 @@ internal fun DhunSeekBar(
 @Composable
 internal fun HoldTapTransportButton(
     forward: Boolean,
-    icon: String,
+    icon: DhunIcon,
+    contentDescription: String,
     onTap: () -> Unit,
     onHold: () -> Unit,
     onRelease: () -> Unit,
@@ -584,7 +606,7 @@ internal fun HoldTapTransportButton(
     )
     Box(
         modifier = modifier
-            .size(52.dp)
+            .size(DhunSpacing.touchTarget)
             .clip(DhunShapes.full)
             .pointerInput(forward) {
                 awaitEachGesture {
@@ -607,11 +629,13 @@ internal fun HoldTapTransportButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = icon,
-            fontSize = 26.sp,
-            color = DhunColors.textPrimary,
-            modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+        DhunIconView(
+            icon = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier
+                .size(DhunSpacing.iconSizeLg)
+                .graphicsLayer { scaleX = scale; scaleY = scale },
+            tint = DhunColors.textPrimary,
         )
     }
 }

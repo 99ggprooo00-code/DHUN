@@ -33,14 +33,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
 import dev.dhun.core.Playlist
 import dev.dhun.core.SearchResults
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.AlbumCard
@@ -189,12 +189,24 @@ private fun SearchBarSection(
                 )
             },
             leadingIcon = {
-                Text("🔍", fontSize = 16.sp, modifier = Modifier.padding(start = DhunSpacing.xs))
+                DhunIconView(
+                    icon = DhunIcon.Search,
+                    contentDescription = "Search",
+                    modifier = Modifier
+                        .padding(start = DhunSpacing.xs)
+                        .size(DhunSpacing.iconSize),
+                    tint = DhunColors.textTertiary,
+                )
             },
             trailingIcon = {
                 if (query.isNotEmpty()) {
-                    DhunIconButton(onClick = onClear) {
-                        Text("✕", color = DhunColors.textTertiary, fontSize = 16.sp)
+                    DhunIconButton(onClick = onClear, contentDescription = "Clear search") {
+                        DhunIconView(
+                            icon = DhunIcon.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            tint = DhunColors.textTertiary,
+                        )
                     }
                 }
             },
@@ -264,14 +276,18 @@ private fun SuggestionsList(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
             ) {
-                Text("🔍", fontSize = 14.sp, color = DhunColors.textTertiary)
+                DhunIconView(
+                    icon = DhunIcon.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = DhunColors.textTertiary,
+                )
                 Text(
                     text = suggestion,
                     style = MaterialTheme.typography.bodyMedium,
                     color = DhunColors.textPrimary,
                     modifier = Modifier.weight(1f),
                 )
-                Text("↗", fontSize = 14.sp, color = DhunColors.textTertiary)
             }
             HorizontalDivider(color = DhunColors.border)
         }
@@ -317,7 +333,12 @@ private fun RecentSearchesSection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                 ) {
-                    Text("⏱", fontSize = 14.sp, color = DhunColors.textTertiary)
+                    DhunIconView(
+                        icon = DhunIcon.History,
+                        contentDescription = "Recent search",
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        tint = DhunColors.textTertiary,
+                    )
                     Text(
                         text = query,
                         style = MaterialTheme.typography.bodyMedium,
@@ -326,9 +347,15 @@ private fun RecentSearchesSection(
                     )
                     DhunIconButton(
                         onClick = { onDeleteSearch(query) },
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(DhunSpacing.touchTarget),
+                        contentDescription = "Delete recent search",
                     ) {
-                        Text("✕", fontSize = 12.sp, color = DhunColors.textTertiary)
+                        DhunIconView(
+                            icon = DhunIcon.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            tint = DhunColors.textTertiary,
+                        )
                     }
                 }
                 HorizontalDivider(color = DhunColors.border)
@@ -352,7 +379,7 @@ private fun SearchResultsList(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 96.dp),
+        contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
         // Songs / Videos
         val tracks = if (filter == SearchFilter.VIDEOS) results.videos else results.songs
@@ -436,7 +463,7 @@ private fun SearchResultsList(
                         .padding(DhunSpacing.md),
                     contentAlignment = Alignment.Center,
                 ) {
-                    LoadingShimmer(modifier = Modifier.width(140.dp).height(20.dp))
+                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.xl))
                 }
             }
         }

@@ -9,6 +9,7 @@ import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
 import dev.dhun.domain.SaveNowPlayingUseCase
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -67,13 +68,13 @@ class NowPlayingPersistence(
     fun start() {
         if (jobs.isNotEmpty()) return
         jobs = listOf(
-            scope.launch {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 player.queue.collect { snapshot() } // StateFlow is already distinct
             },
-            scope.launch {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 player.currentTrack.distinctUntilChanged { a, b -> a?.id == b?.id }.collect { onTrackChanged(it) }
             },
-            scope.launch {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 while (isActive) {
                     delay(progressIntervalMs)
                     if (player.state.value is PlaybackState.Playing) progress()
@@ -132,7 +133,13 @@ class NowPlayingPersistence(
     private suspend fun onTrackChanged(track: Track?) {
         // finish the previous entry if it played (almost) to the end
         val previous = lastHandle
-        if (previous != null && lastProgressFraction >= COMPLETION_FRACTION) {
+        val transitionFraction = player.durationMs.value.takeIf { it > 0L }?.let { duration ->
+            player.positionMs.value.toFloat() / duration.toFloat()
+        } ?: 0f
+        // Read the player once more at the transition. A progress tick can be
+        // delayed by a busy dispatcher, so completion must not depend solely
+        // on the periodic observer having won the scheduling race.
+        if (previous != null && maxOf(lastProgressFraction, transitionFraction) >= COMPLETION_FRACTION) {
             runCatching { recordPlay.complete(previous) }
         }
         lastHandle = null

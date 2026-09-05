@@ -27,14 +27,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.AlbumDetail
 import dev.dhun.core.Artist
 import dev.dhun.core.Track
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import androidx.compose.animation.animateColorAsState
@@ -87,8 +87,17 @@ fun AlbumScreen(
 
         // Floating back
         Box(modifier = Modifier.padding(DhunSpacing.xs)) {
-            DhunIconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
-                Text("←", fontSize = 22.sp, color = DhunColors.textPrimary)
+            DhunIconButton(
+                onClick = onBack,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Back",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.ArrowBack,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
+                )
             }
         }
     }
@@ -133,7 +142,7 @@ private fun AlbumContent(
                     ArtworkImage(
                         imageUrl = detail.thumbnailUrl,
                         contentDescription = detail.title,
-                        modifier = Modifier.size(220.dp),
+                        modifier = Modifier.size(DhunSpacing.artworkAlbum),
                         shape = DhunShapes.extraLarge,
                     )
                     Spacer(modifier = Modifier.height(DhunSpacing.lg))
@@ -167,10 +176,22 @@ private fun AlbumContent(
                     Spacer(modifier = Modifier.height(DhunSpacing.md))
                     Row(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md)) {
                         DhunButton(onClick = onPlayAll, enabled = detail.tracks.isNotEmpty()) {
-                            Text("▶  Play")
+                            DhunIconView(
+                                icon = DhunIcon.Play,
+                                contentDescription = null,
+                                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            )
+                            Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                            Text("Play")
                         }
                         DhunOutlinedButton(onClick = onShuffle, enabled = detail.tracks.isNotEmpty()) {
-                            Text("🔀  Shuffle")
+                            DhunIconView(
+                                icon = DhunIcon.Shuffle,
+                                contentDescription = null,
+                                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            )
+                            Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                            Text("Shuffle")
                         }
                     }
                 }
@@ -219,7 +240,7 @@ private fun AlbumContent(
                             },
                             enabled = detail.artistId != null,
                         ) {
-                            Text("→ Artist page")
+                            Text("Artist page")
                         }
                     }
                 }
@@ -247,7 +268,7 @@ private fun AlbumTrackRow(
             text = "%2d".format(number),
             style = MaterialTheme.typography.labelMedium,
             color = DhunColors.textHint,
-            modifier = Modifier.width(32.dp),
+            modifier = Modifier.width(DhunSpacing.xxxl),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -268,8 +289,17 @@ private fun AlbumTrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        DhunIconButton(onClick = onOverflow, modifier = Modifier.size(36.dp)) {
-            Text("⋮", color = DhunColors.textTertiary, fontSize = 18.sp)
+        DhunIconButton(
+            onClick = onOverflow,
+            modifier = Modifier.size(DhunSpacing.touchTarget),
+            contentDescription = "More actions for ${track.title}",
+        ) {
+            DhunIconView(
+                icon = DhunIcon.MoreVert,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.iconSize),
+                tint = DhunColors.textTertiary,
+            )
         }
     }
 }
@@ -281,11 +311,11 @@ private fun AlbumSkeleton() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.height(DhunSpacing.huge))
-        LoadingShimmer(modifier = Modifier.size(220.dp))
+        LoadingShimmer(modifier = Modifier.size(DhunSpacing.artworkAlbum))
         Spacer(modifier = Modifier.height(DhunSpacing.lg))
-        LoadingShimmer(modifier = Modifier.width(200.dp).height(24.dp))
+        LoadingShimmer(modifier = Modifier.width(DhunSpacing.artworkPlaylist).height(DhunSpacing.xxl))
         Spacer(modifier = Modifier.height(DhunSpacing.sm))
-        LoadingShimmer(modifier = Modifier.width(140.dp).height(14.dp))
+        LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.mdPlus))
         Spacer(modifier = Modifier.height(DhunSpacing.xxl))
         repeat(6) {
             Row(
@@ -295,10 +325,10 @@ private fun AlbumSkeleton() {
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LoadingShimmer(modifier = Modifier.width(32.dp).height(14.dp))
+                LoadingShimmer(modifier = Modifier.width(DhunSpacing.xxxl).height(DhunSpacing.mdPlus))
                 Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
-                    LoadingShimmer(modifier = Modifier.width(220.dp).height(14.dp))
-                    LoadingShimmer(modifier = Modifier.width(120.dp).height(12.dp))
+                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.artworkAlbum).height(DhunSpacing.mdPlus))
+                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonTextWidth).height(DhunSpacing.md))
                 }
             }
         }

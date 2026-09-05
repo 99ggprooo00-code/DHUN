@@ -1,5 +1,6 @@
 package dev.dhun.desktop.native
 
+import dev.dhun.design.DhunColors
 import java.awt.Color
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -15,9 +16,12 @@ import java.awt.image.BufferedImage
  */
 object TrayIcons {
 
-    private val background = Color(0xFF161616.toInt())
-    private val border = Color(0x33FFFFFF)
-    private val accent = Color(0xFFBB86FC.toInt())
+    private val background = awtColor(DhunColors.surface)
+    private val border = awtColor(DhunColors.border)
+    private val accent = awtColor(DhunColors.accent)
+
+    private fun awtColor(color: androidx.compose.ui.graphics.Color): Color =
+        Color(color.red, color.green, color.blue, color.alpha)
 
     fun playing(size: Int = 32): BufferedImage = draw(size) { g, s ->
         tile(g, s)

@@ -27,6 +27,16 @@ object DhunTypographyTokens {
     val bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.W400, letterSpacing = 0.5.sp)
     val bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.W400, letterSpacing = 0.25.sp)
     val bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.W400, letterSpacing = 0.4.sp)
+
+    // Semantic display sizes used by the legacy harnesses and small labels.
+    // Keeping them here lets platform UI scale with the same token family.
+    val compact = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.W400)
+    val trackTitle = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.W500)
+    val playerTitle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.W500)
+    val hero = TextStyle(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.W500)
+    val bodyRelaxed = TextStyle(fontSize = 14.sp, lineHeight = 22.sp, fontWeight = FontWeight.W400)
+    val brand = TextStyle(fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.W600, letterSpacing = 2.sp)
+    val compactLetterSpacing = 1.sp
 }
 
 /** Material3 Typography wired to Dhun tokens — used by DhunTheme. */

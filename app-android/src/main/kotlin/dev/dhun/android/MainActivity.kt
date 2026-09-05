@@ -1,5 +1,7 @@
 package dev.dhun.android
 
+import dev.dhun.design.DhunSpacing
+import dev.dhun.design.DhunTypographyTokens
 import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
@@ -15,29 +17,36 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import dev.dhun.android.playback.AndroidDhunPlayer
 import dev.dhun.android.playback.DhunPlaybackService
 import dev.dhun.android.playback.PlaybackGraph
+import dev.dhun.core.PlaybackState
 import dev.dhun.data.DataLayer
+import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
@@ -46,6 +55,8 @@ import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.shell.AppNavState
+import dev.dhun.ui.shell.AppTab
+import dev.dhun.ui.shell.DetailRoute
 import dev.dhun.ui.shell.DhunAppShell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +73,14 @@ class MainActivity : ComponentActivity() {
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var player: AndroidDhunPlayer? = null
     private var persistence: NowPlayingPersistence? = null
+    private var currentNav: AppNavState? = null
+    private var restoredNavTab: String? = null
+    private var restoredPlayerExpanded = false
+    private var restoredDetailRoutes: ArrayList<String>? = null
+
+    private enum class ShortcutAction { SEARCH, RESUME, LIBRARY }
+    private val pendingShortcut = MutableStateFlow<ShortcutAction?>(null)
+    private val batteryRationaleVisible = MutableStateFlow(false)
 
     private sealed interface ConnectUi {
         data object Connecting : ConnectUi
@@ -82,6 +101,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        restoredNavTab = savedInstanceState?.getString(KEY_NAV_TAB)
+        restoredPlayerExpanded = savedInstanceState?.getBoolean(KEY_PLAYER_EXPANDED) ?: false
+        restoredDetailRoutes = savedInstanceState?.getStringArrayList(KEY_DETAIL_ROUTES)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        handleShortcutIntent(intent)
         requestNotificationPermissionIfNeeded()
         connectWithFallback()
         setContent {
@@ -89,19 +119,50 @@ class MainActivity : ComponentActivity() {
                 // Music-app back behavior: FullPlayer collapses first, then
                 // detail pages pop; only when nothing overlays do we park the
                 // app — BACK never kills the player.
-                val nav = androidx.compose.runtime.remember { AppNavState() }
+                val nav = androidx.compose.runtime.remember { restoredNavState() }
+                currentNav = nav
                 BackHandler { if (!nav.closeTop()) moveTaskToBack(true) }
 
                 val ui by connectState.collectAsState()
+                val shortcut by pendingShortcut.collectAsState()
+                val showBatteryRationale by batteryRationaleVisible.collectAsState()
                 val koin = GlobalContext.get()
+
+                LaunchedEffect(ui, shortcut) {
+                    val action = shortcut ?: return@LaunchedEffect
+                    if (ui !is ConnectUi.Ready) return@LaunchedEffect
+                    when (action) {
+                        ShortcutAction.SEARCH -> {
+                            nav.selectedTab = AppTab.SEARCH
+                            nav.detailStack.clear()
+                        }
+                        ShortcutAction.LIBRARY -> {
+                            nav.selectedTab = AppTab.LIBRARY
+                            nav.detailStack.clear()
+                        }
+                        ShortcutAction.RESUME -> {
+                            // Restore is launched during attach; give it a
+                            // short main-scope window before resuming the
+                            // paused queue. If there is no saved queue this is
+                            // a harmless no-op in the player implementation.
+                            delay(500L)
+                            player?.let { p ->
+                                if (p.state.value !is PlaybackState.Playing) p.playPause()
+                            }
+                        }
+                    }
+                    pendingShortcut.value = null
+                }
 
                 when (val s = ui) {
                     is ConnectUi.Connecting -> ConnectingScreen(
                         log = connectLog.collectAsState().value,
                         version = appVersionName(),
                     )
-                    is ConnectUi.Ready -> androidx.compose.foundation.layout.Box(
-                        modifier = Modifier.fillMaxSize(),
+                    is ConnectUi.Ready -> Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.safeDrawing),
                     ) {
                         player?.let { p ->
                             val homeViewModel: HomeViewModel = koin.get()
@@ -132,16 +193,16 @@ class MainActivity : ComponentActivity() {
                         }
                         s.reason?.let { reason ->
                             Surface(
-                                color = Color(0xFF2A1A00),
+                                color = DhunColors.errorContainer,
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
                                     .fillMaxWidth(),
                             ) {
                                 Text(
                                     reason,
-                                    fontSize = 11.sp,
-                                    color = Color(0xFFFFB74D),
-                                    modifier = Modifier.padding(6.dp),
+                                    fontSize = DhunTypographyTokens.labelSmall.fontSize,
+                                    color = DhunColors.warning,
+                                    modifier = Modifier.padding(DhunSpacing.xsPlus),
                                 )
                             }
                         }
@@ -154,7 +215,90 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                 }
+
+                if (showBatteryRationale) {
+                    AlertDialog(
+                        onDismissRequest = { batteryRationaleVisible.value = false },
+                        title = { Text("Keep playback reliable") },
+                        text = {
+                            Text(
+                                "Android battery optimization can stop background music " +
+                                    "on some phones. Allow DHUN to keep the playback service " +
+                                    "available when the screen is off?",
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    batteryRationaleVisible.value = false
+                                    openBatteryOptimizationSettings()
+                                },
+                            ) {
+                                Text("Allow")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { batteryRationaleVisible.value = false }) {
+                                Text("Not now")
+                            }
+                        },
+                    )
+                }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShortcutIntent(intent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        currentNav?.let { nav ->
+            outState.putString(KEY_NAV_TAB, nav.selectedTab.name)
+            outState.putBoolean(KEY_PLAYER_EXPANDED, nav.playerExpanded)
+            outState.putStringArrayList(
+                KEY_DETAIL_ROUTES,
+                ArrayList(nav.detailStack.map(::encodeRoute)),
+            )
+        }
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun restoredNavState(): AppNavState = AppNavState().apply {
+        restoredNavTab?.let { name ->
+            selectedTab = runCatching { AppTab.valueOf(name) }.getOrDefault(AppTab.HOME)
+        }
+        playerExpanded = restoredPlayerExpanded
+        restoredDetailRoutes.orEmpty().mapNotNull(::decodeRoute).forEach { route -> detailStack.add(route) }
+    }
+
+    private fun encodeRoute(route: DetailRoute): String = when (route) {
+        is DetailRoute.ArtistPage -> "artist:${route.id}"
+        is DetailRoute.AlbumPage -> "album:${route.id}"
+        is DetailRoute.PlaylistPage -> "playlist:${route.isLocal}:${route.id}"
+    }
+
+    private fun decodeRoute(value: String): DetailRoute? {
+        val parts = value.split(':', limit = 3)
+        return when (parts.firstOrNull()) {
+            "artist" -> parts.getOrNull(1)?.let(DetailRoute::ArtistPage)
+            "album" -> parts.getOrNull(1)?.let(DetailRoute::AlbumPage)
+            "playlist" -> parts.getOrNull(2)?.let { id ->
+                DetailRoute.PlaylistPage(id, parts.getOrNull(1) == "true")
+            }
+            else -> null
+        }
+    }
+
+    private fun handleShortcutIntent(intent: Intent?) {
+        val action = intent?.getStringExtra(EXTRA_SHORTCUT_ACTION) ?: return
+        pendingShortcut.value = when (action) {
+            SHORTCUT_SEARCH -> ShortcutAction.SEARCH
+            SHORTCUT_RESUME -> ShortcutAction.RESUME
+            SHORTCUT_LIBRARY -> ShortcutAction.LIBRARY
+            else -> null
         }
     }
 
@@ -262,6 +406,15 @@ class MainActivity : ComponentActivity() {
         try {
             val pm = getSystemService(POWER_SERVICE) as PowerManager
             if (pm.isIgnoringBatteryOptimizations(packageName)) return
+            batteryRationaleVisible.value = true
+        } catch (_: Exception) {
+            // OEMs with no such settings page / dialog denied — playback
+            // still works, just less resilient to aggressive savers.
+        }
+    }
+
+    private fun openBatteryOptimizationSettings() {
+        try {
             startActivity(
                 Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
                     .setData(Uri.parse("package:$packageName")),
@@ -292,6 +445,13 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "DHUN"
         private const val MAX_CONNECT_ATTEMPTS = 3
+        private const val EXTRA_SHORTCUT_ACTION = "dev.dhun.android.extra.SHORTCUT_ACTION"
+        private const val KEY_NAV_TAB = "dhun.nav.tab"
+        private const val KEY_PLAYER_EXPANDED = "dhun.player.expanded"
+        private const val KEY_DETAIL_ROUTES = "dhun.nav.routes"
+        private const val SHORTCUT_SEARCH = "search"
+        private const val SHORTCUT_RESUME = "resume"
+        private const val SHORTCUT_LIBRARY = "library"
         private var batteryExemptionRequested = false
     }
 }
@@ -301,28 +461,31 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun ConnectingScreen(log: List<String>, version: String) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(DhunSpacing.lg),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("DHUN", fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text("DHUN", fontSize = DhunTypographyTokens.hero.fontSize, fontWeight = FontWeight.Bold)
         Text(
-            "starting playback engine… (v$version)",
-            fontSize = 12.sp,
-            color = Color(0xFF888888),
+            "starting playback engine... (v$version)",
+            fontSize = DhunTypographyTokens.bodySmall.fontSize,
+            color = DhunColors.textTertiary,
         )
         if (log.isNotEmpty()) {
             Column(
                 modifier = Modifier
-                    .padding(top = 20.dp)
+                    .padding(top = DhunSpacing.xl)
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.Start,
             ) {
                 log.takeLast(8).forEach { line ->
                     Text(
-                        "· " + line,
-                        fontSize = 11.sp,
-                        color = Color(0xFFBBBBBB),
+                        "- " + line,
+                        fontSize = DhunTypographyTokens.labelSmall.fontSize,
+                        color = DhunColors.textSecondary,
                     )
                 }
             }
@@ -333,23 +496,26 @@ private fun ConnectingScreen(log: List<String>, version: String) {
 @Composable
 private fun FailureScreen(message: String, onRetry: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(DhunSpacing.xxl),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("DHUN", fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text("DHUN", fontSize = DhunTypographyTokens.hero.fontSize, fontWeight = FontWeight.Bold)
         Text(
             "Playback failed to start",
-            color = Color(0xFFCF6679),
-            modifier = Modifier.padding(top = 12.dp),
+            color = DhunColors.error,
+            modifier = Modifier.padding(top = DhunSpacing.md),
         )
         Text(
             message,
-            fontSize = 12.sp,
-            color = Color(0xFF888888),
-            modifier = Modifier.padding(top = 8.dp),
+            fontSize = DhunTypographyTokens.bodySmall.fontSize,
+            color = DhunColors.textTertiary,
+            modifier = Modifier.padding(top = DhunSpacing.sm),
         )
-        Button(onClick = onRetry, modifier = Modifier.padding(top = 20.dp)) {
+        Button(onClick = onRetry, modifier = Modifier.padding(top = DhunSpacing.xl)) {
             Text("Retry")
         }
     }

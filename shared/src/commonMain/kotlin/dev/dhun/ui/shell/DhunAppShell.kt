@@ -6,15 +6,24 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,15 +34,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunShapes
+import dev.dhun.design.DhunSpacing
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.player.DhunPlayer
@@ -57,11 +69,11 @@ import dev.dhun.ui.player.MiniPlayer
 import dev.dhun.ui.search.SearchScreen
 import kotlinx.coroutines.launch
 
-enum class AppTab(val title: String, val icon: String) {
-    HOME("Home", "🏠"),
-    SEARCH("Search", "🔍"),
-    LIBRARY("Library", "📚"),
-    CATALOG("Catalog", "🎨"),
+enum class AppTab(val title: String, val icon: DhunIcon) {
+    HOME("Home", DhunIcon.Home),
+    SEARCH("Search", DhunIcon.Search),
+    LIBRARY("Library", DhunIcon.LibraryMusic),
+    CATALOG("Catalog", DhunIcon.Palette),
 }
 
 /**
@@ -123,57 +135,37 @@ fun DhunAppShell(
         track.albumId?.let { nav.push(DetailRoute.AlbumPage(it)) }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val useNavigationRail = maxWidth >= DhunSpacing.navigationRailBreakpoint
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = DhunColors.background,
-            bottomBar = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    // Docked MiniPlayer (Phase 08) — hidden while the FullPlayer covers.
-                    if (!nav.playerExpanded) {
-                        MiniPlayer(
-                            viewModel = playerViewModel,
-                            onExpand = { nav.playerExpanded = true },
-                        )
-                    }
-
-                    GlassBottomBar(modifier = Modifier.fillMaxWidth()) {
-                        NavigationBar(
-                            containerColor = Color.Transparent,
-                            contentColor = DhunColors.textPrimary,
-                            modifier = Modifier.fillMaxWidth().height(64.dp),
-                        ) {
-                            AppTab.entries.forEach { tab ->
-                                NavigationBarItem(
-                                    selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
-                                    onClick = {
-                                        nav.selectedTab = tab
-                                        nav.detailStack.clear()
-                                    },
-                                    icon = { Text(text = tab.icon, fontSize = 18.sp) },
-                                    label = {
-                                        Text(text = tab.title, style = MaterialTheme.typography.labelSmall)
-                                    },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = DhunColors.accent,
-                                        selectedTextColor = DhunColors.accent,
-                                        unselectedIconColor = DhunColors.textTertiary,
-                                        unselectedTextColor = DhunColors.textTertiary,
-                                        indicatorColor = DhunColors.accentContainer,
-                                    ),
-                                )
-                            }
-                        }
-                    }
+            bottomBar = if (useNavigationRail) {
+                {}
+            } else {
+                {
+                    BottomNavigationBar(
+                        nav = nav,
+                        playerViewModel = playerViewModel,
+                    )
                 }
             },
         ) { innerPadding ->
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
-                when (val route = nav.detailStack.lastOrNull()) {
+                if (useNavigationRail) {
+                    AppNavigationRail(nav = nav)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        when (val route = nav.detailStack.lastOrNull()) {
                     null -> TabContent(
                         tab = nav.selectedTab,
                         homeViewModel = homeViewModel,
@@ -218,6 +210,17 @@ fun DhunAppShell(
                             onTrackPlay = onPlayPlaylist,
                             onTrackOverflow = { overflowTrack = it },
                             onDeleted = { nav.closeTop() },
+                        )
+                    }
+                        }
+                    }
+                    if (useNavigationRail && !nav.playerExpanded) {
+                        MiniPlayer(
+                            viewModel = playerViewModel,
+                            onExpand = { nav.playerExpanded = true },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
                         )
                     }
                 }
@@ -299,6 +302,115 @@ fun DhunAppShell(
             )
         }
     }
+}
+
+@Composable
+private fun BottomNavigationBar(
+    nav: AppNavState,
+    playerViewModel: PlayerViewModel,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (!nav.playerExpanded) {
+            MiniPlayer(
+                viewModel = playerViewModel,
+                onExpand = { nav.playerExpanded = true },
+            )
+        }
+        GlassBottomBar(
+            modifier = Modifier.fillMaxWidth(),
+            shape = DhunShapes.bottomSheet,
+        ) {
+            NavigationBar(
+                containerColor = Color.Transparent,
+                contentColor = DhunColors.textPrimary,
+                modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
+            ) {
+                AppTab.entries.forEach { tab ->
+                    AppBottomNavigationItem(
+                        tab = tab,
+                        selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
+                        onClick = {
+                            nav.selectedTab = tab
+                            nav.detailStack.clear()
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppNavigationRail(nav: AppNavState) {
+    NavigationRail(
+        containerColor = DhunColors.surface,
+        contentColor = DhunColors.textPrimary,
+        modifier = Modifier.fillMaxHeight(),
+    ) {
+        AppTab.entries.forEach { tab ->
+            AppRailNavigationItem(
+                tab = tab,
+                selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
+                onClick = {
+                    nav.selectedTab = tab
+                    nav.detailStack.clear()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppNavigationIcon(tab: AppTab, selected: Boolean) {
+    DhunIconView(
+        icon = tab.icon,
+        contentDescription = "${tab.title} tab",
+        modifier = Modifier.size(DhunSpacing.iconSize),
+        tint = if (selected) DhunColors.accent else DhunColors.textTertiary,
+    )
+}
+
+@Composable
+private fun ColumnScope.AppRailNavigationItem(
+    tab: AppTab,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    NavigationRailItem(
+        selected = selected,
+        onClick = onClick,
+        icon = { AppNavigationIcon(tab, selected) },
+        label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
+        alwaysShowLabel = true,
+        colors = NavigationRailItemDefaults.colors(
+            selectedIconColor = DhunColors.accent,
+            selectedTextColor = DhunColors.accent,
+            unselectedIconColor = DhunColors.textTertiary,
+            unselectedTextColor = DhunColors.textTertiary,
+            indicatorColor = DhunColors.accentContainer,
+        ),
+    )
+}
+
+@Composable
+private fun RowScope.AppBottomNavigationItem(
+    tab: AppTab,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    NavigationBarItem(
+        selected = selected,
+        onClick = onClick,
+        icon = { AppNavigationIcon(tab, selected) },
+        label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
+        colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = DhunColors.accent,
+            selectedTextColor = DhunColors.accent,
+            unselectedIconColor = DhunColors.textTertiary,
+            unselectedTextColor = DhunColors.textTertiary,
+            indicatorColor = DhunColors.accentContainer,
+        ),
+    )
 }
 
 @Composable

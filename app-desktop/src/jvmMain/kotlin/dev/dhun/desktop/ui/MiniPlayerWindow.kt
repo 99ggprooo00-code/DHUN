@@ -22,10 +22,10 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.PlaybackState
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypography
@@ -63,12 +63,12 @@ fun MiniPlayerContent(
             .fillMaxSize()
             .clip(DhunShapes.glass)
             .background(DhunColors.surfaceCard)
-            .border(1.dp, DhunColors.border, DhunShapes.glass),
+            .border(DhunSpacing.divider, DhunColors.border, DhunShapes.glass),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = DhunSpacing.md, top = DhunSpacing.sm, bottom = DhunSpacing.md, end = 0.dp),
+                .padding(start = DhunSpacing.md, top = DhunSpacing.sm, bottom = DhunSpacing.md, end = DhunSpacing.zero),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
@@ -82,7 +82,7 @@ fun MiniPlayerContent(
                 ArtworkImage(
                     imageUrl = track?.thumbnailUrl,
                     contentDescription = track?.title,
-                    modifier = Modifier.size(56.dp),
+                    modifier = Modifier.size(DhunSpacing.artworkThumb),
                 )
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
@@ -104,22 +104,26 @@ fun MiniPlayerContent(
             }
             DhunIconButton(
                 onClick = { viewModel.togglePlay() },
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = if (state is PlaybackState.Playing) "Pause" else "Play",
             ) {
-                Text(
-                    text = if (state is PlaybackState.Playing) "⏸" else "▶",
-                    fontSize = 22.sp,
-                    color = DhunColors.textPrimary,
+                DhunIconView(
+                    icon = if (state is PlaybackState.Playing) DhunIcon.Pause else DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
                 )
             }
             DhunIconButton(
                 onClick = { viewModel.next() },
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Next track",
             ) {
-                Text(
-                    text = "⏭",
-                    fontSize = 18.sp,
-                    color = DhunColors.textSecondary,
+                DhunIconView(
+                    icon = DhunIcon.SkipNext,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = DhunColors.textSecondary,
                 )
             }
         }
@@ -128,13 +132,13 @@ fun MiniPlayerContent(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(2.dp)
+                .height(DhunSpacing.iconStroke)
                 .background(DhunColors.surfaceHighest),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(progress)
-                    .height(2.dp)
+                    .height(DhunSpacing.iconStroke)
                     .background(DhunColors.accent),
             )
         }

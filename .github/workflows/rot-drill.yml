@@ -1,18 +1,99 @@
 name: rot-drill
-# Daily extraction health check vs live YouTube. The tools/playback-probe
-# suite exists and compiles in CI (step "Probe compiles"); the scheduled
-# LIVE run is still pending wiring (needs a real networked run + alerting).
-# Until then this is a placeholder that must FAIL LOUD when someone
-# removes this comment and ships no probe.
+
+# Daily extraction health check against live YouTube. This is intentionally
+# separate from pull-request CI: it exercises the networked Phase 01 probe
+# from a fresh runner and detects extractor rot within 24 hours.
 on:
   schedule:
     - cron: '17 4 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: rot-drill
+  cancel-in-progress: true
+
 jobs:
   probe:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Placeholder — replaced by playback-probe run in Phase 01
-        run: echo "rot-drill activates in Phase 01 (see MASTER_PROMPT.md)"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install live extraction tool
+        run: |
+          python -m pip install --upgrade pip yt-dlp
+          yt-dlp --version
+
+      - name: Run live search, resolve, stream, and related probe
+        id: probe
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :tools:playback-probe:run --no-daemon --console=plain 2>&1 | tee rot-drill.log
+
+      - name: Upload probe log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rot-drill-${{ github.run_id }}
+          path: rot-drill.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Open or update a rot-drill issue
+        if: steps.probe.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue_body="rot-drill failed on **${GITHUB_SHA}**.
+
+          Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          Trigger: ${GITHUB_EVENT_NAME}
+
+          The attached `rot-drill-${GITHUB_RUN_ID}` artifact contains the full Gradle/probe log.
+
+          Last probe output:
+
+          $(tail -c 12000 rot-drill.log)"
+          open_issue=$(gh issue list --state open --limit 1 --search 'rot-drill in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$open_issue" ]; then
+            gh issue comment "$open_issue" --body "$issue_body"
+          else
+            gh issue create \
+              --title "[rot-drill] Live extraction probe failed" \
+              --body "$issue_body"
+          fi
+
+      - name: Close a recovered rot-drill issue
+        if: steps.probe.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          open_issue=$(gh issue list --state open --limit 1 --search 'rot-drill in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$open_issue" ]; then
+            gh issue comment "$open_issue" --body "rot-drill recovered on ${GITHUB_SHA}. Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            gh issue close "$open_issue" --comment "Closed automatically after a green live probe."
+          fi
+
+      - name: Fail the workflow after alerting
+        if: steps.probe.outcome == 'failure'
+        run: exit 1

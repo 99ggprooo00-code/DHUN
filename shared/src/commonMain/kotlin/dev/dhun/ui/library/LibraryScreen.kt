@@ -1,5 +1,6 @@
 package dev.dhun.ui.library
 
+import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,14 +37,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.HistoryEntry
 import dev.dhun.core.Track
 import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlayContext
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.ArtworkImage
@@ -101,7 +103,7 @@ fun LibraryScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = DhunColors.accent,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
+                letterSpacing = DhunTypographyTokens.brand.letterSpacing,
             )
             Text(
                 text = "Your library",
@@ -154,7 +156,7 @@ private fun LibraryTabRow(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().height(44.dp),
+        modifier = modifier.fillMaxWidth().height(DhunSpacing.touchTarget),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
         LibraryTab.entries.forEach { tab ->
@@ -166,16 +168,17 @@ private fun LibraryTabRow(
             }
             Box(
                 modifier = Modifier
+                    .fillMaxHeight()
                     .clip(DhunShapes.full)
-                    .background(if (selected) DhunColors.accent else DhunColors.surfaceElevated)
+                    .background(if (selected) DhunColors.accentContainer else DhunColors.surfaceElevated)
                     .clickable { onSelect(tab) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = DhunSpacing.lg, vertical = DhunSpacing.sm),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) DhunColors.onAccent else DhunColors.textSecondary,
+                    color = if (selected) DhunColors.onAccentContainer else DhunColors.textSecondary,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 )
             }
@@ -260,12 +263,17 @@ private fun PlaylistRow(
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
             Box(
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.size(DhunSpacing.artworkThumb)
                     .clip(DhunShapes.medium)
                     .background(DhunColors.surfaceElevated),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("♫", fontSize = 22.sp, color = DhunColors.textTertiary)
+                DhunIconView(
+                    icon = DhunIcon.LibraryMusic,
+                    contentDescription = "Playlist",
+                    modifier = Modifier.size(DhunSpacing.iconSizeLg),
+                    tint = DhunColors.textTertiary,
+                )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -284,8 +292,17 @@ private fun PlaylistRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            DhunIconButton(onClick = onPlay, modifier = Modifier.size(36.dp)) {
-                Text("▶", fontSize = 14.sp, color = DhunColors.accent)
+            DhunIconButton(
+                onClick = onPlay,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Play ${playlist.name}",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = DhunColors.accent,
+                )
             }
         }
     }
@@ -301,7 +318,7 @@ private fun CreatePlaylistDialog(
     var creating by remember { mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = 280.dp, max = 380.dp), shape = DhunShapes.large) {
+        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text("New playlist", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
@@ -366,7 +383,15 @@ private fun FavoritesTab(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("${favorites.size} favorite${if (favorites.size == 1) "" else "s"}", style = MaterialTheme.typography.labelMedium, color = DhunColors.textSecondary)
-            DhunButton(onClick = onPlayAll, enabled = favorites.isNotEmpty()) { Text("▶  Play all") }
+            DhunButton(onClick = onPlayAll, enabled = favorites.isNotEmpty()) {
+                DhunIconView(
+                    icon = DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                )
+                Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                Text("Play all")
+            }
         }
         // Swipe-to-remove via ReorderableList (drag disabled by not exposing handle reorder? we keep handle but reorder is no-op grouped by favorites? Actually favorites are ordered by addedAt DESC, reordering not supported for now; we expose drag handle but move is no-op — swipe is the primary action.)
         ReorderableList(
@@ -381,13 +406,22 @@ private fun FavoritesTab(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
             ) {
-                ArtworkImage(imageUrl = track.thumbnailUrl, contentDescription = track.title, modifier = Modifier.size(48.dp))
+                ArtworkImage(imageUrl = track.thumbnailUrl, contentDescription = track.title, modifier = Modifier.size(DhunSpacing.touchTarget))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(track.title, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(track.artistName, style = MaterialTheme.typography.labelSmall, color = DhunColors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                DhunIconButton(onClick = { onTrackOverflow(track) }, modifier = Modifier.size(32.dp)) {
-                    Text("⋮", color = DhunColors.textTertiary, fontSize = 18.sp)
+                DhunIconButton(
+                    onClick = { onTrackOverflow(track) },
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = "More actions for ${track.title}",
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.MoreVert,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.textTertiary,
+                    )
                 }
                 Box(modifier = dragHandle) { DragHandleGrip() }
             }
@@ -442,7 +476,7 @@ private fun HistoryTab(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(headerLabel, style = MaterialTheme.typography.titleSmall, color = DhunColors.textPrimary, fontWeight = FontWeight.Bold)
-                        DhunTextButton(onClick = { onPlayDay(day, 0) }) { Text("Play day", fontSize = 12.sp) }
+                        DhunTextButton(onClick = { onPlayDay(day, 0) }) { Text("Play day", fontSize = DhunTypographyTokens.bodySmall.fontSize) }
                     }
                 }
                 itemsIndexed(day.entries, key = { _, e -> "h_${e.entryId}" }) { index, entry ->
@@ -480,7 +514,7 @@ private fun HistoryRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
-        ArtworkImage(imageUrl = entry.track.thumbnailUrl, contentDescription = entry.track.title, modifier = Modifier.size(48.dp))
+        ArtworkImage(imageUrl = entry.track.thumbnailUrl, contentDescription = entry.track.title, modifier = Modifier.size(DhunSpacing.touchTarget))
         Column(modifier = Modifier.weight(1f)) {
             Text(entry.track.title, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
@@ -498,8 +532,17 @@ private fun HistoryRow(
             )
         }
         // Long-press hint affordance (desktop fallback)
-        DhunIconButton(onClick = onLongPressRemove, modifier = Modifier.size(32.dp)) {
-            Text("✕", fontSize = 14.sp, color = DhunColors.textTertiary)
+        DhunIconButton(
+            onClick = onLongPressRemove,
+            modifier = Modifier.size(DhunSpacing.touchTarget),
+            contentDescription = "Remove ${entry.track.title} from history",
+        ) {
+            DhunIconView(
+                icon = DhunIcon.Close,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                tint = DhunColors.textTertiary,
+            )
         }
     }
 }
@@ -507,7 +550,7 @@ private fun HistoryRow(
 @Composable
 private fun ClearHistoryConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = 280.dp, max = 380.dp), shape = DhunShapes.large) {
+        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text("Clear history?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.sm))

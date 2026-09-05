@@ -1,5 +1,6 @@
 package dev.dhun.desktop.ui
 
+import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,7 +21,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -28,11 +28,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.PlaybackState
+import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunSpacing
+import dev.dhun.design.components.DhunIconButton
 import dev.dhun.player.DhunPlayer
 import kotlinx.coroutines.launch
 
@@ -57,18 +59,18 @@ fun DesktopHarnessScreen(player: DhunPlayer, viewModel: DesktopHarnessViewModel)
 
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                Text("DHUN", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Column(modifier = Modifier.fillMaxSize().padding(DhunSpacing.lg)) {
+                Text("DHUN", fontSize = DhunTypographyTokens.headlineMedium.fontSize, fontWeight = FontWeight.Bold)
                 Text(
                     "Phase 04 test harness — throwaway",
-                    fontSize = 12.sp,
-                    color = Color(0xFF888888.toInt()),
+                    fontSize = DhunTypographyTokens.bodySmall.fontSize,
+                    color = DhunColors.textTertiary,
                 )
 
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.md),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
                 ) {
                     OutlinedTextField(
                         value = ui.query,
@@ -83,24 +85,24 @@ fun DesktopHarnessScreen(player: DhunPlayer, viewModel: DesktopHarnessViewModel)
                 }
 
                 ui.error?.let {
-                    Text(it, color = Color(0xFFCF6679.toInt()), modifier = Modifier.padding(top = 8.dp))
+                    Text(it, color = DhunColors.error, modifier = Modifier.padding(top = DhunSpacing.sm))
                 }
 
                 // Phase 05 verification strip: recent searches + "listen again"
                 // come from the local database and must survive a restart.
                 if (recentSearches.isNotEmpty()) {
-                    Text("Recent: " + recentSearches.joinToString(" · "), fontSize = 11.sp, color = Color(0xFF777777.toInt()))
+                    Text("Recent: " + recentSearches.joinToString(" · "), fontSize = DhunTypographyTokens.labelSmall.fontSize, color = DhunColors.textTertiary)
                 }
                 if (recentlyPlayed.isNotEmpty()) {
-                    Text("Listen again", fontSize = 12.sp, color = Color(0xFF888888.toInt()), modifier = Modifier.padding(top = 6.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Listen again", fontSize = DhunTypographyTokens.bodySmall.fontSize, color = DhunColors.textTertiary, modifier = Modifier.padding(top = DhunSpacing.xsPlus))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
                         items(recentlyPlayed, key = { it.id }) { t ->
                             Surface(
-                                color = Color(0xFF1E1E1E.toInt()),
+                                color = DhunColors.surfaceCard,
                                 shape = MaterialTheme.shapes.small,
                                 modifier = Modifier.clickable { scope.launch { player.prepareQueue(recentlyPlayed, recentlyPlayed.indexOf(t)) } },
                             ) {
-                                Text(t.title.take(22), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                                Text(t.title.take(22), fontSize = DhunTypographyTokens.bodySmall.fontSize, modifier = Modifier.padding(horizontal = DhunSpacing.smPlus, vertical = DhunSpacing.xsPlus))
                             }
                         }
                     }
@@ -108,38 +110,47 @@ fun DesktopHarnessScreen(player: DhunPlayer, viewModel: DesktopHarnessViewModel)
 
                 if (ui.loading) {
                     CircularProgressIndicator(
-                        modifier = Modifier.padding(top = 16.dp).size(28.dp),
-                        strokeWidth = 3.dp,
+                        modifier = Modifier.padding(top = DhunSpacing.lg).size(DhunSpacing.mediumLarge),
+                        strokeWidth = DhunSpacing.progressStroke,
                     )
                 }
 
                 LazyColumn(
-                    modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(top = DhunSpacing.sm),
                 ) {
                     itemsIndexed(ui.tracks) { index, track ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { scope.launch { player.prepareQueue(ui.tracks, index) } }
-                                .padding(vertical = 10.dp),
+                                .padding(vertical = DhunSpacing.smPlus),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(track.title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                                Text(track.title, fontSize = DhunTypographyTokens.trackTitle.fontSize, fontWeight = FontWeight.Medium)
                                 Text(
                                     "${track.artistName}" +
                                         (track.albumName?.let { " • $it" } ?: "") +
                                         (track.durationSeconds?.let { " • ${formatSeconds(it)}" } ?: ""),
-                                    fontSize = 12.sp,
-                                    color = Color(0xFFAAAAAA.toInt()),
+                                    fontSize = DhunTypographyTokens.bodySmall.fontSize,
+                                    color = DhunColors.textSecondary,
                                 )
                             }
                             val fav = track.id in favoriteIds
-                            TextButton(onClick = { viewModel.toggleFavorite(track) }) {
-                                Text(if (fav) "♥" else "♡", fontSize = 20.sp, color = if (fav) Color(0xFFBB86FC.toInt()) else Color(0xFF777777.toInt()))
+                            DhunIconButton(
+                                onClick = { viewModel.toggleFavorite(track) },
+                                modifier = Modifier.size(DhunSpacing.touchTarget),
+                                contentDescription = if (fav) "Remove ${track.title} from favorites" else "Add ${track.title} to favorites",
+                            ) {
+                                DhunIconView(
+                                    icon = if (fav) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(DhunSpacing.iconSize),
+                                    tint = if (fav) DhunColors.accent else DhunColors.textTertiary,
+                                )
                             }
                         }
-                        HorizontalDivider(color = Color(0xFF222222.toInt()))
+                        HorizontalDivider(color = DhunColors.border)
                     }
                 }
 
@@ -169,22 +180,22 @@ private fun NowPlayingBar(
     onPrevious: () -> Unit,
     onSeek: (Long) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.sm)) {
         Text(
             when (state) {
-                is PlaybackState.Playing -> "▶ playing"
-                is PlaybackState.Paused -> "⏸ paused"
-                is PlaybackState.Buffering -> "… buffering"
-                is PlaybackState.Resolving -> "… resolving"
-                is PlaybackState.Error -> "✕ ${state.message}"
+                is PlaybackState.Playing -> "Playing"
+                is PlaybackState.Paused -> "Paused"
+                is PlaybackState.Buffering -> "Buffering"
+                is PlaybackState.Resolving -> "Resolving"
+                is PlaybackState.Error -> "Error: ${state.message}"
                 PlaybackState.Idle -> "idle"
             },
-            fontSize = 12.sp,
-            color = Color(0xFF888888.toInt()),
+            fontSize = DhunTypographyTokens.bodySmall.fontSize,
+            color = DhunColors.textTertiary,
         )
         Text(
             current?.let { "${it.title} — ${it.artistName}" } ?: "Nothing playing",
-            fontSize = 14.sp,
+            fontSize = DhunTypographyTokens.bodyMedium.fontSize,
             fontWeight = FontWeight.Medium,
         )
         Slider(
@@ -197,18 +208,46 @@ private fun NowPlayingBar(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            TextButton(onClick = onPrevious) { Text("⏮", fontSize = 20.sp) }
-            TextButton(onClick = onPlayPause) {
-                Text(
-                    if (state is PlaybackState.Playing) "⏸" else "▶",
-                    fontSize = 24.sp,
+            DhunIconButton(
+                onClick = onPrevious,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Previous track",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.SkipPrevious,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
                 )
             }
-            TextButton(onClick = onNext) { Text("⏭", fontSize = 20.sp) }
+            DhunIconButton(
+                onClick = onPlayPause,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = if (state is PlaybackState.Playing) "Pause" else "Play",
+            ) {
+                DhunIconView(
+                    icon = if (state is PlaybackState.Playing) DhunIcon.Pause else DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeLg),
+                    tint = DhunColors.textPrimary,
+                )
+            }
+            DhunIconButton(
+                onClick = onNext,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Next track",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.SkipNext,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
+                )
+            }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatMs(position), fontSize = 11.sp, color = Color(0xFF777777.toInt()))
-            Text(formatMs(duration), fontSize = 11.sp, color = Color(0xFF777777.toInt()))
+            Text(formatMs(position), fontSize = DhunTypographyTokens.labelSmall.fontSize, color = DhunColors.textTertiary)
+            Text(formatMs(duration), fontSize = DhunTypographyTokens.labelSmall.fontSize, color = DhunColors.textTertiary)
         }
     }
 }

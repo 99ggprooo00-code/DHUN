@@ -3,7 +3,8 @@
 A serious, cross-platform music application streaming from YouTube Music.
 Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 
-> **Status:** Phases 01–11 merged, Phase 12 (desktop native) in progress —
+> **Status:** Phases 01–11 merged; Phases 12–13 have CI-green code with
+> hardware gates open; Phase 14 robustness/rot-drill work is in progress —
 > live status in [.ai/ROADMAP.md](.ai/ROADMAP.md). Plan:
 > [.ai/MASTER_PROMPT.md](.ai/MASTER_PROMPT.md); why it looks like this:
 > [.ai/PROBLEMS_AND_FIXES.md](.ai/PROBLEMS_AND_FIXES.md).
@@ -36,6 +37,9 @@ Requires JDK 17 and an Android SDK (`ANDROID_HOME`).
 ./gradlew :tools:playback-probe:run -PmainClass=dev.dhun.tools.smoke.SmokeMainKt  # live provider smoke
 ./gradlew :app-desktop:run             # desktop app (needs libVLC + yt-dlp; see KNOWN_LIMITATIONS.md)
 ./gradlew :app-desktop:compileKotlinJvm  # desktop compile check (what CI should run)
+
+# Live Phase 14 rot-drill (requires network + yt-dlp on PATH or Python module)
+./gradlew :tools:playback-probe:run --no-daemon
 ```
 
 APK output: `app-android/build/outputs/apk/debug/app-android-debug.apk`
