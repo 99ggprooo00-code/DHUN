@@ -235,6 +235,7 @@ fun main() = application {
                         is PlaybackState.Playing -> Smct.PlaybackStatus.Playing
                         is PlaybackState.Resolving,
                         is PlaybackState.Buffering,
+                        is PlaybackState.Recovering,
                         -> Smct.PlaybackStatus.Changing
                         is PlaybackState.Paused -> Smct.PlaybackStatus.Paused
                         is PlaybackState.Idle,
