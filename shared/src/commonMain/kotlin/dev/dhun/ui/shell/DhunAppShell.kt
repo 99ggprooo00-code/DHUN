@@ -8,16 +8,18 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem as MaterialNavigationBarItem
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
@@ -324,14 +326,13 @@ private fun BottomNavigationBar(
                 modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
             ) {
                 AppTab.entries.forEach { tab ->
-                    AppNavigationItem(
+                    AppBottomNavigationItem(
                         tab = tab,
                         selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
                         onClick = {
                             nav.selectedTab = tab
                             nav.detailStack.clear()
                         },
-                        rail = false,
                     )
                 }
             }
@@ -347,64 +348,69 @@ private fun AppNavigationRail(nav: AppNavState) {
         modifier = Modifier.fillMaxHeight(),
     ) {
         AppTab.entries.forEach { tab ->
-            AppNavigationItem(
+            AppRailNavigationItem(
                 tab = tab,
                 selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
                 onClick = {
                     nav.selectedTab = tab
                     nav.detailStack.clear()
                 },
-                rail = true,
             )
         }
     }
 }
 
 @Composable
-private fun AppNavigationItem(
+private fun AppNavigationIcon(tab: AppTab, selected: Boolean) {
+    DhunIconView(
+        icon = tab.icon,
+        contentDescription = "${tab.title} tab",
+        modifier = Modifier.size(DhunSpacing.iconSize),
+        tint = if (selected) DhunColors.accent else DhunColors.textTertiary,
+    )
+}
+
+@Composable
+private fun ColumnScope.AppRailNavigationItem(
     tab: AppTab,
     selected: Boolean,
     onClick: () -> Unit,
-    rail: Boolean,
 ) {
-    val icon: @Composable () -> Unit = {
-        DhunIconView(
-            icon = tab.icon,
-            contentDescription = "${tab.title} tab",
-            modifier = Modifier.size(DhunSpacing.iconSize),
-            tint = if (selected) DhunColors.accent else DhunColors.textTertiary,
-        )
-    }
-    if (rail) {
-        NavigationRailItem(
-            selected = selected,
-            onClick = onClick,
-            icon = icon,
-            label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
-            alwaysShowLabel = true,
-            colors = NavigationRailItemDefaults.colors(
-                selectedIconColor = DhunColors.accent,
-                selectedTextColor = DhunColors.accent,
-                unselectedIconColor = DhunColors.textTertiary,
-                unselectedTextColor = DhunColors.textTertiary,
-                indicatorColor = DhunColors.accentContainer,
-            ),
-        )
-    } else {
-        MaterialNavigationBarItem(
-            selected = selected,
-            onClick = onClick,
-            icon = icon,
-            label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = DhunColors.accent,
-                selectedTextColor = DhunColors.accent,
-                unselectedIconColor = DhunColors.textTertiary,
-                unselectedTextColor = DhunColors.textTertiary,
-                indicatorColor = DhunColors.accentContainer,
-            ),
-        )
-    }
+    NavigationRailItem(
+        selected = selected,
+        onClick = onClick,
+        icon = { AppNavigationIcon(tab, selected) },
+        label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
+        alwaysShowLabel = true,
+        colors = NavigationRailItemDefaults.colors(
+            selectedIconColor = DhunColors.accent,
+            selectedTextColor = DhunColors.accent,
+            unselectedIconColor = DhunColors.textTertiary,
+            unselectedTextColor = DhunColors.textTertiary,
+            indicatorColor = DhunColors.accentContainer,
+        ),
+    )
+}
+
+@Composable
+private fun RowScope.AppBottomNavigationItem(
+    tab: AppTab,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    NavigationBarItem(
+        selected = selected,
+        onClick = onClick,
+        icon = { AppNavigationIcon(tab, selected) },
+        label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
+        colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = DhunColors.accent,
+            selectedTextColor = DhunColors.accent,
+            unselectedIconColor = DhunColors.textTertiary,
+            unselectedTextColor = DhunColors.textTertiary,
+            indicatorColor = DhunColors.accentContainer,
+        ),
+    )
 }
 
 @Composable
