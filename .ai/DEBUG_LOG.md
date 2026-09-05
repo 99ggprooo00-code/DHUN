@@ -1,5 +1,14 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — Phase 14 audio-segment cache (Android)
+
+**Shipped:** Media3 SimpleCache LRU (`DhunAudioSegmentCache`), wired in
+`PlaybackGraph` with stable video-id keys; offline span replay when
+resolve fails; budget `CACHE_SIZE_MB` default 1 GiB.
+
+**Not claimed:** HW offline proof, desktop cache, soaks, v0.1.0, residential
+extraction (still CDN 403 on Actions).
+
 ## 2026-09-05 — ADR-002 M3 polish + Recovering (no Liquid Glass)
 
 **User:** No Liquid Glass; Material 3 OK; plan + execute.

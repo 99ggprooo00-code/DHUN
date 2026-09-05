@@ -1,9 +1,11 @@
 package dev.dhun.android.di
 
+import dev.dhun.android.playback.DhunAudioSegmentCache
 import dev.dhun.android.playback.DhunStreamCache
 import dev.dhun.data.DataLayer
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
+import dev.dhun.data.SettingsKeys
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
@@ -11,6 +13,7 @@ import dev.dhun.domain.SaveNowPlayingUseCase
 import dev.dhun.extraction.OwnClientStreamResolver
 import dev.dhun.extraction.StreamResolver
 import dev.dhun.innertube.InnerTubeClient
+import dev.dhun.player.AudioCacheBudget
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.lyrics.LrcLibSource
@@ -21,6 +24,7 @@ import dev.dhun.provider.YouTubeMusicProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -46,6 +50,26 @@ val appModule = module {
     single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
     single { RecordPlayUseCase(get<DataLayer>().history) }
     single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
+
+    // Phase 14: bounded audio-segment cache (Media3 SimpleCache LRU).
+    // Budget from SettingsKeys.CACHE_SIZE_MB (default 1 GiB). Changing the
+    // setting takes effect on next process start (SimpleCache locks dir).
+    single {
+        val mb = try {
+            runBlocking {
+                get<DataLayer>().settings.getInt(
+                    SettingsKeys.CACHE_SIZE_MB,
+                    SettingsKeys.CACHE_SIZE_MB_DEFAULT,
+                )
+            }
+        } catch (_: Throwable) {
+            SettingsKeys.CACHE_SIZE_MB_DEFAULT
+        }
+        DhunAudioSegmentCache.get(
+            androidContext(),
+            AudioCacheBudget.bytesForMb(mb),
+        )
+    }
 
     // Phase 11 lyrics — cache → YTM → LRCLIB
     single { LrcLibSource() }

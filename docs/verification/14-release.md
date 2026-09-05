@@ -10,7 +10,7 @@ Desktop soak, clean-install, or release checks below.
 | Step | Current status | Evidence / remaining gate |
 |---|---|---|
 | Typed error taxonomy and actionable user messages | 🟨 Typed `DhunResult`/`DhunError` + `toUserMessage` paths, per-request retry, 429 global backoff gate (`2932d57`, with unit tests), and offline banner (`fed1d54`) are implemented; CI verdict pending on the current push; 403 "Reconnecting…" UX, offline-banner hardware check, and the db-path review pass remain | `shared/.../core/RateLimitGate.kt`, `shared/.../core/ConnectivityMonitor.kt`, `DhunAppShell.kt`, hosts' Koin modules |
-| Bounded audio cache and offline replay | ⬜ Not implemented | Android currently has a 5-hour stream-URL cache with 403 invalidation; played audio segment caching and offline replay are still required |
+| Bounded audio cache and offline replay | 🟨 Android code | Media3 `SimpleCache` LRU via `DhunAudioSegmentCache` + `CacheDataSource` (stable video-id keys); budget `SettingsKeys.CACHE_SIZE_MB` default 1024 MB (`AudioCacheBudget`); offline serve when resolve fails but spans exist. URL TTL cache still `DhunStreamCache`. Hardware offline-replay check OPEN. Desktop segment cache ⬜ (vlcj) |
 | Daily live rot-drill | 🔴 Workflow + probe fixes LIVE on correct branch (run 33968950214 @ `10ad025`): both engines CI-IP bot-gated; metadata PASS; kill switch OK. No green verdict; residential verify OPEN | issue #14, artifact `rot-drill-33968950214` |
 | Android 30-minute soak | ⬜ Open | Requires a physical device with unrestricted battery mode, lock-screen playback, and zero-crash/leak evidence |
 | Desktop 30-minute soak | ⬜ Open | Requires a desktop with libVLC and tray/SMTC-capable runtime |

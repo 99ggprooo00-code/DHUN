@@ -128,9 +128,13 @@ Updated every phase. Nothing hidden.
   proof residential playback is broken — residential verification is the
   user-impact gate.
 - Android currently caches resolved stream URLs for five hours and invalidates
-  them on HTTP 403. A bounded audio-segment cache and offline replay are not
-  implemented yet; the rolling `test` APK/MSI is not the signed/stable
-  `v0.1.0` release.
+  them on HTTP 403. **Android audio-segment cache** (Phase 14) is now in
+  code: Media3 `SimpleCache` LRU under `cacheDir/audio-segments`, default
+  1 GiB (`SettingsKeys.CACHE_SIZE_MB`), stable keys = video id, offline
+  replay of already-downloaded spans when resolve fails. Hardware offline
+  check OPEN. Desktop (vlcj) has no segment cache yet. Cache budget changes
+  apply on next process start. The rolling `test` APK/MSI is not the signed
+  stable `v0.1.0` release.
 - Phase 14 Android/Desktop soak tests, clean-target installation checks, and
   release evidence remain open because this environment has no Android device,
   OEM runtime, Windows machine, libVLC runtime, or display.

@@ -15,30 +15,27 @@ Rules (permanent, from the user):
 **Branch:** `arena/01a07170-dhun` · **PR #16**.
 **User lock:** **No Liquid Glass. Material 3 only.**
 
-**Phase:** 14 + ADR-002 player polish (M3 execution).
+**Phase:** 14 robustness — audio-segment cache + prior M3 player polish.
 
 **Just implemented (this push):**
-1. `PlaybackState.Recovering` + `StreamRecoverySignal` — Android 403
-   mid-stream recovery surfaces **"Reconnecting…"** on MiniPlayer + FullPlayer
-   (M3 chip / accent text). Exhausted retries still → `Error`.
-2. `BlurredArtworkCache` — once-per-track key (ADR-002 P4); unit tests.
-3. FullPlayer **lyrics-dominant** (ADR-002 P6): Lyrics tab → artwork recedes
-   (scale/weight/alpha), lyrics surface expands with translucent
-   `surfaceElevated` — **not** Liquid Glass, not a new route.
-4. ADR-002 hardened: Liquid Glass explicitly forbidden.
+1. **Bounded audio-segment cache (Android):** `DhunAudioSegmentCache`
+   (Media3 SimpleCache + LRU) + `PlaybackGraph` pipeline
+   ResolvingDataSource → CacheDataSource → HTTP. Cache **key = video id**
+   (survives googlevideo URL rotation / 403). Budget from
+   `SettingsKeys.CACHE_SIZE_MB` (default 1024) via `AudioCacheBudget`.
+   Offline: if resolve fails but spans exist, serve from disk.
+2. Prior (still on branch): Recovering / Reconnecting…, lyrics-dominant
+   FullPlayer, BlurredArtworkCache, ADR-002 M3-only.
 
-**Last live rot-drill:** 33970045379 @ `d9f4083` — googlevideo URL then CDN
-403 on bytes (category 8). Kill switch OK. Residential smoke still the
-user-impact gate.
+**Last live rot-drill:** 33970045379 — URL then CDN 403 (cat.8). Kill switch OK.
 
 **Exact next step:**
-1. Push → CI green on PR #16.
-2. Residential play smoke when device available.
-3. Phase 14 audio-segment cache (still ⬜). Soaks / v0.1.0 OPEN.
-4. Optional: more extraction research only after residential evidence.
+1. Push → CI green on PR #16 (Media3 database dep + compile).
+2. Residential play + offline-replay smoke when device available.
+3. Soaks / v0.1.0 still OPEN. Desktop segment cache deferred.
 
-**Marks:** taxonomy 🟨 (+ Recovering UX) · cache ⬜ · rot-drill 🔴 · soaks ⬜ ·
-v0.1.0 ⬜ · ADR-002 P3/P4/P6 🟨 code · P7–P9 ⬜ · Liquid Glass 🚫
+**Marks:** taxonomy 🟨 · **cache 🟨 Android code** · rot-drill 🔴 · soaks ⬜ ·
+v0.1.0 ⬜ · ADR-002 P3/P4/P6 🟨 · Liquid Glass 🚫
 
 **Sandbox:** no JDK/device; agent no workflow_dispatch.
 
@@ -114,7 +111,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 CI green; live run **33968950214** on correct branch FAILED — both own-client + yt-dlp CI-IP bot-gated (cat. 8) with full detail; residential verify + audio cache + soaks + v0.1.0 OPEN | run 33968950214, issue #14, PR #16 |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 CI green; live drills RED (cat.8 CDN/Auth); **audio-segment cache 🟨 Android code**; Recovering UX 🟨; residential + soaks + v0.1.0 OPEN | issue #14, PR #16, `DhunAudioSegmentCache` |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -148,8 +145,8 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 
 | Step | Status |
 |---|---|
-| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 On branch + CI green + live-proven AuthRequired detail: typed errors, 429 gate, offline banner. Open: 403 "Reconnecting…" UX, airplane-mode check, db-path review |
-| Bounded audio cache and offline replay | ⬜ Not started |
+| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Typed errors, 429 gate, offline banner, **403 Reconnecting…** (`PlaybackState.Recovering`). Open: airplane-mode HW check, db-path review |
+| Bounded audio cache (Android SimpleCache) | 🟨 code (`DhunAudioSegmentCache`); HW offline OPEN; desktop ⬜ |
 | Daily live rot-drill | 🔴 Run **33968950214** on `arena/01a07170-dhun@10ad025`: production chain exercised; `WATCH\|own-client` + `WATCH\|ytdlp` both `AuthRequired` (Sign in to confirm you're not a bot) from Actions IP; metadata PASS; kill switch correct. **Category 8 CI-network evidence — not extractor-shape rot.** No PASS. Residential verification required before any "playback broken for users" claim |
 | Android 30-minute soak | ⬜ Open |
 | Desktop 30-minute soak | ⬜ Open |
