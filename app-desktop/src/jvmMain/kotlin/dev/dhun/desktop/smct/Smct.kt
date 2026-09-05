@@ -87,7 +87,7 @@ object Smct {
                 report(steps, log)
                 return false
             }
-            steps += ProbeResult("hwnd", true, "0x${hwnd.toString(16)}")
+            steps += ProbeResult("hwnd", true, "ptr=$hwnd")
 
             // 1. WinRT ABI reachable.
             val lib = loadWinRt()
@@ -114,7 +114,7 @@ object Smct {
                 report(steps, log)
                 return false
             }
-            steps += ProbeResult("activate-factory", true, "ptr=0x${factory.toLong().toString(16)}")
+            steps += ProbeResult("activate-factory", true, "ptr=$factory")
 
             // 3. GetForWindow (interop vtable slot 6).
             val smtcOut = Memory(Native.POINTER_SIZE.toLong())
@@ -132,7 +132,7 @@ object Smct {
                     report(steps, log)
                     return false
                 }
-                steps += ProbeResult("get-for-window", true, "ptr=0x${smtc.toLong().toString(16)}")
+                steps += ProbeResult("get-for-window", true, "ptr=$smtc")
 
                 // 4. Live-object check (slot 6, out BOOL).
                 val visibleOut = Memory(4L)
@@ -216,9 +216,8 @@ object Smct {
         .recoverCatching { Native.load("WindowsCore", WinRt::class.java) }
         .getOrThrow()
 
-    private fun findHwnd(windowTitle: String): Long? = runCatching {
-        val h = User32Lib.INSTANCE.FindWindowW(WString("SunAwtFrame"), WString(windowTitle))
-        if (h == null) null else h.toLong()
+    private fun findHwnd(windowTitle: String): Pointer? = runCatching {
+        User32Lib.INSTANCE.FindWindowW(WString("SunAwtFrame"), WString(windowTitle))
     }.getOrNull()
 
     /**
@@ -233,7 +232,7 @@ object Smct {
             val rect = WinRect()
             if (User32Lib.INSTANCE.GetWindowRect(hwnd, rect) == 0) return false
             val flags = SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE
-            User32Lib.INSTANCE.SetWindowPos(hwnd, null, rect.left + dx, rect.top + dy, 0, 0, flags)
+            User32Lib.INSTANCE.SetWindowPos(hwnd, null, rect.left + dx, rect.top + dy, 0, 0, flags) != 0
         }.getOrDefault(false)
 
     /**
@@ -266,12 +265,12 @@ object Smct {
      */
     private fun vtableCall(obj: Pointer, slot: Int, vararg args: Any?): Int {
         val vtbl = obj.getPointer(0) ?: error("null vtable")
-        val fnPtr = vtbl.getPointer(slot * Native.POINTER_SIZE)
+        val fnPtr = vtbl.getPointer((slot * Native.POINTER_SIZE).toLong())
         val fn = Function.getFunction(fnPtr)
         val all = arrayOfNulls<Any>(args.size + 1)
         all[0] = obj
         System.arraycopy(args, 0, all, 1, args.size)
-        return fn.invokeInt(*all)
+        return fn.invokeInt(all)
     }
 
     /** IInspectable::Release (slot 2). Best-effort. */
