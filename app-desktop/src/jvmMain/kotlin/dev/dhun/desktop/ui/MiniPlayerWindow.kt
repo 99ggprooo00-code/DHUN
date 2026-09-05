@@ -152,8 +152,8 @@ private fun Modifier.dragWindow(onReleasedWithoutDrag: () -> Unit): Modifier =
         if (!Smct.isWindows) return@pointerInput
         awaitPointerEventScope {
             while (true) {
-                val down = awaitFirstDown(requireCapture = true)
-                down.press()
+                val down = awaitFirstDown()
+                down.consume()
                 var moved = false
                 var last = down.position
                 while (true) {
