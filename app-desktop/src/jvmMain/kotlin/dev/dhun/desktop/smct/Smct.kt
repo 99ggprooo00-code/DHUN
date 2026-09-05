@@ -467,7 +467,7 @@ object Smct {
     /* ---------------- JNA ABI helpers ---------------- */
 
     /** Win32 GUID (4+2+2+8 bytes; first three fields little-endian in memory). */
-    private class WinGuid : Structure() {
+    internal class WinGuid : Structure() {
         var data1: Int = 0
         var data2: Short = 0
         var data3: Short = 0

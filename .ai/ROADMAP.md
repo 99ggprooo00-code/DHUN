@@ -12,7 +12,7 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at pushed commit `dd0e35e` (SMTC phase-2
+**Branch:** `arena/01a070b3-dhun` at pushed commit `4dee23a` (SMTC phase-2
 code/docs pushed; icon handoff + raw-glyph purge + token polish are pushed;
 PR #13 OPEN). The current `test` pre-release is healthy: run `33952291659`
 passed `apk`, `msi`, and `publish`; all four rolling assets are present. The
@@ -35,17 +35,16 @@ recreated here.
    dialogs, catalog, Android/Desktop harnesses, and the desktop mini-player
    use `DhunIconView`; target icon and numeric dp/sp greps are clean. CI run
    `33956457785` passed shared tests, Android debug build, and probe compiles.
-5. **SMTC phase 2 — CODE PUSHED, CI RED:** commit `b465abf` is included
-   in pushed `dd0e35e`; run `33957925730` passed shared tests and Android
-   debug build but failed `:app-desktop:compileKotlinJvm` because the
-   `Session` constructor was private. The current worktree changes the
-   constructor to internal and exposes only the internal WinRt ABI type.
-   Windows hardware round-trip, tray, mini-player, and MSI checks remain
-   open; docs were updated from the old phase-1-only procedure.
+5. **SMTC phase 2 — CODE PUSHED, CI RED:** commit `4dee23a` fixed the
+   private `Session` constructor, but run `33958092891` then reported that
+   the internal `WinRt` method exposed private `WinGuid`. The current
+   worktree makes the ABI GUID type internal as well. Windows hardware
+   round-trip, tray, mini-player, and MSI checks remain open; docs were
+   updated from the old phase-1-only procedure.
 
 **Exact next step:**
-1. Commit/push this visibility fix, inspect PR #13 annotations, and fix any
-   remaining JNA/WinRT or Compose diagnostics until CI is green.
+1. Commit/push this ABI visibility fix, inspect PR #13 annotations, and fix
+   any remaining JNA/WinRT or Compose diagnostics until CI is green.
 2. If CI is green, run the Windows checklist when hardware is available;
    record PASS/FAIL and choose integrated SMTC or documented fallback.
 3. Keep Android/desktop hardware gates open; then continue Phase 13 Android
@@ -148,7 +147,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 
 | Step | Status |
 |---|---|
-| SMTC spike (3-day timebox) | 🟨 **phase 2 code pushed in `dd0e35e`, CI red on visibility fix** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — Windows round-trip and fallback verdict OPEN |
+| SMTC spike (3-day timebox) | 🟨 **phase 2 code pushed in `4dee23a`, CI red on ABI visibility** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — Windows round-trip and fallback verdict OPEN |
 | System tray (playing/paused icon, 6-item menu) | 🟨 code pushed (`DhunTray.kt` + `TrayIcons.kt`, AWT, EDT-marshaled, headless-safe) — CI compile pending; hardware OPEN |
 | Mini-player window (320×88, always-on-top, drag, click-opens-main) | 🟨 code pushed (`MiniPlayerWindow.kt` + second Compose `Window`; hide-not-close; Ctrl+M) — CI compile pending; hardware OPEN; taskbar visibility is a 1.8.2 limitation (no `skipTaskbar`) |
 | Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — CI compile pending; hardware OPEN |
