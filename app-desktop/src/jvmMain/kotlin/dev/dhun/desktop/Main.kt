@@ -61,7 +61,10 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * Phase 12 additions (this file):
  *  - system tray (AWT): track title + play/pause/next/prev/open/quit menu,
- *    playing/paused icon variants — the documented SMTC fallback path
+ *    playing/paused icon variants — also the documented SMTC fallback path
+ *  - SMTC phase 2: now-playing metadata, remote thumbnail, playback state,
+ *    previous/next enablement, and native ButtonPressed dispatch to the
+ *    shared player; activation failures degrade to the tray path
  *  - close-to-tray (setting [SettingsKeys.CLOSE_TO_TRAY], default on): the
  *    main window's X hides to tray; tray "Quit" exits clean
  *  - window geometry persisted to [SettingsKeys.WINDOW_GEOMETRY] ("x,y,w,h"
@@ -130,6 +133,7 @@ fun main() = application {
 
     val mainWindowRef = AtomicReference<ComposeWindow>()
     val miniWindowRef = AtomicReference<ComposeWindow>()
+    val smctSessionRef = AtomicReference<Smct.Session?>()
 
     fun showMainWindow() {
         val w = mainWindowRef.get() ?: return
@@ -169,6 +173,7 @@ fun main() = application {
     fun quit() {
         saveGeometry()
         runCatching { tray.stop() }
+        runCatching { smctSessionRef.getAndSet(null)?.close() }
         runCatching { persistence.stop() }
         runCatching { player.release() }
         appScope.cancel()
@@ -183,14 +188,74 @@ fun main() = application {
     appScope.launch { player.currentTrack.collect { tray.setTrack(it) } }
     appScope.launch { player.state.collect { tray.setPlaying(it is PlaybackState.Playing) } }
 
-    // Phase 12 SMTC spike (phase 1): passive probe after the main window is
-    // up. Logs "SMTC probe PASS/FAIL — …" to the console; disable with
-    // -Ddhun.smct=false. No integration yet (metadata + button events are
-    // spike phase 2, see docs/verification/12-desktop-native.md).
+    // Phase 12 SMTC phase 2: connect after the AWT main window exists. A
+    // failed activation or event registration leaves the documented tray /
+    // keyboard fallback active; no native failure reaches the UI.
     appScope.launch {
         kotlinx.coroutines.delay(2_000)
-        runCatching { Smct.probe("DHUN") }
-            .onFailure { System.err.println("DHUN SMTC probe error: $it") }
+        val session = Smct.connect(
+            windowTitle = "DHUN",
+            onButton = { button ->
+                // WinRT invokes this callback from a native thread. Keep all
+                // player calls on the app scope instead of the callback.
+                appScope.launch {
+                    when (button) {
+                        Smct.Button.Play -> if (player.state.value !is PlaybackState.Playing) player.playPause()
+                        Smct.Button.Pause -> if (player.state.value is PlaybackState.Playing) player.playPause()
+                        Smct.Button.Stop -> player.stop()
+                        Smct.Button.Next -> player.next()
+                        Smct.Button.Previous -> player.previous()
+                        Smct.Button.FastForward -> player.seekTo(player.positionMs.value + 10_000L)
+                        Smct.Button.Rewind -> player.seekTo((player.positionMs.value - 10_000L).coerceAtLeast(0L))
+                        Smct.Button.Record,
+                        Smct.Button.ChannelUp,
+                        Smct.Button.ChannelDown,
+                        Smct.Button.Unknown,
+                        -> Unit
+                    }
+                }
+            },
+        ) ?: return@launch
+        smctSessionRef.set(session)
+
+        appScope.launch {
+            player.currentTrack.collect { track ->
+                session.updateMetadata(
+                    title = track?.title,
+                    artist = track?.artistName,
+                    album = track?.albumName,
+                    thumbnailUrl = track?.thumbnailUrl,
+                )
+            }
+        }
+        appScope.launch {
+            player.state.collect { state ->
+                session.setPlaybackState(
+                    when (state) {
+                        is PlaybackState.Playing -> Smct.PlaybackStatus.Playing
+                        is PlaybackState.Resolving,
+                        is PlaybackState.Buffering,
+                        -> Smct.PlaybackStatus.Changing
+                        is PlaybackState.Paused -> Smct.PlaybackStatus.Paused
+                        is PlaybackState.Idle,
+                        is PlaybackState.Error,
+                        -> Smct.PlaybackStatus.Stopped
+                    },
+                )
+            }
+        }
+        appScope.launch {
+            player.queue.collect { queue ->
+                val index = player.currentQueueIndex.value
+                session.setNavigationButtons(hasPrevious = index > 0, hasNext = index >= 0 && index < queue.lastIndex)
+            }
+        }
+        appScope.launch {
+            player.currentQueueIndex.collect { index ->
+                val queueSize = player.queue.value.size
+                session.setNavigationButtons(hasPrevious = index > 0, hasNext = index >= 0 && index < queueSize - 1)
+            }
+        }
     }
 
     // Restore the last session (paused) then keep persisting.

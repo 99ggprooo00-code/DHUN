@@ -12,7 +12,7 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at `d38c233` (icon handoff + raw-glyph
+**Branch:** `arena/01a070b3-dhun` at `0afb084` (icon handoff + raw-glyph
 purge + token polish pushed; PR #13 OPEN). The current `test` pre-release is
 healthy: run `33952291659` passed `apk`, `msi`, and `publish`; all four rolling
 assets are present. The referenced `3bcca3b` / `f469605` objects were absent,
@@ -26,28 +26,27 @@ so the handoff was recreated here.
    Windows tray/close-to-tray/geometry/mini-player/shortcuts/SMTC/MSI
    clean-VM checks, and the Phase 10/11 checklists remain open as recorded
    below.
-3. **Icon pass — CODE DONE, CI UNVERIFIED:** `DhunIcons.kt` has 24 embedded
+3. **Icon pass — CODE DONE, CI GREEN:** `DhunIcons.kt` has 24 embedded
    Apache-2.0 Material paths, a common SVG path parser, and accessible
-   `DhunIconView`; attribution is in `THIRD_PARTY.md`. PR #13 run
-   `33955728824` hit the existing completion-history timeout; the transition
-   race fix is in `ec30cb8`.
-4. **Raw glyph purge — CODE DONE, CI UNVERIFIED:** shared UI, dialogs,
-   catalog, Android/Desktop harnesses, and the desktop mini-player use
-   `DhunIconView`; target icon grep is clean. Token scaling/selected-state
-   polish is staged but not yet pushed.
-5. **Last CI error:** run `33956336755` reached the existing
-   `NowPlayingPersistenceTest.naturalCompletionMarksHistoryRow` and timed out
-   waiting for the two history rows. The player observer launch race is now
-   hardened with `CoroutineStart.UNDISPATCHED` in the current unpushed
-   worktree; the earlier `fillMaxHeight` compiler error is fixed.
+   `DhunIconView`; attribution is in `THIRD_PARTY.md`. The completion-history
+   race fix and token polish are included in the green run below.
+4. **Raw glyph purge + token polish — CODE DONE, CI GREEN:** shared UI,
+   dialogs, catalog, Android/Desktop harnesses, and the desktop mini-player
+   use `DhunIconView`; target icon and numeric dp/sp greps are clean. CI run
+   `33956457785` passed shared tests, Android debug build, and probe compiles.
+5. **SMTC phase 2 — CODE IN PROGRESS:** the current unpushed worktree adds
+   guarded WinRT metadata/artwork/playback-state integration and a retained
+   base-JNA `ButtonPressed` COM callback, while preserving tray/keyboard
+   fallback. Windows hardware round-trip, tray, mini-player, and MSI checks
+   remain open; docs were updated from the old phase-1-only procedure.
 
 **Exact next step:**
-1. Commit the observer scheduling fix + roadmap, push the branch, and
-   inspect PR #13 annotations; repeat until CI reaches Android/desktop.
-2. Resolve any remaining compiler diagnostics/test flakes, then keep raw
-   dp/sp and raw glyph greps clean; only CI-green work can be marked done.
-3. Keep hardware verification open; after CI is green continue with SMTC
-   phase 2 or the documented tray fallback, then Phase 13/14.
+1. Commit the SMTC phase-2 code/docs + roadmap, push the branch, and inspect
+   PR #13 annotations; CI must compile the new JNA/WinRT path.
+2. If CI is green, run the Windows checklist when hardware is available;
+   record PASS/FAIL and choose integrated SMTC or documented fallback.
+3. Keep Android/desktop hardware gates open; then continue Phase 13 Android
+   polish and Phase 14 rot-drill/GA only after the required evidence exists.
 
 **CI trail (this session, 9 rounds — all in DEBUG_LOG):**
 `33941799559`→android media3 APIs · `33942371150`/`33942622916`→
@@ -134,7 +133,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 09 | Artist/Album/Playlist | ✅ MERGED PR #7 @ `3fce5e5` — fixtures schema-authored (no YT egress in sandbox; live re-capture scheduled); hardware 3/3/CRUD OPEN | docs/verification/09 |
 | 10 | Library & history | ✅ MERGED PR #8 @ `d27eb37` (CI green `33842104141`) — hardware checklist OPEN | docs/verification/10 |
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
-| 12 | Desktop native | 🟨 IN PROGRESS — all code pushed (`a20165b`); CI RED ×4 (rounds 1–3 = 1.8.2 API, fixed from source; round 4 = shared test race, fixed locally); **desktop compile itself first CI-checked on the next push**; hardware OPEN; SMTC phase 1 only | docs/verification/12 · `.ai/DEBUG_LOG.md` |
+| 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | ⬜ not started (battery-exemption prompt — the one item Phase 13 lists — landed early this session via the Phase 1 directive, unpushed) | — |
 | 14 | Robustness + rot-drill CI + release v0.1.0 | ⬜ not started (rot-drill.yml exists as a placeholder cron; activation = wiring the probe suite, Phase 14) | — |
 
@@ -146,7 +145,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 
 | Step | Status |
 |---|---|
-| SMTC spike (3-day timebox) | 🟨 **phase 1 code pushed** (`Smct.kt` — WinRT activation via JNA/combase → `ISystemMediaTransportControlsInterop` → `GetForWindow` → live `IsTransportControlsButtonVisible`; HRESULT-logged `SMTC probe` console line; `-Ddhun.smct=false` off) — CI compile pending (first real check = next push's step 6); on-Windows probe OPEN; phase 2 (UpdateMetadata + ButtonPressed, IIDs pulled on-machine) + fallback decision OPEN |
+| SMTC spike (3-day timebox) | 🟨 **phase 2 code in current unpushed worktree** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — CI compile pending; Windows round-trip and fallback verdict OPEN |
 | System tray (playing/paused icon, 6-item menu) | 🟨 code pushed (`DhunTray.kt` + `TrayIcons.kt`, AWT, EDT-marshaled, headless-safe) — CI compile pending; hardware OPEN |
 | Mini-player window (320×88, always-on-top, drag, click-opens-main) | 🟨 code pushed (`MiniPlayerWindow.kt` + second Compose `Window`; hide-not-close; Ctrl+M) — CI compile pending; hardware OPEN; taskbar visibility is a 1.8.2 limitation (no `skipTaskbar`) |
 | Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — CI compile pending; hardware OPEN |
