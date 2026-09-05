@@ -12,6 +12,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import dev.dhun.player.StreamRecoverySignal
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -77,15 +78,34 @@ object PlaybackGraph {
         player.addListener(object : Player.Listener {
             private val retries = HashMap<String, Int>()
             override fun onPlayerError(error: PlaybackException) {
-                if (error.errorCode != PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) return
+                if (error.errorCode != PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
+                    StreamRecoverySignal.end()
+                    return
+                }
                 val id = player.currentMediaItem?.mediaId ?: return
                 val count = (retries[id] ?: 0) + 1
                 retries[id] = count
-                if (count > MAX_403_RETRIES) return
+                if (count > MAX_403_RETRIES) {
+                    StreamRecoverySignal.end()
+                    return
+                }
+                // Phase 14: surface Recovering → "Reconnecting…" while we
+                // invalidate the stale URL and re-prepare at the same position.
+                StreamRecoverySignal.begin()
                 streamCache.invalidate(id)
                 val position = player.currentPosition
                 player.seekTo(position)
-                player.prepare() // re-resolve and resume where the user was
+                player.prepare()
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) StreamRecoverySignal.end()
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
+                    StreamRecoverySignal.end()
+                }
             }
         })
         return player

@@ -12,58 +12,35 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
-**Branch:** `arena/01a07170-dhun` · **PR #16 OPEN** · extraction fix @ `d9f4083`
-CI green (`33969405710`); ADR-002 + audit in this push.
+**Branch:** `arena/01a07170-dhun` · **PR #16**.
+**User lock:** **No Liquid Glass. Material 3 only.**
 
-**Phase:** 14 + **ADR-002 Full-Screen player design locked**.
+**Phase:** 14 + ADR-002 player polish (M3 execution).
 
-**Last live rot-drill — run 33970045379 (expanded client chain LIVE):**
+**Just implemented (this push):**
+1. `PlaybackState.Recovering` + `StreamRecoverySignal` — Android 403
+   mid-stream recovery surfaces **"Reconnecting…"** on MiniPlayer + FullPlayer
+   (M3 chip / accent text). Exhausted retries still → `Error`.
+2. `BlurredArtworkCache` — once-per-track key (ADR-002 P4); unit tests.
+3. FullPlayer **lyrics-dominant** (ADR-002 P6): Lyrics tab → artwork recedes
+   (scale/weight/alpha), lyrics surface expands with translucent
+   `surfaceElevated` — **not** Liquid Glass, not a new route.
+4. ADR-002 hardened: Liquid Glass explicitly forbidden.
 
-```
-https://github.com/99ggprooo00-code/DHUN/actions/runs/33970045379
-ref: arena/01a07170-dhun @ d9f4083
-yt-dlp 2026.08.19
-
-PROBE|version|PASS
-PROBE|search|PASS|20
-WATCH|own-client|BROKEN|Unavailable
-WATCH|ytdlp|BROKEN|AuthRequired(...Sign in to confirm you're not a bot...)
-PROBE|resolve+stream|FAIL|IOException: Server returned HTTP response code: 403
-  for URL: https://rr2---sn-…googlevideo.com/videoplayback?...itag=251...
-PROBE|related|PASS|50
-WATCH|newpipe-stream|BROKEN|Parse(JSON too short)
-PROBE|verdict|FAIL
-```
-
-**Progress vs 33968950214:** we **did obtain a real googlevideo audio URL**
-(itag 251) then failed the **byte-fetch with HTTP 403** from the Actions IP.
-That is still category-8 / CDN bot gating — but the client-chain expansion
-moved the failure from "no URL" to "URL then 403 on range-GET". Kill switch
-correct. Do **not** skip the byte check to fake PASS.
-
-**Design lock (user brief → real KMP plan):** Full-Screen Now Playing is a
-signature polish on **existing** Phase 08/11 code (not unimplemented).
-Philosophy: Apple clarity × ViMusic immersion × M3 glass; lightweight 2D
-blur + translucent surfaces; lyrics-dominant mode; blur-once-per-track;
-**no** Liquid Glass dependency; **no** Tauri/Web. Source-neutral
-`MusicProvider` stays law. Docs: `ADR-002`, `roadmap-audit-2026-09-05.md`.
+**Last live rot-drill:** 33970045379 @ `d9f4083` — googlevideo URL then CDN
+403 on bytes (category 8). Kill switch OK. Residential smoke still the
+user-impact gate.
 
 **Exact next step:**
-1. Finish rebase push of ADR-002 + audit onto PR #16; CI green.
-2. Optional next extraction slice: nsig/player JS or residential-only
-   classification — **not** cookies without ADR. Prefer residential smoke
-   before more client churn.
-3. Phase 14: 403 mid-stream UX already partially exists; surface
-   "Reconnecting…"; audio cache. ADR-002 P3–P6 only after one residential
-   play. Soaks / v0.1.0 OPEN.
+1. Push → CI green on PR #16.
+2. Residential play smoke when device available.
+3. Phase 14 audio-segment cache (still ⬜). Soaks / v0.1.0 OPEN.
+4. Optional: more extraction research only after residential evidence.
 
-**Phase 14 marks:** taxonomy 🟨 · cache ⬜ · rot-drill 🔴 (URL-then-403 on
-33970045379) · soaks ⬜ · v0.1.0 ⬜
+**Marks:** taxonomy 🟨 (+ Recovering UX) · cache ⬜ · rot-drill 🔴 · soaks ⬜ ·
+v0.1.0 ⬜ · ADR-002 P3/P4/P6 🟨 code · P7–P9 ⬜ · Liquid Glass 🚫
 
-**Player polish (ADR-002):** P0 🟨 (chain helped, CDN 403 remains on CI) ·
-P1–P2 exist · P3–P9 ⬜ · lyrics ✅ code / 🟨 HW
-
-**Sandbox:** no JDK/device; YT TLS blocked here; no workflow_dispatch (403).
+**Sandbox:** no JDK/device; agent no workflow_dispatch.
 
 ---
 

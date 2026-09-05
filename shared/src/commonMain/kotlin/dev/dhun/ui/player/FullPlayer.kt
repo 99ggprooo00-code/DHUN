@@ -66,7 +66,9 @@ import androidx.compose.ui.unit.IntOffset
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
+import androidx.compose.runtime.LaunchedEffect
 import dev.dhun.design.ArtworkColorExtractor
+import dev.dhun.design.BlurredArtworkCache
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
@@ -80,13 +82,20 @@ import dev.dhun.presentation.player.SkipDirection
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * FullPlayer — the Phase 08 showstopper.
+ * FullPlayer — the Phase 08 showstopper + ADR-002 polish.
  *
  * Layout (top → bottom): collapse bar · sliding artwork (blurred-artwork
- * background + scrim behind everything) · title/artist · custom seek bar
- * (4dp→8dp drag, thumb on touch only) · transport (shuffle / prev|hold-seek /
- * play-pause morph / next|hold-seek / repeat-cycle) · volume (desktop) ·
- * Lyrics | Queue | Related tabs.
+ * background + Material 3 scrim behind everything) · title/artist · custom
+ * seek bar · transport · volume (desktop) · Lyrics | Queue | Related tabs.
+ *
+ * **Lyrics-dominant mode (ADR-002 P6):** selecting the Lyrics tab recedes
+ * the centered artwork (scale/fade) and gives the lyrics surface most of
+ * the vertical weight. Still the same screen — no navigation. Material 3
+ * only: translucent surfaces + existing [Modifier.blur] pipeline. **No
+ * Liquid Glass.**
+ *
+ * **Reconnecting chip:** when [PlaybackState.Recovering], a small M3
+ * surface chip appears under the title (403 mid-stream recovery).
  *
  * Choreography: artwork slides in skip direction with fade, background color
  * crossfades 500ms, title fades. BACK/⌄ collapses — never exits the app.
@@ -133,6 +142,16 @@ fun FullPlayer(
     )
 
     var selectedTab by remember { mutableIntStateOf(1) } // Queue by default
+    // ADR-002 P6: Lyrics tab = lyrics-dominant layout (artwork recedes).
+    val lyricsDominant = selectedTab == 0
+
+    // ADR-002 P4: mark blur-pipeline key once per track/URL — never every frame.
+    val artworkCacheKey = remember(current?.thumbnailUrl, current?.id) {
+        BlurredArtworkCache.keyFor(current?.thumbnailUrl, current?.id)
+    }
+    LaunchedEffect(artworkCacheKey) {
+        if (artworkCacheKey.isNotBlank()) BlurredArtworkCache.markPrepared(artworkCacheKey)
+    }
 
     Box(
         modifier = modifier
@@ -145,7 +164,9 @@ fun FullPlayer(
             ) {}
             .safeDrawingPadding(),
     ) {
-        // ---- background: real blurred artwork -----------------------------------
+        // ---- background: Material 3 blurred artwork (once-per-track key) --------
+        // Compose blur on the layer; BlurredArtworkCache records the key so we
+        // never pretend to reprocess full-res art every frame (ADR-002).
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -230,19 +251,36 @@ fun FullPlayer(
                 }
             }
 
-            // Artwork with skip-direction slide + playing scale spring
+            // Artwork stage — recedes in lyrics-dominant mode (ADR-002 P6).
+            val stageWeight by animateFloatAsState(
+                targetValue = if (lyricsDominant) 0.28f else 1.05f,
+                animationSpec = DhunAnimations.mediumTween(),
+                label = "artworkStageWeight",
+            )
+            val stageAlpha by animateFloatAsState(
+                targetValue = if (lyricsDominant) 0.55f else 1f,
+                animationSpec = DhunAnimations.mediumTween(),
+                label = "artworkStageAlpha",
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1.05f)
-                    .padding(horizontal = DhunSpacing.xxxl),
+                    .weight(stageWeight.coerceAtLeast(0.2f))
+                    .padding(horizontal = if (lyricsDominant) DhunSpacing.huge else DhunSpacing.xxxl)
+                    .graphicsLayer { alpha = stageAlpha },
                 contentAlignment = Alignment.Center,
             ) {
-                val artworkScale by animateFloatAsState(
+                val playScale by animateFloatAsState(
                     targetValue = if (isPlaying) 1f else 0.84f,
                     animationSpec = DhunAnimations.springSpec(),
                     label = "artworkScale",
                 )
+                val dominantScale by animateFloatAsState(
+                    targetValue = if (lyricsDominant) 0.42f else 1f,
+                    animationSpec = DhunAnimations.mediumTween(),
+                    label = "lyricsDominantScale",
+                )
+                val artworkScale = playScale * dominantScale
                 AnimatedContent(
                     targetState = current,
                     transitionSpec = {
@@ -267,12 +305,31 @@ fun FullPlayer(
                             imageUrl = t?.thumbnailUrl,
                             contentDescription = t?.title,
                             modifier = Modifier
-                                .fillMaxWidth(0.82f)
+                                .fillMaxWidth(if (lyricsDominant) 0.36f else 0.82f)
                                 .aspectRatio(1f)
                                 .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale },
                             shape = DhunShapes.extraLarge,
                         )
                     }
+                }
+            }
+
+            // Phase 14: mid-stream 403 recovery — Material 3 surface chip (sharp text).
+            if (state is PlaybackState.Recovering) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.xs)
+                        .clip(DhunShapes.medium)
+                        .background(DhunColors.surfaceElevated.copy(alpha = 0.92f))
+                        .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Reconnecting…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accent,
+                    )
                 }
             }
 
@@ -471,15 +528,32 @@ fun FullPlayer(
             Spacer(modifier = Modifier.height(DhunSpacing.xs))
 
             // Bottom tabs: Lyrics | Queue | Related
+            // Lyrics-dominant (ADR-002): lyrics surface takes most vertical room;
+            // still Material 3 translucent fill — not Liquid Glass.
             PlayerTabRow(
                 selectedTab = selectedTab,
                 onSelect = { selectedTab = it },
                 accent = accent,
             )
+            val tabsWeight by animateFloatAsState(
+                targetValue = if (lyricsDominant) 1.55f else 0.9f,
+                animationSpec = DhunAnimations.mediumTween(),
+                label = "tabsWeight",
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.9f),
+                    .weight(tabsWeight.coerceAtLeast(0.5f))
+                    .then(
+                        if (lyricsDominant) {
+                            Modifier
+                                .padding(horizontal = DhunSpacing.sm)
+                                .clip(DhunShapes.large)
+                                .background(DhunColors.surfaceElevated.copy(alpha = 0.72f))
+                        } else {
+                            Modifier
+                        },
+                    ),
             ) {
                 PlayerTabContent(
                     tab = selectedTab,

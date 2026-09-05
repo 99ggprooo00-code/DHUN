@@ -130,12 +130,17 @@ fun MiniPlayer(
                             when (state) {
                                 is PlaybackState.Buffering -> append(" • Buffering…")
                                 is PlaybackState.Resolving -> append(" • Resolving…")
+                                is PlaybackState.Recovering -> append(" • Reconnecting…")
                                 is PlaybackState.Error -> append(" • Error — tap to see")
                                 else -> {}
                             }
                         },
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (state is PlaybackState.Error) DhunColors.error else DhunColors.textTertiary,
+                        color = when (state) {
+                            is PlaybackState.Error -> DhunColors.error
+                            is PlaybackState.Recovering -> DhunColors.accent
+                            else -> DhunColors.textTertiary
+                        },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

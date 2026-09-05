@@ -73,6 +73,10 @@ Updated every phase. Nothing hidden.
   Playback history is local-only; nothing leaves the device.
 - Desktop (Phase 04) runtime needs a system libVLC install and `yt-dlp` on
   PATH (streams resolve own-client first, yt-dlp failover — ADR-001).
+- **Visual system lock (2026-09-05):** Material 3 only. **No Liquid Glass**
+  renderer, no continuous full-res reblur. Atmosphere = tokens
+  (`DhunColors.glass` / translucent `surfaceElevated`) + one-shot
+  artwork blur via `BlurredArtworkCache` key + `Modifier.blur`.
 - Design system (Phase 06): `GlassCard` uses `Modifier.blur()` / `RenderEffect`
   on Android 12+ (API 31+) and Desktop Skiko; below that floor it degrades to
   a translucent scrim (`DhunColors.glass` 60% #99111111 + 10% white border) — still

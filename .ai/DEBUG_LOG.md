@@ -1,5 +1,17 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-05 — ADR-002 M3 polish + Recovering (no Liquid Glass)
+
+**User:** No Liquid Glass; Material 3 OK; plan + execute.
+
+**Shipped:**
+- `PlaybackState.Recovering` / `StreamRecoverySignal` / PlaybackGraph 403 → chip
+- FullPlayer lyrics-dominant (Lyrics tab) + BlurredArtworkCache
+- ADR-002 hardened M3-only
+
+**Not claimed done:** residential stream, hardware 08/11, soaks, v0.1.0.
+Live drill still 33970045379 URL→CDN 403.
+
 Format: date · title · symptom (with stack where available) · root cause ·
 fix · verification state. Newest first. If you hit one of these again,
 read this entry before re-diagnosing.

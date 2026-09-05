@@ -1,6 +1,6 @@
 # Phase 08 verification — Player UI (MiniPlayer + FullPlayer)
 
-Status: 🟨 **CODE COMPLETE** — on-hardware checklist below is OPEN (needs a
+Status: 🟨 **CODE COMPLETE** (+ ADR-002 lyrics-dominant / Recovering chip 2026-09-05) — on-hardware checklist below is OPEN (needs a
 physical run on Android + desktop, like Phases 03/04/05 checklists).
 
 ## What was built (code-level, auditable)
@@ -53,3 +53,13 @@ physical run on Android + desktop, like Phases 03/04/05 checklists).
 - [ ] Queue drag/swipe/tap on touch (Android) and mouse (desktop)
 - [ ] Desktop: volume slider drives vlcj; blur over artwork (Skiko)
 - [ ] BACK collapses FullPlayer; app never finishes while expanded
+
+## ADR-002 polish (2026-09-05) — Material 3 only
+
+| Item | Status |
+|---|---|
+| Liquid Glass | 🚫 forbidden |
+| Lyrics-dominant mode (Lyrics tab) | 🟨 code — artwork recedes, M3 translucent surface |
+| BlurredArtworkCache once-per-track | 🟨 code + unit tests |
+| Reconnecting chip (`PlaybackState.Recovering`) | 🟨 code — Android 403 path |
+| Hardware re-check of 16-item list | ⬜ still OPEN |

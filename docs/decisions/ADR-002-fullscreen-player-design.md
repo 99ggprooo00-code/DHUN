@@ -3,7 +3,13 @@
 ## Status
 Accepted (2026-09-05) — **design contract**. Implementation is **incremental polish
 on existing Phase 08/11 code**, not a greenfield player. Does not reorder the
-locked 14-phase plan; does not authorize Liquid Glass as a hard dependency.
+locked 14-phase plan.
+
+**Visual system (user lock 2026-09-05): Material 3 only. No Liquid Glass.**
+Translucent M3 surfaces + one-shot `Modifier.blur` on artwork backgrounds +
+gradient scrims. Glass tokens (`DhunColors.glass`) remain the atmosphere
+layer — never a separate Liquid Glass renderer, never continuous full-res
+reblur, never platform-private glass APIs.
 
 ## Context
 
@@ -41,10 +47,13 @@ Rules:
 1. **Material 3 is structure. Glass is atmosphere.**  
    Glass only on: player controls, lyrics surface, queue sheet, transient
    chrome, floating actions. Home/Search/Library stay conventional M3 dark.
-2. **No Liquid Glass hard dependency.**  
-   Path: artwork → downscale → blur once per track change → tint from
-   `ArtworkColorExtractor` → gradient scrim → translucent M3 surface → cache.
-   Re-blur only on track change (or artwork URL change), never every frame.
+2. **Material 3 only — Liquid Glass is forbidden (user lock).**  
+   Path: artwork → (optional downscale) → blur **once** per track change →
+   tint from `ArtworkColorExtractor` → gradient scrim → translucent M3
+   surface (`surfaceElevated` / `DhunColors.glass`) → cache via
+   `BlurredArtworkCache`. Re-blur only on track/URL change, never every
+   frame. Do not adopt iOS Liquid Glass, Windows Acrylic-as-primary, or
+   any continuous backdrop-filter fashion that fights battery/low-end.
 3. **UI never knows the stream source.**  
    `PlayerScreen → PlayerViewModel → DhunPlayer → StreamResolver → MusicProvider`.
    InnerTube / yt-dlp stay behind the provider/extraction boundary (already true).
@@ -130,10 +139,10 @@ source-neutral (already).
 | P0 | Extraction truthfulness | live | Rot-drill + expanded tokenless client chain (in flight). Do not build glass on a red stream path without residential evidence. |
 | P1 | Player state already exists | — | Idle/Playing/Paused/Buffering/Error via `PlaybackState` — do not reinvent. |
 | P2 | Basic player | done | Mini + Full transport — Phase 08. |
-| P3 | Full-screen Now Playing hierarchy polish | P2 | Spacing, CC control affordance, collapse choreography. |
-| P4 | Dynamic artwork background cache | P2 | Explicit cache type; blur-once-per-track. |
+| P3 | Full-screen Now Playing hierarchy polish | P2 | 🟨 lyrics-dominant weight shift in FullPlayer (2026-09-05). |
+| P4 | Dynamic artwork background cache | P2 | 🟨 `BlurredArtworkCache` key once-per-track (Compose blur still on layer). |
 | P5 | Lyrics domain + providers | done | Phase 11. |
-| P6 | Lyrics-dominant mode | P3+P5 | Artwork recedes; glass surface; no new page. |
+| P6 | Lyrics-dominant mode | P3+P5 | 🟨 FullPlayer: artwork recedes + M3 translucent lyrics surface when Lyrics tab selected. |
 | P7 | Blur + translucent M3 refinement | P4+P6 | Token-only; <API 31 scrim fallback already in KNOWN_LIMITATIONS. |
 | P8 | Smooth lyric sync motion | P5 | Spring emphasis, better scroll anchoring. |
 | P9 | Gesture / animation polish | P3–P8 | Horizontal skip swipe optional; keep simple. |
@@ -159,7 +168,8 @@ Human / multi-session policy:
 ## Non-goals (explicit)
 
 - Web / PWA / Tauri player (Web deferred; Desktop is Compose JVM + vlcj).
-- Apple Liquid Glass renderer, continuous full-res blur, per-frame blur.
+- **Liquid Glass** (any form), continuous full-res blur, per-frame blur,
+  platform-private glass APIs as a hard dependency.
 - Cookies / PO-token minting without a separate ADR + user sign-off.
 - Rewriting `MusicProvider` / `DhunPlayer` for aesthetics.
 - Replacing the 14-phase MASTER_PROMPT with M1/M2/M3 labels.
@@ -179,3 +189,16 @@ Human / multi-session policy:
 - `docs/verification/08-player.md`, `docs/verification/11-lyrics.md`
 - ADR-001 (extraction; rot-drill category-8 CI-network rule)
 - Design brief 2026-09-05 (Apple / ViMusic / VIVI / lightweight glass)
+
+## Addendum — 2026-09-05 execution (Material 3 only)
+
+Shipped on `arena/01a07170-dhun` without Liquid Glass:
+
+- `PlaybackState.Recovering` + `StreamRecoverySignal` + Android 403 path →
+  FullPlayer / MiniPlayer **"Reconnecting…"** chip (M3 surface).
+- `BlurredArtworkCache` — once-per-track key (unit-tested).
+- FullPlayer lyrics-dominant: Lyrics tab shrinks artwork stage, expands
+  lyrics surface with `surfaceElevated` translucent fill.
+
+Still OPEN: residential stream smoke, hardware Phase 08/11 checklists,
+audio-segment cache, soaks, v0.1.0.

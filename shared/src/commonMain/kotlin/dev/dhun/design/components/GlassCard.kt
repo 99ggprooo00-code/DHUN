@@ -16,15 +16,16 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 
 /**
- * GlassCard — the DHUN signature surface.
+ * GlassCard — DHUN translucent Material 3 surface (atmosphere layer).
  *
- * Real blur where the platform supports it (Android 12+ via RenderEffect,
- * Desktop Skiko). Below that floor we gracefully degrade to a translucent
- * scrim + hairline border — still glassy, never a solid card.
+ * **Not Liquid Glass** (user lock 2026-09-05 / ADR-002). Tokens only:
+ * translucent fill + hairline border + optional one-shot `Modifier.blur`.
+ * Real blur where the platform supports it (Android 12+ RenderEffect,
+ * Desktop Skiko); older runtimes degrade to translucent scrim + border.
  *
- * Blur is applied to the *background* layer so the content stays sharp
- * while the artwork behind the card appears frosted. The fallback is
- * flagged in KNOWN_LIMITATIONS.md.
+ * Prefer this for chrome over artwork. Prefer plain `surfaceElevated`
+ * (no blur) when the *content* must stay razor-sharp (lyrics, chips).
+ * Fallback notes: KNOWN_LIMITATIONS.md.
  */
 @Composable
 fun GlassCard(

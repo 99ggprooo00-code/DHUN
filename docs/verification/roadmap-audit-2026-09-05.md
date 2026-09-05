@@ -100,3 +100,11 @@ Trajectory 15+ only after v0.1.0
 - Not a claim that Phase 08/11 hardware acceptance is done.
 - Not a claim that live rot-drill is green.
 - Not an M1–M30 rewrite. MASTER_PROMPT 14 phases remain authoritative.
+
+## Addendum — ADR-002 M3 polish (same day)
+
+User lock: **No Liquid Glass**. Code on branch:
+
+- `PlaybackState.Recovering` + Reconnecting chip (Android 403 path).
+- Lyrics-dominant FullPlayer + `BlurredArtworkCache`.
+- Still does **not** close residential extraction (drill 33970045379 CDN 403).

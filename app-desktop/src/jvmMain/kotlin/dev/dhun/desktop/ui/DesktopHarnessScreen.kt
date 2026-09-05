@@ -187,6 +187,7 @@ private fun NowPlayingBar(
                 is PlaybackState.Paused -> "Paused"
                 is PlaybackState.Buffering -> "Buffering"
                 is PlaybackState.Resolving -> "Resolving"
+                is PlaybackState.Recovering -> "Reconnecting…"
                 is PlaybackState.Error -> "Error: ${state.message}"
                 PlaybackState.Idle -> "idle"
             },

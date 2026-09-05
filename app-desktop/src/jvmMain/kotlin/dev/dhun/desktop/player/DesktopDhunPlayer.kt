@@ -165,7 +165,10 @@ class DesktopDhunPlayer(
         }
         when (_state.value) {
             is PlaybackState.Playing -> mediaPlayer.controls().pause()
-            is PlaybackState.Paused, is PlaybackState.Buffering -> mediaPlayer.controls().play()
+            is PlaybackState.Paused,
+            is PlaybackState.Buffering,
+            is PlaybackState.Recovering,
+            -> mediaPlayer.controls().play()
             else -> Unit
         }
     }
