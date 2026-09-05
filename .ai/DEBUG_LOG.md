@@ -303,3 +303,27 @@ mini-player (documented in `.ai/KNOWN_LIMITATIONS.md`).
   `dhun-test.apk` (+ `.sha256`) and — since 2026-09-05 — `dhun-test.msi`
   (+ `.sha256`). No version numbers, no history for unfinished builds.
   Stable URLs: `/releases/download/test/dhun-test.apk`, `…/dhun-test.msi`.
+
+## 2026-09-05 · Phase 13 Android native polish compile gate
+
+**Implementation:** `8669e09` adds edge-to-edge setup and safe-drawing insets,
+static launcher shortcuts, saved navigation state, battery-exemption rationale,
+and an 840dp shared navigation rail. `c2a86df` was an intermediate attempt to
+reuse the bottom navigation item helper.
+
+**CI failure:** run `33958722933` reached `:shared:compileKotlinJvm` and
+reported `Unresolved reference 'NavigationBarItem'` plus two composable-context
+errors at `DhunAppShell.kt:394-398`. Material3's `NavigationBarItem` is a
+`RowScope` extension; the helper had been moved outside the `NavigationBar`
+content scope. An import alias did not fix receiver resolution (`33958802810`
+reproduced the same error).
+
+**Fix:** `4de9795` splits the shared rendering into `RowScope.AppBottomNavigationItem`
+and `ColumnScope.AppRailNavigationItem`, leaving each Material3 item in its
+required layout scope. CI run `33958894084` passed shared tests, Android debug
+build, and the Desktop/probe compilation.
+
+**Environment:** local `./gradlew` remains blocked by the sandbox's missing
+`JAVA_HOME`/`java`; CI is the compile gate. Device rotation, gesture-nav,
+shortcut launcher, battery/OEM, and 30-minute playback soak evidence remain
+open and must not be inferred from CI.

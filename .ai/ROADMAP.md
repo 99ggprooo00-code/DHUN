@@ -12,13 +12,12 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at local commit `4de9795` (Phase 13 Android
-native-polish code plus a CI compile fix; **not pushed and not CI-verified
-yet**). The previous pushed baseline is `7ca2f5d`; CI run `33958287878` is
-green through shared tests, Android debug build, and Desktop/probe
-compilation. PR #13 remains OPEN. The current `test` pre-release is healthy:
-run `33952291659` passed `apk`, `msi`, and `publish`; all four rolling assets
-are present.
+**Branch:** `arena/01a070b3-dhun` at pushed commit `9dc77c3`; Phase 13
+Android native-polish code is **CI-verified green** by run `33958894084`
+(shared tests, Android debug build, Desktop/probe compilation). The previous
+pushed baseline was `7ca2f5d`; PR #13 remains OPEN. The current `test`
+pre-release is healthy: run `33952291659` passed `apk`, `msi`, and `publish`;
+all four rolling assets are present.
 
 **User 2026-09-05 directive — status:**
 1. **Release verification — DONE (CI + GitHub release):** `dhun-test.apk`,
@@ -42,32 +41,30 @@ are present.
    a retained base-JNA `ButtonPressed` COM callback, while tray/keyboard
    fallback remains active. Windows media-key round-trip, tray,
    mini-player, and MSI checks remain open; no phase is hardware-done here.
-6. **Phase 13 native polish — CODE STAGED, CI/HARDWARE OPEN:** `8669e09`
+6. **Phase 13 native polish — CODE + CI GREEN, HARDWARE OPEN:** `8669e09`
    plus `c2a86df` and `4de9795` adds edge-to-edge safe-drawing insets, saved
    Android navigation state for rotation, static Search/Resume/Library
    shortcuts with routing, a battery exemption rationale, and an 840dp
    navigation rail with a docked rail MiniPlayer. No acceptance item is
-   complete until CI and real-device/OEM evidence exist.
+   complete until real-device/OEM evidence exists.
 
-**Last error:** CI run `33958802810` reached `:shared:compileKotlinJvm` but
-reported `NavigationBarItem` unresolved because Material3's bottom item is a
-`RowScope` extension and the new helper had no receiver. `4de9795` keeps rail
-and bottom helpers in their respective layout scopes. Local Gradle
-verification also cannot start because this sandbox has no `JAVA_HOME` and no
-`java` executable; CI remains the compilation gate.
+**Last error:** CI run `33958802810` exposed the Material3 `RowScope`
+`NavigationBarItem` receiver issue; `4de9795` fixed it and CI run
+`33958894084` is green. Local Gradle verification still cannot start because
+this sandbox has no `JAVA_HOME` and no `java` executable; CI is the
+compilation gate.
 
 **Exact next step:**
-1. Push `4de9795` (and this roadmap update) to
-   `origin/arena/01a070b3-dhun`, then inspect the PR CI annotations.
-2. If CI is green, run the Android rotation/back-stack/shortcut/insets and
-   30-minute OEM/background-playback checklist on real hardware. Keep all
-   hardware gates open here; if CI finds another API error, fix it before
-   claiming code complete.
-3. Keep the Windows checklist open; then wire the Phase 14 rot-drill and
-   release evidence only after Phase 13 code is CI-green. Do not call GA
-   complete without hardware logs.
+1. Run the Android rotation/back-stack/shortcut/insets and 30-minute
+   unrestricted background-playback checklist on real hardware, including
+   lock-screen controls and OEM battery behavior; keep Phase 13 acceptance
+   open until evidence is recorded.
+2. Keep the Windows checklist and Phase 10/11 hardware checklists open; do
+   not mark Phase 12–14 complete from CI alone.
+3. After the hardware evidence is available, wire the Phase 14 rot-drill and
+   release evidence. Do not call GA complete without hardware logs.
 
-**CI trail (this session, 9 rounds — all in DEBUG_LOG):**
+**CI trail (prior 9 rounds plus Phase 13 rounds, all in DEBUG_LOG):**
 `33941799559`→android media3 APIs · `33942371150`/`33942622916`→
 no CATEGORY_MEDIA, artworkData ByteArray · `33943041377`→desktop
 round 1 (Long.dp etc.) · `33944244828`→JNA GUID/Memory ·
@@ -75,7 +72,9 @@ round 1 (Long.dp etc.) · `33944244828`→JNA GUID/Memory ·
 `33945300702`→JNA 5.17 API + MiniPlayer imports (annotations capped at
 10 — harness Color errors were hiding behind the cap) ·
 `33945909159`/`33946130860`→harness 12× Long-hex Color ·
-`33946527454` (`3cd4bf8`) → **GREEN**.
+`33946527454` (`3cd4bf8`) → **GREEN** · `33958894084` (`9dc77c3`) →
+**Phase 13 GREEN** (scope-correct navigation helpers, Android build, tests,
+probe).
 
 **Standing sandbox notes:** no local JDK (CI is the compile gate); no
 device/adb/display; direct `curl` mostly blocked, `fetch_page` works;
@@ -153,7 +152,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 10 | Library & history | ✅ MERGED PR #8 @ `d27eb37` (CI green `33842104141`) — hardware checklist OPEN | docs/verification/10 |
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
-| 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code staged in `8669e09` + `c2a86df` + `4de9795`; CI + rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
+| 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
 | 14 | Robustness + rot-drill CI + release v0.1.0 | ⬜ not started (rot-drill.yml exists as a placeholder cron; activation = wiring the probe suite, Phase 14) | — |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
@@ -173,7 +172,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY | ✅ done + pushed (`ffa138b`) |
 | Acceptance 1–4 (media keys / tray / mini-player / installer) | 🟨 OPEN — on hardware (checklist in docs/verification/12) |
 
-### Phase 13 step status — 🟨 CODE STAGED @ `8669e09` + `c2a86df` + `4de9795` (CI + hardware OPEN)
+### Phase 13 step status — 🟨 CODE + CI GREEN @ `8669e09` + `c2a86df` + `4de9795` (hardware OPEN)
 
 | Step | Status |
 |---|---|
