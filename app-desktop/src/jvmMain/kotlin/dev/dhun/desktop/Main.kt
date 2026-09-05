@@ -33,6 +33,8 @@ import dev.dhun.domain.SaveNowPlayingUseCase
 import dev.dhun.lyrics.LrcLibSource
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.lyrics.YouTubeLyricsSource
+import dev.dhun.player.AudioCacheBudget
+import dev.dhun.player.AudioFileCache
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.player.PlayerViewModel
@@ -386,7 +388,20 @@ private data class WindowGeometry(val x: Long, val y: Long, val w: Long, val h: 
 private val desktopModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
     single<MusicProvider> { YouTubeMusicProvider.forDesktop() }
-    single { DesktopDhunPlayer(provider = get(), scope = get()) }
+    // Phase 14 bounded audio cache (desktop): whole-track files under the
+    // per-OS DHUN data dir; budget from CACHE_SIZE_MB (applied at start).
+    single {
+        val settings = get<DataLayer>().settings
+        val mb = runBlocking {
+            runCatching { settings.getInt(SettingsKeys.CACHE_SIZE_MB, SettingsKeys.CACHE_SIZE_MB_DEFAULT) }
+                .getOrDefault(SettingsKeys.CACHE_SIZE_MB_DEFAULT)
+        }
+        AudioFileCache(
+            dir = AudioFileCache.defaultDir(DatabaseDriverFactory.defaultFile().parentFile),
+            maxBytes = AudioCacheBudget.bytesForMb(mb),
+        ).also { it.evictToBudget() }
+    }
+    single { DesktopDhunPlayer(provider = get(), scope = get(), audioCache = get()) }
     // Phase 14: connectivity signal for the shared offline banner (5s poll).
     single<dev.dhun.core.ConnectivityMonitor> { dev.dhun.core.DesktopConnectivityMonitor(get()) }
 
