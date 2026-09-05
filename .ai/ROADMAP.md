@@ -12,88 +12,67 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a06b14-dhun)
 
-**Branch:** `arena/01a06b14-dhun` · **PR:** **#9 OPEN** (remote head
-`a20165b`). PR #8 (Phases 10+11) MERGED @ `d27eb37` = `main`.
+**Branch:** `arena/01a06b14-dhun` at `f955e6d` · **PR #9 (Phase 12 +
+Phase 1 fixes) MERGED @ `697cf54`** = `main` · **PR #10 OPEN** =
+workflow patch (MSI job + rolling publish) — CI pending, merge after
+green.
 
-**Phase:** 12 (desktop native) still in progress — **plus the user's
-2026-09-05 directive (Phase 1 critical fixes / Phase 2 docs / Phase 3
-builds)** is now the driver.
-
-**Code done in THIS session (local, NOT yet pushed — counts as UNDONE
-until CI green):**
-1. **Android fatal crash fixed** — every `MediaController` call in
-   `AndroidDhunPlayer` marshalled to the main thread (`onMain` +
-   `withContext(Dispatchers.Main)` for suspend; poll job pinned to Main).
-   Stack + root cause: `.ai/DEBUG_LOG.md` entry 2026-09-05 #1.
-2. **CI red #4 root-caused + fixed** — it was NOT the desktop code:
-   `:shared:jvmTest` failed on a **persistence race** (`NowPlayingPersistence`
-   — two concurrent `saveQueue` transactions interleaved on the
-   single-connection in-memory driver). Fixed with a write `Mutex`.
-   Side effect discovered: desktop compile is chained into the CI step
-   "Probe compiles" (GITHUB_ACTIONS-guarded) — CI runs 1–3 died there,
-   run 4 died at the test step, so **the round-3 desktop fix
-   (`a20165b`, 1.8.2 API from source) has never actually compile-checked
-   in CI**. The next push's step 6 is the first real signal for it.
-3. **Background/OEM resilience (Phase 1.2 of the directive)** —
-   `DhunPlaybackService` now a true FOREGROUND service (plain
-   `Service.startForeground` + `FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK` on
-   API 29+, media notification via nested
-   `MediaStyleNotificationHelper.MediaStyle(session)` — first attempt used
-   APIs that don't exist in media3 1.5.1 and failed CI compile, corrected,
-   see `.ai/DEBUG_LOG.md`); battery-optimization exemption dialog
-   (one-shot, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`); `ic_notification`
-   icon added. MIUI/HyperOS "auto-start" is manual-only → hardware
-   checklist.
-4. **Agent meta moved to `.ai/`** (this file, MASTER_PROMPT,
-   PROMPT_SEQUENCE, KNOWN_LIMITATIONS, PROBLEMS_AND_FIXES, RISK_REGISTER)
-   + new `.ai/DEBUG_LOG.md` + `.ai/README.md` (boot protocol). Note: the
-   user's wording was "a separate branch `.ai`" — the Arena session is
-   pinned to `arena/01a06b14-dhun` (only branch pushable), so it is
-   implemented as the `.ai/` directory on this branch; splitting it into
-   a real branch is one `git` command after merge if still wanted.
-5. **test-release workflow extended** — rolling `test` **pre-release** now
-   gets BOTH assets on every push to main: `dhun-test.apk` (ubuntu job)
-   and `dhun-test.msi` (windows-latest job, `:app-desktop:createMsi`),
-   published by a `publish` job. (Satisfies Phase 3 of the directive; the
-   sandbox has no JDK/Windows host, so CI IS the build.)
-
-**CI state (this session's run trail):**
-- `33941799559` (fa53643): step 4 tests **PASSED** (Mutex fix confirmed);
-  step 5 android compile FAILED (media3 1.5.1 API mixups in my new service).
-- `33942371150` / `33942622916`: two more small android compile rounds
-  (NotificationCompat.CATEGORY_MEDIA doesn't exist; artworkData = ByteArray;
-  no framework CATEGORY_MEDIA at all) — all fixed.
-- `33943041377` (4602d9d): **step 5 (Android, incl. crash fix + FGS) GREEN**;
-  step 6 (probe + desktop) FAILED on 8 small desktop errors (Long.dp,
-  Long hex literals → Color, MenuItem.label vs text, noinline,
-  Float.coerceAtLeast) → fixed in `21201fc`.
-- `33944244828` (21201fc): steps 4+5 GREEN; step 6 errors moved to
-  `Smct.kt` (the JNA files Main/Tray now compile): `com.sun.jna.platform.win32.GUID`
-  doesn't exist (→ base-jna `com.sun.jna.win32.Guid.GUID` + byte converter),
-  jna-platform was only transitive (→ declared explicitly), `Memory(long)`
-  (→ `.toLong()`/`4L`) → **fixed in this push** (`Smct.kt`,
-  `app-desktop/build.gradle.kts`, `THIRD_PARTY.md`). Details in
-  `.ai/DEBUG_LOG.md` (rounds 4–5). Next run green → **merge PR #9**.
+**User 2026-09-05 directive — status:**
+1. **Phase 1 critical fixes — DONE (pushed + CI green + merged):**
+   (a) fatal artist-shuffle crash (MediaController off-main-thread)
+   fixed in `AndroidDhunPlayer`; (b) background/OEM resilience:
+   `DhunPlaybackService` = true foreground service
+   (`FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK`), media notification,
+   one-shot battery-exemption dialog, `ic_notification` icon —
+   compile-verified; on-device behavior = OPEN hardware checklist;
+   (c) audio audit: Android path sound, `DesktopDhunPlayer` (vlcj)
+   reviewed against javadoc — no blocking defect.
+2. **Phase 2 docs — DONE:** `.ai/` on the session branch (session is
+   pinned to one branch; a real `.ai` branch = one git command after
+   merge if still wanted). DEBUG_LOG has all 9 CI red rounds.
+3. **Phase 3 builds — 95%:** rolling `test` pre-release with
+   `dhun-test.apk` EXISTS (published by the PR #9 merge); the
+   **MSI** half is in PR #10 (apk+msi+publish jobs,
+   `:app-desktop:createMsi` on windows-latest). Merging PR #10
+   publishes both assets.
+4. **Phase 12 (desktop) — CI-DONE, hardware-OPEN:** first fully green
+   CI on the branch (run `33946527454` @ `3cd4bf8`): shared tests ✓,
+   android assembleDebug ✓, probe + desktop compile ✓ (9 fix rounds,
+   all logged in DEBUG_LOG: 1.8.2 Window/WindowState/Key API from
+   source, no `Long.dp`, Long-hex `Color(0xFF…)` literals,
+   `MenuItem.label`, `noinline` for EDT marshaling, JNA win32 helpers
+   are version-fragile → self-contained Structures, JNA 5.17
+   `getPointer(long)`/`invokeInt(array)`, vlcj `finished` event,
+   `awaitFirstDown()` no params in 1.8.2).
 
 **Exact next step:**
-1. Commit the session's work (small commits) → push
-   `arena/01a06b14-dhun` → PR #9 gets a new CI run: step 4 (tests, should
-   now pass) → step 5 (android assembleDebug, compiles the crash fix) →
-   step 6 (probe + chained **desktop** compile, first real check of the
-   round-3 1.8.2 fix). If step 6 red → annotations → fix (risk surface is
-   only the two `Window(...)` calls + key handlers). If green → **merge
-   PR #9**; the merge triggers the rolling test release with APK+MSI.
-2. **User's hardware** (OPEN, parallel):
-   - Android: crash repro (artist shuffle play) no longer crashes;
-     background 30-min soak; lock-screen controls; MIUI/HyperOS auto-start
-     manual toggle; battery-exemption dialog appears once.
+1. PR #10 CI green → merge → watch the `test-release` run (first
+   apk+msi publish) → verify the `test` release has
+   `dhun-test.apk` + `dhun-test.msi` + both `.sha256` files.
+2. **User's hardware** (OPEN, parallel — the phase-completion gate):
+   - Android: crash repro (artist shuffle) no longer crashes;
+     30-min background soak; lock-screen controls; MIUI/HyperOS
+     auto-start manual toggle; battery-exemption dialog once.
    - Windows (`docs/verification/12-desktop-native.md`): tray,
-     close-to-tray, geometry, mini-player, 7 shortcuts, `SMTC probe`
-     console line, `dhun-test.msi` clean-VM install (needs libVLC).
+     close-to-tray, geometry persistence, mini-player drag, 7
+     shortcuts, `SMTC probe` console line (PASS expected; the REFIID
+     by-value marshaling caveat in DEBUG_LOG may show up here),
+     `dhun-test.msi` clean-VM install (needs VLC).
    - Phases 10+11 checklists (`docs/verification/10-library.md`,
      `11-lyrics.md`).
-3. Then: SMTC phase 2 (on-machine IID pull) or lock in the fallback;
-   Phase 13 (Android polish) and Phase 14 (rot-drill GA + soak + release).
+3. Then: SMTC phase 2 (on-machine IID pull → metadata + media keys) or
+   lock in the documented tray fallback; Phase 13 (Android polish),
+   Phase 14 (rot-drill live wiring + GA).
+
+**CI trail (this session, 9 rounds — all in DEBUG_LOG):**
+`33941799559`→android media3 APIs · `33942371150`/`33942622916`→
+no CATEGORY_MEDIA, artworkData ByteArray · `33943041377`→desktop
+round 1 (Long.dp etc.) · `33944244828`→JNA GUID/Memory ·
+`33944782718`→JNA platform helpers fragile → self-contained rewrite ·
+`33945300702`→JNA 5.17 API + MiniPlayer imports (annotations capped at
+10 — harness Color errors were hiding behind the cap) ·
+`33945909159`/`33946130860`→harness 12× Long-hex Color ·
+`33946527454` (`3cd4bf8`) → **GREEN**.
 
 **Standing sandbox notes:** no local JDK (CI is the compile gate); no
 device/adb/display; direct `curl` mostly blocked, `fetch_page` works;

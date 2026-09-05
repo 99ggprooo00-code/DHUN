@@ -161,6 +161,38 @@ self-contained on base JNA: own `WinGuid`/`WinRect` `Structure`s
 jna-platform direct dep again (nothing references it; vlcj still pulls
 it transitively for itself).
 
+Rounds 7–9 (runs 33945300702 → 33945909159/33946130860 → 33946527454
+GREEN): the JNA rewrite held; the rest was small 1.8.2/JNA-5.17 API
+graining — **and the first lesson is process, not code:**
+- **Check-run annotations are capped at 10 per run** (8 are consumed by
+  Gradle's own build-failure annotations). In run 33945300702 the
+  visible 10 hid 12+ real errors: `DesktopHarnessScreen.kt` had 12
+  `Color(0xFF…)` literals — every 0xFFxx value > Int.MAX = Long →
+  `Color(Int)` mismatch. Rule: when a desktop file is untested,
+  pre-scan it for the known hazard classes (Long hex literals,
+  missing dp extensions) instead of waiting for the capped list.
+- JNA 5.17: `Pointer.getPointer(offset)` takes a **long** offset;
+  `Function.invokeInt(Object[])` is NOT vararg (no `*all` spread);
+  `Pointer` has **no `toLong()`** — log via `toString()`, pass the
+  `Pointer` itself as the HWND arg.
+- Compose 1.8.2: `awaitFirstDown()` takes **no parameters**
+  (`requireCapture` is a later version); `PointerInputChange` has no
+  `press()` — use `consume()`.
+- vlcj 4.8.2 (javadoc-verified): the track-ended event is
+  `MediaPlayerEventAdapter.finished(MediaPlayer)` — NOT `ended`.
+- MiniPlayerWindow.kt: `ArtworkImage` lives in
+  `dev.dhun.design.components`, and **`edit_file` can silently not
+  persist in this sandbox** — verify edits with grep after applying;
+  sed/perl/python are the reliable hammers.
+- Also fixed while in the file (runtime correctness, machine-verify):
+  `RoGetActivationFactory` takes an **HSTRING handle** — built with
+  `WindowsCreateString`/freed with `WindowsDeleteString`; `FindWindowW`
+  takes `WString` (wide).
+
+Final state: run `33946527454` on `3cd4bf8` = **first fully green CI**
+(shared tests, android assembleDebug, probe + desktop compile). PR #9
+merged @ `697cf54`.
+
 ---
 
 ## 2026-09-05 · Background playback killed by OEM battery savers (MIUI/HyperOS/OneUI)
