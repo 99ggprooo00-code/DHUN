@@ -62,6 +62,11 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   set (own client primary, yt-dlp failover on desktop — ADR-001).
 - CI now compiles `app-desktop` on every PR (previously only on `main`'s
   MSI job).
+- **Windows MSI is per-user** (`perUserInstall`, no admin UAC). Runtime
+  data (SQLite + audio cache) lives in `<installDir>/userdata` so
+  Settings → Apps → Uninstall removes it. No leftover `%APPDATA%\DHUN`.
+  Android already wiped private storage on uninstall; the manifest now
+  also sets `hasFragileUserData=false` and `usesCleartextTraffic=false`.
 
 ### Fixed
 - SQLDelight IO serialised — resolved a `NowPlayingPersistenceTest` hang

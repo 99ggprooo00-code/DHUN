@@ -388,8 +388,10 @@ private data class WindowGeometry(val x: Long, val y: Long, val w: Long, val h: 
 private val desktopModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
     single<MusicProvider> { YouTubeMusicProvider.forDesktop() }
-    // Phase 14 bounded audio cache (desktop): whole-track files under the
-    // per-OS DHUN data dir; budget from CACHE_SIZE_MB (applied at start).
+    // Phase 14 bounded audio cache (desktop): whole-track files under
+    // DhunUserDirs (packaged = <installDir>/userdata/cache/audio so MSI
+    // uninstall removes them; unpackaged = OS user-data dir). Budget from
+    // CACHE_SIZE_MB (applied at start).
     single {
         val settings = get<DataLayer>().settings
         val mb = runBlocking {

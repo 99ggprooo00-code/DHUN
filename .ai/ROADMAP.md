@@ -26,41 +26,43 @@ Rules (permanent, from the user):
 
 ---
 
-## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07287-dhun)
+## CURRENT ACTIVE TASK (updated 2026-09-06, session arena/01a073c3-dhun)
 
-**PR #17 MERGED → `main@29eeb93`.** Verified on GitHub: CI `33981426540` ✅
-· test-release `33981426608` ✅ → `test` pre-release republished 17:38 UTC
-(`dhun-test.apk` + `dhun-test.msi` now contain the desktop cache).
-PR #15 closed (superseded). Session branch fast-forwarded to main; tree
-clean; no unpushed commits anywhere (stranded-commit audit: clean).
+**PR #18 MERGED → `main@a3db23e`.** Verified on GitHub: CI `33997115572` ✅
+· test-release `33997115581` ✅. This session: install/uninstall hygiene
+(user asked: safe to install, easy to uninstall, no leftover data/cache,
+no extra uninstaller file).
 
-**Phase:** 14 — Robustness + rot-drill + v0.1.0. **All code slices of
-Phase 14 are now merged**; what remains is evidence, not code.
+**Phase:** 14 — Robustness + rot-drill + v0.1.0.
 
-**Last file worked on:** `.ai/ROADMAP.md` (this post-merge mark flip).
-Last code files: `shared/src/jvmMain/.../player/AudioFileCache.kt`,
-`app-desktop/.../player/DesktopDhunPlayer.kt` (merged in #17).
+**Files worked on:**
+- `shared/src/jvmMain/kotlin/dev/dhun/data/DhunUserDirs.kt` (new)
+- `shared/src/jvmTest/kotlin/dev/dhun/data/DhunUserDirsTest.kt` (new, 7)
+- `shared/src/jvmMain/kotlin/dev/dhun/data/DatabaseDriverFactory.jvm.kt`
+- `app-desktop/build.gradle.kts` (per-user MSI, upgradeUuid, vendor)
+- `app-android/src/main/AndroidManifest.xml` (`hasFragileUserData=false`,
+  `usesCleartextTraffic=false`)
+- `README.md` · `CHANGELOG.md` · `.ai/KNOWN_LIMITATIONS.md` ·
+  `docs/verification/14-release.md` · this file
 
-**Last error:** none.
+**Last error:** none. (Sandbox cannot download GitHub release bytes —
+audit is from source + CI provenance, not a VirusTotal scan.)
 
-**Exact next step — human/hardware gates (agent cannot do these from the
-sandbox: no device, no libVLC, no residential IP):**
-1. Install `dhun-test.apk` on a phone on a residential network → play a
-   track (residential extraction truth) → play it fully → airplane mode
-   → replay (Android offline-cache smoke).
-2. Install `dhun-test.msi` on Windows with VLC → same sequence; expect
-   `DHUN cache: cached <id>` then `DHUN cache: cache hit` in the log
-   (checklist: `docs/verification/14-release.md`).
-3. Record results in `docs/verification/14-release.md`; then 30-min soaks
-   on both; only then v0.1.0 (tag, AAB, signed artifacts, CHANGELOG
-   `[0.1.0]` section).
-Agent-doable follow-ups on request: `cache_size_mb` Settings UI (both
-platforms read the DB key only), live re-capture of Phase 09 fixtures.
+**Exact next step:**
+1. Push this branch, wait CI green, merge so rolling `test` MSI becomes
+   per-user with `<installDir>/userdata` (current `main` MSI still
+   leaves `%APPDATA%\DHUN` on uninstall — do **not** install that one
+   if leftover cache is unacceptable).
+2. Human/hardware: install the **new** `dhun-test.apk` / `.msi` → play
+   → uninstall → confirm no leftover files (Android
+   `/data/data/dev.dhun.android` gone; Windows `%LOCALAPPDATA%\DHUN`
+   gone, `%APPDATA%\DHUN` never created). Then residential cache smoke
+   + soaks as before.
 
-**Marks (GitHub main):** PR #16 ✅ · PR #17 ✅ · Android cache ✅ code
-(HW ⬜) · **desktop cache ✅ code** (HW ⬜) · **CHANGELOG ✅** · pre-push
-ritual rule ✅ · rot-drill live 🔴 (cat.8 CI-IP) · residential ⬜ · soaks ⬜
-· v0.1.0 ⬜ · Liquid Glass 🚫.
+**Marks (GitHub main, pre this PR):** PR #16 ✅ · PR #17 ✅ · PR #18 ✅ ·
+Android cache ✅ code (HW ⬜) · desktop cache ✅ code (HW ⬜) · CHANGELOG ✅
+· rot-drill live 🔴 (cat.8 CI-IP) · residential ⬜ · soaks ⬜ · v0.1.0 ⬜
+· install hygiene 🟨 this PR · Liquid Glass 🚫.
 
 ---
 
@@ -176,6 +178,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Android 30-minute soak | ⬜ Open |
 | Desktop 30-minute soak | ⬜ Open |
 | v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open |
+| Install/uninstall hygiene (no leftover data) | 🟨 this PR: per-user MSI + `<installDir>/userdata`; Android already private-storage-only. HW confirm OPEN |
 | Phase 14 acceptance 1–4 | ⬜ None complete |
 
 ### Phase 11 step status — ✅ MERGED @ `d27eb37` (hardware OPEN)

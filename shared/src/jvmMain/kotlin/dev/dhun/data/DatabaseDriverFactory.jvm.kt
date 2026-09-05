@@ -21,16 +21,10 @@ actual class DatabaseDriverFactory(private val file: File? = defaultFile()) {
     companion object {
         fun inMemory(): DatabaseDriverFactory = DatabaseDriverFactory(file = null)
 
-        /** Per-OS user data dir: %APPDATA%\DHUN, ~/Library/Application Support/DHUN, ~/.local/share/dhun. */
-        fun defaultFile(): File {
-            val os = System.getProperty("os.name").lowercase()
-            val home = System.getProperty("user.home")
-            val dir = when {
-                os.contains("win") -> File(System.getenv("APPDATA") ?: "$home\\AppData\\Roaming", "DHUN")
-                os.contains("mac") -> File(home, "Library/Application Support/DHUN")
-                else -> File(System.getenv("XDG_DATA_HOME") ?: "$home/.local/share", "dhun")
-            }
-            return File(dir, DatabaseFactory.FILE_NAME)
-        }
+        /**
+         * Packaged install: `<installDir>/userdata/dhun.db` (removed with the
+         * app). Unpackaged: OS user-data dir (see [DhunUserDirs]).
+         */
+        fun defaultFile(): File = File(DhunUserDirs.dataDir(), DatabaseFactory.FILE_NAME)
     }
 }
