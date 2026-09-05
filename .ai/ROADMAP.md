@@ -73,6 +73,30 @@ to the step log but not into the `rot-drill.log` artifact.
   stream-byte verification unchanged.
 - `c038295` `rot-drill.yml` — issue-body backtick bug fixed; `yt-dlp
   --version` now recorded into the `rot-drill.log` artifact (`tee -a`).
+- `2932d57` **Phase 14 error-taxonomy: 429 global backoff** — new
+  `shared/core/RateLimitGate.kt` (process-wide monotonic cooldown, extend-
+  never-shorten, injectable TimeSource), wired into both InnerTubeClient
+  request loops; `Retry-After` parsed into `RateLimited(retryAfterSeconds)`
+  (was always null) and the gate; 4 real-clock unit tests
+  (`RateLimitGateTest`).
+- `fed1d54` **Phase 14 error-taxonomy: offline banner** — common
+  `ConnectivityMonitor` interface; Android actual (default-network
+  callback, NET_CAPABILITY_INTERNET); desktop actual (5s interface poll,
+  IO dispatcher, no new deps); shared shell renders the banner in the
+  Scaffold topBar slot; Koin-wired on both hosts.
+- **Next slice (designed, not started): 403-recovery UX visibility** —
+  PlaybackGraph retries 403s silently; exhausted retries already surface
+  via the ERROR state + `describeErrorChain` diagnostics, but the
+  transient "Reconnecting…" state needs a shared transient-event surface
+  (PlaybackGraph state flow → AndroidDhunPlayer → PlayerViewModel →
+  FullPlayer chip). Requires real UI work + hardware verification — do
+  NOT rush it as a doc-only change.
+
+**Taxonomy sweep state after `2932d57`/`fed1d54`:** typed errors ✓
+(ViewModels → `toUserMessage`), per-request retry ✓, 429 global backoff ✓
+(CI pending), offline banner ✓ (CI pending, hardware check open: airplane
+mode / cable pull), 403-recovery UX ⬜ (next slice), db-path sweep ⬜
+(repositories are typed; a full review pass remains).
 
 **Exact next step:**
 1. ~~Push branch → open PR → require green CI~~ — **DONE: PR #15, CI run
@@ -223,7 +247,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 
 | Step | Status |
 |---|---|
-| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Existing typed `DhunResult`/`DhunError` paths and 403 recovery are present, but run 33961533965 exposed dropped evidence (`AuthRequired(detail=null)` from `YtDlpStreamResolver`); full network/db/playback sweep and offline-banner review remain |
+| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Implemented so far: typed `DhunResult`/`DhunError` + `toUserMessage` everywhere, per-request retry, **429 global backoff gate (`2932d57`)**, **offline banner (`fed1d54`)** — CI verdict pending on this push; still open: 403-recovery "Reconnecting…" UX, offline-banner hardware check (airplane mode), db-path review pass | `RateLimitGate.kt`, `ConnectivityMonitor.kt`, `DhunAppShell.kt`, both hosts' Koin modules |
 | Bounded audio cache and offline replay | ⬜ Not started; current Android cache is stream-URL-only with TTL/403 invalidation |
 | Daily live rot-drill | 🔴 First live run **33961533965 FAILED**: yt-dlp default player path bot-gated ("Sign in to confirm" → `AuthRequired`) from the Actions runner's datacenter IP (category 8), while the probe's fatal step tested only the desktop-fallback engine instead of the production own-client→yt-dlp chain; issue #14 auto-opened, kill switch fired correctly. Fixes + rerun in flight; no `PROBE|verdict|PASS` exists yet |
 | Android 30-minute soak | ⬜ Open — requires unrestricted-battery physical device evidence |
