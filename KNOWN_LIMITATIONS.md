@@ -73,5 +73,8 @@ Updated every phase. Nothing hidden.
   mini-player window starts visible (Ctrl+M or its X hides it — hiding,
   not closing, so it can always come back). Window geometry
   (`SettingsKeys.WINDOW_GEOMETRY`) persists across restarts.
+  The mini-player window shows in the OS taskbar (Compose Desktop 1.8.2's
+  `Window` has no `skipTaskbar` parameter — a 1.9+-era API; hiding via
+  Ctrl+M/X is the supported way to get it out of the way).
   jpackage installers: `packageVersion` stays 1.0.x (packager rejects
   MAJOR 0); clean-VM install test OPEN on hardware.
