@@ -12,88 +12,58 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07170-dhun)
 
-**Session branch:** `arena/01a07170-dhun` · **PR #16 OPEN** · CI green
-(`33967339900` @ `60e5631`).
+**Branch:** `arena/01a07170-dhun` · **PR #16 OPEN** · extraction fix @ `d9f4083`
+CI green (`33969405710`); ADR-002 + audit in this push.
 
-**Phase:** 14 — Robustness, rot-drill, release v0.1.0 (🟨 IN PROGRESS).
+**Phase:** 14 + **ADR-002 Full-Screen player design locked**.
 
-**Last live rot-drill — run 33968950214 (CORRECT branch, first real test of fixes):**
+**Last live rot-drill — run 33970045379 (expanded client chain LIVE):**
 
 ```
-https://github.com/99ggprooo00-code/DHUN/actions/runs/33968950214
-ref: arena/01a07170-dhun @ 10ad025
-event: workflow_dispatch
-kill switch: "Fail the workflow after alerting" → exit 1  (intentional)
+https://github.com/99ggprooo00-code/DHUN/actions/runs/33970045379
+ref: arena/01a07170-dhun @ d9f4083
+yt-dlp 2026.08.19
 
-yt-dlp 2026.08.19   ← now in log artifact (fix worked)
-artifact name: rot-drill-33968950214  ← issue body names it (fix worked)
-
-PROBE|version|PASS|WEB_REMIX 1.20260901.12.00
-PROBE|search|PASS|20 music-song results
-WATCH|own-client|BROKEN|AuthRequired(
-  web_remix=AUTH_REQUIRED(Sign in to confirm you're not a bot);
-  visionos=AUTH_REQUIRED(...);
-  tv=AUTH_REQUIRED(...))
-WATCH|ytdlp|BROKEN|AuthRequired(
-  ERROR: [youtube] utwMHfDZ6SA: Sign in to confirm you're not a bot.
-  Use --cookies-from-browser or --cookies ...)
-PROBE|resolve+stream|FAIL|resolve via resolving(own-innertube-player -> yt-dlp): AuthRequired(...)
-PROBE|related|PASS|50 related tracks
-WATCH|newpipe-stream|BROKEN|Parse(detail=JSON response is too short)
-PROBE|verdict|FAIL|extraction-pipeline-broken
+PROBE|version|PASS
+PROBE|search|PASS|20
+WATCH|own-client|BROKEN|Unavailable
+WATCH|ytdlp|BROKEN|AuthRequired(...Sign in to confirm you're not a bot...)
+PROBE|resolve+stream|FAIL|IOException: Server returned HTTP response code: 403
+  for URL: https://rr2---sn-…googlevideo.com/videoplayback?...itag=251...
+PROBE|related|PASS|50
+WATCH|newpipe-stream|BROKEN|Parse(JSON too short)
+PROBE|verdict|FAIL
 ```
 
-**Classification:** still **category 8 — CI/datacenter-IP bot gating**, now
-proven against the **production chain**, not just the fallback:
-- Metadata (version/search/related) PASS from the same runner ⇒ not blanket
-  IP block, not InnerTube shape rot.
-- **Both** production engines gated (own-client all three strategies +
-  yt-dlp) with full `AuthRequired.detail` evidence.
-- NewPipe still upstream-broken (known, non-fatal watch).
-- Kill switch correctly kept the workflow red. **Do not weaken the probe
-  to manufacture a PASS.**
+**Progress vs 33968950214:** we **did obtain a real googlevideo audio URL**
+(itag 251) then failed the **byte-fetch with HTTP 403** from the Actions IP.
+That is still category-8 / CDN bot gating — but the client-chain expansion
+moved the failure from "no URL" to "URL then 403 on range-GET". Kill switch
+correct. Do **not** skip the byte check to fake PASS.
 
-**What the fixes proved (vs runs on main@a554594):**
-| Check | 33961533965 / 33968612285 (main) | 33968950214 (this branch) |
-|---|---|---|
-| Production chain exercised | ❌ yt-dlp alone | ✅ own-client → yt-dlp |
-| `WATCH\|own-client` / `WATCH\|ytdlp` | ❌ absent | ✅ both BROKEN w/ detail |
-| `AuthRequired.detail` | `null` | full bot-gate text |
-| Artifact name in issue #14 | swallowed | `rot-drill-33968950214` |
-| yt-dlp version in artifact | missing | `2026.08.19` |
-
-**Minor bug found in this run (fixing now):** WATCH/resolve lines printed
-`Failure(...).error` literally because Kotlin `"$r.error"` interpolates the
-receiver then a literal `.error`. Changing to `"${r.error}"`.
+**Design lock (user brief → real KMP plan):** Full-Screen Now Playing is a
+signature polish on **existing** Phase 08/11 code (not unimplemented).
+Philosophy: Apple clarity × ViMusic immersion × M3 glass; lightweight 2D
+blur + translucent surfaces; lyrics-dominant mode; blur-once-per-track;
+**no** Liquid Glass dependency; **no** Tauri/Web. Source-neutral
+`MusicProvider` stays law. Docs: `ADR-002`, `roadmap-audit-2026-09-05.md`.
 
 **Exact next step:**
-1. ~~Dispatch on correct branch~~ DONE — run 33968950214 (both engines gated).
-2. ~~WATCH string-template fix~~ DONE (`fedfaec`).
-3. **Proper extraction fix (this push, not a probe mask):** expand
-   tokenless own-client chain (web_embedded→visionos→tv→tv_downgraded→
-   tv_simply→mweb→web_remix) + yt-dlp explicit `player_client` list; no
-   cookies; kill switch preserved. ADR-001 2026-09-05 addendum.
-4. Push → CI green on PR #16 → **user re-dispatches rot-drill** on
-   `arena/01a07170-dhun`. Expect either a real PASS (bytes verified) or
-   the same category-8 FAIL with longer per-client detail — either is
-   honest. Residential check remains the user-impact gate.
-5. Then: 403 "Reconnecting…" UX → audio cache. Soaks / v0.1.0 stay OPEN.
+1. Finish rebase push of ADR-002 + audit onto PR #16; CI green.
+2. Optional next extraction slice: nsig/player JS or residential-only
+   classification — **not** cookies without ADR. Prefer residential smoke
+   before more client churn.
+3. Phase 14: 403 mid-stream UX already partially exists; surface
+   "Reconnecting…"; audio cache. ADR-002 P3–P6 only after one residential
+   play. Soaks / v0.1.0 OPEN.
 
-**Phase 14 step marks (exact):**
+**Phase 14 marks:** taxonomy 🟨 · cache ⬜ · rot-drill 🔴 (URL-then-403 on
+33970045379) · soaks ⬜ · v0.1.0 ⬜
 
-| Step | Status |
-|---|---|
-| Error taxonomy / offline/429/403 UX | 🟨 typed + 429 gate + offline banner + AuthRequired detail ✓ (live-proven); 403 "Reconnecting…" UX ⬜; airplane-mode ⬜; db review ⬜ |
-| Bounded audio cache / offline replay | ⬜ not started |
-| Daily live rot-drill | 🔴 **Workflow + fixes LIVE-PROVEN** on correct branch (33968950214). Verdict FAIL = category-8 CI-IP gating of **both** production engines. Failure/alert/kill-switch path proven. **No `PROBE\|verdict\|PASS`. Residential verification OPEN.** |
-| Android 30-min soak | ⬜ open |
-| Desktop 30-min soak | ⬜ open |
-| v0.1.0 release + clean-target | ⬜ open |
-| Phase 14 acceptance 1–4 | ⬜ none complete |
+**Player polish (ADR-002):** P0 🟨 (chain helped, CDN 403 remains on CI) ·
+P1–P2 exist · P3–P9 ⬜ · lyrics ✅ code / 🟨 HW
 
-**Standing sandbox notes:** no local JDK; no device; YouTube TLS-blocked
-here; agent cannot `workflow_dispatch` or comment on issues (403); PR
-comments work. Live drill UI dispatch only.
+**Sandbox:** no JDK/device; YT TLS blocked here; no workflow_dispatch (403).
 
 ---
 
@@ -245,6 +215,7 @@ stubbed, NOT scheduled** until the user picks them (Doctrine: no
 
 | # | Candidate | Why this slot |
 |---|---|---|
+| 15a | **Full-Screen player immersion polish (ADR-002 P3–P9)** — lyrics-dominant mode, blur-once cache, gesture simplicity; only after P0 extraction truth + Phase 08/11 hardware smoke | Signature UX; must not outrun streams |
 | 15 | **Android native polish finish** (Phase 13 leftovers: app shortcuts, Robolectric/UI tests, tablet two-pane, 30-min soak with LeakCanary) | Same platform as the crash/FGS work just done; cheap while context is warm |
 | 16 | **Audio cache (bounded LRU) + offline replay of cached tracks** | Phase 14 item pulled forward; user-visible value, no new surface |
 | 17 | **Rot-drill GA** — wire `tools/playback-probe` into the daily cron (replacing the placeholder), auto-issue on red, 24h detection contract live | The Doctrine's maintenance leg; must exist before any public distribution |

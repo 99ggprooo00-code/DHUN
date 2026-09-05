@@ -75,6 +75,14 @@ for upstream recovery.
         production engines** — not shape rot. Residential verification OPEN.
       - Do **not** convert this red into a pass.
 
+
+- [x] **Expanded-chain live run — 33970045379 (2026-09-05, `d9f4083`):** FAIL.
+      `WATCH|ytdlp` still AuthRequired on default messaging, but
+      `resolve+stream` reached a **real googlevideo URL (itag 251)** then
+      **HTTP 403** on the range byte-fetch from the Actions IP. Own-client
+      WATCH reported `Unavailable`. Metadata PASS. Progress: no-URL →
+      URL-then-CDN-403. Kill switch OK. Do not drop byte verification.
+
 - [ ] Manual/scheduled run completes with `PROBE|verdict|PASS` (CI-IP may stay red under category-8 gating; residential green is the user-impact gate — see KNOWN_LIMITATIONS).
       Fixes for run 33961533965 are now on session branch `arena/01a07170-dhun`
       (cherry-picks ending at `39cc924`; equivalent to PR #15 head `5dabdfa`).

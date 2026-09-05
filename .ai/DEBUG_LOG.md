@@ -6,6 +6,16 @@ read this entry before re-diagnosing.
 
 ---
 
+## 2026-09-05 · rot-drill 33970045379 — expanded chain got googlevideo URL, CDN 403 on bytes
+
+**Ref:** `d9f4083` on `arena/01a07170-dhun`.  
+**Evidence:** `PROBE|resolve+stream|FAIL|IOException: ... 403 ... googlevideo.com/videoplayback...itag=251`.  
+**Meaning:** client_client list produced a URL; Actions IP cannot fetch media bytes (category 8 CDN gate). Own-client WATCH `Unavailable`. Still not a green drill; still not a reason to skip byte checks or add cookies without ADR.
+
+**Next:** residential smoke; optional nsig research; ADR-002 player polish only after one real play.
+
+---
+
 ## 2026-09-05 · proper fix after 33968950214 — expand tokenless client chain (no probe mask)
 
 **Trigger:** User confirmed the job diagnosis: all three playback paths
