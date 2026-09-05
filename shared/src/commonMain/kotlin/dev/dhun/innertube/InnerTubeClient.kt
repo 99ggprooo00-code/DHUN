@@ -351,7 +351,7 @@ class InnerTubeClient(
      * sent, else the default cooldown) and return the typed error carrying
      * the advised delay.
      */
-    private fun onRateLimited(retryAfterHeader: String?): DhunError.RateLimited {
+    private suspend fun onRateLimited(retryAfterHeader: String?): DhunError.RateLimited {
         val retryAfterSeconds = retryAfterHeader?.trim()?.toIntOrNull()?.takeIf { it > 0 }
         globalRateGate.trip((retryAfterSeconds?.seconds) ?: DEFAULT_429_COOLDOWN)
         return DhunError.RateLimited(retryAfterSeconds)
