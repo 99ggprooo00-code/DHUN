@@ -12,8 +12,8 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at pushed commit `9dc77c3`; Phase 13
-Android native-polish code is **CI-verified green** by run `33958894084`
+**Branch:** `arena/01a070b3-dhun` at pushed commit `e679c00`; Phase 13
+Android native-polish code is **CI-verified green** by run `33959076412`
 (shared tests, Android debug build, Desktop/probe compilation). The previous
 pushed baseline was `7ca2f5d`; PR #13 remains OPEN. The current `test`
 pre-release is healthy: run `33952291659` passed `apk`, `msi`, and `publish`;
@@ -74,7 +74,8 @@ round 1 (Long.dp etc.) · `33944244828`→JNA GUID/Memory ·
 `33945909159`/`33946130860`→harness 12× Long-hex Color ·
 `33946527454` (`3cd4bf8`) → **GREEN** · `33958894084` (`9dc77c3`) →
 **Phase 13 GREEN** (scope-correct navigation helpers, Android build, tests,
-probe).
+probe) · `33959076412` (`e679c00`) → **GREEN** again after the AI log and
+roadmap update.
 
 **Standing sandbox notes:** no local JDK (CI is the compile gate); no
 device/adb/display; direct `curl` mostly blocked, `fetch_page` works;
