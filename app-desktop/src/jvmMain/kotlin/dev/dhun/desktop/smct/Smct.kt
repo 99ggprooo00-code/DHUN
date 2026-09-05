@@ -66,7 +66,7 @@ object Smct {
      * The class is public because the desktop entry point owns its lifetime;
      * it does not expose raw ABI pointers to the rest of the application.
      */
-    class Session private constructor(
+    class Session internal constructor(
         private val winRt: WinRt,
         private val smtc: Pointer,
         private val log: (String) -> Unit,
@@ -477,7 +477,7 @@ object Smct {
     }
 
     /** combase.dll WinRT ABI. HSTRING is a pointer-sized handle. */
-    private interface WinRt : Library {
+    internal interface WinRt : Library {
         fun WindowsCreateString(sourceString: WString?, length: Int, hstring: Pointer?): Int
         fun WindowsDeleteString(hstring: Pointer?)
         fun RoGetActivationFactory(classId: Pointer?, iid: WinGuid, ppv: Pointer): Int
