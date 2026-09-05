@@ -90,3 +90,18 @@ Updated every phase. Nothing hidden.
   `skipTaskbar` parameter — hiding via Ctrl+M/X is the supported way to get it
   out of the way). jpackage installers use `packageVersion` 1.0.x (packager
   rejects MAJOR 0); clean-VM install test OPEN on hardware.
+
+## Phase 14 — robustness / rot-drill / release (2026-09-05)
+
+- The daily live extraction workflow is now wired in
+  `.github/workflows/rot-drill.yml`, but it has not yet produced a green
+  scheduled/manual live-run record from this branch. Datacenter IPs can be
+  bot-flagged; a red CI probe is evidence to investigate, not by itself proof
+  that residential playback is broken.
+- Android currently caches resolved stream URLs for five hours and invalidates
+  them on HTTP 403. A bounded audio-segment cache and offline replay are not
+  implemented yet; the rolling `test` APK/MSI is not the signed/stable
+  `v0.1.0` release.
+- Phase 14 Android/Desktop soak tests, clean-target installation checks, and
+  release evidence remain open because this environment has no Android device,
+  OEM runtime, Windows machine, libVLC runtime, or display.
