@@ -9,7 +9,7 @@ name: test-release
 #   https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk
 #   https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.msi
 #
-# Phase 12 (2026-09-05): Windows MSI added. `:app-desktop:createMsi` runs
+# Phase 12 (2026-09-05): Windows MSI added. `:app-desktop:packageMsi` runs
 # jpackage on a windows-latest runner (JDK 17 ships the WiX toolset). The
 # MSI needs a VLC install at runtime (vlcj dynamic link — see THIRD_PARTY).
 
