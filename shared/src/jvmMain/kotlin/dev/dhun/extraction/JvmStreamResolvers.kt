@@ -52,7 +52,11 @@ class YtDlpStreamResolver(
                     val message = stderr.lineSequence().lastOrNull { it.isNotBlank() } ?: ""
                     return@withContext DhunResult.Failure(
                         when {
-                            message.contains("Sign in to confirm", ignoreCase = true) -> DhunError.AuthRequired()
+                            // ADR-001 contract: detail carries the per-attempt evidence
+                            // (rot-drill 33961533965 failed with detail=null and the
+                            // actual yt-dlp stderr had to be inferred from code).
+                            message.contains("Sign in to confirm", ignoreCase = true) ->
+                                DhunError.AuthRequired(message.take(200))
                             message.contains("Video unavailable", ignoreCase = true) -> DhunError.Unavailable
                             else -> DhunError.Unknown(message.take(200))
                         }
