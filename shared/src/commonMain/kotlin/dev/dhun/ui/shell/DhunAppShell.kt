@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItem as MaterialNavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
@@ -391,7 +391,7 @@ private fun AppNavigationItem(
             ),
         )
     } else {
-        NavigationBarItem(
+        MaterialNavigationBarItem(
             selected = selected,
             onClick = onClick,
             icon = icon,
