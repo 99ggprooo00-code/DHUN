@@ -9,6 +9,7 @@ import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
 import dev.dhun.domain.SaveNowPlayingUseCase
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -67,13 +68,13 @@ class NowPlayingPersistence(
     fun start() {
         if (jobs.isNotEmpty()) return
         jobs = listOf(
-            scope.launch {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 player.queue.collect { snapshot() } // StateFlow is already distinct
             },
-            scope.launch {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 player.currentTrack.distinctUntilChanged { a, b -> a?.id == b?.id }.collect { onTrackChanged(it) }
             },
-            scope.launch {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 while (isActive) {
                     delay(progressIntervalMs)
                     if (player.state.value is PlaybackState.Playing) progress()

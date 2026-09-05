@@ -12,7 +12,7 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at `ca3bff7` (icon handoff + raw-glyph
+**Branch:** `arena/01a070b3-dhun` at `d38c233` (icon handoff + raw-glyph
 purge + token polish pushed; PR #13 OPEN). The current `test` pre-release is
 healthy: run `33952291659` passed `apk`, `msi`, and `publish`; all four rolling
 assets are present. The referenced `3bcca3b` / `f469605` objects were absent,
@@ -35,16 +35,17 @@ so the handoff was recreated here.
    catalog, Android/Desktop harnesses, and the desktop mini-player use
    `DhunIconView`; target icon grep is clean. Token scaling/selected-state
    polish is staged but not yet pushed.
-5. **Last CI error:** run `33956258268` reached `:shared:compileKotlinJvm`
-   and reported the missing `fillMaxHeight` import in `LibraryScreen.kt`.
-   The import is fixed in the current unpushed worktree; no test failure was
-   reached in that run.
+5. **Last CI error:** run `33956336755` reached the existing
+   `NowPlayingPersistenceTest.naturalCompletionMarksHistoryRow` and timed out
+   waiting for the two history rows. The player observer launch race is now
+   hardened with `CoroutineStart.UNDISPATCHED` in the current unpushed
+   worktree; the earlier `fillMaxHeight` compiler error is fixed.
 
 **Exact next step:**
-1. Commit the import fix + roadmap, push the branch, and inspect PR #13
-   annotations; repeat until CI reaches the Android/desktop compile steps.
-2. Resolve any remaining compiler diagnostics, then keep raw dp/sp and raw
-   glyph greps clean; only CI-green work can be marked done.
+1. Commit the observer scheduling fix + roadmap, push the branch, and
+   inspect PR #13 annotations; repeat until CI reaches Android/desktop.
+2. Resolve any remaining compiler diagnostics/test flakes, then keep raw
+   dp/sp and raw glyph greps clean; only CI-green work can be marked done.
 3. Keep hardware verification open; after CI is green continue with SMTC
    phase 2 or the documented tray fallback, then Phase 13/14.
 
