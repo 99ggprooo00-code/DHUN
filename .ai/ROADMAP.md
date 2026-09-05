@@ -75,14 +75,20 @@ to the step log but not into the `rot-drill.log` artifact.
   --version` now recorded into the `rot-drill.log` artifact (`tee -a`).
 
 **Exact next step:**
-1. Push branch → open PR → require green CI (shared unit tests, Android
-   debug build, probe compile — sandbox has no JDK, CI is the gate).
-2. Dispatch the rot-drill on this branch (`workflow_dispatch`); require a
-   real `PROBE|verdict|PASS` line before the rot-drill step may be marked
-   green. Reading the new WATCH lines: own-client OK ⇒ production primary
-   healthy even if `WATCH|ytdlp` shows CI-IP gating; both BROKEN ⇒ verdict
-   FAIL stands as CI-network gating evidence — do NOT fake a pass;
-   residential verification then moves to real hardware.
+1. ~~Push branch → open PR → require green CI~~ — **DONE: PR #15, CI run
+   `33963002355` GREEN 2026-09-05** (shared unit tests ✓, Android debug
+   build ✓, probe compile ✓; only pre-existing deprecation warnings).
+2. **Dispatch the rot-drill on this branch** — the sandbox GitHub token
+   cannot (`HTTP 403: Resource not accessible by integration` on the
+   dispatch API, re-confirmed this session). The failed run 33961533965 was
+   dispatched from the GitHub UI; the rerun needs the same: **Actions →
+   rot-drill → Run workflow → ref `arena/01a07141-dhun`** (or merge PR #15
+   and let the 04:17 UTC cron pick it up). Require a real
+   `PROBE|verdict|PASS` line before the rot-drill step may be marked green.
+   Reading the new WATCH lines: own-client OK ⇒ production primary healthy
+   even if `WATCH|ytdlp` shows CI-IP gating; both BROKEN ⇒ verdict FAIL
+   stands as CI-network gating evidence — do NOT fake a pass; residential
+   verification then moves to real hardware.
 3. Comment the outcome on issue #14 (it auto-closes only on a green run).
 
 **Phase 14 step status after this failure:**
