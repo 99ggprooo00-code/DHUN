@@ -37,8 +37,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
 import dev.dhun.core.ArtistPage
@@ -251,7 +249,7 @@ private fun ArtistContent(
                 }
                 DhunTonalButton(onClick = onRadio, enabled = !radioLoading && page.topSongs.isNotEmpty()) {
                     if (radioLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(DhunSpacing.iconSizeSm), strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(DhunSpacing.iconSizeSm), strokeWidth = DhunSpacing.iconStroke)
                     } else {
                         DhunIconView(
                             icon = DhunIcon.Play,
@@ -286,7 +284,10 @@ private fun ArtistContent(
                                 color = DhunColors.textHint,
                                 modifier = Modifier.padding(end = DhunSpacing.xs),
                             )
-                            TrackOverflowIcon(onClick = { onTrackOverflow(track) })
+                            TrackOverflowIcon(
+                                trackTitle = track.title,
+                                onClick = { onTrackOverflow(track) },
+                            )
                         }
                     },
                 )
@@ -393,11 +394,11 @@ private fun ArtistContent(
 }
 
 @Composable
-private fun TrackOverflowIcon(onClick: () -> Unit) {
+private fun TrackOverflowIcon(trackTitle: String, onClick: () -> Unit) {
     DhunIconButton(
         onClick = onClick,
         modifier = Modifier.size(DhunSpacing.touchTarget),
-        contentDescription = "More actions for ${track.title}",
+        contentDescription = "More actions for $trackTitle",
     ) {
         DhunIconView(
             icon = DhunIcon.MoreVert,
@@ -411,9 +412,9 @@ private fun TrackOverflowIcon(onClick: () -> Unit) {
 @Composable
 private fun ArtistSkeleton() {
     Column(modifier = Modifier.fillMaxSize()) {
-        LoadingShimmer(modifier = Modifier.fillMaxWidth().height(240.dp))
+        LoadingShimmer(modifier = Modifier.fillMaxWidth().height(DhunSpacing.artistHeaderHeight))
         Spacer(modifier = Modifier.height(DhunSpacing.md))
-        LoadingShimmer(modifier = Modifier.width(150.dp).height(20.dp).padding(horizontal = DhunSpacing.screenPadding))
+        LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonArtistWidth).height(DhunSpacing.xl).padding(horizontal = DhunSpacing.screenPadding))
         SectionShimmer()
         SectionShimmer()
     }

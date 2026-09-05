@@ -31,8 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.Track
@@ -188,7 +186,7 @@ private fun RemoteTrackRow(index: Int, track: Track, onClick: () -> Unit, onOver
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
             contentDescription = track.title,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(DhunSpacing.touchTarget),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -281,7 +279,7 @@ private fun LocalPlaylistContent(
                     ArtworkImage(
                         imageUrl = track.thumbnailUrl,
                         contentDescription = track.title,
-                        modifier = Modifier.size(44.dp),
+                        modifier = Modifier.size(DhunSpacing.compactTarget),
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -348,7 +346,7 @@ private fun PlaylistHeader(
         ArtworkImage(
             imageUrl = thumbnailUrl,
             contentDescription = title,
-            modifier = Modifier.size(200.dp),
+            modifier = Modifier.size(DhunSpacing.artworkPlaylist),
             shape = DhunShapes.extraLarge,
         )
         Spacer(modifier = Modifier.height(DhunSpacing.lg))
@@ -415,7 +413,7 @@ private fun RenameDialog(
 ) {
     var name by remember(current) { mutableStateOf(current) }
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = 280.dp, max = 380.dp), shape = DhunShapes.large) {
+        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text(
                     "Rename playlist",
@@ -447,7 +445,7 @@ private fun DeleteConfirmDialog(
     onConfirm: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = 280.dp, max = 380.dp), shape = DhunShapes.large) {
+        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text(
                     "Delete \"$playlistName\"?",
@@ -478,9 +476,9 @@ private fun PlaylistSkeleton() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.height(DhunSpacing.huge))
-        LoadingShimmer(modifier = Modifier.size(200.dp))
+        LoadingShimmer(modifier = Modifier.size(DhunSpacing.artworkPlaylist))
         Spacer(modifier = Modifier.height(DhunSpacing.lg))
-        LoadingShimmer(modifier = Modifier.fillMaxWidth(0.5f).height(24.dp).padding(horizontal = DhunSpacing.xxl))
+        LoadingShimmer(modifier = Modifier.fillMaxWidth(0.5f).height(DhunSpacing.xxl).padding(horizontal = DhunSpacing.xxl))
         Spacer(modifier = Modifier.height(DhunSpacing.xxl))
         repeat(5) {
             Row(
@@ -490,10 +488,10 @@ private fun PlaylistSkeleton() {
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LoadingShimmer(modifier = Modifier.size(48.dp))
+                LoadingShimmer(modifier = Modifier.size(DhunSpacing.touchTarget))
                 Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
-                    LoadingShimmer(modifier = Modifier.width(200.dp).height(14.dp))
-                    LoadingShimmer(modifier = Modifier.width(120.dp).height(12.dp))
+                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.artworkPlaylist).height(DhunSpacing.mdPlus))
+                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonTextWidth).height(DhunSpacing.md))
                 }
             }
         }

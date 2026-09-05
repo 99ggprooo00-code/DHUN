@@ -1,5 +1,6 @@
 package dev.dhun.ui.components
 
+import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,8 +25,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
 import dev.dhun.data.LocalPlaylist
@@ -59,7 +58,7 @@ fun AddToPlaylistDialog(
     Dialog(onDismissRequest = onDismiss) {
         GlassCard(
             modifier = Modifier
-                .widthIn(min = 280.dp, max = 400.dp)
+                .widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogWideMaxWidth)
                 .padding(DhunSpacing.md),
             shape = DhunShapes.large,
         ) {
@@ -140,7 +139,7 @@ fun AddToPlaylistDialog(
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(180.dp),
+                                .height(DhunSpacing.dialogListHeight),
                         ) {
                             items(playlists, key = { it.id }) { playlist ->
                                 Row(
@@ -180,7 +179,7 @@ fun AddToPlaylistDialog(
                                         DhunTextButton(
                                             onClick = { onOpenPlaylist(playlist.id) },
                                         ) {
-                                            Text("Open", fontSize = 12.sp)
+                                            Text("Open", fontSize = DhunTypographyTokens.bodySmall.fontSize)
                                         }
                                     }
                                 }

@@ -1,5 +1,6 @@
 package dev.dhun.ui.player
 
+import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -62,8 +63,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
@@ -213,7 +212,7 @@ fun FullPlayer(
                     text = "NOW PLAYING",
                     style = MaterialTheme.typography.labelSmall,
                     color = DhunColors.textTertiary,
-                    letterSpacing = 2.sp,
+                    letterSpacing = DhunTypographyTokens.brand.letterSpacing,
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 DhunIconButton(
@@ -345,7 +344,7 @@ fun FullPlayer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(88.dp)
+                    .height(DhunSpacing.transportRowHeight)
                     .padding(horizontal = DhunSpacing.lg),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -384,7 +383,7 @@ fun FullPlayer(
                 )
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(DhunSpacing.miniPlayerHeight)
                         .shadow(DhunSpacing.lg, DhunShapes.full, clip = false)
                         .clip(DhunShapes.full)
                         .background(accent)
@@ -523,7 +522,7 @@ internal fun DhunSeekBar(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(28.dp),
+            .height(DhunSpacing.mediumLarge),
         contentAlignment = Alignment.CenterStart,
     ) {
         val widthPx = constraints.maxWidth.toFloat()
@@ -573,7 +572,7 @@ internal fun DhunSeekBar(
             )
             // Thumb — only while touching
             if (dragging) {
-                val thumbPx = 14.dp
+                val thumbPx = DhunSpacing.mdPlus
                 val thumbXPx = (effective * (widthPx)).toInt()
                 Box(
                     modifier = Modifier

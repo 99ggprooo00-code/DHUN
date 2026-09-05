@@ -28,8 +28,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
@@ -37,6 +35,7 @@ import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.GlassBottomBar
@@ -141,15 +140,19 @@ fun DhunAppShell(
                         )
                     }
 
-                    GlassBottomBar(modifier = Modifier.fillMaxWidth()) {
+                    GlassBottomBar(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = DhunShapes.bottomSheet,
+                    ) {
                         NavigationBar(
                             containerColor = Color.Transparent,
                             contentColor = DhunColors.textPrimary,
-                            modifier = Modifier.fillMaxWidth().height(64.dp),
+                            modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
                         ) {
                             AppTab.entries.forEach { tab ->
+                                val selected = nav.selectedTab == tab && nav.detailStack.isEmpty()
                                 NavigationBarItem(
-                                    selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
+                                    selected = selected,
                                     onClick = {
                                         nav.selectedTab = tab
                                         nav.detailStack.clear()
@@ -159,7 +162,7 @@ fun DhunAppShell(
                                             icon = tab.icon,
                                             contentDescription = "${tab.title} tab",
                                             modifier = Modifier.size(DhunSpacing.iconSize),
-                                            tint = if (nav.selectedTab == tab) DhunColors.accent else DhunColors.textTertiary,
+                                            tint = if (selected) DhunColors.accent else DhunColors.textTertiary,
                                         )
                                     },
                                     label = {

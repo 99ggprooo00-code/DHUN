@@ -27,8 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.AlbumDetail
 import dev.dhun.core.Artist
 import dev.dhun.core.Track
@@ -144,7 +142,7 @@ private fun AlbumContent(
                     ArtworkImage(
                         imageUrl = detail.thumbnailUrl,
                         contentDescription = detail.title,
-                        modifier = Modifier.size(220.dp),
+                        modifier = Modifier.size(DhunSpacing.artworkAlbum),
                         shape = DhunShapes.extraLarge,
                     )
                     Spacer(modifier = Modifier.height(DhunSpacing.lg))
@@ -270,7 +268,7 @@ private fun AlbumTrackRow(
             text = "%2d".format(number),
             style = MaterialTheme.typography.labelMedium,
             color = DhunColors.textHint,
-            modifier = Modifier.width(32.dp),
+            modifier = Modifier.width(DhunSpacing.xxxl),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -313,11 +311,11 @@ private fun AlbumSkeleton() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.height(DhunSpacing.huge))
-        LoadingShimmer(modifier = Modifier.size(220.dp))
+        LoadingShimmer(modifier = Modifier.size(DhunSpacing.artworkAlbum))
         Spacer(modifier = Modifier.height(DhunSpacing.lg))
-        LoadingShimmer(modifier = Modifier.width(200.dp).height(24.dp))
+        LoadingShimmer(modifier = Modifier.width(DhunSpacing.artworkPlaylist).height(DhunSpacing.xxl))
         Spacer(modifier = Modifier.height(DhunSpacing.sm))
-        LoadingShimmer(modifier = Modifier.width(140.dp).height(14.dp))
+        LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.mdPlus))
         Spacer(modifier = Modifier.height(DhunSpacing.xxl))
         repeat(6) {
             Row(
@@ -327,10 +325,10 @@ private fun AlbumSkeleton() {
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LoadingShimmer(modifier = Modifier.width(32.dp).height(14.dp))
+                LoadingShimmer(modifier = Modifier.width(DhunSpacing.xxxl).height(DhunSpacing.mdPlus))
                 Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
-                    LoadingShimmer(modifier = Modifier.width(220.dp).height(14.dp))
-                    LoadingShimmer(modifier = Modifier.width(120.dp).height(12.dp))
+                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.artworkAlbum).height(DhunSpacing.mdPlus))
+                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonTextWidth).height(DhunSpacing.md))
                 }
             }
         }

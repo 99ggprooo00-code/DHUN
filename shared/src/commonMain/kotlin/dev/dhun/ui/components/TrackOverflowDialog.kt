@@ -16,8 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
@@ -44,7 +42,7 @@ fun TrackOverflowDialog(
     Dialog(onDismissRequest = onDismiss) {
         GlassCard(
             modifier = Modifier
-                .widthIn(min = 280.dp, max = 380.dp)
+                .widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth)
                 .padding(DhunSpacing.md),
             shape = DhunShapes.large,
         ) {
@@ -62,7 +60,7 @@ fun TrackOverflowDialog(
                     ArtworkImage(
                         imageUrl = track.thumbnailUrl,
                         contentDescription = track.title,
-                        modifier = Modifier.size(52.dp),
+                        modifier = Modifier.size(DhunSpacing.transportTarget),
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

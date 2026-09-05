@@ -22,8 +22,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.PlaybackState
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
@@ -65,12 +63,12 @@ fun MiniPlayerContent(
             .fillMaxSize()
             .clip(DhunShapes.glass)
             .background(DhunColors.surfaceCard)
-            .border(1.dp, DhunColors.border, DhunShapes.glass),
+            .border(DhunSpacing.divider, DhunColors.border, DhunShapes.glass),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = DhunSpacing.md, top = DhunSpacing.sm, bottom = DhunSpacing.md, end = 0.dp),
+                .padding(start = DhunSpacing.md, top = DhunSpacing.sm, bottom = DhunSpacing.md, end = DhunSpacing.zero),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
@@ -84,7 +82,7 @@ fun MiniPlayerContent(
                 ArtworkImage(
                     imageUrl = track?.thumbnailUrl,
                     contentDescription = track?.title,
-                    modifier = Modifier.size(56.dp),
+                    modifier = Modifier.size(DhunSpacing.artworkThumb),
                 )
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
@@ -134,13 +132,13 @@ fun MiniPlayerContent(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(2.dp)
+                .height(DhunSpacing.iconStroke)
                 .background(DhunColors.surfaceHighest),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(progress)
-                    .height(2.dp)
+                    .height(DhunSpacing.iconStroke)
                     .background(DhunColors.accent),
             )
         }

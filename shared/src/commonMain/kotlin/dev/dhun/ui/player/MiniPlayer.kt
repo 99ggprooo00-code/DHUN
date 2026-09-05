@@ -26,8 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.PlaybackState
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
@@ -114,7 +112,7 @@ fun MiniPlayer(
                 ArtworkImage(
                     imageUrl = track.thumbnailUrl,
                     contentDescription = track.title,
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

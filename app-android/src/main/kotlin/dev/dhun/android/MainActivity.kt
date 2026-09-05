@@ -1,5 +1,7 @@
 package dev.dhun.android
 
+import dev.dhun.design.DhunSpacing
+import dev.dhun.design.DhunTypographyTokens
 import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
@@ -27,10 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -38,6 +37,7 @@ import dev.dhun.android.playback.AndroidDhunPlayer
 import dev.dhun.android.playback.DhunPlaybackService
 import dev.dhun.android.playback.PlaybackGraph
 import dev.dhun.data.DataLayer
+import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
@@ -132,16 +132,16 @@ class MainActivity : ComponentActivity() {
                         }
                         s.reason?.let { reason ->
                             Surface(
-                                color = Color(0xFF2A1A00),
+                                color = DhunColors.errorContainer,
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
                                     .fillMaxWidth(),
                             ) {
                                 Text(
                                     reason,
-                                    fontSize = 11.sp,
-                                    color = Color(0xFFFFB74D),
-                                    modifier = Modifier.padding(6.dp),
+                                    fontSize = DhunTypographyTokens.labelSmall.fontSize,
+                                    color = DhunColors.warning,
+                                    modifier = Modifier.padding(DhunSpacing.xsPlus),
                                 )
                             }
                         }
@@ -301,28 +301,28 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun ConnectingScreen(log: List<String>, version: String) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(DhunSpacing.lg),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("DHUN", fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text("DHUN", fontSize = DhunTypographyTokens.hero.fontSize, fontWeight = FontWeight.Bold)
         Text(
-            "starting playback engine… (v$version)",
-            fontSize = 12.sp,
-            color = Color(0xFF888888),
+            "starting playback engine... (v$version)",
+            fontSize = DhunTypographyTokens.bodySmall.fontSize,
+            color = DhunColors.textTertiary,
         )
         if (log.isNotEmpty()) {
             Column(
                 modifier = Modifier
-                    .padding(top = 20.dp)
+                    .padding(top = DhunSpacing.xl)
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.Start,
             ) {
                 log.takeLast(8).forEach { line ->
                     Text(
-                        "· " + line,
-                        fontSize = 11.sp,
-                        color = Color(0xFFBBBBBB),
+                        "- " + line,
+                        fontSize = DhunTypographyTokens.labelSmall.fontSize,
+                        color = DhunColors.textSecondary,
                     )
                 }
             }
@@ -333,23 +333,23 @@ private fun ConnectingScreen(log: List<String>, version: String) {
 @Composable
 private fun FailureScreen(message: String, onRetry: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(DhunSpacing.xxl),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("DHUN", fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text("DHUN", fontSize = DhunTypographyTokens.hero.fontSize, fontWeight = FontWeight.Bold)
         Text(
             "Playback failed to start",
-            color = Color(0xFFCF6679),
-            modifier = Modifier.padding(top = 12.dp),
+            color = DhunColors.error,
+            modifier = Modifier.padding(top = DhunSpacing.md),
         )
         Text(
             message,
-            fontSize = 12.sp,
-            color = Color(0xFF888888),
-            modifier = Modifier.padding(top = 8.dp),
+            fontSize = DhunTypographyTokens.bodySmall.fontSize,
+            color = DhunColors.textTertiary,
+            modifier = Modifier.padding(top = DhunSpacing.sm),
         )
-        Button(onClick = onRetry, modifier = Modifier.padding(top = 20.dp)) {
+        Button(onClick = onRetry, modifier = Modifier.padding(top = DhunSpacing.xl)) {
             Text("Retry")
         }
     }

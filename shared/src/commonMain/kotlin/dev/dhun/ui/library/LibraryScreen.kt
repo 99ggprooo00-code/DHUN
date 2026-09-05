@@ -1,5 +1,6 @@
 package dev.dhun.ui.library
 
+import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,8 +36,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.HistoryEntry
 import dev.dhun.core.Track
@@ -103,7 +102,7 @@ fun LibraryScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = DhunColors.accent,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
+                letterSpacing = DhunTypographyTokens.brand.letterSpacing,
             )
             Text(
                 text = "Your library",
@@ -156,7 +155,7 @@ private fun LibraryTabRow(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().height(44.dp),
+        modifier = modifier.fillMaxWidth().height(DhunSpacing.touchTarget),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
         LibraryTab.entries.forEach { tab ->
@@ -168,16 +167,17 @@ private fun LibraryTabRow(
             }
             Box(
                 modifier = Modifier
+                    .fillMaxHeight()
                     .clip(DhunShapes.full)
-                    .background(if (selected) DhunColors.accent else DhunColors.surfaceElevated)
+                    .background(if (selected) DhunColors.accentContainer else DhunColors.surfaceElevated)
                     .clickable { onSelect(tab) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = DhunSpacing.lg, vertical = DhunSpacing.sm),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) DhunColors.onAccent else DhunColors.textSecondary,
+                    color = if (selected) DhunColors.onAccentContainer else DhunColors.textSecondary,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 )
             }
@@ -262,7 +262,7 @@ private fun PlaylistRow(
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
             Box(
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.size(DhunSpacing.artworkThumb)
                     .clip(DhunShapes.medium)
                     .background(DhunColors.surfaceElevated),
                 contentAlignment = Alignment.Center,
@@ -317,7 +317,7 @@ private fun CreatePlaylistDialog(
     var creating by remember { mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = 280.dp, max = 380.dp), shape = DhunShapes.large) {
+        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text("New playlist", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
@@ -405,7 +405,7 @@ private fun FavoritesTab(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
             ) {
-                ArtworkImage(imageUrl = track.thumbnailUrl, contentDescription = track.title, modifier = Modifier.size(48.dp))
+                ArtworkImage(imageUrl = track.thumbnailUrl, contentDescription = track.title, modifier = Modifier.size(DhunSpacing.touchTarget))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(track.title, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(track.artistName, style = MaterialTheme.typography.labelSmall, color = DhunColors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -475,7 +475,7 @@ private fun HistoryTab(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(headerLabel, style = MaterialTheme.typography.titleSmall, color = DhunColors.textPrimary, fontWeight = FontWeight.Bold)
-                        DhunTextButton(onClick = { onPlayDay(day, 0) }) { Text("Play day", fontSize = 12.sp) }
+                        DhunTextButton(onClick = { onPlayDay(day, 0) }) { Text("Play day", fontSize = DhunTypographyTokens.bodySmall.fontSize) }
                     }
                 }
                 itemsIndexed(day.entries, key = { _, e -> "h_${e.entryId}" }) { index, entry ->
@@ -513,7 +513,7 @@ private fun HistoryRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
-        ArtworkImage(imageUrl = entry.track.thumbnailUrl, contentDescription = entry.track.title, modifier = Modifier.size(48.dp))
+        ArtworkImage(imageUrl = entry.track.thumbnailUrl, contentDescription = entry.track.title, modifier = Modifier.size(DhunSpacing.touchTarget))
         Column(modifier = Modifier.weight(1f)) {
             Text(entry.track.title, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
@@ -549,7 +549,7 @@ private fun HistoryRow(
 @Composable
 private fun ClearHistoryConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = 280.dp, max = 380.dp), shape = DhunShapes.large) {
+        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text("Clear history?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.sm))

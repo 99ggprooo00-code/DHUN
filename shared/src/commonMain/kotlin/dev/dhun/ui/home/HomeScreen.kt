@@ -1,5 +1,6 @@
 package dev.dhun.ui.home
 
+import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,8 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
 import dev.dhun.core.HomeFeed
@@ -127,7 +126,7 @@ private fun HomeFeedContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 96.dp),
+        contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
         // Top Header: Greeting + Refresh
         item(key = "header") {
@@ -144,7 +143,7 @@ private fun HomeFeedContent(
                         style = MaterialTheme.typography.labelSmall,
                         color = DhunColors.accent,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp,
+                        letterSpacing = DhunTypographyTokens.brand.letterSpacing,
                     )
                     Text(
                         text = feed.greeting,
@@ -278,7 +277,7 @@ private fun QuickPicksGrid(
         items(chunked) { columnTracks ->
             Column(
                 verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-                modifier = Modifier.width(280.dp),
+                modifier = Modifier.width(DhunSpacing.dialogMinWidth),
             ) {
                 columnTracks.forEach { track ->
                     val originalIndex = tracks.indexOf(track)
@@ -315,7 +314,7 @@ private fun QuickPickItem(
             ArtworkImage(
                 imageUrl = track.thumbnailUrl,
                 contentDescription = track.title,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(DhunSpacing.touchTarget),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -358,17 +357,17 @@ private fun HomeShimmerSkeleton(modifier: Modifier = Modifier) {
             .fillMaxSize()
             .padding(DhunSpacing.screenPadding),
     ) {
-        LoadingShimmer(modifier = Modifier.width(80.dp).height(16.dp))
+        LoadingShimmer(modifier = Modifier.width(DhunSpacing.bottomNavHeight).height(DhunSpacing.lg))
         Spacer(modifier = Modifier.height(DhunSpacing.xs))
-        LoadingShimmer(modifier = Modifier.width(180.dp).height(28.dp))
+        LoadingShimmer(modifier = Modifier.width(DhunSpacing.dialogListHeight).height(DhunSpacing.mediumLarge))
         Spacer(modifier = Modifier.height(DhunSpacing.xl))
 
         // Quick picks skeleton (2 cards)
-        LoadingShimmer(modifier = Modifier.width(120.dp).height(20.dp))
+        LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonTextWidth).height(DhunSpacing.xl))
         Spacer(modifier = Modifier.height(DhunSpacing.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md)) {
-            LoadingShimmer(modifier = Modifier.width(260.dp).height(110.dp))
-            LoadingShimmer(modifier = Modifier.width(260.dp).height(110.dp))
+            LoadingShimmer(modifier = Modifier.width(DhunSpacing.quickPickWidth).height(DhunSpacing.skeletonCardHeight))
+            LoadingShimmer(modifier = Modifier.width(DhunSpacing.quickPickWidth).height(DhunSpacing.skeletonCardHeight))
         }
 
         Spacer(modifier = Modifier.height(DhunSpacing.xl))

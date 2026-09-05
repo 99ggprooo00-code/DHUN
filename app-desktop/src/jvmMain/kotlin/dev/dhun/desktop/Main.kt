@@ -1,5 +1,6 @@
 package dev.dhun.desktop
 
+import dev.dhun.design.DhunSpacing
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -116,15 +117,15 @@ fun main() = application {
     // Window states (hoisted so close-to-tray/quit can read the live geometry:
     // Compose keeps position/size current via the AWT component listener).
     val mainState = rememberWindowState(
-        width = (initialGeometry?.w?.toFloat() ?: 1200f).dp,
-        height = (initialGeometry?.h?.toFloat() ?: 780f).dp,
+        width = initialGeometry?.w?.toFloat()?.dp ?: DhunSpacing.windowDefaultWidth,
+        height = initialGeometry?.h?.toFloat()?.dp ?: DhunSpacing.windowDefaultHeight,
         position = initialGeometry?.let { WindowPosition(it.x.toFloat().dp, it.y.toFloat().dp) }
             ?: WindowPosition.PlatformDefault,
     )
     val miniState = rememberWindowState(
-        width = 320.dp,
-        height = 88.dp,
-        position = WindowPosition(96.dp, 72.dp),
+        width = DhunSpacing.miniPlayerWindowWidth,
+        height = DhunSpacing.transportRowHeight,
+        position = WindowPosition(DhunSpacing.contentBottomInset, DhunSpacing.miniPlayerHeight),
     )
 
     val mainWindowRef = AtomicReference<ComposeWindow>()

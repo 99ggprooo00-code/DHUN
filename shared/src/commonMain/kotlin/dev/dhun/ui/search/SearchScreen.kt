@@ -33,8 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
 import dev.dhun.core.Playlist
@@ -381,7 +379,7 @@ private fun SearchResultsList(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 96.dp),
+        contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
         // Songs / Videos
         val tracks = if (filter == SearchFilter.VIDEOS) results.videos else results.songs
@@ -465,7 +463,7 @@ private fun SearchResultsList(
                         .padding(DhunSpacing.md),
                     contentAlignment = Alignment.Center,
                 ) {
-                    LoadingShimmer(modifier = Modifier.width(140.dp).height(20.dp))
+                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.xl))
                 }
             }
         }

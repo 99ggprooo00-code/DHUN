@@ -12,11 +12,11 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at `a9a8628` (icon handoff pushed; PR #13
-OPEN). The current `test` pre-release is healthy: run `33952291659` passed
-`apk`, `msi`, and `publish`; all four rolling assets are present. The
-referenced `3bcca3b` / `f469605` objects were absent, so the handoff was
-recreated here.
+**Branch:** `arena/01a070b3-dhun` at `ec30cb8` (icon handoff + raw-glyph
+purge pushed; PR #13 OPEN). The current `test` pre-release is healthy: run
+`33952291659` passed `apk`, `msi`, and `publish`; all four rolling assets are
+present. The referenced `3bcca3b` / `f469605` objects were absent, so the
+handoff was recreated here.
 
 **User 2026-09-05 directive — status:**
 1. **Release verification — DONE (CI + GitHub release):** `dhun-test.apk`,
@@ -29,19 +29,22 @@ recreated here.
 3. **Icon pass — CODE DONE, CI UNVERIFIED:** `DhunIcons.kt` has 24 embedded
    Apache-2.0 Material paths, a common SVG path parser, and accessible
    `DhunIconView`; attribution is in `THIRD_PARTY.md`. PR #13 run
-   `33955728824` failed in the pre-existing `NowPlayingPersistenceTest`
-   timeout before any UI compile; the completion transition race is now
-   fixed in the unpushed worktree.
-4. **Raw glyph purge — CODE IN PROGRESS:** shared UI, dialogs, catalog,
-   Android/Desktop harnesses, and the desktop mini-player now use
-   `DhunIconView`; target icon grep is clean. Token scaling and broader
-   non-icon typography cleanup remain.
+   `33955728824` hit the existing completion-history timeout; the transition
+   race fix is in `ec30cb8`.
+4. **Raw glyph purge — CODE DONE, CI UNVERIFIED:** shared UI, dialogs,
+   catalog, Android/Desktop harnesses, and the desktop mini-player use
+   `DhunIconView`; target icon grep is clean. Token scaling/selected-state
+   polish is staged but not yet pushed.
+5. **Last CI error:** run `33956056214` reached `:shared:compileKotlinJvm`
+   and reported missing `sizeIn` in `DhunButton.kt` plus a missing `track`
+   parameter in the Artist overflow helper. Both are fixed in the current
+   unpushed worktree; no test failure was reached in that run.
 
 **Exact next step:**
-1. Commit the raw glyph purge plus the completion-race fix and roadmap,
-   push the branch, then inspect PR #13 CI annotations and rerun if needed.
-2. Resolve any compiler diagnostics, then finish token/radius/selected-state
-   polish and eliminate raw dp/sp from touched platform UI.
+1. Commit the token/radius/selected-state polish plus the CI compiler fixes,
+   push the branch, and inspect PR #13 annotations.
+2. Resolve any remaining compiler diagnostics, then keep raw dp/sp and raw
+   glyph greps clean; only CI-green work can be marked done.
 3. Keep hardware verification open; after CI is green continue with SMTC
    phase 2 or the documented tray fallback, then Phase 13/14.
 

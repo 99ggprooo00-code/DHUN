@@ -57,12 +57,14 @@ fun GlassCard(
 @Composable
 fun GlassBottomBar(
     modifier: Modifier = Modifier,
+    shape: Shape = DhunShapes.glass,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Box(
         modifier = modifier
-            .background(DhunColors.glassStrong)
-            .border(BorderStroke(DhunSpacing.divider, DhunColors.border)),
+            .clip(shape)
+            .background(DhunColors.glassStrong, shape)
+            .border(BorderStroke(DhunSpacing.divider, DhunColors.border), shape),
         content = content,
     )
 }

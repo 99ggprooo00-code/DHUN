@@ -1,5 +1,6 @@
 package dev.dhun.ui.components
 
+import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -40,8 +41,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
@@ -71,7 +70,7 @@ fun <T> ReorderableList(
     onSwipeRemove: ((index: Int, item: T) -> Unit)? = null,
     onItemClick: ((index: Int, item: T) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    rowHeight: Dp = 68.dp,
+    rowHeight: Dp = DhunSpacing.listRowHeight,
     reorderEnabled: Boolean = true,
     swipeRemoveEnabled: Boolean = true,
     highlightIndex: Int = -1,
@@ -189,7 +188,7 @@ fun <T> ReorderableList(
                         Text(
                             text = "Remove",
                             color = DhunColors.error,
-                            fontSize = 13.sp,
+                            fontSize = DhunTypographyTokens.compact.fontSize,
                         )
                     }
                 }

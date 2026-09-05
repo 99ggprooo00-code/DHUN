@@ -1,5 +1,6 @@
 package dev.dhun.ui.player
 
+import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -43,8 +44,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dhun.core.Track
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
@@ -79,7 +78,7 @@ internal fun PlayerTabRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp),
+            .height(DhunSpacing.touchTarget),
     ) {
         tabTitles.forEachIndexed { index, title ->
             val selected = index == selectedTab
@@ -92,6 +91,8 @@ internal fun PlayerTabRow(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .clip(DhunShapes.medium)
+                    .background(if (selected) DhunColors.accent.copy(alpha = 0.12f) else Color.Transparent)
                     .clickable { onSelect(index) },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -104,8 +105,8 @@ internal fun PlayerTabRow(
                 Spacer(modifier = Modifier.height(DhunSpacing.xs))
                 Box(
                     modifier = Modifier
-                        .height(2.dp)
-                        .width(if (selected) 20.dp else 0.dp)
+                        .height(DhunSpacing.iconStroke)
+                        .width(if (selected) DhunSpacing.xl else DhunSpacing.zero)
                         .clip(DhunShapes.full)
                         .background(if (selected) accent else Color.Transparent),
                 )
@@ -169,7 +170,7 @@ internal fun QueueTabContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
-            Box(modifier = Modifier.size(44.dp)) {
+            Box(modifier = Modifier.size(DhunSpacing.compactTarget)) {
                 ArtworkImage(
                     imageUrl = track.thumbnailUrl,
                     contentDescription = track.title,
@@ -186,7 +187,7 @@ internal fun QueueTabContent(
                         EqualizerBars(
                             color = accent,
                             animate = isPlaying,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(DhunSpacing.xl),
                         )
                     }
                 }
@@ -216,7 +217,7 @@ internal fun QueueTabContent(
                     text = "NOW",
                     style = MaterialTheme.typography.labelSmall,
                     color = accent,
-                    letterSpacing = 1.sp,
+                    letterSpacing = DhunTypographyTokens.compactLetterSpacing,
                 )
             }
             Box(modifier = dragHandle) {
@@ -255,7 +256,7 @@ internal fun EqualizerBars(
                 Box(
                     modifier = Modifier
                         .fillMaxHeight(h.value)
-                        .width(3.dp)
+                        .width(DhunSpacing.progressStroke)
                         .clip(DhunShapes.full)
                         .background(color),
                 )
@@ -271,7 +272,7 @@ internal fun EqualizerBars(
                 Box(
                     modifier = Modifier
                         .fillMaxHeight(h)
-                        .width(3.dp)
+                        .width(DhunSpacing.progressStroke)
                         .clip(DhunShapes.full)
                         .background(color),
                 )
@@ -300,7 +301,7 @@ internal fun LyricsTabContent(
                 verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
             ) {
                 repeat(7) {
-                    LoadingShimmer(modifier = Modifier.fillMaxWidth(if (it % 2 == 0) 0.9f else 0.6f).height(16.dp))
+                    LoadingShimmer(modifier = Modifier.fillMaxWidth(if (it % 2 == 0) 0.9f else 0.6f).height(DhunSpacing.lg))
                 }
             }
         }
@@ -330,7 +331,7 @@ internal fun LyricsTabContent(
                     text = state.text,
                     style = MaterialTheme.typography.bodyMedium,
                     color = DhunColors.textSecondary,
-                    lineHeight = 22.sp,
+                    lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight,
                 )
                 Spacer(modifier = Modifier.height(DhunSpacing.huge))
             }
@@ -400,10 +401,10 @@ internal fun RelatedTabContent(
                         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                         modifier = Modifier.padding(vertical = DhunSpacing.sm),
                     ) {
-                        LoadingShimmer(modifier = Modifier.size(44.dp))
+                        LoadingShimmer(modifier = Modifier.size(DhunSpacing.compactTarget))
                         Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
-                            LoadingShimmer(modifier = Modifier.width(180.dp).height(14.dp))
-                            LoadingShimmer(modifier = Modifier.width(120.dp).height(12.dp))
+                            LoadingShimmer(modifier = Modifier.width(DhunSpacing.dialogListHeight).height(DhunSpacing.mdPlus))
+                            LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonTextWidth).height(DhunSpacing.md))
                         }
                     }
                 }
@@ -473,7 +474,7 @@ private fun RelatedRow(track: Track, onClick: () -> Unit) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
             contentDescription = track.title,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(DhunSpacing.touchTarget),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(

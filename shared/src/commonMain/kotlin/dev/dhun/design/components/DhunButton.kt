@@ -134,16 +134,11 @@ fun DhunIconButton(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = modifier
-            .sizeIn(
-                minWidth = DhunSpacing.touchTarget,
-                minHeight = DhunSpacing.touchTarget,
-            )
-            .then(
-                if (contentDescription == null) Modifier else Modifier.semantics {
-                    this.contentDescription = contentDescription
-                },
-            ),
+        modifier = modifier.then(
+            if (contentDescription == null) Modifier else Modifier.semantics {
+                this.contentDescription = contentDescription
+            },
+        ),
         enabled = enabled,
         content = content,
     )
