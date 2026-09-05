@@ -6,8 +6,8 @@ import com.sun.jna.Memory
 import com.sun.jna.Native
 import com.sun.jna.Pointer
 import com.sun.jna.WString
-import com.sun.jna.platform.win32.GUID
 import com.sun.jna.platform.win32.User32
+import com.sun.jna.win32.Guid
 import java.util.UUID
 
 /**
@@ -86,10 +86,10 @@ object Smct {
             steps += ProbeResult("abi", true, "RoGetActivationFactory resolved")
 
             // 2. Interop activation factory.
-            val factoryOut = Memory(Native.POINTER_SIZE)
+            val factoryOut = Memory(Native.POINTER_SIZE.toLong())
             val hrFactory = lib.RoGetActivationFactory(
                 WString(RUNTIME_CLASS_SMTC),
-                GUID(UUID.fromString(IID_SMTC_INTEROP)),
+                guidFromIid(IID_SMTC_INTEROP),
                 factoryOut,
             )
             val factory = factoryOut.getPointer(0)
@@ -101,12 +101,12 @@ object Smct {
             steps += ProbeResult("activate-factory", true, "ptr=0x${factory.toLong().toString(16)}")
 
             // 3. GetForWindow (interop vtable slot 6).
-            val smtcOut = Memory(Native.POINTER_SIZE)
+            val smtcOut = Memory(Native.POINTER_SIZE.toLong())
             val hrForWindow = vtableCall(
                 factory,
                 SLOT_INTEROP_GET_FOR_WINDOW,
                 hwnd,
-                GUID(UUID.fromString(IID_SMTC)),
+                guidFromIid(IID_SMTC),
                 smtcOut,
             )
             val smtc = smtcOut.getPointer(0)
@@ -119,7 +119,7 @@ object Smct {
                 steps += ProbeResult("get-for-window", true, "ptr=0x${smtc.toLong().toString(16)}")
 
                 // 4. Live-object check (slot 6, out BOOL).
-                val visibleOut = Memory(4)
+                val visibleOut = Memory(4L)
                 val hrVisible = vtableCall(smtc, SLOT_SMTC_IS_TRANSPORT_CONTROLS_BUTTON_VISIBLE, visibleOut)
                 val visible = visibleOut.getInt(0) != 0
                 steps += ProbeResult(
@@ -144,7 +144,31 @@ object Smct {
 
     /** RoGetActivationFactory(HSTRING classId, REFIID, void**) → HRESULT. */
     private interface WinRt : Library {
-        fun RoGetActivationFactory(clsid: WString, iid: GUID, ppv: Pointer): Int
+        fun RoGetActivationFactory(clsid: WString, iid: Guid.GUID, ppv: Pointer): Int
+    }
+
+    /**
+     * UUID string → Win32 GUID struct (base-jna `com.sun.jna.win32.Guid.GUID`).
+     * Layout: first 4 bytes as a little-endian int, next two shorts
+     * little-endian, last 8 bytes as-is (standard C GUID memory layout; the
+     * UUID string is big-endian 128-bit).
+     */
+    private fun guidFromIid(iid: String): Guid.GUID {
+        val u = UUID.fromString(iid)
+        val b = ByteArray(16)
+        val hi = u.mostSignificantBits
+        val lo = u.leastSignificantBits
+        for (i in 0 until 8) {
+            b[i] = ((hi ushr ((7 - i) * 8)) and 0xFF).toByte()
+            b[8 + i] = ((lo ushr ((7 - i) * 8)) and 0xFF).toByte()
+        }
+        val g = Guid.GUID()
+        g.Data1 = ((b[0].toInt() and 0xFF) shl 24) or ((b[1].toInt() and 0xFF) shl 16) or
+            ((b[2].toInt() and 0xFF) shl 8) or (b[3].toInt() and 0xFF)
+        g.Data2 = (((b[4].toInt() and 0xFF) shl 8) or (b[5].toInt() and 0xFF)).toShort()
+        g.Data3 = (((b[6].toInt() and 0xFF) shl 8) or (b[7].toInt() and 0xFF)).toShort()
+        g.Data4 = b.copyOfRange(8, 16)
+        return g
     }
 
     private fun loadWinRt(): WinRt = runCatching { Native.load("combase", WinRt::class.java) }

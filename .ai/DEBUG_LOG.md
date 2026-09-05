@@ -131,6 +131,24 @@ and the `Window` overload with `undecorated: Boolean = false` has defaults
 for every parameter (state/title/resizable/alwaysOnTop/onKeyEvent/content
 all named-safe).
 
+Round 5 (run 33944244828 on `21201fc`): Main/DhunTray/TrayIcons all
+compiled; errors moved to `Smct.kt` (JNA):
+- `com.sun.jna.platform.win32.GUID` **does not exist** (the platform GUID
+  is nested in `WinNT`) — the stable home is base-jna
+  `com.sun.jna.win32.Guid.GUID` (Data1 int / Data2 short / Data3 short /
+  Data4 byte[8]) → added a `guidFromIid()` byte converter (Win32 GUID =
+  first 3 fields LE, last 8 bytes as-is; verified against the
+  ddb0472d-… bytes by hand).
+- jna-platform (User32) was only on the classpath **transitively** (via
+  vlcj) — declared `jna-platform:5.17.0` explicitly + THIRD_PARTY line.
+- JNA `Memory` constructor takes **long** — `Memory(Native.POINTER_SIZE)`
+  (Int const) rejected → `.toLong()` / `4L`.
+- RUNTIME caveat (not a compile issue, machine-verify): raw
+  `Function.invoke` marshals Structure args **by reference**, so the
+  REFIID inside `vtableCall` may need by-value marshaling on a real
+  machine. The probe is failure-isolated (logs HRESULT, never throws;
+  documented fallback = tray path) so this can't break the app.
+
 ---
 
 ## 2026-09-05 · Background playback killed by OEM battery savers (MIUI/HyperOS/OneUI)

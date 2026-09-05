@@ -66,9 +66,14 @@ until CI green):**
 - `33943041377` (4602d9d): **step 5 (Android, incl. crash fix + FGS) GREEN**;
   step 6 (probe + desktop) FAILED on 8 small desktop errors (Long.dp,
   Long hex literals → Color, MenuItem.label vs text, noinline,
-  Float.coerceAtLeast) — **fixed in this push**; full details in
-  `.ai/DEBUG_LOG.md` (round 4 block). If this next run is green →
-  **first fully green CI on this branch → merge PR #9**.
+  Float.coerceAtLeast) → fixed in `21201fc`.
+- `33944244828` (21201fc): steps 4+5 GREEN; step 6 errors moved to
+  `Smct.kt` (the JNA files Main/Tray now compile): `com.sun.jna.platform.win32.GUID`
+  doesn't exist (→ base-jna `com.sun.jna.win32.Guid.GUID` + byte converter),
+  jna-platform was only transitive (→ declared explicitly), `Memory(long)`
+  (→ `.toLong()`/`4L`) → **fixed in this push** (`Smct.kt`,
+  `app-desktop/build.gradle.kts`, `THIRD_PARTY.md`). Details in
+  `.ai/DEBUG_LOG.md` (rounds 4–5). Next run green → **merge PR #9**.
 
 **Exact next step:**
 1. Commit the session's work (small commits) → push
