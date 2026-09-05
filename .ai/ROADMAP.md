@@ -12,12 +12,13 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a070b3-dhun)
 
-**Branch:** `arena/01a070b3-dhun` at pushed commit `4dee23a` (SMTC phase-2
+**Branch:** `arena/01a070b3-dhun` at pushed commit `7ca2f5d` (SMTC phase-2
 code/docs pushed; icon handoff + raw-glyph purge + token polish are pushed;
-PR #13 OPEN). The current `test` pre-release is healthy: run `33952291659`
-passed `apk`, `msi`, and `publish`; all four rolling assets are present. The
-referenced `3bcca3b` / `f469605` objects were absent, so the handoff was
-recreated here.
+PR #13 OPEN). CI run `33958287878` is green through shared tests, Android
+debug build, and Desktop/probe compilation. The current `test` pre-release is
+healthy: run `33952291659` passed `apk`, `msi`, and `publish`; all four rolling
+assets are present. The referenced `3bcca3b` / `f469605` objects were absent,
+so the handoff was recreated here.
 
 **User 2026-09-05 directive — status:**
 1. **Release verification — DONE (CI + GitHub release):** `dhun-test.apk`,
@@ -35,20 +36,22 @@ recreated here.
    dialogs, catalog, Android/Desktop harnesses, and the desktop mini-player
    use `DhunIconView`; target icon and numeric dp/sp greps are clean. CI run
    `33956457785` passed shared tests, Android debug build, and probe compiles.
-5. **SMTC phase 2 — CODE PUSHED, CI RED:** commit `4dee23a` fixed the
-   private `Session` constructor, but run `33958092891` then reported that
-   the internal `WinRt` method exposed private `WinGuid`. The current
-   worktree makes the ABI GUID type internal as well. Windows hardware
-   round-trip, tray, mini-player, and MSI checks remain open; docs were
-   updated from the old phase-1-only procedure.
+5. **SMTC phase 2 — CODE DONE, HARDWARE OPEN:** commit `7ca2f5d` is pushed
+   and CI run `33958287878` is green through the Desktop/probe compilation.
+   The integration provides guarded WinRT metadata/artwork/playback state and
+   a retained base-JNA `ButtonPressed` COM callback, while tray/keyboard
+   fallback remains active. Windows media-key round-trip, tray,
+   mini-player, and MSI checks remain open; no phase is hardware-done here.
 
 **Exact next step:**
-1. Commit/push this ABI visibility fix, inspect PR #13 annotations, and fix
-   any remaining JNA/WinRT or Compose diagnostics until CI is green.
-2. If CI is green, run the Windows checklist when hardware is available;
-   record PASS/FAIL and choose integrated SMTC or documented fallback.
-3. Keep Android/desktop hardware gates open; then continue Phase 13 Android
-   polish and Phase 14 rot-drill/GA only after the required evidence exists.
+1. Keep the Windows checklist open for real hardware; if no Windows machine
+   is available, retain the documented fallback and do not mark Phase 12
+   acceptance complete.
+2. Start Phase 13 Android native polish from the existing battery/FGS work:
+   audit insets/back stack, add shortcuts, rotation/UI tests, and tablet rail
+   behavior; keep hardware soak/lock-screen/OEM gates open.
+3. After Phase 13 code is CI-green, wire the Phase 14 rot-drill and release
+   evidence; do not call GA complete without hardware logs.
 
 **CI trail (this session, 9 rounds — all in DEBUG_LOG):**
 `33941799559`→android media3 APIs · `33942371150`/`33942622916`→
@@ -147,7 +150,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 
 | Step | Status |
 |---|---|
-| SMTC spike (3-day timebox) | 🟨 **phase 2 code pushed in `4dee23a`, CI red on ABI visibility** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — Windows round-trip and fallback verdict OPEN |
+| SMTC spike (3-day timebox) | 🟨 **phase 2 code pushed in `7ca2f5d`, CI green `33958287878`** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — Windows round-trip and fallback verdict OPEN |
 | System tray (playing/paused icon, 6-item menu) | 🟨 code pushed (`DhunTray.kt` + `TrayIcons.kt`, AWT, EDT-marshaled, headless-safe) — CI compile pending; hardware OPEN |
 | Mini-player window (320×88, always-on-top, drag, click-opens-main) | 🟨 code pushed (`MiniPlayerWindow.kt` + second Compose `Window`; hide-not-close; Ctrl+M) — CI compile pending; hardware OPEN; taskbar visibility is a 1.8.2 limitation (no `skipTaskbar`) |
 | Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — CI compile pending; hardware OPEN |
