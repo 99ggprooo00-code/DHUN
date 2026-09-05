@@ -5,6 +5,7 @@ import dev.dhun.core.DhunException
 import dev.dhun.core.DhunResult
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
+import dev.dhun.core.RateLimitGate
 import dev.dhun.core.SearchResults
 import dev.dhun.core.Track
 import io.ktor.client.HttpClient
@@ -25,6 +26,7 @@ import io.ktor.utils.io.errors.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -251,6 +253,7 @@ class InnerTubeClient(
     ): JsonObject {
         var lastError: DhunError = DhunError.Network
         repeat(ALT_MAX_ATTEMPTS) { attempt ->
+            globalRateGate.await() // Phase 14: 429 global backoff — all calls wait out a tripped gate
             if (attempt > 0) delay(backoffMillis(attempt, lastError))
             try {
                 val response = httpClient.post("$WWW_BASE/youtubei/v1/$endpoint?prettyPrint=false") {
@@ -266,7 +269,7 @@ class InnerTubeClient(
                 }
                 val code = response.status.value
                 when {
-                    code == 429 -> lastError = DhunError.RateLimited()
+                    code == 429 -> lastError = onRateLimited(response.headers["Retry-After"])
                     code in 500..599 -> lastError = DhunError.Network
                     code != 200 -> throw DhunException(DhunError.Parse("HTTP $code from ${alt.label} /$endpoint"))
                     else -> return Json.parseToJsonElement(response.bodyAsText()).jsonObject
@@ -295,6 +298,7 @@ class InnerTubeClient(
         val version = clientVersion()
         var lastError: DhunError = DhunError.Unknown()
         repeat(MAX_ATTEMPTS) { attempt ->
+            globalRateGate.await() // Phase 14: 429 global backoff — all calls wait out a tripped gate
             if (attempt > 0) delay(backoffMillis(attempt, lastError))
             try {
                 val response = httpClient.post("$MUSIC_BASE/youtubei/v1/$endpoint?prettyPrint=false") {
@@ -309,7 +313,7 @@ class InnerTubeClient(
                 }
                 val code = response.status.value
                 when {
-                    code == 429 -> lastError = DhunError.RateLimited()
+                    code == 429 -> lastError = onRateLimited(response.headers["Retry-After"])
                     code in 500..599 -> lastError = DhunError.Network
                     code != 200 -> throw DhunException(DhunError.Parse("HTTP $code from /$endpoint"))
                     else -> return Json.parseToJsonElement(response.bodyAsText()).jsonObject
@@ -341,6 +345,18 @@ class InnerTubeClient(
         return base shl (attempt - 1).coerceAtMost(4)
     }
 
+    /**
+     * Phase 14 "429 global backoff": a 429 throttles the CLIENT, not the
+     * call — trip the process-wide gate (honoring server Retry-After when
+     * sent, else the default cooldown) and return the typed error carrying
+     * the advised delay.
+     */
+    private fun onRateLimited(retryAfterHeader: String?): DhunError.RateLimited {
+        val retryAfterSeconds = retryAfterHeader?.trim()?.toIntOrNull()?.takeIf { it > 0 }
+        globalRateGate.trip((retryAfterSeconds?.seconds) ?: DEFAULT_429_COOLDOWN)
+        return DhunError.RateLimited(retryAfterSeconds)
+    }
+
     private fun classify(t: Throwable): DhunError = when (t) {
         is DhunException -> t.error
         is HttpRequestTimeoutException,
@@ -357,6 +373,10 @@ class InnerTubeClient(
         const val CLIENT_VERSION_FALLBACK = "1.20250310.01.00"
         private const val MAX_ATTEMPTS = 3
         private const val ALT_MAX_ATTEMPTS = 2
+
+        /** Process-wide: every InnerTubeClient instance shares one 429 gate. */
+        internal val globalRateGate = RateLimitGate()
+        private val DEFAULT_429_COOLDOWN = 15.seconds
 
         val ALT_CLIENT_VISIONOS = AltInnertubeClient(
             label = "visionos",
