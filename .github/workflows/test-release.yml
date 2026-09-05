@@ -1,11 +1,17 @@
 name: test-release
 
 # ONE rolling test release, by policy (user decision 2026-09-01):
-#  - a single release tagged `test`, asset always named dhun-test.apk
+#  - a single release tagged `test`, assets ALWAYS named dhun-test.apk
+#    and dhun-test.msi
 #  - every push to main REPLACES it (old release, tag and assets deleted)
 #  - no version numbers, no release history for unfinished builds
-# The stable download URL never changes:
+# The stable download URLs never change:
 #   https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk
+#   https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.msi
+#
+# Phase 12 (2026-09-05): Windows MSI added. `:app-desktop:createMsi` runs
+# jpackage on a windows-latest runner (JDK 17 ships the WiX toolset). The
+# MSI needs a VLC install at runtime (vlcj dynamic link — see THIRD_PARTY).
 
 on:
   workflow_dispatch:
@@ -34,6 +40,67 @@ jobs:
       - name: Build debug APK
         run: ./gradlew :app-android:assembleDebug --no-daemon
 
+      - name: Stage + checksum
+        run: |
+          cp app-android/build/outputs/apk/debug/app-android-debug.apk dhun-test.apk
+          sha256sum dhun-test.apk > dhun-test.apk.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: |
+            dhun-test.apk
+            dhun-test.apk.sha256
+
+  msi:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # jpackage creates the MSI; output lands in
+      # app-desktop/build/compose/binaries/mainMsi/<name>.msi
+      - name: Build MSI (jpackage)
+        run: ./gradlew :app-desktop:createMsi --no-daemon
+
+      - name: Stage + checksum
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path app-desktop/build/compose/binaries/mainMsi -Filter *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $msi) { throw "No .msi found under app-desktop/build/compose/binaries/mainMsi" }
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          Copy-Item $msi.FullName out/dhun-test.msi
+          $hash = (Get-FileHash out/dhun-test.msi -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path out/dhun-test.msi.sha256 -Value "$hash  dhun-test.msi" -Encoding ascii
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msi
+          path: |
+            out/dhun-test.msi
+            out/dhun-test.msi.sha256
+
+  publish:
+    needs: [apk, msi]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: msi
+          path: dist
+
       - name: Replace the rolling test release (delete old, publish new)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -47,9 +114,11 @@ jobs:
           gh release delete test --yes --cleanup-tag || true
           git push origin :refs/tags/test || true
 
-          cp app-android/build/outputs/apk/debug/app-android-debug.apk dhun-test.apk
-          sha256sum dhun-test.apk > dhun-test.apk.sha256
-          gh release create test dhun-test.apk dhun-test.apk.sha256 \
+          cp dist/dhun-test.apk dist/dhun-test.msi .
+          cp dist/dhun-test.apk.sha256 dist/dhun-test.msi.sha256 .
+          gh release create test \
+            dhun-test.apk dhun-test.apk.sha256 \
+            dhun-test.msi dhun-test.msi.sha256 \
             --title "DHUN test build (auto-replaced on every update)" \
-            --notes "Rolling UNVERIFIED development build of main. Nothing here is stable, signed for stores, or recommended for daily-driver devices. Install only where that is acceptable. Current open checks: docs/verification/03-android-skeleton.md" \
+            --notes "Rolling UNVERIFIED development build of main. dhun-test.apk = Android, dhun-test.msi = Windows (playback needs a VLC install). Nothing here is stable, signed for stores, or recommended for daily-driver devices. Install only where that is acceptable. Current open checks: docs/verification/03-android-skeleton.md, docs/verification/12-desktop-native.md" \
             --prerelease
