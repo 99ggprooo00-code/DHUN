@@ -189,6 +189,7 @@ class MainActivity : ComponentActivity() {
                                 dataLayer = dataLayer,
                                 nav = nav,
                                 isDesktop = false,
+                                connectivity = koin.get(),
                             )
                         }
                         s.reason?.let { reason ->

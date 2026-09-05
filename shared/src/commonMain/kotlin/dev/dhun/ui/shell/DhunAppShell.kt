@@ -25,6 +25,7 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -37,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import dev.dhun.core.AlwaysOnlineConnectivityMonitor
+import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
@@ -46,6 +49,7 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.player.DhunPlayer
@@ -95,6 +99,7 @@ fun DhunAppShell(
     modifier: Modifier = Modifier,
     isDesktop: Boolean = false,
     libraryViewModel: LibraryViewModel? = null,
+    connectivity: ConnectivityMonitor = AlwaysOnlineConnectivityMonitor,
 ) {
     val scope = rememberCoroutineScope()
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
@@ -137,9 +142,28 @@ fun DhunAppShell(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val useNavigationRail = maxWidth >= DhunSpacing.navigationRailBreakpoint
+        // Phase 14 error taxonomy: offline banner. Rendered in the Scaffold
+        // topBar slot so innerPadding pushes content down while it shows.
+        val isOnline by connectivity.isOnline.collectAsState()
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = DhunColors.background,
+            topBar = {
+                AnimatedVisibility(
+                    visible = !isOnline,
+                    enter = slideInVertically { -it } + fadeIn(DhunAnimations.mediumTween()),
+                    exit = slideOutVertically { -it } + fadeOut(DhunAnimations.fastTween()),
+                ) {
+                    Surface(color = DhunColors.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "You're offline. Search and streaming are unavailable until the connection returns.",
+                            fontSize = DhunTypographyTokens.labelSmall.fontSize,
+                            color = DhunColors.warning,
+                            modifier = Modifier.padding(DhunSpacing.xsPlus),
+                        )
+                    }
+                }
+            },
             bottomBar = if (useNavigationRail) {
                 {}
             } else {
