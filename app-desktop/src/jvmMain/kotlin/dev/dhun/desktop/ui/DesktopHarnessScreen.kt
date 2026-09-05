@@ -62,7 +62,7 @@ fun DesktopHarnessScreen(player: DhunPlayer, viewModel: DesktopHarnessViewModel)
                 Text(
                     "Phase 04 test harness — throwaway",
                     fontSize = 12.sp,
-                    color = Color(0xFF888888),
+                    color = Color(0xFF888888.toInt()),
                 )
 
                 Row(
@@ -83,20 +83,20 @@ fun DesktopHarnessScreen(player: DhunPlayer, viewModel: DesktopHarnessViewModel)
                 }
 
                 ui.error?.let {
-                    Text(it, color = Color(0xFFCF6679), modifier = Modifier.padding(top = 8.dp))
+                    Text(it, color = Color(0xFFCF6679.toInt()), modifier = Modifier.padding(top = 8.dp))
                 }
 
                 // Phase 05 verification strip: recent searches + "listen again"
                 // come from the local database and must survive a restart.
                 if (recentSearches.isNotEmpty()) {
-                    Text("Recent: " + recentSearches.joinToString(" · "), fontSize = 11.sp, color = Color(0xFF777777))
+                    Text("Recent: " + recentSearches.joinToString(" · "), fontSize = 11.sp, color = Color(0xFF777777.toInt()))
                 }
                 if (recentlyPlayed.isNotEmpty()) {
-                    Text("Listen again", fontSize = 12.sp, color = Color(0xFF888888), modifier = Modifier.padding(top = 6.dp))
+                    Text("Listen again", fontSize = 12.sp, color = Color(0xFF888888.toInt()), modifier = Modifier.padding(top = 6.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(recentlyPlayed, key = { it.id }) { t ->
                             Surface(
-                                color = Color(0xFF1E1E1E),
+                                color = Color(0xFF1E1E1E.toInt()),
                                 shape = MaterialTheme.shapes.small,
                                 modifier = Modifier.clickable { scope.launch { player.prepareQueue(recentlyPlayed, recentlyPlayed.indexOf(t)) } },
                             ) {
@@ -131,15 +131,15 @@ fun DesktopHarnessScreen(player: DhunPlayer, viewModel: DesktopHarnessViewModel)
                                         (track.albumName?.let { " • $it" } ?: "") +
                                         (track.durationSeconds?.let { " • ${formatSeconds(it)}" } ?: ""),
                                     fontSize = 12.sp,
-                                    color = Color(0xFFAAAAAA),
+                                    color = Color(0xFFAAAAAA.toInt()),
                                 )
                             }
                             val fav = track.id in favoriteIds
                             TextButton(onClick = { viewModel.toggleFavorite(track) }) {
-                                Text(if (fav) "♥" else "♡", fontSize = 20.sp, color = if (fav) Color(0xFFBB86FC) else Color(0xFF777777))
+                                Text(if (fav) "♥" else "♡", fontSize = 20.sp, color = if (fav) Color(0xFFBB86FC.toInt()) else Color(0xFF777777.toInt()))
                             }
                         }
-                        HorizontalDivider(color = Color(0xFF222222))
+                        HorizontalDivider(color = Color(0xFF222222.toInt()))
                     }
                 }
 
@@ -180,7 +180,7 @@ private fun NowPlayingBar(
                 PlaybackState.Idle -> "idle"
             },
             fontSize = 12.sp,
-            color = Color(0xFF888888),
+            color = Color(0xFF888888.toInt()),
         )
         Text(
             current?.let { "${it.title} — ${it.artistName}" } ?: "Nothing playing",
@@ -207,8 +207,8 @@ private fun NowPlayingBar(
             TextButton(onClick = onNext) { Text("⏭", fontSize = 20.sp) }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatMs(position), fontSize = 11.sp, color = Color(0xFF777777))
-            Text(formatMs(duration), fontSize = 11.sp, color = Color(0xFF777777))
+            Text(formatMs(position), fontSize = 11.sp, color = Color(0xFF777777.toInt()))
+            Text(formatMs(duration), fontSize = 11.sp, color = Color(0xFF777777.toInt()))
         }
     }
 }

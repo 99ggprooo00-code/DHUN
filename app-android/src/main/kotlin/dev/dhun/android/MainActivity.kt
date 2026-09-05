@@ -2,9 +2,13 @@ package dev.dhun.android
 
 import android.Manifest
 import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -221,6 +225,13 @@ class MainActivity : ComponentActivity() {
         player?.release()
         persistence?.stop()
         player = p
+        // Media apps are expected to ask; without the exemption OEM battery
+        // savers (MIUI/HyperOS/OneUI) kill the playback service in the
+        // background. Asked at most once per process, only while the app is
+        // actually in use (a system dialog from the background would be
+        // blocked anyway). MIUI "auto-start" still has to be toggled by hand
+        // (no programmatic request exists) — see docs/verification/03.
+        requestBatteryOptimizationExemptionIfNeeded()
         // Persist queue/position/history, restore the last session
         // when the engine is idle (cold start). Restored = paused, never autoplay.
         val koin = GlobalContext.get()
@@ -244,6 +255,23 @@ class MainActivity : ComponentActivity() {
     private fun Throwable.toDhunStyleMessage(): String =
         message?.take(200) ?: ""
 
+    private fun requestBatteryOptimizationExemptionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        if (batteryExemptionRequested) return
+        batteryExemptionRequested = true
+        try {
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            if (pm.isIgnoringBatteryOptimizations(packageName)) return
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(Uri.parse("package:$packageName")),
+            )
+        } catch (_: Exception) {
+            // OEMs with no such settings page / dialog denied — playback
+            // still works, just less resilient to aggressive savers.
+        }
+    }
+
     private fun appVersionName(): String = try {
         packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
     } catch (_: Exception) {
@@ -264,6 +292,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "DHUN"
         private const val MAX_CONNECT_ATTEMPTS = 3
+        private var batteryExemptionRequested = false
     }
 }
 

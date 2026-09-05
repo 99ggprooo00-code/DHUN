@@ -13,6 +13,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.launch
 
@@ -43,6 +45,17 @@ class NowPlayingPersistence(
     private var lastHandle: RecordPlayUseCase.PlayHandle? = null
     @Volatile private var lastProgressFraction = 0f
     private var playContext: PlayContext = PlayContext.UNKNOWN
+
+    /**
+     * Serializes every now-playing write. Queue-change and track-change
+     * events fire back-to-back (prepareQueue sets both), so without this
+     * two saveQueue transactions interleave on the DB — on the in-memory
+     * JDBC driver (single shared connection) that corrupts the queue rows
+     * (CI flake: NowPlayingPersistenceTest, "expected [T1,T2,T3] but was
+     * [T1,T2,…]"). Same latent race existed in production: the snapshot
+     * coroutines hop to Dispatchers.Default inside withContext.
+     */
+    private val writeMutex = Mutex()
 
     /** Call when the UI starts something — so history knows where from. */
     fun setPlayContext(context: PlayContext) { playContext = context }
@@ -100,8 +113,9 @@ class NowPlayingPersistence(
         val queue = player.queue.value
         val current = player.currentTrack.value
         val index = queue.indexOfFirst { it.id == current?.id }.coerceAtLeast(0)
-        runCatching { save(queue, index, player.positionMs.value, repeatMode, shuffle) }
-            .onFailure { log("save queue failed: ${it.message}") }
+        runCatching {
+            writeMutex.withLock { save(queue, index, player.positionMs.value, repeatMode, shuffle) }
+        }.onFailure { log("save queue failed: ${it.message}") }
     }
 
     private suspend fun progress() {
@@ -110,8 +124,9 @@ class NowPlayingPersistence(
         val index = queue.indexOfFirst { it.id == current.id }.coerceAtLeast(0)
         val duration = player.durationMs.value
         if (duration > 0) lastProgressFraction = player.positionMs.value.toFloat() / duration
-        runCatching { save.progress(index, player.positionMs.value) }
-            .onFailure { log("save progress failed: ${it.message}") }
+        runCatching {
+            writeMutex.withLock { save.progress(index, player.positionMs.value) }
+        }.onFailure { log("save progress failed: ${it.message}") }
     }
 
     private suspend fun onTrackChanged(track: Track?) {
