@@ -28,55 +28,46 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-05, session arena/01a07287-dhun)
 
-**Branch:** `arena/01a07287-dhun` (from `main@290e0f6`) · **PR #17** open →
-`main`. **CI GREEN** on `82ac4f0`: run `33980343727` — Unit tests ✅ ·
-Android debug build ✅ · Probe compiles ✅ · **Desktop compiles ✅ (new
-step)**. Ready for review/merge.
+**Branch:** `arena/01a07287-dhun` · **PR #17 → main, MERGING NOW.**
+**GitHub state at this commit (verified `gh`/`git fetch`):** branch head
+`f70e3f9`, CI run `33980933493` ✅ (Unit tests · Android debug · Probe ·
+**Desktop compiles**); prior runs `33980627234`/`33980343727` also ✅.
+PR #15 **closed** as superseded (all 10 commits patch-identical to main).
+Local tree clean; local == remote; no unpushed commits.
 
 **Phase:** 14 — Robustness + rot-drill + v0.1.0.
 
-**Files worked on this session:**
-- `shared/src/jvmMain/kotlin/dev/dhun/player/AudioFileCache.kt` — NEW.
-  Desktop whole-track LRU cache (`<data dir>/cache/audio/<id>.audio`,
-  `.part` in-flight, sweep on open, budget from `AudioCacheBudget`,
-  injectable fetch, safe-id guard).
-- `shared/src/jvmTest/kotlin/dev/dhun/player/AudioFileCacheTest.kt` — NEW,
-  9 tests (hit/no-refetch, LRU victim, over-budget, short read, cancel,
-  unsafe id, partial sweep, shrink+clear).
-- `app-desktop/.../player/DesktopDhunPlayer.kt` — cache hit → local file
-  (no resolve); miss → stream + background fill on `Dispatchers.IO`; fill
-  cancelled on skip/stop/release.
-- `app-desktop/.../Main.kt` — Koin: `AudioFileCache` from `CACHE_SIZE_MB`,
-  `evictToBudget()` at start, injected into the player.
-- `.github/workflows/ci.yml` — new step `:app-desktop:compileKotlinJvm`
-  (desktop was only compiled by main's MSI job before; PRs could break it
-  silently).
-- `CHANGELOG.md` — NEW (Unreleased only; v0.1.0 NOT claimed); README link.
-- `.ai/KNOWN_LIMITATIONS.md`, `docs/verification/14-release.md` updated.
+**Files worked on (this session, all on PR #17):**
+- `shared/src/jvmMain/kotlin/dev/dhun/player/AudioFileCache.kt` (new)
+- `shared/src/jvmTest/kotlin/dev/dhun/player/AudioFileCacheTest.kt` (new, 9)
+- `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/player/DesktopDhunPlayer.kt`
+- `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt` (Koin wiring)
+- `.github/workflows/ci.yml` (+ `Desktop compiles` step)
+- `CHANGELOG.md` (new) · `README.md` · `.ai/KNOWN_LIMITATIONS.md` ·
+  `docs/verification/14-release.md` · `.ai/DEBUG_LOG.md` · this file
+  (+ pre-push ritual rule).
 
-**Last error:** none. Sandbox has no JDK and no egress (adoptium / gradle /
-maven / Actions log blobs all unreachable), so verification = CI step
-results (job `101344341802`, all steps success); per-test log lines could
-not be downloaded from the sandbox.
+**Last error:** none. (Sandbox: no JDK, no egress — CI is the compiler.)
+
+**Stranded-commit audit (rule step 4):** 7 old session branches are
+"ahead" of main by count only — every commit is patch-identical to main
+(`git cherry` = 0 unique) or a pre-merge draft of a merged PR
+(01a06a42 = Phase 07 draft, PR #6 landed it). `faf8d03` from 01a07170 was
+cherry-picked here (`1eb377c`). Nothing left behind.
 
 **Exact next step:**
-1. Human: review + merge PR #17 → rolling `test` MSI picks up the desktop
-   cache. Close PR #15 (superseded).
-2. Hardware gates (human): residential play + offline-cache smoke on
-   Android AND a desktop machine with libVLC (checklist in
-   `docs/verification/14-release.md`), soaks, then v0.1.0.
-3. Agent follow-ups if asked: `cache_size_mb` UI in Settings (both
-   platforms currently read the DB key only), live re-capture of Phase 09
-   fixtures.
+1. `gh pr merge 17 --merge` → main gets desktop cache + CHANGELOG + rules.
+   test-release then rebuilds `dhun-test.apk`/`.msi` from main.
+2. Post-merge follow-up commit: flip desktop-cache / CHANGELOG rows to ✅
+   (merged + CI green), HW columns stay OPEN.
+3. Human/hardware gates: residential play + offline-cache smoke (Android
+   + libVLC desktop; checklist in `docs/verification/14-release.md`),
+   30-min soaks, then v0.1.0.
 
-**Marks (GitHub):** PR #16 ✅ merged · Android cache ✅ merged (HW ⬜) ·
-desktop cache 🟨 PR #17 CI green, awaiting merge (HW ⬜) · CHANGELOG 🟨
-PR #17 CI green · rot-drill live 🔴 · soaks ⬜ · v0.1.0 ⬜ · Liquid Glass 🚫 ·
-PR #15 superseded → close.
-
-**Session constraints:** pinned to `arena/01a07287-dhun`; `faf8d03` from
-`arena/01a07170-dhun` carried here as `1eb377c`. No JDK/device; agent lacks
-`workflow_dispatch`.
+**Marks (GitHub):** PR #16 ✅ · PR #17 CI ✅ (merge in progress) · Android
+cache ✅ (HW ⬜) · desktop cache 🟨→✅ on merge (HW ⬜) · CHANGELOG 🟨→✅ on
+merge · rot-drill live 🔴 · soaks ⬜ · v0.1.0 ⬜ · Liquid Glass 🚫 · PR #15
+closed (superseded).
 
 ---
 
