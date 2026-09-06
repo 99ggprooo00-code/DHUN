@@ -44,7 +44,10 @@ fun TrackOverflowDialog(
             modifier = Modifier
                 .widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth)
                 .padding(DhunSpacing.md),
-            shape = DhunShapes.large,
+            // Soft sheet: large radius + faint edge so it melts into the
+            // dark glass instead of drawing a hard boundary.
+            shape = DhunShapes.extraLarge,
+            borderColor = DhunColors.border,
         ) {
             Column(
                 modifier = Modifier

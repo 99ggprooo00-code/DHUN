@@ -2,7 +2,6 @@ package dev.dhun.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -233,62 +231,68 @@ private fun HomeFeedContent(
             }
         }
 
-        // ---- Quick-action chips -----------------------------------------------
+        // ---- Quick-action chips (LazyRow, same pattern as the mood row:
+        // symmetric edge padding via contentPadding holds while scrolling —
+        // horizontalScroll + padding drops the trailing inset at scroll end,
+        // which read as uneven chip spacing) ----------------------------------
         item(key = "quick_actions") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = DhunSpacing.screenPadding),
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             ) {
-                DhunAssistChip(
-                    onClick = onOpenLiked,
-                    label = {
-                        Text("Liked songs", style = MaterialTheme.typography.labelLarge)
-                    },
-                    leadingIcon = {
-                        DhunIconView(
-                            icon = DhunIcon.Favorite,
-                            contentDescription = null,
-                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                            tint = DhunColors.accent,
-                        )
-                    },
-                )
-                DhunAssistChip(
-                    onClick = onOpenOffline,
-                    label = {
-                        Text("Offline", style = MaterialTheme.typography.labelLarge)
-                    },
-                    leadingIcon = {
-                        DhunIconView(
-                            icon = DhunIcon.Offline,
-                            contentDescription = null,
-                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                            tint = DhunColors.textSecondary,
-                        )
-                    },
-                )
-                DhunAssistChip(
-                    onClick = onCycleSleepTimer,
-                    label = {
-                        Text(
-                            sleepTimerLabel ?: "Sleep timer",
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    },
-                    leadingIcon = {
-                        DhunIconView(
-                            icon = DhunIcon.Timer,
-                            contentDescription = null,
-                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                            tint = if (sleepTimerLabel != null) DhunColors.accent else DhunColors.textSecondary,
-                        )
-                    },
-                )
+                item(key = "liked") {
+                    DhunAssistChip(
+                        onClick = onOpenLiked,
+                        label = {
+                            Text("Liked songs", style = MaterialTheme.typography.labelLarge)
+                        },
+                        leadingIcon = {
+                            DhunIconView(
+                                icon = DhunIcon.Favorite,
+                                contentDescription = null,
+                                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                                tint = DhunColors.accent,
+                            )
+                        },
+                    )
+                }
+                item(key = "offline") {
+                    DhunAssistChip(
+                        onClick = onOpenOffline,
+                        label = {
+                            Text("Offline", style = MaterialTheme.typography.labelLarge)
+                        },
+                        leadingIcon = {
+                            DhunIconView(
+                                icon = DhunIcon.Offline,
+                                contentDescription = null,
+                                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                                tint = DhunColors.textSecondary,
+                            )
+                        },
+                    )
+                }
+                item(key = "sleep") {
+                    DhunAssistChip(
+                        onClick = onCycleSleepTimer,
+                        label = {
+                            Text(
+                                sleepTimerLabel ?: "Sleep timer",
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        },
+                        leadingIcon = {
+                            DhunIconView(
+                                icon = DhunIcon.Timer,
+                                contentDescription = null,
+                                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                                tint = if (sleepTimerLabel != null) DhunColors.accent else DhunColors.textSecondary,
+                            )
+                        },
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(DhunSpacing.md))
+            Spacer(modifier = Modifier.height(DhunSpacing.sm))
         }
 
         // ---- Mood & genre chips -----------------------------------------------

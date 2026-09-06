@@ -50,7 +50,14 @@ class DhunPlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val player = PlaybackGraph.buildExoPlayer(this, streamCache, audioCache)
+        // A corrupt cache dir makes SimpleCache throw — degrade to direct
+        // streaming instead of killing the service (and with it all audio).
+        val player = try {
+            PlaybackGraph.buildExoPlayer(this, streamCache, audioCache)
+        } catch (t: Throwable) {
+            android.util.Log.e(TAG, "segment cache unusable — streaming without cache", t)
+            PlaybackGraph.buildExoPlayer(this, streamCache, null)
+        }
         player.addListener(notificationUpdater)
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(PlaybackGraph.sessionActivityIntent(this))
@@ -138,5 +145,6 @@ class DhunPlaybackService : MediaSessionService() {
     private companion object {
         const val NOTIFICATION_ID = 1
         const val CHANNEL_ID = "dhun_playback"
+        const val TAG = "DHUN"
     }
 }

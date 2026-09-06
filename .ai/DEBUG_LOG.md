@@ -1,5 +1,65 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — device screenshots: splash rawness, total APK stream failure, sheets (session arena/01a0740a-dhun)
+
+**Report:** splash shows raw attempt/log lines; APK streams nothing
+(persistent mini-player Error + never-resolving skeletons); dialog sheets
+have hard boundaries on dark glass. (Screenshots referenced but not
+viewable in sandbox — fixes from descriptions + code audit.)
+
+**Audit results:**
+- Manifest/FGS/audio-focus all correct (mediaPlayback type + permission,
+  exported MediaSessionService, handleAudioFocus/noisy, WAKE_LOCK).
+  Koin starts in Application.onCreate before any service access. No
+  cleartext anywhere (all endpoints https) — `usesCleartextTraffic=false`
+  is not the blocker.
+- Real total-failure cliff found: `SimpleCache` throws on a corrupt cache
+  dir, and BOTH engine paths (service + session-less fallback) built the
+  cache unconditionally → dead app, zero audio. Now both degrade to
+  direct streaming (`audioCache = null` path in `PlaybackGraph`).
+- Throttled/stall-y carrier reads got more per-segment retries
+  (`DefaultLoadErrorHandlingPolicy(5)`) before the error reaches the
+  recovery listener from the previous entry.
+- `ArtworkImage` pulsed its placeholder forever on failed loads (read as
+  never-resolving skeletons) → now settles static on error.
+- Splash rewritten (indicator + static line + corner version, logs to
+  Logcat only); dialogs to 28dp + `GlassCard.borderColor` (default keeps
+  old look elsewhere).
+- Still NOT done: if the device's network gates the /player endpoint or
+  googlevideo bytes per-region, no Android engine exists (ADR-001: no
+  yt-dlp on Android) — the error dialog now surfaces the exact chain for
+  the next report. Hardware verification OPEN.
+
+## 2026-09-06 — APK "Error — tap to see" stuck-error + blurry Now Playing art (session arena/01a0740a-dhun)
+
+**Symptom:** Android build latched `PlaybackState.Error` on any ExoPlayer
+failure (mini-player "Error — tap to see"); tapping expanded a FullPlayer
+that showed no error, and play did nothing. Now Playing art visibly blurry.
+
+**Root causes (code-read, sandbox has no JDK/egress — CI compiles only):**
+1. `PlaybackGraph` recovered ONLY `ERROR_CODE_IO_BAD_HTTP_STATUS`; every
+   other failure (resolve IOException, timeout, dropped connection) went
+   straight to permanent Error — and `AndroidDhunPlayer.refresh()` latches
+   any `playerError` into Error.
+2. After `onPlayerError` ExoPlayer sits in error-idle where `play()` is a
+   no-op until `prepare()` — so the play button appeared dead. No `retry()`
+   path existed on `DhunPlayer`, and the 403 path never restored
+   `playWhenReady` (re-prepare could land paused).
+3. Art: `Parsers.thumbnailOf` kept the FIRST (smallest, w60) thumbnail;
+   `parseRelatedTracks` same with no upscale; only literal w60/w120
+   rewrites (missed w176+); FullPlayer rendered that at ~0.82 screen width.
+
+**Fix:** bounded auto-recovery for all transient IO errors (invalidate →
+seek → prepare + playWhenReady, backoff, max 3/track) in `PlaybackGraph`;
+`DhunPlayer.retry()` (Android re-prepare, desktop re-resolve) wired to a
+mini-player error dialog, a FullPlayer error banner, and `togglePlay()`;
+`ArtworkUrls` tiers (lists 544, Now Playing 1024, proxy-only rewrites) +
+largest-entry parsers. Home quick-actions Row→LazyRow (trailing inset);
+FullPlayer transport 88→72dp, edges at xxl.
+
+**Verification:** `ArtworkUrlsTest` added (7); hardware play + error-path
+soak still OPEN (needs device + residential network).
+
 ## 2026-09-05 — Desktop audio cache (session arena/01a07287-dhun)
 
 **Environment trap:** sandbox has no JDK and *no egress* (adoptium,

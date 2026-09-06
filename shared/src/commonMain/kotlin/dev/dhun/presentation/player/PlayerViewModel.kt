@@ -168,7 +168,15 @@ class PlayerViewModel(
 
     /* ---------------- transport ---------------- */
 
-    fun togglePlay() = player.playPause()
+    fun togglePlay() {
+        // After a failure the engine sits in error-idle where play() is a
+        // no-op — route the press through recovery so the button never
+        // appears dead on an error row.
+        if (state.value is PlaybackState.Error) retry() else player.playPause()
+    }
+
+    /** One-tap recovery from [PlaybackState.Error] (mini/full-player Retry). */
+    fun retry() = player.retry()
 
     fun next() {
         _skipDirection.value = SkipDirection.FORWARD

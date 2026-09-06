@@ -57,12 +57,10 @@ private fun thumbnailsLastUrl(node: JsonObject?): String? {
     return null
 }
 
-private fun normalizeRemoteUrl(url: String): String {
-    val https = if (url.startsWith("//")) "https:$url" else url
-    return https
-        .replace("w60-h60", "w544-h544")
-        .replace("w120-h120", "w544-h544")
-}
+private fun normalizeRemoteUrl(url: String): String =
+    // List tier via the shared helper: scheme fix + generic w/h rewrite on
+    // proxy hosts (covers w176/w192/… sizes the old literal replaces missed).
+    dev.dhun.design.ArtworkUrls.list(url) ?: url
 
 /**
  * Browsable sections of any page layout, normalized so each entry is a

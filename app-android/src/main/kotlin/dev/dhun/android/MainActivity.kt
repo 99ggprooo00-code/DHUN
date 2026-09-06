@@ -19,14 +19,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -348,7 +351,14 @@ class MainActivity : ComponentActivity() {
             try {
                 logLine("starting LOCAL fallback player…")
                 val cache = GlobalContext.get().get<dev.dhun.android.playback.DhunStreamCache>()
-                val segments = GlobalContext.get().get<dev.dhun.android.playback.DhunAudioSegmentCache>()
+                // Same corrupt-cache guard as the service: a dead cache dir
+                // must not take down the fallback engine too.
+                val segments = try {
+                    GlobalContext.get().get<dev.dhun.android.playback.DhunAudioSegmentCache>()
+                } catch (t: Throwable) {
+                    Log.w(TAG, "segment cache unusable — streaming without cache", t)
+                    null
+                }
                 val local = PlaybackGraph.buildExoPlayer(applicationContext, cache, segments)
                 attach(AndroidDhunPlayer(local, activityScope))
                 logLine("local player ready — audio will play; session controls degraded")
@@ -462,36 +472,45 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun ConnectingScreen(log: List<String>, version: String) {
-    Column(
+    // Consumer splash: brand + indeterminate indicator + one static status
+    // line. The raw attempt/log lines stay in Logcat (via logLine) — they
+    // read as a terminal on screen and never ship to users.
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(DhunSpacing.lg),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
-        Text("DHUN", fontSize = DhunTypographyTokens.hero.fontSize, fontWeight = FontWeight.Bold)
-        Text(
-            "starting playback engine... (v$version)",
-            fontSize = DhunTypographyTokens.bodySmall.fontSize,
-            color = DhunColors.textTertiary,
-        )
-        if (log.isNotEmpty()) {
-            Column(
-                modifier = Modifier
-                    .padding(top = DhunSpacing.xl)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.Start,
-            ) {
-                log.takeLast(8).forEach { line ->
-                    Text(
-                        "- " + line,
-                        fontSize = DhunTypographyTokens.labelSmall.fontSize,
-                        color = DhunColors.textSecondary,
-                    )
-                }
-            }
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                "DHUN",
+                fontSize = DhunTypographyTokens.hero.fontSize,
+                fontWeight = FontWeight.Bold,
+                color = DhunColors.textPrimary,
+            )
+            Spacer(modifier = Modifier.height(DhunSpacing.xl))
+            CircularProgressIndicator(
+                color = DhunColors.accent,
+                strokeWidth = DhunSpacing.progressStroke,
+            )
+            Spacer(modifier = Modifier.height(DhunSpacing.lg))
+            Text(
+                "Initializing audio engine…",
+                fontSize = DhunTypographyTokens.bodySmall.fontSize,
+                color = DhunColors.textTertiary,
+            )
         }
+        Text(
+            text = "v$version",
+            fontSize = DhunTypographyTokens.labelSmall.fontSize,
+            color = DhunColors.textHint,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = DhunSpacing.lg),
+        )
     }
 }
 

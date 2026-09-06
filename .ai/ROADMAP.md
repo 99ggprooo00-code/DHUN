@@ -26,43 +26,60 @@ Rules (permanent, from the user):
 
 ---
 
-## CURRENT ACTIVE TASK (updated 2026-09-06, session arena/01a073c3-dhun)
+## CURRENT ACTIVE TASK (updated 2026-09-06, session arena/01a0740a-dhun)
 
-**PR #18 MERGED → `main@a3db23e`.** Verified on GitHub: CI `33997115572` ✅
-· test-release `33997115581` ✅. This session: install/uninstall hygiene
-(user asked: safe to install, easy to uninstall, no leftover data/cache,
-no extra uninstaller file).
+**Branch `arena/01a0740a-dhun`: 2 commits PUSHED (`cf535ca`, `1384b32` —
+verified via `git ls-remote`, remote == local). NO PR open, NO CI runs on
+this branch yet (CI triggers only on `push: main` + `pull_request`, so
+branch pushes get no signal until a PR opens). `main@6d81eb2` is CI-green:
+CI `33998220729` ✅ · test-release `33998220750` ✅ (both ~1h ago, per
+`gh run list`).
 
-**Phase:** 14 — Robustness + rot-drill + v0.1.0.
+**Phase:** 14 — Robustness + rot-drill + v0.1.0. (This session: user
+device-feedback round — APK stuck-error recovery, Now Playing art
+sharpness, splash/sheets/spacing polish.)
 
 **Files worked on:**
-- `shared/src/jvmMain/kotlin/dev/dhun/data/DhunUserDirs.kt` (new)
-- `shared/src/jvmTest/kotlin/dev/dhun/data/DhunUserDirsTest.kt` (new, 7)
-- `shared/src/jvmMain/kotlin/dev/dhun/data/DatabaseDriverFactory.jvm.kt`
-- `app-desktop/build.gradle.kts` (per-user MSI, upgradeUuid, vendor)
-- `app-android/src/main/AndroidManifest.xml` (`hasFragileUserData=false`,
-  `usesCleartextTraffic=false`)
-- `README.md` · `CHANGELOG.md` · `.ai/KNOWN_LIMITATIONS.md` ·
-  `docs/verification/14-release.md` · this file
+- `app-android/.../playback/PlaybackGraph.kt` (transient-error
+  auto-recovery x3 + backoff, segment retries x5, nullable-cache
+  direct-stream fallback)
+- `app-android/.../playback/AndroidDhunPlayer.kt` (`retry()`)
+- `app-android/.../playback/DhunPlaybackService.kt` + `MainActivity.kt`
+  (corrupt-cache fallback; polished splash — indicator + static line +
+  corner version, logs to Logcat only)
+- `shared/.../player/DhunPlayer.kt` (`retry()` default no-op) ·
+  `presentation/player/PlayerViewModel.kt` (error-aware `togglePlay`)
+- `shared/.../ui/player/MiniPlayer.kt` (error dialog + Retry) ·
+  `FullPlayer.kt` (error banner + Retry, 1024-tier art, 72dp transport)
+- `shared/.../design/ArtworkUrls.kt` (new) + `ArtworkUrlsTest.kt`
+  (new, 7) · `ArtworkImage.kt` (failed loads settle static) ·
+  `GlassCard.kt` (`borderColor`) · `DhunSpacing.kt`
+  (`playerTransportHeight`)
+- `shared/.../innertube/Parsers.kt` + `BrowseParsers.kt`
+  (largest thumbnail + generic proxy rewrite)
+- `shared/.../ui/home/HomeScreen.kt` (quick-actions LazyRow) ·
+  `ui/components/TrackOverflowDialog.kt` + `AddToPlaylistDialog.kt`
+  (28dp radii + faint edge)
+- `CHANGELOG.md` · `.ai/DEBUG_LOG.md` · this file
 
-**Last error:** none. (Sandbox cannot download GitHub release bytes —
-audit is from source + CI provenance, not a VirusTotal scan.)
+**Last error:** none reported. (Sandbox has no JDK and no egress, so
+nothing compiled locally — the first compile verdict comes from PR CI.)
 
 **Exact next step:**
-1. Push this branch, wait CI green, merge so rolling `test` MSI becomes
-   per-user with `<installDir>/userdata` (current `main` MSI still
-   leaves `%APPDATA%\DHUN` on uninstall — do **not** install that one
-   if leftover cache is unacceptable).
-2. Human/hardware: install the **new** `dhun-test.apk` / `.msi` → play
-   → uninstall → confirm no leftover files (Android
-   `/data/data/dev.dhun.android` gone; Windows `%LOCALAPPDATA%\DHUN`
-   gone, `%APPDATA%\DHUN` never created). Then residential cache smoke
-   + soaks as before.
+1. Open PR from `arena/01a0740a-dhun` → wait CI green → merge to `main`
+   (rolling `test` artifacts rebuild).
+2. Human/hardware: install the new `dhun-test.apk` → play → force an
+   error (e.g. airplane-toggle mid-stream) → confirm auto-recovery /
+   Retry, sharp Now Playing art, clean splash, soft sheets. If streaming
+   still fails, capture the error dialog's message text — it now carries
+   the exact resolve chain.
 
-**Marks (GitHub main, pre this PR):** PR #16 ✅ · PR #17 ✅ · PR #18 ✅ ·
-Android cache ✅ code (HW ⬜) · desktop cache ✅ code (HW ⬜) · CHANGELOG ✅
-· rot-drill live 🔴 (cat.8 CI-IP) · residential ⬜ · soaks ⬜ · v0.1.0 ⬜
-· install hygiene 🟨 this PR · Liquid Glass 🚫.
+**Marks (GitHub evidence only, 2026-09-06):** main CI pass `33998220729`
+· main test-release pass `33998220750` · this branch pushed (2/2) ·
+this branch CI open (no PR, no runs) · PR open (none) · code changes
+pending (uncompiled, CI-pending) · residential stream open · soaks open
+· v0.1.0 open · rot-drill live failing (cat.8 CI-IP, unchanged) ·
+Liquid Glass refused.
 
 ---
 

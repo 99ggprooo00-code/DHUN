@@ -9,6 +9,7 @@ import dev.dhun.core.Lyrics
 import dev.dhun.core.Playlist
 import dev.dhun.core.SearchResults
 import dev.dhun.core.Track
+import dev.dhun.design.ArtworkUrls
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -49,14 +50,17 @@ internal fun trailingDuration(item: JsonObject): Int? {
     return null
 }
 
-internal fun thumbnailOf(item: JsonObject): String? =
-    ((descend(item, listOf("thumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"))
+internal fun thumbnailOf(item: JsonObject): String? {
+    val thumbs = descend(item, listOf("thumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"))
         as? JsonArray ?: descend(item, listOf("thumbnailRenderer", "musicThumbnailRenderer", "thumbnail", "thumbnails"))
         as? JsonArray ?: descend(item, listOf("thumbnail", "thumbnails"))
-        as? JsonArray)?.firstOrNull() as? JsonObject)
-        ?.str("url")
-        ?.replace("w60-h60", "w544-h544")
-        ?.replace("w120-h120", "w544-h544")
+        as? JsonArray ?: return null
+    // Thumbnail arrays arrive smallest-first — the old code kept the first
+    // (w60) entry and blurred every large surface. Keep the largest and pin
+    // the list tier (proxy-safe; see ArtworkUrls).
+    val biggest = (thumbs.lastOrNull() as? JsonObject)?.str("url")
+    return ArtworkUrls.list(biggest)
+}
 
 internal fun parseContinuationToken(root: JsonObject): String? {
     val continuations = mutableListOf<JsonObject>()
@@ -308,7 +312,8 @@ internal fun parseRelatedTracks(root: JsonObject): List<Track> {
             albumId = bylineIds.second,
             durationSeconds = duration,
             thumbnailUrl = (descend(p, listOf("thumbnail", "thumbnails"))
-                as? JsonArray)?.firstOrNull()?.let { (it as? JsonObject)?.str("url") },
+                as? JsonArray)?.lastOrNull()?.let { (it as? JsonObject)?.str("url") }
+                ?.let { ArtworkUrls.list(it) },
         )
     }
 }
