@@ -86,6 +86,20 @@ Final shape that compiles: the resolver publishes the agent into an
 request, and implements `addTransferListener` / `getUri` /
 `getResponseHeaders` by delegation.
 
+**Device answers (same session) — they confirm the diagnosis and rule out two alternatives:**
+
+| Question | Answer | What it settles |
+|---|---|---|
+| APK symptom | **"Buffering, then Reconnecting"** | Resolution **succeeded** (Buffering means a URL arrived and ExoPlayer opened it), then the byte fetch failed → `PlaybackGraph`'s recovery listener set `Recovering` → "Reconnecting…". That is *exactly* the User-Agent-mismatch signature, not a resolution failure. |
+| Windows symptom | **"Resolving"** (stuck) | Different symptom — stuck in `PlaybackState.Resolving`, i.e. `provider.getStreamInfo` had not returned. VLC is installed, so this is not a missing dependency. Note: `postAltJson` does **not** retry a definitive `LOGIN_REQUIRED`/`UNPLAYABLE` verdict (`catch (DhunException) { throw e }` exits immediately) — only 429/5xx/timeout get the 2 attempts — so "stuck" means slow/timing-out requests, not a retry storm. Re-check with the fixed build before treating it as a second bug. |
+| Metadata | **Partial** — some content loads | Their network reaches YouTube for at least some calls, so this is **not** blanket IP gating. Consistent with a stream-layer (not metadata-layer) failure. |
+| VLC | **Installed** | Rules out the "no libVLC ⇒ no desktop audio path" explanation. |
+| UI | Screenshots to follow | No restyle attempted yet. |
+
+The APK answer is the strongest evidence in this file: "Buffering → Reconnecting"
+cannot be produced by a resolver that never returns a URL. Something resolved,
+and the CDN then refused the bytes.
+
 **(2) is unresolved — no screenshots were provided**, so no restyle was
 attempted rather than guess at the wrong thing.
 
