@@ -1,3 +1,107 @@
+# CURRENT ACTIVE TASK
+
+Updated **2026-09-06 (UTC)** · session **`arena/01a0743b-dhun`**.
+
+**Phase:** **14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS.**
+The latest device-feedback fixes are merged and CI-green; real-device
+playback/recovery, offline replay, both soaks, and the release gates are
+still open. **Do not reopen PR #20 or start Phase 15.**
+
+**Documentation merge — authorized by the user (2026-09-06):**
+[PR #21](https://github.com/99ggprooo00-code/DHUN/pull/21) carries this
+ROADMAP-only consolidation from `arena/01a0743b-dhun` to `main`.
+The four commits through `54faffe` are verified pushed; PR
+[CI `34003373869`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34003373869)
+passed shared JVM tests, Android debug build, and probe/Desktop compilation
+on that head. This is a **pre-merge evidence snapshot**: check the PR for
+its final head/checks and merge result. Any follow-up docs commit must also
+pass PR CI before merge; no application changes or new hardware evidence
+are included, and no Phase 14 acceptance is closed by this merge.
+
+**GitHub-verified application baseline (before documentation PR #21):**
+- [PR #20](https://github.com/99ggprooo00-code/DHUN/pull/20) merged at
+  `2026-09-06T00:35:51Z` into **`main@8310383`**. Its implementation
+  commits are `cf535ca` + `1384b32`; PR CI `34001522235` passed.
+- Main [CI `34001706156`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34001706156)
+  **passed** shared JVM unit tests, Android debug build, probe compilation,
+  and Desktop compilation at that exact SHA.
+- Main [test-release `34001706159`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34001706159)
+  **passed** APK, MSI, and publish jobs. The rolling
+  [`test` pre-release](https://github.com/99ggprooo00-code/DHUN/releases/tag/test)
+  was published at `2026-09-06T00:40:21Z`; its tag points to `8310383` and
+  includes `dhun-test.apk`, `dhun-test.msi`, and both SHA-256 files.
+  This is **not** v0.1.0, an AAB build, or a clean-target install verdict.
+
+**Exact file / work context:**
+- This PR changes **`.ai/ROADMAP.md` only**. Application code is unchanged;
+  builds/tests cited here ran on GitHub. No local application build or
+  hardware verification is claimed.
+- Last implementation focus:
+  **`app-android/src/main/kotlin/dev/dhun/android/playback/PlaybackGraph.kt`**
+  — bounded transient-error recovery (three re-prepares with backoff),
+  five segment-load retries, and nullable-cache direct-stream fallback.
+- Recovery companions:
+  `app-android/src/main/kotlin/dev/dhun/android/playback/AndroidDhunPlayer.kt`
+  (`retry()`),
+  `app-android/src/main/kotlin/dev/dhun/android/playback/DhunPlaybackService.kt`
+  (cache-failure fallback),
+  `shared/src/commonMain/kotlin/dev/dhun/presentation/player/PlayerViewModel.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt`, and
+  `shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt`
+  (error-aware Play / visible Retry). PR #20 also includes artwork,
+  splash, sheets, and spacing fixes; those still need visual device checks.
+- **Next evidence file:** `docs/verification/14-release.md`.
+
+**Last error:**
+- No outstanding build failure in the latest main CI. The last device
+  report was an APK stuck at **“Error — tap to see”**, with Play doing
+  nothing and some artwork placeholders never settling. PR #20 addresses
+  those code paths; **the new APK has no recorded on-device verdict yet**.
+- The latest live drill is still **red**:
+  [run `33970045379`, attempt 2](https://github.com/99ggprooo00-code/DHUN/actions/runs/33970045379/attempts/2)
+  on `d9f4083`, completed `2026-09-05T22:58:28Z`. The production resolver
+  returned `Unavailable`; yt-dlp WATCH returned `AuthRequired` (“Sign in
+  to confirm you're not a bot”), and NewPipe WATCH reported
+  `Parse(detail=JSON response is too short)`. Search/related passed.
+  [Issue #14's latest evidence](https://github.com/99ggprooo00-code/DHUN/issues/14#issuecomment-5555358843)
+  supersedes the older handoff: attempt 1 reached a media URL but got
+  HTTP 403 fetching bytes. These are Actions-network failures, **not a
+  residential playback verdict for the latest APK**. Do not weaken the
+  live probe or silently change the ADR-001 extraction strategy.
+
+**Exact next product step — after the docs merge, with a real Android device:**
+Install the latest **`dhun-test.apk` from the rolling `test` pre-release**;
+verify its current tag/build SHA and published checksum before testing.
+The verified build at the start of PR #21 was `8310383`; a docs-only merge
+also rebuilds/replaces these assets, so do not assume that tag stays fixed.
+On a residential network, play an **uncached** search result
+and confirm audible audio. Interrupt connectivity long enough to drain
+the buffer and trigger recovery, restore it, and verify auto-recovery.
+Repeat the interruption until automatic retries are exhausted, reconnect,
+and test manual **Retry** from the mini/full player and error-aware Play.
+Record build SHA, device/Android version, network type, track ID,
+position/resume behavior, and the exact sanitized error dialog / relevant
+Logcat if it still fails in **`docs/verification/14-release.md`**.
+No device credentials, signed media URLs, or personal data in the log.
+Only after this smoke: offline-cache checks, Android/Desktop 30-minute
+soaks, clean install/uninstall checks, and the remaining release gates.
+
+**Unpushed / carried-work audit:** at boot this session had a clean tree
+and `HEAD == origin/main@8310383`, with **no pre-existing local-only
+commits**. Three ROADMAP-only post-merge commits were already on the
+previous GitHub branch but absent from main: `2270cb9`, `e2916cd`,
+`fab334b`. They are preserved on this session branch as `6f066cd`,
+`39da8e3`, `ca8e243` (cherry-picked with provenance), then reconciled here.
+The older Phase 14 commits on `arena/01a07141-dhun` and the PR #16
+post-merge handoff are patch-equivalent to main, so they are not duplicated.
+All pushes in this session target **`arena/01a0743b-dhun` only**; the
+requested merge to `main` goes through PR #21, not a direct main push.
+CI runs on `push: main` / `pull_request`: opening PR #21 supplied the
+previously missing branch check. Its verified result is recorded above;
+this follow-up documentation commit does not claim its own CI verdict.
+
+---
+
 # ROADMAP — live status
 
 Rules (permanent, from the user):
@@ -23,63 +127,6 @@ Rules (permanent, from the user):
      status changed (a commit can't truthfully mark *itself* as pushed
      and green — the ROADMAP always lags the push by one small commit).
   Only then open/merge the PR.
-
----
-
-## CURRENT ACTIVE TASK (updated 2026-09-06, session arena/01a0740a-dhun)
-
-**Branch `arena/01a0740a-dhun`: 2 commits PUSHED (`cf535ca`, `1384b32` —
-verified via `git ls-remote`, remote == local). NO PR open, NO CI runs on
-this branch yet (CI triggers only on `push: main` + `pull_request`, so
-branch pushes get no signal until a PR opens). `main@6d81eb2` is CI-green:
-CI `33998220729` ✅ · test-release `33998220750` ✅ (both ~1h ago, per
-`gh run list`).
-
-**Phase:** 14 — Robustness + rot-drill + v0.1.0. (This session: user
-device-feedback round — APK stuck-error recovery, Now Playing art
-sharpness, splash/sheets/spacing polish.)
-
-**Files worked on:**
-- `app-android/.../playback/PlaybackGraph.kt` (transient-error
-  auto-recovery x3 + backoff, segment retries x5, nullable-cache
-  direct-stream fallback)
-- `app-android/.../playback/AndroidDhunPlayer.kt` (`retry()`)
-- `app-android/.../playback/DhunPlaybackService.kt` + `MainActivity.kt`
-  (corrupt-cache fallback; polished splash — indicator + static line +
-  corner version, logs to Logcat only)
-- `shared/.../player/DhunPlayer.kt` (`retry()` default no-op) ·
-  `presentation/player/PlayerViewModel.kt` (error-aware `togglePlay`)
-- `shared/.../ui/player/MiniPlayer.kt` (error dialog + Retry) ·
-  `FullPlayer.kt` (error banner + Retry, 1024-tier art, 72dp transport)
-- `shared/.../design/ArtworkUrls.kt` (new) + `ArtworkUrlsTest.kt`
-  (new, 7) · `ArtworkImage.kt` (failed loads settle static) ·
-  `GlassCard.kt` (`borderColor`) · `DhunSpacing.kt`
-  (`playerTransportHeight`)
-- `shared/.../innertube/Parsers.kt` + `BrowseParsers.kt`
-  (largest thumbnail + generic proxy rewrite)
-- `shared/.../ui/home/HomeScreen.kt` (quick-actions LazyRow) ·
-  `ui/components/TrackOverflowDialog.kt` + `AddToPlaylistDialog.kt`
-  (28dp radii + faint edge)
-- `CHANGELOG.md` · `.ai/DEBUG_LOG.md` · this file
-
-**Last error:** none reported. (Sandbox has no JDK and no egress, so
-nothing compiled locally — the first compile verdict comes from PR CI.)
-
-**Exact next step:**
-1. Open PR from `arena/01a0740a-dhun` → wait CI green → merge to `main`
-   (rolling `test` artifacts rebuild).
-2. Human/hardware: install the new `dhun-test.apk` → play → force an
-   error (e.g. airplane-toggle mid-stream) → confirm auto-recovery /
-   Retry, sharp Now Playing art, clean splash, soft sheets. If streaming
-   still fails, capture the error dialog's message text — it now carries
-   the exact resolve chain.
-
-**Marks (GitHub evidence only, 2026-09-06):** main CI pass `33998220729`
-· main test-release pass `33998220750` · this branch pushed (2/2) ·
-this branch CI open (no PR, no runs) · PR open (none) · code changes
-pending (uncompiled, CI-pending) · residential stream open · soaks open
-· v0.1.0 open · rot-drill live failing (cat.8 CI-IP, unchanged) ·
-Liquid Glass refused.
 
 ---
 
@@ -142,18 +189,18 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 |---|-------|--------|----------|
 | 01 | Extraction spike | ✅ — probe PASS end-to-end (search 20 + resolve + audio bytes + related 50); NewPipe v0.26.5 stream extraction broken upstream → ADR-001 two-tier resolver; on-device audible check rode Phase 03 | docs/research/01 · docs/verification/01 · ADR-001 |
 | 02 | Provider & domain core | ✅ — 34/34 unit tests; live smoke PASS (all filters, suggestions, radio 50, lyrics 27, stream via yt-dlp failover) | docs/verification/02 |
-| 03 | Android skeleton + Media3 + lock screen | 🟨 — APK builds in CI; on-device v0.1.4: search works, playback via own-client chain; WEB_REMIX-gated networks → typed error (ADR-001) | docs/verification/03 (+ this session: FGS + battery exemption, unpushed) |
-| 04 | Desktop skeleton + vlcj | 🟨 — module in build, compile-checked via probe chain (round-3 code pending first green step 6); ON-DESKTOP checklist open; needs libVLC (+yt-dlp optional) | docs/verification/04 |
-| 05 | Data layer | ✅ — schema v2, 7+ repos, use cases, shared NowPlayingPersistence (queue/position/history, paused restore); repo/use-case/restore tests green in CI; this session: write-race fixed (unpushed) | docs/verification/05 |
+| 03 | Android skeleton + Media3 + lock screen | 🟨 — APK builds in CI; on-device v0.1.4: search works, playback via own-client chain; WEB_REMIX-gated networks → typed error (ADR-001) | docs/verification/03 (FGS + battery exemption on main; Android build green `34001706156`; remaining device checks OPEN) |
+| 04 | Desktop skeleton + vlcj | 🟨 — Desktop compile and MSI build green on `main@8310383`; ON-DESKTOP checklist open; needs libVLC (+yt-dlp fallback) | docs/verification/04 |
+| 05 | Data layer | ✅ — schema v2, 7+ repos, use cases, shared NowPlayingPersistence (queue/position/history, paused restore); repo/use-case/restore tests green in CI; write-race fix on main (latest shared tests green `34001706156`) | docs/verification/05 |
 | 06 | Design system | ✅ — tokens, GlassCard real blur (API 31+/Skiko, scrim below), ArtworkImage (Coil 3.1.0), color extraction, catalogue screen | docs/verification/06 |
 | 07 | Home & Search | ✅ MERGED PR #6 @ `2519290` (CI green) | docs/verification/07 |
 | 08 | Player UI (Mini+Full) | ✅ MERGED PR #7 @ `3fce5e5` (CI green `33840510549`) — hardware 16-check list OPEN | docs/verification/08 |
 | 09 | Artist/Album/Playlist | ✅ MERGED PR #7 @ `3fce5e5` — fixtures schema-authored (no YT egress in sandbox; live re-capture scheduled); hardware 3/3/CRUD OPEN | docs/verification/09 |
 | 10 | Library & history | ✅ MERGED PR #8 @ `d27eb37` (CI green `33842104141`) — hardware checklist OPEN | docs/verification/10 |
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
-| 12 | Desktop native | 🟨 IN PROGRESS — tray/mini-player/shortcuts plus SMTC phase 2 code are staged; prior CI run `33956457785` is green through Android + probe compile, new JNA/WinRT code is unverified until the next push; hardware OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
+| 12 | Desktop native | 🟨 — tray/mini-player/shortcuts and SMTC phase 2 on main; Desktop compilation + MSI packaging green `34001706156` / `34001706159`; Windows runtime and clean-install acceptance OPEN | docs/verification/12 · `.ai/DEBUG_LOG.md` |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PR #16 **MERGED** @ `290e0f6` (CI green `33979260227`); live drills RED (cat.8 CI-IP auth); Android audio cache merged (HW OPEN); **desktop cache ✅ merged PR #17 · CHANGELOG ✅**; Recovering UX merged; residential + soaks + v0.1.0 OPEN | issue #14, PR #16, `DhunAudioSegmentCache` |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PRs #16/#17/#19/#20 **MERGED** through `main@8310383`; main CI `34001706156` and test APK/MSI release `34001706159` green. Caches, recovery, device-feedback fixes and Unreleased changelog on GitHub; live drill attempt 2 RED; residential/recovery/offline/soaks/clean installs/v0.1.0 OPEN | Phase 14 step table below; issue #14; docs/verification/14 |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -164,11 +211,11 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Step | Status |
 |---|---|
 | SMTC spike (3-day timebox) | 🟨 **phase 2 code pushed in `7ca2f5d`, CI green `33958287878`** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — Windows round-trip and fallback verdict OPEN |
-| System tray (playing/paused icon, 6-item menu) | 🟨 code pushed (`DhunTray.kt` + `TrayIcons.kt`, AWT, EDT-marshaled, headless-safe) — CI compile pending; hardware OPEN |
-| Mini-player window (320×88, always-on-top, drag, click-opens-main) | 🟨 code pushed (`MiniPlayerWindow.kt` + second Compose `Window`; hide-not-close; Ctrl+M) — CI compile pending; hardware OPEN; taskbar visibility is a 1.8.2 limitation (no `skipTaskbar`) |
-| Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — CI compile pending; hardware OPEN |
-| Close-to-tray (default on) + remembered geometry | 🟨 code pushed (`SettingsKeys.CLOSE_TO_TRAY`/`WINDOW_GEOMETRY`; public-AWT `Frame.getFrames()` title lookup; `WindowPosition` Dp) — CI compile pending; hardware OPEN |
-| Packaging: jpackage MSI + clean-VM install | 🟨 `createMsi` configured (`packageVersion` 1.0.4 — packagers reject MAJOR 0); **now also wired into the rolling test release** (this session, unpushed); app icon + clean-VM install OPEN on Windows |
+| System tray (playing/paused icon, 6-item menu) | 🟨 code pushed (`DhunTray.kt` + `TrayIcons.kt`, AWT, EDT-marshaled, headless-safe) — main Desktop compile green `34001706156`; hardware OPEN |
+| Mini-player window (320×88, always-on-top, drag, click-opens-main) | 🟨 code pushed (`MiniPlayerWindow.kt` + second Compose `Window`; hide-not-close; Ctrl+M) — main Desktop compile green `34001706156`; hardware OPEN; taskbar visibility is a 1.8.2 limitation (no `skipTaskbar`) |
+| Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — main Desktop compile green `34001706156`; hardware OPEN |
+| Close-to-tray (default on) + remembered geometry | 🟨 code pushed (`SettingsKeys.CLOSE_TO_TRAY`/`WINDOW_GEOMETRY`; public-AWT `Frame.getFrames()` title lookup; `WindowPosition` Dp) — main Desktop compile green `34001706156`; hardware OPEN |
+| Packaging: jpackage MSI + clean-VM install | 🟨 `packageMsi` wired into rolling test release; `34001706159` built and published `dhun-test.msi` from `8310383` (per-user installer, PR #19); clean-VM install/run/uninstall OPEN on Windows |
 | Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY | ✅ done + pushed (`ffa138b`) |
 | Acceptance 1–4 (media keys / tray / mini-player / installer) | 🟨 OPEN — on hardware (checklist in docs/verification/12) |
 
@@ -183,20 +230,50 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
-### Phase 14 step status — 🟨 IN PROGRESS (live drill on fixed branch = CI-IP gating of both engines)
+### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-06)
 
-| Step | Status |
-|---|---|
-| Error taxonomy sweep and actionable offline/429/403 UX | 🟨 Typed errors, 429 gate, offline banner, **403 Reconnecting…** (`PlaybackState.Recovering`). Open: airplane-mode HW check, db-path review |
-| Bounded audio cache — Android (Media3 SimpleCache LRU) | ✅ code **MERGED** (`0f88026`, PR #16, CI green) — HW offline replay OPEN |
-| Bounded audio cache — Desktop (vlcj path) | ✅ code **MERGED** PR #17 @ `29eeb93` (CI `33981426540` green; `AudioFileCache` + `DesktopDhunPlayer` + 9 unit tests + desktop compile step) — desktop offline HW check OPEN |
-| `CHANGELOG.md` | ✅ **MERGED** PR #17 (Unreleased only; `[0.1.0]` section written at release time) |
-| Daily live rot-drill | 🔴 Run **33968950214** on `arena/01a07170-dhun@10ad025`: production chain exercised; `WATCH\|own-client` + `WATCH\|ytdlp` both `AuthRequired` (Sign in to confirm you're not a bot) from Actions IP; metadata PASS; kill switch correct. **Category 8 CI-network evidence — not extractor-shape rot.** No PASS. Residential verification required before any "playback broken for users" claim |
-| Android 30-minute soak | ⬜ Open |
-| Desktop 30-minute soak | ⬜ Open |
-| v0.1.0 APK/AAB/MSI release and clean-target install | ⬜ Open |
-| Install/uninstall hygiene (no leftover data) | 🟨 this PR: per-user MSI + `<installDir>/userdata`; Android already private-storage-only. HW confirm OPEN |
-| Phase 14 acceptance 1–4 | ⬜ None complete |
+Application-code snapshot before documentation PR #21:
+**`origin/main@8310383`**, main CI **`34001706156`** and rolling test-release
+**`34001706159`** (links in CURRENT ACTIVE TASK). The docs merge does not
+change these implementation or hardware marks.
+PR #16 merged at `290e0f6`, #17 at `29eeb93`, #19 at `6d81eb2`, and #20
+at `8310383`. These are remote commits, not unpushed local work.
+
+**Read the columns separately:** ✅ in the GitHub column completes only
+that named code/test/publishing milestone. It does **not** close the
+hardware or release gate in the last column. All Phase 14 acceptance
+criteria remain open; green build CI does not mean green live extraction.
+
+| Step | Complete on GitHub / evidence | Remaining gate |
+|---|---|---|
+| Error taxonomy, 429 backoff, offline banner, recovery UX | ✅ Existing typed-error paths, `RateLimitGate`, `ConnectivityMonitor`, and `PlaybackState.Recovering` merged via PR #16; recovery extended by PR #20; main CI green | 🟨 Full db-path/error-taxonomy review and real offline/429/403/forced-error behavior not verified |
+| Stream-URL cache (TTL + invalidation) | ✅ `DhunStreamCache` five-hour TTL and 403 invalidation are on main; latest playback code compiles in CI | 🟨 Stale-URL recovery on hardware |
+| Bounded audio cache — Android | ✅ `DhunAudioSegmentCache` / Media3 `SimpleCache` LRU merged in PR #16; PR #20 adds corrupt-cache direct-stream fallback; main Android build green | 🟨 Offline span replay, eviction/budget behavior, and cache-failure fallback on a device |
+| Bounded audio cache — Desktop | ✅ `AudioFileCache` + `DesktopDhunPlayer` wiring + nine cache unit tests merged in PR #17; shared tests and Desktop compile green | 🟨 Fully cached track replays offline, uncached-track error, and eviction on a libVLC desktop |
+| Daily rot-drill workflow + failure alerts | ✅ `.github/workflows/rot-drill.yml` merged; cron `17 4 * * *`; real failing probes upload logs, update issue #14, and fail the job | 🟨 First scheduled production-probe run and recovery/auto-close evidence still open; older placeholder-workflow greens do not count |
+| Live extraction verdict / residential playback | 🔴 Latest real drill `33970045379`, **attempt 2**, on `d9f4083`: production resolver `Unavailable`, yt-dlp `AuthRequired`, NewPipe parse failure; metadata passes; issue #14 OPEN | No green live production-probe verdict. Verify the latest APK on a residential network; do not label Actions bot/CDN gating as proven residential failure |
+| Device-feedback recovery + artwork/splash/sheets/spacing | ✅ `cf535ca` + `1384b32` merged via PR #20; `ArtworkUrlsTest` (seven tests) included in the green shared test job; APK/MSI rebuilt | 🟨 Audible play, auto/manual Retry, sharp Now Playing art, settled error placeholders, clean splash, soft sheets on hardware |
+| Install/uninstall hygiene | ✅ PR #19 merged per-user MSI and `DhunUserDirs` / packaged `userdata` path plus tests; Android private-storage manifest policy on main; current MSI job green | 🟨 Clean Windows install/run/uninstall and absence of leftover runtime data must be observed, not inferred from packaging code |
+| `CHANGELOG.md` (Unreleased history) | ✅ Created in PR #17 and updated in PR #19/#20; present on GitHub main | Unreleased milestone complete; `[0.1.0]` entry waits for a real release |
+| Rolling **test** APK/MSI publishing | ✅ `test@8310383`: APK + MSI + checksums published by `34001706159` | Not evidence for an AAB, stable v0.1.0, or clean-target installation |
+| Android 30-minute soak | ⬜ No completed device evidence committed | Physical device, unrestricted battery/OEM settings, lock-screen controls, zero crashes/leaks; record timestamps/results |
+| Desktop 30-minute soak | ⬜ No completed desktop evidence committed | libVLC desktop, transport/tray/mini-player/SMTC or fallback, clean exit, zero crashes; record timestamps/results |
+| v0.1.0 artifacts / tag / release | ⬜ Only the rolling `test` pre-release exists; no v0.1.0 completion | APK + AAB + MSI release artifacts, clean-target runs, soaks, live drill, final docs/risk/license review, then tag/release |
+| Final release documentation review | 🟨 Docs exist on main, including limitations and verification checklists | Reconcile stale CI/live-run wording in the verification/limitations docs and attach real device evidence; README, THIRD_PARTY, RISK_REGISTER, CHANGELOG final review still open |
+
+Cache configuration already stored on main: `SettingsKeys.CACHE_SIZE_MB`,
+default **1024 MB**, applied on process restart on both platforms. This is
+not evidence that a user-facing cache-budget control or runtime change has
+been verified. Desktop caches whole tracks, not Media3-style segments.
+
+**Phase 14 acceptance (MASTER_PROMPT):**
+1. **OPEN / red:** rot drill green **and** scheduled — cron is configured,
+   but no green live production-probe verdict or first scheduled-run proof.
+2. **OPEN:** 30-minute soaks on **both** platforms — neither logged.
+3. **OPEN:** all three release artifacts + clean-target install/run —
+   rolling test APK/MSI builds alone do not satisfy this.
+4. **OPEN:** KNOWN_LIMITATIONS current and honest — final reconciliation
+   and hardware-informed release review not yet complete.
 
 ### Phase 11 step status — ✅ MERGED @ `d27eb37` (hardware OPEN)
 
