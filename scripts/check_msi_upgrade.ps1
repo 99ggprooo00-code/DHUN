@@ -14,8 +14,8 @@ $baseline = Join-Path $baselineDir 'dhun-test.msi'
 $candidatePath = (Resolve-Path -LiteralPath $Candidate).Path
 
 function Invoke-MsiCheck {
-    param([string]$Operation, [string]$Product, [string]$Log, [switch]$Cleanup)
-    $arguments = "$Operation `"$Product`" /qn /norestart /L*V `"$Log`""
+    param([string]$Operation, [string]$Product, [string]$Log, [switch]$Cleanup, [string]$Properties = '')
+    $arguments = "$Operation `"$Product`" /qn /norestart /L*V `"$Log`" $Properties"
     $process = Start-Process -FilePath (Join-Path $env:WINDIR 'System32/msiexec.exe') -ArgumentList $arguments -PassThru
     if (-not $process.WaitForExit(180000)) {
         $process.Kill()
@@ -70,6 +70,18 @@ try {
     }
     Write-Host "::notice title=MSI upgrade smoke PASS::Hosted Windows: $($old['ProductVersion']) -> $($new['ProductVersion']); per-user install and userdata/cache sentinels preserved. Baseline SHA256=$baselineHash. App playback/visuals not tested."
 
+    # Exercise the installed candidate's future-upgrade removal path too.
+    # This is the same public flag RemoveExistingProducts gives the old MSI;
+    # it is not a simulation of sound/GUI or a separate published package.
+    [void](Invoke-MsiCheck '/x' $new['ProductCode'] (Join-Path $logs 'future-upgrade-remove.log') -Properties 'UPGRADINGPRODUCTCODE={757885D5-5101-4F7E-A611-487E5F68B8B1}')
+    if (-not (Test-Path -LiteralPath $sentinel) -or [IO.File]::ReadAllText($sentinel) -ne 'preserve-userdata') {
+        throw 'Candidate upgrade-removal path removed userdata'
+    }
+    if (-not (Test-Path -LiteralPath $cacheSentinel) -or [IO.File]::ReadAllText($cacheSentinel) -ne 'preserve-cache') {
+        throw 'Candidate upgrade-removal path removed cache data'
+    }
+    Write-Host '::notice title=MSI future-upgrade guard PASS::Upgrade-removal flag preserved both sentinels; ordinary uninstall is checked separately.'
+    [void](Invoke-MsiCheck '/i' $candidatePath (Join-Path $logs 'candidate-reinstall.log'))
     [void](Invoke-MsiCheck '/x' $new['ProductCode'] (Join-Path $logs 'candidate-uninstall.log'))
     if (Test-Path -LiteralPath $userdata) { throw 'MSI uninstall left the test userdata directory behind' }
     Write-Host '::notice title=MSI uninstall smoke PASS::Hosted Windows uninstall removed test userdata. No app launch, audio or visual acceptance claimed.'
@@ -82,6 +94,7 @@ try {
         installOver = 'passed'
         userdataSentinel = 'preserved'
         cacheSentinel = 'preserved'
+        futureUpgradeRemoval = 'preserved both sentinels'
         uninstallCleanup = 'passed'
         appLaunch = 'not tested'
         audioAndVisuals = 'not tested'

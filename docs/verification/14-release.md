@@ -272,6 +272,24 @@ cleanup runs once, start denial is typed, and a track ID containing `429`
 is not a rate limit. Corresponding Kotlin regressions now **PASS in the
 verified branch run**. None of this closes playback, UI or installation acceptance.
 
+### Native PR packaging result — 34029598179 (merge blocked)
+
+PR #30 on `8b2da25` / synthetic merge `1fb74d9` built APK and MSI. Code CI
+34029598196 passed. MSI property verification confirmed **1.33.1**, stable
+UpgradeCode, **112,075,216 bytes**, SHA256
+`57aaf0a53cf17319dc832398adbb4ab485e9e29f86dbf9633ca540c5eb5af576`.
+The real install-over step then **FAILED: existing userdata was removed**.
+The MSI artifact was withheld, diagnostic artifact `msi-install-check`
+(9988255378) was uploaded, and `publish` skipped. Nothing was merged/released.
+
+Do not weaken this test. The in-progress installer finalization adds an
+upgrade-only property guard plus a narrow legacy-HKCU cleanup bridge, before
+checksums/signing. A second native path test verifies future upgrade removal
+preserves data and explicit uninstall still removes it. Preparation errors
+abort before old-product removal; a later cancelled legacy transaction may
+leave cleanup suppressed until a successful retry, rather than deleting data.
+No Windows/installer safety pass is claimed until the corrected run succeeds.
+
 ### Packaging verification and newly authorised PR/merge
 
 The latest user instruction explicitly requests completing the work, then

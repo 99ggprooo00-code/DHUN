@@ -1,5 +1,39 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — Real MSI upgrade deletes userdata; PR held before merge
+
+PR #30 run **34029598179** built MSI **1.33.1**, 112,075,216 B,
+SHA256 `57aaf0a53cf17319dc832398adbb4ab485e9e29f86dbf9633ca540c5eb5af576`,
+UpgradeCode `31ddb86b-9666-4071-b11c-45f16fa4682d`. The install-over test then
+failed **“In-place MSI upgrade removed/changed existing userdata.”** The MSI
+artifact was not uploaded; publishing skipped. APK built; code CI 34029598196
+passed. The PR must not merge on compilation alone.
+
+Source review of OpenJDK jpackage's `WixAppImageFragmentBuilder` and
+`resources/main.wxs` confirms a version-specific `HKCU\Software\DHUN\DHUN\<version>`
+recursive-cleaner registration and early RemoveExistingProducts. The old MSI
+removes the whole install tree, including userdata, during an upgrade.
+
+Correction under native test: finalize the unsigned MSI with an upgrade-only
+cleaner-property guard, preserving normal explicit-uninstall cleanup. An
+upgrade-only built-in PowerShell action suppresses only matching legacy
+DHUN HKCU cleanup values before old-product removal; already-safe packages
+carry a marker and use the session-property guard instead. It never moves
+or deletes userdata, uses no execution-policy bypass, and aborts preparation
+on unexpected registrations. RemoveExistingProducts is placed in the supported
+post-InstallValidate/pre-InstallInitialize slot so directory properties exist.
+The bridge restores its edits if preparation itself fails; a later cancelled
+legacy upgrade can leave the old cleanup registration suppressed (data-safe,
+but cleanup may need a successful retry). Backups remain recommended.
+
+The native smoke now also uninstalls the candidate with UPGRADINGPRODUCTCODE
+set, verifies both sentinels survive, reinstalls, then explicitly uninstalls
+and requires userdata removal. This does not test playback or GUI. No source
+from OpenJDK was copied; these are DHUN-owned MSI table/PowerShell operations.
+All native outcomes are still pending; Python helper tests: 21 pass.
+
+---
+
 ## 2026-09-06 — User authorises PR/merge; require native package checks before merge
 
 Latest instruction: “Ok complete this work then PR and merge.” The current

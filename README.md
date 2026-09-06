@@ -67,6 +67,11 @@ repository permissions. APK/MSI ZIP artifacts are retained for 14 days in
 Actions (GitHub sign-in may be required), separate from the single rolling
 `test` release. No new branch, PR or release is needed.
 
+PRs to main also run these package checks before merging, without publishing.
+Only use an MSI that passed the native sentinel checks. Packaging finalization
+in `scripts/stage_msi.ps1` applies the upgrade-data policy before checksums;
+raw `:app-desktop:packageMsi` output alone is not a distribution-ready update.
+
 Each ZIP includes the binary, SHA256 and a `*.build-info.json` with its exact
 source SHA/run and internal MSI version. The Windows job reads the actual
 MSI's version/upgrade identity and checks install-over/data preservation on

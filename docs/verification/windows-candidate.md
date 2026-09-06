@@ -2,6 +2,10 @@
 
 This is an **unsigned development MSI from a branch build**, not a stable
 release. It includes Java; you do **not** need a JDK or an Android SDK.
+Use only the MSI artifact from a **successful** package/sentinel run. A
+failed early candidate was withheld after its installer deleted test userdata;
+plain, unfinalized `packageMsi` output is not an approved update package.
+
 A system VLC installation is still required for audio output. The optional
 yt-dlp fallback is separate and is not bundled.
 

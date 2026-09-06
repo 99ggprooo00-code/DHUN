@@ -12,6 +12,8 @@ if ($files.Count -ne 1) {
     throw "Expected one MSI under $tree; found $($files.Count)"
 }
 $msi = $files[0]
+# Apply installer lifecycle policy to the unsigned package before hashing it.
+& (Join-Path $PSScriptRoot 'patch_msi_upgrade.ps1') -Path $msi.FullName
 $properties = Get-DhunMsiProperties -Path $msi.FullName
 $upgradeCode = $properties['UpgradeCode'].Trim('{}').ToLowerInvariant()
 if ($properties['ProductVersion'] -ne $ExpectedVersion) {

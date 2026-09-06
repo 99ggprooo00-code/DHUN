@@ -52,6 +52,18 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("- name: Check install-over and userdata on disposable Windows", self.text)
         self.assertIn("    needs: [apk, msi]", self.publish)
 
+    def test_unsigned_msi_is_finalized_before_checksum_and_upload(self):
+        scripts = WORKFLOW.parents[2] / "scripts"
+        stage = (scripts / "stage_msi.ps1").read_text()
+        self.assertLess(stage.index("patch_msi_upgrade.ps1"), stage.index("stage_artifact.py"))
+        smoke = (scripts / "check_msi_upgrade.ps1").read_text()
+        self.assertIn("UPGRADINGPRODUCTCODE=", smoke)
+        self.assertIn("candidate-uninstall.log", smoke)
+        patch = (scripts / "patch_msi_upgrade.ps1").read_text()
+        self.assertIn("Get-AuthenticodeSignature", patch)
+        self.assertIn("DHUN_UPGRADE_DATA_POLICY", patch)
+        self.assertIn("'UPGRADINGPRODUCTCODE'", patch)
+
     def test_build_jobs_do_not_get_contents_write(self):
         before_publish = self.text.split("\n  publish:\n", 1)[0]
         self.assertIn("permissions:\n  contents: read", before_publish)
