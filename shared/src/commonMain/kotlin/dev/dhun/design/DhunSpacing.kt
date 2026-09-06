@@ -38,7 +38,6 @@ object DhunSpacing {
     val listRowHeight = 72.dp
     val miniPlayerHeight = 72.dp
     val bottomNavHeight = 80.dp
-    val transportRowHeight = 88.dp
     /** Compact Now Playing transport row: hugs the 48dp targets + 72dp play disc. */
     val playerTransportHeight = 72.dp
     val contentBottomInset = 112.dp  // room above frosted mini+nav dock
@@ -52,7 +51,6 @@ object DhunSpacing {
     val artistHeaderHeight = 240.dp
     val quickPickWidth = 260.dp
     val dialogMinWidth = 280.dp
-    val miniPlayerWindowWidth = 320.dp
     val dialogMaxWidth = 380.dp
     val windowDefaultWidth = 1200.dp
     val windowDefaultHeight = 780.dp

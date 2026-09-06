@@ -29,7 +29,6 @@ import dev.dhun.design.DhunTheme
 import dev.dhun.desktop.native.DhunTray
 import dev.dhun.desktop.player.DesktopDhunPlayer
 import dev.dhun.desktop.smct.Smct
-import dev.dhun.desktop.ui.MiniPlayerContent
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
@@ -66,8 +65,14 @@ import javax.swing.SwingUtilities
 /**
  * Phase 04 + 07 + 08 + 12 Desktop entry point.
  *
- * Two windows: the main app window (1200×780) and the Phase 12 mini-player
- * window (320×88, always on top, draggable, click → main).
+ * One window: the main app window (1200×780) with the in-app docked
+ * MiniPlayer above the bottom nav. The separate Phase 12 mini-player window
+ * (320×88, always on top) was REMOVED on 2026-09-06 per user decision —
+ * ADR-004: the docked mini-player is the product's mini-player, so a second
+ * window is redundant (and showed in the taskbar, which Compose Desktop
+ * 1.8.2 cannot suppress). The removed window lived in
+ * `desktop/ui/MiniPlayerWindow.kt` (deleted); its Ctrl+M toggle and the
+ * `Smct.moveWindow` helper went with it.
  *
  * Phase 12 additions (this file):
  *  - system tray (AWT): track title + play/pause/next/prev/open/quit menu,
@@ -82,7 +87,7 @@ import javax.swing.SwingUtilities
  *    Compose window's component listener), restored via WindowPosition
  *  - keyboard shortcuts (window-scope [Window.onKeyEvent], receives only keys
  *    the focused node didn't consume): Space play/pause, ←/→ seek ±5 s,
- *    Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+M mini-player, Ctrl+Q quit
+ *    Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+Q quit
  *
  * Phase 14 ruggedization — \"Failed to launch JVM\" investigation:
  *  - jpackage bundles a jlink-minimized runtime; missing JDK modules (notably
@@ -102,10 +107,10 @@ import javax.swing.SwingUtilities
  *  - `Window` content is `FrameWindowScope.() -> Unit`; `window` is a
  *    [ComposeWindow] which extends `javax.swing.JFrame` — all window control
  *    (show/hide/toFront/requestFocus) is plain public AWT on it.
- *  - `alwaysOnTop` is a top-level `Window` parameter (not in WindowState).
- *  - `WindowPosition` (Dp-based) for position; no `skipTaskbar` parameter
- *    in 1.8.2 (mini-player shows in the taskbar — see KNOWN_LIMITATIONS).
+ *  - `WindowPosition` (Dp-based) for position.
  *  - Arrows are `Key.DirectionLeft/DirectionRight`; space is `Key.Spacebar`.
+ *  - `alwaysOnTop` and the missing `skipTaskbar` parameter mattered only for
+ *    the removed mini-player window (ADR-004).
  */
 
 // ---------------------------------------------------------------------------
@@ -310,14 +315,8 @@ fun main() {
                 position = initialGeometry?.let { WindowPosition(it.x.toFloat().dp, it.y.toFloat().dp) }
                     ?: WindowPosition.PlatformDefault,
             )
-            val miniState = rememberWindowState(
-                width = DhunSpacing.miniPlayerWindowWidth,
-                height = DhunSpacing.transportRowHeight,
-                position = WindowPosition(DhunSpacing.contentBottomInset, DhunSpacing.miniPlayerHeight),
-            )
 
             val mainWindowRef = AtomicReference<ComposeWindow>()
-            val miniWindowRef = AtomicReference<ComposeWindow>()
             val smctSessionRef = AtomicReference<Smct.Session?>()
 
             fun showMainWindow() {
@@ -325,15 +324,6 @@ fun main() {
                 w.isVisible = true
                 w.toFront()
                 w.requestFocus()
-            }
-
-            fun toggleMiniPlayer() {
-                val w = miniWindowRef.get() ?: return
-                w.isVisible = !w.isVisible
-                if (w.isVisible) {
-                    w.toFront()
-                    w.requestFocus()
-                }
             }
 
             fun saveGeometry() {
@@ -455,31 +445,6 @@ fun main() {
 
             val nav = remember { AppNavState() }
 
-            // ---- Phase 12 mini-player window (declared first so the main window   //
-            // ---- owns the startup focus) ------------------------------------------ //
-            Window(
-                onCloseRequest = {
-                    // X hides (not disposes; 1.8.2 sets DO_NOTHING_ON_CLOSE itself) —
-                    // Ctrl+M / tray \"Open\" always work.
-                    miniWindowRef.get()?.isVisible = false
-                },
-                state = miniState,
-                title = "DHUN mini-player",
-                resizable = false,
-                alwaysOnTop = true,
-            ) {
-                // FrameWindowScope: `window` is the ComposeWindow (a JFrame).
-                LaunchedEffect(window) {
-                    miniWindowRef.set(window)
-                }
-                DhunTheme {
-                    MiniPlayerContent(
-                        viewModel = playerViewModel,
-                        onOpenMain = { showMainWindow() },
-                    )
-                }
-            }
-
             // ---- main window ------------------------------------------------------- //
             Window(
                 onCloseRequest = {
@@ -502,10 +467,6 @@ fun main() {
                     when {
                         event.isCtrlPressed && event.key == Key.Q -> {
                             quit()
-                            true
-                        }
-                        event.isCtrlPressed && event.key == Key.M -> {
-                            toggleMiniPlayer()
                             true
                         }
                         event.isCtrlPressed && event.key == Key.F -> {
