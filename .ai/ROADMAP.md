@@ -7,7 +7,18 @@ The latest device-feedback fixes are merged and CI-green; real-device
 playback/recovery, offline replay, both soaks, and the release gates are
 still open. **Do not reopen PR #20 or start Phase 15.**
 
-**GitHub-verified state (not a local build claim):**
+**Documentation merge — authorized by the user (2026-09-06):**
+[PR #21](https://github.com/99ggprooo00-code/DHUN/pull/21) carries this
+ROADMAP-only consolidation from `arena/01a0743b-dhun` to `main`.
+The four commits through `54faffe` are verified pushed; PR
+[CI `34003373869`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34003373869)
+passed shared JVM tests, Android debug build, and probe/Desktop compilation
+on that head. This is a **pre-merge evidence snapshot**: check the PR for
+its final head/checks and merge result. Any follow-up docs commit must also
+pass PR CI before merge; no application changes or new hardware evidence
+are included, and no Phase 14 acceptance is closed by this merge.
+
+**GitHub-verified application baseline (before documentation PR #21):**
 - [PR #20](https://github.com/99ggprooo00-code/DHUN/pull/20) merged at
   `2026-09-06T00:35:51Z` into **`main@8310383`**. Its implementation
   commits are `cf535ca` + `1384b32`; PR CI `34001522235` passed.
@@ -22,8 +33,9 @@ still open. **Do not reopen PR #20 or start Phase 15.**
   This is **not** v0.1.0, an AAB build, or a clean-target install verdict.
 
 **Exact file / work context:**
-- This boot changes **`.ai/ROADMAP.md` only**. No application code is being
-  written before permission, and no new build or hardware test is claimed.
+- This PR changes **`.ai/ROADMAP.md` only**. Application code is unchanged;
+  builds/tests cited here ran on GitHub. No local application build or
+  hardware verification is claimed.
 - Last implementation focus:
   **`app-android/src/main/kotlin/dev/dhun/android/playback/PlaybackGraph.kt`**
   — bounded transient-error recovery (three re-prepares with backoff),
@@ -57,9 +69,12 @@ still open. **Do not reopen PR #20 or start Phase 15.**
   residential playback verdict for the latest APK**. Do not weaken the
   live probe or silently change the ADR-001 extraction strategy.
 
-**Exact next step — after permission, with a real Android device:**
-Install **`dhun-test.apk` from `test@8310383`** (check its published
-checksum). On a residential network, play an **uncached** search result
+**Exact next product step — after the docs merge, with a real Android device:**
+Install the latest **`dhun-test.apk` from the rolling `test` pre-release**;
+verify its current tag/build SHA and published checksum before testing.
+The verified build at the start of PR #21 was `8310383`; a docs-only merge
+also rebuilds/replaces these assets, so do not assume that tag stays fixed.
+On a residential network, play an **uncached** search result
 and confirm audible audio. Interrupt connectivity long enough to drain
 the buffer and trigger recovery, restore it, and verify auto-recovery.
 Repeat the interruption until automatic retries are exhausted, reconnect,
@@ -79,9 +94,11 @@ previous GitHub branch but absent from main: `2270cb9`, `e2916cd`,
 `39da8e3`, `ca8e243` (cherry-picked with provenance), then reconciled here.
 The older Phase 14 commits on `arena/01a07141-dhun` and the PR #16
 post-merge handoff are patch-equivalent to main, so they are not duplicated.
-All pushes in this session target **`arena/01a0743b-dhun` only**. This
-handoff cites the existing green **main** runs, not CI for its own docs
-commit: branch pushes do not trigger CI (`push: main` / `pull_request`).
+All pushes in this session target **`arena/01a0743b-dhun` only**; the
+requested merge to `main` goes through PR #21, not a direct main push.
+CI runs on `push: main` / `pull_request`: opening PR #21 supplied the
+previously missing branch check. Its verified result is recorded above;
+this follow-up documentation commit does not claim its own CI verdict.
 
 ---
 
@@ -215,8 +232,10 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 
 ### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-06)
 
-Evidence base: **`origin/main@8310383`**, main CI **`34001706156`** and
-rolling test-release **`34001706159`** (links in CURRENT ACTIVE TASK).
+Application-code snapshot before documentation PR #21:
+**`origin/main@8310383`**, main CI **`34001706156`** and rolling test-release
+**`34001706159`** (links in CURRENT ACTIVE TASK). The docs merge does not
+change these implementation or hardware marks.
 PR #16 merged at `290e0f6`, #17 at `29eeb93`, #19 at `6d81eb2`, and #20
 at `8310383`. These are remote commits, not unpushed local work.
 
