@@ -7,9 +7,9 @@ Updated **2026-09-06 (UTC)** · session **`arena/01a076f3-dhun`** · **working P
 **Latest verified published build:** [`test`](https://github.com/99ggprooo00-code/DHUN/releases/tag/test) at **`76c68eb`**, published **2026-09-06T11:58:17Z**, internal MSI **1.36.1**. Main CI **34031477321 SUCCESS** and test-release **34031477327 SUCCESS**.
 
 **Candidate PR #32 verification (session branch):**
-- Branch CI **34043396999 PASS** — Python tests, PowerShell syntax, shared JVM tests (including `AudioFileCacheTest`, `QueueManagerTest`, `OwnClientStreamResolverTest`, `LyricsRepositoryTest`), Android debug build, probe/Desktop compilation.
-- Packaging run **34043397009 PASS** — MSI **1.40.1** with disposable Windows install-over checks, and APK build.
-- ADR-003 (staged wave parallel extraction) and ADR-005 (next-track pre-buffering, temporary cache lifecycle, and per-track User-Agent stream isolation) implemented and CI-green.
+- Branch CI **34064910238 PASS** / **34064908697 PASS** — Python tests, PowerShell syntax, shared JVM tests, Android debug build, probe/Desktop compilation.
+- Packaging run **34064910218 PASS** — MSI **1.40.1** and Android APK build with disposable Windows upgrade validation.
+- ADR-003 (staged wave parallel extraction) and ADR-005 (next-track pre-buffering, temporary cache lifecycle, Android low-latency LoadControl, video track disablement, and per-track User-Agent stream isolation) implemented and CI-green.
 - Hosted Windows upgrade smoke verified **1.36.1 → 1.40.1** (baseline SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`), preserving userdata and cache sentinels.
 - Future upgrade removal and explicit uninstall checks **PASS**.
 
