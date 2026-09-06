@@ -34,6 +34,8 @@ class BuildWorkflowTest(unittest.TestCase):
             ("refs/heads/arena/example", "workflow_dispatch", True, False),
             ("refs/heads/arena/example", "workflow_dispatch", False, False),
             ("refs/heads/arena/example", "push", False, False),
+            ("refs/pull/30/merge", "pull_request", True, False),
+            ("refs/pull/30/merge", "pull_request", False, False),
             ("refs/heads/main", "workflow_dispatch", True, False),
             ("refs/heads/main", "workflow_dispatch", False, True),
             ("refs/heads/main", "push", False, True),
@@ -44,6 +46,11 @@ class BuildWorkflowTest(unittest.TestCase):
             with self.subTest(ref=ref, event=event, build_only=build_only):
                 result = eval(code, {"__builtins__": {}}, {"ref": ref, "event": event, "build_only": build_only})
                 self.assertIs(result, expected)
+
+    def test_installer_is_a_pull_request_check_before_merge(self):
+        self.assertIn("  pull_request:\n    branches: [main]", self.text)
+        self.assertIn("- name: Check install-over and userdata on disposable Windows", self.text)
+        self.assertIn("    needs: [apk, msi]", self.publish)
 
     def test_build_jobs_do_not_get_contents_write(self):
         before_publish = self.text.split("\n  publish:\n", 1)[0]

@@ -3,7 +3,7 @@ name: test-release
 # One rolling `test` pre-release on main. Manual branch builds reuse this
 # SAME workflow's run-number sequence, so their MSI versions cannot leap
 # ahead of a separate publishing workflow's counter and block later upgrades.
-# Manual runs default to artifact-only; non-main refs can NEVER publish.
+# PR builds and manual branch runs are artifact-only; non-main refs can NEVER publish.
 on:
   workflow_dispatch:
     inputs:
@@ -12,6 +12,8 @@ on:
         type: boolean
         required: true
         default: true
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
 

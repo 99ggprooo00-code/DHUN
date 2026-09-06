@@ -10,7 +10,7 @@ The fresh Windows report confirms **one-window startup after manual
 uninstall/reinstall**, but rejects install-over upgrade, audio, Home
 pagination and parts of the player layout. New source/test/doc repairs on
 `arena/01a0759b-dhun` are **pushed and CI-green at `75c4a8b`**, verified by
-[run 34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972). No PR, merge or release is authorised.
+[run 34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972), with later branch checks green through `455743b`. The user now explicitly authorises completing this repair batch, opening its PR and merging after checks; no stable v0.1.0 release or hardware acceptance is implied.
 No newer installer has been produced. Hardware, live extraction, soaks,
 clean-target hygiene and v0.1.0 cannot be inferred from build CI.
 
@@ -272,7 +272,17 @@ cleanup runs once, start denial is typed, and a track ID containing `429`
 is not a rate limit. Corresponding Kotlin regressions now **PASS in the
 verified branch run**. None of this closes playback, UI or installation acceptance.
 
-### Build-only packaging follow-up (pending execution)
+### Packaging verification and newly authorised PR/merge
+
+The latest user instruction explicitly requests completing the work, then
+PR and merge. The earlier CI-only/no-PR restriction is superseded for this
+batch. Windows packaging and install-over checks are being made normal PR
+checks before merge; PR refs have contents:read and cannot publish. The
+manual workflow-dispatch API remains denied; it is not retried. Actual
+Windows execution is still pending and must not be confused with the
+already-green PowerShell syntax step.
+
+### Build-only packaging history
 
 The user clarified that ordinary development is allowed; only the one-time
 Arena session-ending action must be avoided. No PR/merge is being used.

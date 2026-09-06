@@ -1,5 +1,18 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — User authorises PR/merge; require native package checks before merge
+
+Latest instruction: “Ok complete this work then PR and merge.” The current
+branch is clean and CI-green through `455743b`, but the native packaging
+script has only been parsed so far. Add packaging/install-over as ordinary
+pull_request checks on the existing workflow, using the same MSI version
+counter and a publish guard that rejects PR refs. No manual dispatch retry,
+credential change, extra working branch or stable release is involved.
+The PR will be merged only after real checks; user playback/visual/soak
+acceptance still cannot be inferred from CI.
+
+---
+
 ## 2026-09-06 — Packaging helpers CI-green; dispatch still requires owner action
 
 [CI 34028225356](https://github.com/99ggprooo00-code/DHUN/actions/runs/34028225356) on `77f9c96` **PASSED**;
