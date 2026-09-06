@@ -1,5 +1,25 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — PR #30 merged and repair-code test release verified
+
+User-requested merge completed at **11:52:26Z**, PR #30 →
+`76c68eb2b27da5341d146bda3d5aa6ea298d954a`; session branch preserved.
+Main CI **34031477321 PASS**, packaging/publishing **34031477327 PASS**.
+`test@76c68eb` published **11:58:17Z**: MSI **1.36.1**, 112,091,136 B,
+SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`;
+APK 17,499,806 B, SHA256
+`1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86`.
+Checksum assets uploaded; producer notices and release/tag/asset APIs agree.
+Main's native smoke preserved sentinels from 1.0.5 → 1.36.1 and during
+upgrade-flag removal, then removed them on explicit uninstall after reinstall.
+No app launch/audio/GUI test was performed. The publish job had an action
+Node-20 deprecation warning for download-artifact v4; no full zero-warning
+claim. The post-merge documentation checkpoint records this code-release
+snapshot; later rolling builds may advance asset identities. Hardware and
+v0.1.0 remain open; no unrelated finalization action or branch deletion.
+
+---
+
 ## 2026-09-06 — MSI data-safety correction passes real Windows checks
 
 PR #30 at `b6d47bd`: code CI 34030730736 and branch CI 34030728903 PASS.

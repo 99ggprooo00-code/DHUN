@@ -19,7 +19,11 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### Repair candidate — 2026-09-06 (PR #30, code and native installer checks green)
+### Windows/Home/player repairs — 2026-09-06 (PR #30 merged; rolling test build)
+- **Merged and test-published:** PR #30 → `76c68eb`; main CI
+  **34031477321** and publishing **34031477327** passed. The repair-code test
+  release was published at **11:58:17Z**, MSI **1.36.1**. This is still
+  `Unreleased` for stable semver: v0.1.0/audio/visual/native/soak gates are open.
 - **Installer data safety:** the real PR smoke caught jpackage deleting
   existing userdata during a major upgrade. Finalize the unsigned MSI with
   an upgrade-only cleaner guard and a matching legacy-HKCU cleanup bridge;
@@ -53,7 +57,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   validates the shared JVM regressions, Android debug build and probe/Desktop
   compilation. The first run's four Home interpolation errors were fixed;
   fresh Quick picks now pass through the screen's real category projection.
-  Local Gradle still cannot start without a JDK. PR #30 is authorised for merge;
+  Local Gradle still cannot start without a JDK. PR #30 is merged;
   actual Windows upgrade/playback/visual verification remains open in
   `docs/verification/14-release.md`.
 
