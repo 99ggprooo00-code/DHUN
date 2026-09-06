@@ -10,34 +10,29 @@ and player glyph placement/shuffle/colour styling is not accepted**. The
 last verified published build is `test@0920148`, 07:22:29Z. This is user-facing
 impact, not something to dismiss as an Actions-IP-only failure.
 
-Repairs on `arena/01a0759b-dhun` address MSI versions, Windows extractor
-handling/diagnostics, Home pagination and player geometry/gestures. They are
-**pushed and CI-green, but not merged or released**. [CI 34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972)
-at **`75c4a8b`** passed shared JVM tests, the Android debug build and
-probe/Desktop compilation. This includes the new Home, subprocess and
-rendering regressions. The first run exposed four Home string interpolation
-errors; they are corrected, and the Quick-picks predicate is now wired into
-the screen's actual projection.
+Repairs are pushed in **PR #30**, now explicitly authorised for merge after
+checks. Code CI passes on `b6d47bd` (branch 34030728903 / PR 34030730736).
+Native packaging run **34030730743** also passes: MSI **1.34.1**, actual
+version/upgrade identity, published-1.0.5 install-over with userdata/cache
+sentinels preserved, upgrade-flag removal preserving data, and explicit
+uninstall cleanup after reinstall. APK/MSI artifacts exist; main/test have
+not changed at this pre-merge checkpoint.
 
-The sandbox itself still has no runnable JDK; direct downloads and the
-GitHub asset route failed. GitHub CI has now removed that verification
-blocker for the candidate. Ten Python helper tests and 29 JSON fixture
-syntax checks also pass locally. **No Windows MSI was packaged or installed,
-no live audio/uncached byte retrieval was verified, and no visual/native or
-soak acceptance is claimed.** The no-PR/no-merge/no-release boundary remains
-in force; no new downloadable candidate was published.
+The first native test caught real userdata deletion in MSI 1.33.1. That
+artifact was withheld and the PR not merged. The installer finalizer now
+adds an upgrade-only cleaner-property guard plus a narrow legacy HKCU
+cleanup bridge; it uses built-in Windows PowerShell without execution-policy
+bypass, and never moves/deletes userdata itself. Raw `packageMsi` output is
+not safe to distribute without `stage_msi.ps1` finalization. Back up user
+data before testing. If an old-version upgrade is cancelled after legacy
+preparation, its old cleanup registration can remain suppressed until a
+successful retry; this preserves data but is not perfect rollback hygiene.
 
-A build-only candidate route is being prepared without PR/merge/session
-finalization: APK/MSI artifacts, checksums/provenance and actual MSI metadata
-checks, plus install-over/userdata/uninstall sentinels on a disposable
-Windows Actions runner. Packaging and those installer checks are **pending**:
-manual dispatch was denied with **403 Resource not accessible by integration**,
-and no branch packaging run exists. The owner must reconnect GitHub or start
-the build-only workflow on the session ref from GitHub Actions. The
-helper/publishing-boundary tests and PowerShell syntax now pass CI at
-`77f9c96` / 34028225356, along with shared JVM tests and all usual build
-checks. PowerShell parsing is not MSI execution. A successful
-hosted-installer smoke check still will not prove real playback or visuals.
+The sandbox still cannot run Java locally. The manual dispatch API remains
+403-denied and is not retried; normal PR checks provided the native evidence.
+**No app launch, actual VLC/audio playback, live Home/user visuals, media-key
+integration or soak acceptance is claimed.** Installer sentinels on a hosted
+Windows runner are not the user's complete hardware test.
 
 The user-provided Windows yt-dlp installation state is unknown. The old
 locator could miss an installed `yt-dlp.exe`; the new candidate checks PATH /
@@ -49,7 +44,7 @@ MSI ProductVersion must advance independently of the app's semantic version.
 The candidate keeps the stable upgrade UUID and uses a run/attempt sequence
 (plus a stale-ref publishing guard). Manual packaging must also supply a
 higher internal version; future stable packaging must not reset it to 0.1.0.
-In-place upgrade **and preservation of userdata** still need a Windows test.
+Hosted-Windows install-over/data sentinels pass; the user-machine upgrade and real library/queue preservation still need a re-test.
 See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
 
 ## Platform and service limitations

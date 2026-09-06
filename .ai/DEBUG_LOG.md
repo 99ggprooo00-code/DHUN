@@ -1,5 +1,27 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — MSI data-safety correction passes real Windows checks
+
+PR #30 at `b6d47bd`: code CI 34030730736 and branch CI 34030728903 PASS.
+Packaging run **34030730743** PASS, MSI 1.34.1, 112,091,136 B,
+SHA256 `1a4d2fe5c9b0c8949995cbd62e5e01675a9fb8081d71eb3da74b5a834dde021c`.
+Check annotations confirm **1.0.5 → 1.34.1** preserves both userdata/cache
+sentinels, explicit UPGRADINGPRODUCTCODE removal preserves both, and
+reinstall/ordinary uninstall removes test userdata. MSI artifact 9988585984;
+diagnostic artifact 9988584693. PR publishing skipped. The failed unsafe
+1.33.1 MSI was never exposed as a downloadable candidate or merged.
+
+The fix applies only to unsigned packages before hashing/signing and uses
+DHUN-owned MSI operations; no OpenJDK template was copied. Legacy preparation
+only changes matching DHUN HKCU cleanup values, never moves/deletes userdata;
+future versions use the session-property guard. A later cancelled legacy
+transaction can require retry to restore normal cleanup. Native passing
+sentinels do not prove app launch, user library integrity, audio, visuals,
+SMTC/tray or soaks. PR can proceed to merge after final evidence checks;
+no stable v0.1.0 is earned.
+
+---
+
 ## 2026-09-06 — Real MSI upgrade deletes userdata; PR held before merge
 
 PR #30 run **34029598179** built MSI **1.33.1**, 112,075,216 B,

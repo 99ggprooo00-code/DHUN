@@ -17,6 +17,17 @@ see [Phase 14's fresh report and validation record](14-release.md).
 Tray/SMTC/shortcuts, data-preserving upgrade and clean-target hygiene are
 not proven by a visible window or a green packaging job.
 
+## Installer-specific PR verification — 2026-09-06
+
+PR #30 at `b6d47bd`: native run **34030730743** passes MSI **1.34.1** packaging,
+actual ProductVersion/stable UpgradeCode, published-1.0.5 install-over with
+userdata/cache sentinels preserved, future-upgrade removal (explicit flag)
+with data retained, and reinstall/ordinary-uninstall cleanup. The initial
+1.33.1 candidate failed data preservation and was withheld; it was not merged.
+Code PR CI **34030730736** passes too. No application launch, audio, tray,
+SMTC, shortcuts or visual check was performed in this installer-only smoke.
+User-machine/full runtime acceptance below remains open.
+
 ## What was built (code-level, auditable)
 
 | Spec item (PROMPT_SEQUENCE.md Phase 12) | Implementation |

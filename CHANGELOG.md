@@ -19,11 +19,18 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### Branch candidate — 2026-09-06 (CI-green at 75c4a8b; not released)
+### Repair candidate — 2026-09-06 (PR #30, code and native installer checks green)
+- **Installer data safety:** the real PR smoke caught jpackage deleting
+  existing userdata during a major upgrade. Finalize the unsigned MSI with
+  an upgrade-only cleaner guard and a matching legacy-HKCU cleanup bridge;
+  explicit uninstall still removes userdata. PR run **34030730743** at
+  `b6d47bd` passes 1.0.5 → 1.34.1 data/cache preservation, upgrade-flag
+  removal, reinstall and explicit uninstall. This is not an app/audio test;
+  backups are still recommended for legacy/failed-upgrade recovery.
 - **MSI upgrades:** increasing internal versions per build/run attempt,
   stable upgrade UUID, stale-ref publishing protection and startup version
   logging. Five Python version-ordering/bounds regressions pass locally;
-  actual install-over/data-preservation verification remains open.
+  hosted native sentinel checks now pass; user-machine verification remains open.
 - **Windows playback path:** executable/Python discovery without Unix
   `which` or Windows Store aliases; cancellable process/pipe cleanup;
   explicit missing-tool evidence; reason-preserving bounded diagnostics
@@ -46,7 +53,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   validates the shared JVM regressions, Android debug build and probe/Desktop
   compilation. The first run's four Home interpolation errors were fixed;
   fresh Quick picks now pass through the screen's real category projection.
-  Local Gradle still cannot start without a JDK. No PR, merge or release;
+  Local Gradle still cannot start without a JDK. PR #30 is authorised for merge;
   actual Windows upgrade/playback/visual verification remains open in
   `docs/verification/14-release.md`.
 

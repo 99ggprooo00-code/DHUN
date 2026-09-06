@@ -14,6 +14,33 @@ pagination and parts of the player layout. New source/test/doc repairs on
 No newer installer has been produced. Hardware, live extraction, soaks,
 clean-target hygiene and v0.1.0 cannot be inferred from build CI.
 
+## Latest pre-merge checkpoint — PR #30, b6d47bd
+
+Code CI **34030728903** (branch) and **34030730736** (PR) pass. Native
+packaging **34030730743** passes with MSI **1.34.1** after fixing the initial
+userdata-deletion failure; PR synthetic merge source **61bf548b62b689f67687afcd7e6b76c0a56739a4**.
+Verified from job/check annotations and artifact APIs:
+
+- MSI: **112,091,136 B**, SHA256
+  `1a4d2fe5c9b0c8949995cbd62e5e01675a9fb8081d71eb3da74b5a834dde021c`;
+  stable UpgradeCode and MSI database ProductVersion verified.
+- Hosted Windows **1.0.5 → 1.34.1** install-over: userdata/cache sentinels
+  preserved. Baseline hash:
+  `0683538542af97c7505cd35610e03cfb42ce92e01e07ea09c28a7364b1825add`.
+- Candidate uninstall with explicit UPGRADINGPRODUCTCODE: both sentinels
+  preserved; candidate reinstalled and ordinary uninstall removed userdata.
+- Artifacts: `msi` **9988585984**, diagnostic `msi-install-check`
+  **9988584693**, `apk` **9988526777**. APK **17,499,806 B**, SHA256
+  `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86`.
+- `publish` **SKIPPED** on PR. Main/test remain `0920148` / 07:22:29Z until
+  the separately verified merge/publishing step.
+
+These native checks execute real Windows Installer operations, not just
+PowerShell parsing. They still do not launch DHUN, play audio or inspect its
+UI. User-machine library preservation, sound, Home, visuals and native/soak
+gates remain open. A later cancelled legacy transaction can leave cleanup
+suppressed until retry; backups are still recommended. No v0.1.0.
+
 ## Phase 14 implementation status
 
 | Step | Current status | Evidence / remaining gate |
@@ -272,7 +299,7 @@ cleanup runs once, start denial is typed, and a track ID containing `429`
 is not a rate limit. Corresponding Kotlin regressions now **PASS in the
 verified branch run**. None of this closes playback, UI or installation acceptance.
 
-### Native PR packaging result — 34029598179 (merge blocked)
+### Initial native PR packaging failure — 34029598179 (historical; corrected above)
 
 PR #30 on `8b2da25` / synthetic merge `1fb74d9` built APK and MSI. Code CI
 34029598196 passed. MSI property verification confirmed **1.33.1**, stable
@@ -288,7 +315,7 @@ checksums/signing. A second native path test verifies future upgrade removal
 preserves data and explicit uninstall still removes it. Preparation errors
 abort before old-product removal; a later cancelled legacy transaction may
 leave cleanup suppressed until a successful retry, rather than deleting data.
-No Windows/installer safety pass is claimed until the corrected run succeeds.
+The corrected native run 34030730743 above passed these sentinel checks; full user-machine acceptance remains open.
 
 ### Packaging verification and newly authorised PR/merge
 
