@@ -10,8 +10,9 @@ the docked in-app MiniPlayer remains.
 The same report says **install-over fails with “Another version of this
 product is already installed…” and audio still fails**. A local candidate
 adds increasing MSI ProductVersions, Windows-aware extraction, diagnostics,
-Home and player repairs. **Commit/push for branch CI is approved; tests are
-pending and no PR, merge or release is authorised**;
+Home and player repairs. **Branch CI 34025807972 is green at `75c4a8b`**
+(shared JVM tests, Android debug build and probe/Desktop compiles), but
+**no MSI package/install test, PR, merge or release is included/authorised**;
 see [Phase 14's fresh report and validation record](14-release.md).
 Tray/SMTC/shortcuts, data-preserving upgrade and clean-target hygiene are
 not proven by a visible window or a green packaging job.

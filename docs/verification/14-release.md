@@ -9,8 +9,8 @@ verify the previously published code, **not** the repair batch below.
 The fresh Windows report confirms **one-window startup after manual
 uninstall/reinstall**, but rejects install-over upgrade, audio, Home
 pagination and parts of the player layout. New source/test/doc repairs on
-`arena/01a0759b-dhun` are **pending branch CI, with commit/push now explicitly
-authorised**. No PR, merge or release is authorised.
+`arena/01a0759b-dhun` are **pushed and CI-green at `75c4a8b`**, verified by
+[run 34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972). No PR, merge or release is authorised.
 No newer installer has been produced. Hardware, live extraction, soaks,
 clean-target hygiene and v0.1.0 cannot be inferred from build CI.
 
@@ -203,7 +203,26 @@ in `HomeScreen.kt`. Kotlin tests did not execute; Android/probe/Desktop steps
 were skipped. Fix: delimit `${index}` in the shelf keys. Follow-up also wires
 the Quick-picks visibility predicate into the actual category projection and
 adds a regression, and upgrades CI checkout to its Node-24 v5 runtime after
-the run reported the v4 Node-20 warning. Rerun required; no release/PR.
+the run reported the v4 Node-20 warning. The rerun below is green; no release/PR.
+
+**Verified corrected branch run:** [34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972) at
+**`75c4a8b9e6b3a030d24a360b0cb98923a4de5a0f`**, completed **09:57:34Z on
+2026-09-06**, job **101466441642** (6m13s), **SUCCESS**. Run, job steps and
+check annotations were verified via GitHub REST APIs:
+
+| Check | Actual result |
+|---|---|
+| JDK 17 / checkout v5 setup | PASS |
+| Installer + fixture Python tests | PASS |
+| `:shared:jvmTest` | PASS — includes new parser/paging, resolver lifecycle, diagnostics, transport and raster/layout regressions |
+| `:app-android:assembleDebug` | PASS — built, not device-tested or published |
+| `:tools:playback-probe:compileKotlin` | PASS — compilation only, not a live extraction run |
+| `:app-desktop:compileKotlinJvm` | PASS — no MSI/native runtime test |
+| Check annotations | 0 — not a separate full-log compiler-warning audit |
+
+This proves the automated **branch code/test checkpoint**, not actual audio,
+Windows upgrades or visual acceptance. `main` / `test` remain `0920148`, the
+public download remains the 07:22:29Z build, and there are no open PRs.
 
 | Area | Source repair / regression coverage added |
 |---|---|
@@ -214,7 +233,7 @@ the run reported the v4 Node-20 warning. Rerun required; no release/PR.
 | Home data / state / UI | Same title plus fresh item IDs is new content. Follow advancing empty/duplicate pages, but stop token cycles and pause after three no-growth pages. Claim loading before dispatch; refresh invalidates stale pages. Keep failed feed visible with explicit retry; show honest end state. Indexed keys and later quick-picks shelves do not hide fresh tracks |
 | Player graphics / diagnostics | Scale SVG paths about the origin; canonical Apache-2.0 Material shuffle/repeat paths. Fit artwork to both available axes; centre bounded transport/volume; consistent inactive tint and active toggle treatment. Same full, scrollable/selectable Playback details dialog from either player; docked MiniPlayer retained |
 
-**Validation actually executed locally:**
+**Local checks and the original environment blocker (distinct from CI above):**
 
 - **PASS:** `python3 -m unittest discover -s scripts -p 'test_*.py' -v` —
   **10 tests**: five installer tests (legacy 1.0.5 upgrade ordering, reruns,
@@ -232,13 +251,14 @@ the run reported the v4 Node-20 warning. Rerun required; no release/PR.
   `SSL_ERROR_SYSCALL`. The follow-up official Temurin JDK-17 download through
   GitHub also failed at `release-assets.githubusercontent.com` with EOF.
   No usable JDK or Gradle dependencies were downloaded/installed.
-- **Written, NOT RUN:** Windows tool lookup/missing module/Store aliases,
+- **Now PASS in GitHub CI 34025807972, not run locally:** Windows tool lookup/missing module/Store aliases,
   pipe back-pressure and cancellation tests; error aggregation and fallback
   evidence; scoped continuation/response-shape and first-request tests;
   repeated-title/empty-page/cycle/retry/stale-refresh tests; headless
   icon raster bounds at 18–64 px and artwork dimension tests.
-- No new CI, MSI/APK build, live extraction, Windows install or audible
-  playback proof for this candidate. Publication is deferred until the
+- Candidate CI, shared tests and Android/probe/Desktop builds passed as
+  recorded above. There is **no new MSI package, published APK/MSI, live
+  extraction, Windows install or audible playback proof**. Publication is deferred until the
   user separately authorises it after verified CI. The earlier **Keep
   everything local** decision was superseded by explicit permission for
   **commit/push and CI only**. Do not open a PR, merge or publish a release.
@@ -249,8 +269,8 @@ split updates and rejects ambiguous targets. Previous/Next cancellation no
 longer routes through a tap; hold cleanup is in `finally`, and scrubbing is
 reset on track/duration changes. yt-dlp's own deadline includes pipe EOF,
 cleanup runs once, start denial is typed, and a track ID containing `429`
-is not a rate limit. Corresponding Kotlin regressions are **written but
-UNRUN**. None of this closes playback, UI or installation acceptance.
+is not a rate limit. Corresponding Kotlin regressions now **PASS in the
+verified branch run**. None of this closes playback, UI or installation acceptance.
 
 **Next Windows acceptance, only with a CI-green published candidate:**
 

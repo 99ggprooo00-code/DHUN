@@ -1,5 +1,25 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — Corrected branch CI GREEN; release deliberately unchanged
+
+**Verified:** [CI 34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972) on
+`75c4a8b9e6b3a030d24a360b0cb98923a4de5a0f` succeeded; job 101466441642
+completed **09:57:34Z**, duration **6m13s**. GitHub run/job/check APIs confirm
+Python checks, shared JVM tests, Android debug build and probe/Desktop
+compilation all passed. Check annotations: **0** (not a full log-warning audit).
+The `$index_` compiler errors are resolved and the Quick-picks predicate is
+now connected to the actual screen projection rather than only a test.
+
+This removes the Kotlin/build-verification blocker through the user-approved
+CI path, despite the local sandbox still lacking a JDK. It does NOT prove
+YouTube playback, Windows installer upgrade/data preservation, live Home
+scrolling, visual/native acceptance or soaks. No test-release/rot-drill dispatch,
+PR, merge, tag or release was performed. Main/test remain `0920148` and the
+published installer remains the 07:22:29Z build. This evidence is followed by
+a same-branch documentation-only push; application/test inputs stay unchanged.
+
+---
+
 ## 2026-09-06 — First authorised branch CI reaches Kotlin; Home key interpolation fails
 
 Push `f914050` started CI **34025629231**. JDK setup and Python checks passed;

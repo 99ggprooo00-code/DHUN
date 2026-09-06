@@ -108,8 +108,9 @@ only on a device you are willing to experiment with.
   ProductVersion to the app's `0.1.0` semver. Quit DHUN/tray before updating.
 - **Verification warning (2026-09-06):** the published 07:22:29Z / `0920148`
   build still failed in-place upgrade, audio and Home in the user's Windows
-  re-test. The repair batch is awaiting branch CI; only commit/push for checks is authorised, not merge or release. The current
-  download does **not** contain it. Manual uninstall/reinstall launched one
+  re-test. The repair batch at `75c4a8b` [passes branch CI](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972),
+  including Kotlin tests and Android/probe/Desktop builds, but is **not merged
+  or released**. The current download does **not** contain it. Manual uninstall/reinstall launched one
   window, but did not fix audio. Upgrade data preservation and clean-target
   uninstall cleanup remain unverified; back up test userdata before testing.
 - Unsigned / SmartScreen + debug APK are why these are not

@@ -10,20 +10,22 @@ and player glyph placement/shuffle/colour styling is not accepted**. The
 last verified published build is `test@0920148`, 07:22:29Z. This is user-facing
 impact, not something to dismiss as an Actions-IP-only failure.
 
-Local repairs on `arena/01a0759b-dhun` address static MSI versions, Windows
-yt-dlp discovery/process cleanup, lost resolver evidence, feed continuation
-ownership/dedup/state, and icon/artwork/control geometry. They are
-**awaiting authorised branch CI and not released**. The user approved commit/push for CI only; no PR, merge or installer publication is permitted. Ten Python helper tests
-pass (installer + fixture validator), and 29 JSON fixture files are syntax
-valid, including 17 synthetic Home cases. These are not Kotlin test passes.
-Gradle cannot start (`JAVA_HOME`/`java` absent); direct build-download hosts
-fail, and the official GitHub JDK asset route also returned EOF. No new MSI,
-audible playback, live Home pagination or visual acceptance is claimed.
+Repairs on `arena/01a0759b-dhun` address MSI versions, Windows extractor
+handling/diagnostics, Home pagination and player geometry/gestures. They are
+**pushed and CI-green, but not merged or released**. [CI 34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972)
+at **`75c4a8b`** passed shared JVM tests, the Android debug build and
+probe/Desktop compilation. This includes the new Home, subprocess and
+rendering regressions. The first run exposed four Home string interpolation
+errors; they are corrected, and the Quick-picks predicate is now wired into
+the screen's actual projection.
 
-The latest local review also corrected mixed Home action-target ownership,
-cancelled transport presses/hold cleanup, stale scrub handlers, and the
-subprocess deadline's output-drain gap. Their Kotlin tests remain unrun.
-The later explicit permission allows branch CI only. The no-PR/no-merge/no-release boundary remains in force.
+The sandbox itself still has no runnable JDK; direct downloads and the
+GitHub asset route failed. GitHub CI has now removed that verification
+blocker for the candidate. Ten Python helper tests and 29 JSON fixture
+syntax checks also pass locally. **No Windows MSI was packaged or installed,
+no live audio/uncached byte retrieval was verified, and no visual/native or
+soak acceptance is claimed.** The no-PR/no-merge/no-release boundary remains
+in force; no new downloadable candidate was published.
 
 The user-provided Windows yt-dlp installation state is unknown. The old
 locator could miss an installed `yt-dlp.exe`; the new candidate checks PATH /

@@ -19,7 +19,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### Branch candidate — 2026-09-06 (CI-only checkpoint; not released)
+### Branch candidate — 2026-09-06 (CI-green at 75c4a8b; not released)
 - **MSI upgrades:** increasing internal versions per build/run attempt,
   stable upgrade UUID, stale-ref publishing protection and startup version
   logging. Five Python version-ordering/bounds regressions pass locally;
@@ -42,9 +42,13 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   Previous/Next presses and hold cleanup, reset stale scrub state, and bound
   yt-dlp pipe draining as well as child exit. Ten Python helper tests and
   strict validation of 29 JSON fixture files pass; this is not an app build.
-- Kotlin regressions await authorised branch CI: local Gradle cannot
-  start without a JDK. See `docs/verification/14-release.md` for the real
-  Windows failure report, environment error and remaining acceptance gates.
+- **Branch CI passed:** [34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972) at `75c4a8b`
+  validates the shared JVM regressions, Android debug build and probe/Desktop
+  compilation. The first run's four Home interpolation errors were fixed;
+  fresh Quick picks now pass through the screen's real category projection.
+  Local Gradle still cannot start without a JDK. No PR, merge or release;
+  actual Windows upgrade/playback/visual verification remains open in
+  `docs/verification/14-release.md`.
 
 ### Added
 - **Desktop bounded audio cache** — whole-track LRU file cache for the vlcj
