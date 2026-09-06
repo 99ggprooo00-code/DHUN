@@ -19,7 +19,7 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Installer and fixture validation tests
+      - name: Packaging and fixture helper tests
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
       - name: "Unit tests — shared domain (queue, parsers, resolvers)"
