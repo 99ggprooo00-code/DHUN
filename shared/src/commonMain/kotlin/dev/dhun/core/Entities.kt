@@ -190,5 +190,17 @@ sealed interface PlaybackState {
     data class Recovering(val track: Track) : PlaybackState
     data class Playing(val track: Track) : PlaybackState
     data class Paused(val track: Track) : PlaybackState
-    data class Error(val track: Track?, val message: String) : PlaybackState
+    /**
+     * @param message human, actionable (from `DhunError.toUserMessage()`).
+     * @param detail technical companion: the per-identity resolve-chain
+     *   verdict (`web_embedded=AUTH_REQUIRED(…); visionos=PARSE(…); …`) or
+     *   the exception chain. Null when there is nothing useful to show.
+     *   Rendered as diagnostics — without it a device report cannot
+     *   distinguish "resolution gated" from "resolved, CDN refused bytes".
+     */
+    data class Error(
+        val track: Track?,
+        val message: String,
+        val detail: String? = null,
+    ) : PlaybackState
 }

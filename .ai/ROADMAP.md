@@ -1,8 +1,16 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-06 (UTC)** · session **`arena/01a0750c-dhun`** · branch at `e1f69b4`, **CI `34014443760` green** (5 commits ahead of `main@9294520`).
+Updated **2026-09-06 (UTC), after PR #24 merged** · session **`arena/01a0750c-dhun`** · `origin/main@c247fb4` · **new `test` build published `2026-09-06T06:00:14Z`** containing the audio fix + endless scroll.
 
-**Phase:** **14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS — first real hardware verdict is in, and it closed one gate and opened a blocker.**
+**Phase:** **14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS — the no-audio blocker is fixed and now in a downloadable build, awaiting re-test.**
+
+**Merged and published this session:**
+
+- **PR #24 merged → `main@c247fb4`.** CI on the PR was green (`34014443760`); post-merge **test-release `34015233896` success**, republishing the rolling `test` pre-release at `2026-09-06T06:00:14Z`:
+  - `dhun-test.apk` **17,483,422 B** (+16 KB vs the old build — the new code)
+  - `dhun-test.msi` **112,026,064 B** + both `.sha256`
+  These are the **first builds containing the User-Agent audio fix and Home endless scroll.** The previous assets (`9294520`) had neither.
+- Post-merge CI `34015233894` was still running at the time of writing; the same content already passed as PR CI.
 
 **Hardware verdict (user, real hardware, builds from the rolling `test` release):**
 
@@ -24,11 +32,18 @@ A googlevideo stream URL is **bound to the InnerTube client identity that resolv
 
 Dead end recorded so nobody repeats it: calling `httpFactory.setUserAgent(…)` inside the `ResolvingDataSource.Resolver` does **nothing** — `ResolvingDataSource` constructs its upstream data source once, in its own constructor. The agent must be stamped on the live instance per `open()`.
 
-**Exact next step:**
+**Exact next step — in order:**
 
-1. **Re-test audio on hardware with the NEXT build** (the fix is not in the currently published `test` assets — those are still `9294520`/`1.0.5`). After this branch merges and `test-release` republishes: play an uncached track on the APK and on the MSI. Capture, this time: the exact player error text (if any), `adb logcat -s DHUN` lines showing `resolved <id>: … ua=…`, OS + VLC versions, MSI sha256, and `dhun-startup.log`.
-2. **If audio still fails**, the logcat `resolved … ua=…` line splits the problem cleanly: no such line ⇒ resolution is gated on that network (extraction problem, ADR-001); line present but still no audio ⇒ the CDN rejects even a matching agent (PO-token territory, needs an ADR).
-3. Then: endless scroll check on Home, UI pass **once screenshots exist**, offline-cache checks, 30-min soaks, clean uninstalls, `v0.1.0`.
+0. **Re-test audio on the NEW build** (`test` release, published `06:00:14Z`). This is the only thing that can confirm the fix.
+
+
+1. **Re-test audio on the new build.** Play an uncached track on the APK and on the MSI. Capture: the exact player error text (if any), `adb logcat -s DHUN` lines showing `resolved <id>: … ua=…`, OS + VLC versions, MSI sha256, `dhun-startup.log`.
+2. **If audio still fails**, the logcat `resolved … ua=…` line splits it cleanly: no such line ⇒ resolution is gated on that network (extraction problem, ADR-001); line present but still no audio ⇒ the CDN rejects even a matching agent (PO-token territory, needs an ADR).
+3. **Then, per the user's direction this session:**
+   - Investigate the desktop **"stuck on Resolving"** symptom as its own bug (APK showed Buffering→Reconnecting, i.e. resolution succeeded there; desktop never left Resolving — a different failure point).
+   - **Improve on-screen diagnostics**: surface the exact resolve-chain verdict (which InnerTube identity failed and why) so the next device report is conclusive without logcat.
+   - **UI pass, researched** against `vivizzz007/vivi-music` — verified **GPL-3.0** (plus a musixmatch-only linking exception), i.e. the same licence as DHUN, so its UI code may be studied and adapted with attribution. **No forking.** Screenshots from the user still pending; findings go in `.ai/ui-research-vivi-music.md`.
+4. Then: endless scroll check on Home, offline-cache checks, 30-min soaks, clean uninstalls, `v0.1.0`.
 
 **Verification honesty:** this sandbox has **no JDK** and **no egress except `github.com`** (`api.adoptium.net`, `services.gradle.org`, `repo1.maven.org`, `dl.google.com`, `music.youtube.com` all `000`; `raw.githubusercontent.com` also blocked, so the media3 1.5.1 `DataSource` interface was read through `api.github.com`). CI is therefore the only executable check available here. Run `34014443760` **passed** on `e1f69b4` — `:shared:jvmTest` (which covers `shared/src/jvmTest`, so the new `AudioFileCacheTest` and 3 `UseCasesTest` pagination tests ran), `:app-android:assembleDebug`, probe, desktop compile. **Audio itself is still NOT verified** — that needs the next build on a device.
 
