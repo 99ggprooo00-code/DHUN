@@ -53,16 +53,16 @@ object PlaybackGraph {
         // resolver writes it, [UserAgentDataSource] reads it on open.
         val userAgentForNextOpen = AtomicReference<String?>(null)
 
+        // Configured once; the agent is restamped on it per resolve (see
+        // UserAgentDataSource) and each open builds a source from it.
         val httpFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(FALLBACK_USER_AGENT)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(25_000)
             .setAllowCrossProtocolRedirects(true)
 
-        // A fresh HTTP source per createDataSource(), wrapped so the agent can
-        // still be restamped per open (see UserAgentDataSource).
         val userAgentHttpFactory = DataSource.Factory {
-            UserAgentDataSource(httpFactory.createDataSource(), userAgentForNextOpen)
+            UserAgentDataSource(httpFactory, userAgentForNextOpen)
         }
 
         // Outer data source: segment cache when available, plain HTTP when
@@ -277,28 +277,38 @@ object PlaybackGraph {
 }
 
 /**
- * Stamps the resolving InnerTube identity onto each HTTP open.
+ * Opens each request through an HTTP source built with the User-Agent that
+ * resolved the URL.
  *
- * [androidx.media3.datasource.ResolvingDataSource] constructs its upstream
- * data source **once**, in its own constructor, so the agent cannot be
- * changed through the factory after the fact — it has to be applied to the
- * live instance, per open. [userAgent] is published by the resolver
- * immediately before the open it belongs to (same loader thread, and opens
- * on one player are serialised).
+ * Two constraints force this shape. (1) [androidx.media3.datasource.ResolvingDataSource]
+ * constructs its upstream data source once, in its own constructor, so the
+ * agent cannot be chosen later through the factory alone. (2) In media3
+ * 1.5.1 `DefaultHttpDataSource` has no `setUserAgent` — the agent is fixed
+ * at construction and only `DefaultHttpDataSource.Factory` accepts one.
+ * So: the resolver publishes the agent, and every `open` builds a fresh
+ * source from the factory carrying it.
+ *
+ * [userAgent] is written by the resolver immediately before the open it
+ * belongs to (same loader thread, and opens on one player are serialised).
  */
 private class UserAgentDataSource(
-    private val upstream: DefaultHttpDataSource,
+    private val httpFactory: DefaultHttpDataSource.Factory,
     private val userAgent: AtomicReference<String?>,
 ) : DataSource {
+    private var current: DataSource? = null
+
     override fun open(dataSpec: DataSpec): Long {
-        userAgent.get()?.let { upstream.setUserAgent(it) }
-        return upstream.open(dataSpec)
+        userAgent.get()?.let { httpFactory.setUserAgent(it) }
+        val source = httpFactory.createDataSource()
+        current = source
+        return source.open(dataSpec)
     }
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
-        upstream.read(buffer, offset, length)
+        current?.read(buffer, offset, length) ?: C.RESULT_END_OF_INPUT
 
-    override fun close() = upstream.close()
-
-    override val uri: android.net.Uri? get() = upstream.uri
+    override fun close() {
+        current?.close()
+        current = null
+    }
 }
