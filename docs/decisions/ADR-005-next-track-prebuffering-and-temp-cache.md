@@ -24,10 +24,13 @@ Hardware testing on Android and Windows revealed three interrelated playback iss
 - **Eviction / Cleanup:** If the user skips to an arbitrary track, reorders the queue, switches playlists, or exits the application, all unplayed `.prebuff` files are immediately deleted.
 - On startup, any leftover `.prebuff` or `.part` files in the temp directory are swept and removed.
 
-### 3. Android User-Agent Isolation Map
+### 3. Android Stream Isolation, Low-Latency Audio Tuning & Proactive Pre-fetch
 - In `PlaybackGraph.kt`, replace the global `AtomicReference<String?>` with a concurrent key-to-agent mapping (`ConcurrentHashMap<String, String>`).
-- When `ResolvingDataSource.Resolver` resolves `videoId`, it associates `videoId` and the resolved URL with the exact User-Agent returned by the winning InnerTube identity.
+- When `ResolvingDataSource.Resolver` resolves `videoId`, it associates `videoId` with the exact User-Agent returned by the winning InnerTube identity.
 - When `UserAgentDataSource.open(dataSpec)` opens an HTTP connection for any segment of any track, it queries the map using `dataSpec.key` (or URI), ensuring every segment of every track always presents its own matching User-Agent.
+- **Audio-Only Track Disablement:** `TrackSelectionParameters` explicitly disables video and caption tracks (`setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)`). Even when a progressive muxed fallback format is streamed, ExoPlayer demuxes and decodes purely the audio stream, never allocating video buffers or invoking video decoders.
+- **Low-Latency `DefaultLoadControl`:** Tuned specifically for music streaming (`bufferForPlaybackMs = 500`, `bufferForPlaybackAfterRebufferMs = 1_000`, `minBufferMs = 15_000`, `maxBufferMs = 50_000`, `backBufferDurationMs = 10_000`). Audio playback begins after only 0.5s of buffer instead of ExoPlayer's 2.5s video default, and 10s of back-buffer provides instant seeking without network hits.
+- **Proactive Next-Track Stream Pre-fetch:** When `AndroidDhunPlayer` enters `Playing` state, it triggers `streamCache.prefetch(nextId)` in the background so the upcoming track's URL and User-Agent are already resolved in cache when transition occurs.
 
 ### 4. Clean Audio Transition (Desktop)
 - When a track change is triggered, if the next track is already pre-buffered, it begins playing immediately with near-zero latency.

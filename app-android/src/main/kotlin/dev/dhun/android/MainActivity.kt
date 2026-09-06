@@ -330,7 +330,8 @@ class MainActivity : ComponentActivity() {
             val controller = kotlinx.coroutines.withTimeout(10_000L) {
                 pending!!.await()
             }
-            attach(AndroidDhunPlayer(controller, activityScope))
+            val cache = GlobalContext.get().get<dev.dhun.android.playback.DhunStreamCache>()
+            attach(AndroidDhunPlayer(controller, activityScope, cache))
             connectState.value = ConnectUi.Ready(reason = null)
             logLine("connected to playback service")
             return
@@ -360,7 +361,7 @@ class MainActivity : ComponentActivity() {
                     null
                 }
                 val local = PlaybackGraph.buildExoPlayer(applicationContext, cache, segments)
-                attach(AndroidDhunPlayer(local, activityScope))
+                attach(AndroidDhunPlayer(local, activityScope, cache))
                 logLine("local player ready — audio will play; session controls degraded")
                 connectState.value = ConnectUi.Ready(
                     reason = "Background/media-session controls unavailable on this device " +

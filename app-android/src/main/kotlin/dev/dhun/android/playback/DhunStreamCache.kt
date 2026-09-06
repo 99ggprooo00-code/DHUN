@@ -59,6 +59,16 @@ class DhunStreamCache(private val provider: MusicProvider) {
         }
     }
 
+    /**
+     * Proactively resolves and caches stream URL for [videoId] in background (ADR-005 prefetch).
+     */
+    suspend fun prefetch(videoId: String) {
+        val hit = cache[videoId]
+        val now = System.currentTimeMillis()
+        if (hit != null && now - hit.resolvedAtMs < TTL_MS) return
+        runCatching { get(videoId) }
+    }
+
     fun invalidate(videoId: String) {
         Log.i(TAG, "invalidating cached stream for $videoId")
         cache.remove(videoId)

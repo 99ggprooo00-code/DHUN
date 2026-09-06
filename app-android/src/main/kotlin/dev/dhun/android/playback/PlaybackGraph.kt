@@ -144,10 +144,28 @@ object PlaybackGraph {
                 /* minimumLoadableRetryCount = */ SEGMENT_RETRY_COUNT,
             ),
         )
+
+        // Audio-optimized load control: start audio in 500ms (cuts 2.5s video default),
+        // keep buffer bounded to 15-50s for music tracks, and retain 10s back-buffer for instant rewind.
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 15_000,
+                /* maxBufferMs = */ 50_000,
+                /* bufferForPlaybackMs = */ 500,
+                /* bufferForPlaybackAfterRebufferMs = */ 1_000,
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .setBackBuffer(
+                /* backBufferDurationMs = */ 10_000,
+                /* retainBackBufferFromKeyframe = */ true,
+            )
+            .build()
+
         val player = ExoPlayer.Builder(
             context,
             mediaSourceFactory,
         )
+            .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -157,6 +175,13 @@ object PlaybackGraph {
             )
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
+            .build()
+
+        // Pure audio player: disable video and text track parsing/decoding/buffering entirely.
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
             .build()
 
         // One main-thread handler for every recovery re-prepare: listener
