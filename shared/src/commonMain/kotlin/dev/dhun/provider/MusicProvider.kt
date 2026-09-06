@@ -1,6 +1,7 @@
 package dev.dhun.provider
 
 import dev.dhun.core.DhunResult
+import dev.dhun.core.HomeFeedPage
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
 import dev.dhun.core.SearchResults
@@ -17,6 +18,16 @@ interface MusicProvider {
     suspend fun search(query: String, filter: SearchFilter = SearchFilter.SONGS): DhunResult<SearchResults>
     suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults>
     suspend fun searchSuggestions(query: String): DhunResult<List<String>>
+    /**
+     * First page of home shelves plus the continuation token for the next
+     * one. Prefer this over [homeFeed] when the caller can scroll.
+     */
+    suspend fun homeFeedPage(): DhunResult<HomeFeedPage>
+
+    /** Next page of home shelves, or an empty page when the feed is done. */
+    suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage>
+
+    /** Convenience: first page, sections only. */
     suspend fun homeFeed(): DhunResult<List<HomeSection>>
     suspend fun relatedTracks(videoId: String): DhunResult<List<Track>>
     suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo>
@@ -48,8 +59,17 @@ class YouTubeMusicProvider(
     override suspend fun searchSuggestions(query: String): DhunResult<List<String>> =
         client.searchSuggestions(query)
 
+    override suspend fun homeFeedPage(): DhunResult<HomeFeedPage> =
+        client.homeFeedPage()
+
+    override suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> =
+        client.homeFeedContinuation(continuationToken)
+
     override suspend fun homeFeed(): DhunResult<List<HomeSection>> =
-        client.homeFeed()
+        when (val page = client.homeFeedPage()) {
+            is DhunResult.Success -> DhunResult.Success(page.value.sections)
+            is DhunResult.Failure -> DhunResult.Failure(page.error)
+        }
 
     override suspend fun relatedTracks(videoId: String): DhunResult<List<Track>> =
         client.relatedTracks(videoId)

@@ -75,6 +75,17 @@ data class HomeFeed(
     val quickPicks: List<Track> = emptyList(),
     val listenAgain: List<Track> = emptyList(),
     val sections: List<HomeSection> = emptyList(),
+    /**
+     * InnerTube continuation for the home shelf list. Null = the feed is
+     * exhausted; the Home screen stops asking for more (endless scroll).
+     */
+    val continuationToken: String? = null,
+)
+
+/** One page of home shelves plus the token that fetches the next one. */
+data class HomeFeedPage(
+    val sections: List<HomeSection> = emptyList(),
+    val continuationToken: String? = null,
 )
 
 data class HistoryEntry(
@@ -137,6 +148,17 @@ data class StreamInfo(
     val bitrateKbps: Int? = null,
     val codec: String? = null,
     val contentLengthBytes: Long? = null,
+    /**
+     * User-Agent of the InnerTube client identity that produced [audioUrl].
+     *
+     * googlevideo binds a signed stream URL to the identity that requested
+     * it: fetching the bytes with a different User-Agent is rejected (403 at
+     * open, or mid-stream), which surfaces as "resolved fine, but no audio".
+     * Every byte-reading layer (ExoPlayer's DataSource, the desktop cache
+     * downloader) MUST send this agent, not its own default. Null only for
+     * engines that do not expose one — those keep their historical default.
+     */
+    val userAgent: String? = null,
 )
 
 /* ---------------- Lyrics ------------------------------------------------ */

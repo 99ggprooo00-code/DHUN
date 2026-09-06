@@ -146,11 +146,13 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 
 - PR CI `34011326728` — **passed** shared JVM tests, Android debug build, probe compile, Desktop compile (`:app-desktop:compileKotlinJvm`).
 - Main CI `34011563632` — **passed** (6m10s) on `e90dba6`.
-- Rolling test-release `34011563630` — **passed** `msi` `5m13s` + `apk` `4m33s` + `publish` `19s`; published `dhun-test.msi` 112001488 bytes + `dhun-test.msi.sha256` and `dhun-test.apk` to the `test` pre-release at `2026-09-06T04:33:36Z` (tag points to `e90dba6` — verify before testing; a docs-only merge will replace these assets).
+- Rolling test-release `34011563630` — **passed** `msi` `5m13s` + `apk` `4m33s` + `publish` `19s`; published the `1.0.5` JVM-fix binaries to the `test` pre-release at `2026-09-06T04:33:36Z`.
+- Rolling test-release `34012157287` on `main@9294520` (PR #23, docs-only) — **passed**; re-published the same `1.0.5` binaries at `2026-09-06T04:45:40Z`: `dhun-test.msi` 112,001,488 bytes + `dhun-test.msi.sha256`, `dhun-test.apk` 17,467,038 bytes + `dhun-test.apk.sha256` (verified with `gh release view test`). Main CI on the same commit: `34012157207` — **passed**.
+- **The `test` tag now points at `9294520`, not `e90dba6`** — the binaries are unchanged, so either checksum set matches the JVM-fix build. Verify before testing; any further push to `main` replaces these assets.
 
 **Hardware gate still OPEN — to verify on a Windows machine:**
 
-1. Download the current `dhun-test.msi` + `dhun-test.msi.sha256` from `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`; verify checksum matches the published tag `e90dba6`.
+1. Download the current `dhun-test.msi` + `dhun-test.msi.sha256` from `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`; verify the checksum, and that the release tag currently points at `9294520` (the docs merge after the `e90dba6` fix — same `1.0.5` binaries).
 2. Install per-user (no admin) — accept SmartScreen **Run anyway** / **More info → Run anyway** — confirm install completes without admin UAC.
 3. Launch DHUN from Start menu / installed shortcut — **no** `Failed to launch JVM`; main window (1200×780) + mini-player (if visible) + tray icon appear.
 4. Check `dhun-startup.log` (packaged: `<installDir>/userdata/dhun-startup.log`; fallback: `%TEMP%\dhun-startup.log`) —
@@ -160,6 +162,28 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 6. Clean uninstall: Settings → Apps → DHUN → Uninstall → confirm `<installDir>/userdata` is removed; VLC remains (not ours).
 
 Record here: Windows version/build, VLC version (or \"not installed\"), MSI size/sha256, `dhun-startup.log` excerpts (sanitized), and whether launch succeeded. **Successful CI packaging is not launch verification.**
+
+### Hardware verdict — 2026-09-06 (user, real hardware, rolling `test` release)
+
+**Both builds launch.** `dhun-test.msi` and `dhun-test.apk` install and
+start — the `Failed to launch JVM` fix (PR #22, `java.sql` modules +
+`includeAllModules`, `1.0.5`) is confirmed working on real hardware. This
+closes the "Windows desktop startup (JVM launch)" gate below.
+
+**But no audio plays on either platform**, which is the blocking defect
+for Phase 14. Root cause found by code audit and fixed this session:
+googlevideo binds a stream URL to the InnerTube identity that resolved it,
+and every byte-reading layer was sending its own hardcoded User-Agent
+instead. See `.ai/DEBUG_LOG.md` (2026-09-06, "both builds LAUNCH, but no
+audio at all") for the full chain and the `ResolvingDataSource` trap.
+
+Also reported: **no endless scroll** (Home had no pagination at any layer —
+fixed: `HomeFeedPage` + `homeFeedContinuation` + near-bottom trigger), and
+the UI reads as poor on both apps (no screenshots provided; not restyled).
+
+Not recorded because it was not reported: OS/VLC versions, MSI sha256,
+`dhun-startup.log` excerpts, and whether the player showed an error or
+looked like it was playing. The audio re-test should capture those.
 
 ### v0.1.0 release gate
 

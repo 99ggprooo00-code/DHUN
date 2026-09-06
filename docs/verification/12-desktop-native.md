@@ -85,9 +85,9 @@ phase-2 readiness requirements.
 
 - **Startup diagnostics (`Main.kt`):** `Thread.setDefaultUncaughtExceptionHandler`, probes for `java.sql.Driver`/`org.sqlite.JDBC`/`vlcj` availability, logs to `<installDir>/userdata/dhun-startup.log` (fallback `%TEMP%`/`dhun-startup.log`) with OS/Java/jpackage.app-path/stacktrace, shows AWT `JOptionPane` dialog on failure, and can open a minimal error `Window` if Koin/DataLayer fails before the main window (previously the launcher's generic message was the only signal). `DataLayer` creation now tries file DB then in-memory fallback and logs both.
 
-**CI evidence:** PR #22 `34011326728` passed shared tests + Android + probe + Desktop compiles; `test-release` `34011563630` on `main@e90dba6` (merge commit) built and published `dhun-test.msi` (5m13s) + `dhun-test.apk` (4m33s) — the MSI that previously would have launched with the generic error now bundles the required modules.
+**CI evidence:** PR #22 `34011326728` passed shared tests + Android + probe + Desktop compiles; `test-release` `34011563630` on `main@e90dba6` (merge commit) built and published `dhun-test.msi` (5m13s) + `dhun-test.apk` (4m33s) — the MSI that previously would have launched with the generic error now bundles the required modules. Post-fix docs merge PR #23 (`main@9294520`) re-ran both green — CI `34012157207`, test-release `34012157287` — and republished the identical `1.0.5` binaries (MSI 112,001,488 B, APK 17,467,038 B) at `2026-09-06T04:45:40Z`; the `test` tag now points at `9294520`.
 
-**Remaining verification (OPEN — requires Windows hardware):** install `dhun-test.msi` from the rolling `test` pre-release at `e90dba6` on a clean Windows user/VM (accept SmartScreen), launch DHUN, confirm:
+**Remaining verification (OPEN — requires Windows hardware):** install `dhun-test.msi` from the rolling `test` pre-release (tag `9294520`, same `1.0.5` JVM-fix build as `e90dba6`) on a clean Windows user/VM (accept SmartScreen), launch DHUN, confirm:
 
 - No `Failed to launch JVM` — window opens, tray icon appears.
 - `dhun-startup.log` (in `<installDir>/userdata` or `%TEMP%` if dataDir not yet created) contains `java.sql.Driver available` + `org.sqlite.JDBC available` + `VLC initialized` (or `VLC init failed` → graceful Error state with VLC install hint, not a crash).

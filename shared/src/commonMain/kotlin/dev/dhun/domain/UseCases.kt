@@ -34,9 +34,9 @@ class GetHomeFeedUseCase(
 ) {
     suspend operator fun invoke(): DhunResult<HomeFeed> {
         val greeting = greetingForCurrentTime(clock)
-        return when (val r = provider.homeFeed()) {
+        return when (val r = provider.homeFeedPage()) {
             is DhunResult.Success -> {
-                val sections = r.value
+                val sections = r.value.sections
                 val quickPicks = extractQuickPicks(sections)
                 // Keep remote shelves intact so Home can scroll deep; only
                 // promote quick-picks extraction for the grid hero.
@@ -45,12 +45,40 @@ class GetHomeFeedUseCase(
                         greeting = greeting,
                         quickPicks = quickPicks,
                         sections = sections,
+                        continuationToken = r.value.continuationToken,
                     )
                 )
             }
             is DhunResult.Failure -> {
                 DhunResult.Failure(r.error)
             }
+        }
+    }
+
+    /**
+     * Appends the next page of home shelves to [current] (endless scroll).
+     * A no-op Success when the feed is exhausted or a page is already in
+     * flight — the caller keeps what it has rather than losing the list.
+     */
+    suspend fun loadMore(current: HomeFeed): DhunResult<HomeFeed> {
+        val token = current.continuationToken
+            ?: return DhunResult.Success(current.copy(continuationToken = null))
+        return when (val r = provider.homeFeedContinuation(token)) {
+            is DhunResult.Success -> {
+                val page = r.value
+                val existing = current.sections.map { it.title }.toSet()
+                val fresh = page.sections.filterNot { it.title in existing }
+                DhunResult.Success(
+                    current.copy(
+                        sections = current.sections + fresh,
+                        // Stop scrolling when the server sends no new token,
+                        // or when a page added nothing (pagination is done).
+                        continuationToken = page.continuationToken
+                            ?.takeIf { fresh.isNotEmpty() },
+                    )
+                )
+            }
+            is DhunResult.Failure -> DhunResult.Failure(r.error)
         }
     }
 

@@ -1,5 +1,6 @@
 package dev.dhun.domain
 
+import dev.dhun.core.DhunResult
 import dev.dhun.core.HistoryEntry
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
@@ -153,6 +154,137 @@ class UseCasesTest {
         assertNotNull(restore())
         save.clear()
         assertNull(restore())
+    }
+
+    /* ---------------- home feed pagination (endless scroll) ---------------- */
+
+    private class PagingProvider(
+        private val first: dev.dhun.core.HomeFeedPage,
+        private val pages: Map<String, dev.dhun.core.HomeFeedPage>,
+    ) : dev.dhun.provider.MusicProvider {
+        var continuationCalls = 0
+        override suspend fun homeFeedPage(): DhunResult<dev.dhun.core.HomeFeedPage> =
+            DhunResult.Success(first)
+
+        override suspend fun homeFeedContinuation(
+            continuationToken: String,
+        ): DhunResult<dev.dhun.core.HomeFeedPage> {
+            continuationCalls++
+            return DhunResult.Success(
+                pages[continuationToken] ?: dev.dhun.core.HomeFeedPage(),
+            )
+        }
+
+        override suspend fun homeFeed(): DhunResult<List<dev.dhun.core.HomeSection>> =
+            when (val page = homeFeedPage()) {
+                is DhunResult.Success -> DhunResult.Success(page.value.sections)
+                is DhunResult.Failure -> DhunResult.Failure(page.error)
+            }
+
+        // Unused by GetHomeFeedUseCase — MusicProvider's other members.
+        override suspend fun search(query: String, filter: dev.dhun.innertube.SearchFilter) =
+            DhunResult.Success(dev.dhun.core.SearchResults(query))
+        override suspend fun searchContinuation(continuationToken: String) =
+            DhunResult.Success(dev.dhun.core.SearchResults(""))
+        override suspend fun searchSuggestions(query: String) =
+            DhunResult.Success(emptyList<String>())
+        override suspend fun relatedTracks(videoId: String) =
+            DhunResult.Success(emptyList<Track>())
+        override suspend fun getStreamInfo(videoId: String) =
+            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable)
+        override suspend fun getLyrics(videoId: String) =
+            DhunResult.Success<dev.dhun.core.Lyrics>(dev.dhun.core.Lyrics.NotAvailable)
+        override suspend fun artistPage(browseId: String) =
+            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable)
+        override suspend fun albumPage(browseId: String) =
+            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable)
+        override suspend fun playlistPage(browseId: String) =
+            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable)
+    }
+
+    private fun shelf(title: String, vararg trackIds: String) = dev.dhun.core.HomeSection(
+        title = title,
+        items = trackIds.map { dev.dhun.core.HomeItem.TrackItem(track(it)) },
+    )
+
+    @Test
+    fun homeFeedCarriesTheContinuationTokenAndLoadMoreAppendsTheNextPage() = runBlocking {
+        val provider = PagingProvider(
+            first = dev.dhun.core.HomeFeedPage(
+                sections = listOf(shelf("Made for you", "a1", "a2")),
+                continuationToken = "page2",
+            ),
+            pages = mapOf(
+                "page2" to dev.dhun.core.HomeFeedPage(
+                    sections = listOf(shelf("Charts", "b1")),
+                    continuationToken = "page3",
+                ),
+            ),
+        )
+        val useCase = GetHomeFeedUseCase(provider, FakeHistoryRepo)
+
+        val first = (useCase() as DhunResult.Success).value
+        assertEquals("page2", first.continuationToken)
+        assertEquals(listOf("Made for you"), first.sections.map { it.title })
+
+        val second = (useCase.loadMore(first) as DhunResult.Success).value
+        assertEquals(
+            listOf("Made for you", "Charts"),
+            second.sections.map { it.title },
+            "the next page must be appended, not replace the shelves on screen",
+        )
+        assertEquals("page3", second.continuationToken)
+    }
+
+    @Test
+    fun homePaginationStopsWhenTheServerRunsOutOfShelves() = runBlocking {
+        val provider = PagingProvider(
+            first = dev.dhun.core.HomeFeedPage(
+                sections = listOf(shelf("Made for you", "a1")),
+                continuationToken = "last",
+            ),
+            pages = mapOf(
+                "last" to dev.dhun.core.HomeFeedPage(
+                    sections = listOf(shelf("Charts", "b1")),
+                    continuationToken = null,
+                ),
+            ),
+        )
+        val useCase = GetHomeFeedUseCase(provider, FakeHistoryRepo)
+
+        val feed = (useCase() as DhunResult.Success).value
+        val exhausted = (useCase.loadMore(feed) as DhunResult.Success).value
+        assertNull(exhausted.continuationToken, "no token left means the feed is finished")
+
+        val after = (useCase.loadMore(exhausted) as DhunResult.Success).value
+        assertEquals(0, provider.continuationCalls - 1, "an exhausted feed must not hit the network")
+        assertEquals(exhausted.sections.size, after.sections.size)
+    }
+
+    @Test
+    fun homePaginationDropsDuplicateShelvesAndStopsOnAnEmptyPage() = runBlocking {
+        val provider = PagingProvider(
+            first = dev.dhun.core.HomeFeedPage(
+                sections = listOf(shelf("Made for you", "a1")),
+                continuationToken = "dup",
+            ),
+            pages = mapOf(
+                // Same shelf title again: LazyColumn keys are title-based, so a
+                // duplicate would crash the list — and an empty page means the
+                // server is just repeating itself.
+                "dup" to dev.dhun.core.HomeFeedPage(
+                    sections = listOf(shelf("Made for you", "a9")),
+                    continuationToken = "forever",
+                ),
+            ),
+        )
+        val useCase = GetHomeFeedUseCase(provider, FakeHistoryRepo)
+
+        val feed = (useCase() as DhunResult.Success).value
+        val after = (useCase.loadMore(feed) as DhunResult.Success).value
+        assertEquals(1, after.sections.size, "a repeated shelf must not be appended")
+        assertEquals("a1", (after.sections[0].items[0] as dev.dhun.core.HomeItem.TrackItem).track.id)
+        assertNull(after.continuationToken, "a page that adds nothing ends pagination")
     }
 
     /** Minimal fake for the pure grouping test (no DB needed). */

@@ -31,7 +31,13 @@ import kotlin.concurrent.withLock
 class AudioFileCache(
     val dir: File,
     val maxBytes: Long,
-    private val fetch: (url: String) -> InputStream = ::openHttp,
+    /**
+     * Injectable network layer: `fetch(url, userAgent)`. The agent matters —
+     * googlevideo rejects a byte read whose User-Agent differs from the
+     * InnerTube identity that resolved the URL, so [download] forwards
+     * `StreamInfo.userAgent` here. Tests inject a fake and ignore it.
+     */
+    private val fetch: (url: String, userAgent: String?) -> InputStream = ::openHttp,
 ) {
     private val lock = ReentrantLock()
 
@@ -73,6 +79,12 @@ class AudioFileCache(
         expectedBytes: Long? = null,
         cancel: AtomicBoolean = AtomicBoolean(false),
         onProgress: ((bytes: Long) -> Unit)? = null,
+        /**
+         * User-Agent of the identity that resolved [url]. googlevideo 403s a
+         * byte read whose agent differs from the resolving one, so callers
+         * must pass `StreamInfo.userAgent` rather than rely on the default.
+         */
+        userAgent: String? = null,
     ): File? {
         if (!isSafeId(videoId)) return null
         fileFor(videoId)?.let { return it }
@@ -82,7 +94,7 @@ class AudioFileCache(
         val target = File(dir, videoId + AUDIO_SUFFIX)
         var written = 0L
         val ok = try {
-            copyToPart(url, part, cancel, onProgress) { written = it }
+            copyToPart(url, part, cancel, onProgress, userAgent) { written = it }
         } catch (_: IOException) {
             false
         } catch (_: RuntimeException) {
@@ -127,10 +139,11 @@ class AudioFileCache(
         part: File,
         cancel: AtomicBoolean,
         onProgress: ((Long) -> Unit)?,
+        userAgent: String?,
         report: (Long) -> Unit,
     ): Boolean {
         var written = 0L
-        fetch(url).use { input ->
+        fetch(url, userAgent).use { input ->
             part.outputStream().buffered().use { out ->
                 val buf = ByteArray(64 * 1024)
                 while (true) {
@@ -188,12 +201,12 @@ class AudioFileCache(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
-        private fun openHttp(url: String): InputStream {
+        private fun openHttp(url: String, userAgent: String?): InputStream {
             val conn = URI(url).toURL().openConnection() as HttpURLConnection
             conn.connectTimeout = 15_000
             conn.readTimeout = 25_000
             conn.instanceFollowRedirects = true
-            conn.setRequestProperty("User-Agent", USER_AGENT)
+            conn.setRequestProperty("User-Agent", userAgent ?: USER_AGENT)
             val code = conn.responseCode
             if (code !in 200..299) {
                 conn.disconnect()

@@ -1,5 +1,115 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — hardware verdict: both builds LAUNCH, but no audio at all (session arena/01a0750c-dhun)
+
+**Report (user, real hardware, builds from the rolling `test` release):**
+`dhun-test.msi` and `dhun-test.apk` both install and **both launch** — the
+"Failed to launch JVM" fix from PR #22 is confirmed on hardware. But:
+
+1. **No audio plays on either platform.** Not one track, on either app.
+2. UI reads as "bad / terrible", and the two apps look much alike.
+3. **No endless scroll** anywhere.
+
+**Root cause found for (1) — User-Agent mismatch on the byte fetch:**
+
+A googlevideo stream URL is bound to the InnerTube client identity that
+resolved it. `OwnClientStreamResolver` tries seven identities
+(`web_embedded` → `visionos` → `tv` → `tv_downgraded` → `tv_simply` →
+`mweb` → `web_remix`), each with a *different* User-Agent, then returned
+**only the URL**. `StreamInfo` had no field for the identity.
+
+Every byte-reading layer then used its own hardcoded agent:
+
+| Layer | Agent it sent | File |
+|---|---|---|
+| ExoPlayer HTTP source | `Mozilla/5.0 (Linux; Android 14) … Chrome/126` | `PlaybackGraph.kt` |
+| Desktop audio-file cache | `Mozilla/5.0 (Windows NT 10.0; …) Chrome/126` | `AudioFileCache.kt` |
+| libVLC itself | whatever libVLC sends — **not overridable via vlcj** | `DesktopDhunPlayer.kt` |
+
+So resolution succeeded and the CDN refused the bytes. This is the same
+failure the drill saw once and mis-attributed to IP gating — 2026-09-05
+entry: *"expanded chain got googlevideo URL, CDN 403 on bytes"*.
+
+**Fix (this session):** `StreamInfo.userAgent` added and populated by every
+resolver (own-client stamps the winning strategy; yt-dlp pinned with
+`--user-agent`; NewPipe from `SimpleDownloader.USER_AGENT`).
+`AltInnertubeClient.userAgent` made public. Android: `DhunStreamCache`
+returns url+agent, `PlaybackGraph` wraps the HTTP source in
+`UserAgentDataSource` which stamps the agent on the live instance per open.
+Desktop: cache downloader gets the agent, and because libVLC cannot send
+one, a fallback waits for that download and replays from the local file
+when libVLC rejects the URL (one attempt per track, `Recovering` state).
+
+**Dead end worth recording:** the obvious fix — `httpFactory.setUserAgent(…)`
+inside the `ResolvingDataSource.Resolver` — does **nothing**. `ResolvingDataSource`
+constructs its upstream data source once, in its own constructor, so the
+agent is baked in before the first resolve. It has to be applied to the
+live instance per `open()`.
+
+**Root cause for (3):** `MusicProvider` had `searchContinuation` but **no
+home continuation at all** — `homeFeed()` returned a bare `List<HomeSection>`
+and `HomeScreen` had no list state, so Home could never scroll past page one.
+Added `HomeFeedPage` (sections + token), `homeFeedPage()` /
+`homeFeedContinuation()` through client → provider → use case → ViewModel,
+and a near-bottom trigger + spinner in `HomeScreen`. Search already had
+load-more wiring and is unchanged.
+
+**Four CI rounds to compile the Android half — media3 1.5.1 API traps.**
+Worth recording because each one is a plausible-looking API that does not
+exist or behaves differently here:
+
+1. `httpFactory.setUserAgent(…)` inside the `ResolvingDataSource.Resolver`
+   compiles but does **nothing** — `ResolvingDataSource` builds its upstream
+   data source once, in its own constructor.
+2. `DefaultHttpDataSource.Builder()` — **does not exist** in 1.5.1
+   (`Unresolved reference 'Builder'`). It is `DefaultHttpDataSource.Factory`.
+3. `DefaultHttpDataSource.setUserAgent(…)` on an **instance** — does not
+   exist; only `Factory.setUserAgent(@Nullable String)` does. Verified
+   against the source at tag `1.5.1`.
+4. `override val uri` on a `DataSource` — *"'uri' overrides nothing"*. The
+   interface declares `@Nullable Uri getUri()`, so Kotlin wants
+   `override fun getUri()`.
+5. The member that kept producing the truncated *"does not implement
+   abstract members"* error: **`addTransferListener(TransferListener)` is
+   abstract**, not default. Only `getResponseHeaders()` has a default.
+
+GitHub annotations truncate multi-line compiler messages and
+`gh run view --log` returned nothing, so the interface was read directly
+via `api.github.com/repos/androidx/media/contents/...?ref=1.5.1`
+(`raw.githubusercontent.com` is blocked in this sandbox, `api.github.com`
+is not). **Lesson: when an "unimplemented member" error is truncated, fetch
+the interface instead of guessing — four CI rounds cost ~10 minutes each.**
+
+Final shape that compiles: the resolver publishes the agent into an
+`AtomicReference`; `UserAgentDataSource.open()` restamps the
+`DefaultHttpDataSource.Factory`, builds a fresh source for that one
+request, and implements `addTransferListener` / `getUri` /
+`getResponseHeaders` by delegation.
+
+**Device answers (same session) — they confirm the diagnosis and rule out two alternatives:**
+
+| Question | Answer | What it settles |
+|---|---|---|
+| APK symptom | **"Buffering, then Reconnecting"** | Resolution **succeeded** (Buffering means a URL arrived and ExoPlayer opened it), then the byte fetch failed → `PlaybackGraph`'s recovery listener set `Recovering` → "Reconnecting…". That is *exactly* the User-Agent-mismatch signature, not a resolution failure. |
+| Windows symptom | **"Resolving"** (stuck) | Different symptom — stuck in `PlaybackState.Resolving`, i.e. `provider.getStreamInfo` had not returned. VLC is installed, so this is not a missing dependency. Note: `postAltJson` does **not** retry a definitive `LOGIN_REQUIRED`/`UNPLAYABLE` verdict (`catch (DhunException) { throw e }` exits immediately) — only 429/5xx/timeout get the 2 attempts — so "stuck" means slow/timing-out requests, not a retry storm. Re-check with the fixed build before treating it as a second bug. |
+| Metadata | **Partial** — some content loads | Their network reaches YouTube for at least some calls, so this is **not** blanket IP gating. Consistent with a stream-layer (not metadata-layer) failure. |
+| VLC | **Installed** | Rules out the "no libVLC ⇒ no desktop audio path" explanation. |
+| UI | Screenshots to follow | No restyle attempted yet. |
+
+The APK answer is the strongest evidence in this file: "Buffering → Reconnecting"
+cannot be produced by a resolver that never returns a URL. Something resolved,
+and the CDN then refused the bytes.
+
+**(2) is unresolved — no screenshots were provided**, so no restyle was
+attempted rather than guess at the wrong thing.
+
+**Verification status:** no JDK and no egress in this sandbox (only
+`github.com` resolves; `api.adoptium.net`, `services.gradle.org`,
+`repo1.maven.org`, `dl.google.com` all `000`), so this is code-read +
+CI-compiled. **Audio is NOT yet verified** — needs the next APK/MSI on a
+device. `AudioFileCacheTest` now asserts the agent reaches the network
+layer; `UseCasesTest` has three new home-pagination tests.
+
 ## 2026-09-06 — device screenshots: splash rawness, total APK stream failure, sheets (session arena/01a0740a-dhun)
 
 **Report:** splash shows raw attempt/log lines; APK streams nothing

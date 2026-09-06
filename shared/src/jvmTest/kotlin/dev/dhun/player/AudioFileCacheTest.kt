@@ -21,8 +21,12 @@ class AudioFileCacheTest {
     private val bodies = HashMap<String, ByteArray>()
     private var fetches = 0
 
-    private val fetch: (String) -> InputStream = { url ->
+    /** User-Agent seen by the network layer, per fetch, in order. */
+    private val seenUserAgents = ArrayList<String?>()
+
+    private val fetch: (String, String?) -> InputStream = { url, userAgent ->
         fetches++
+        seenUserAgents += userAgent
         bodies[url]?.let { ByteArrayInputStream(it) } ?: throw IOException("404 $url")
     }
 
@@ -40,6 +44,24 @@ class AudioFileCacheTest {
 
     private fun body(url: String, size: Int) {
         bodies[url] = ByteArray(size) { (it % 251).toByte() }
+    }
+
+    @Test
+    fun downloadPresentsTheResolvingIdentityToTheNetworkLayer() {
+        // googlevideo answers a byte read whose User-Agent differs from the
+        // InnerTube identity that resolved the URL with 403 — the agent has
+        // to travel from StreamInfo all the way down to the socket.
+        body("u/ua", 100)
+        val c = cache(10_000)
+
+        assertNotNull(c.download("uauauauaua1", "u/ua", userAgent = "Cobalt/25.lts"))
+        assertEquals(listOf<String?>("Cobalt/25.lts"), seenUserAgents)
+
+        // No identity reported (e.g. a non-InnerTube engine) → null, and the
+        // transport falls back to its own default rather than sending none.
+        body("u/ub", 100)
+        assertNotNull(c.download("uauauauaua2", "u/ub"))
+        assertEquals(listOf<String?>("Cobalt/25.lts", null), seenUserAgents)
     }
 
     @Test

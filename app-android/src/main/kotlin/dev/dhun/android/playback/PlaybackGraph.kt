@@ -8,12 +8,15 @@ import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import dev.dhun.player.StreamRecoverySignal
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -47,21 +50,28 @@ object PlaybackGraph {
         streamCache: DhunStreamCache,
         audioCache: DhunAudioSegmentCache?,
     ): DataSource.Factory {
+        // The agent googlevideo expects for the URL about to be opened. The
+        // resolver writes it, [UserAgentDataSource] reads it on open.
+        val userAgentForNextOpen = AtomicReference<String?>(null)
+
+        // Configured once; the agent is restamped on it per resolve (see
+        // UserAgentDataSource) and each open builds a source from it.
         val httpFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent(
-                "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
-                    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-            )
+            .setUserAgent(FALLBACK_USER_AGENT)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(25_000)
             .setAllowCrossProtocolRedirects(true)
+
+        val userAgentHttpFactory = DataSource.Factory {
+            UserAgentDataSource(httpFactory, userAgentForNextOpen)
+        }
 
         // Outer data source: segment cache when available, plain HTTP when
         // the cache dir is unusable (no offline replay in that mode).
         val outerFactory: DataSource.Factory = if (audioCache != null) {
             CacheDataSource.Factory()
                 .setCache(audioCache.cache)
-                .setUpstreamDataSourceFactory(httpFactory)
+                .setUpstreamDataSourceFactory(userAgentHttpFactory)
                 // Prefer cache; on cache read errors fall through to network once.
                 .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
                 // Key already set on DataSpec in the resolver — do not let the
@@ -70,7 +80,7 @@ object PlaybackGraph {
                     dataSpec.key?.takeIf { it.isNotBlank() } ?: dataSpec.uri.toString()
                 }
         } else {
-            httpFactory
+            userAgentHttpFactory
         }
 
         return ResolvingDataSource.Factory(
@@ -83,13 +93,20 @@ object PlaybackGraph {
                     throw java.io.IOException("bad media uri: ${dataSpec.uri}", e)
                 }
                 try {
-                    val url = runBlocking { streamCache.get(videoId) }
+                    val resolved = runBlocking { streamCache.get(videoId) }
+                    // googlevideo binds a signed stream URL to the InnerTube
+                    // identity that resolved it and answers a byte read from
+                    // any other User-Agent with 403 — which ExoPlayer reports
+                    // as a playback error, i.e. "no audio". Hand the resolving
+                    // identity to the data source before the open it feeds.
+                    userAgentForNextOpen.set(resolved.userAgent ?: FALLBACK_USER_AGENT)
                     dataSpec
                         .buildUpon()
-                        .setUri(Uri.parse(url))
+                        .setUri(Uri.parse(resolved.url))
                         .setKey(videoId)
                         .build()
                 } catch (e: Exception) {
+                    userAgentForNextOpen.set(FALLBACK_USER_AGENT)
                     if (audioCache != null && audioCache.hasContent(videoId)) {
                         android.util.Log.i(
                             "DHUN",
@@ -249,8 +266,64 @@ object PlaybackGraph {
         return false
     }
 
+    /** Only used when a resolver reports no identity (non-InnerTube engines). */
+    private const val FALLBACK_USER_AGENT =
+        "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
     private const val MAX_RETRIES = 3
     private const val RETRY_BACKOFF_MS = 1_500L
     /** Per-segment load retries before the error reaches onPlayerError. */
     private const val SEGMENT_RETRY_COUNT = 5
+}
+
+/**
+ * Opens each request through an HTTP source built with the User-Agent that
+ * resolved the URL.
+ *
+ * Two constraints force this shape. (1) [ResolvingDataSource] constructs its
+ * upstream data source once, in its own constructor, so the agent cannot be
+ * chosen later through the factory alone. (2) In media3 1.5.1
+ * `DefaultHttpDataSource` has no instance-level `setUserAgent` — the agent
+ * is fixed at construction and only `DefaultHttpDataSource.Factory` accepts
+ * one. So the resolver publishes the agent, and every [open] restamps the
+ * factory and builds a fresh source for that one request.
+ *
+ * [userAgent] is written by the resolver immediately before the open it
+ * belongs to (same loader thread, and opens on one player are serialised).
+ *
+ * `DataSource` declares `addTransferListener` and `getUri` as abstract
+ * (only `getResponseHeaders` has a default), so all of them are implemented
+ * here — omitting the listener registration is what an earlier attempt got
+ * wrong.
+ */
+private class UserAgentDataSource(
+    private val httpFactory: DefaultHttpDataSource.Factory,
+    private val userAgent: AtomicReference<String?>,
+) : DataSource {
+    private var current: DataSource? = null
+
+    override fun addTransferListener(transferListener: TransferListener) {
+        current?.addTransferListener(transferListener)
+    }
+
+    override fun open(dataSpec: DataSpec): Long {
+        userAgent.get()?.let { httpFactory.setUserAgent(it) }
+        val source = httpFactory.createDataSource()
+        current = source
+        return source.open(dataSpec)
+    }
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+        current?.read(buffer, offset, length) ?: C.RESULT_END_OF_INPUT
+
+    override fun getUri(): android.net.Uri? = current?.uri
+
+    override fun getResponseHeaders(): Map<String, List<String>> =
+        current?.responseHeaders ?: emptyMap()
+
+    override fun close() {
+        current?.close()
+        current = null
+    }
 }

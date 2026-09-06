@@ -86,6 +86,10 @@ class BrowseViewModelTest {
         override suspend fun searchContinuation(continuationToken: String) = DhunResult.Success(SearchResults(""))
         override suspend fun searchSuggestions(query: String) = DhunResult.Success(emptyList<String>())
         override suspend fun homeFeed() = DhunResult.Success(emptyList<HomeSection>())
+        override suspend fun homeFeedPage() =
+            DhunResult.Success(dev.dhun.core.HomeFeedPage())
+        override suspend fun homeFeedContinuation(continuationToken: String) =
+            DhunResult.Success(dev.dhun.core.HomeFeedPage())
         override suspend fun relatedTracks(videoId: String) = DhunResult.Success(radio)
         override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> = DhunResult.Failure(DhunError.Unavailable)
         override suspend fun getLyrics(videoId: String) = DhunResult.Success(Lyrics.NotAvailable)

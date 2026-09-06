@@ -18,10 +18,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
 import dev.dhun.core.HomeFeed
@@ -94,6 +99,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -123,6 +129,8 @@ fun HomeScreen(
                     feed = state.feed,
                     recentlyPlayed = recentlyPlayed,
                     isRefreshing = isRefreshing,
+                    isLoadingMore = isLoadingMore,
+                    onLoadMore = { viewModel.loadMore() },
                     onRefresh = { viewModel.refresh() },
                     onTrackClick = onTrackClick,
                     onAlbumClick = onAlbumClick,
@@ -144,6 +152,8 @@ private fun HomeFeedContent(
     feed: HomeFeed,
     recentlyPlayed: List<Track>,
     isRefreshing: Boolean,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit,
     onRefresh: () -> Unit,
     onTrackClick: (track: Track, contextQueue: List<Track>, index: Int) -> Unit,
     onAlbumClick: (Album) -> Unit,
@@ -191,7 +201,25 @@ private fun HomeFeedContent(
         }
     }
 
+    val listState = rememberLazyListState()
+
+    // Endless scroll: ask for the next page of shelves once the user gets
+    // near the end of what we already have. `feed.continuationToken == null`
+    // means InnerTube has no more shelves, so nothing is requested.
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val total = listState.layoutInfo.totalItemsCount
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            total > 0 && lastVisible >= total - 3
+        }
+    }
+    val canLoadMore = feed.continuationToken != null
+    LaunchedEffect(shouldLoadMore, canLoadMore, isLoadingMore) {
+        if (shouldLoadMore && canLoadMore && !isLoadingMore) onLoadMore()
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
@@ -355,7 +383,7 @@ private fun HomeFeedContent(
 
         // ---- Rediscover / mixes -----------------------------------------------
         mixSections.forEach { section ->
-            item(key = "mix_${section.title}") {
+            item(key = "mix_${mixSections.indexOf(section)}_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -369,7 +397,7 @@ private fun HomeFeedContent(
 
         // ---- Charts & trending ------------------------------------------------
         chartSections.forEach { section ->
-            item(key = "chart_${section.title}") {
+            item(key = "chart_${chartSections.indexOf(section)}_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -382,7 +410,7 @@ private fun HomeFeedContent(
 
         // ---- Albums & EPs -----------------------------------------------------
         albumSections.forEach { section ->
-            item(key = "album_${section.title}") {
+            item(key = "album_${albumSections.indexOf(section)}_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -401,7 +429,7 @@ private fun HomeFeedContent(
             if (kind == HomeShelfKind.MIX || kind == HomeShelfKind.CHARTS || kind == HomeShelfKind.ALBUMS) {
                 return@forEach
             }
-            item(key = "other_${section.title}") {
+            item(key = "other_${orderedOther.indexOf(section)}_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -409,6 +437,24 @@ private fun HomeFeedContent(
                     onPlaylistClick = onPlaylistClick,
                     onArtistClick = onArtistClick,
                 )
+            }
+        }
+
+        // ---- Next-page indicator ----------------------------------------------
+        if (isLoadingMore) {
+            item(key = "load_more") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = DhunSpacing.lg),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        strokeWidth = 2.dp,
+                        color = DhunColors.accent,
+                    )
+                }
             }
         }
     }
