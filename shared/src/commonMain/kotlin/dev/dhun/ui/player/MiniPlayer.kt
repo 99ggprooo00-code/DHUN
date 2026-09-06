@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -192,6 +193,15 @@ fun MiniPlayer(
     if (showErrorDialog && errorState != null) {
         AlertDialog(
             onDismissRequest = { showErrorDialog = false },
+            // Stock AlertDialog paints an opaque grey slab that ignored the
+            // design system entirely (visible in the device screenshots).
+            // Match the frosted M3 chrome the rest of the app uses.
+            containerColor = DhunColors.glassStrong,
+            titleContentColor = DhunColors.textPrimary,
+            textContentColor = DhunColors.textSecondary,
+            iconContentColor = DhunColors.accent,
+            tonalElevation = DhunSpacing.zero,
+            shape = DhunShapes.extraLarge,
             title = {
                 Text(
                     text = "Playback error",
@@ -200,11 +210,27 @@ fun MiniPlayer(
                 )
             },
             text = {
-                Text(
-                    text = errorState.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DhunColors.textSecondary,
-                )
+                Column {
+                    Text(
+                        text = errorState.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DhunColors.textSecondary,
+                    )
+                    // Diagnostics chain, when the resolver supplied one. The
+                    // FullPlayer already surfaces this; the mini-player dialog
+                    // is where most users actually hit the error first.
+                    val detail = errorState.detail
+                    if (!detail.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                        Text(
+                            text = detail,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DhunColors.textTertiary,
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(

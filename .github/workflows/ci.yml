@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Session branches build too: a commit pushed to `arena/**` before its PR
+    # exists used to get NO CI at all, silently (2026-09-06 handoff, Task B).
+    branches: [main, "arena/**"]
   pull_request:
 
 jobs:

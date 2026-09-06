@@ -48,6 +48,8 @@ fun TrackOverflowDialog(
             // dark glass instead of drawing a hard boundary.
             shape = DhunShapes.extraLarge,
             borderColor = DhunColors.border,
+            // Floating over a scrim — needs a base or the page reads through.
+            opaqueBase = true,
         ) {
             Column(
                 modifier = Modifier

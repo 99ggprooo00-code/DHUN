@@ -47,6 +47,16 @@ fun GlassCard(
      * into the scrim instead of drawing a hard boundary on dark glass.
      */
     borderColor: Color = DhunColors.glassEdge,
+    /**
+     * Paints an opaque base under the translucent stack.
+     *
+     * Glass only works when there is something *behind* it. A `Dialog` floats
+     * over a dimmed scrim, so a purely translucent card let the page beneath
+     * bleed straight through the text — the device screenshots show a "New
+     * playlist" sheet whose fields are illegible against the list under it.
+     * Dialogs and sheets pass `true`; in-page glass leaves it `false`.
+     */
+    opaqueBase: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     @Suppress("UNUSED_VARIABLE")
@@ -61,6 +71,9 @@ fun GlassCard(
     Box(
         modifier = base
             .clip(shape)
+            .then(
+                if (opaqueBase) Modifier.background(DhunColors.surface, shape) else Modifier,
+            )
             .background(
                 Brush.verticalGradient(
                     colors = listOf(

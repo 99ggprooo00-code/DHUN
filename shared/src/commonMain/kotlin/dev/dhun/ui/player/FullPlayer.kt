@@ -12,7 +12,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -37,6 +39,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -128,17 +131,19 @@ fun FullPlayer(
         ArtworkColorExtractor.extractFromSeed(current?.thumbnailUrl ?: current?.id ?: "")
     }
     val bgTintTop by animateColorAsState(
-        targetValue = colors.primary.copy(alpha = 0.28f),
+        targetValue = colors.backgroundTint,
         animationSpec = DhunAnimations.slowTween(),
         label = "bgTintTop",
     )
     val bgTintMid by animateColorAsState(
-        targetValue = colors.primary.copy(alpha = 0.10f),
+        targetValue = colors.backgroundTint.copy(alpha = 0.05f),
         animationSpec = DhunAnimations.slowTween(),
         label = "bgTintMid",
     )
+    // Controls use the tamed accent, never the raw artwork colour — a raw
+    // hue put a red play disc + red volume slider on screen (device report).
     val accent by animateColorAsState(
-        targetValue = colors.primary,
+        targetValue = colors.controlAccent,
         animationSpec = DhunAnimations.slowTween(),
         label = "accent",
     )
@@ -372,8 +377,12 @@ fun FullPlayer(
                         .fillMaxWidth()
                         .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.xs)
                         .clip(DhunShapes.large)
-                        .background(DhunColors.errorContainer)
-                        .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.xs),
+                        .background(DhunColors.errorContainer.copy(alpha = 0.55f))
+                        .border(
+                            BorderStroke(DhunSpacing.border, DhunColors.borderError),
+                            DhunShapes.large,
+                        )
+                        .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -587,16 +596,19 @@ fun FullPlayer(
                         tint = DhunColors.textSecondary,
                     )
                     Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                    // Bounded width: a full-bleed slider at 100% volume read
+                    // as a giant coloured error bar across the window.
                     Slider(
                         value = volume,
                         onValueChange = viewModel::setVolume,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(max = DhunSpacing.artworkPlaylist),
                         colors = SliderDefaults.colors(
                             thumbColor = accent,
-                            activeTrackColor = accent,
+                            activeTrackColor = accent.copy(alpha = 0.85f),
                             inactiveTrackColor = DhunColors.border,
                         ),
                     )
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
 
