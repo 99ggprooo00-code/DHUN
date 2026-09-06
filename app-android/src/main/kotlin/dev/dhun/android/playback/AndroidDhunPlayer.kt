@@ -207,6 +207,23 @@ class AndroidDhunPlayer(
         refresh()
     }
 
+    /**
+     * Manual recovery from [PlaybackState.Error]: re-resolves the current
+     * item at its last position and resumes. After a failure ExoPlayer sits
+     * in error-idle where play() alone is a no-op — only prepare() clears
+     * the parked error, which is why the old UI's play button appeared dead.
+     */
+    override fun retry() {
+        onMain {
+            if (player.mediaItemCount == 0) return@onMain
+            StreamRecoverySignal.end()
+            player.seekTo(player.currentPosition.coerceAtLeast(0))
+            player.playWhenReady = true
+            player.prepare()
+        }
+        refresh()
+    }
+
     fun release() {
         pollJob.cancel()
         onMain {

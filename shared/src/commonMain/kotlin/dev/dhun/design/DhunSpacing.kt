@@ -39,6 +39,8 @@ object DhunSpacing {
     val miniPlayerHeight = 72.dp
     val bottomNavHeight = 80.dp
     val transportRowHeight = 88.dp
+    /** Compact Now Playing transport row: hugs the 48dp targets + 72dp play disc. */
+    val playerTransportHeight = 72.dp
     val contentBottomInset = 112.dp  // room above frosted mini+nav dock
     val skeletonCardHeight = 110.dp
     val skeletonTextWidth = 120.dp

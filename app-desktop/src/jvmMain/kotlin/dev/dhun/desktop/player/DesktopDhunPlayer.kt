@@ -260,6 +260,16 @@ class DesktopDhunPlayer(
         scope.launch { opMutex.withLock { stopLocked() } }
     }
 
+    /**
+     * Manual recovery from [PlaybackState.Error]: re-resolves the current
+     * track from scratch (fresh stream URL) and resumes. No-op unless the
+     * engine is actually in an error state — never clobbers a live queue.
+     */
+    override fun retry() {
+        if (_state.value !is PlaybackState.Error) return
+        scope.launch { opMutex.withLock { playCurrentLocked(true) } }
+    }
+
     /** Tears down libVLC resources. Call once when the app exits. */
     fun release() {
         cancelCacheFill()

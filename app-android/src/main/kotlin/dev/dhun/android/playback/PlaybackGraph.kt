@@ -120,28 +120,51 @@ object PlaybackGraph {
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
 
+        // One main-thread handler for every recovery re-prepare: listener
+        // callbacks may arrive on an ExoPlayer internal thread, and every
+        // controller/player call must be marshalled to main (see
+        // AndroidDhunPlayer's threading contract).
+        val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
         player.addListener(object : Player.Listener {
             private val retries = HashMap<String, Int>()
+            private var recoveryPosted = false
             override fun onPlayerError(error: PlaybackException) {
-                if (error.errorCode != PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
+                if (!isRecoverable(error)) {
                     StreamRecoverySignal.end()
                     return
                 }
                 val id = player.currentMediaItem?.mediaId ?: return
-                val count = (retries[id] ?: 0) + 1
-                retries[id] = count
-                if (count > MAX_403_RETRIES) {
+                val count = ((retries[id] ?: 0) + 1).also { retries[id] = it }
+                if (count > MAX_RETRIES) {
                     StreamRecoverySignal.end()
                     return
                 }
-                // Phase 14: surface Recovering → "Reconnecting…" while we
-                // invalidate the stale URL and re-prepare at the same position.
+                // Surface Recovering → "Reconnecting…" while we invalidate
+                // the stale/failed URL and re-resolve at the same position.
                 // Segment cache is NOT cleared — already-played bytes stay.
+                // First retry is immediate; later ones back off so a gated
+                // endpoint is not hammered. playWhenReady is restored —
+                // after an error ExoPlayer parks it, and without this the
+                // re-prepare would land paused (read as "still broken").
                 StreamRecoverySignal.begin()
                 streamCache.invalidate(id)
-                val position = player.currentPosition
-                player.seekTo(position)
-                player.prepare()
+                recoveryPosted = true
+                val backoffMs = RETRY_BACKOFF_MS * (count - 1)
+                mainHandler.post {
+                    recoveryPosted = false
+                    // The user may have skipped while this was queued —
+                    // never yank a different track to the failed position.
+                    if (player.currentMediaItem?.mediaId != id) return@post
+                    player.seekTo(player.currentPosition.coerceAtLeast(0))
+                    player.playWhenReady = true
+                    if (backoffMs <= 0) {
+                        player.prepare()
+                    } else {
+                        mainHandler.postDelayed({
+                            if (player.currentMediaItem?.mediaId == id) player.prepare()
+                        }, backoffMs)
+                    }
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -149,7 +172,11 @@ object PlaybackGraph {
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
+                if (playbackState == Player.STATE_ENDED) {
+                    StreamRecoverySignal.end()
+                } else if (playbackState == Player.STATE_IDLE && !recoveryPosted) {
+                    // IDLE fires right after onPlayerError too — only stand
+                    // down when no recovery re-prepare is still queued.
                     StreamRecoverySignal.end()
                 }
             }
@@ -164,5 +191,35 @@ object PlaybackGraph {
             android.app.PendingIntent.FLAG_IMMUTABLE,
         )
 
-    private const val MAX_403_RETRIES = 2
+    /**
+     * Transient failures worth one automatic re-resolve: HTTP errors
+     * (403-expired / 429 / 5xx at open or mid-stream), dropped/timeout
+     * connections, missing-file opens (rotated URL), and our own
+     * "stream resolve failed" wrapper from the ResolvingDataSource.
+     * Parse/decoder/drm errors are NOT recoverable by re-resolving — those
+     * go straight to the Error state with its manual Retry button.
+     */
+    private fun isRecoverable(error: PlaybackException): Boolean {
+        when (error.errorCode) {
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+            -> return true
+        }
+        var cause: Throwable? = error.cause
+        while (cause != null) {
+            if (cause is java.io.IOException &&
+                cause.message?.contains("stream resolve failed") == true
+            ) {
+                return true
+            }
+            cause = cause.cause
+        }
+        return false
+    }
+
+    private const val MAX_RETRIES = 3
+    private const val RETRY_BACKOFF_MS = 1_500L
 }

@@ -67,8 +67,24 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   Settings → Apps → Uninstall removes it. No leftover `%APPDATA%\DHUN`.
   Android already wiped private storage on uninstall; the manifest now
   also sets `hasFragileUserData=false` and `usesCleartextTraffic=false`.
+- Now Playing transport cluster tightened (compact 72 dp row, edges
+  aligned to the title/seek column); Home quick-action chips use the same
+  padded `LazyRow` pattern as the mood chips so edge insets hold while
+  scrolling.
 
 ### Fixed
+- **Android playback recovery (APK "Error — tap to see")** — transient
+  ExoPlayer failures (expired-URL 403s, timeouts, dropped connections,
+  resolve failures) now auto-recover with a bounded re-resolve
+  (invalidate → seek → prepare, `playWhenReady` restored, backoff on
+  repeat hits) instead of latching a permanent error; the mini-player
+  error tap opens a diagnosis dialog with Retry, the FullPlayer shows an
+  inline error banner with Retry, and the play button routes through
+  recovery instead of sitting dead in error-idle.
+- **Now Playing artwork sharpness** — parsers keep the largest thumbnail
+  entry (was: smallest-first `w60`), proxy size params rewrite
+  generically, and the FullPlayer stage + backdrop load the 1024 tier
+  (one shared Coil key, fetched once); cards keep the 544 tier.
 - SQLDelight IO serialised — resolved a `NowPlayingPersistenceTest` hang
   and a queue-save write race.
 - `onRateLimited` made `suspend` so the 429 gate actually trips.

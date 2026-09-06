@@ -41,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,6 +69,7 @@ import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import androidx.compose.runtime.LaunchedEffect
 import dev.dhun.design.ArtworkColorExtractor
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.BlurredArtworkCache
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
@@ -172,8 +174,10 @@ fun FullPlayer(
                 .fillMaxSize()
                 .blur(DhunSpacing.glassBlur * 4),  // richer frosted backdrop; still one layer
         ) {
+            // Hi-res tier for the backdrop — the same Coil key as the main
+            // artwork below, so the bytes are fetched once, not twice.
             Crossfade(
-                targetState = current?.thumbnailUrl,
+                targetState = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
                 animationSpec = DhunAnimations.slowTween(),
                 label = "bgArtwork",
             ) { url ->
@@ -315,8 +319,11 @@ fun FullPlayer(
                     label = "artworkChange",
                 ) { t ->
                     Box(modifier = Modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        // Hi-res tier (1024): list feeds arrive at w60/w120
+                        // and upscale only to 544 — far below what this
+                        // ~0.82-width stage renders, hence the blur.
                         ArtworkImage(
-                            imageUrl = t?.thumbnailUrl,
+                            imageUrl = ArtworkUrls.nowPlaying(t?.thumbnailUrl),
                             contentDescription = t?.title,
                             modifier = Modifier
                                 .fillMaxWidth(if (lyricsDominant) 0.36f else 0.82f)
@@ -354,6 +361,35 @@ fun FullPlayer(
                 }
             }
 
+            // Playback failure — message + one-tap recovery inline, so the
+            // player never sits silently dead on an error (previously this
+            // screen showed nothing and its play button was a no-op while
+            // the engine sat in error-idle).
+            val playbackError = state as? PlaybackState.Error
+            if (playbackError != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.xs)
+                        .clip(DhunShapes.large)
+                        .background(DhunColors.errorContainer)
+                        .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = playbackError.message,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = DhunColors.error,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = viewModel::retry) {
+                        Text("Retry", color = DhunColors.error)
+                    }
+                }
+            }
+
             // Title / artist (fade-update via Crossfade)
             Crossfade(
                 targetState = current,
@@ -388,7 +424,7 @@ fun FullPlayer(
                 }
             }
 
-            Spacer(modifier = Modifier.height(DhunSpacing.md))
+            Spacer(modifier = Modifier.height(DhunSpacing.sm))
 
             // Seek bar + time labels
             Column(
@@ -418,12 +454,15 @@ fun FullPlayer(
                 }
             }
 
-            // Transport row
+            // Transport row — compact height with edges aligned to the
+            // title/seek column (xxl), so the seek bar, times and controls
+            // read as one balanced group instead of three loose bands.
+            Spacer(modifier = Modifier.height(DhunSpacing.xs))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(DhunSpacing.transportRowHeight)
-                    .padding(horizontal = DhunSpacing.lg),
+                    .height(DhunSpacing.playerTransportHeight)
+                    .padding(horizontal = DhunSpacing.xxl),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {

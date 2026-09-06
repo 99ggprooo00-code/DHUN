@@ -62,4 +62,13 @@ interface DhunPlayer {
     fun setShuffle(enabled: Boolean)
     fun setVolume(volume: Float)
     fun stop()
+
+    /**
+     * User-initiated recovery from [PlaybackState.Error]: re-resolves the
+     * current item at its last position and resumes. Needed because engines
+     * sit in an error-idle state after a failure where play() alone is a
+     * no-op — only a fresh prepare clears it. Default no-op so existing
+     * engines keep compiling; real engines override.
+     */
+    fun retry() {}
 }

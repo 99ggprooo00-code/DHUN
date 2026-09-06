@@ -13,12 +13,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -70,6 +73,10 @@ fun MiniPlayer(
     }
 
     var dragAccumPx by remember { mutableFloatStateOf(0f) }
+    // "Error — tap to see": an error tap opens the diagnosis dialog (with
+    // Retry) instead of just expanding to a FullPlayer that showed nothing.
+    var showErrorDialog by remember { mutableStateOf(false) }
+    val errorState = state as? PlaybackState.Error
 
     GlassBottomBar(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -94,7 +101,13 @@ fun MiniPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(DhunSpacing.miniPlayerHeight)
-                    .pointerInput(Unit) { detectTapGestures(onTap = { onExpand() }) }
+                    .pointerInput(errorState) {
+                        detectTapGestures(
+                            onTap = {
+                                if (errorState != null) showErrorDialog = true else onExpand()
+                            },
+                        )
+                    }
                     .pointerInput(Unit) {
                         detectVerticalDragGestures(
                             onDragEnd = {
@@ -174,6 +187,41 @@ fun MiniPlayer(
                 }
             }
         }
+    }
+
+    if (showErrorDialog && errorState != null) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = {
+                Text(
+                    text = "Playback error",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DhunColors.textPrimary,
+                )
+            },
+            text = {
+                Text(
+                    text = errorState.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DhunColors.textSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showErrorDialog = false
+                        viewModel.retry()
+                    },
+                ) {
+                    Text("Retry", color = DhunColors.accent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showErrorDialog = false }) {
+                    Text("Close", color = DhunColors.textSecondary)
+                }
+            },
+        )
     }
 }
 
