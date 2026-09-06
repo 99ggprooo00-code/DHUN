@@ -1,5 +1,77 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — UI restyle: the "terrible UI" was one bad colour function (session arena/01a07563-dhun)
+
+**Trigger:** the user supplied 18 screenshots (APK under MEmu, MSI on
+Windows 11) that had been outstanding since the previous session. Task C of
+the handoff was unblocked.
+
+**What the screenshots actually showed.** Nine of them are tinted a
+different colour — Home brown, Search green, FullPlayer maroon, the desktop
+window magenta. The Now Playing screen has a **fire-engine-red play disc and
+a full-width red volume slider**, which is pixel-for-pixel what an error
+state should look like. This was not a "styling taste" problem; it was one
+function.
+
+**Root cause.** `ArtworkColorExtractor.extractFromSeed` hashed the artwork
+URL and mapped the hash across the **entire hue wheel** at 0.62–0.92
+saturation / 0.78–0.98 value. That colour then went to three places at once:
+
+| Consumer | What it did with it |
+|---|---|
+| `DhunAppShell` ambient wash | painted the whole app at alpha 0.42 → 0.18 |
+| `FullPlayer` backdrop | alpha 0.28 |
+| `FullPlayer` **controls** | used it *raw* for the play disc, seek bar, slider, active tab, "NOW" label |
+
+So the UI was a different loud colour every track, and roughly one seed in
+six landed on red — indistinguishable from the error affordance sitting
+directly above it.
+
+**Fix.** Split "ambient colour" from "control colour", which had been
+conflated:
+
+- hue clamped to −40°..+30° of the brand hue (deliberately asymmetric — it
+  stops short of 300° so it can never cross into magenta/red), saturation
+  0.34–0.48, value 0.62–0.74;
+- ambient alpha 0.22 → 0.10, desaturated 55%; shell wash 0.42 → 0.30;
+- new `ArtworkColors.controlAccent`: blends 45% brand accent in, then floors
+  luminance at 0.42 so dark artwork cannot produce an invisible disc. All
+  transport chrome reads this. **Raw `primary` is now backdrop-only.**
+
+**Other genuine defects the screenshots exposed** (each was invisible from
+the code alone):
+
+1. `SkipPrevious` and `SkipNext` **glyph paths were swapped** — the left
+   button drew a right-pointing arrow with a trailing bar. Present in every
+   player screenshot; nobody caught it because the *handlers* were correct.
+2. Missing artwork rendered as a flat grey rectangle, and a *failed* Coil
+   load fell through to the same bare box. Both now get a note glyph.
+3. The mini-player "Playback error" dialog was a stock `AlertDialog` — an
+   opaque grey slab that ignored the design system entirely. It also
+   discarded `PlaybackState.Error.detail`, the very diagnostics the previous
+   session added, because only `FullPlayer` rendered it.
+4. Dialogs used `GlassCard` while floating over a `Dialog` scrim. Glass needs
+   something behind it; there was nothing, so the page bled through the text
+   and "New playlist" was unreadable. Added `opaqueBase`.
+5. Glass tokens were 55–82% **opaque** near-black composited onto a near-black
+   background — arithmetically that is just flat grey, which is exactly how
+   it rendered. Re-tuned genuinely translucent (the user's standing ask).
+6. The developer component catalogue shipped as a **fourth user-facing nav
+   tab**. Hidden behind `AppTab.userTabs`; the enum entry stays because
+   `MainActivity` restores tab state by `valueOf(name)`.
+
+**Trap worth recording.** `ArtworkColorExtractorTest` asserted
+`backgroundTint.alpha in 0.15f..0.35f` — a test that *locked in* the alpha
+that was causing the problem. Retuned to 0.05–0.15. A test asserting a
+design token is only as good as the token.
+
+**Task B (assigned corrective) closed.** `ci.yml` push trigger extended to
+`branches: [main, "arena/**"]`. Verified live: pushing this branch with no
+PR open produced run `34016873567`, and its `headSha` was confirmed equal to
+the pushed commit before trusting the green.
+
+**Status: CI-green, NOT hardware-verified.** Playback untouched by this work.
+
 ## 2026-09-06 — hardware verdict: both builds LAUNCH, but no audio at all (session arena/01a0750c-dhun)
 
 **Report (user, real hardware, builds from the rolling `test` release):**
