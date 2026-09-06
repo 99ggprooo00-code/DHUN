@@ -126,6 +126,25 @@ Updated every phase. Nothing hidden.
   warn is expected). Runtime data is `<installDir>/userdata` so Apps-and-Features
   uninstall removes DB + audio cache. `packageVersion` is 1.0.x (packager
   rejects MAJOR 0); clean-VM install test OPEN on hardware.
+  **Phase 14 Windows JVM fix (2026-09-06, main@e90dba6, PR #22):** MSI
+  `dhun-test.msi` installed but launch showed \"Failed to launch JVM\".
+  Root causes: (1) bundled jlink runtime omitted `java.sql` (and
+  `jdk.unsupported`/`java.naming`) needed by SQLDelight/sqlite-jdbc —
+  the Compose plugin does not auto-detect modules; (2) `DesktopDhunPlayer`
+  eagerly constructed `MediaPlayerFactory` before the window, so a
+  missing VLC crashed startup. Fixed in `app-desktop/build.gradle.kts`
+  via `modules(\"java.sql\", \"java.sql.rowset\", \"java.naming\",
+  \"jdk.unsupported\", …) + includeAllModules=true` and `packageVersion`
+  `1.0.5`; `DesktopDhunPlayer` now degrades to an `Error` state with
+  install-VLC guidance; `Main.kt` logs every startup exception to
+  `<installDir>/userdata/dhun-startup.log` (fallback `%TEMP%`) and
+  shows an AWT dialog + minimal error Window so the MSI user sees the
+  real cause. `DataLayer` now falls back to in-memory DB on file-DB
+  corruption. MSI `1.0.5` built at `34011563630` (112 MB, `includeAllModules`);
+  install → launch verification still OPEN — install the new `dhun-test.msi`
+  on a clean Windows VM, confirm window + tray appear and the log
+  contains `java.sql.Driver available` / `VLC initialized` (or graceful
+  VLC Error if VLC absent), no \"Failed to launch JVM\".
 
 ## Phase 14 — robustness / rot-drill / release (2026-09-05)
 

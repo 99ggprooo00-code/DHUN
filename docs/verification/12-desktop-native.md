@@ -71,6 +71,29 @@ phase-2 readiness requirements.
 - Phase 2 verdict (stable → integrated / not stable → fallback): ______
 - Tray: ______ · Close-to-tray: ______ · Geometry: ______ · Mini-player: ______ · Shortcuts: ______ · jpackage MSI: ______
 
+## Phase 14 Windows JVM launch fix — 2026-09-06 (main@e90dba6, PR #22)
+
+**Symptom:** `dhun-test.msi` installed after SmartScreen **Run anyway**, but opening the installed app displayed `Failed to launch JVM`. Compilation and MSI packaging had succeeded — install ≠ launch.
+
+**Investigation (per handoff):** checked `app-desktop/build.gradle.kts` bundled modules and `DesktopDhunPlayer`/`Main.kt` startup. Confirmed: (1) no explicit `java.sql` module despite SQLDelight/JDBC, (2) VLC eager init before window.
+
+**Fixes applied:**
+
+- **Bundled runtime modules (`app-desktop/build.gradle.kts`):** added `modules("java.sql","java.sql.rowset","java.naming","jdk.unsupported","java.management","java.instrument","java.desktop","java.logging","java.net.http")` plus `includeAllModules = true` (fallback; size 112 MB at `34011563630`) and bumped `packageVersion` 1.0.4 → **1.0.5**. The Compose plugin's `jlink` does NOT auto-detect modules — missing `java.sql` was the exact cause (same as StackOverflow 77675565/78374398 for Compose+sqlite/H2).
+
+- **VLC fault tolerance (`DesktopDhunPlayer.kt`):** `MediaPlayerFactory` now constructed inside `try/catch`; `vlcAvailable` gates every op; init failure writes `dhun-vlc-error.log` and sets `PlaybackState.Error` with `install VLC (https://www.videolan.org/vlc/)` guidance; the app continues (window + tray + SMTC remain usable).
+
+- **Startup diagnostics (`Main.kt`):** `Thread.setDefaultUncaughtExceptionHandler`, probes for `java.sql.Driver`/`org.sqlite.JDBC`/`vlcj` availability, logs to `<installDir>/userdata/dhun-startup.log` (fallback `%TEMP%`/`dhun-startup.log`) with OS/Java/jpackage.app-path/stacktrace, shows AWT `JOptionPane` dialog on failure, and can open a minimal error `Window` if Koin/DataLayer fails before the main window (previously the launcher's generic message was the only signal). `DataLayer` creation now tries file DB then in-memory fallback and logs both.
+
+**CI evidence:** PR #22 `34011326728` passed shared tests + Android + probe + Desktop compiles; `test-release` `34011563630` on `main@e90dba6` (merge commit) built and published `dhun-test.msi` (5m13s) + `dhun-test.apk` (4m33s) — the MSI that previously would have launched with the generic error now bundles the required modules.
+
+**Remaining verification (OPEN — requires Windows hardware):** install `dhun-test.msi` from the rolling `test` pre-release at `e90dba6` on a clean Windows user/VM (accept SmartScreen), launch DHUN, confirm:
+
+- No `Failed to launch JVM` — window opens, tray icon appears.
+- `dhun-startup.log` (in `<installDir>/userdata` or `%TEMP%` if dataDir not yet created) contains `java.sql.Driver available` + `org.sqlite.JDBC available` + `VLC initialized` (or `VLC init failed` → graceful Error state with VLC install hint, not a crash).
+- If VLC installed: play a track → audio audible; if VLC missing: player shows `VLC not found` Error but window remains responsive and tray works.
+- Record OS/Windows build, VLC version, MSI size (112 MB), and log excerpts here.
+
 ## Known gaps (mirror of KNOWN_LIMITATIONS)
 
 - SMTC phase 2 is source-integrated but not hardware-verified in this
