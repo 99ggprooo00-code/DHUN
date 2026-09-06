@@ -36,6 +36,28 @@ compose.desktop {
         mainClass = "dev.dhun.desktop.MainKt"
 
         nativeDistributions {
+            // Phase 14 Windows JVM launch fix: the MSI bundles a jlink-slimmed
+            // JDK. The Compose plugin does NOT auto-detect required JDK modules;
+            // missing java.sql (needed by SQLDelight/sqlite-jdbc) makes the
+            // launcher show "Failed to launch JVM" after a successful install.
+            // See: https://kotlinlang.org/docs/multiplatform/compose-native-distribution.html#including-jdk-modules
+            // StackOverflow cases with H2/sqlite on Compose Desktop required
+            // explicit java.sql or includeAllModules. Keep both: explicit list
+            // documents the minimum, includeAllModules guarantees launch even
+            // if the list drifts (size cost acceptable for test builds). Run
+            // :app-desktop:suggestModules on a full JDK to tighten later.
+            modules(
+                "java.sql",
+                "java.sql.rowset",
+                "java.naming",
+                "jdk.unsupported",
+                "java.management",
+                "java.instrument",
+                "java.desktop",
+                "java.logging",
+                "java.net.http",
+            )
+            includeAllModules = true
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "DHUN"
             description = "DHUN — YouTube Music player (test build)"
@@ -46,7 +68,9 @@ compose.desktop {
             // then fails, which takes down every Gradle task in the build —
             // that was the "desktop CI blocker" (docs/verification/04-desktop.md).
             // Installer versions map DHUN 0.x -> 1.0.x until v1.0.0 ships.
-            packageVersion = "1.0.4"
+            // 1.0.5: Phase 14 ruggedization — bundles java.sql etc. and makes
+            // VLC init fault-tolerant (fixes Windows "Failed to launch JVM").
+            packageVersion = "1.0.5"
             windows {
                 // Per-user = no admin UAC, install under %LOCALAPPDATA%\DHUN,
                 // uninstall from Settings → Apps. Runtime data lives in
