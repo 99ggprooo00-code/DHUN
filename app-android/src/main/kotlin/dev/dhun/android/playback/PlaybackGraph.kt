@@ -53,16 +53,16 @@ object PlaybackGraph {
         // resolver writes it, [UserAgentDataSource] reads it on open.
         val userAgentForNextOpen = AtomicReference<String?>(null)
 
-        val httpFactory = DataSource.Factory {
-            UserAgentDataSource(
-                DefaultHttpDataSource.Builder()
-                    .setUserAgent(FALLBACK_USER_AGENT)
-                    .setConnectTimeoutMs(15_000)
-                    .setReadTimeoutMs(25_000)
-                    .setAllowCrossProtocolRedirects(true)
-                    .build(),
-                userAgentForNextOpen,
-            )
+        val httpFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent(FALLBACK_USER_AGENT)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(25_000)
+            .setAllowCrossProtocolRedirects(true)
+
+        // A fresh HTTP source per createDataSource(), wrapped so the agent can
+        // still be restamped per open (see UserAgentDataSource).
+        val userAgentHttpFactory = DataSource.Factory {
+            UserAgentDataSource(httpFactory.createDataSource(), userAgentForNextOpen)
         }
 
         // Outer data source: segment cache when available, plain HTTP when
@@ -70,7 +70,7 @@ object PlaybackGraph {
         val outerFactory: DataSource.Factory = if (audioCache != null) {
             CacheDataSource.Factory()
                 .setCache(audioCache.cache)
-                .setUpstreamDataSourceFactory(httpFactory)
+                .setUpstreamDataSourceFactory(userAgentHttpFactory)
                 // Prefer cache; on cache read errors fall through to network once.
                 .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
                 // Key already set on DataSpec in the resolver — do not let the
@@ -79,7 +79,7 @@ object PlaybackGraph {
                     dataSpec.key?.takeIf { it.isNotBlank() } ?: dataSpec.uri.toString()
                 }
         } else {
-            httpFactory
+            userAgentHttpFactory
         }
 
         return ResolvingDataSource.Factory(
@@ -300,5 +300,5 @@ private class UserAgentDataSource(
 
     override fun close() = upstream.close()
 
-    override fun getUri(): android.net.Uri? = upstream.uri
+    override val uri: android.net.Uri? get() = upstream.uri
 }
