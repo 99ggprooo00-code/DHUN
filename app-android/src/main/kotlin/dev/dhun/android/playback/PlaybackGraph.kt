@@ -11,6 +11,7 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -280,22 +281,31 @@ object PlaybackGraph {
  * Opens each request through an HTTP source built with the User-Agent that
  * resolved the URL.
  *
- * Two constraints force this shape. (1) [androidx.media3.datasource.ResolvingDataSource]
- * constructs its upstream data source once, in its own constructor, so the
- * agent cannot be chosen later through the factory alone. (2) In media3
- * 1.5.1 `DefaultHttpDataSource` has no `setUserAgent` — the agent is fixed
- * at construction and only `DefaultHttpDataSource.Factory` accepts one.
- * So: the resolver publishes the agent, and every `open` builds a fresh
- * source from the factory carrying it.
+ * Two constraints force this shape. (1) [ResolvingDataSource] constructs its
+ * upstream data source once, in its own constructor, so the agent cannot be
+ * chosen later through the factory alone. (2) In media3 1.5.1
+ * `DefaultHttpDataSource` has no instance-level `setUserAgent` — the agent
+ * is fixed at construction and only `DefaultHttpDataSource.Factory` accepts
+ * one. So the resolver publishes the agent, and every [open] restamps the
+ * factory and builds a fresh source for that one request.
  *
  * [userAgent] is written by the resolver immediately before the open it
  * belongs to (same loader thread, and opens on one player are serialised).
+ *
+ * `DataSource` declares `addTransferListener` and `getUri` as abstract
+ * (only `getResponseHeaders` has a default), so all of them are implemented
+ * here — omitting the listener registration is what an earlier attempt got
+ * wrong.
  */
 private class UserAgentDataSource(
     private val httpFactory: DefaultHttpDataSource.Factory,
     private val userAgent: AtomicReference<String?>,
 ) : DataSource {
     private var current: DataSource? = null
+
+    override fun addTransferListener(transferListener: TransferListener) {
+        current?.addTransferListener(transferListener)
+    }
 
     override fun open(dataSpec: DataSpec): Long {
         userAgent.get()?.let { httpFactory.setUserAgent(it) }
@@ -306,6 +316,11 @@ private class UserAgentDataSource(
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
         current?.read(buffer, offset, length) ?: C.RESULT_END_OF_INPUT
+
+    override fun getUri(): android.net.Uri? = current?.uri
+
+    override fun getResponseHeaders(): Map<String, List<String>> =
+        current?.responseHeaders ?: emptyMap()
 
     override fun close() {
         current?.close()
