@@ -69,17 +69,39 @@ Screens: `HomeScreen.kt`, `ExploreScreen.kt`, `AlbumScreen.kt`,
 `NewReleaseScreen.kt`, `ChartsScreen.kt`, `HistoryScreen.kt`,
 `NavigationBuilder.kt`, `Screens.kt`.
 
-## Not yet done, and why
+## Outcome (2026-09-06): the screenshots made most of this unnecessary
 
-- **No specific patterns have been extracted yet.** The user is sending
-  screenshots of what looks wrong in DHUN; researching a redesign before
-  knowing the complaint risks fixing the wrong thing (this already bit once
-  — see `.ai/ROADMAP.md`, "UI quality" row).
-- Concrete next step once screenshots exist: read
-  `ui/player/PlaybackError.kt` + `Player_v2.kt` + `Theme.kt` first (they map
-  onto the reported complaints: player quality, error surfacing, overall
-  flatness), then translate the relevant decisions into
-  `shared/src/commonMain/kotlin/dev/dhun/design/`.
+The screenshots arrived and the restyle shipped as **PR #26**. Notably,
+**nothing was adapted from vivi-music** — and that was the right call, not an
+oversight.
+
+The defects the screenshots revealed were not design-vocabulary problems that
+a reference implementation could have solved. They were **bugs wearing a
+styling costume**:
+
+| Complaint, as reported | What it actually was |
+|---|---|
+| "bad terrible UI", every screen a different colour | `extractFromSeed` mapping a hash across the whole hue wheel at 62–92% saturation, applied to the app-wide wash *and* raw to transport controls |
+| player looks broken / alarming | that same raw colour on the play disc — one seed in six landed on red, i.e. identical to the error affordance |
+| — (not reported, found in the images) | `SkipPrevious`/`SkipNext` **glyph paths were swapped** |
+| flat, grey, lifeless | glass tokens were 55–82% **opaque** near-black composited on near-black — arithmetically flat grey |
+| dialogs unreadable | `GlassCard` floating over a `Dialog` scrim with nothing behind it |
+
+Reading `Theme.kt` or `Player_v2.kt` would not have surfaced any of these. The
+lesson is the one already recorded in `.ai/ROADMAP.md`: **get the artefact
+before theorising about the fix.**
+
+Where vivi-music remains genuinely worth reading, for later work:
+
+- `ui/theme/PlayerColorExtractor.kt` — DHUN's `ArtworkColorExtractor` now
+  separates ambient colour from control colour; comparing how vivi constrains
+  its extracted palette is still useful input if the seeded-hash fallback is
+  ever replaced with true bitmap extraction on the hot path.
+- `ui/player/PlaybackError.kt` — DHUN's error surface now carries the
+  resolve-chain `detail`; worth a comparison pass when the audio defect is
+  closed and error UX gets a proper review.
+
+Constraints below are unchanged and still binding.
 
 ## Rules for whoever picks this up
 
