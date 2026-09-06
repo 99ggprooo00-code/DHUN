@@ -296,8 +296,12 @@ table and artifact provenance tests); 29 JSON fixtures pass syntax checks.
 **Packaging dispatch:** pushed at `9317050`, then denied by GitHub with
 **HTTP 403: Resource not accessible by integration**. The branch has no
 packaging run; no MSI or install-over test ran. Automatic CI 34028039448
-started separately. A normal-CI PowerShell syntax check is being added;
-that cannot substitute for the actual Windows execution.
+passed separately. The follow-up [CI 34028225356](https://github.com/99ggprooo00-code/DHUN/actions/runs/34028225356) at **`77f9c96`**
+completed **10:46:45Z** (job 101472922356): **PASS** for 19 Python helper
+tests, PowerShell syntax, shared JVM tests, Android debug build and
+probe/Desktop compilation. Check annotations: 0. The PowerShell check
+parses the scripts only; it does not execute Windows Installer/COM or
+install/uninstall products.
 
 Owner action: reconnect GitHub in Arena, or manually run `test-release` from
 GitHub Actions using **arena/01a0759b-dhun**, not main, with build-only on.

@@ -34,7 +34,9 @@ Windows Actions runner. Packaging and those installer checks are **pending**:
 manual dispatch was denied with **403 Resource not accessible by integration**,
 and no branch packaging run exists. The owner must reconnect GitHub or start
 the build-only workflow on the session ref from GitHub Actions. The
-helper/publishing-boundary Python tests pass locally. A successful
+helper/publishing-boundary tests and PowerShell syntax now pass CI at
+`77f9c96` / 34028225356, along with shared JVM tests and all usual build
+checks. PowerShell parsing is not MSI execution. A successful
 hosted-installer smoke check still will not prove real playback or visuals.
 
 The user-provided Windows yt-dlp installation state is unknown. The old

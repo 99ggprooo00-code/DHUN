@@ -1,5 +1,23 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — Packaging helpers CI-green; dispatch still requires owner action
+
+[CI 34028225356](https://github.com/99ggprooo00-code/DHUN/actions/runs/34028225356) on `77f9c96` **PASSED**;
+job 101472922356 completed 10:46:45Z. GitHub APIs confirm Python helper
+tests, PowerShell AST parsing, shared JVM tests, Android debug build and
+probe/Desktop compilation passed, with no check annotations. Earlier
+CI 34028039448 at `9317050` passed too. There is still **no packaging run**
+on this branch after the 403 dispatch denial, hence no MSI/package/sentinel
+result or new downloadable Windows artifact. Main/test remain `0920148`,
+public release timestamp 07:22:29Z, PR list empty.
+
+Owner action is now the minimal unblock: reconnect GitHub in Arena, or use
+GitHub Actions → test-release → Run workflow, choose the existing session
+branch (not main), leave build-only on. No credential should be shared in
+chat. Do not call PR/merge/finalization actions or bypass the denied dispatch.
+
+---
+
 ## 2026-09-06 — Manual packaging dispatch denied by integration permissions
 
 Build-only automation was pushed at `9317050` (implementation `6fedf8a`).
