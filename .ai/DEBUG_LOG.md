@@ -110,6 +110,63 @@ CI-compiled. **Audio is NOT yet verified** — needs the next APK/MSI on a
 device. `AudioFileCacheTest` now asserts the agent reaches the network
 layer; `UseCasesTest` has three new home-pagination tests.
 
+## 2026-09-06 — desktop "stuck on Resolving" is a 4-minute chain, not a hang (session arena/01a0750c-dhun)
+
+**Symptom (user, Windows MSI):** the player sits on "Resolving" and never
+advances. The APK on the same network showed "Buffering → Reconnecting",
+i.e. resolution *succeeded* there — so this looked like a second, separate
+bug.
+
+**Investigation — it is not a hang.** Two things rule that out:
+
+- `InnerTubeClient.defaultHttpClient()` installs `HttpTimeout`
+  (`connectTimeoutMillis = 10_000`, `requestTimeoutMillis = 25_000`), and the
+  per-request `timeout { requestTimeoutMillis = 12_000 }` in `postAltJson`
+  is honoured because the plugin is installed. No request can block forever.
+- `postAltJson` does **not** retry a definitive verdict: `LOGIN_REQUIRED` →
+  `DhunError.AuthRequired` and `UNPLAYABLE`/`ERROR` → `Unavailable` are
+  thrown as `DhunException`, and `catch (e: DhunException) { throw e }`
+  exits the `repeat` loop immediately. Only 429 / 5xx / timeout get the
+  second attempt. So there is no retry storm either.
+
+**Actual cause: the chain is slow by construction.**
+
+| Stage | Worst case |
+|---|---|
+| `WEB_REMIX` primary, `MAX_ATTEMPTS = 3` × 25 s + backoffs | ≈ 77 s |
+| 7 alt identities, `ALT_MAX_ATTEMPTS = 2` × 12 s + 0.6 s backoff | ≈ 172 s |
+| **Total** | **≈ 4.2 min** |
+
+For those ~4 minutes the only thing the UI can render is
+`PlaybackState.Resolving` — indistinguishable from a dead player. The
+desktop just has less going on than Android (no notification/lock-screen
+state), so it reads as "stuck".
+
+**Fix (`d390dd0`):** `ResolvingStreamResolver` wraps the chain in
+`withTimeoutOrNull(budgetMs)` (default **45 s**) and returns a typed verdict
+on expiry. Typed as `DhunError.Parse`, not `Network`, because `Network` has
+no `detail` slot and `toUserMessage()` renders `Parse.detail` — Parse is the
+only member that can explain itself. Two tests: the budget returns a verdict
+near the window and cancels the slow chain; a fast chain is unaffected.
+
+**Deliberately deferred:** running the identity chain in parallel would cut
+wall clock far more (a gated identity fails in ~1 s, so parallel ≈ a few
+seconds total), but it changes extraction behaviour and fires concurrent
+`/player` calls at YouTube. Under MASTER_PROMPT AI rule 8 that needs an ADR
+and real data first.
+
+## 2026-09-06 — CI blind spot: branch pushes with no open PR are never checked
+
+`.github/workflows/ci.yml` is `on: push: branches: [main]` +
+`pull_request:`. A commit pushed to a session branch **while no PR is open
+gets no CI run at all** — no failure, no warning, just silence. Three
+commits (`37f04e8`, `3591e70`, `d390dd0`) sat unverified until PR #25 was
+opened, and `gh run list --branch <branch>` simply showed the older runs,
+which reads like "CI is fine" if you do not check the SHA.
+
+**Rule: open the PR before trusting a green mark, and always confirm the run
+`headSha` matches the commit you think you verified.**
+
 ## 2026-09-06 — device screenshots: splash rawness, total APK stream failure, sheets (session arena/01a0740a-dhun)
 
 **Report:** splash shows raw attempt/log lines; APK streams nothing
