@@ -70,11 +70,11 @@ sharp Now Playing art, clean splash, soft sheets. If streaming still
 fails, capture the error dialog's message text.
 
 **Marks (GitHub evidence only, 2026-09-06):** PR #20 MERGED ·
-branch CI pass (build-and-test 3m56s, run `34001522235`) · main CI pass
-`33998220729` (pre-merge) · main test-release pass `33998220750`
-(pre-merge) · post-merge main CI/test-release pending · residential
-stream open · soaks open · v0.1.0 open · rot-drill live failing (cat.8
-CI-IP, unchanged) · Liquid Glass refused.
+branch CI pass (run `34001522235`) · post-merge main CI pass
+(`34001706156`) · post-merge test-release pass (`34001706159`, rolling
+`test` APK/MSI rebuilt) · residential stream open · soaks open ·
+v0.1.0 open · rot-drill live failing (cat.8 CI-IP, unchanged) ·
+Liquid Glass refused.
 
 
 ---
