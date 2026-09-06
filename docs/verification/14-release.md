@@ -128,14 +128,47 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 - Crash / zombie-process result: ____________________
 - Screenshots or logs: ____________________
 
+### Windows MSI startup — \"Failed to launch JVM\" (2026-09-06)
+
+**History:** `dhun-test.msi` built from `main@8310383` (PR #20, `34001706159`) installed per-user to `%LOCALAPPDATA%\DHUN` but opening the installed app showed `Failed to launch JVM` — a desktop startup failure, not a packaging failure. No startup fix was published before the handoff; the exception was uncaptured.
+
+**Investigation leads from code review (not yet confirmed then):** `app-desktop/build.gradle.kts` omitted `java.sql` (needed by SQLDelight/JDBC), `DesktopDhunPlayer` init before window (VLC), missing exception capture.
+
+**Fix (PR #22, merged to `main@e90dba6`):**
+
+- `app-desktop/build.gradle.kts` — adds explicit `modules("java.sql", "java.sql.rowset", "java.naming", "jdk.unsupported", "java.management", "java.instrument", "java.desktop", "java.logging", "java.net.http")` plus `includeAllModules = true` (112 MB MSI, `test-release` `34011563630` windows-latest `5m13s`). Bumped `packageVersion` 1.0.4 → **1.0.5** (same `upgradeUuid`, per-user, SmartScreen unsigned — unchanged). This is the documented Compose Desktop fix for sqlite/H2 \"Failed to launch JVM\" (docs: `kotlinlang.org/.../compose-native-distribution.html#including-jdk-modules`; StackOverflow 77675565, 78374398).
+
+- `app-desktop/.../player/DesktopDhunPlayer.kt` — `MediaPlayerFactory` now try/caught; `vlcAvailable` gates all ops; missing VLC degrades to `PlaybackState.Error("VLC not found — install VLC…")` instead of crashing before window.
+
+- `app-desktop/.../desktop/Main.kt` — captures every startup exception: `Thread.setDefaultUncaughtExceptionHandler`, early probes for `java.sql.Driver`/`org.sqlite.JDBC`/`vlcj`, log file `<installDir>/userdata/dhun-startup.log` (fallback `%TEMP%`) with OS/Java/jpackage.app-path + stacktrace, AWT `JOptionPane` dialog + minimal error `Window` if Koin/DataLayer fails before main window, `DataLayer` file-DB → in-memory fallback with logging.
+
+**CI evidence (GitHub-verified, not yet hardware-verified):**
+
+- PR CI `34011326728` — **passed** shared JVM tests, Android debug build, probe compile, Desktop compile (`:app-desktop:compileKotlinJvm`).
+- Main CI `34011563632` — **passed** (6m10s) on `e90dba6`.
+- Rolling test-release `34011563630` — **passed** `msi` `5m13s` + `apk` `4m33s` + `publish` `19s`; published `dhun-test.msi` 112001488 bytes + `dhun-test.msi.sha256` and `dhun-test.apk` to the `test` pre-release at `2026-09-06T04:33:36Z` (tag points to `e90dba6` — verify before testing; a docs-only merge will replace these assets).
+
+**Hardware gate still OPEN — to verify on a Windows machine:**
+
+1. Download the current `dhun-test.msi` + `dhun-test.msi.sha256` from `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`; verify checksum matches the published tag `e90dba6`.
+2. Install per-user (no admin) — accept SmartScreen **Run anyway** / **More info → Run anyway** — confirm install completes without admin UAC.
+3. Launch DHUN from Start menu / installed shortcut — **no** `Failed to launch JVM`; main window (1200×780) + mini-player (if visible) + tray icon appear.
+4. Check `dhun-startup.log` (packaged: `<installDir>/userdata/dhun-startup.log`; fallback: `%TEMP%\dhun-startup.log`) —
+   - contains `DHUN main starting` + `java.sql.Driver available` + `org.sqlite.JDBC available` + `VLC initialized` (or `VLC init failed` → graceful Error state, not crash).
+   - no `ClassNotFoundException: java.sql` or `UnsatisfiedLinkError: libvlc`.
+5. If VLC is installed: play an uncached search result → audible audio; tray icon switches; if VLC is **not** installed: player shows `VLC not found — install VLC…` Error but app stays responsive (tray/close-to-tray still work).
+6. Clean uninstall: Settings → Apps → DHUN → Uninstall → confirm `<installDir>/userdata` is removed; VLC remains (not ours).
+
+Record here: Windows version/build, VLC version (or \"not installed\"), MSI size/sha256, `dhun-startup.log` excerpts (sanitized), and whether launch succeeded. **Successful CI packaging is not launch verification.**
+
 ### v0.1.0 release gate
 
-- [ ] Rot-drill is scheduled and has a green live run.
+- [ ] Rot-drill is scheduled and has a green live run (scheduled run still red at `34011539225`; re-investigate after next green).
 - [ ] Android APK and AAB build and install on a clean target.
-- [ ] Windows MSI installs and launches on a clean Windows VM/user.
-- [ ] Android and Desktop soak evidence is attached above.
+- [ ] Windows MSI installs and launches on a clean Windows VM/user — **new MSI `1.0.5` built at `34011563630`; install → launch check OPEN as above**.
+- [ ] Android and Desktop soak evidence is attached above (both still OPEN; desktop soak now expects the new `1.0.5` MSI).
 - [ ] `KNOWN_LIMITATIONS.md`, `THIRD_PARTY.md`, `RISK_REGISTER.md`, README,
-      and CHANGELOG are current.
+      and CHANGELOG are current (KNOWN_LIMITATIONS + 12-desktop-native updated for the JVM fix; final release review still OPEN).
 - [ ] Release is tagged `v0.1.0` only after all required evidence is real.
 
 ## PR #16 merge (2026-09-05)
