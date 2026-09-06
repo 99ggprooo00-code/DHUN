@@ -1,13 +1,20 @@
 # Phase 12 verification — Desktop Native Integrations
 
-Status: 🟨 **SMTC PHASE 2 CODE STAGED; CI + HARDWARE OPEN** — tray, keyboard
-shortcuts, close-to-tray + window geometry, and the SMTC integration are
-implemented in `app-desktop`; the new JNA/WinRT path must pass the next CI
-run. **The separate mini-player window was REMOVED on 2026-09-06 per user
-decision (ADR-004)** — the docked in-app MiniPlayer (Phase 08) is the
-product's mini-player, so its checklist row below is now a single-window
-launch check. Windows acceptance remains OPEN because this sandbox has no
-Windows desktop, system tray, libVLC, or SMTC-capable hardware.
+Status: 🟨 **NATIVE CODE MERGED; UPGRADE / PLAYBACK / NATIVE HARDWARE GATES OPEN.**
+Baseline `main` / `test` is `0920148`; Desktop compilation and MSI publishing
+are green (`34018809911` / `34018809913`, published 2026-09-06T07:22:29Z).
+The user now reports **one-window startup after manual uninstall/reinstall**.
+The separate mini-player removal (ADR-004 / PR #28) is not work to repeat;
+the docked in-app MiniPlayer remains.
+
+The same report says **install-over fails with “Another version of this
+product is already installed…” and audio still fails**. A local candidate
+adds increasing MSI ProductVersions, Windows-aware extraction, diagnostics,
+Home and player repairs. **Commit/push for branch CI is approved; tests are
+pending and no PR, merge or release is authorised**;
+see [Phase 14's fresh report and validation record](14-release.md).
+Tray/SMTC/shortcuts, data-preserving upgrade and clean-target hygiene are
+not proven by a visible window or a green packaging job.
 
 ## What was built (code-level, auditable)
 
@@ -19,7 +26,7 @@ Windows desktop, system tray, libVLC, or SMTC-capable hardware.
 | Keyboard shortcuts: Space, ←/→ seek 5 s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+Q quit | `Main.kt` — root `Modifier.onKeyEvent` (NOT preview: fires only for keys the focused node didn't consume, so Space/←/→ typing in the search field stays untouched); `EventType.Press`-only (no auto-repeat); Ctrl+F → `nav.selectedTab = AppTab.SEARCH` (jumps to the Search tab — auto-focus into the field is a follow-up); Ctrl+Q → `quit()` (the one clean-exit path, shared with tray Quit: save geometry → tray.stop → persistence.stop → player.release → scope.cancel → `System.exit(0)` — no zombies). Ctrl+M was removed with the mini-player window (ADR-004) |
 | Close-to-tray setting (default on), remembered window state | `Main.kt` — `closeToTray` read once at startup from `SettingsKeys.CLOSE_TO_TRAY` (default `true`); main window `onCloseRequest` → hide to tray (after saving geometry) or `quit()`; geometry persisted as `"x,y,w,h"` in `SettingsKeys.WINDOW_GEOMETRY` (Phase 05 DB) on close-to-tray and quit, restored into `rememberWindowState(position=…)` at startup. The mini frame reference went away with the removed mini-player window (ADR-004) |
 | SMTC spike (time-boxed 3 days): now-playing tile, artwork, media keys; if stable → integrate, else documented fallback | `app-desktop/.../desktop/smct/Smct.kt` — **phase 2 code**: startup activation after the AWT window exists, `GetForWindow(HWND, IID 99FA3FF4-1742-42A6-902E-087D41F965EC)`, `DisplayUpdater` → `MusicProperties` title/artist/album, remote `RandomAccessStreamReference` thumbnail, playback-state and previous/next state updates, and `ButtonPressed` registration through a retained JNA COM callback (`0557e996-7b23-5bae-aa81-ea0d671143a4`). The exact Windows.Media vtable order is encoded from the Windows SDK/windows-rs ABI; `IsEnabled` is the liveness check at slot 10. Native failures are HRESULT-logged and leave the AWT tray/keyboard fallback active; `-Ddhun.smct=false` disables. Hardware round-trip is still OPEN. |
-| Packaging: jpackage `.msi` with app icon; clean-VM install test | `app-desktop/build.gradle.kts` `compose.desktop { application { nativeDistributions { targetFormats(Dmg, Msi, Deb) } } }` already active (Phase 04) — the Compose packager drives jpackage; `packageVersion` stays 1.0.x (packager rejects MAJOR 0, documented Phase 04). App icon + clean-VM install test: OPEN (needs Windows machine + a real `.ico`) |
+| Packaging: jpackage `.msi` with app icon; clean-VM install test | `app-desktop/build.gradle.kts` `compose.desktop { application { nativeDistributions { targetFormats(Dmg, Msi, Deb) } } }` already active (Phase 04) — the Compose packager drives jpackage; published baseline uses 1.0.5; the LOCAL candidate uses a positive-major, increasing internal MSI sequence (`scripts/installer_version.py`), separate from app semver. App icon + clean-VM install test: OPEN (needs Windows machine + a real `.ico`) |
 
 ## SMTC phase 2 procedure (on the user's Windows machine)
 
@@ -60,10 +67,11 @@ phase-2 readiness requirements.
 - [ ] **Close-to-tray (default on)**: main window X → window hides, app alive (tray still there, playback continues — audio is the proof); tray → Open DHUN → window back with same queue/position; **Quit** from tray → process gone (`tasklist | findstr dhun` / `ps` — no zombie, no dangling libVLC/vlc process); quit path also saves geometry
 - [ ] **Close-to-tray off**: clear the setting (`Settings` row for `close_to_tray` = false in `dhun.db`, or via a future settings screen) → restart → main window X now exits the app
 - [ ] **Window geometry**: resize/move the main window → close-to-tray → relaunch → window returns at the same size+position (`window_geometry` row in `dhun.db` = "x,y,w,h")
-- [ ] **Mini-player window — REMOVED (ADR-004, 2026-09-06)**: launch DHUN → **exactly one window** opens — the main window (1200×780) with the docked in-app MiniPlayer above the bottom nav; no second window, no extra taskbar entry; Ctrl+M is a dead key (removed). The docked MiniPlayer's own behavior (tap-to-expand, transport, progress) is covered by the Phase 08 checklist
+- [x] **Single-window startup after manual reinstall** — user-confirmed 2026-09-06 following the latest `test` recommendation; ADR-004 removal is on GitHub in PR #28. This closes only the reported one-window check, not installer upgrade, native controls, playback or checksum identity.
+- [ ] **Remaining window/native checks** — no unwanted taskbar entry; docked MiniPlayer expands/controls playback; tray hide/restore works; no removed Ctrl+M window behavior. Do not reintroduce the separate always-on-top mini-player.
 - [ ] **Keyboard shortcuts** (main window focused): Space toggles play/pause; ←/→ seek ±5 s (position bar moves); Ctrl+← / Ctrl+→ = previous/next track; Ctrl+F lands on the Search tab; Ctrl+Q exits clean (same zombie check as tray Quit). **Negative check**: typing "Bohemian  Rhapsody" (space) in the search field types a space — shortcuts don't steal keys from the text field
 - [ ] **SMTC probe + phase 2**: console shows `SMTC probe PASS — …` with `hwnd`, `abi`, `activate-factory`, `get-for-window`, `is-enabled`, and `phase2=ok`; use the Windows tile to verify title/artist/artwork and press Play/Pause/Next/Previous media keys → record the exact line and round-trip below
-- [ ] **jpackage**: `./gradlew :app-desktop:createMsi` (Windows) → installer builds with app icon; install on a clean Windows user/VM → launches, plays, tray works → record version/any issues
+- [ ] **jpackage**: `./gradlew :app-desktop:packageMsi` (Windows) → installer builds with app icon; install on a clean Windows user/VM → launches, plays, tray works → record version/any issues
 - [ ] **Soak**: 30-min mixed use (queue skips, tray use, shortcuts) — zero crashes; tray state never desyncs from the player (icon/verb always match)
 
 ## Probe / evidence log (fill on hardware)
@@ -72,7 +80,8 @@ phase-2 readiness requirements.
 - `SMTC probe` console line: ______
 - IIDs used (source-verified): `ISystemMediaTransportControlsInterop` `ddb0472d-c911-4a1f-86d9-dc3d71a95f5a` · `ButtonPressedEventHandler` `0557e996-7b23-5bae-aa81-ea0d671143a4`
 - Phase 2 verdict (stable → integrated / not stable → fallback): ______
-- Tray: ______ · Close-to-tray: ______ · Geometry: ______ · Mini-player: ______ · Shortcuts: ______ · jpackage MSI: ______
+- One-window launch: **user-reported PASS after manual reinstall, 2026-09-06**. Install-over: **FAIL, “Another version…”**. Audio: **FAIL, generic unavailable**.
+- Tray: ______ · Close-to-tray: ______ · Geometry: ______ · Docked MiniPlayer controls: ______ · Shortcuts: ______ · Clean-target MSI: ______
 
 ## Phase 14 Windows JVM launch fix — 2026-09-06 (main@e90dba6, PR #22)
 
@@ -88,9 +97,9 @@ phase-2 readiness requirements.
 
 - **Startup diagnostics (`Main.kt`):** `Thread.setDefaultUncaughtExceptionHandler`, probes for `java.sql.Driver`/`org.sqlite.JDBC`/`vlcj` availability, logs to `<installDir>/userdata/dhun-startup.log` (fallback `%TEMP%`/`dhun-startup.log`) with OS/Java/jpackage.app-path/stacktrace, shows AWT `JOptionPane` dialog on failure, and can open a minimal error `Window` if Koin/DataLayer fails before the main window (previously the launcher's generic message was the only signal). `DataLayer` creation now tries file DB then in-memory fallback and logs both.
 
-**CI evidence:** PR #22 `34011326728` passed shared tests + Android + probe + Desktop compiles; `test-release` `34011563630` on `main@e90dba6` (merge commit) built and published `dhun-test.msi` (5m13s) + `dhun-test.apk` (4m33s) — the MSI that previously would have launched with the generic error now bundles the required modules. Post-fix docs merge PR #23 (`main@9294520`) re-ran both green — CI `34012157207`, test-release `34012157287` — and republished the identical `1.0.5` binaries (MSI 112,001,488 B, APK 17,467,038 B) at `2026-09-06T04:45:40Z`; the `test` tag now points at `9294520`.
+**CI evidence:** PR #22 `34011326728` passed shared tests + Android + probe + Desktop compiles; `test-release` `34011563630` on `main@e90dba6` (merge commit) built and published `dhun-test.msi` (5m13s) + `dhun-test.apk` (4m33s) — the MSI that previously would have launched with the generic error now bundles the required modules. Post-fix docs merge PR #23 (`main@9294520`) re-ran both green — CI `34012157207`, test-release `34012157287` — and republished the identical `1.0.5` binaries (MSI 112,001,488 B, APK 17,467,038 B) at `2026-09-06T04:45:40Z`; the `test` tag pointed at `9294520` at that historical checkpoint (superseded by `0920148` / 07:22:29Z).
 
-**Remaining verification (OPEN — requires Windows hardware):** install `dhun-test.msi` from the rolling `test` pre-release (tag `9294520`, same `1.0.5` JVM-fix build as `e90dba6`) on a clean Windows user/VM (accept SmartScreen), launch DHUN, confirm:
+**Remaining verification (OPEN — requires Windows hardware):** install `dhun-test.msi` from the rolling `test` pre-release (last verified tag `0920148`, 07:22:29Z; record the current identity, because `test` is rolling) on a clean Windows user/VM (accept SmartScreen), launch DHUN, confirm:
 
 - No `Failed to launch JVM` — window opens, tray icon appears.
 - `dhun-startup.log` (in `<installDir>/userdata` or `%TEMP%` if dataDir not yet created) contains `java.sql.Driver available` + `org.sqlite.JDBC available` + `VLC initialized` (or `VLC init failed` → graceful Error state with VLC install hint, not a crash).
@@ -117,6 +126,6 @@ phase-2 readiness requirements.
 ## Screenshots (to capture on hardware)
 
 - Tray: paused vs playing icon + open menu (track title row visible)
-- Mini-player window over another app (always-on-top proof) + dragged position
+- One main window with docked MiniPlayer and taskbar (no separate mini-player); restored main window after tray Open
 - Main window restored to previous geometry (before/after relaunch)
 - Console: `SMTC probe …` line (PASS or the exact FAIL step)

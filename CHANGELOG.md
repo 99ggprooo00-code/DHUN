@@ -10,13 +10,41 @@ stream verification, 30-minute soaks on Android and Desktop, clean-target
 installs). Until then the only downloadable build is the rolling
 [`test` pre-release](https://github.com/99ggprooo00-code/DHUN/releases/tag/test)
 (`dhun-test.apk`, `dhun-test.msi`), replaced on every push to `main` — it
-has no version number by design.
+has an unversioned public tag; Windows still requires an increasing internal
+MSI ProductVersion, separate from the app's semantic version.
 
 The maintenance contract applies to every entry below: stream extraction
 rots; when it breaks, DHUN ships a patch release fast (see README and
 `.ai/RISK_REGISTER.md`).
 
 ## [Unreleased]
+
+### Branch candidate — 2026-09-06 (CI-only checkpoint; not released)
+- **MSI upgrades:** increasing internal versions per build/run attempt,
+  stable upgrade UUID, stale-ref publishing protection and startup version
+  logging. Five Python version-ordering/bounds regressions pass locally;
+  actual install-over/data-preservation verification remains open.
+- **Windows playback path:** executable/Python discovery without Unix
+  `which` or Windows Store aliases; cancellable process/pipe cleanup;
+  explicit missing-tool evidence; reason-preserving bounded diagnostics
+  across the sequential primary/fallback chain. This is **not a claim that
+  the user's playback now works**.
+- **Home:** feed-owned continuation tokens and modern append actions,
+  consistent request client version, content-aware shelf deduplication,
+  explicit page retry/end UI, bounded empty-page following and stale-refresh
+  protection. Later quick-picks shelves retain new music.
+- **Player:** origin-pivot icon scaling, canonical Material shuffle/repeat
+  paths, artwork sized to available width **and height**, centred bounded
+  transport/volume with consistent toggle styling, complete selectable
+  diagnostics from the docked/full player. The separate window stays removed.
+- **Local follow-up:** keep unrelated Home continuation targets separate
+  (17 synthetic fixture cases), reject ambiguous cursors, fix cancelled
+  Previous/Next presses and hold cleanup, reset stale scrub state, and bound
+  yt-dlp pipe draining as well as child exit. Ten Python helper tests and
+  strict validation of 29 JSON fixture files pass; this is not an app build.
+- Kotlin regressions await authorised branch CI: local Gradle cannot
+  start without a JDK. See `docs/verification/14-release.md` for the real
+  Windows failure report, environment error and remaining acceptance gates.
 
 ### Added
 - **Desktop bounded audio cache** — whole-track LRU file cache for the vlcj
@@ -32,9 +60,9 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   and a visible "Reconnecting…" state during 403 mid-stream recovery.
 - **Daily rot drill** — `rot-drill.yml` runs the playback probe against
   live YouTube on the production resolver chain, watches each engine
-  separately, and opens an issue on failure. (From GitHub-hosted runners
-  both engines are currently bot-gated — category 8 network evidence, not
-  extractor rot; residential verification is the user-impact gate.)
+  separately, and opens an issue on failure. Latest verified scheduled
+  run 34011539225 is red (production Unavailable; yt-dlp WATCH AuthRequired).
+  Windows audio also failed; do not dismiss it as CI-only gating.
 - **Material 3 glass UI** — frosted (not blurred-content) chrome across
   Home, Search, Library, browse pages and the player; sans typography;
   artwork-driven ambient wash; lyrics-dominant full player (ADR-002).
@@ -43,9 +71,10 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   shortcuts (Search / Resume / Library), battery-optimisation rationale +
   handoff, rotation/back-stack state restore, 840 dp navigation rail.
 - **Desktop native (Phase 12)** — system tray with playing/paused icons,
-  always-on-top mini-player window, keyboard shortcuts (Space, ←/→ 5 s,
-  Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q), close-to-tray with remembered window
-  geometry, Windows SMTC spike (JNA/WinRT), MSI packaging.
+  keyboard shortcuts (Space, ←/→ 5 s, Ctrl+←/→, Ctrl+F, Ctrl+Q),
+  close-to-tray with remembered window geometry, Windows SMTC (JNA/WinRT),
+  MSI packaging. The separate always-on-top mini-player and Ctrl+M were
+  subsequently removed in accepted ADR-004; the docked MiniPlayer remains.
 - **Foreground media service + OEM resilience** on Android; all
   `MediaController` calls marshalled to the main thread.
 - **Lyrics (Phase 11)** — synced lyrics via LRCLIB with YouTube Music text

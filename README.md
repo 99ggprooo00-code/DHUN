@@ -13,10 +13,12 @@ Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 
 1. **Extraction is maintenance, not implementation.** YouTube enforces PO
    tokens / SABR; hand-rolled InnerTube extraction is what killed ViMusic,
-   RiMusic, InnerTune and others. DHUN wraps **NewPipe Extractor**
-   (Android + Desktop) with a **yt-dlp** desktop fallback, keeps its own
-   InnerTube client for metadata only, and runs a **daily CI rot-drill**
-   against live YouTube.
+   RiMusic, InnerTune and others. Under accepted ADR-001, DHUN currently
+   uses its **own sequential InnerTube player-client chain**, with an
+   optional **user-provided yt-dlp desktop fallback** while the pinned
+   NewPipe engine remains a non-fatal recovery watch, not the production
+   primary. Metadata also uses the own client. A **daily CI rot-drill**
+   validates resolution and actual audio bytes against live YouTube.
 2. **Code-first.** The previous attempt produced great documents and an app
    that never attempted its core mission. Every phase here ships running
    code on real hardware before it is "done."
@@ -26,7 +28,7 @@ Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 GPL-3.0 — required for legitimate reuse of the ecosystem's maintained
 extractors (NewPipe Extractor is GPL-3.0). See THIRD_PARTY.md.
 
-## Build (real, as of Phase 03)
+## Build
 
 Requires JDK 17 and an Android SDK (`ANDROID_HOME`).
 
@@ -35,7 +37,7 @@ Requires JDK 17 and an Android SDK (`ANDROID_HOME`).
 ./gradlew :shared:jvmTest              # domain + parser + queue + data-layer unit tests
 ./gradlew :tools:playback-probe:run    # extraction probe (needs PYTHONPATH w/ yt-dlp for the resolve step)
 ./gradlew :tools:playback-probe:run -PmainClass=dev.dhun.tools.smoke.SmokeMainKt  # live provider smoke
-./gradlew :app-desktop:run             # desktop app (needs libVLC + yt-dlp; see KNOWN_LIMITATIONS.md)
+./gradlew :app-desktop:run             # system libVLC; optional yt-dlp fallback (see below)
 ./gradlew :app-desktop:compileKotlinJvm  # desktop compile check (what CI should run)
 
 # Live Phase 14 rot-drill (requires network + yt-dlp on PATH or Python module)
@@ -81,12 +83,35 @@ only on a device you are willing to experiment with.
 **Windows (`dhun-test.msi`)**
 - Per-user install (no Administrator prompt) to `%LOCALAPPDATA%\DHUN`.
   Uninstall: Settings → Apps → DHUN → Uninstall (or Start menu → DHUN
-  folder). That removes the program **and** `<installDir>/userdata`
-  (SQLite + audio cache). No leftover `%APPDATA%\DHUN`.
+  folder). Packaged runtime data is intended to live under
+  `<installDir>/userdata` (SQLite + audio cache), not `%APPDATA%\DHUN`,
+  and be removed with the program. Clean-target cleanup and in-place
+  upgrade data preservation still require hardware verification.
 - The MSI is **not Authenticode-signed** — SmartScreen will warn
   ("Windows protected your PC"). That is expected for a test build,
   not a virus. Needs a system VLC/libVLC install for playback; DHUN
   does not install or uninstall VLC.
+- The desktop fallback is **not bundled**. If needed, install the official
+  [yt-dlp Windows executable](https://github.com/yt-dlp/yt-dlp/releases/latest)
+  on PATH, or set `DHUN_YTDLP` to its full executable path, then restart DHUN.
+  A standalone `yt-dlp.exe` does not need Python. VLC and yt-dlp perform
+  different jobs; installing VLC alone does not install an extractor.
+  The candidate resolver ignores user yt-dlp config/cookies. If audio
+  fails, open **Playback details** and copy the bounded diagnostic plus
+  track ID; do not share cookies, signed stream URLs or credentials.
+- Public tag/asset names stay `test` / `dhun-test.msi`. The **internal MSI
+  ProductVersion must increase**: `scripts/installer_version.py` maps
+  workflow run and attempt to a valid numeric version; CI supplies it via
+  `-PdhunInstallerVersion=…`, keeping the upgrade UUID stable. For manual
+  packaging, use a version higher than the installed build (the local
+  default 1.0.6 is not higher than future CI versions). Do not reset MSI
+  ProductVersion to the app's `0.1.0` semver. Quit DHUN/tray before updating.
+- **Verification warning (2026-09-06):** the published 07:22:29Z / `0920148`
+  build still failed in-place upgrade, audio and Home in the user's Windows
+  re-test. The repair batch is awaiting branch CI; only commit/push for checks is authorised, not merge or release. The current
+  download does **not** contain it. Manual uninstall/reinstall launched one
+  window, but did not fix audio. Upgrade data preservation and clean-target
+  uninstall cleanup remain unverified; back up test userdata before testing.
 - Unsigned / SmartScreen + debug APK are why these are not
   daily-driver builds. Source of both artifacts is this repo via
   `.github/workflows/test-release.yml`.

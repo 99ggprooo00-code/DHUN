@@ -2,15 +2,54 @@
 
 Updated every phase. Nothing hidden.
 
+## Latest Windows result / branch CI candidate — 2026-09-06
+
+The user reports **one window after manual uninstall/reinstall**, but
+**install-over fails (“Another version…”), audio fails, Home does not page,
+and player glyph placement/shuffle/colour styling is not accepted**. The
+last verified published build is `test@0920148`, 07:22:29Z. This is user-facing
+impact, not something to dismiss as an Actions-IP-only failure.
+
+Local repairs on `arena/01a0759b-dhun` address static MSI versions, Windows
+yt-dlp discovery/process cleanup, lost resolver evidence, feed continuation
+ownership/dedup/state, and icon/artwork/control geometry. They are
+**awaiting authorised branch CI and not released**. The user approved commit/push for CI only; no PR, merge or installer publication is permitted. Ten Python helper tests
+pass (installer + fixture validator), and 29 JSON fixture files are syntax
+valid, including 17 synthetic Home cases. These are not Kotlin test passes.
+Gradle cannot start (`JAVA_HOME`/`java` absent); direct build-download hosts
+fail, and the official GitHub JDK asset route also returned EOF. No new MSI,
+audible playback, live Home pagination or visual acceptance is claimed.
+
+The latest local review also corrected mixed Home action-target ownership,
+cancelled transport presses/hold cleanup, stale scrub handlers, and the
+subprocess deadline's output-drain gap. Their Kotlin tests remain unrun.
+The later explicit permission allows branch CI only. The no-PR/no-merge/no-release boundary remains in force.
+
+The user-provided Windows yt-dlp installation state is unknown. The old
+locator could miss an installed `yt-dlp.exe`; the new candidate checks PATH /
+`DHUN_YTDLP` and provides explicit missing-tool evidence. yt-dlp remains
+optional/user-provided, not bundled; no cookies, login, PO-token minting or
+parallel identity scheduling was added. ADR-003 remains **PROPOSED**.
+
+MSI ProductVersion must advance independently of the app's semantic version.
+The candidate keeps the stable upgrade UUID and uses a run/attempt sequence
+(plus a stale-ref publishing guard). Manual packaging must also supply a
+higher internal version; future stable packaging must not reset it to 0.1.0.
+In-place upgrade **and preservation of userdata** still need a Windows test.
+See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
+
+## Platform and service limitations
+
 - Web platform intentionally absent from v1 (browser YouTube streaming is
   blocked by PO tokens/SABR for third-party apps — see
   PROBLEMS_AND_FIXES.md P7).
 - Stream extraction depends on maintained upstream extractors; when YouTube
   changes, playback breaks until a patch release. The daily rot-drill CI
   detects this within 24h.
-- NewPipeExtractor v0.26.5 stream extraction is broken upstream-unfixed
-  (2026-09-01). Desktop streams go through yt-dlp; Android uses DHUN's
-  minimal own player-endpoint client until upstream recovers (ADR-001).
+- The pinned NewPipeExtractor v0.26.5 remains a non-fatal recovery watch,
+  not the production primary. Both platforms use the own player-client
+  chain; Desktop adds the optional yt-dlp fallback (ADR-001). No live
+  evidence of NewPipe recovery was verified in this session.
 - Datacenter/server IPs are bot-flagged by YouTube's player endpoint more
   aggressively than residential IPs; the rot drill may show resolve-step
   failures on CI runners that do not affect normal users. Repeated red +
@@ -27,11 +66,12 @@ Updated every phase. Nothing hidden.
     along. This is stronger CI-network evidence: Android's only engine and
     desktop's primary+fallback are all gated from GitHub-hosted runners as
     of 2026-09-05.
-  - Interpretation rule for red drills: metadata PASS + resolve gated ⇒
-    **CI-network gating** — verify on residential hardware before declaring
-    user-facing rot; metadata ALSO failing ⇒ real rot (pin last-good, patch
-    ≤72h). Kill switch stays ON for both; never convert a CI red into a
-    pass; never add cookies/sign-in without an ADR + user sign-off.
+  - Those are historical runner observations, not proof that IP class is
+    the only cause. Latest scheduled run **34011539225** (2026-09-06,
+    `dd1ab31`) reports production/own Unavailable, yt-dlp WATCH AuthRequired,
+    metadata PASS; issue #14 remains open. The fresh Windows failure is
+    independent user-impact evidence. Keep the kill switch and byte
+    validation; no cookies/sign-in without an ADR + user sign-off.
 - **Rot-drill probe coverage (fixed and live-proven 2026-09-05):** the
   fatal resolve step now drives the production own-client→yt-dlp chain and
   emits `WATCH|own-client` / `WATCH|ytdlp` / `WATCH|newpipe-stream`. Run
@@ -39,10 +79,10 @@ Updated every phase. Nothing hidden.
 - YTM lyrics via InnerTube are unsynced text only; synced lyrics are now via LRCLIB fallback (`LrcLibSource` + `LyricsRepository` cache→YTM→LRCLIB, see Lyrics bullet above) — YTM remains primary unsynced fallback.
 - The PLAYLISTS search filter returns mixed result types from YouTube;
   classification routes them by browseId prefix (harmless, refined later).
-- The shared module currently builds the JVM target only; the Android target
-  (same commonMain sources) is added with the AGP/SDK setup in Phase 03.
-- Android: harness UI is a throwaway Compose screen (replaced in Phase 06+);
-  app icon is a framework placeholder until the design phase.
+- The shared module now builds **Android and JVM** targets; real Home,
+  Search, Library, browse and player UI replaced the original harness.
+  Android/native installer app-icon acceptance remains separate from
+  the in-app vector icon repairs.
 - Android: stream resolution is the own-client only (ADR-001). The
   2026-09-05 chain tries WEB_EMBEDDED → VISIONOS → TV → TV_DOWNGRADED →
   TV_SIMPLY → MWEB → WEB_REMIX (tokenless, no cookies). On networks where
@@ -62,10 +102,10 @@ Updated every phase. Nothing hidden.
   user's device, that is the cause (checklist:
   docs/verification/03-android-skeleton.md). Until toggled, aggressive OEM
   cleaners can still kill the service.
-- Desktop (Phase 04): module is in the build; CI configures it on every
-  run but only compiles it once the owner adds the workflow step (agent
-  token lacks `workflows` permission — see docs/verification/04-desktop.md).
-  Installer `packageVersion` is 1.0.x (Compose packagers reject MAJOR 0).
+- Desktop compilation is part of current CI (verified green at 34018809911),
+  and MSI packaging is green at 34018809913. These do not verify native
+  playback/integration or the unpublished candidate. Packagers require a
+  positive-major native version; the old fixed 1.0.5 prevented rolling upgrades.
 - Data layer (Phase 05+11): schema is now v2 (v1 + `LyricsCache` via `migrations/1.sqm`); the DB file is
   `dhun.db` (Android app-private storage — deleted with the app;
   desktop packaged = `<installDir>/userdata`, also deleted with the
@@ -74,8 +114,10 @@ Updated every phase. Nothing hidden.
   sessions come back **paused** at the saved position — stream URLs expire,
   so the desktop player re-resolves lazily on the first play press.
   Playback history is local-only; nothing leaves the device.
-- Desktop (Phase 04) runtime needs a system libVLC install and `yt-dlp` on
-  PATH (streams resolve own-client first, yt-dlp failover — ADR-001).
+- Desktop runtime needs system libVLC. The optional yt-dlp fallback is a
+  separate user-provided executable/module (PATH or `DHUN_YTDLP`); it is not
+  installed with VLC. Missing fallback is diagnosed in the candidate, not
+  silently classified as an offline network.
 - **Visual system lock (2026-09-05):** Material 3 only. **No Liquid Glass**
   renderer, no continuous full-res reblur. Atmosphere = **glass-morphism**
   tokens (translucent multi-stop fills, sheen, hairline edge) on chrome;
@@ -119,12 +161,14 @@ Updated every phase. Nothing hidden.
   **The separate 320×88 mini-player window was removed on 2026-09-06 per user
   decision (ADR-004)** — the docked in-app MiniPlayer above the bottom nav is
   the product's mini-player; the Ctrl+M toggle went with the window, so the
-  desktop app now opens exactly one window. Window geometry
+  desktop app now opens exactly one window; the latest user report confirms
+  this after manual reinstall. Window geometry
   (`SettingsKeys.WINDOW_GEOMETRY`) persists across restarts. jpackage MSI is **per-user** (`perUserInstall`, upgradeUuid
   `31ddb86b-9666-4071-b11c-45f16fa4682d`), not Authenticode-signed (SmartScreen
   warn is expected). Runtime data is `<installDir>/userdata` so Apps-and-Features
-  uninstall removes DB + audio cache. `packageVersion` is 1.0.x (packager
-  rejects MAJOR 0); clean-VM install test OPEN on hardware.
+  uninstall is intended to remove DB + audio cache (clean-target cleanup
+  evidence remains open). Published ProductVersion is 1.0.5; dynamic
+  candidate versions are local, and upgrade/data preservation is unverified.
   **Phase 14 Windows JVM fix (2026-09-06, main@e90dba6, PR #22):** MSI
   `dhun-test.msi` installed but launch showed \"Failed to launch JVM\".
   Root causes: (1) bundled jlink runtime omitted `java.sql` (and
@@ -140,19 +184,18 @@ Updated every phase. Nothing hidden.
   shows an AWT dialog + minimal error Window so the MSI user sees the
   real cause. `DataLayer` now falls back to in-memory DB on file-DB
   corruption. MSI `1.0.5` built at `34011563630` (112 MB, `includeAllModules`);
-  install → launch verification still OPEN — install the new `dhun-test.msi`
-  on a clean Windows VM, confirm window + tray appear and the log
-  contains `java.sql.Driver available` / `VLC initialized` (or graceful
-  VLC Error if VLC absent), no \"Failed to launch JVM\".
+  the user subsequently confirmed launch (and now one-window startup after
+  manual reinstall). Clean-target/tray/log verification remains OPEN;
+  failed install-over and failed audio are separate current blockers.
 
 ## Phase 14 — robustness / rot-drill / release (2026-09-05)
 
 - The daily live extraction workflow is wired and **failure path is
   live-proven** on the fixed branch (run 33968950214). It has **not**
-  produced a green `PROBE|verdict|PASS` from GitHub-hosted runners: both
-  production engines are CI-IP bot-gated (category 8). That is not by itself
-  proof residential playback is broken — residential verification is the
-  user-impact gate.
+  produced a green `PROBE|verdict|PASS` from GitHub-hosted runners. Latest
+  scheduled failure is 34011539225 (production Unavailable, yt-dlp WATCH
+  AuthRequired). User Windows audio also fails; successful playback and
+  validated bytes on a real user network remain gates, not assumptions.
 - Android currently caches resolved stream URLs for five hours and invalidates
   them on HTTP 403. **Android audio-segment cache** (Phase 14) is now in
   code: Media3 `SimpleCache` LRU under `cacheDir/audio-segments`, default

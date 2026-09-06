@@ -1,17 +1,26 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-Status: 🟨 **ROT-DRILL WORKFLOW WIRED; ALL HARDWARE AND RELEASE ACCEPTANCE
-OPEN**. This document is an evidence log, not a claim that Phase 14 is done.
-CI compilation is not a substitute for the live extraction, Android soak,
-Desktop soak, clean-install, or release checks below.
+Status: 🟨 **IN PROGRESS — WINDOWS UPGRADE, PLAYBACK, HOME AND UI BLOCKERS.**
+Current GitHub `main` / `test`: **`0920148`**, CI **34018809911** and publishing
+**34018809913** green; `test` published **2026-09-06T07:22:29Z** (MSI
+112,009,680 B; APK 17,483,422 B; checksum assets present). Those green runs
+verify the previously published code, **not** the repair batch below.
+
+The fresh Windows report confirms **one-window startup after manual
+uninstall/reinstall**, but rejects install-over upgrade, audio, Home
+pagination and parts of the player layout. New source/test/doc repairs on
+`arena/01a0759b-dhun` are **pending branch CI, with commit/push now explicitly
+authorised**. No PR, merge or release is authorised.
+No newer installer has been produced. Hardware, live extraction, soaks,
+clean-target hygiene and v0.1.0 cannot be inferred from build CI.
 
 ## Phase 14 implementation status
 
 | Step | Current status | Evidence / remaining gate |
 |---|---|---|
-| Typed error taxonomy and actionable user messages | 🟨 Typed `DhunResult`/`DhunError` + `toUserMessage` paths, per-request retry, 429 global backoff gate (`2932d57`, with unit tests), and offline banner (`fed1d54`) are implemented; CI verdict pending on the current push; 403 "Reconnecting…" UX, offline-banner hardware check, and the db-path review pass remain | `shared/.../core/RateLimitGate.kt`, `shared/.../core/ConnectivityMonitor.kt`, `DhunAppShell.kt`, hosts' Koin modules |
+| Typed error taxonomy and actionable user messages | 🟨 Typed `DhunResult`/`DhunError` + `toUserMessage` paths, per-request retry, 429 global backoff gate (`2932d57`, with unit tests), and offline banner (`fed1d54`) are merged with recovery UX; baseline CI `34018809911` is green. Local reason-preserving diagnostics changes await CI; offline/429/403 hardware checks and db-path review remain | `shared/.../core/RateLimitGate.kt`, `shared/.../core/ConnectivityMonitor.kt`, `DhunAppShell.kt`, hosts' Koin modules |
 | Bounded audio cache and offline replay | 🟨 Android + Desktop code | Android: Media3 `SimpleCache` LRU via `DhunAudioSegmentCache` + `CacheDataSource` (stable video-id keys). Desktop: `AudioFileCache` whole-track LRU files under `<data dir>/cache/audio`, background fill during first play, local-file playback on hit (no resolve → offline). Both use `SettingsKeys.CACHE_SIZE_MB` default 1024 MB (`AudioCacheBudget`). URL TTL cache still `DhunStreamCache`. Unit tests: `AudioFileCacheTest` (9: hit/LRU victim/over-budget/short-read/cancel/unsafe id/partial sweep/shrink+clear). Hardware offline-replay check OPEN on both |
-| Daily live rot-drill | 🔴 Workflow + probe fixes LIVE on correct branch (run 33968950214 @ `10ad025`): both engines CI-IP bot-gated; metadata PASS; kill switch OK. No green verdict; residential verify OPEN | issue #14, artifact `rot-drill-33968950214` |
+| Daily live rot-drill | 🔴 Latest verified run **34011539225**, scheduled on `dd1ab31`, failed; metadata PASS; own-client / production aggregate Unavailable; yt-dlp WATCH separately AuthRequired | Schedule, issue #14 alert and artifact `rot-drill-34011539225` proven. No newer live verdict, green byte check or recovery auto-close |
 | Android 30-minute soak | ⬜ Open | Requires a physical device with unrestricted battery mode, lock-screen playback, and zero-crash/leak evidence |
 | Desktop 30-minute soak | ⬜ Open | Requires a desktop with libVLC and tray/SMTC-capable runtime |
 | Release v0.1.0 artifacts | ⬜ Open | Rolling `test` APK/MSI is not the signed/stable v0.1.0 release; clean-target installation and release evidence are required |
@@ -83,29 +92,25 @@ for upstream recovery.
       WATCH reported `Unavailable`. Metadata PASS. Progress: no-URL →
       URL-then-CDN-403. Kill switch OK. Do not drop byte verification.
 
-- [ ] Manual/scheduled run completes with `PROBE|verdict|PASS` (CI-IP may stay red under category-8 gating; residential green is the user-impact gate — see KNOWN_LIMITATIONS).
-      Fixes for run 33961533965 are now on session branch `arena/01a07170-dhun`
-      (cherry-picks ending at `39cc924`; equivalent to PR #15 head `5dabdfa`).
-      CI run **`33967339900` GREEN** @ `60e5631`. Live rerun requires UI/manual dispatch when the
-      agent token lacks `actions:write`: Actions → rot-drill → Run workflow →
-      ref `arena/01a07170-dhun`. Do not mark green from CI alone.
+- [x] **Scheduled default-branch execution verified — run 34011539225,
+      2026-09-06, `schedule`, `dd1ab31`: FAILED.** Artifact
+      `rot-drill-34011539225` (3,241 B) exists. Issue #14's
+      [04:29:14Z comment](https://github.com/99ggprooo00-code/DHUN/issues/14#issuecomment-5556894160)
+      preserves the output: version/search/related PASS; own-client WATCH
+      Unavailable; yt-dlp WATCH bot-gate AuthRequired; production resolve+
+      stream FAIL / Unavailable. Do not relabel the aggregate as AuthRequired.
+      Run: https://github.com/99ggprooo00-code/DHUN/actions/runs/34011539225
+- [x] Failure path creates/updates one issue and uploads the log artifact.
+- [ ] Manual/scheduled run completes with `PROBE|verdict|PASS`, including
+      validated audio bytes. No newer live run for `0920148` was verified.
+- [ ] Recovery path comments on and closes issue #14 (still OPEN).
 
-- [ ] First scheduled run completes on the default branch.
-- [x] Failure path creates or updates one `[rot-drill]` issue and uploads the
-      log artifact. (done in 33961533965 — though the artifact name was
-      mangled in the issue text by the quoting bug; fix in flight)
-- [ ] Recovery path comments on and closes the open issue.
-- Run URL / date: https://github.com/99ggprooo00-code/DHUN/actions/runs/33961533965 · 2026-09-05
-- Verdict line: `PROBE|verdict|FAIL|extraction-pipeline-broken`
-- Issue number (if exercised): #14 (OPEN — auto-close awaits a green run)
-
-**CI-network vs residential (kill-switch policy, do not weaken):** a red
-drill caused by `AuthRequired`/bot-gate text on a GitHub runner is
-CI-network evidence only. It must NOT be converted to a pass by removing
-stream validation, skipping the byte check, or making the probe tolerate
-resolve failures. Distinguish: metadata PASS + resolve gated ⇒ datacenter
-gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
-(pin last-good, patch, release ≤72h per RISK_REGISTER).
+**CI vs user-network evidence:** a red Actions run establishes failure on
+that runner, not its unique cause or residential success. The user now
+also reports failed Windows audio; do not dismiss it as CI-only gating.
+Keep byte validation and the kill switch intact. Authentication/cookie or
+identity-scheduling changes require the appropriate approved decision;
+ADR-003 remains proposed and the own-client chain remains sequential.
 
 ### Android soak
 
@@ -152,7 +157,7 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 
 **Hardware gate still OPEN — to verify on a Windows machine:**
 
-1. Download the current `dhun-test.msi` + `dhun-test.msi.sha256` from `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`; verify the checksum, and that the release tag currently points at `9294520` (the docs merge after the `e90dba6` fix — same `1.0.5` binaries).
+1. Download the current `dhun-test.msi` + `dhun-test.msi.sha256` from `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`; verify the checksum, record the actual release SHA and published time (last verified `0920148` / `07:22:29Z`; the rolling asset can change).
 2. Install per-user (no admin) — accept SmartScreen **Run anyway** / **More info → Run anyway** — confirm install completes without admin UAC.
 3. Launch DHUN from Start menu / installed shortcut — **no** `Failed to launch JVM`; exactly one window opens: the main window (1200×780) with the docked mini-player above the bottom nav, plus the tray icon. (The separate mini-player window was removed — ADR-004, 2026-09-06.)
 4. Check `dhun-startup.log` (packaged: `<installDir>/userdata/dhun-startup.log`; fallback: `%TEMP%\dhun-startup.log`) —
@@ -163,36 +168,109 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 
 Record here: Windows version/build, VLC version (or \"not installed\"), MSI size/sha256, `dhun-startup.log` excerpts (sanitized), and whether launch succeeded. **Successful CI packaging is not launch verification.**
 
-### Hardware verdict — 2026-09-06 (user, real hardware, rolling `test` release)
+### Hardware reports — 2026-09-06
 
-**Both builds launch.** `dhun-test.msi` and `dhun-test.apk` install and
-start — the `Failed to launch JVM` fix (PR #22, `java.sql` modules +
-`includeAllModules`, `1.0.5`) is confirmed working on real hardware. This
-closes the "Windows desktop startup (JVM launch)" gate below.
+**Earlier report:** APK and MSI installed/launched, confirming the previous
+JVM-launch recovery on the user's machines; audio failed on both. PR #24
+subsequently propagated the resolving User-Agent and added Home continuation,
+PR #25 added a resolve budget/diagnostics, and PR #26 restyled the UI. Those
+changes are on GitHub and in the 07:22:29Z release, but are **not proof of
+successful audio or accepted UI**. The earlier attribution of all no-audio
+to User-Agent mismatch was too strong without device stream evidence.
 
-**But no audio plays on either platform**, which is the blocking defect
-for Phase 14. Root cause found by code audit and fixed this session:
-googlevideo binds a stream URL to the InnerTube identity that resolved it,
-and every byte-reading layer was sending its own hardcoded User-Agent
-instead. See `.ai/DEBUG_LOG.md` (2026-09-06, "both builds LAUNCH, but no
-audio at all") for the full chain and the `ResolvingDataSource` trap.
+**Fresh Windows report, in response to the 07:22:29Z build recommendation:**
 
-Also reported: **no endless scroll** (Home had no pagination at any layer —
-fixed: `HomeFeedPage` + `homeFeedContinuation` + near-bottom trigger), and
-the UI reads as poor on both apps (no screenshots provided; not restyled).
+| Check | User-observed result |
+|---|---|
+| Install over existing DHUN | **FAIL** — “Another version of this product is already installed. Installation of this version cannot continue. To configure or remove the existing version of the product, use Add/Remove Programs on the Control Panel.” |
+| Manual uninstall, then reinstall / launch | **PASS as reported** — one window opens. This is not a clean-VM or successful in-place upgrade test |
+| Playback | **FAIL** — “This track is not available right now.” Screenshot: **Ko Cha Ra (Official Audio) — John Rai**, **0:00 / 4:49**, Retry, no useful diagnostic detail |
+| Home | **FAIL** — endless/further-page scrolling still unavailable |
+| Player appearance | **NOT ACCEPTED** — styling somewhat better; glyph positions, shuffle shape and shuffle/next/previous/repeat colours wrong. Artwork/controls appear oversized/spread across the window |
 
-Not recorded because it was not reported: OS/VLC versions, MSI sha256,
-`dhun-startup.log` excerpts, and whether the player showed an error or
-looked like it was playing. The audio re-test should capture those.
+Screenshot evidence was supplied in the conversation (`Screenshot 2026-09-06
+132629.png`), not copied into this checkout. No verified installer SHA256,
+track ID, Windows/VLC versions or sanitized current logs were supplied. No
+fresh Android result accompanied this Windows report. Only the reported
+one-window launch check is closed; tray/SMTC/shortcuts remain unverified.
+
+### Branch repair candidate — arena/01a0759b-dhun (CI ONLY, NOT RELEASED)
+
+| Area | Source repair / regression coverage added |
+|---|---|
+| MSI identity | Replace constant 1.0.5 with `dhunInstallerVersion`; CI uses `(1 + run/256).(run%256).attempt`, bounded to MSI numeric limits; local default 1.0.6. Run 33/attempt 1 would be 1.33.1. Keep upgrade UUID `31ddb86b-9666-4071-b11c-45f16fa4682d` and `dhun-test.msi`; reject superseded-ref publishing; log installer version. A future stable packager must continue the internal sequence, not reset it to app semver |
+| Desktop extraction | Locate `yt-dlp.exe` on Windows Path / explicit `DHUN_YTDLP`; discover real Python/`py` fallback without Unix `which` or launching Store aliases. Missing tool gets an actionable diagnostic, not Network. Drain both pipes while waiting, retain bounded output, interrupt waits and dispose child processes on cancellation; ignore user yt-dlp config to preserve anonymous/no-cookie operation |
+| Failure evidence | Network/Unavailable/429 can retain details; preserve playability reason/subreason, every completed own-client outcome and both engine failures. Bound/sanitize external text and redact URLs. Timeout names the active engine and any completed primary failure. No scheduling fan-out |
+| Home parsing / transport | Select only feed-level section-list continuation tokens; support list continuations and append/reload actions/commands. Keep the request body's client version aligned with its header on the first request too |
+| Home data / state / UI | Same title plus fresh item IDs is new content. Follow advancing empty/duplicate pages, but stop token cycles and pause after three no-growth pages. Claim loading before dispatch; refresh invalidates stale pages. Keep failed feed visible with explicit retry; show honest end state. Indexed keys and later quick-picks shelves do not hide fresh tracks |
+| Player graphics / diagnostics | Scale SVG paths about the origin; canonical Apache-2.0 Material shuffle/repeat paths. Fit artwork to both available axes; centre bounded transport/volume; consistent inactive tint and active toggle treatment. Same full, scrollable/selectable Playback details dialog from either player; docked MiniPlayer retained |
+
+**Validation actually executed locally:**
+
+- **PASS:** `python3 -m unittest discover -s scripts -p 'test_*.py' -v` —
+  **10 tests**: five installer tests (legacy 1.0.5 upgrade ordering, reruns,
+  run ordering, numeric rollover/limits and invalid inputs) and five strict
+  fixture-validator tests (valid/malformed/duplicate-key/non-JSON-number
+  handling plus validation of checked-in inputs).
+- **PASS:** `git diff --check`; `python3 scripts/validate_fixtures.py` —
+  **29 JSON fixture files**, including **17 new synthetic Home response
+  cases** consumed by the Kotlin tests. These are static/helper checks,
+  not Kotlin parser tests or application execution.
+- **BLOCKED before Gradle started:**
+  `./gradlew :shared:jvmTest :app-desktop:compileKotlinJvm --no-daemon` →
+  `JAVA_HOME is not set and no 'java' command could be found in your PATH.`
+  Maven, Gradle distribution and Adoptium requests also failed with
+  `SSL_ERROR_SYSCALL`. The follow-up official Temurin JDK-17 download through
+  GitHub also failed at `release-assets.githubusercontent.com` with EOF.
+  No usable JDK or Gradle dependencies were downloaded/installed.
+- **Written, NOT RUN:** Windows tool lookup/missing module/Store aliases,
+  pipe back-pressure and cancellation tests; error aggregation and fallback
+  evidence; scoped continuation/response-shape and first-request tests;
+  repeated-title/empty-page/cycle/retry/stale-refresh tests; headless
+  icon raster bounds at 18–64 px and artwork dimension tests.
+- No new CI, MSI/APK build, live extraction, Windows install or audible
+  playback proof for this candidate. Publication is deferred until the
+  user separately authorises it after verified CI. The earlier **Keep
+  everything local** decision was superseded by explicit permission for
+  **commit/push and CI only**. Do not open a PR, merge or publish a release.
+
+**Local follow-up review:** Home now keeps different action targets separate,
+prefers full-page section lists over unrelated actions, accepts same-target
+split updates and rejects ambiguous targets. Previous/Next cancellation no
+longer routes through a tap; hold cleanup is in `finally`, and scrubbing is
+reset on track/duration changes. yt-dlp's own deadline includes pipe EOF,
+cleanup runs once, start denial is typed, and a track ID containing `429`
+is not a rate limit. Corresponding Kotlin regressions are **written but
+UNRUN**. None of this closes playback, UI or installation acceptance.
+
+**Next Windows acceptance, only with a CI-green published candidate:**
+
+1. Record build SHA, published time, internal MSI version and SHA256.
+   Quit all DHUN/tray processes. Back up test userdata before the upgrade
+   check; test on a disposable user/VM where possible.
+2. Install **over** the previous MSI without manual uninstall. Verify
+   library/queue preservation, one-window startup, and no “Another version”
+   error. Manual uninstall/reinstall does not pass this test.
+3. Play an uncached track and verify actual sound plus advancing position.
+   If it fails, open **Details**, select/copy the diagnostic (no signed URLs,
+   cookies or tokens), and record track ID, elapsed resolving time,
+   Windows/VLC/yt-dlp versions and sanitized `dhun-startup.log` excerpts.
+4. Scroll Home through multiple server pages, including repeated shelf
+   labels with new music; verify manual retry after a network failure and
+   refresh while paging. An upstream null continuation is a real end, not
+   an excuse to fabricate an infinite feed.
+5. Inspect shuffle/previous/play/next/repeat at common Windows display
+   scaling and in a short/wide window. Artwork must not cover controls.
+   Then re-check Android using the matching candidate APK.
 
 ### v0.1.0 release gate
 
 - [ ] Rot-drill is scheduled and has a green live run (scheduled run still red at `34011539225`; re-investigate after next green).
 - [ ] Android APK and AAB build and install on a clean target.
-- [ ] Windows MSI installs and launches on a clean Windows VM/user — **new MSI `1.0.5` built at `34011563630`; install → launch check OPEN as above**.
-- [ ] Android and Desktop soak evidence is attached above (both still OPEN; desktop soak now expects the new `1.0.5` MSI).
+- [ ] Windows MSI installs and launches on a clean Windows VM/user — **published baseline `0920148` launches on the user’s machine; install-over failed and clean-target hygiene is still OPEN**.
+- [ ] Android and Desktop soak evidence is attached above (both still OPEN; use an identified candidate that first passes real playback).
 - [ ] `KNOWN_LIMITATIONS.md`, `THIRD_PARTY.md`, `RISK_REGISTER.md`, README,
-      and CHANGELOG are current (KNOWN_LIMITATIONS + 12-desktop-native updated for the JVM fix; final release review still OPEN).
+      and CHANGELOG are current (current-report reconciliation is local; final hardware/risk/license/release review still OPEN).
 - [ ] Release is tagged `v0.1.0` only after all required evidence is real.
 
 ## PR #16 merge (2026-09-05)

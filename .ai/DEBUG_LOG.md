@@ -1,5 +1,148 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — CI-only checkpoint explicitly approved
+
+After the local JDK/download blockers, the user approved the offered scope:
+**commit/push only to `arena/01a0759b-dhun`, run CI and fix failures; no PR,
+merge or release**. This supersedes the earlier keep-local restriction for
+branch verification only. No workflow dispatch of test-release or rot-drill
+is included. The published `test@0920148` / 07:22:29Z build is unchanged.
+
+Pre-push GitHub audit: main unchanged, no open PRs, no remote session branch;
+previous baseline CI 34018809911 is green but does not cover the repairs.
+Ten local Python helper tests, 29 JSON fixture syntax checks and diff checks
+pass. Candidate Kotlin/Android/Desktop checks are pending. Record real run
+IDs and failures below when available; do not close hardware acceptance.
+
+---
+
+## 2026-09-06 — Local continuation: target ownership, gesture cancellation, subprocess deadline
+
+The user asked to continue from the saved state. The earlier **Keep everything
+local** decision remains in force; no commit, push, PR or publication occurred.
+
+**Additional source defects corrected locally:**
+
+- `HomeFeedParser` initially flattened all append/reload actions. A horizontal
+  shelf command could therefore supply the vertical feed's next cursor even
+  after fixing recursive token lookup. A full initial page could also be
+  overridden by an unrelated action. Prefer the actual section list, group
+  incremental updates only by matching non-null target IDs, select an
+  unambiguous Home group, and reject ambiguous targets instead of guessing.
+  Split shelf/cursor commands for the same named target are supported.
+- Replaced interpolated Home test JSON with **17 synthetic fixture files**
+  consumed by `HomeFeedParserTest`, covering mixed/anonymous/ambiguous targets,
+  append/reload aliases, split commands, empty advancing pages and exhaustion.
+  `scripts/validate_fixtures.py` strictly checks the actual files (duplicate
+  keys and non-JSON numeric constants are errors). This does not run Kotlin.
+- Previous/Next treated `waitForUpOrCancellation()` returning null as a
+  successful release and could skip on a cancelled press. Hold cleanup was
+  also skipped if the pointer coroutine was disposed/cancelled after starting
+  seek. `TransportPress` distinguishes release/cancel/deadline, captures a
+  matching callback set per press, and gets idempotent cleanup in `finally`.
+  Seek-bar handlers now refresh when duration/callback changes; changing
+  tracks recreates the scrub state, including equal-duration tracks.
+- yt-dlp's process-exit wait alone did not bound awaiting pipe EOF. Its own
+  timeout now wraps exit **and output drain**; inner/outer cleanup share one
+  disposal. Process start denial is typed. HTTP 429 classification no longer
+  mistakes a video ID containing `429` for a rate limit. New Kotlin cases cover
+  an exited child with still-open output, cleanup count, start denial and
+  classification. The extractor identity chain remains sequential/unchanged.
+
+**Verification actually run:** ten Python tests PASS (5 installer + 5 fixture
+validator); all **29 JSON fixture files** pass strict syntax validation;
+`git diff --check` passes. Kotlin tests remain **UNRUN**: Gradle again stops
+with `JAVA_HOME is not set and no 'java' command could be found in your PATH.`
+The official Temurin 17.0.20.1+1 Linux JDK asset was identified through GitHub,
+but its download failed with EOF at `release-assets.githubusercontent.com`;
+no binary/checksum/install succeeded. Direct Gradle, Maven, Android SDK and
+Debian endpoints also failed. Do not retry these routes indefinitely or use
+unauthorised CI publication to evade the local-only decision.
+
+No new app build, live extraction, audible playback, Windows upgrade, UI
+acceptance or soak evidence exists for these local changes. See ROADMAP for
+exact next validation tasks and the still-open gates.
+
+---
+
+## 2026-09-06 — Fresh Windows failures; local repair batch (arena/01a0759b-dhun)
+
+**Evidence, not a success claim:** after the 07:22:29Z `test@0920148`
+recommendation, the user reports install-over blocked by **“Another version
+of this product is already installed…”**. Manual uninstall/reinstall opens
+**one window**, so do not redo ADR-004. Audio still fails with the generic
+unavailable banner; Home still does not page; glyph placement, shuffle shape
+and transport colours remain wrong despite somewhat better styling.
+Screenshot/report: **Ko Cha Ra (Official Audio) — John Rai, 0:00 / 4:49**,
+no useful error detail. Original image was not copied into the repository;
+no verified checksum, track ID, Windows/VLC/tool versions or sanitized current
+logs were supplied. This is user-facing failure, not evidence of CI-only gating.
+
+**Source defects and LOCAL corrections:**
+
+1. `app-desktop/build.gradle.kts` rebuilt every MSI as **1.0.5**. Add an
+   explicit internal version property; the rolling workflow supplies a
+   numeric run/attempt sequence from `scripts/installer_version.py`, keeping
+   the stable upgrade UUID/public asset. Fresh reruns advance too; an old-ref
+   publishing guard prevents replacing the slot with a superseded build.
+   Startup logs record the version. Actual in-place upgrade/data preservation
+   is still untested; future stable packaging must not reset the sequence.
+2. Desktop `YtDlpStreamResolver` invoked Unix **`which`**, then assumed
+   `python3`. The standalone `yt-dlp.exe` can be installed on Windows yet
+   missed. New locator handles Windows Path casing, quoted paths, executable
+   override, real Python/`py` fallback and Store-alias avoidance. Tool absence
+   is explicit evidence, not Network. The user's installation state remains
+   unknown; this defect alone does not explain every rejected player request.
+3. The process waited before draining either pipe and was not cancellation
+   safe. Move the resolver to its own JVM file, drain both pipes concurrently
+   with bounded retained output, interrupt `waitFor`, dispose process/children
+   before joining readers and also on early cancellation. This is pipe I/O
+   concurrency, **not** parallel InnerTube identities. `--ignore-config`
+   preserves the anonymous/no-cookie contract.
+4. UNPLAYABLE/ERROR reasons disappeared into a detail-less Unavailable,
+   aggregation dropped those details, and double failure discarded the
+   fallback. Preserve status/reason/subreason, bounded per-identity and both
+   engine outcomes (including missing dependency), sanitized URL-free text;
+   429 keeps retry semantics. Timeout identifies the active engine and any
+   completed primary failure. Full and docked players share a complete,
+   scrollable/selectable Details dialog instead of ellipsis or a giant banner.
+5. Home chose the first continuation recursively (often a horizontal shelf's
+   token), deduplicated by title, and stopped even if a duplicate/empty page
+   supplied a new token. Add a scoped Home parser plus action/command response
+   handling, content-aware deduplication, advancing-token following with a
+   three-no-growth-page pause, token-cycle checks, visible retry/end UI and
+   indexed shelf keys. Later Quick picks with new IDs must remain visible.
+   VM generation/feed/flags now update atomically; old completion cannot
+   overwrite refresh even on Desktop's Default dispatcher. Failed pages are
+   not retried by every recomposition. Home's original fixture has no token,
+   so the new parser cases are explicitly **synthetic**, not live evidence.
+6. The first metadata context could contain a fallback version while the
+   header used the newly discovered version. Normalise the request body to
+   the same value; MockEngine regression covers first Home and continuation.
+7. SVG scaling pivoted around the canvas centre instead of coordinate origin,
+   shifting/clipping non-24px glyphs (including display scaling). Fix the
+   actual draw helper and use canonical Material shuffle/repeat/repeat-one
+   paths; record upstream SHA/license in THIRD_PARTY. Fit player artwork to
+   width **and height**, centre bounded transport/volume and use consistent
+   inactive colours/sizes and active toggle treatment. No separate window
+   was reintroduced. Raster/layout regressions are written, not executed.
+
+**Validation/publication boundary:** five Python version regressions PASS;
+`git diff --check` PASS; literal request-fixture JSON syntax checked.
+`./gradlew :shared:jvmTest :app-desktop:compileKotlinJvm --no-daemon` stops
+before Gradle with **`JAVA_HOME is not set and no 'java' command could be
+found in your PATH.`** No checked JDK/cache exists; Maven/Gradle/Adoptium
+requests failed with `SSL_ERROR_SYSCALL`. No Kotlin compile/test, Windows
+installer, current live playback or UI result was produced for this batch.
+No commit/push/PR has been made. When asked about making this the next
+checkpoint, the user explicitly selected **Keep everything local**: do not
+commit, push, open a PR or publish now. The prior green GitHub runs are only
+the baseline; wait for a later authorised checkpoint or an available local
+build environment. ADR-003 is still proposed; seven identities remain sequential.
+See verification/12 and /14 and ROADMAP for exact next actions/open gates.
+
+---
+
 ## 2026-09-06 — UI restyle: the "terrible UI" was one bad colour function (session arena/01a07563-dhun)
 
 **Trigger:** the user supplied 18 screenshots (APK under MEmu, MSI on
