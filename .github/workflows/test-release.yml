@@ -67,8 +67,20 @@ jobs:
       # doesn't exist in this plugin version; CI 33950291501 proved it).
       # jpackage creates the MSI; output lands in
       # app-desktop/build/compose/binaries/mainMsi/<name>.msi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # The public asset remains dhun-test.msi, but Windows needs a new
+      # ProductVersion for every published run AND rerun. Keep upgradeUuid stable.
       - name: Build MSI (jpackage)
-        run: ./gradlew :app-desktop:packageMsi --no-daemon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = python scripts/installer_version.py $env:GITHUB_RUN_NUMBER $env:GITHUB_RUN_ATTEMPT
+          if ($LASTEXITCODE -ne 0) { throw "Could not allocate MSI ProductVersion" }
+          Write-Host "MSI ProductVersion: $version"
+          ./gradlew :app-desktop:packageMsi "-PdhunInstallerVersion=$version" --no-daemon
 
       # Recurse the whole compose build tree (run 33951385012: the MSI was
       # NOT where the old hardcoded path expected — and job logs were
@@ -124,6 +136,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # A rerun of an OLD commit must not replace test with a lower MSI
+          # version after a newer main build has already been published.
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$latest" != "$GITHUB_SHA" ]; then
+            echo "::error::Refusing to publish a superseded main commit ($GITHUB_SHA; current $latest)"
+            exit 1
+          fi
           # one-time cleanup: remove the historical dev-v* releases and tags
           gh release delete dev-v0.1.0 --yes --cleanup-tag || true
           gh release delete dev-v0.1.1 --yes --cleanup-tag || true
@@ -138,6 +157,7 @@ jobs:
           gh release create test \
             dhun-test.apk dhun-test.apk.sha256 \
             dhun-test.msi dhun-test.msi.sha256 \
+            --target "$GITHUB_SHA" \
             --title "DHUN test build (auto-replaced on every update)" \
             --notes "Rolling UNVERIFIED development build of main. dhun-test.apk = Android, dhun-test.msi = Windows (playback needs a VLC install). Nothing here is stable, signed for stores, or recommended for daily-driver devices. Install only where that is acceptable. Current open checks: docs/verification/03-android-skeleton.md, docs/verification/12-desktop-native.md" \
             --prerelease

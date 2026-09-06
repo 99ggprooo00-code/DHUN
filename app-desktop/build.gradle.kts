@@ -6,6 +6,16 @@ plugins {
     id("org.jetbrains.compose")
 }
 
+// MSI ProductVersion is an installer sequence, not DHUN's semantic version.
+// Rebuilding "1.0.5" for every main push prevented in-place Windows upgrades.
+// Rolling CI supplies a strictly increasing value, including workflow reruns.
+val installerVersion = providers.gradleProperty("dhunInstallerVersion").getOrElse("1.0.6")
+val installerParts = installerVersion.split('.').map { it.toIntOrNull() ?: -1 }
+require(installerParts.size == 3 &&
+    installerParts[0] in 1..255 && installerParts[1] in 0..255 && installerParts[2] in 0..65535) {
+    "dhunInstallerVersion must be a numeric MSI version: major 1..255, minor 0..255, build 0..65535"
+}
+
 kotlin {
     // Desktop app = JVM-only multiplatform target (src/jvmMain).
     jvm()
@@ -34,6 +44,7 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "dev.dhun.desktop.MainKt"
+        jvmArgs += "-Ddhun.installer.version=$installerVersion"
 
         nativeDistributions {
             // Phase 14 Windows JVM launch fix: the MSI bundles a jlink-slimmed
@@ -63,14 +74,7 @@ compose.desktop {
             description = "DHUN — YouTube Music player (test build)"
             vendor = "DHUN"
             copyright = "© DHUN contributors. GPL-3.0."
-            // WHY 1.x: Compose Desktop's DMG/MSI packagers reject MAJOR == 0
-            // ("'0.1.4' is not a valid version"). Configuration of THIS project
-            // then fails, which takes down every Gradle task in the build —
-            // that was the "desktop CI blocker" (docs/verification/04-desktop.md).
-            // Installer versions map DHUN 0.x -> 1.0.x until v1.0.0 ships.
-            // 1.0.5: Phase 14 ruggedization — bundles java.sql etc. and makes
-            // VLC init fault-tolerant (fixes Windows "Failed to launch JVM").
-            packageVersion = "1.0.5"
+            packageVersion = installerVersion
             windows {
                 // Per-user = no admin UAC, install under %LOCALAPPDATA%\DHUN,
                 // uninstall from Settings → Apps. Runtime data lives in
