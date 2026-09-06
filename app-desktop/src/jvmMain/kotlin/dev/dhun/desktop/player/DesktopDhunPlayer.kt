@@ -45,10 +45,20 @@ class DesktopDhunPlayer(
     private val audioCache: AudioFileCache? = null,
 ) : DhunPlayer {
 
-    private val factory = MediaPlayerFactory("--no-video", "--quiet")
-    private val mediaPlayer = factory.mediaPlayers().newMediaPlayer()
+    // VLC is an external native dependency (system libVLC). The original eager
+    // `MediaPlayerFactory(...).newMediaPlayer()` throws UnsatisfiedLinkError /
+    // IllegalStateException if VLC is missing or incompatible, which previously
+    // crashed the whole desktop startup before the window opened (reported as
+    // a generic \"Failed to launch JVM\" style failure). Make it lazy and
+    // fault-tolerant: init is caught, `vlcAvailable` gates all player ops,
+    // and a user-visible Error state explains the fix (install VLC).
+    private var factory: MediaPlayerFactory? = null
+    private var mediaPlayer: MediaPlayer? = null
+    private var vlcInitError: String? = null
     private val queueManager = QueueManager()
     private val opMutex = Mutex()
+
+    private val vlcAvailable: Boolean get() = factory != null && mediaPlayer != null
 
     private val _state = MutableStateFlow<PlaybackState>(PlaybackState.Idle)
     override val state: StateFlow<PlaybackState> = _state.asStateFlow()
@@ -84,31 +94,55 @@ class DesktopDhunPlayer(
     private var cacheFillCancel: AtomicBoolean? = null
 
     init {
-        _volume.value =
-            runCatching { mediaPlayer.audio().volume() / 100f }.getOrDefault(1f).coerceIn(0f, 1f)
-        mediaPlayer.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
-            override fun playing(mediaPlayer: MediaPlayer) {
-                _state.value = PlaybackState.Playing(_currentTrack.value ?: UNKNOWN)
-            }
+        try {
+            val f = MediaPlayerFactory("--no-video", "--quiet")
+            val mp = f.mediaPlayers().newMediaPlayer()
+            factory = f
+            mediaPlayer = mp
+            _volume.value =
+                runCatching { mp.audio().volume() / 100f }.getOrDefault(1f).coerceIn(0f, 1f)
+            mp.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
+                override fun playing(mediaPlayer: MediaPlayer) {
+                    _state.value = PlaybackState.Playing(_currentTrack.value ?: UNKNOWN)
+                }
 
-            override fun paused(mediaPlayer: MediaPlayer) {
-                _state.value = PlaybackState.Paused(_currentTrack.value ?: UNKNOWN)
-            }
+                override fun paused(mediaPlayer: MediaPlayer) {
+                    _state.value = PlaybackState.Paused(_currentTrack.value ?: UNKNOWN)
+                }
 
-            override fun error(mediaPlayer: MediaPlayer) {
-                _state.value = PlaybackState.Error(
-                    _currentTrack.value,
-                    "Playback failed (stream URL or network).",
+                override fun error(mediaPlayer: MediaPlayer) {
+                    _state.value = PlaybackState.Error(
+                        _currentTrack.value,
+                        "Playback failed (stream URL or network).",
+                    )
+                }
+
+                override fun finished(mediaPlayer: MediaPlayer) {
+                    // Never call back into libVLC on the native callback thread
+                    // (vlcj 4 tutorial, "exit() is called from submit()") —
+                    // advance on a coroutine instead.
+                    scope.launch { advanceOnEnded() }
+                }
+            })
+            println("DHUN VLC initialized successfully")
+        } catch (e: Throwable) {
+            vlcInitError = e.message ?: e::class.simpleName ?: "unknown"
+            System.err.println("DHUN VLC init failed (playback disabled, app continues): $e")
+            e.printStackTrace()
+            // Persist a startup log so the MSI user can find the cause without console.
+            runCatching {
+                val logFile = java.io.File(
+                    try { dev.dhun.data.DhunUserDirs.dataDir() } catch (_: Throwable) { java.io.File(System.getProperty("java.io.tmpdir") ?: ".") },
+                    "dhun-vlc-error.log",
                 )
+                logFile.parentFile?.mkdirs()
+                logFile.appendText("[${java.time.Instant.now()}] VLC init failed: $e\n${e.stackTrace.take(30).joinToString("\n")}\n")
             }
-
-            override fun finished(mediaPlayer: MediaPlayer) {
-                // Never call back into libVLC on the native callback thread
-                // (vlcj 4 tutorial, "exit() is called from submit()") —
-                // advance on a coroutine instead.
-                scope.launch { advanceOnEnded() }
-            }
-        })
+            _state.value = PlaybackState.Error(
+                null,
+                "VLC not found — install VLC (https://www.videolan.org/vlc/) and restart DHUN. Detail: $vlcInitError",
+            )
+        }
     }
 
     override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
@@ -171,16 +205,26 @@ class DesktopDhunPlayer(
     }
 
     override fun playPause() {
+        if (!vlcAvailable) {
+            // VLC missing: keep the descriptive Error state; don't crash.
+            if (_state.value !is PlaybackState.Error) {
+                _state.value = PlaybackState.Error(
+                    _currentTrack.value,
+                    "VLC not found — install VLC (https://www.videolan.org/vlc/) and restart. Detail: ${vlcInitError ?: "unknown"}",
+                )
+            }
+            return
+        }
         if (pendingLazyStart) {
             scope.launch { opMutex.withLock { if (pendingLazyStart) playCurrentLocked(true) } }
             return
         }
         when (_state.value) {
-            is PlaybackState.Playing -> mediaPlayer.controls().pause()
+            is PlaybackState.Playing -> mediaPlayer?.controls()?.pause()
             is PlaybackState.Paused,
             is PlaybackState.Buffering,
             is PlaybackState.Recovering,
-            -> mediaPlayer.controls().play()
+            -> mediaPlayer?.controls()?.play()
             else -> Unit
         }
     }
@@ -203,9 +247,13 @@ class DesktopDhunPlayer(
                 if (prev == null) return@withLock
                 if (prev.id == before?.id) {
                     // Already at the first track of the play order: restart it.
-                    mediaPlayer.controls().setTime(0)
-                    _positionMs.value = 0
-                    if (wasPlaying) mediaPlayer.controls().play()
+                    if (vlcAvailable) {
+                        mediaPlayer?.controls()?.setTime(0)
+                        _positionMs.value = 0
+                        if (wasPlaying) mediaPlayer?.controls()?.play()
+                    } else {
+                        _positionMs.value = 0
+                    }
                 } else {
                     playCurrentLocked()
                 }
@@ -221,7 +269,9 @@ class DesktopDhunPlayer(
             _positionMs.value = safe
             return
         }
-        mediaPlayer.controls().setTime(safe)
+        if (vlcAvailable) {
+            mediaPlayer?.controls()?.setTime(safe)
+        }
         _positionMs.value = safe
     }
 
@@ -229,7 +279,7 @@ class DesktopDhunPlayer(
     private suspend fun seekWhenPlaying(positionMs: Long) {
         repeat(40) {
             if (_state.value is PlaybackState.Playing) {
-                mediaPlayer.controls().setTime(positionMs)
+                if (vlcAvailable) mediaPlayer?.controls()?.setTime(positionMs)
                 _positionMs.value = positionMs
                 return
             }
@@ -253,7 +303,7 @@ class DesktopDhunPlayer(
     override fun setVolume(volume: Float) {
         val v = volume.coerceIn(0f, 1f)
         _volume.value = v
-        runCatching { mediaPlayer.audio().setVolume((v * 100).toInt()) }
+        if (vlcAvailable) runCatching { mediaPlayer?.audio()?.setVolume((v * 100).toInt()) }
     }
 
     override fun stop() {
@@ -275,8 +325,8 @@ class DesktopDhunPlayer(
         cancelCacheFill()
         pollJob?.cancel()
         pollJob = null
-        mediaPlayer.release()
-        factory.release()
+        runCatching { mediaPlayer?.release() }
+        runCatching { factory?.release() }
     }
 
     /* ---------------- internals ---------------- */
@@ -327,7 +377,18 @@ class DesktopDhunPlayer(
     }
 
     private fun startMedia(track: Track, mrl: String) {
-        mediaPlayer.media().play(mrl)
+        if (!vlcAvailable) {
+            _state.value = PlaybackState.Error(
+                track,
+                "VLC not available — install VLC (https://www.videolan.org/vlc/) and restart. Detail: ${vlcInitError ?: "unknown"}",
+            )
+            return
+        }
+        val mp = mediaPlayer ?: run {
+            _state.value = PlaybackState.Error(track, "VLC unavailable")
+            return
+        }
+        mp.media().play(mrl)
         startPolling()
         _state.value = PlaybackState.Buffering(track)
         val resume = pendingSeekMs
@@ -368,18 +429,19 @@ class DesktopDhunPlayer(
         cancelCacheFill()
         pollJob?.cancel()
         pollJob = null
-        mediaPlayer.controls().stop()
+        if (vlcAvailable) runCatching { mediaPlayer?.controls()?.stop() }
         _positionMs.value = 0
         publishQueueLocked()
         _state.value = PlaybackState.Idle
     }
 
     private fun startPolling() {
+        if (!vlcAvailable) return
         if (pollJob?.isActive == true) return
         pollJob = scope.launch {
             while (isActive) {
-                val time = runCatching { mediaPlayer.status().time() }.getOrDefault(_positionMs.value)
-                val length = runCatching { mediaPlayer.status().length() }.getOrDefault(_durationMs.value)
+                val time = runCatching { mediaPlayer?.status()?.time() ?: _positionMs.value }.getOrDefault(_positionMs.value)
+                val length = runCatching { mediaPlayer?.status()?.length() ?: _durationMs.value }.getOrDefault(_durationMs.value)
                 if (length > 0) _durationMs.value = length
                 if (time > 0) _positionMs.value = time
                 delay(POLL_MS)
