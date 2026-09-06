@@ -1,15 +1,15 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-06 (UTC)** · session **`arena/01a076f3-dhun`** · **working PR #32 OPEN** · latest head commit `4e95493` on branch `arena/01a076f3-dhun`.
+Updated **2026-09-06 (UTC)** · session **`arena/01a076f3-dhun`** · **working PR #32 OPEN** · latest head commit `52c6aba` on branch `arena/01a076f3-dhun`.
 
 **Phase: 14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS.** Repair PR #30 was merged into main at `76c68eb` and published to the rolling `test` release (MSI 1.36.1, APK). Working session PR #32 tracks active session hardening and tests. Hardware/user-machine gates (audio playback, Home pagination, installer upgrade, visuals, tray/SMTC, soaks) remain open; no stable v0.1.0 was created.
 
 **Latest verified published build:** [`test`](https://github.com/99ggprooo00-code/DHUN/releases/tag/test) at **`76c68eb`**, published **2026-09-06T11:58:17Z**, internal MSI **1.36.1**. Main CI **34031477321 SUCCESS** and test-release **34031477327 SUCCESS**.
 
 **Candidate PR #32 verification (session branch):**
-- Branch CI **34037275812 PASS** — Python tests, PowerShell syntax, shared JVM tests, Android debug build, probe/Desktop compilation.
-- Packaging run **34037275826 PASS** — MSI **1.39.1** (112,091,136 B, SHA256 `a2fdb85f699caef797fd6fb6202aedf5f4f65f07b47d834b69d67d6ada59bc8a`); APK (17,499,806 B, SHA256 `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86`).
-- Hosted Windows upgrade smoke verified **1.36.1 → 1.39.1** (baseline SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`), preserving userdata and cache sentinels.
+- Branch CI **34037665009 PASS** — Python tests, PowerShell syntax, shared JVM tests (including `LyricsRepositoryTest` and `SqlDelightLyricsCacheRepository` tests), Android debug build, probe/Desktop compilation.
+- Packaging run **34037665019 PASS** — MSI **1.40.1** (112,091,136 B, SHA256 `332f6dec0ea91821aecf10afa451c80a14bf370d7779b18fb7acab1445ff216a`); APK (17,499,806 B, SHA256 `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86`).
+- Hosted Windows upgrade smoke verified **1.36.1 → 1.40.1** (baseline SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`), preserving userdata and cache sentinels.
 - Future upgrade removal and explicit uninstall checks **PASS**.
 
 | Published artifact | Verified size / CI-produced SHA256 |
@@ -23,12 +23,12 @@ Updated **2026-09-06 (UTC)** · session **`arena/01a076f3-dhun`** · **working P
 
 **What is verified / merged / released / open:**
 - **Merged on main:** PR #30 at `76c68eb` (installer data safety, Home feed/pagination, diagnostics, player layout).
-- **CI-verified:** Main CI 34031477321 (PASS), test-release 34031477327 (PASS), PR #32 CI 34037275812 (PASS), PR #32 packaging 34037275826 (PASS).
+- **CI-verified:** Main CI 34031477321 (PASS), test-release 34031477327 (PASS), PR #32 CI 34037665009 (PASS), PR #32 packaging 34037665019 (PASS).
 - **Released:** Rolling `test` pre-release at `76c68eb` (MSI 1.36.1, APK).
 - **Hardware-verified:** One-window startup confirmed by user on prior build. Install-over upgrade, live audio stream byte playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, and 30-min soaks remain **OPEN**.
 - **ADR-003:** Stays **PROPOSED**; 7-identity chain remains sequential.
 
-**Exact next technical step:** Push test suite additions (LyricsRepositoryTest + lyrics cache repository coverage in RepositoriesTest) to PR #32 on `arena/01a076f3-dhun`, verify CI pass, and keep hardware gates open. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
+**Exact next technical step:** Maintain working PR #32, keep test suites green, and await user hardware feedback on the published MSI 1.36.1 / APK builds. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
 
 ---
 

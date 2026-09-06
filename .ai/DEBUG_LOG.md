@@ -1,5 +1,22 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — PR #32 test suite expansion: LyricsRepository & cache persistence CI PASS
+
+Commit `52c6aba` on `arena/01a076f3-dhun`:
+- Added `LyricsRepositoryTest.kt` (6 unit tests covering cache hits, YTM-first resolution, LRCLIB fallback with MockEngine, NotAvailable negative-cache prevention, cache read exception tolerance, and cache clear/inspection helpers).
+- Added `RepositoriesTest.kt` coverage for `SqlDelightLyricsCacheRepository` (round-trip of Synced/Unsynced lyrics, NotAvailable non-caching, observe flow, and clear).
+- CI results on PR #32:
+  - Code CI run **34037665009** PASS (job 101498587867: Python checks, PowerShell syntax, shared JVM domain tests including new lyrics tests, Android debug build, probe and Desktop compilation).
+  - Native packaging run **34037665019** PASS:
+    - MSI build job 101498588247 produced MSI **1.40.1** (112,091,136 B, SHA256 `332f6dec0ea91821aecf10afa451c80a14bf370d7779b18fb7acab1445ff216a`).
+    - Hosted Windows upgrade smoke verified **1.36.1 → 1.40.1**, preserving userdata and cache sentinels.
+    - Future upgrade-removal guard and explicit uninstall checks passed.
+    - APK build job 101498588114 passed (17,499,806 B, SHA256 `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86`).
+
+Hardware/product gates remain open awaiting user device re-tests.
+
+---
+
 ## 2026-09-06 — Session arena/01a076f3-dhun initialized; PR #32 CI & MSI verification PASS
 
 Session branch `arena/01a076f3-dhun` established from `main@76c68eb`. Working
