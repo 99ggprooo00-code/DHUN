@@ -3,6 +3,7 @@ package dev.dhun.innertube
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunException
 import dev.dhun.core.DhunResult
+import dev.dhun.core.HomeFeedPage
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
 import dev.dhun.core.RateLimitGate
@@ -120,14 +121,39 @@ class InnerTubeClient(
             parseSuggestions(postJson("music/get_search_suggestions", body))
         }
 
-    /** Home feed (browseId = FEmusic_home) for the Home screen. */
+    /** Home feed (browseId = FEmusic_home), first page, for the Home screen. */
     suspend fun homeFeed(): DhunResult<List<HomeSection>> =
+        resultify { homeFeedPage().sections }
+
+    /**
+     * First page of home shelves **plus** its continuation token, so the
+     * Home screen can keep scrolling instead of stopping at page one.
+     */
+    suspend fun homeFeedPage(): DhunResult<HomeFeedPage> =
         resultify {
             val body = buildJsonObject {
                 put("context", context())
                 put("browseId", "FEmusic_home")
             }
-            parseHomeSections(postJson("browse", body))
+            val root = postJson("browse", body)
+            HomeFeedPage(
+                sections = parseHomeSections(root),
+                continuationToken = parseContinuationToken(root),
+            )
+        }
+
+    /** Next page of home shelves (InnerTube `/browse` continuation). */
+    suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> =
+        resultify {
+            val body = buildJsonObject {
+                put("context", context())
+                put("continuation", continuationToken)
+            }
+            val root = postJson("browse", body)
+            HomeFeedPage(
+                sections = parseHomeSections(root),
+                continuationToken = parseContinuationToken(root),
+            )
         }
 
     /* ---------------- browse pages (Phase 09) ---------------------------- */

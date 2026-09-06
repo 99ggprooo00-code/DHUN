@@ -1,49 +1,38 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-06 (UTC), after PR #23 merged** · session
-**`arena/01a0750c-dhun`** (branched from `main@9294520`, in sync, no local-only commits at boot).
+Updated **2026-09-06 (UTC)** · session **`arena/01a0750c-dhun`** · branch at `5a89b81`+ (2 commits ahead of `main@9294520` at the time of writing).
 
-**Phase:** **14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS — every Phase 14 *code* slice is on GitHub and CI-green; the entire remaining Phase 14 gate is hardware evidence.**
+**Phase:** **14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS — first real hardware verdict is in, and it closed one gate and opened a blocker.**
 
-**Handoff context:** PR #23 (`553a612`, docs-only) merged to `main@9294520` at **2026-09-06T04:41:51Z**, recording the Windows JVM-launch fix from PR #22 (`e90dba6`) in `14-release.md` / `12-desktop-native.md` / `KNOWN_LIMITATIONS.md`. That merge re-ran everything green: CI **`34012157207`** and test-release **`34012157287`** both `completed/success` on `9294520`. **No application code changed between `e90dba6` and `9294520`** — the rolling `test` assets are byte-identical rebuilds (MSI **112,001,488** bytes, `1.0.5`; APK **17,467,038** bytes), published `2026-09-06T04:45:40Z`.
+**Hardware verdict (user, real hardware, builds from the rolling `test` release):**
 
-**Application-code state on GitHub (the last code change is still PR #22):**
+- ✅ **Both `dhun-test.msi` and `dhun-test.apk` install and launch.** The "Failed to launch JVM" fix (PR #22 @ `e90dba6`, `java.sql` modules + `includeAllModules`, `1.0.5`) is **hardware-confirmed**. That gate is closed.
+- 🔴 **No audio plays on either platform.** Not one track. This is now the blocking Phase 14 defect.
+- 🔴 **No endless scroll** on either app.
+- 🔴 **UI reads as poor** on both apps, and the two look much alike. No screenshots were provided, so nothing was restyled rather than guess.
 
-- `app-desktop/build.gradle.kts` — adds `modules("java.sql","java.sql.rowset","java.naming","jdk.unsupported","java.management","java.instrument","java.desktop","java.logging","java.net.http")` + `includeAllModules=true` (the Compose plugin does NOT auto-detect modules; missing `java.sql` for sqlite-jdbc was the launcher failure) and bumps `packageVersion` 1.0.4 → **1.0.5** (same `upgradeUuid`, per-user, SmartScreen-unsigned).
-- `DesktopDhunPlayer.kt` — VLC `MediaPlayerFactory` now try/catched, `vlcAvailable` gates all ops, degraded `Error` state with install-VLC guidance, app continues.
-- `Main.kt` — captures every startup exception: `UncaughtExceptionHandler`, early probes for `java.sql.Driver`/`org.sqlite.JDBC`/`vlcj`, log `<installDir>/userdata/dhun-startup.log` (fallback `%TEMP%`) with OS/Java/jpackage + stacktrace, AWT dialog + minimal error Window, `DataLayer` file→in-memory fallback.
+**Exact files worked on this session (both commits):**
 
-**GitHub-verified baseline (checked this session with `gh`, not local state):**
+1. **`5a89b81` — `fix(playback): send the resolving identity's User-Agent when fetching audio`**
+   `shared/…/core/Entities.kt` (`StreamInfo.userAgent`), `shared/…/innertube/InnerTubeClient.kt` (`AltInnertubeClient.userAgent` public), `shared/…/extraction/OwnClientStreamResolver.kt` (stamp the winning strategy), `shared/src/jvmMain/…/JvmStreamResolvers.kt` (yt-dlp `--user-agent`), `app-android/…/DhunStreamCache.kt` + `PlaybackGraph.kt` (`UserAgentDataSource`), `app-desktop/…/DesktopDhunPlayer.kt` (agent to the downloader + local-copy fallback when libVLC rejects a URL), `shared/src/jvmMain/…/AudioFileCache.kt`, `AudioFileCacheTest.kt`.
+2. **This commit — home endless scroll + docs**
+   `shared/…/core/Entities.kt` (`HomeFeedPage`, `HomeFeed.continuationToken`), `shared/…/innertube/InnerTubeClient.kt` (`homeFeedPage` / `homeFeedContinuation`), `shared/…/provider/MusicProvider.kt`, `shared/…/domain/UseCases.kt` (`GetHomeFeedUseCase.loadMore`), `shared/…/presentation/home/HomeViewModel.kt` (`isLoadingMore` + `loadMore()`), `shared/…/ui/home/HomeScreen.kt` (near-bottom trigger, index-safe shelf keys, spinner), 4 test fakes, `UseCasesTest.kt` (+3 pagination tests), `.ai/DEBUG_LOG.md`, `docs/verification/14-release.md`, this file.
 
-- PR #22: [CI `34011326728`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34011326728) **passed** shared JVM tests + Android build + probe + Desktop compile.
-- Main push `e90dba6`: [CI `34011563632`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34011563632) **passed** `6m10s`; [test-release `34011563630`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34011563630) **passed** `msi` `5m13s` + `apk` `4m33s` + `publish` `19s`.
-- Main push `9294520` (PR #23, docs-only): [CI `34012157207`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34012157207) **passed**; [test-release `34012157287`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34012157287) **passed** — rolling `test` pre-release re-published `2026-09-06T04:45:40Z` with `dhun-test.msi` **112,001,488 bytes** + `dhun-test.msi.sha256` + `dhun-test.apk` **17,467,038 bytes** + `dhun-test.apk.sha256`. **The `test` tag now points at `9294520`** (verified via `gh release view test`), but the binaries are the same `1.0.5` JVM-fix build. Not v0.1.0.
-- Live drill still **red**: [run `34011539225`](https://github.com/99ggprooo00-code/DHUN/actions/runs/34011539225) (schedule, `main@dd1ab31`, `probe` job `failure`) — issue #14 **open** (last comment `2026-09-06T04:29:14Z`). Not a code regression from PR #22.
+**Last error, and its root cause (found by code audit, not yet re-verified on hardware):**
 
-**Exact file / work context (this commit):**
+A googlevideo stream URL is **bound to the InnerTube client identity that resolved it**. `OwnClientStreamResolver` tries seven identities with seven different User-Agents, then returned only the URL — `StreamInfo` had no field for the identity. Every byte-reading layer then sent its own hardcoded Chrome agent (`PlaybackGraph` Android-14, `AudioFileCache` Windows-Chrome), and **libVLC cannot send a custom User-Agent at all** through vlcj. The CDN refuses the mismatch → resolution succeeds, audio never arrives. This is the same failure the drill saw once and mis-attributed to IP gating (`DEBUG_LOG` 2026-09-05: "expanded chain got googlevideo URL, CDN 403 on bytes").
 
-- **This commit** is the standing ROADMAP sync only: `.ai/ROADMAP.md` (this file) plus one stale artifact-tag note each in `docs/verification/14-release.md` and `docs/verification/12-desktop-native.md` (the `test` tag now points at `9294520`, not `e90dba6`; the binaries are unchanged). No application code touched.
-- **Last code files worked on** (PR #22, on main since `e90dba6`): `app-desktop/build.gradle.kts`, `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt`, `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/player/DesktopDhunPlayer.kt`.
-- **Next evidence files** (checklists already seeded, awaiting hardware data): `docs/verification/14-release.md` → "Windows MSI startup" 6-step checklist + Android residential playback; `docs/verification/12-desktop-native.md` → "Phase 14 Windows JVM launch fix" section.
+Dead end recorded so nobody repeats it: calling `httpFactory.setUserAgent(…)` inside the `ResolvingDataSource.Resolver` does **nothing** — `ResolvingDataSource` constructs its upstream data source once, in its own constructor. The agent must be stamped on the live instance per `open()`.
 
-**Last error (mitigated in code on `main`, verification still open):**
+**Exact next step:**
 
-- Windows MSI from `8310383` → **Failed to launch JVM**. Code fix merged at `e90dba6`; **launch not yet hardware-verified** — the single highest-priority open item.
-- APK last device report **"Error — tap to see"** with Play no-op and unsettled artwork placeholders (PR #20 code on main; no on-device verdict yet).
-- Rot drill `34011539225` probe lines (from issue #14): `PROBE|version|PASS`, `PROBE|search|PASS|20 music-song results`, **`PROBE|resolve+stream|FAIL|IllegalStateException: resolve: AuthRequired(detail=null)`**, `PROBE|related|PASS|50 related tracks`, `PROBE|verdict|FAIL|extraction-pipeline-broken`. Category-8 CI-datacenter-IP gating hypothesis — **not** residential proof. Last green live drill was `33944557207` (`d27eb37`, 2026-09-05T04:26Z).
+1. **Re-test audio on hardware with the NEXT build** (the fix is not in the currently published `test` assets — those are still `9294520`/`1.0.5`). After this branch merges and `test-release` republishes: play an uncached track on the APK and on the MSI. Capture, this time: the exact player error text (if any), `adb logcat -s DHUN` lines showing `resolved <id>: … ua=…`, OS + VLC versions, MSI sha256, and `dhun-startup.log`.
+2. **If audio still fails**, the logcat `resolved … ua=…` line splits the problem cleanly: no such line ⇒ resolution is gated on that network (extraction problem, ADR-001); line present but still no audio ⇒ the CDN rejects even a matching agent (PO-token territory, needs an ADR).
+3. Then: endless scroll check on Home, UI pass **once screenshots exist**, offline-cache checks, 30-min soaks, clean uninstalls, `v0.1.0`.
 
-**Exact next product step — manual Windows + Android hardware (cannot be done in this sandbox):**
+**Verification honesty:** this sandbox has **no JDK** and **no egress except `github.com`** (`api.adoptium.net`, `services.gradle.org`, `repo1.maven.org`, `dl.google.com`, `music.youtube.com` all `000`). So both commits are **code-read + CI-compiled only — audio is NOT verified**. CI is the only executable check available here.
 
-1. **Windows (highest priority):** on a clean Windows VM/user, download the **current** `dhun-test.msi` + `dhun-test.msi.sha256` from the rolling `test` pre-release (tag now `9294520`, same `1.0.5` JVM-fix build; verify checksum), install per-user (SmartScreen Run anyway), launch → **no** `Failed to launch JVM`; main + mini + tray appear; check `dhun-startup.log` (`<installDir>/userdata` or `%TEMP%`) for `java.sql.Driver available` / `VLC initialized` (or graceful VLC Error if VLC absent). Record OS/VLC/MSI size and log excerpts in `docs/verification/14-release.md` + `12-desktop-native.md`.
-
-2. **Android:** install `dhun-test.apk` from same `test` release (verify checksum), on residential network play an **uncached** search result → audible audio, interrupt connectivity → auto-recovery, exhaustive interruption → manual Retry. Record in `14-release.md`.
-
-Only after these: offline-cache checks, 30-min soaks on both platforms, clean uninstall checks, final docs review, then `v0.1.0` tag.
-
-**Unpushed / carried-work audit (2026-09-06, GitHub-verified this session):**
-
-- Session branch `arena/01a0750c-dhun` was **0 ahead / 0 behind** `origin/main` at boot (`git rev-list --left-right --count origin/main...HEAD` → `0	0`), tree clean. This docs commit is the only unpushed work.
-- All 16 remote `arena/*` session branches audited (`gh api …/compare/main...<branch>` + `git cherry`): `01a0600a`, `01a07141` (PR #15, closed as superseded — "0 unique"), `01a07170`, `01a0740a`, `01a0743b`, `01a074f1` are patch-identical to merged work. The `+` flags on the pre-squash Phase 05/07/08/09 branches (`01a06537`, `01a06a42`, `01a06a81`, `01a06aaa`) are stale merge bases only — every file they add exists on main today (e.g. `shared/src/commonMain/sqldelight/dev/dhun/database/Favorite.sq`, `shared/src/commonMain/kotlin/dev/dhun/ui/home/HomeScreen.kt`, `…/ui/player/FullPlayer.kt`). **Nothing stranded; no cherry-picks required.**
+**Unpushed / carried-work audit:** both commits pushed to `arena/01a0750c-dhun`. Earlier this session, all 16 remote `arena/*` branches were audited (`gh api …compare` + `git cherry`) — nothing stranded, no cherry-picks needed. PR #24 (the earlier docs sync) is open and CI-green; this work supersedes its next-step section.
 
 ---
 
@@ -160,7 +149,7 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Mini-player window (320×88, always-on-top, drag, click-opens-main) | 🟨 code pushed (`MiniPlayerWindow.kt` + second Compose `Window`; hide-not-close; Ctrl+M) — main Desktop compile green `34001706156`; hardware OPEN; taskbar visibility is a 1.8.2 limitation (no `skipTaskbar`) |
 | Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+M, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — main Desktop compile green `34001706156`; hardware OPEN |
 | Close-to-tray (default on) + remembered geometry | 🟨 code pushed (`SettingsKeys.CLOSE_TO_TRAY`/`WINDOW_GEOMETRY`; public-AWT `Frame.getFrames()` title lookup; `WindowPosition` Dp) — main Desktop compile green `34001706156`; hardware OPEN |
-| Packaging: jpackage MSI + clean-VM install | 🟨 `packageMsi` now at `1.0.5` with `java.sql` modules (PR #22; latest build `34012157287` published the 112,001,488 B `dhun-test.msi` — per-user, SmartScreen unsigned); previous `34001706159` from `8310383` had the generic JVM launch failure; clean-VM **install→launch** verification still requires hardware test of the **new** MSI |
+| Packaging: jpackage MSI + clean-VM install | ✅ `packageMsi` `1.0.5` with `java.sql` modules — **install → launch confirmed on hardware 2026-09-06**, no \"Failed to launch JVM\"; 🟨 clean-VM *uninstall* leaves-nothing check still unobserved |
 | Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY | ✅ done + pushed (`ffa138b`) |
 | Acceptance 1–4 (media keys / tray / mini-player / installer) | 🟨 OPEN — on hardware (checklist in docs/verification/12) |
 
@@ -203,11 +192,14 @@ criteria remain open; green build CI does not mean green live extraction.
 | Bounded audio cache — Desktop | ✅ `AudioFileCache` + `DesktopDhunPlayer` wiring + nine cache unit tests merged in PR #17; shared tests and Desktop compile green | 🟨 Fully cached track replays offline, uncached-track error, and eviction on a libVLC desktop |
 | Daily rot-drill workflow + failure alerts | ✅ `.github/workflows/rot-drill.yml` merged; cron `17 4 * * *`; real failing probes upload logs, update issue #14, and fail the job. **Scheduled-run + alert path now has real evidence:** scheduled run `34011539225` fired, `probe` job `failure`, issue #14 auto-commented `2026-09-06T04:29:14Z` with the run link + log tail | 🟨 A **green** live production-probe verdict and the auto-close-on-recovery path are still unproven; older placeholder-workflow greens do not count |
 | Live extraction verdict / residential playback | 🔴 Latest real drill `34011539225` (schedule, ran on `main@dd1ab31` — the SHA recorded in issue #14, not `e90dba6`) and prior `33970045379` attempt 2 on `d9f4083`: `PROBE\|resolve+stream\|FAIL\|IllegalStateException: resolve: AuthRequired(detail=null)`, `PROBE\|verdict\|FAIL\|extraction-pipeline-broken`; `version`/`search`/`related` PASS; issue #14 OPEN (comment `2026-09-06T04:29:14Z`) | No green live production-probe verdict since `33944557207` (`d27eb37`, 2026-09-05T04:26Z). Verify the latest APK on a residential network; do not label Actions bot/CDN gating as proven residential failure |
-| Device-feedback recovery + artwork/splash/sheets/spacing | ✅ `cf535ca` + `1384b32` merged via PR #20; `ArtworkUrlsTest` (seven tests) included in the green shared test job; APK/MSI carrying the JVM fix rebuilt at `34012157287` | 🟨 Audible play, auto/manual Retry, sharp Now Playing art, settled error placeholders, clean splash, soft sheets on hardware |
+| Device-feedback recovery + artwork/splash/sheets/spacing | 🟨 PR #20 code on main, but **hardware verdict 2026-09-06 is negative: no audio plays on either platform** | 🔴 Blocking. Root cause found (User-Agent mismatch on the byte fetch) and fixed in `5a89b81` — **not yet in a published build, not yet re-verified** |
 | Install/uninstall hygiene | ✅ PR #19 per-user MSI and `DhunUserDirs` + PR #22 startup ruggedization (log + dialog + in-memory fallback); Android private-storage manifest policy on main; current MSI `1.0.5` rebuilt green at `34012157287` (112,001,488 B, `includeAllModules`) | 🟨 Clean Windows install/run/uninstall and startup-log + absence of leftover runtime data must be observed on hardware — **no \"Failed to launch JVM\" on launch** |
 | `CHANGELOG.md` (Unreleased history) | ✅ Created in PR #17 and updated in PR #19/#20; present on GitHub main (PR #22 bumps `packageVersion` to `1.0.5` but changelog `[0.1.0]` still waits for release) | Unreleased milestone complete; `[0.1.0]` entry waits for a real release |
 | Rolling **test** APK/MSI publishing | ✅ `test@9294520` (verified via `gh release view test`): `dhun-test.msi` **112,001,488 B** + `.sha256`, `dhun-test.apk` **17,467,038 B** + `.sha256`, published by `34012157287` at `2026-09-06T04:45:40Z` — the same `1.0.5` JVM-fix binaries as `34011563630` (`e90dba6`) | Not evidence for an AAB, stable v0.1.0, or clean-target installation; **MSI launch must still be verified on Windows hardware** |
-| Windows desktop startup (JVM launch) | ✅ PR #22 merged at `e90dba6`; `modules` + `includeAllModules` + VLC fault-tolerance + startup diagnostics on `main@9294520`; MSI builds on windows-latest (`34012157287` success) | 🟨 **OPEN — hardware:** install the current `dhun-test.msi` on clean Windows, verify no "Failed to launch JVM", log contains `java.sql.Driver available` / `VLC initialized` (or graceful VLC Error) |
+| Windows desktop startup (JVM launch) | ✅ **CLOSED on hardware 2026-09-06** — user installed and launched `dhun-test.msi` (`1.0.5`, PR #22 fix); no \"Failed to launch JVM\". APK launches too | None for launch. Clean-VM *uninstall* hygiene still unobserved; `dhun-startup.log` contents not captured |
+| **Stream byte fetch presents the resolving identity** (audio fix) | 🟨 `5a89b81` on the session branch: `StreamInfo.userAgent` populated by every resolver; Android stamps it per `open()` via `UserAgentDataSource`; desktop downloader receives it and libVLC rejection falls back to the local copy; `AudioFileCacheTest` asserts the agent reaches the socket | 🔴 **Unverified** — needs the next `test` build on hardware; no JDK/egress in sandbox means CI compile is the only check |
+| **Home endless scroll** | 🟨 session branch: `HomeFeedPage` + `homeFeedContinuation` (client → provider → use case → ViewModel) + near-bottom trigger and index-safe shelf keys in `HomeScreen`; 3 new pagination tests in `UseCasesTest` | 🟨 Unverified on hardware; Search load-more was already wired and is unchanged |
+| UI quality (both apps) | ⬜ Not started — user reports \"bad/terrible\" UI, no screenshots provided | Blocked on screenshots: restyling blind would likely fix the wrong thing |
 | Android 30-minute soak | ⬜ No completed device evidence committed | Physical device, unrestricted battery/OEM settings, lock-screen controls, zero crashes/leaks; record timestamps/results |
 | Desktop 30-minute soak | ⬜ No completed desktop evidence committed | libVLC desktop, transport/tray/mini-player/SMTC or fallback, clean exit, zero crashes; record timestamps/results |
 | v0.1.0 artifacts / tag / release | ⬜ Only the rolling `test` pre-release exists; no v0.1.0 completion | APK + AAB + MSI release artifacts, clean-target runs, soaks, live drill, final docs/risk/license review, then tag/release |

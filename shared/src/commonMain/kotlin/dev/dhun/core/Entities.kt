@@ -75,6 +75,17 @@ data class HomeFeed(
     val quickPicks: List<Track> = emptyList(),
     val listenAgain: List<Track> = emptyList(),
     val sections: List<HomeSection> = emptyList(),
+    /**
+     * InnerTube continuation for the home shelf list. Null = the feed is
+     * exhausted; the Home screen stops asking for more (endless scroll).
+     */
+    val continuationToken: String? = null,
+)
+
+/** One page of home shelves plus the token that fetches the next one. */
+data class HomeFeedPage(
+    val sections: List<HomeSection> = emptyList(),
+    val continuationToken: String? = null,
 )
 
 data class HistoryEntry(

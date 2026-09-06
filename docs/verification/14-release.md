@@ -163,6 +163,28 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 
 Record here: Windows version/build, VLC version (or \"not installed\"), MSI size/sha256, `dhun-startup.log` excerpts (sanitized), and whether launch succeeded. **Successful CI packaging is not launch verification.**
 
+### Hardware verdict — 2026-09-06 (user, real hardware, rolling `test` release)
+
+**Both builds launch.** `dhun-test.msi` and `dhun-test.apk` install and
+start — the `Failed to launch JVM` fix (PR #22, `java.sql` modules +
+`includeAllModules`, `1.0.5`) is confirmed working on real hardware. This
+closes the "Windows desktop startup (JVM launch)" gate below.
+
+**But no audio plays on either platform**, which is the blocking defect
+for Phase 14. Root cause found by code audit and fixed this session:
+googlevideo binds a stream URL to the InnerTube identity that resolved it,
+and every byte-reading layer was sending its own hardcoded User-Agent
+instead. See `.ai/DEBUG_LOG.md` (2026-09-06, "both builds LAUNCH, but no
+audio at all") for the full chain and the `ResolvingDataSource` trap.
+
+Also reported: **no endless scroll** (Home had no pagination at any layer —
+fixed: `HomeFeedPage` + `homeFeedContinuation` + near-bottom trigger), and
+the UI reads as poor on both apps (no screenshots provided; not restyled).
+
+Not recorded because it was not reported: OS/VLC versions, MSI sha256,
+`dhun-startup.log` excerpts, and whether the player showed an error or
+looked like it was playing. The audio re-test should capture those.
+
 ### v0.1.0 release gate
 
 - [ ] Rot-drill is scheduled and has a green live run (scheduled run still red at `34011539225`; re-investigate after next green).

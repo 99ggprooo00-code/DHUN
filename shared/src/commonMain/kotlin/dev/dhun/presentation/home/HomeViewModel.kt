@@ -37,6 +37,10 @@ class HomeViewModel(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _isLoadingMore = MutableStateFlow(false)
+    /** True while the next page of home shelves is being fetched. */
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
     val recentlyPlayed: StateFlow<List<Track>> = historyRepository.observeRecentlyPlayed(24)
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -75,6 +79,25 @@ class HomeViewModel(
             is DhunResult.Failure -> {
                 _uiState.value = HomeUiState.Error(result.error.toUserMessage())
             }
+        }
+    }
+
+    /**
+     * Fetches the next page of home shelves and appends it (endless scroll).
+     * Silently stops when the feed is exhausted or a page is already loading;
+     * a failed page keeps the list the user already has.
+     */
+    fun loadMore() {
+        val current = (_uiState.value as? HomeUiState.Success)?.feed ?: return
+        if (current.continuationToken == null) return
+        if (_isLoadingMore.value) return
+        scope.launch {
+            _isLoadingMore.value = true
+            when (val result = getHomeFeed.loadMore(current)) {
+                is DhunResult.Success -> _uiState.value = HomeUiState.Success(result.value)
+                is DhunResult.Failure -> Unit // keep the existing shelves
+            }
+            _isLoadingMore.value = false
         }
     }
 

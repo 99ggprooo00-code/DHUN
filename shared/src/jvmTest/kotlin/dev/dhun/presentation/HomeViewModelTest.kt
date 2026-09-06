@@ -46,6 +46,14 @@ class HomeViewModelTest {
         override suspend fun searchContinuation(continuationToken: String) = DhunResult.Success(SearchResults(""))
         override suspend fun searchSuggestions(query: String) = DhunResult.Success(emptyList<String>())
         override suspend fun homeFeed(): DhunResult<List<HomeSection>> = feedResult
+        override suspend fun homeFeedPage(): DhunResult<dev.dhun.core.HomeFeedPage> =
+            when (val r = feedResult) {
+                is DhunResult.Success ->
+                    DhunResult.Success(dev.dhun.core.HomeFeedPage(sections = r.value))
+                is DhunResult.Failure -> DhunResult.Failure(r.error)
+            }
+        override suspend fun homeFeedContinuation(continuationToken: String): DhunResult<dev.dhun.core.HomeFeedPage> =
+            DhunResult.Success(dev.dhun.core.HomeFeedPage())
         override suspend fun relatedTracks(videoId: String) = DhunResult.Success(emptyList<Track>())
         override suspend fun getStreamInfo(videoId: String) = DhunResult.Failure(DhunError.Unavailable)
         override suspend fun getLyrics(videoId: String) = DhunResult.Success(Lyrics.NotAvailable)
