@@ -28,12 +28,10 @@ Rules (permanent, from the user):
 
 ## CURRENT ACTIVE TASK (updated 2026-09-06, session arena/01a0740a-dhun)
 
-**Branch `arena/01a0740a-dhun`: 2 commits PUSHED (`cf535ca`, `1384b32` —
-verified via `git ls-remote`, remote == local). NO PR open, NO CI runs on
-this branch yet (CI triggers only on `push: main` + `pull_request`, so
-branch pushes get no signal until a PR opens). `main@6d81eb2` is CI-green:
-CI `33998220729` ✅ · test-release `33998220750` ✅ (both ~1h ago, per
-`gh run list`).
+**PR #20 MERGED → `main@8310383`** (2026-09-06T00:35:51Z). Branch CI was
+green before merge (`build-and-test` pass, 3m56s, run `34001522235`).
+Post-merge `main` CI + test-release runs pending — rolling `test`
+artifacts rebuild from the merged tree.
 
 **Phase:** 14 — Robustness + rot-drill + v0.1.0. (This session: user
 device-feedback round — APK stuck-error recovery, Now Playing art
@@ -74,12 +72,16 @@ nothing compiled locally — the first compile verdict comes from PR CI.)
    still fails, capture the error dialog's message text — it now carries
    the exact resolve chain.
 
-**Marks (GitHub evidence only, 2026-09-06):** main CI pass `33998220729`
-· main test-release pass `33998220750` · this branch pushed (2/2) ·
-this branch CI open (no PR, no runs) · PR open (none) · code changes
-pending (uncompiled, CI-pending) · residential stream open · soaks open
-· v0.1.0 open · rot-drill live failing (cat.8 CI-IP, unchanged) ·
-Liquid Glass refused.
+**Marks (GitHub evidence only, 2026-09-06):** PR #20 MERGED ·
+branch CI pass (build-and-test 3m56s, run `34001522235`) · main CI pass
+`33998220729` (pre-merge) · main test-release pass `33998220750`
+(pre-merge) · post-merge main CI/test-release pending · residential
+stream open · soaks open · v0.1.0 open · rot-drill live failing (cat.8
+CI-IP, unchanged) · Liquid Glass refused.
+
+**Exact next step (human/hardware):** install the new `dhun-test.apk`
+once the post-merge test-release rebuilds → play → force an error →
+confirm auto-recovery/Retry, sharp art, clean splash, soft sheets.
 
 ---
 
