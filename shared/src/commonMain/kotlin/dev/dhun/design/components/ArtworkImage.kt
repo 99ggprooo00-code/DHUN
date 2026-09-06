@@ -7,6 +7,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -25,7 +26,11 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Alignment
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 
 /**
@@ -48,15 +53,7 @@ fun ArtworkImage(
     val resolvedShape: Shape = if (cornerRadius != null) RoundedCornerShape(cornerRadius) else shape
 
     if (imageUrl.isNullOrBlank()) {
-        Box(
-            modifier = modifier
-                .clip(resolvedShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(DhunColors.placeholderStart, DhunColors.placeholderEnd),
-                    ),
-                ),
-        )
+        ArtworkPlaceholder(modifier = modifier, shape = resolvedShape)
         return
     }
 
@@ -93,6 +90,12 @@ fun ArtworkImage(
                 ),
             ),
         )
+        if (phase == LoadPhase.Failed) {
+            // A failed load used to leave a flat grey rectangle — the device
+            // screenshots are full of them. Show the same glyph placeholder
+            // the null-URL path uses so the grid reads as artwork-shaped.
+            ArtworkPlaceholder(modifier = Modifier.fillMaxSize(), shape = resolvedShape)
+        }
         if (phase != LoadPhase.Failed) {
             AsyncImage(
                 model = request,
@@ -105,6 +108,31 @@ fun ArtworkImage(
                 onError = { phase = LoadPhase.Failed },
             )
         }
+    }
+}
+
+/**
+ * Artwork stand-in: a soft diagonal wash plus a dimmed note glyph. Reads as
+ * "no cover art" rather than "this pane failed to render".
+ */
+@Composable
+private fun ArtworkPlaceholder(modifier: Modifier, shape: Shape) {
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    listOf(DhunColors.placeholderStart, DhunColors.placeholderEnd),
+                ),
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        DhunIconView(
+            icon = DhunIcon.LibraryMusic,
+            contentDescription = null,
+            modifier = Modifier.fillMaxWidth(0.34f).aspectRatio(1f),
+            tint = DhunColors.textHint,
+        )
     }
 }
 

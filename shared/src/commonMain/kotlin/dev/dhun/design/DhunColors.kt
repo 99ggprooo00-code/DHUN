@@ -25,17 +25,17 @@ object DhunColors {
     // Glass-morphism tokens (M3 translucent atmosphere — not Liquid Glass).
     // Stack: sheen → highlight → body → deep so backdrops read through.
     /** Upper glass fill (~55% near-black with cool lift). */
-    val glassHighlight = Color(0x8C1C1C22)
+    val glassHighlight = Color(0x5E20202A)
     /** Mid glass body (~62%). */
-    val glass = Color(0x9E14141A)
+    val glass = Color(0x7016161E)
     /** Lower glass depth (~72%). */
-    val glassDeep = Color(0xB80C0C10)
+    val glassDeep = Color(0x8A0E0E14)
     /** Stronger glass for bottom bars / mini-player (~82%). */
-    val glassStrong = Color(0xD1121218)
+    val glassStrong = Color(0xB8121218)
     /** Top edge of docked bars — slightly lighter for separation. */
-    val glassBarTop = Color(0xE01A1A22)
+    val glassBarTop = Color(0xC81C1C26)
     /** Specular sheen painted on glass tops (cheap “frost” cue). */
-    val glassSheen = Color(0x28FFFFFF)
+    val glassSheen = Color(0x1FFFFFFF)
     /** Hairline edge for frosted chrome. */
     val glassEdge = Color(0x38FFFFFF)
 

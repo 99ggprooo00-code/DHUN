@@ -35,10 +35,52 @@ class ArtworkColorExtractorTest {
         // Each palette has sane alphas (container + tint translucent)
         palettes.forEach { p ->
             assertTrue(p.container.alpha in 0.2f..0.4f, "container alpha sane: ${p.container.alpha}")
-            assertTrue(p.backgroundTint.alpha in 0.15f..0.35f, "tint alpha sane: ${p.backgroundTint.alpha}")
+            assertTrue(
+                p.backgroundTint.alpha in 0.05f..0.15f,
+                "ambient tint stays a wash, not a paint job: ${p.backgroundTint.alpha}",
+            )
             // onPrimary contrasts primary
             assertNotEquals(p.primary, p.onPrimary)
         }
+    }
+
+    /**
+     * Regression for the hardware-reported "terrible UI": seeded hues used to
+     * roam the whole colour wheel at 62–92% saturation, so a track could paint
+     * the app fire-engine red (indistinguishable from the error state) or
+     * sludge brown. Hues are now clamped near the brand hue and muted.
+     */
+    @Test
+    fun extractFromSeed_staysNearBrandHue_andIsMuted() {
+        val seeds = listOf(
+            "bohemian rhapsody queen", "maya le", "yo hawalai",
+            "shiv stotras", "me raqsam", "dhun rockheads", "cheli le maitilai",
+        )
+        seeds.forEach { seed ->
+            val p = ArtworkColorExtractor.extractFromSeed(seed).primary
+            val mx = maxOf(p.red, p.green, p.blue)
+            val mn = minOf(p.red, p.green, p.blue)
+            val sat = if (mx == 0f) 0f else (mx - mn) / mx
+            assertTrue(sat <= 0.55f, "seed '$seed' must stay muted, was sat=$sat")
+            // Never a red-dominant colour — that reads as an error state.
+            assertTrue(
+                !(p.red > p.blue && p.red > p.green),
+                "seed '$seed' must not be red-dominant: $p",
+            )
+        }
+    }
+
+    /** Control chrome never takes the raw artwork colour; it is brand-blended and floored. */
+    @Test
+    fun controlAccent_isLegibleAndBrandLeaning() {
+        val darkArtwork = ArtworkColors.fromPrimary(Color(0xFF120A05))
+        val control = darkArtwork.controlAccent
+        val lum = 0.2126f * control.red + 0.7152f * control.green + 0.0722f * control.blue
+        assertTrue(lum > 0.30f, "control accent must stay visible on near-black, lum=$lum")
+
+        val redArtwork = ArtworkColors.fromPrimary(Color(0xFFD32F2F))
+        val tamed = redArtwork.controlAccent
+        assertTrue(tamed.blue > redArtwork.primary.blue, "brand accent must pull red toward violet")
     }
 
     @Test

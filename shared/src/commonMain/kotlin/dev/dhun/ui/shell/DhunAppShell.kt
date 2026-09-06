@@ -82,7 +82,20 @@ enum class AppTab(val title: String, val icon: DhunIcon) {
     HOME("Home", DhunIcon.Home),
     SEARCH("Search", DhunIcon.Search),
     LIBRARY("Library", DhunIcon.LibraryMusic),
+
+    /**
+     * Internal design catalogue. Kept in the enum (deep links and restored
+     * state may name it) but **not shown in the nav bar** — it shipped to
+     * real devices as a fourth user-facing tab full of swatches, which is
+     * developer scaffolding, not a product surface. See [userTabs].
+     */
     CATALOG("Catalog", DhunIcon.Palette),
+    ;
+
+    companion object {
+        /** Tabs the nav bar / rail actually offers. */
+        val userTabs: List<AppTab> = listOf(HOME, SEARCH, LIBRARY)
+    }
 }
 
 /**
@@ -172,10 +185,12 @@ fun DhunAppShell(
                 .background(DhunColors.background)
                 .background(
                     Brush.verticalGradient(
+                        // Restrained: the old 0.42 wash tinted whole screens
+                        // brown/green and made list art look dirty.
                         colorStops = arrayOf(
-                            0.0f to ambient.copy(alpha = 0.42f),
-                            0.28f to ambient.copy(alpha = 0.14f),
-                            0.55f to Color.Transparent,
+                            0.0f to ambient.copy(alpha = 0.30f),
+                            0.22f to ambient.copy(alpha = 0.10f),
+                            0.45f to Color.Transparent,
                             1.0f to Color.Transparent,
                         ),
                     ),
@@ -183,7 +198,7 @@ fun DhunAppShell(
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            ambient.copy(alpha = 0.18f),
+                            ambient.copy(alpha = 0.08f),
                             Color.Transparent,
                         ),
                     ),
@@ -409,7 +424,7 @@ private fun BottomNavigationBar(
                 tonalElevation = DhunSpacing.zero,
                 modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
             ) {
-                AppTab.entries.forEach { tab ->
+                AppTab.userTabs.forEach { tab ->
                     AppBottomNavigationItem(
                         tab = tab,
                         selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
@@ -431,7 +446,7 @@ private fun AppNavigationRail(nav: AppNavState) {
         contentColor = DhunColors.textPrimary,
         modifier = Modifier.fillMaxHeight(),
     ) {
-        AppTab.entries.forEach { tab ->
+        AppTab.userTabs.forEach { tab ->
             AppRailNavigationItem(
                 tab = tab,
                 selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
