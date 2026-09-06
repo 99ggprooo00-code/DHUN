@@ -1,21 +1,17 @@
 # Phase 12 verification — Desktop Native Integrations
 
-Status: 🟨 **NATIVE CODE MERGED; UPGRADE / PLAYBACK / NATIVE HARDWARE GATES OPEN.**
-Baseline `main` / `test` is `0920148`; Desktop compilation and MSI publishing
-are green (`34018809911` / `34018809913`, published 2026-09-06T07:22:29Z).
-The user now reports **one-window startup after manual uninstall/reinstall**.
-The separate mini-player removal (ADR-004 / PR #28) is not work to repeat;
-the docked in-app MiniPlayer remains.
+Status: 🟨 **REPAIR PR #30 MERGED; USER-MACHINE PLAYBACK/NATIVE GATES OPEN.**
+`main` repair code `76c68eb` passed CI 34031477321 and rolling test publishing
+34031477327. First verified repair release: **2026-09-06T11:58:17Z**, MSI
+**1.36.1**. Windows packaging and actual install-over/cache/userdata/uninstall
+sentinels pass on a hosted runner, including the main build. That does not
+verify application launch, VLC sound, tray/SMTC or visuals on the user's PC.
 
-The same report says **install-over fails with “Another version of this
-product is already installed…” and audio still fails**. A local candidate
-adds increasing MSI ProductVersions, Windows-aware extraction, diagnostics,
-Home and player repairs. **Branch CI 34025807972 is green at `75c4a8b`**
-(shared JVM tests, Android debug build and probe/Desktop compiles), but
-**no MSI package/install test, PR, merge or release is included/authorised**;
-see [Phase 14's fresh report and validation record](14-release.md).
-Tray/SMTC/shortcuts, data-preserving upgrade and clean-target hygiene are
-not proven by a visible window or a green packaging job.
+The user previously confirmed **one-window startup after manual reinstall**
+of the old 07:22 build, but audio/Home/visuals and install-over failed. Retest
+the new MSI; preserve the docked MiniPlayer and do not re-add a second window.
+The branch was retained after the authorised merge; no unrelated Arena
+session-finalizing control or old-branch cleanup was used.
 
 ## Installer-specific PR verification — 2026-09-06
 
