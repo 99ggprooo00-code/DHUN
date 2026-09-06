@@ -111,17 +111,16 @@ Updated every phase. Nothing hidden.
   `SMTC probe PASS/FAIL — … phase2=ok/FAIL (…)` line; `-Ddhun.smct=false`
   disables it. **This integration is not hardware-verified in the sandbox**:
   Windows media-key round trip, lock/quick-settings tile, remote thumbnail,
-  tray, close-to-tray, geometry, mini-player, and clean MSI install remain
+  tray, close-to-tray, geometry, and clean MSI install remain
   open in `docs/verification/12-desktop-native.md`. If activation or event
-  registration fails, the app intentionally remains usable through the tray,
-  keyboard shortcuts (Space/←→/Ctrl+←→/Ctrl+F/Ctrl+M), and mini-player.
-  Close-to-tray is on by default (`SettingsKeys.CLOSE_TO_TRAY`); the
-  mini-player window starts visible (Ctrl+M or its X hides it — hiding, not
-  closing, so it can always come back). Window geometry
-  (`SettingsKeys.WINDOW_GEOMETRY`) persists across restarts. The mini-player
-  window shows in the OS taskbar (Compose Desktop 1.8.2's `Window` has no
-  `skipTaskbar` parameter — hiding via Ctrl+M/X is the supported way to get it
-  out of the way). jpackage MSI is **per-user** (`perUserInstall`, upgradeUuid
+  registration fails, the app intentionally remains usable through the tray
+  and keyboard shortcuts (Space/←→/Ctrl+←→/Ctrl+F).
+  Close-to-tray is on by default (`SettingsKeys.CLOSE_TO_TRAY`).
+  **The separate 320×88 mini-player window was removed on 2026-09-06 per user
+  decision (ADR-004)** — the docked in-app MiniPlayer above the bottom nav is
+  the product's mini-player; the Ctrl+M toggle went with the window, so the
+  desktop app now opens exactly one window. Window geometry
+  (`SettingsKeys.WINDOW_GEOMETRY`) persists across restarts. jpackage MSI is **per-user** (`perUserInstall`, upgradeUuid
   `31ddb86b-9666-4071-b11c-45f16fa4682d`), not Authenticode-signed (SmartScreen
   warn is expected). Runtime data is `<installDir>/userdata` so Apps-and-Features
   uninstall removes DB + audio cache. `packageVersion` is 1.0.x (packager
