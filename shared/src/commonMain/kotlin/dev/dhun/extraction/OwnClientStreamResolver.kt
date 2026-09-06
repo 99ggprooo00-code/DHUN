@@ -4,6 +4,7 @@ import dev.dhun.core.DhunError
 import dev.dhun.core.DhunException
 import dev.dhun.core.DhunResult
 import dev.dhun.core.StreamInfo
+import dev.dhun.innertube.INNERTUBE_USER_AGENT
 import dev.dhun.innertube.InnerTubeClient
 import dev.dhun.innertube.arr
 import dev.dhun.innertube.long
@@ -52,7 +53,10 @@ class OwnClientStreamResolver(
             }
             when (response) {
                 is DhunResult.Success -> try {
-                    return DhunResult.Success(parseStreamInfo(videoId, response.value))
+                    return DhunResult.Success(
+                        parseStreamInfo(videoId, response.value)
+                            .copy(userAgent = strategy.userAgent),
+                    )
                 } catch (e: DhunException) {
                     outcomes[strategy.label] = e.error
                 }
@@ -67,30 +71,44 @@ class OwnClientStreamResolver(
 
     private class Strategy(
         val label: String,
+        /**
+         * User-Agent this identity presents. Stream URLs resolved through it
+         * are only served to the same agent, so it travels with [StreamInfo]
+         * all the way to the byte-reading layer.
+         */
+        val userAgent: String,
         val call: suspend (InnerTubeClient, String) -> DhunResult<JsonObject>,
     )
 
     companion object {
         private val STRATEGIES = listOf(
-            Strategy("web_embedded") { c, id ->
+            Strategy(
+                "web_embedded",
+                InnerTubeClient.ALT_CLIENT_WEB_EMBEDDED.userAgent,
+            ) { c, id ->
                 c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_WEB_EMBEDDED)
             },
-            Strategy("visionos") { c, id ->
+            Strategy("visionos", InnerTubeClient.ALT_CLIENT_VISIONOS.userAgent) { c, id ->
                 c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_VISIONOS)
             },
-            Strategy("tv") { c, id ->
+            Strategy("tv", InnerTubeClient.ALT_CLIENT_TV.userAgent) { c, id ->
                 c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV)
             },
-            Strategy("tv_downgraded") { c, id ->
+            Strategy(
+                "tv_downgraded",
+                InnerTubeClient.ALT_CLIENT_TV_DOWNGRADED.userAgent,
+            ) { c, id ->
                 c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV_DOWNGRADED)
             },
-            Strategy("tv_simply") { c, id ->
+            Strategy("tv_simply", InnerTubeClient.ALT_CLIENT_TV_SIMPLY.userAgent) { c, id ->
                 c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV_SIMPLY)
             },
-            Strategy("mweb") { c, id ->
+            Strategy("mweb", InnerTubeClient.ALT_CLIENT_MWEB.userAgent) { c, id ->
                 c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_MWEB)
             },
-            Strategy("web_remix") { c, id -> c.playerResponse(id) },
+            // WEB_REMIX is the primary (non-alt) identity: its /player call
+            // goes through browserHeaders(), i.e. INNERTUBE_USER_AGENT.
+            Strategy("web_remix", INNERTUBE_USER_AGENT) { c, id -> c.playerResponse(id) },
         )
     }
 }

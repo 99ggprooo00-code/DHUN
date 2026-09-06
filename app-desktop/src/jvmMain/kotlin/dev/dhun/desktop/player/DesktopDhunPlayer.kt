@@ -58,6 +58,16 @@ class DesktopDhunPlayer(
     private val queueManager = QueueManager()
     private val opMutex = Mutex()
 
+    /**
+     * Remote MRL currently handed to libVLC, and whether the local-copy
+     * fallback already ran for it. libVLC cannot send a custom User-Agent,
+     * so a googlevideo URL bound to a specific InnerTube identity may be
+     * rejected at the CDN even though resolution succeeded — the fallback
+     * replays the same track from a file DHUN downloaded *with* that agent.
+     */
+    @Volatile private var streamingRemoteUrl: String? = null
+    @Volatile private var localFallbackAttempted = false
+
     private val vlcAvailable: Boolean get() = factory != null && mediaPlayer != null
 
     private val _state = MutableStateFlow<PlaybackState>(PlaybackState.Idle)
@@ -111,10 +121,7 @@ class DesktopDhunPlayer(
                 }
 
                 override fun error(mediaPlayer: MediaPlayer) {
-                    _state.value = PlaybackState.Error(
-                        _currentTrack.value,
-                        "Playback failed (stream URL or network).",
-                    )
+                    handlePlaybackError()
                 }
 
                 override fun finished(mediaPlayer: MediaPlayer) {
@@ -350,6 +357,7 @@ class DesktopDhunPlayer(
             // Restored session: do not resolve or touch libVLC until the user
             // presses play (stream URLs expire anyway). playPause() handles it.
             pendingLazyStart = true
+            localFallbackAttempted = false
             _state.value = PlaybackState.Paused(track)
             return
         }
@@ -360,6 +368,8 @@ class DesktopDhunPlayer(
         val cached = audioCache?.fileFor(track.id)
         if (cached != null) {
             log("cache hit ${track.id} (${cached.length()} bytes) — playing local file")
+            streamingRemoteUrl = null
+            localFallbackAttempted = false
             startMedia(track, cached.absolutePath)
             return
         }
@@ -367,8 +377,20 @@ class DesktopDhunPlayer(
         _state.value = PlaybackState.Resolving(track)
         when (val result = provider.getStreamInfo(track.id)) {
             is DhunResult.Success -> {
-                startMedia(track, result.value.audioUrl)
-                startCacheFill(track.id, result.value.audioUrl, result.value.contentLengthBytes)
+                val info = result.value
+                streamingRemoteUrl = info.audioUrl
+                localFallbackAttempted = false
+                log(
+                    "resolved ${track.id}: ${info.mimeType} " +
+                        "${info.bitrateKbps ?: "?"}kbps ua=${info.userAgent?.take(40) ?: "<none>"}",
+                )
+                startMedia(track, info.audioUrl)
+                startCacheFill(
+                    track.id,
+                    info.audioUrl,
+                    info.contentLengthBytes,
+                    info.userAgent,
+                )
             }
             is DhunResult.Failure -> {
                 _state.value = PlaybackState.Error(track, result.error.toUserMessage())
@@ -402,13 +424,24 @@ class DesktopDhunPlayer(
      * Bandwidth is spent twice for a first play (stream + fill) — accepted
      * v1 trade-off for a URL-only engine; documented in KNOWN_LIMITATIONS.
      */
-    private fun startCacheFill(videoId: String, url: String, contentLength: Long?) {
+    private fun startCacheFill(
+        videoId: String,
+        url: String,
+        contentLength: Long?,
+        userAgent: String?,
+    ) {
         val cache = audioCache ?: return
         if (contentLength != null && contentLength > cache.maxBytes) return
         val cancel = AtomicBoolean(false)
         cacheFillCancel = cancel
         cacheFillJob = scope.launch(Dispatchers.IO) {
-            val file = cache.download(videoId, url, expectedBytes = contentLength, cancel = cancel)
+            val file = cache.download(
+                videoId,
+                url,
+                expectedBytes = contentLength,
+                cancel = cancel,
+                userAgent = userAgent,
+            )
             if (file != null) {
                 log("cached $videoId (${file.length()} bytes, total ${cache.totalBytes()} / ${cache.maxBytes})")
             } else if (!cancel.get()) {
@@ -423,9 +456,51 @@ class DesktopDhunPlayer(
         cacheFillJob = null
     }
 
+    /**
+     * libVLC reports failure on the MRL it was given. For a remote stream
+     * that is usually the CDN refusing libVLC's own User-Agent (it cannot be
+     * overridden through vlcj), not a dead URL — so before showing an error,
+     * wait for the cache fill — which *does* send the resolving identity —
+     * and replay from the local file. One attempt per track.
+     */
+    private fun handlePlaybackError() {
+        val track = _currentTrack.value
+        val remoteUrl = streamingRemoteUrl
+        if (track == null || remoteUrl == null || localFallbackAttempted) {
+            _state.value = PlaybackState.Error(
+                track,
+                "Playback failed (stream URL or network).",
+            )
+            return
+        }
+        localFallbackAttempted = true
+        log("libVLC rejected the stream for ${track.id} — retrying from the local copy")
+        _state.value = PlaybackState.Recovering(track)
+        val fill = cacheFillJob
+        scope.launch {
+            fill?.join()
+            // The user may have skipped or stopped while the copy finished.
+            if (_currentTrack.value?.id != track.id) return@launch
+            val file = audioCache?.fileFor(track.id)
+            if (file != null && file.length() > 0) {
+                streamingRemoteUrl = null
+                log("playing ${track.id} from the local copy (${file.length()} bytes)")
+                startMedia(track, file.absolutePath)
+            } else {
+                _state.value = PlaybackState.Error(
+                    track,
+                    "Stream rejected by the CDN and no local copy could be fetched. " +
+                        "Check the connection, then press Retry.",
+                )
+            }
+        }
+    }
+
     private fun log(message: String) = println("DHUN cache: $message")
 
     private fun stopLocked() {
+        streamingRemoteUrl = null
+        localFallbackAttempted = false
         cancelCacheFill()
         pollJob?.cancel()
         pollJob = null

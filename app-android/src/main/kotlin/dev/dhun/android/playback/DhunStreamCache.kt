@@ -19,24 +19,34 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class DhunStreamCache(private val provider: MusicProvider) {
 
-    private data class Entry(val url: String, val resolvedAtMs: Long)
+    private data class Entry(val stream: ResolvedStream, val resolvedAtMs: Long)
 
     private val cache = ConcurrentHashMap<String, Entry>()
 
-    suspend fun get(videoId: String): String {
+    /**
+     * A resolved stream URL **plus the User-Agent it is bound to**.
+     * googlevideo 403s a byte read whose agent differs from the one that
+     * resolved the URL, so the two must travel together — returning a bare
+     * URL is what let the playback layer send its own default agent.
+     */
+    data class ResolvedStream(val url: String, val userAgent: String?)
+
+    suspend fun get(videoId: String): ResolvedStream {
         val hit = cache[videoId]
         val now = System.currentTimeMillis()
-        if (hit != null && now - hit.resolvedAtMs < TTL_MS) return hit.url
+        if (hit != null && now - hit.resolvedAtMs < TTL_MS) return hit.stream
         return when (val result = provider.getStreamInfo(videoId)) {
             is DhunResult.Success -> {
-                cache[videoId] = Entry(result.value.audioUrl, now)
+                val stream = ResolvedStream(result.value.audioUrl, result.value.userAgent)
+                cache[videoId] = Entry(stream, now)
                 Log.i(
                     TAG,
                     "resolved $videoId: ${result.value.mimeType} " +
                         "${result.value.bitrateKbps ?: "?"}kbps " +
-                        "host=${Uri.parse(result.value.audioUrl).host}",
+                        "host=${Uri.parse(result.value.audioUrl).host} " +
+                        "ua=${stream.userAgent?.take(40) ?: "<none>"}",
                 )
-                result.value.audioUrl
+                stream
             }
             is DhunResult.Failure -> {
                 Log.w(

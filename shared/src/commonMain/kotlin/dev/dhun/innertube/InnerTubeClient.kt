@@ -495,7 +495,11 @@ class AltInnertubeClient(
     internal val name: String,
     internal val version: String,
     internal val headerId: String,
-    internal val userAgent: String,
+    /**
+     * Public on purpose: stream URLs this identity resolves are only served
+     * back to the same User-Agent, so the playback layer needs it.
+     */
+    val userAgent: String,
     internal val contextExtras: JsonObject = JsonObject(emptyMap()),
     /** When set, context includes `thirdParty.embedUrl` (WEB_EMBEDDED_PLAYER). */
     internal val thirdPartyEmbedUrl: String? = null,

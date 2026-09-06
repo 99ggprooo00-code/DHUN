@@ -41,6 +41,10 @@ class YtDlpStreamResolver(
                 // clients are still tokenless — no --cookies.
                 val command = binary + listOf(
                     "--no-warnings", "--no-playlist",
+                    // Pinned so the URL yt-dlp hands back is bound to a UA we
+                    // know: googlevideo rejects byte reads from a different
+                    // agent, and the desktop cache downloader must match it.
+                    "--user-agent", YTDLP_USER_AGENT,
                     "--extractor-args",
                     "youtube:player_client=web_embedded,tv,tv_downgraded,tv_simply,mweb,web_safari,android",
                     "-f", "bestaudio/bestaudio*,best",
@@ -78,6 +82,7 @@ class YtDlpStreamResolver(
                         audioUrl = url,
                         mimeType = "audio/webm", // bestaudio is itag 251 (opus/webm) in practice; container verified at playback
                         codec = "opus",
+                        userAgent = YTDLP_USER_AGENT,
                     )
                 )
             } catch (e: java.util.concurrent.TimeoutException) {
@@ -90,6 +95,14 @@ class YtDlpStreamResolver(
         }
 
     companion object {
+        /**
+         * UA DHUN forces on yt-dlp (`--user-agent`) and therefore the one a
+         * resolved URL expects on every subsequent byte read.
+         */
+        const val YTDLP_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
         /** DHUN_YTDLP env var overrides; else `yt-dlp`; else `python3 -m yt_dlp`. */
         fun locate(): List<String> {
             System.getenv("DHUN_YTDLP")?.let { return listOf(it) }
@@ -130,6 +143,7 @@ class NewPipeStreamResolver : StreamResolver {
                             audioUrl = best.content,
                             mimeType = best.format?.mimeType ?: "audio/unknown",
                             bitrateKbps = best.averageBitrate.takeIf { it > 0 },
+                            userAgent = SimpleDownloader.USER_AGENT,
                         )
                     )
                 }
