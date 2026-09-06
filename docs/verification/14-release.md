@@ -146,11 +146,13 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 
 - PR CI `34011326728` — **passed** shared JVM tests, Android debug build, probe compile, Desktop compile (`:app-desktop:compileKotlinJvm`).
 - Main CI `34011563632` — **passed** (6m10s) on `e90dba6`.
-- Rolling test-release `34011563630` — **passed** `msi` `5m13s` + `apk` `4m33s` + `publish` `19s`; published `dhun-test.msi` 112001488 bytes + `dhun-test.msi.sha256` and `dhun-test.apk` to the `test` pre-release at `2026-09-06T04:33:36Z` (tag points to `e90dba6` — verify before testing; a docs-only merge will replace these assets).
+- Rolling test-release `34011563630` — **passed** `msi` `5m13s` + `apk` `4m33s` + `publish` `19s`; published the `1.0.5` JVM-fix binaries to the `test` pre-release at `2026-09-06T04:33:36Z`.
+- Rolling test-release `34012157287` on `main@9294520` (PR #23, docs-only) — **passed**; re-published the same `1.0.5` binaries at `2026-09-06T04:45:40Z`: `dhun-test.msi` 112,001,488 bytes + `dhun-test.msi.sha256`, `dhun-test.apk` 17,467,038 bytes + `dhun-test.apk.sha256` (verified with `gh release view test`). Main CI on the same commit: `34012157207` — **passed**.
+- **The `test` tag now points at `9294520`, not `e90dba6`** — the binaries are unchanged, so either checksum set matches the JVM-fix build. Verify before testing; any further push to `main` replaces these assets.
 
 **Hardware gate still OPEN — to verify on a Windows machine:**
 
-1. Download the current `dhun-test.msi` + `dhun-test.msi.sha256` from `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`; verify checksum matches the published tag `e90dba6`.
+1. Download the current `dhun-test.msi` + `dhun-test.msi.sha256` from `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`; verify the checksum, and that the release tag currently points at `9294520` (the docs merge after the `e90dba6` fix — same `1.0.5` binaries).
 2. Install per-user (no admin) — accept SmartScreen **Run anyway** / **More info → Run anyway** — confirm install completes without admin UAC.
 3. Launch DHUN from Start menu / installed shortcut — **no** `Failed to launch JVM`; main window (1200×780) + mini-player (if visible) + tray icon appear.
 4. Check `dhun-startup.log` (packaged: `<installDir>/userdata/dhun-startup.log`; fallback: `%TEMP%\dhun-startup.log`) —
