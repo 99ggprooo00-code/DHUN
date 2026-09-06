@@ -1,29 +1,30 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-06 (UTC)** · session **`arena/01a0759b-dhun`** · **repair PR #30 MERGED** at `76c68eb2b27da5341d146bda3d5aa6ea298d954a`, **11:52:26Z**. The session branch was retained. This is the verified **application-code release snapshot**; a later documentation-only build may advance the rolling tag without changing the repair code.
+Updated **2026-09-06 (UTC)** · session **`arena/01a076f3-dhun`** · **repair PR #30 MERGED** at `76c68eb2b27da5341d146bda3d5aa6ea298d954a` (11:52:26Z). Current session branch is `arena/01a076f3-dhun` branched from `main@76c68eb`.
 
-**Phase: 14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS.** The requested implementation/PR/merge work is complete. Do not confuse that with user-machine playback, visual/native acceptance, full clean-target runtime checks or the two soaks. No v0.1.0 was created.
+**Phase: 14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS.** Repair PR #30 is merged into main and published to the rolling `test` release. Hardware/user-machine gates (audio playback, Home pagination, installer upgrade, visuals, tray/SMTC, soaks) remain open; no stable v0.1.0 was created.
 
-**Latest verified published build:** [`test`](https://github.com/99ggprooo00-code/DHUN/releases/tag/test) at **`76c68eb`**, published **2026-09-06T11:58:17Z**, internal MSI **1.36.1**. Main CI **34031477321 SUCCESS** and test-release **34031477327 SUCCESS** (APK/MSI/publish all passed). Verify the live tag/checksum before testing because the release is rolling.
+**Latest verified published build:** [`test`](https://github.com/99ggprooo00-code/DHUN/releases/tag/test) at **`76c68eb`**, published **2026-09-06T11:58:17Z**, internal MSI **1.36.1**. Main CI **34031477321 SUCCESS** and test-release **34031477327 SUCCESS** (APK/MSI/publish all passed).
 
 | Published artifact | Verified size / CI-produced SHA256 |
 |---|---|
 | `dhun-test.msi` | **112,091,136 B** · `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008` |
 | `dhun-test.apk` | **17,499,806 B** · `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86` |
 
-Both `.sha256` assets were published. Hashes came from the producer's checked annotations; this sandbox could not independently download the binaries. Main's native Windows run verified ProductVersion/UpgradeCode, **1.0.5 → 1.36.1** install-over with userdata/cache sentinels retained, upgrade-flag removal retaining both, reinstall, and ordinary-uninstall cleanup. These checks did **not** launch DHUN or test sound/visuals. The publish job passed with an infrastructure deprecation warning for `actions/download-artifact@v4` (Node 20 forced to Node 24); no claim of a full zero-warning audit.
+Both `.sha256` assets were published. Main's native Windows run verified ProductVersion/UpgradeCode, **1.0.5 → 1.36.1** install-over with userdata/cache sentinels retained, upgrade-flag removal retaining both, reinstall, and ordinary-uninstall cleanup. These automated runner checks did **not** test real audio/sound or GUI visuals.
 
-**Last resolved blocker:** PR run 34029598179 produced an unsafe 1.33.1 MSI that removed userdata on upgrade. It was withheld and never merged/distributed. `b6d47bd` fixed the unsigned MSI's lifecycle policy; PR runs **34030730743** (1.34.1) and **34031213682** (1.35.1), plus the main run above, all passed real data-sentinel checks. The legacy bridge changes only matching DHUN HKCU cleanup values and never moves/deletes userdata; future packages use the upgrade-only cleaner-property guard. A later cancelled legacy transaction can leave cleanup suppressed until retry; back up data before testing. Raw `packageMsi` output is not distribution-ready without finalization.
+**Last error:** None on CI. Previous user hardware report on the 07:22:29Z build reported failed install-over, failed audio, and Home pagination issues. The repair batch was merged in PR #30 and published in MSI 1.36.1 / APK, awaiting user hardware re-test.
 
-**Current exact files:** post-merge evidence/documentation in `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`, `docs/verification/12-desktop-native.md`, `docs/verification/14-release.md`, `docs/verification/windows-candidate.md`, README and CHANGELOG. No application/installer code change is needed for this documentation checkpoint. Keep all work on this branch; no branch deletion or unrelated repository-setting change.
+**Current exact files:** `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`, `docs/verification/12-desktop-native.md`, `docs/verification/14-release.md`, `docs/verification/windows-candidate.md`, README.md, CHANGELOG.md.
 
-**Exact next technical step:** finish the same-branch post-merge documentation checkpoint with checks, then hand the user the current `test` MSI/APK and short Windows checklist. Test an install-over upgrade after quitting DHUN/tray and backing up userdata; verify saved data, one main window, uncached audible audio, subsequent Home pages and transport/artwork visuals. If audio still fails, collect the selectable **Details** text, track ID, Windows/VLC/yt-dlp versions and sanitized logs. Do not repeat the removed-window implementation.
+**What is verified / merged / released / open:**
+- **Merged on main:** PR #30 at `76c68eb` (installer data safety, Home feed/pagination, diagnostics, player layout).
+- **CI-verified:** Main CI 34031477321 (PASS), test-release 34031477327 (PASS), PR #31 CI 34031961481 (PASS).
+- **Released:** Rolling `test` pre-release at `76c68eb` (MSI 1.36.1, APK).
+- **Hardware-verified:** One-window startup confirmed by user on prior build. Install-over upgrade, live audio stream byte playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, and 30-min soaks remain **OPEN**.
+- **ADR-003:** Stays **PROPOSED**; 7-identity chain remains sequential.
 
-**Still OPEN:** real current-build audio/validated stream bytes, live Home/visual acceptance, tray/SMTC/shortcuts, cache/offline/recovery behavior, clean-target complete app runtime, Android/Desktop 30-minute soaks and stable release artifacts/review. Latest live drill remains **34011539225 RED**, issue #14 OPEN. ADR-003 stays **PROPOSED**; the seven identities remain sequential. Main merge/publishing used the ordinary authorised GitHub workflow, not an unrelated one-time Arena finalization control.
-
-**Branch history:** only this session branch was used. Older branches were not deleted; the earlier audit found `main` + 20 `arena/…` refs with automatic deletion disabled. Manual Actions dispatch remains 403-denied and is not retried; PR/main workflows supplied verification and publishing through their normal events.
-
-**Commit/push status:** all repair/automation work was merged in PR #30. The current follow-up is post-merge documentation only; its purpose is to prevent future sessions from treating the old dispatch blocker or pre-merge status as current. Any later verification record must use actual GitHub run/release state and keep the hardware gates open.
+**Exact next technical step:** Push session branch `arena/01a076f3-dhun`, maintain working PR for session checks, and proceed with roadmap execution / awaiting user hardware test feedback on the published MSI 1.36.1 and APK test builds. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
 
 ---
 
