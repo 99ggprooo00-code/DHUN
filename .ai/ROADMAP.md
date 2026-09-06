@@ -26,7 +26,8 @@ Updated **2026-09-06 (UTC)** · session **`arena/01a076f3-dhun`** · **working P
 - **CI-verified:** Main CI 34031477321 (PASS), test-release 34031477327 (PASS), PR #32 CI 34037665009 (PASS), PR #32 packaging 34037665019 (PASS).
 - **Released:** Rolling `test` pre-release at `76c68eb` (MSI 1.36.1, APK).
 - **Hardware-verified:** One-window startup confirmed by user on prior build. Install-over upgrade, live audio stream byte playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, and 30-min soaks remain **OPEN**.
-- **ADR-003:** Stays **PROPOSED**; 7-identity chain remains sequential.
+- **ADR-003 (Accepted):** Staged wave parallel tokenless identity chain implemented in `OwnClientStreamResolver.kt`.
+- **ADR-005 (Accepted):** Next-track pre-buffering, temporary cache lifecycle, unplayed eviction, and Android per-track User-Agent stream isolation implemented in `AudioFileCache.kt`, `DesktopDhunPlayer.kt`, and `PlaybackGraph.kt`.
 
 **Exact next technical step:** Maintain working PR #32, keep test suites green, and await user hardware feedback on the published MSI 1.36.1 / APK builds. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
 

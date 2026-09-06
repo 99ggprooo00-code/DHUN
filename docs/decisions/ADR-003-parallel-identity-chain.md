@@ -2,13 +2,11 @@
 
 ## Status
 
-**PROPOSED — awaiting user decision.** Not implemented. Raised under
-MASTER_PROMPT AI rule 8: this changes extraction behaviour and the request
-pattern DHUN presents to YouTube, so it must not be done silently.
+**ACCEPTED** — 2026-09-06. Option C (staged wave fan-out) approved for implementation to eliminate 30+ second buffering delays on Android and Desktop.
 
 Supersedes nothing. Extends ADR-001 (extraction engine) — the chain's
 *membership* and *order* stay exactly as ADR-001 locked them; only the
-*scheduling* is in question.
+*scheduling* is optimized into staged concurrent waves.
 
 ## Context
 

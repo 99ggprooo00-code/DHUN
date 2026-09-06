@@ -193,4 +193,18 @@ class QueueManagerTest {
         assertNull(q.next(trackEnded = true)?.let { if (it.id == "b") null else it }) // natural end on b replays b
         assertEquals("b", q.current?.id)
     }
+
+    @Test
+    fun peekNextInspectsWithoutAdvancingCursor() {
+        val q = queueOf("a", "b", "c")
+        assertEquals("b", q.peekNext()?.id)
+        assertEquals("a", q.current?.id) // still a
+        q.next() // advance to b
+        assertEquals("c", q.peekNext()?.id)
+        assertEquals("b", q.current?.id)
+        q.next() // advance to c
+        assertNull(q.peekNext()) // no more tracks with repeat OFF
+        q.setRepeatMode(RepeatMode.ALL)
+        assertEquals("a", q.peekNext()?.id) // wraps to a with repeat ALL
+    }
 }

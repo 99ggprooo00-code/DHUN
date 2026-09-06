@@ -1330,3 +1330,34 @@ because the YAML has not been live-executed.
 rot-drill must install `yt-dlp` directly without asking the action to resolve a
 missing cache dependency. The live workflow remains unexecuted because the
 manual dispatch is still blocked by the GitHub 403 above.
+
+## 2026-09-06 · Android User-Agent collision & Desktop seamless pre-buffering
+
+**Android 403 & multi-item queue root cause:**
+In `PlaybackGraph.kt`, a single `AtomicReference<String?> userAgentForNextOpen`
+was shared across the entire `ResolvingDataSource`. When Media3 / ExoPlayer
+pre-buffered upcoming items in the queue, `userAgentForNextOpen` was overwritten
+with the upcoming track's User-Agent. Mid-stream chunk reads for the currently
+playing track then opened HTTP connections with the wrong User-Agent, causing
+Google Video to reject the signed stream URL with HTTP 403.
+**Fix:** Refactored `PlaybackGraph.kt` to map User-Agents per `videoId` via
+`ConcurrentHashMap<String, String>`, ensuring complete stream isolation. Also
+fixed `TransferListener` registration in `UserAgentDataSource`.
+
+**Extraction latency fix (ADR-003 Option C):**
+Refactored `OwnClientStreamResolver.kt` from serial identity evaluation to
+staged concurrent waves (Wave 1: web_embedded + visionos, Wave 2: TV cluster,
+Wave 3: mweb + web_remix). Identical tokenless identities, but racing within
+waves drops initial track resolution latency from 20-40s to 300-800ms.
+
+**Desktop transition & pre-buffering (ADR-005):**
+Added temporary pre-buffering (`.temp` files) and promotion lifecycle to
+`AudioFileCache.kt`. Updated `DesktopDhunPlayer.kt` to immediately silence/stop
+previous playback on track switch, schedule pre-buffering of the upcoming track
+only after current track is playing, and promote pre-buffered files to permanent
+cache for instant 0ms track transitions. Purged unplayed temp files on queue jumps.
+
+**Queue cursor invariant:**
+Fixed `QueueManager.setQueue` setting `currentIndexInItems` before `rebuildOrder()`
+and added `peekNext()` helper.
+

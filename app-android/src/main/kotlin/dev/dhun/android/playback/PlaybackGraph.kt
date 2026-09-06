@@ -16,7 +16,8 @@ import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import dev.dhun.player.StreamRecoverySignal
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -50,20 +51,12 @@ object PlaybackGraph {
         streamCache: DhunStreamCache,
         audioCache: DhunAudioSegmentCache?,
     ): DataSource.Factory {
-        // The agent googlevideo expects for the URL about to be opened. The
-        // resolver writes it, [UserAgentDataSource] reads it on open.
-        val userAgentForNextOpen = AtomicReference<String?>(null)
-
-        // Configured once; the agent is restamped on it per resolve (see
-        // UserAgentDataSource) and each open builds a source from it.
-        val httpFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent(FALLBACK_USER_AGENT)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(25_000)
-            .setAllowCrossProtocolRedirects(true)
+        // ADR-005: Map each videoId to its resolving User-Agent so pre-buffering
+        // next-track items does not clobber the active stream's User-Agent.
+        val userAgentByVideoId = ConcurrentHashMap<String, String>()
 
         val userAgentHttpFactory = DataSource.Factory {
-            UserAgentDataSource(httpFactory, userAgentForNextOpen)
+            UserAgentDataSource(userAgentByVideoId)
         }
 
         // Outer data source: segment cache when available, plain HTTP when
@@ -97,16 +90,16 @@ object PlaybackGraph {
                     // googlevideo binds a signed stream URL to the InnerTube
                     // identity that resolved it and answers a byte read from
                     // any other User-Agent with 403 — which ExoPlayer reports
-                    // as a playback error, i.e. "no audio". Hand the resolving
-                    // identity to the data source before the open it feeds.
-                    userAgentForNextOpen.set(resolved.userAgent ?: FALLBACK_USER_AGENT)
+                    // as a playback error, i.e. "no audio". Store the resolving
+                    // identity specifically for this videoId.
+                    userAgentByVideoId[videoId] = resolved.userAgent ?: FALLBACK_USER_AGENT
                     dataSpec
                         .buildUpon()
                         .setUri(Uri.parse(resolved.url))
                         .setKey(videoId)
                         .build()
                 } catch (e: Exception) {
-                    userAgentForNextOpen.set(FALLBACK_USER_AGENT)
+                    userAgentByVideoId[videoId] = FALLBACK_USER_AGENT
                     if (audioCache != null && audioCache.hasContent(videoId)) {
                         android.util.Log.i(
                             "DHUN",
@@ -254,7 +247,7 @@ object PlaybackGraph {
             PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
             -> return true
         }
-        var cause: Throwable? = error.cause
+        var cause: Throwable? = error
         while (cause != null) {
             if (cause is java.io.IOException &&
                 cause.message?.contains("stream resolve failed") == true
@@ -267,7 +260,7 @@ object PlaybackGraph {
     }
 
     /** Only used when a resolver reports no identity (non-InnerTube engines). */
-    private const val FALLBACK_USER_AGENT =
+    const val FALLBACK_USER_AGENT =
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
@@ -279,37 +272,31 @@ object PlaybackGraph {
 
 /**
  * Opens each request through an HTTP source built with the User-Agent that
- * resolved the URL.
- *
- * Two constraints force this shape. (1) [ResolvingDataSource] constructs its
- * upstream data source once, in its own constructor, so the agent cannot be
- * chosen later through the factory alone. (2) In media3 1.5.1
- * `DefaultHttpDataSource` has no instance-level `setUserAgent` — the agent
- * is fixed at construction and only `DefaultHttpDataSource.Factory` accepts
- * one. So the resolver publishes the agent, and every [open] restamps the
- * factory and builds a fresh source for that one request.
- *
- * [userAgent] is written by the resolver immediately before the open it
- * belongs to (same loader thread, and opens on one player are serialised).
- *
- * `DataSource` declares `addTransferListener` and `getUri` as abstract
- * (only `getResponseHeaders` has a default), so all of them are implemented
- * here — omitting the listener registration is what an earlier attempt got
- * wrong.
+ * resolved the specific video URL (ADR-005 stream isolation).
  */
 private class UserAgentDataSource(
-    private val httpFactory: DefaultHttpDataSource.Factory,
-    private val userAgent: AtomicReference<String?>,
+    private val userAgentByVideoId: ConcurrentHashMap<String, String>,
 ) : DataSource {
     private var current: DataSource? = null
+    private val listeners = CopyOnWriteArrayList<TransferListener>()
 
     override fun addTransferListener(transferListener: TransferListener) {
+        if (!listeners.contains(transferListener)) {
+            listeners.add(transferListener)
+        }
         current?.addTransferListener(transferListener)
     }
 
     override fun open(dataSpec: DataSpec): Long {
-        userAgent.get()?.let { httpFactory.setUserAgent(it) }
-        val source = httpFactory.createDataSource()
+        val videoId = dataSpec.key ?: dataSpec.uri.lastPathSegment
+        val ua = (videoId?.let { userAgentByVideoId[it] }) ?: PlaybackGraph.FALLBACK_USER_AGENT
+        val source = DefaultHttpDataSource.Factory()
+            .setUserAgent(ua)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(25_000)
+            .setAllowCrossProtocolRedirects(true)
+            .createDataSource()
+        listeners.forEach { source.addTransferListener(it) }
         current = source
         return source.open(dataSpec)
     }
@@ -317,7 +304,7 @@ private class UserAgentDataSource(
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
         current?.read(buffer, offset, length) ?: C.RESULT_END_OF_INPUT
 
-    override fun getUri(): android.net.Uri? = current?.uri
+    override fun getUri(): Uri? = current?.uri
 
     override fun getResponseHeaders(): Map<String, List<String>> =
         current?.responseHeaders ?: emptyMap()
