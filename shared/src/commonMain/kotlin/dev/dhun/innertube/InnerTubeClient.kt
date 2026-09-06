@@ -123,7 +123,10 @@ class InnerTubeClient(
 
     /** Home feed (browseId = FEmusic_home), first page, for the Home screen. */
     suspend fun homeFeed(): DhunResult<List<HomeSection>> =
-        resultify { homeFeedPage().sections }
+        when (val page = homeFeedPage()) {
+            is DhunResult.Success -> DhunResult.Success(page.value.sections)
+            is DhunResult.Failure -> DhunResult.Failure(page.error)
+        }
 
     /**
      * First page of home shelves **plus** its continuation token, so the
