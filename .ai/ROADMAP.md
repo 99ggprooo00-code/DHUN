@@ -1,8 +1,16 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-06 (UTC)** · session **`arena/01a0750c-dhun`** · branch at `e1f69b4`, **CI `34014443760` green** (5 commits ahead of `main@9294520`).
+Updated **2026-09-06 (UTC), after PR #24 merged** · session **`arena/01a0750c-dhun`** · `origin/main@c247fb4` · **new `test` build published `2026-09-06T06:00:14Z`** containing the audio fix + endless scroll · **PR #25 open, CI `34015674858` pass** (diagnostics + resolve budget + UI research).
 
-**Phase:** **14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS — first real hardware verdict is in, and it closed one gate and opened a blocker.**
+**Phase:** **14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS — the no-audio blocker is fixed and now in a downloadable build, awaiting re-test.**
+
+**Merged and published this session:**
+
+- **PR #24 merged → `main@c247fb4`.** CI on the PR was green (`34014443760`); post-merge **test-release `34015233896` success**, republishing the rolling `test` pre-release at `2026-09-06T06:00:14Z`:
+  - `dhun-test.apk` **17,483,422 B** (+16 KB vs the old build — the new code)
+  - `dhun-test.msi` **112,026,064 B** + both `.sha256`
+  These are the **first builds containing the User-Agent audio fix and Home endless scroll.** The previous assets (`9294520`) had neither.
+- Post-merge CI `34015233894` was still running at the time of writing; the same content already passed as PR CI.
 
 **Hardware verdict (user, real hardware, builds from the rolling `test` release):**
 
@@ -24,13 +32,22 @@ A googlevideo stream URL is **bound to the InnerTube client identity that resolv
 
 Dead end recorded so nobody repeats it: calling `httpFactory.setUserAgent(…)` inside the `ResolvingDataSource.Resolver` does **nothing** — `ResolvingDataSource` constructs its upstream data source once, in its own constructor. The agent must be stamped on the live instance per `open()`.
 
-**Exact next step:**
+**Exact next step — in order:**
 
-1. **Re-test audio on hardware with the NEXT build** (the fix is not in the currently published `test` assets — those are still `9294520`/`1.0.5`). After this branch merges and `test-release` republishes: play an uncached track on the APK and on the MSI. Capture, this time: the exact player error text (if any), `adb logcat -s DHUN` lines showing `resolved <id>: … ua=…`, OS + VLC versions, MSI sha256, and `dhun-startup.log`.
-2. **If audio still fails**, the logcat `resolved … ua=…` line splits the problem cleanly: no such line ⇒ resolution is gated on that network (extraction problem, ADR-001); line present but still no audio ⇒ the CDN rejects even a matching agent (PO-token territory, needs an ADR).
-3. Then: endless scroll check on Home, UI pass **once screenshots exist**, offline-cache checks, 30-min soaks, clean uninstalls, `v0.1.0`.
+0. **Re-test audio on the NEW build** (`test` release, published `06:00:14Z`). This is the only thing that can confirm the fix.
+
+
+1. **Re-test audio on the new build.** Play an uncached track on the APK and on the MSI. Capture: the exact player error text (if any), `adb logcat -s DHUN` lines showing `resolved <id>: … ua=…`, OS + VLC versions, MSI sha256, `dhun-startup.log`.
+2. **If audio still fails**, the logcat `resolved … ua=…` line splits it cleanly: no such line ⇒ resolution is gated on that network (extraction problem, ADR-001); line present but still no audio ⇒ the CDN rejects even a matching agent (PO-token territory, needs an ADR).
+3. **Then, per the user's direction this session:**
+   - ~~Investigate the desktop **"stuck on Resolving"** symptom~~ — **DONE (`d390dd0`, PR #25).** Root cause is not a hang: `defaultHttpClient()` installs Ktor `HttpTimeout` and `postAltJson` rethrows a definitive `LOGIN_REQUIRED` immediately, so nothing blocks forever. The chain is just slow by construction — WEB_REMIX 3×25 s ≈ 77 s **plus** 7 identities × (2×12 s + backoff) ≈ 172 s ≈ **4 minutes** of a UI that can only say "Resolving". `ResolvingStreamResolver` now runs under a 45 s wall-clock budget and returns a typed verdict. *Deferred:* parallelising the identity chain would help far more but changes extraction behaviour and fires concurrent `/player` calls — needs its own ADR (AI rule 8).
+   - ~~**Improve on-screen diagnostics**~~ — **DONE (`37f04e8`, PR #25).** `PlaybackState.Error` gained a `detail` channel, `FullPlayer` renders it, desktop resolve failures carry `detailString()` and every resolve is timed/logged. Android's `describeErrorChain` was truncating the verdict away (160 chars/cause, 400 total, vs a 400-char chain summary) — now 500/1000.
+   - **UI pass, researched** (**research done, `3591e70`**; restyle still blocked on screenshots) against `vivizzz007/vivi-music` — licence **verified GPL-3.0** (plus a musixmatch-only exception), i.e. the same licence as DHUN, so its UI may be studied and adapted with attribution; **no fork, no vendored copy**. Research notes, the file map and the platform constraint (vivi is Android-only + Material3 **Expressive**, DHUN is Compose Multiplatform 1.8.2 — so nothing can be pasted, only re-expressed) are in `.ai/ui-research-vivi-music.md`; the reference is also registered in `THIRD_PARTY.md`. **Blocked on the user's screenshots** before any restyle.
+4. Then: endless scroll check on Home, offline-cache checks, 30-min soaks, clean uninstalls, `v0.1.0`.
 
 **Verification honesty:** this sandbox has **no JDK** and **no egress except `github.com`** (`api.adoptium.net`, `services.gradle.org`, `repo1.maven.org`, `dl.google.com`, `music.youtube.com` all `000`; `raw.githubusercontent.com` also blocked, so the media3 1.5.1 `DataSource` interface was read through `api.github.com`). CI is therefore the only executable check available here. Run `34014443760` **passed** on `e1f69b4` — `:shared:jvmTest` (which covers `shared/src/jvmTest`, so the new `AudioFileCacheTest` and 3 `UseCasesTest` pagination tests ran), `:app-android:assembleDebug`, probe, desktop compile. **Audio itself is still NOT verified** — that needs the next build on a device.
+
+**CI blind spot found this session:** `.github/workflows/ci.yml` triggers on `push: branches: [main]` and `pull_request:` only — so commits pushed to a session branch with **no open PR get no CI at all**. Three commits (`37f04e8`, `3591e70`, `d390dd0`) sat unverified until PR #25 was opened. Open the PR *before* relying on a green mark, not after.
 
 **Four CI rounds were needed to get there.** My first three `UserAgentDataSource` attempts rested on media3 APIs that do not exist in 1.5.1: instance-level `DefaultHttpDataSource.setUserAgent` (there is none — only `Factory.setUserAgent`), `DefaultHttpDataSource.Builder` (does not exist), `override val uri` (it is `getUri()`), and a missing `addTransferListener` override (abstract, not default). Recorded in DEBUG_LOG so nobody repeats it.
 

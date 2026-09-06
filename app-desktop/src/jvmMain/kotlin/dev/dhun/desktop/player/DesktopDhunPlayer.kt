@@ -4,6 +4,7 @@ import dev.dhun.core.DhunResult
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
+import dev.dhun.core.detailString
 import dev.dhun.core.toUserMessage
 import dev.dhun.player.AudioFileCache
 import dev.dhun.player.DhunPlayer
@@ -375,14 +376,17 @@ class DesktopDhunPlayer(
         }
 
         _state.value = PlaybackState.Resolving(track)
+        val startedAtMs = System.currentTimeMillis()
+        log("resolving ${track.id} …")
         when (val result = provider.getStreamInfo(track.id)) {
             is DhunResult.Success -> {
                 val info = result.value
                 streamingRemoteUrl = info.audioUrl
                 localFallbackAttempted = false
                 log(
-                    "resolved ${track.id}: ${info.mimeType} " +
-                        "${info.bitrateKbps ?: "?"}kbps ua=${info.userAgent?.take(40) ?: "<none>"}",
+                    "resolved ${track.id} in ${System.currentTimeMillis() - startedAtMs}ms: " +
+                        "${info.mimeType} ${info.bitrateKbps ?: "?"}kbps " +
+                        "ua=${info.userAgent?.take(40) ?: "<none>"}",
                 )
                 startMedia(track, info.audioUrl)
                 startCacheFill(
@@ -393,7 +397,17 @@ class DesktopDhunPlayer(
                 )
             }
             is DhunResult.Failure -> {
-                _state.value = PlaybackState.Error(track, result.error.toUserMessage())
+                val detail = result.error.detailString()
+                log(
+                    "resolve FAILED for ${track.id} after " +
+                        "${System.currentTimeMillis() - startedAtMs}ms: " +
+                        "${result.error::class.simpleName} ${detail ?: ""}",
+                )
+                _state.value = PlaybackState.Error(
+                    track,
+                    result.error.toUserMessage(),
+                    detail,
+                )
             }
         }
     }
@@ -491,6 +505,8 @@ class DesktopDhunPlayer(
                     track,
                     "Stream rejected by the CDN and no local copy could be fetched. " +
                         "Check the connection, then press Retry.",
+                    "libVLC rejected the stream URL and the cache fill produced no file " +
+                        "(VLC cannot send the resolving identity's User-Agent).",
                 )
             }
         }

@@ -388,6 +388,21 @@ fun FullPlayer(
                         Text("Retry", color = DhunColors.error)
                     }
                 }
+                // Diagnostics: the per-identity resolve-chain verdict, or the
+                // exception chain. This is what turns a "no audio" report into
+                // an actionable one — it says whether resolution was gated or
+                // the CDN refused the bytes after a successful resolve.
+                if (!playbackError.detail.isNullOrBlank()) {
+                    Text(
+                        text = playbackError.detail,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DhunColors.textTertiary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = DhunSpacing.xxl)
+                            .padding(bottom = DhunSpacing.xs),
+                    )
+                }
             }
 
             // Title / artist (fade-update via Crossfade)

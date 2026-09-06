@@ -293,12 +293,15 @@ class AndroidDhunPlayer(
         var cause: Throwable? = error
         var depth = 0
         while (cause != null && depth < 5) {
-            val msg = cause.message?.take(160)?.trim()
+            // 500, not 160: DhunResolveException's message carries the whole
+            // per-identity resolve-chain verdict (up to 400 chars on its own),
+            // and truncating it is what made device reports inconclusive.
+            val msg = cause.message?.take(500)?.trim()
             if (!msg.isNullOrEmpty()) parts.add(msg)
             cause = cause.cause
             depth++
         }
-        return parts.joinToString(" ← ").take(400)
+        return parts.joinToString(" ← ").take(1_000)
     }
 
     private fun trackOf(item: MediaItem?): Track? {
