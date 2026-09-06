@@ -1,10 +1,13 @@
 # Phase 12 verification — Desktop Native Integrations
 
-Status: 🟨 **SMTC PHASE 2 CODE STAGED; CI + HARDWARE OPEN** — tray,
-mini-player window, keyboard shortcuts, close-to-tray + window geometry, and
-the SMTC integration are implemented in `app-desktop`; the new JNA/WinRT path
-must pass the next CI run. Windows acceptance remains OPEN because this
-sandbox has no Windows desktop, system tray, libVLC, or SMTC-capable hardware.
+Status: 🟨 **SMTC PHASE 2 CODE STAGED; CI + HARDWARE OPEN** — tray, keyboard
+shortcuts, close-to-tray + window geometry, and the SMTC integration are
+implemented in `app-desktop`; the new JNA/WinRT path must pass the next CI
+run. **The separate mini-player window was REMOVED on 2026-09-06 per user
+decision (ADR-004)** — the docked in-app MiniPlayer (Phase 08) is the
+product's mini-player, so its checklist row below is now a single-window
+launch check. Windows acceptance remains OPEN because this sandbox has no
+Windows desktop, system tray, libVLC, or SMTC-capable hardware.
 
 ## What was built (code-level, auditable)
 
@@ -12,9 +15,9 @@ sandbox has no Windows desktop, system tray, libVLC, or SMTC-capable hardware.
 |---|---|
 | System tray: icon (playing/paused variants), menu (track title / play-pause / next / prev / open / quit) | `app-desktop/.../desktop/native/DhunTray.kt` — AWT `SystemTray` + `TrayIcon` (JDK standard, no dependency; Win/Linux/macOS, silently degraded on headless); menu exactly per spec — non-selectable track-title row + Play/Pause (verb swaps) + Next + Previous + Open DHUN + Quit; icon swaps `TrayIcons.playing()` (accent triangle) ↔ `TrayIcons.paused()` (accent bars); all mutators EDT-marshaled (thread-safe); `start()` returns false on headless so the app degrades instead of crashing |
 | Tray icons (no binary assets yet) | `app-desktop/.../desktop/native/TrayIcons.kt` — 32×32 ARGB `BufferedImage` drawn in code (dark rounded tile + accent glyph, `setAutoSize` for 16/48 DPI). Replaced by a real `.ico` in the jpackage step if a design asset lands |
-| Mini-player window: 320×88 always-on-top; artwork, title, transport, progress; draggable; click opens main | `app-desktop/.../desktop/ui/MiniPlayerWindow.kt` — `MiniPlayerContent` (56 dp `ArtworkImage`, title `titleSmall` / artist `labelSmall`, ⏸/▶ + ⏭ `DhunIconButton`s, 2 dp accent progress line) hosted in `Main.kt` as a second Compose `Window` (`alwaysOnTopValue=true`, `resizable=false`, `skipTaskbar=true`); `dragWindow` modifier moves the AWT frame on pointer-drag over the artwork+title region; release **without** drag = click → `showMainWindow()`; window X hides (not disposes — `DO_NOTHING_ON_CLOSE` + `isVisible=false`) so Ctrl+M / tray "Open" always work |
-| Keyboard shortcuts: Space, ←/→ seek 5 s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+M mini-player, Ctrl+Q quit | `Main.kt` — root `Modifier.onKeyEvent` (NOT preview: fires only for keys the focused node didn't consume, so Space/←/→ typing in the search field stays untouched); `EventType.Press`-only (no auto-repeat); Ctrl+F → `nav.selectedTab = AppTab.SEARCH` (jumps to the Search tab — auto-focus into the field is a follow-up); Ctrl+M → `toggleMiniPlayer()` (AWT show/hide + toFront); Ctrl+Q → `quit()` (the one clean-exit path, shared with tray Quit: save geometry → tray.stop → persistence.stop → player.release → scope.cancel → `System.exit(0)` — no zombies) |
-| Close-to-tray setting (default on), remembered window state | `Main.kt` — `closeToTray` read once at startup from `SettingsKeys.CLOSE_TO_TRAY` (default `true`); main window `onCloseRequest` → hide to tray (after saving geometry) or `quit()`; main + mini frames get `WindowConstants.DO_NOTHING_ON_CLOSE`; geometry persisted as `"x,y,w,h"` in `SettingsKeys.WINDOW_GEOMETRY` (Phase 05 DB) on close-to-tray and quit, restored into `rememberWindowState(position=…)` at startup |
+| Mini-player window: ~~320×88 always-on-top; artwork, title, transport, progress; draggable; click opens main~~ **REMOVED 2026-09-06 (ADR-004, user decision)** | Was `app-desktop/.../desktop/ui/MiniPlayerWindow.kt` — `MiniPlayerContent` (56 dp `ArtworkImage`, title/artist, ⏸/▶ + ⏭, 2 dp accent progress line) hosted in `Main.kt` as a second Compose `Window` (`alwaysOnTop=true`, `resizable=false`), draggable via JNA `SetWindowPos`, click → `showMainWindow()`, Ctrl+M toggle. The user judged it redundant next to the docked in-app MiniPlayer (Phase 08) and it always showed in the taskbar (no `skipTaskbar` in Compose Desktop 1.8.2). The window, its toggle, and the `Smct.moveWindow` helper were deleted; `Main.kt` now opens exactly one window |
+| Keyboard shortcuts: Space, ←/→ seek 5 s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+Q quit | `Main.kt` — root `Modifier.onKeyEvent` (NOT preview: fires only for keys the focused node didn't consume, so Space/←/→ typing in the search field stays untouched); `EventType.Press`-only (no auto-repeat); Ctrl+F → `nav.selectedTab = AppTab.SEARCH` (jumps to the Search tab — auto-focus into the field is a follow-up); Ctrl+Q → `quit()` (the one clean-exit path, shared with tray Quit: save geometry → tray.stop → persistence.stop → player.release → scope.cancel → `System.exit(0)` — no zombies). Ctrl+M was removed with the mini-player window (ADR-004) |
+| Close-to-tray setting (default on), remembered window state | `Main.kt` — `closeToTray` read once at startup from `SettingsKeys.CLOSE_TO_TRAY` (default `true`); main window `onCloseRequest` → hide to tray (after saving geometry) or `quit()`; geometry persisted as `"x,y,w,h"` in `SettingsKeys.WINDOW_GEOMETRY` (Phase 05 DB) on close-to-tray and quit, restored into `rememberWindowState(position=…)` at startup. The mini frame reference went away with the removed mini-player window (ADR-004) |
 | SMTC spike (time-boxed 3 days): now-playing tile, artwork, media keys; if stable → integrate, else documented fallback | `app-desktop/.../desktop/smct/Smct.kt` — **phase 2 code**: startup activation after the AWT window exists, `GetForWindow(HWND, IID 99FA3FF4-1742-42A6-902E-087D41F965EC)`, `DisplayUpdater` → `MusicProperties` title/artist/album, remote `RandomAccessStreamReference` thumbnail, playback-state and previous/next state updates, and `ButtonPressed` registration through a retained JNA COM callback (`0557e996-7b23-5bae-aa81-ea0d671143a4`). The exact Windows.Media vtable order is encoded from the Windows SDK/windows-rs ABI; `IsEnabled` is the liveness check at slot 10. Native failures are HRESULT-logged and leave the AWT tray/keyboard fallback active; `-Ddhun.smct=false` disables. Hardware round-trip is still OPEN. |
 | Packaging: jpackage `.msi` with app icon; clean-VM install test | `app-desktop/build.gradle.kts` `compose.desktop { application { nativeDistributions { targetFormats(Dmg, Msi, Deb) } } }` already active (Phase 04) — the Compose packager drives jpackage; `packageVersion` stays 1.0.x (packager rejects MAJOR 0, documented Phase 04). App icon + clean-VM install test: OPEN (needs Windows machine + a real `.ico`) |
 
@@ -57,11 +60,11 @@ phase-2 readiness requirements.
 - [ ] **Close-to-tray (default on)**: main window X → window hides, app alive (tray still there, playback continues — audio is the proof); tray → Open DHUN → window back with same queue/position; **Quit** from tray → process gone (`tasklist | findstr dhun` / `ps` — no zombie, no dangling libVLC/vlc process); quit path also saves geometry
 - [ ] **Close-to-tray off**: clear the setting (`Settings` row for `close_to_tray` = false in `dhun.db`, or via a future settings screen) → restart → main window X now exits the app
 - [ ] **Window geometry**: resize/move the main window → close-to-tray → relaunch → window returns at the same size+position (`window_geometry` row in `dhun.db` = "x,y,w,h")
-- [ ] **Mini-player window**: starts visible at 320×88, always on top (verified: over an elevated other window); shows current artwork/title/artist; ▶/⏸ and ⏭ buttons work; progress line advances with playback; **drag** the artwork/title region → window follows the cursor; **click** (no drag) the artwork/title region → main window comes to front; its X hides it (mini gone, app alive) → **Ctrl+M** brings it back → **Ctrl+M** hides again
-- [ ] **Keyboard shortcuts** (main window focused): Space toggles play/pause; ←/→ seek ±5 s (position bar moves); Ctrl+← / Ctrl+→ = previous/next track; Ctrl+F lands on the Search tab; Ctrl+M toggles the mini-player; Ctrl+Q exits clean (same zombie check as tray Quit). **Negative check**: typing "Bohemian  Rhapsody" (space) in the search field types a space — shortcuts don't steal keys from the text field
+- [ ] **Mini-player window — REMOVED (ADR-004, 2026-09-06)**: launch DHUN → **exactly one window** opens — the main window (1200×780) with the docked in-app MiniPlayer above the bottom nav; no second window, no extra taskbar entry; Ctrl+M is a dead key (removed). The docked MiniPlayer's own behavior (tap-to-expand, transport, progress) is covered by the Phase 08 checklist
+- [ ] **Keyboard shortcuts** (main window focused): Space toggles play/pause; ←/→ seek ±5 s (position bar moves); Ctrl+← / Ctrl+→ = previous/next track; Ctrl+F lands on the Search tab; Ctrl+Q exits clean (same zombie check as tray Quit). **Negative check**: typing "Bohemian  Rhapsody" (space) in the search field types a space — shortcuts don't steal keys from the text field
 - [ ] **SMTC probe + phase 2**: console shows `SMTC probe PASS — …` with `hwnd`, `abi`, `activate-factory`, `get-for-window`, `is-enabled`, and `phase2=ok`; use the Windows tile to verify title/artist/artwork and press Play/Pause/Next/Previous media keys → record the exact line and round-trip below
 - [ ] **jpackage**: `./gradlew :app-desktop:createMsi` (Windows) → installer builds with app icon; install on a clean Windows user/VM → launches, plays, tray works → record version/any issues
-- [ ] **Soak**: 30-min mixed use (queue skips, tray use, mini-player drag, shortcuts) — zero crashes; tray state never desyncs from the player (icon/verb always match)
+- [ ] **Soak**: 30-min mixed use (queue skips, tray use, shortcuts) — zero crashes; tray state never desyncs from the player (icon/verb always match)
 
 ## Probe / evidence log (fill on hardware)
 
@@ -105,10 +108,9 @@ phase-2 readiness requirements.
 - Ctrl+F jumps to the Search tab but doesn't move focus into the field
   (Compose Desktop focus request on a specific `TextField` is a small
   follow-up; typing works immediately after one click).
-- If the user closes the mini-player window and also closes-to-trays the
-  main window, then quits via tray, all is well; but closing the **last**
-  visible window on some desktops can let the OS reap focus state — the
-  documented user pattern is tray Quit, not closing both windows.
+- (Removed with the mini-player window, ADR-004: the two-window
+  close-interaction note — DHUN now has a single window, so close-to-tray +
+  tray Quit is the only window pattern.)
 - Tray on Wayland/X11 without a system tray (e.g. GNOME default without
   an extension) = `SystemTray.isSupported()` false → no tray, app works.
 

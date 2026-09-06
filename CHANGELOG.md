@@ -102,6 +102,14 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 - Assorted Compose Desktop 1.8.2 / JNA 5.17 / Media3 1.5.1 API corrections
   found by CI.
 
+### Removed
+- **Separate desktop mini-player window** — the 320×88 always-on-top second
+  window (Phase 12) opened at every launch is gone per user decision
+  (ADR-004): the docked in-app mini-player above the bottom nav is the
+  product's mini-player. The window, its Ctrl+M toggle, and the
+  mini-player-only `Smct.moveWindow` helper were deleted; desktop DHUN is a
+  single-window app.
+
 ### Known limitations
 See `.ai/KNOWN_LIMITATIONS.md` (honest > complete). Highlights: Web is not
 a v1 platform; SMTC round-trip unverified on hardware; blur floor is

@@ -5,3 +5,4 @@ of them is being challenged, not before.
 - [ADR-001](ADR-001-extraction-engine.md) — Extraction engine / tokenless client chain
 - [ADR-002](ADR-002-fullscreen-player-design.md) — Full-Screen Now Playing design lock (2026-09-05)
 - [ADR-003](ADR-003-parallel-identity-chain.md) — **PROPOSED, awaiting user decision** — parallelising the tokenless identity chain (2026-09-06)
+- [ADR-004](ADR-004-remove-separate-miniplayer-window.md) — Remove the separate desktop mini-player window (user decision 2026-09-06; the docked in-app MiniPlayer is the product mini-player)

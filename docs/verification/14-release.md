@@ -123,7 +123,7 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 - OS / version / libVLC version: ____________________
 - MSI / commit: ____________________
 - Start and end timestamps (30 minutes): ____________________
-- Tray / mini-player / keyboard / SMTC result: ____________________
+- Tray / keyboard / SMTC result (separate mini-player window removed — ADR-004): ____________________
 - Clean-install result: ____________________
 - Crash / zombie-process result: ____________________
 - Screenshots or logs: ____________________
@@ -154,7 +154,7 @@ gating (verify on residential hardware); metadata ALSO failing ⇒ real rot
 
 1. Download the current `dhun-test.msi` + `dhun-test.msi.sha256` from `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`; verify the checksum, and that the release tag currently points at `9294520` (the docs merge after the `e90dba6` fix — same `1.0.5` binaries).
 2. Install per-user (no admin) — accept SmartScreen **Run anyway** / **More info → Run anyway** — confirm install completes without admin UAC.
-3. Launch DHUN from Start menu / installed shortcut — **no** `Failed to launch JVM`; main window (1200×780) + mini-player (if visible) + tray icon appear.
+3. Launch DHUN from Start menu / installed shortcut — **no** `Failed to launch JVM`; exactly one window opens: the main window (1200×780) with the docked mini-player above the bottom nav, plus the tray icon. (The separate mini-player window was removed — ADR-004, 2026-09-06.)
 4. Check `dhun-startup.log` (packaged: `<installDir>/userdata/dhun-startup.log`; fallback: `%TEMP%\dhun-startup.log`) —
    - contains `DHUN main starting` + `java.sql.Driver available` + `org.sqlite.JDBC available` + `VLC initialized` (or `VLC init failed` → graceful Error state, not crash).
    - no `ClassNotFoundException: java.sql` or `UnsatisfiedLinkError: libvlc`.

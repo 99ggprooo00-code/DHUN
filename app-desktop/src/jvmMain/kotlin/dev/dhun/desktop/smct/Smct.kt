@@ -418,52 +418,6 @@ object Smct {
         }
     }
 
-    /* ---------------- window movement used by the mini-player ---------------- */
-
-    /** Win32 RECT (pixels). */
-    private class WinRect : Structure() {
-        var left: Int = 0
-        var top: Int = 0
-        var right: Int = 0
-        var bottom: Int = 0
-
-        override fun getFieldOrder(): List<String> = listOf("left", "top", "right", "bottom")
-    }
-
-    /** Minimal user32.dll surface (HWND = Pointer; no jna-platform needed). */
-    private interface User32Lib : Library {
-        companion object {
-            val INSTANCE: User32Lib = Native.load("user32", User32Lib::class.java)
-        }
-
-        fun FindWindowW(lpClassName: WString?, lpWindowName: WString?): Pointer?
-        fun GetWindowRect(hWnd: Pointer?, rect: WinRect?): Int
-        fun SetWindowPos(
-            hWnd: Pointer?,
-            hWndInsertAfter: Pointer?,
-            x: Int,
-            y: Int,
-            cx: Int,
-            cy: Int,
-            uFlags: Int,
-        ): Int
-    }
-
-    private const val SWP_NOSIZE = 0x0001
-    private const val SWP_NOZORDER = 0x0004
-    private const val SWP_NOACTIVATE = 0x0010
-
-    /** Moves the top-level AWT window [windowTitle] by (dx, dy) pixels. */
-    fun moveWindow(windowTitle: String, dx: Int, dy: Int): Boolean = if (!isWindows) false else
-        runCatching {
-            val hwnd = User32Lib.INSTANCE.FindWindowW(WString("SunAwtFrame"), WString(windowTitle))
-                ?: return false
-            val rect = WinRect()
-            if (User32Lib.INSTANCE.GetWindowRect(hwnd, rect) == 0) return false
-            val flags = SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE
-            User32Lib.INSTANCE.SetWindowPos(hwnd, null, rect.left + dx, rect.top + dy, 0, 0, flags) != 0
-        }.getOrDefault(false)
-
     /* ---------------- JNA ABI helpers ---------------- */
 
     /** Win32 GUID (4+2+2+8 bytes; first three fields little-endian in memory). */
@@ -481,6 +435,20 @@ object Smct {
         fun WindowsCreateString(sourceString: WString?, length: Int, hstring: Pointer?): Int
         fun WindowsDeleteString(hstring: Pointer?)
         fun RoGetActivationFactory(classId: Pointer?, iid: WinGuid, ppv: Pointer): Int
+    }
+
+    /**
+     * Minimal user32.dll surface for the SMTC `GetForWindow` HWND lookup
+     * (no jna-platform needed). The window-movement calls (`GetWindowRect`,
+     * `SetWindowPos`) that served the removed mini-player window were deleted
+     * with it (ADR-004).
+     */
+    private interface User32Lib : Library {
+        companion object {
+            val INSTANCE: User32Lib = Native.load("user32", User32Lib::class.java)
+        }
+
+        fun FindWindowW(lpClassName: WString?, lpWindowName: WString?): Pointer?
     }
 
     private fun loadWinRt(): WinRt = runCatching { Native.load("combase", WinRt::class.java) }

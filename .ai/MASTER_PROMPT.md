@@ -72,7 +72,8 @@ Established facts (do not re-research):
   lock screen + notification controls, queue, playlists, lyrics.
 - **Desktop (Windows first; Linux/macOS free via JVM):** windowed app,
   system tray, media-key integration (SMTC where feasible, documented
-  fallback if not), mini-player window, keyboard shortcuts, installer.
+  fallback if not), mini-player (docked in-app — ADR-004), keyboard
+  shortcuts, installer.
 - **Web:** cut from v1. No compatibility shims, no `expect/actual` stubs,
   no dead code "for later."
 
@@ -532,10 +533,14 @@ background; blur visibly real; extracted-colors test screen.
    focused-window media keys, **documented in KNOWN_LIMITATIONS.md**.
 2. System tray: icon (playing/paused variants), menu
    (track title / play-pause / next / prev / open / quit).
-3. Mini-player window: 320×88 always-on-top second window; artwork,
-   title, transport, progress; draggable; click opens main window.
+3. Mini-player window: ~~320×88 always-on-top second window; artwork,
+   title, transport, progress; draggable; click opens main window.~~
+   **REMOVED 2026-09-06 — ADR-004 (user decision): the Phase 08 docked
+   in-app MiniPlayer is the product mini-player; do not re-add a second
+   window.**
 4. Keyboard shortcuts: Space, ←/→ seek 5s, Ctrl+←/→ prev/next,
-   Ctrl+F search, Ctrl+M mini-player, Ctrl+Q quit.
+   Ctrl+F search, Ctrl+Q quit. (Ctrl+M mini-player removed with the
+   mini-player window — ADR-004.)
 5. Close-to-tray setting (default on), remembered window state.
 6. Packaging: `jpackage` (.msi via `createDistributable`/
    `packageMsi`) with app icon; test install on a clean Windows VM/user.
