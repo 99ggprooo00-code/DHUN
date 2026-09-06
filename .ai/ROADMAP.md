@@ -1,10 +1,10 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-06 (UTC)** · session **`arena/01a07581-dhun`** · `origin/main@0eb8e76` · PR #26 (UI restyle) and PR #27 (ADR-003 proposed, docs) merged · rolling `test` build republished `2026-09-06T06:51:40Z` — the build the user's Windows report below is about.
+Updated **2026-09-06 (UTC)** · session **`arena/01a07581-dhun`** · `origin/main@b8f148d` · PR #26 (UI restyle), PR #27 (ADR-003 proposed, docs) and **PR #28 (mini-player removal, this session) merged** · rolling `test` build republished `2026-09-06T06:51:40Z` (the build the user's report is about) and again **`07:13:35Z` after this session's merge — the single-window build to re-test**.
 
 **Phase:** **14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS.** This session's work is a desktop windowing change driven by the user's latest Windows report; the audio fix and Home endless scroll from the previous sessions remain un-re-verified on hardware.
 
-**User report driving this session (Windows, `test` build `06:51:40Z`):** opening DHUN also opens a second small mini-player window. User direction: the separate mini-player is **not needed** — the app already has the native docked MiniPlayer above the bottom nav. **Done this session:** the second window is removed (code + docs, PR #28).
+**User report driving this session (Windows, `test` build `06:51:40Z`):** opening DHUN also opens a second small mini-player window. User direction: the separate mini-player is **not needed** — the app already has the native docked MiniPlayer above the bottom nav. **Done this session:** the second window is removed (code + docs, **PR #28 MERGED → `main@b8f148d`**).
 
 **Exact files worked on this session:**
 
@@ -17,12 +17,12 @@ Updated **2026-09-06 (UTC)** · session **`arena/01a07581-dhun`** · `origin/mai
 
 **Last error:** none — not a defect. The "second window" was the Phase 12 mini-player window working exactly as specced (visible at startup, always-on-top); the user judged it redundant next to the docked MiniPlayer. Its one aggravator beyond the spec: Compose Desktop 1.8.2 has no `skipTaskbar`, so it also occupied the taskbar.
 
-**GitHub-verified this session (`gh`, not local state):** `main@0eb8e76` (PR #27 docs merge, `2026-09-06T06:59:41Z`) · PR #26 merged `06:40:06Z` · rolling `test` release republished `2026-09-06T06:51:40Z` (`dhun-test.apk` 17,483,422 B · `dhun-test.msi` 112,038,352 B + `.sha256`) · main CI + test-release on `ef4c8d7` green (`34017427948` / `34017427941`). All previous `arena/*` session branches were audited in the prior session — nothing unpushed; PR #27 was the last open leftover and is now merged.
+**GitHub-verified this session (`gh`, not local state):** `main@b8f148d` (PR #28 merge, `2026-09-06T07:12Z`) · PR #27 merged `06:59:41Z` at `0eb8e76` · PR #26 merged `06:40:06Z` · rolling `test` release republished `2026-09-06T07:13:35Z` (`dhun-test.apk` 17,483,422 B · `dhun-test.msi` **112,009,680 B** + `.sha256`) · PR #28 CI `34018230278` pass, main CI `34018419052` + test-release `34018419047` green. All previous `arena/*` session branches were audited in the prior session — nothing unpushed; the last open leftover (PR #27) was merged this session.
 
 **Exact next step — in order:**
 
-1. **This change lands (PR #28)** — CI green → merge; the next push to `main` republishes the rolling `test` build (new MSI + APK sha256, same stable URLs).
-2. **User re-tests on Windows with the next `test` build:** launching DHUN must show exactly ONE window — the main window with the docked mini-player. Same build, still open from the previous sessions: (a) does audio play now (User-Agent fix), (b) does Home endless-scroll work, (c) does the PR #26 restyle read well.
+1. ✅ **PR #28 landed** — CI `34018230278` pass → merged at `b8f148d`; main CI `34018419052` + test-release `34018419047` green; rolling `test` republished `2026-09-06T07:13:35Z`: MSI **112,009,680 B** (single-window code) · APK unchanged **17,483,422 B** + `.sha256`.
+2. **User re-tests on Windows with the `07:13:35Z` build:** launching DHUN must show exactly ONE window — the main window with the docked mini-player. Same build, still open from the previous sessions: (a) does audio play now (User-Agent fix), (b) does Home endless-scroll work, (c) does the PR #26 restyle read well.
 3. Remaining Phase 14 gates, unchanged: 30-min soaks both platforms, offline-cache checks, clean uninstall, live-drill green on a residential path, then `v0.1.0`.
 4. **ADR-003 is still PROPOSED, not accepted** — if the next device report shows resolution succeeding and the CDN refusing bytes, resolve latency is not the user-facing problem; keep the identity chain sequential.
 
@@ -182,9 +182,12 @@ green, rolling `test` republished `2026-09-06T06:51:40Z` (`dhun-test.apk`
 
 **Update (session `arena/01a07581-dhun`, 2026-09-06):** PR #27 merged
 `06:59:41Z` at `0eb8e76` (ADR-003 PROPOSED — identity-chain parallelism,
-awaiting user decision; UI-research outcome). **PR #28 open:** separate
-desktop mini-player window removed per user decision — ADR-004 (see
-CURRENT ACTIVE TASK; the Phase 12 table marks the step ❌ REMOVED).
+awaiting user decision; UI-research outcome). **PR #28 MERGED `07:12Z` at
+`b8f148d`:** separate desktop mini-player window removed per user decision
+— ADR-004 (see CURRENT ACTIVE TASK; the Phase 12 table marks the step ❌
+REMOVED). PR CI `34018230278` pass; main CI `34018419052` + test-release
+`34018419047` green; rolling `test` republished `07:13:35Z` (MSI
+112,009,680 B — single-window code).
 
 **Read the columns separately:** ✅ in the GitHub column completes only
 that named code/test/publishing milestone. It does **not** close the
