@@ -293,8 +293,16 @@ are retained; this does not launch the app or validate sound/visuals.
 
 **Local results:** 19 Python tests pass (including publishing-guard truth
 table and artifact provenance tests); 29 JSON fixtures pass syntax checks.
-**Packaging/MSI/PowerShell results:** not executed yet. No new artifact or
-hardware pass may be claimed until a real run is recorded here.
+**Packaging dispatch:** pushed at `9317050`, then denied by GitHub with
+**HTTP 403: Resource not accessible by integration**. The branch has no
+packaging run; no MSI or install-over test ran. Automatic CI 34028039448
+started separately. A normal-CI PowerShell syntax check is being added;
+that cannot substitute for the actual Windows execution.
+
+Owner action: reconnect GitHub in Arena, or manually run `test-release` from
+GitHub Actions using **arena/01a0759b-dhun**, not main, with build-only on.
+No new artifact or hardware pass may be claimed until an actual run is
+recorded here.
 
 **Next Windows acceptance, only with a CI-green candidate artifact:**
 

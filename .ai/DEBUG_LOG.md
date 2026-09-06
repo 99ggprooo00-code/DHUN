@@ -1,5 +1,29 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — Manual packaging dispatch denied by integration permissions
+
+Build-only automation was pushed at `9317050` (implementation `6fedf8a`).
+Automatic branch CI 34028039448 started normally. Manual dispatch did not:
+
+- `gh workflow run ... --json` rejected boolean-valued JSON locally; this
+  installed gh version expects strings. No event was sent by that attempt.
+- Retrying with the supported `-f build_only=true` on the same session ref
+  reached GitHub and returned **HTTP 403: Resource not accessible by
+  integration** for the workflow dispatch endpoint. No packaging run exists
+  on the branch, confirmed via the runs API. No MSI artifact was produced.
+
+This is a GitHub integration permission boundary, not a Kotlin/JDK failure.
+Do not work around the denial with a different credential/trigger. Ask for
+GitHub reconnection in Arena, or have the owner use GitHub Actions →
+`test-release` → Run workflow → **arena/01a0759b-dhun** → build-only. Selecting
+main would use the old published workflow, so the ref matters. The new
+branch's publish guard prevents release changes regardless of build-only's
+value. Add a PowerShell AST syntax check to normal CI while dispatch is
+blocked; parsing scripts is not native MSI execution. No PR/merge/release or
+session-finalizing action occurred.
+
+---
+
 ## 2026-09-06 — Safe branch packaging route prepared; no PR/session finalization
 
 The user clarified that normal work should continue without the one-time
