@@ -1,5 +1,6 @@
 package dev.dhun.domain
 
+import dev.dhun.core.DhunResult
 import dev.dhun.core.HistoryEntry
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
@@ -173,6 +174,12 @@ class UseCasesTest {
                 pages[continuationToken] ?: dev.dhun.core.HomeFeedPage(),
             )
         }
+
+        override suspend fun homeFeed(): DhunResult<List<dev.dhun.core.HomeSection>> =
+            when (val page = homeFeedPage()) {
+                is DhunResult.Success -> DhunResult.Success(page.value.sections)
+                is DhunResult.Failure -> DhunResult.Failure(page.error)
+            }
 
         // Unused by GetHomeFeedUseCase — MusicProvider's other members.
         override suspend fun search(query: String, filter: dev.dhun.innertube.SearchFilter) =
