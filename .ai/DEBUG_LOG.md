@@ -54,6 +54,38 @@ Added `HomeFeedPage` (sections + token), `homeFeedPage()` /
 and a near-bottom trigger + spinner in `HomeScreen`. Search already had
 load-more wiring and is unchanged.
 
+**Four CI rounds to compile the Android half — media3 1.5.1 API traps.**
+Worth recording because each one is a plausible-looking API that does not
+exist or behaves differently here:
+
+1. `httpFactory.setUserAgent(…)` inside the `ResolvingDataSource.Resolver`
+   compiles but does **nothing** — `ResolvingDataSource` builds its upstream
+   data source once, in its own constructor.
+2. `DefaultHttpDataSource.Builder()` — **does not exist** in 1.5.1
+   (`Unresolved reference 'Builder'`). It is `DefaultHttpDataSource.Factory`.
+3. `DefaultHttpDataSource.setUserAgent(…)` on an **instance** — does not
+   exist; only `Factory.setUserAgent(@Nullable String)` does. Verified
+   against the source at tag `1.5.1`.
+4. `override val uri` on a `DataSource` — *"'uri' overrides nothing"*. The
+   interface declares `@Nullable Uri getUri()`, so Kotlin wants
+   `override fun getUri()`.
+5. The member that kept producing the truncated *"does not implement
+   abstract members"* error: **`addTransferListener(TransferListener)` is
+   abstract**, not default. Only `getResponseHeaders()` has a default.
+
+GitHub annotations truncate multi-line compiler messages and
+`gh run view --log` returned nothing, so the interface was read directly
+via `api.github.com/repos/androidx/media/contents/...?ref=1.5.1`
+(`raw.githubusercontent.com` is blocked in this sandbox, `api.github.com`
+is not). **Lesson: when an "unimplemented member" error is truncated, fetch
+the interface instead of guessing — four CI rounds cost ~10 minutes each.**
+
+Final shape that compiles: the resolver publishes the agent into an
+`AtomicReference`; `UserAgentDataSource.open()` restamps the
+`DefaultHttpDataSource.Factory`, builds a fresh source for that one
+request, and implements `addTransferListener` / `getUri` /
+`getResponseHeaders` by delegation.
+
 **(2) is unresolved — no screenshots were provided**, so no restyle was
 attempted rather than guess at the wrong thing.
 
