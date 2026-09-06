@@ -6,6 +6,7 @@ import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.HistoryEntry
 import dev.dhun.core.HomeFeedPage
+import dev.dhun.core.HomeFeed
 import dev.dhun.core.HomeItem
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
@@ -22,6 +23,7 @@ import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.home.quickPickShelfAlreadyShown
+import dev.dhun.ui.home.remainingHomeSections
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -147,6 +149,8 @@ class HomePaginationTest {
         val second = page("b", null).sections.single().copy(title = "Quick picks")
         assertTrue(quickPickShelfAlreadyShown(first, first.tracks))
         assertFalse(quickPickShelfAlreadyShown(second, first.tracks))
+        val feed = HomeFeed("Hello", quickPicks = first.tracks, sections = listOf(first, second))
+        assertEquals(listOf(second), remainingHomeSections(feed), "the screen's category filter must not discard fresh Quick picks")
     }
 
     @Test

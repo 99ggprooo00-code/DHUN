@@ -196,6 +196,15 @@ one-window launch check is closed; tray/SMTC/shortcuts remain unverified.
 
 ### Branch repair candidate — arena/01a0759b-dhun (CI ONLY, NOT RELEASED)
 
+**First branch CI result:** [34025629231](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025629231),
+`f914050`, push event, **FAIL**. JDK setup and Python checks passed; shared
+Kotlin compilation failed with four `Unresolved reference 'index_'` errors
+in `HomeScreen.kt`. Kotlin tests did not execute; Android/probe/Desktop steps
+were skipped. Fix: delimit `${index}` in the shelf keys. Follow-up also wires
+the Quick-picks visibility predicate into the actual category projection and
+adds a regression, and upgrades CI checkout to its Node-24 v5 runtime after
+the run reported the v4 Node-20 warning. Rerun required; no release/PR.
+
 | Area | Source repair / regression coverage added |
 |---|---|
 | MSI identity | Replace constant 1.0.5 with `dhunInstallerVersion`; CI uses `(1 + run/256).(run%256).attempt`, bounded to MSI numeric limits; local default 1.0.6. Run 33/attempt 1 would be 1.33.1. Keep upgrade UUID `31ddb86b-9666-4071-b11c-45f16fa4682d` and `dhun-test.msi`; reject superseded-ref publishing; log installer version. A future stable packager must continue the internal sequence, not reset it to app semver |

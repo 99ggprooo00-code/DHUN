@@ -1,5 +1,22 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — First authorised branch CI reaches Kotlin; Home key interpolation fails
+
+Push `f914050` started CI **34025629231**. JDK setup and Python checks passed;
+`:shared:compileKotlinJvm` failed at HomeScreen lines 393/407/420/439 with
+`Unresolved reference 'index_'`. Kotlin reads `$index_` as one identifier;
+keys must use `${index}_`. Four occurrences corrected. Kotlin tests and the
+later Android/probe/Desktop steps were skipped, not passed.
+
+Review also found that `quickPickShelfAlreadyShown` had a test but was not
+used by the actual screen projection, whose category filter discarded all
+Quick picks. Wire `remainingHomeSections` into the screen and test that a
+later same-title shelf with new music survives. The run's Node-20 checkout
+warning is addressed with `actions/checkout@v5` (manifest verified node24).
+All changes remain branch-CI-only; main/test, installer and PR list unchanged.
+
+---
+
 ## 2026-09-06 — CI-only checkpoint explicitly approved
 
 After the local JDK/download blockers, the user approved the offered scope:

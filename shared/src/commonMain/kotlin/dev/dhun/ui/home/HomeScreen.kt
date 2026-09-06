@@ -186,13 +186,9 @@ private fun HomeFeedContent(
     val mixSections = classified.filter { it.second == HomeShelfKind.MIX }.map { it.first }
     val chartSections = classified.filter { it.second == HomeShelfKind.CHARTS }.map { it.first }
     val albumSections = classified.filter { it.second == HomeShelfKind.ALBUMS }.map { it.first }
-    val otherSections = classified
-        .filter {
-            it.second == HomeShelfKind.OTHER || it.second == HomeShelfKind.MOOD
-        }
-        .map { it.first }
-        // Drop pure "quick picks" shelf if already shown as grid
-        .filterNot { GetHomeFeedUseCase.classifySection(it.title) == HomeShelfKind.QUICK_PICKS }
+    val otherSections = remember(feed.sections, feed.quickPicks) {
+        remainingHomeSections(feed)
+    }
 
     // Mood filter: when a named mood chip matches a shelf title, pin that shelf first.
     val orderedOther = remember(selectedMood, otherSections) {
@@ -390,7 +386,7 @@ private fun HomeFeedContent(
 
         // ---- Rediscover / mixes -----------------------------------------------
         mixSections.forEachIndexed { index, section ->
-            item(key = "mix_$index_${section.title}") {
+            item(key = "mix_${index}_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -404,7 +400,7 @@ private fun HomeFeedContent(
 
         // ---- Charts & trending ------------------------------------------------
         chartSections.forEachIndexed { index, section ->
-            item(key = "chart_$index_${section.title}") {
+            item(key = "chart_${index}_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -417,7 +413,7 @@ private fun HomeFeedContent(
 
         // ---- Albums & EPs -----------------------------------------------------
         albumSections.forEachIndexed { index, section ->
-            item(key = "album_$index_${section.title}") {
+            item(key = "album_${index}_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -436,7 +432,7 @@ private fun HomeFeedContent(
             if (kind == HomeShelfKind.MIX || kind == HomeShelfKind.CHARTS || kind == HomeShelfKind.ALBUMS) {
                 return@forEachIndexed
             }
-            item(key = "other_$index_${section.title}") {
+            item(key = "other_${index}_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -652,4 +648,13 @@ internal fun quickPickShelfAlreadyShown(section: HomeSection, quickPicks: List<T
     if (!section.title.contains("quick picks", ignoreCase = true) || section.items.isEmpty()) return false
     val shown = quickPicks.map { it.id }.toSet()
     return section.items.all { it is HomeItem.TrackItem && it.track.id in shown }
+}
+
+/** Projection used by the screen: later Quick picks must survive the category filter too. */
+internal fun remainingHomeSections(feed: HomeFeed): List<HomeSection> = feed.sections.filter { section ->
+    when (GetHomeFeedUseCase.classifySection(section.title)) {
+        HomeShelfKind.OTHER, HomeShelfKind.MOOD, HomeShelfKind.QUICK_PICKS ->
+            !quickPickShelfAlreadyShown(section, feed.quickPicks)
+        else -> false
+    }
 }
