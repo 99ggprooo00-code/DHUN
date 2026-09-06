@@ -63,14 +63,11 @@ sharpness, splash/sheets/spacing polish.)
 **Last error:** none reported. (Sandbox has no JDK and no egress, so
 nothing compiled locally — the first compile verdict comes from PR CI.)
 
-**Exact next step:**
-1. Open PR from `arena/01a0740a-dhun` → wait CI green → merge to `main`
-   (rolling `test` artifacts rebuild).
-2. Human/hardware: install the new `dhun-test.apk` → play → force an
-   error (e.g. airplane-toggle mid-stream) → confirm auto-recovery /
-   Retry, sharp Now Playing art, clean splash, soft sheets. If streaming
-   still fails, capture the error dialog's message text — it now carries
-   the exact resolve chain.
+**Exact next step (human/hardware — PR #20 already merged):**
+install the new `dhun-test.apk` once the post-merge test-release
+rebuilds → play → force an error → confirm auto-recovery / Retry,
+sharp Now Playing art, clean splash, soft sheets. If streaming still
+fails, capture the error dialog's message text.
 
 **Marks (GitHub evidence only, 2026-09-06):** PR #20 MERGED ·
 branch CI pass (build-and-test 3m56s, run `34001522235`) · main CI pass
@@ -79,9 +76,6 @@ branch CI pass (build-and-test 3m56s, run `34001522235`) · main CI pass
 stream open · soaks open · v0.1.0 open · rot-drill live failing (cat.8
 CI-IP, unchanged) · Liquid Glass refused.
 
-**Exact next step (human/hardware):** install the new `dhun-test.apk`
-once the post-merge test-release rebuilds → play → force an error →
-confirm auto-recovery/Retry, sharp art, clean splash, soft sheets.
 
 ---
 
