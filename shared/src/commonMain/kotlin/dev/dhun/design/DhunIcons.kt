@@ -4,13 +4,14 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.compose.material3.LocalContentColor
 import kotlin.math.min
 
@@ -26,13 +27,13 @@ enum class DhunIcon(val pathData: String) {
     Search("M9.5 3C5.91 3 3 5.91 3 9.5C3 13.09 5.91 16 9.5 16C11.1 16 12.56 15.42 13.68 14.45L19.49 20.26L20.9 18.85L15.1 13.04C15.68 12.03 16 10.82 16 9.5C16 5.91 13.09 3 9.5 3ZM9.5 5C11.99 5 14 7.01 14 9.5C14 11.99 11.99 14 9.5 14C7.01 14 5 11.99 5 9.5C5 7.01 7.01 5 9.5 5Z"),
     LibraryMusic("M4 5h10v2H4V5z M4 9h10v2H4V9z M4 13h6v2H4v-2z M16 7v8.5c-.43-.31-.94-.5-1.5-.5C13.12 15 12 16.12 12 17.5S13.12 20 14.5 20s2.5-1.12 2.5-2.5V10h3V7h-4z"),
     Palette("M12 3C7.03 3 3 6.58 3 11s4.03 8 9 8c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.75-.39-1.02-.23-.27-.37-.63-.37-1.03 0-.8.65-1.45 1.45-1.45H16c2.76 0 5-2.24 5-5C21 6.58 16.97 3 12 3z M7.5 11C6.67 11 6 10.33 6 9.5S6.67 8 7.5 8 9 8.67 9 9.5 8.33 11 7.5 11z M11.5 8C10.67 8 10 7.33 10 6.5S10.67 5 11.5 5 13 5.67 13 6.5 12.33 8 11.5 8z M15.5 9C14.67 9 14 8.33 14 7.5S14.67 6 15.5 6 17 6.67 17 7.5 16.33 9 15.5 9z M17 13C16.17 13 15.5 12.33 15.5 11.5S16.17 10 17 10s1.5.67 1.5 1.5S17.83 13 17 13z"),
-    Shuffle("M4 5h2.5l11 11H20v2h-3.33L5.67 7H4V5z M16 5h1.5L20 7.5V5h2v6h-2V8.33L16 5z M4 17h1.67l3.5-3.5 1.42 1.42L6.5 19H4v-2z"),
+    Shuffle("M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"),
     SkipPrevious("M6 6h2v12H6V6z M18 6v12l-8.5-6L18 6z"),
     Pause("M6 4h4v16H6V4z M14 4h4v16h-4V4z"),
     Play("M8 5v14l11-7L8 5z"),
     SkipNext("M6 6l8.5 6L6 18V6z M16 6h2v12h-2V6z"),
-    Repeat("M17 1l4 4-4 4V6H7C5.34 6 4 7.34 4 9H2c0-2.76 2.24-5 5-5h10V1z M7 18h10c1.66 0 3-1.34 3-3h2c0 2.76-2.24 5-5 5H7v4l-4-4 4-4v2z"),
-    RepeatOne("M17 1l4 4-4 4V6H7C5.34 6 4 7.34 4 9H2c0-2.76 2.24-5 5-5h10V1z M7 18h10c1.66 0 3-1.34 3-3h2c0 2.76-2.24 5-5 5H7v4l-4-4 4-4v2z M13 11h-1v-1h2v6h-1v-5z"),
+    Repeat("M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"),
+    RepeatOne("M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"),
     VolumeUp("M3 9v6h4l5 5V4L7 9H3z M16.5 12C16.5 10.23 15.5 8.71 14 7.97v8.05c1.5-.73 2.5-2.25 2.5-4.02z M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"),
     Add("M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"),
     QueueMusic("M15 6H3v2h12V6z M15 10H3v2h12v-2z M3 14h8v2H3v-2z M17 6v8.5c-.43-.31-.94-.5-1.5-.5C14.12 14 13 15.12 13 16.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5V9h3V6h-4z"),
@@ -185,16 +186,19 @@ fun DhunIconView(
     } else {
         modifier.semantics { this.contentDescription = contentDescription }
     }
-    Canvas(modifier = accessibleModifier) {
-        val scale = min(size.width, size.height) / VIEWBOX_SIZE
-        withTransform({
-            translate(
-                left = (size.width - VIEWBOX_SIZE * scale) / 2f,
-                top = (size.height - VIEWBOX_SIZE * scale) / 2f,
-            )
-            scale(scale, scale)
-        }) {
-            drawPath(path = path, color = tint, style = Fill)
-        }
+    Canvas(modifier = accessibleModifier) { drawDhunIcon(path, tint) }
+}
+
+/** SVG coordinates start at (0, 0); DrawTransform.scale otherwise pivots at the canvas centre. */
+internal fun DrawScope.drawDhunIcon(path: Path, tint: Color) {
+    val factor = min(size.width, size.height) / VIEWBOX_SIZE
+    withTransform({
+        translate(
+            left = (size.width - VIEWBOX_SIZE * factor) / 2f,
+            top = (size.height - VIEWBOX_SIZE * factor) / 2f,
+        )
+        scale(factor, factor, pivot = Offset.Zero)
+    }) {
+        drawPath(path = path, color = tint, style = Fill)
     }
 }

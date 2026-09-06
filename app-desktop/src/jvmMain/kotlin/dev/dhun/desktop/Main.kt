@@ -191,7 +191,8 @@ fun main() {
         logStartupFailure(ex)
     }
     logStartup(
-        "DHUN main starting — java=${System.getProperty("java.version")} runtime=${System.getProperty("java.runtime.version")} " +
+        "DHUN main starting — installer=${System.getProperty("dhun.installer.version", "development")} " +
+            "java=${System.getProperty("java.version")} runtime=${System.getProperty("java.runtime.version")} " +
             "os=${System.getProperty("os.name")} jpackage.app-path=${System.getProperty("jpackage.app-path")}",
     )
     // Early module probes — if the bundled jlink image is missing java.sql,

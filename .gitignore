@@ -33,3 +33,6 @@ Thumbs.db
 
 # Test artifacts
 /tests/fixtures/tmp/
+
+# Python release-helper tests
+__pycache__/

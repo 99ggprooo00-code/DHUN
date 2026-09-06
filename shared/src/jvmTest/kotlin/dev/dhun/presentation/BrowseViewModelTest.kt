@@ -77,9 +77,9 @@ class BrowseViewModelTest {
     }
 
     private class FakeBrowseProvider(
-        var artist: DhunResult<ArtistPage> = DhunResult.Failure(DhunError.Network),
-        var album: DhunResult<AlbumDetail> = DhunResult.Failure(DhunError.Network),
-        var playlist: DhunResult<PlaylistDetail> = DhunResult.Failure(DhunError.Network),
+        var artist: DhunResult<ArtistPage> = DhunResult.Failure(DhunError.Network()),
+        var album: DhunResult<AlbumDetail> = DhunResult.Failure(DhunError.Network()),
+        var playlist: DhunResult<PlaylistDetail> = DhunResult.Failure(DhunError.Network()),
         var radio: List<Track> = emptyList(),
     ) : MusicProvider {
         override suspend fun search(query: String, filter: SearchFilter) = DhunResult.Success(SearchResults(query))
@@ -91,7 +91,7 @@ class BrowseViewModelTest {
         override suspend fun homeFeedContinuation(continuationToken: String) =
             DhunResult.Success(dev.dhun.core.HomeFeedPage())
         override suspend fun relatedTracks(videoId: String) = DhunResult.Success(radio)
-        override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> = DhunResult.Failure(DhunError.Unavailable)
+        override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> = DhunResult.Failure(DhunError.Unavailable())
         override suspend fun getLyrics(videoId: String) = DhunResult.Success(Lyrics.NotAvailable)
         override suspend fun artistPage(browseId: String) = artist
         override suspend fun albumPage(browseId: String) = album

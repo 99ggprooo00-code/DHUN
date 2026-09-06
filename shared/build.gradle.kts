@@ -43,6 +43,12 @@ kotlin {
         androidMain.dependencies {
             api("app.cash.sqldelight:android-driver:2.1.0")
         }
+        jvmTest.dependencies {
+            implementation("io.ktor:ktor-client-mock:3.1.3")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            // Headless icon raster regressions need the matching Skiko runtime.
+            implementation(compose.desktop.currentOs)
+        }
         jvmMain.dependencies {
             implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
             api("app.cash.sqldelight:sqlite-driver:2.1.0")

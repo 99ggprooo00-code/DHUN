@@ -2,6 +2,7 @@ package dev.dhun.extraction
 
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunException
+import dev.dhun.core.detailString
 import dev.dhun.core.getOrNull
 import dev.dhun.core.DhunResult
 import dev.dhun.core.StreamInfo
@@ -167,6 +168,39 @@ class OwnClientStreamResolverTest {
         )
         assertTrue(aggregated is DhunError.Parse)
         assertTrue((aggregated as DhunError.Parse).detail!!.contains("visionos"))
+    }
+
+    @Test
+    fun unavailableDoesNotDiscardTheReasonOrOtherClients() {
+        val error = aggregateResolveFailures(linkedMapOf(
+            "web_embedded" to DhunError.Unavailable("Embedding disabled"),
+            "visionos" to DhunError.Unavailable("Unsupported client"),
+        ))
+        assertTrue(error is DhunError.Unavailable)
+        assertTrue(error.detailString().orEmpty().contains("web_embedded=UNAVAILABLE(Embedding disabled)"))
+        assertTrue(error.detailString().orEmpty().contains("visionos=UNAVAILABLE(Unsupported client)"))
+    }
+
+    @Test
+    fun authAndRateLimitAreNotMaskedByTheFirstUnavailableClient() {
+        val errors = linkedMapOf<String, DhunError>(
+            "web_embedded" to DhunError.Unavailable("Embedding disabled"),
+            "visionos" to DhunError.AuthRequired("Sign in to confirm"),
+        )
+        assertTrue(aggregateResolveFailures(errors) is DhunError.AuthRequired)
+        errors["tv"] = DhunError.RateLimited(retryAfterSeconds = 31)
+        val rateLimit = aggregateResolveFailures(errors) as DhunError.RateLimited
+        assertEquals(31, rateLimit.retryAfterSeconds)
+        assertTrue(rateLimit.detailString().orEmpty().contains("web_embedded"))
+        assertTrue(rateLimit.detailString().orEmpty().contains("tv=RATE_LIMITED"))
+    }
+
+    @Test
+    fun longReasonsCannotHideTheLastIdentity() {
+        val errors = (1..7).associate { "client$it" to DhunError.Unavailable("x".repeat(1_000)) }
+        val detail = aggregateResolveFailures(errors).detailString().orEmpty()
+        for (i in 1..7) assertTrue(detail.contains("client$i=UNAVAILABLE"))
+        assertTrue(detail.length < 1_800)
     }
 
     @Test

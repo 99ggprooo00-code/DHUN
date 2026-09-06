@@ -79,13 +79,13 @@ class LrcLibSource(
         } catch (e: Exception) {
             // Network/timeout → map to typed error but the repository will
             // still fall through to NotAvailable (lyrics are non-fatal)
-            DhunResult.Failure(DhunError.Network)
+            DhunResult.Failure(DhunError.Network())
         }
     }
 
     private fun mapHttpError(code: Int): DhunError = when (code) {
         429 -> DhunError.RateLimited()
-        in 500..599 -> DhunError.Network
+        in 500..599 -> DhunError.Network()
         else -> DhunError.Unknown("LRCLIB HTTP $code")
     }
 

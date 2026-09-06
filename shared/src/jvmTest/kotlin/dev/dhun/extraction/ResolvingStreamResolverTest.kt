@@ -3,6 +3,7 @@ package dev.dhun.extraction
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.StreamInfo
+import dev.dhun.core.detailString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -103,8 +104,37 @@ class ResolvingStreamResolverTest {
     }
 
     @Test
+    fun doubleFailureKeepsTheDesktopFallbackDiagnostic() = kotlinx.coroutines.runBlocking {
+        val primary = FakeResolver("own-client") { fail(DhunError.Unavailable("web_embedded=UNAVAILABLE(embedding disabled)")) }
+        val fallback = FakeResolver("yt-dlp") { fail(DhunError.Unknown("Install yt-dlp and restart DHUN")) }
+        val error = (ResolvingStreamResolver(primary, fallback).resolve("vid") as DhunResult.Failure).error
+        assertTrue(error is DhunError.Unavailable)
+        assertTrue(error.detailString().orEmpty().contains("web_embedded"))
+        assertTrue(error.detailString().orEmpty().contains("yt-dlp: Install yt-dlp"))
+    }
+
+    @Test
+    fun rateLimitedPrimaryDoesNotStartFallback() = kotlinx.coroutines.runBlocking {
+        val primary = FakeResolver("primary") { fail(DhunError.RateLimited(20)) }
+        val fallback = FakeResolver("fallback") { ok("v2") }
+        val error = (ResolvingStreamResolver(primary, fallback).resolve("vid") as DhunResult.Failure).error
+        assertEquals(0, fallback.calls)
+        assertEquals(20, (error as DhunError.RateLimited).retryAfterSeconds)
+    }
+
+    @Test
+    fun fallbackTimeoutStillNamesTheCompletedPrimaryFailure() = kotlinx.coroutines.runBlocking {
+        val primary = FakeResolver("primary") { fail(DhunError.Unavailable("embedding disabled")) }
+        val fallback = SlowResolver("yt-dlp", 5_000, ok("late"))
+        val error = (ResolvingStreamResolver(primary, fallback, budgetMs = 100).resolve("vid") as DhunResult.Failure).error
+        assertTrue(error.detailString().orEmpty().contains("yt-dlp"))
+        assertTrue(error.detailString().orEmpty().contains("embedding disabled"))
+        assertFalse(fallback.completed)
+    }
+
+    @Test
     fun noFallbackReturnsPrimaryError() = kotlinx.coroutines.runBlocking {
-        val primary = FakeResolver("primary") { fail(DhunError.Network) }
+        val primary = FakeResolver("primary") { fail(DhunError.Network()) }
         val r = ResolvingStreamResolver(primary, null).resolve("vid")
         assertTrue((r as DhunResult.Failure).error is DhunError.Network)
     }

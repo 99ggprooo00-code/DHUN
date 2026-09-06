@@ -1,61 +1,76 @@
 name: test-release
 
-# ONE rolling test release, by policy (user decision 2026-09-01):
-#  - a single release tagged `test`, assets ALWAYS named dhun-test.apk
-#    and dhun-test.msi
-#  - every push to main REPLACES it (old release, tag and assets deleted)
-#  - no version numbers, no release history for unfinished builds
-# The stable download URLs never change:
-#   https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk
-#   https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.msi
-#
-# Phase 12 (2026-09-05): Windows MSI added. `:app-desktop:packageMsi` runs
-# jpackage on a windows-latest runner (JDK 17 ships the WiX toolset). The
-# MSI needs a VLC install at runtime (vlcj dynamic link — see THIRD_PARTY).
-
+# One rolling `test` pre-release on main. Manual branch builds reuse this
+# SAME workflow's run-number sequence, so their MSI versions cannot leap
+# ahead of a separate publishing workflow's counter and block later upgrades.
+# PR builds and manual branch runs are artifact-only; non-main refs can NEVER publish.
 on:
   workflow_dispatch:
+    inputs:
+      build_only:
+        description: Build downloadable artifacts without updating the test release
+        type: boolean
+        required: true
+        default: true
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
 
+# Building needs no repository-write token. Only the guarded publish job
+# below can request contents:write.
 permissions:
-  contents: write
+  contents: read
+
+env:
+  BUILD_ONLY: ${{ (github.event_name == 'workflow_dispatch' && inputs.build_only) || github.ref != 'refs/heads/main' }}
 
 concurrency:
-  group: test-release
+  # Preserve main's existing group; a branch build must not cancel a release.
+  group: ${{ github.ref == 'refs/heads/main' && 'test-release' || format('test-build-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
   apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
 
       - name: Build debug APK
         run: ./gradlew :app-android:assembleDebug --no-daemon
 
-      - name: Stage + checksum
+      - name: Stage APK and revision-bound checksum
         run: |
-          cp app-android/build/outputs/apk/debug/app-android-debug.apk dhun-test.apk
-          sha256sum dhun-test.apk > dhun-test.apk.sha256
+          mkdir -p out
+          cp app-android/build/outputs/apk/debug/app-android-debug.apk out/dhun-test.apk
+          python scripts/stage_artifact.py out/dhun-test.apk --build-only "$BUILD_ONLY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: apk
+          if-no-files-found: error
+          retention-days: 14
           path: |
-            dhun-test.apk
-            dhun-test.apk.sha256
+            out/dhun-test.apk
+            out/dhun-test.apk.sha256
+            out/dhun-test.apk.build-info.json
 
   msi:
     runs-on: windows-latest
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v5
         with:
@@ -63,52 +78,79 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      # packageMsi = Compose Desktop 1.8.2 task (NOT createMsi — that name
-      # doesn't exist in this plugin version; CI 33950291501 proved it).
-      # jpackage creates the MSI; output lands in
-      # app-desktop/build/compose/binaries/mainMsi/<name>.msi
-      - name: Build MSI (jpackage)
-        run: ./gradlew :app-desktop:packageMsi --no-daemon
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
 
-      # Recurse the whole compose build tree (run 33951385012: the MSI was
-      # NOT where the old hardcoded path expected — and job logs were
-      # unreadable from the agent, so the step now self-diagnoses by
-      # dumping the tree it searched).
-      - name: Stage + checksum
+      # jpackage uses the WiX tools available on the Windows runner.
+      # Public filename remains dhun-test.msi; ProductVersion advances.
+      - name: Build MSI (jpackage)
+        id: msi_build
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $tree = "app-desktop/build/compose"
-          $msi = $null
-          if (Test-Path $tree) {
-            $msi = Get-ChildItem -Path $tree -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
-          }
-          if (-not $msi) {
-            Write-Host "::error file=.github/workflows/test-release.yml,title=MSI staging::No .msi under app-desktop/build/compose (tree follows)"
-            if (Test-Path "app-desktop/build") {
-              Get-ChildItem -Path "app-desktop/build" -Recurse -ErrorAction SilentlyContinue |
-                Select-Object -First 300 | ForEach-Object { Write-Host $_.FullName }
-            }
-            throw "No .msi found under $tree (tree dumped above)"
-          }
-          Write-Host ("Found MSI: " + $msi.FullName)
-          New-Item -ItemType Directory -Force -Path out | Out-Null
-          Copy-Item $msi.FullName out/dhun-test.msi
-          $hash = (Get-FileHash out/dhun-test.msi -Algorithm SHA256).Hash.ToLower()
-          Set-Content -Path out/dhun-test.msi.sha256 -Value "$hash  dhun-test.msi" -Encoding ascii
+          $version = python scripts/installer_version.py $env:GITHUB_RUN_NUMBER $env:GITHUB_RUN_ATTEMPT
+          if ($LASTEXITCODE -ne 0) { throw "Could not allocate MSI ProductVersion" }
+          "installer_version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "MSI ProductVersion: $version"
+          ./gradlew :app-desktop:packageMsi "-PdhunInstallerVersion=$version" --no-daemon
 
-      - uses: actions/upload-artifact@v4
+      - name: Verify MSI identity and stage checksum
+        shell: pwsh
+        env:
+          INSTALLER_VERSION: ${{ steps.msi_build.outputs.installer_version }}
+        run: |
+          try {
+            ./scripts/stage_msi.ps1 -ExpectedVersion $env:INSTALLER_VERSION -BuildOnly $env:BUILD_ONLY
+          } catch {
+            $message = $_.ToString().Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Host "::error file=scripts/stage_msi.ps1,title=MSI staging::$message"
+            exit 1
+          }
+
+      - name: Check install-over and userdata on disposable Windows
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          try {
+            ./scripts/check_msi_upgrade.ps1 -Candidate out/dhun-test.msi
+          } catch {
+            $message = $_.ToString().Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Host "::error file=scripts/check_msi_upgrade.ps1,title=MSI install-over::$message"
+            exit 1
+          }
+
+      - name: Preserve installer-check diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: msi-install-check
+          if-no-files-found: ignore
+          retention-days: 14
+          path: out/installer-check/
+
+      - uses: actions/upload-artifact@v6
         with:
           name: msi
+          if-no-files-found: error
+          retention-days: 14
           path: |
             out/dhun-test.msi
             out/dhun-test.msi.sha256
+            out/dhun-test.msi.build-info.json
+            out/READ-ME-FIRST.md
 
   publish:
+    # This is a hard job-level boundary, not merely a shell early-return.
+    # A manual branch build gets artifacts only, even if build_only=false.
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_only == false)) }}
     needs: [apk, msi]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/download-artifact@v4
         with:
@@ -124,12 +166,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # one-time cleanup: remove the historical dev-v* releases and tags
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$latest" != "$GITHUB_SHA" ]; then
+            echo "::error::Refusing to publish a superseded main commit ($GITHUB_SHA; current $latest)"
+            exit 1
+          fi
           gh release delete dev-v0.1.0 --yes --cleanup-tag || true
           gh release delete dev-v0.1.1 --yes --cleanup-tag || true
           gh release delete dev --yes --cleanup-tag || true
           git push origin :refs/tags/dev || true
-          # rolling slot: always exactly one
           gh release delete test --yes --cleanup-tag || true
           git push origin :refs/tags/test || true
 
@@ -138,6 +183,7 @@ jobs:
           gh release create test \
             dhun-test.apk dhun-test.apk.sha256 \
             dhun-test.msi dhun-test.msi.sha256 \
+            --target "$GITHUB_SHA" \
             --title "DHUN test build (auto-replaced on every update)" \
             --notes "Rolling UNVERIFIED development build of main. dhun-test.apk = Android, dhun-test.msi = Windows (playback needs a VLC install). Nothing here is stable, signed for stores, or recommended for daily-driver devices. Install only where that is acceptable. Current open checks: docs/verification/03-android-skeleton.md, docs/verification/12-desktop-native.md" \
             --prerelease

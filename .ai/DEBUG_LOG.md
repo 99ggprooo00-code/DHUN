@@ -1,5 +1,319 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — MSI data-safety correction passes real Windows checks
+
+PR #30 at `b6d47bd`: code CI 34030730736 and branch CI 34030728903 PASS.
+Packaging run **34030730743** PASS, MSI 1.34.1, 112,091,136 B,
+SHA256 `1a4d2fe5c9b0c8949995cbd62e5e01675a9fb8081d71eb3da74b5a834dde021c`.
+Check annotations confirm **1.0.5 → 1.34.1** preserves both userdata/cache
+sentinels, explicit UPGRADINGPRODUCTCODE removal preserves both, and
+reinstall/ordinary uninstall removes test userdata. MSI artifact 9988585984;
+diagnostic artifact 9988584693. PR publishing skipped. The failed unsafe
+1.33.1 MSI was never exposed as a downloadable candidate or merged.
+
+The fix applies only to unsigned packages before hashing/signing and uses
+DHUN-owned MSI operations; no OpenJDK template was copied. Legacy preparation
+only changes matching DHUN HKCU cleanup values, never moves/deletes userdata;
+future versions use the session-property guard. A later cancelled legacy
+transaction can require retry to restore normal cleanup. Native passing
+sentinels do not prove app launch, user library integrity, audio, visuals,
+SMTC/tray or soaks. PR can proceed to merge after final evidence checks;
+no stable v0.1.0 is earned.
+
+---
+
+## 2026-09-06 — Real MSI upgrade deletes userdata; PR held before merge
+
+PR #30 run **34029598179** built MSI **1.33.1**, 112,075,216 B,
+SHA256 `57aaf0a53cf17319dc832398adbb4ab485e9e29f86dbf9633ca540c5eb5af576`,
+UpgradeCode `31ddb86b-9666-4071-b11c-45f16fa4682d`. The install-over test then
+failed **“In-place MSI upgrade removed/changed existing userdata.”** The MSI
+artifact was not uploaded; publishing skipped. APK built; code CI 34029598196
+passed. The PR must not merge on compilation alone.
+
+Source review of OpenJDK jpackage's `WixAppImageFragmentBuilder` and
+`resources/main.wxs` confirms a version-specific `HKCU\Software\DHUN\DHUN\<version>`
+recursive-cleaner registration and early RemoveExistingProducts. The old MSI
+removes the whole install tree, including userdata, during an upgrade.
+
+Correction under native test: finalize the unsigned MSI with an upgrade-only
+cleaner-property guard, preserving normal explicit-uninstall cleanup. An
+upgrade-only built-in PowerShell action suppresses only matching legacy
+DHUN HKCU cleanup values before old-product removal; already-safe packages
+carry a marker and use the session-property guard instead. It never moves
+or deletes userdata, uses no execution-policy bypass, and aborts preparation
+on unexpected registrations. RemoveExistingProducts is placed in the supported
+post-InstallValidate/pre-InstallInitialize slot so directory properties exist.
+The bridge restores its edits if preparation itself fails; a later cancelled
+legacy upgrade can leave the old cleanup registration suppressed (data-safe,
+but cleanup may need a successful retry). Backups remain recommended.
+
+The native smoke now also uninstalls the candidate with UPGRADINGPRODUCTCODE
+set, verifies both sentinels survive, reinstalls, then explicitly uninstalls
+and requires userdata removal. This does not test playback or GUI. No source
+from OpenJDK was copied; these are DHUN-owned MSI table/PowerShell operations.
+All native outcomes are still pending; Python helper tests: 21 pass.
+
+---
+
+## 2026-09-06 — User authorises PR/merge; require native package checks before merge
+
+Latest instruction: “Ok complete this work then PR and merge.” The current
+branch is clean and CI-green through `455743b`, but the native packaging
+script has only been parsed so far. Add packaging/install-over as ordinary
+pull_request checks on the existing workflow, using the same MSI version
+counter and a publish guard that rejects PR refs. No manual dispatch retry,
+credential change, extra working branch or stable release is involved.
+The PR will be merged only after real checks; user playback/visual/soak
+acceptance still cannot be inferred from CI.
+
+---
+
+## 2026-09-06 — Packaging helpers CI-green; dispatch still requires owner action
+
+[CI 34028225356](https://github.com/99ggprooo00-code/DHUN/actions/runs/34028225356) on `77f9c96` **PASSED**;
+job 101472922356 completed 10:46:45Z. GitHub APIs confirm Python helper
+tests, PowerShell AST parsing, shared JVM tests, Android debug build and
+probe/Desktop compilation passed, with no check annotations. Earlier
+CI 34028039448 at `9317050` passed too. There is still **no packaging run**
+on this branch after the 403 dispatch denial, hence no MSI/package/sentinel
+result or new downloadable Windows artifact. Main/test remain `0920148`,
+public release timestamp 07:22:29Z, PR list empty.
+
+Owner action is now the minimal unblock: reconnect GitHub in Arena, or use
+GitHub Actions → test-release → Run workflow, choose the existing session
+branch (not main), leave build-only on. No credential should be shared in
+chat. Do not call PR/merge/finalization actions or bypass the denied dispatch.
+
+---
+
+## 2026-09-06 — Manual packaging dispatch denied by integration permissions
+
+Build-only automation was pushed at `9317050` (implementation `6fedf8a`).
+Automatic branch CI 34028039448 started normally. Manual dispatch did not:
+
+- `gh workflow run ... --json` rejected boolean-valued JSON locally; this
+  installed gh version expects strings. No event was sent by that attempt.
+- Retrying with the supported `-f build_only=true` on the same session ref
+  reached GitHub and returned **HTTP 403: Resource not accessible by
+  integration** for the workflow dispatch endpoint. No packaging run exists
+  on the branch, confirmed via the runs API. No MSI artifact was produced.
+
+This is a GitHub integration permission boundary, not a Kotlin/JDK failure.
+Do not work around the denial with a different credential/trigger. Ask for
+GitHub reconnection in Arena, or have the owner use GitHub Actions →
+`test-release` → Run workflow → **arena/01a0759b-dhun** → build-only. Selecting
+main would use the old published workflow, so the ref matters. The new
+branch's publish guard prevents release changes regardless of build-only's
+value. Add a PowerShell AST syntax check to normal CI while dispatch is
+blocked; parsing scripts is not native MSI execution. No PR/merge/release or
+session-finalizing action occurred.
+
+---
+
+## 2026-09-06 — Safe branch packaging route prepared; no PR/session finalization
+
+The user clarified that normal work should continue without the one-time
+Arena session-ending action. Reuse `test-release.yml` with a default-on
+`build_only` input. Its job-level guard disallows publishing from non-main
+refs regardless of the input, build tokens are contents:read, and branch
+concurrency cannot cancel main's existing release group. Reuse of the SAME
+workflow counter is deliberate: using the general CI run number for a
+candidate MSI could make a later release MSI a numeric downgrade.
+
+Added revision-bound binary manifests/checksums, read-only Windows Installer
+COM property validation, and a disposable-runner-only install-over sentinel
+check before making the MSI artifact downloadable. The script does not
+launch DHUN or claim audio/visual acceptance. PowerShell/packaging execution
+is still pending. Local Python regressions: **19 PASS**; JSON fixtures: **29
+syntax-valid**. No new release, tag, PR, branch or repository setting changed.
+
+Node runtimes were checked from the upstream action manifests: checkout v5,
+setup-python v6 and upload-artifact v6 use Node 24. The guarded, unexecuted
+publish job's existing download-artifact v4 is unchanged.
+
+---
+
+## 2026-09-06 — Corrected branch CI GREEN; release deliberately unchanged
+
+**Verified:** [CI 34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972) on
+`75c4a8b9e6b3a030d24a360b0cb98923a4de5a0f` succeeded; job 101466441642
+completed **09:57:34Z**, duration **6m13s**. GitHub run/job/check APIs confirm
+Python checks, shared JVM tests, Android debug build and probe/Desktop
+compilation all passed. Check annotations: **0** (not a full log-warning audit).
+The `$index_` compiler errors are resolved and the Quick-picks predicate is
+now connected to the actual screen projection rather than only a test.
+
+This removes the Kotlin/build-verification blocker through the user-approved
+CI path, despite the local sandbox still lacking a JDK. It does NOT prove
+YouTube playback, Windows installer upgrade/data preservation, live Home
+scrolling, visual/native acceptance or soaks. No test-release/rot-drill dispatch,
+PR, merge, tag or release was performed. Main/test remain `0920148` and the
+published installer remains the 07:22:29Z build. This evidence is followed by
+a same-branch documentation-only push; application/test inputs stay unchanged.
+
+---
+
+## 2026-09-06 — First authorised branch CI reaches Kotlin; Home key interpolation fails
+
+Push `f914050` started CI **34025629231**. JDK setup and Python checks passed;
+`:shared:compileKotlinJvm` failed at HomeScreen lines 393/407/420/439 with
+`Unresolved reference 'index_'`. Kotlin reads `$index_` as one identifier;
+keys must use `${index}_`. Four occurrences corrected. Kotlin tests and the
+later Android/probe/Desktop steps were skipped, not passed.
+
+Review also found that `quickPickShelfAlreadyShown` had a test but was not
+used by the actual screen projection, whose category filter discarded all
+Quick picks. Wire `remainingHomeSections` into the screen and test that a
+later same-title shelf with new music survives. The run's Node-20 checkout
+warning is addressed with `actions/checkout@v5` (manifest verified node24).
+All changes remain branch-CI-only; main/test, installer and PR list unchanged.
+
+---
+
+## 2026-09-06 — CI-only checkpoint explicitly approved
+
+After the local JDK/download blockers, the user approved the offered scope:
+**commit/push only to `arena/01a0759b-dhun`, run CI and fix failures; no PR,
+merge or release**. This supersedes the earlier keep-local restriction for
+branch verification only. No workflow dispatch of test-release or rot-drill
+is included. The published `test@0920148` / 07:22:29Z build is unchanged.
+
+Pre-push GitHub audit: main unchanged, no open PRs, no remote session branch;
+previous baseline CI 34018809911 is green but does not cover the repairs.
+Ten local Python helper tests, 29 JSON fixture syntax checks and diff checks
+pass. Candidate Kotlin/Android/Desktop checks are pending. Record real run
+IDs and failures below when available; do not close hardware acceptance.
+
+---
+
+## 2026-09-06 — Local continuation: target ownership, gesture cancellation, subprocess deadline
+
+The user asked to continue from the saved state. The earlier **Keep everything
+local** decision remains in force; no commit, push, PR or publication occurred.
+
+**Additional source defects corrected locally:**
+
+- `HomeFeedParser` initially flattened all append/reload actions. A horizontal
+  shelf command could therefore supply the vertical feed's next cursor even
+  after fixing recursive token lookup. A full initial page could also be
+  overridden by an unrelated action. Prefer the actual section list, group
+  incremental updates only by matching non-null target IDs, select an
+  unambiguous Home group, and reject ambiguous targets instead of guessing.
+  Split shelf/cursor commands for the same named target are supported.
+- Replaced interpolated Home test JSON with **17 synthetic fixture files**
+  consumed by `HomeFeedParserTest`, covering mixed/anonymous/ambiguous targets,
+  append/reload aliases, split commands, empty advancing pages and exhaustion.
+  `scripts/validate_fixtures.py` strictly checks the actual files (duplicate
+  keys and non-JSON numeric constants are errors). This does not run Kotlin.
+- Previous/Next treated `waitForUpOrCancellation()` returning null as a
+  successful release and could skip on a cancelled press. Hold cleanup was
+  also skipped if the pointer coroutine was disposed/cancelled after starting
+  seek. `TransportPress` distinguishes release/cancel/deadline, captures a
+  matching callback set per press, and gets idempotent cleanup in `finally`.
+  Seek-bar handlers now refresh when duration/callback changes; changing
+  tracks recreates the scrub state, including equal-duration tracks.
+- yt-dlp's process-exit wait alone did not bound awaiting pipe EOF. Its own
+  timeout now wraps exit **and output drain**; inner/outer cleanup share one
+  disposal. Process start denial is typed. HTTP 429 classification no longer
+  mistakes a video ID containing `429` for a rate limit. New Kotlin cases cover
+  an exited child with still-open output, cleanup count, start denial and
+  classification. The extractor identity chain remains sequential/unchanged.
+
+**Verification actually run:** ten Python tests PASS (5 installer + 5 fixture
+validator); all **29 JSON fixture files** pass strict syntax validation;
+`git diff --check` passes. Kotlin tests remain **UNRUN**: Gradle again stops
+with `JAVA_HOME is not set and no 'java' command could be found in your PATH.`
+The official Temurin 17.0.20.1+1 Linux JDK asset was identified through GitHub,
+but its download failed with EOF at `release-assets.githubusercontent.com`;
+no binary/checksum/install succeeded. Direct Gradle, Maven, Android SDK and
+Debian endpoints also failed. Do not retry these routes indefinitely or use
+unauthorised CI publication to evade the local-only decision.
+
+No new app build, live extraction, audible playback, Windows upgrade, UI
+acceptance or soak evidence exists for these local changes. See ROADMAP for
+exact next validation tasks and the still-open gates.
+
+---
+
+## 2026-09-06 — Fresh Windows failures; local repair batch (arena/01a0759b-dhun)
+
+**Evidence, not a success claim:** after the 07:22:29Z `test@0920148`
+recommendation, the user reports install-over blocked by **“Another version
+of this product is already installed…”**. Manual uninstall/reinstall opens
+**one window**, so do not redo ADR-004. Audio still fails with the generic
+unavailable banner; Home still does not page; glyph placement, shuffle shape
+and transport colours remain wrong despite somewhat better styling.
+Screenshot/report: **Ko Cha Ra (Official Audio) — John Rai, 0:00 / 4:49**,
+no useful error detail. Original image was not copied into the repository;
+no verified checksum, track ID, Windows/VLC/tool versions or sanitized current
+logs were supplied. This is user-facing failure, not evidence of CI-only gating.
+
+**Source defects and LOCAL corrections:**
+
+1. `app-desktop/build.gradle.kts` rebuilt every MSI as **1.0.5**. Add an
+   explicit internal version property; the rolling workflow supplies a
+   numeric run/attempt sequence from `scripts/installer_version.py`, keeping
+   the stable upgrade UUID/public asset. Fresh reruns advance too; an old-ref
+   publishing guard prevents replacing the slot with a superseded build.
+   Startup logs record the version. Actual in-place upgrade/data preservation
+   is still untested; future stable packaging must not reset the sequence.
+2. Desktop `YtDlpStreamResolver` invoked Unix **`which`**, then assumed
+   `python3`. The standalone `yt-dlp.exe` can be installed on Windows yet
+   missed. New locator handles Windows Path casing, quoted paths, executable
+   override, real Python/`py` fallback and Store-alias avoidance. Tool absence
+   is explicit evidence, not Network. The user's installation state remains
+   unknown; this defect alone does not explain every rejected player request.
+3. The process waited before draining either pipe and was not cancellation
+   safe. Move the resolver to its own JVM file, drain both pipes concurrently
+   with bounded retained output, interrupt `waitFor`, dispose process/children
+   before joining readers and also on early cancellation. This is pipe I/O
+   concurrency, **not** parallel InnerTube identities. `--ignore-config`
+   preserves the anonymous/no-cookie contract.
+4. UNPLAYABLE/ERROR reasons disappeared into a detail-less Unavailable,
+   aggregation dropped those details, and double failure discarded the
+   fallback. Preserve status/reason/subreason, bounded per-identity and both
+   engine outcomes (including missing dependency), sanitized URL-free text;
+   429 keeps retry semantics. Timeout identifies the active engine and any
+   completed primary failure. Full and docked players share a complete,
+   scrollable/selectable Details dialog instead of ellipsis or a giant banner.
+5. Home chose the first continuation recursively (often a horizontal shelf's
+   token), deduplicated by title, and stopped even if a duplicate/empty page
+   supplied a new token. Add a scoped Home parser plus action/command response
+   handling, content-aware deduplication, advancing-token following with a
+   three-no-growth-page pause, token-cycle checks, visible retry/end UI and
+   indexed shelf keys. Later Quick picks with new IDs must remain visible.
+   VM generation/feed/flags now update atomically; old completion cannot
+   overwrite refresh even on Desktop's Default dispatcher. Failed pages are
+   not retried by every recomposition. Home's original fixture has no token,
+   so the new parser cases are explicitly **synthetic**, not live evidence.
+6. The first metadata context could contain a fallback version while the
+   header used the newly discovered version. Normalise the request body to
+   the same value; MockEngine regression covers first Home and continuation.
+7. SVG scaling pivoted around the canvas centre instead of coordinate origin,
+   shifting/clipping non-24px glyphs (including display scaling). Fix the
+   actual draw helper and use canonical Material shuffle/repeat/repeat-one
+   paths; record upstream SHA/license in THIRD_PARTY. Fit player artwork to
+   width **and height**, centre bounded transport/volume and use consistent
+   inactive colours/sizes and active toggle treatment. No separate window
+   was reintroduced. Raster/layout regressions are written, not executed.
+
+**Validation/publication boundary:** five Python version regressions PASS;
+`git diff --check` PASS; literal request-fixture JSON syntax checked.
+`./gradlew :shared:jvmTest :app-desktop:compileKotlinJvm --no-daemon` stops
+before Gradle with **`JAVA_HOME is not set and no 'java' command could be
+found in your PATH.`** No checked JDK/cache exists; Maven/Gradle/Adoptium
+requests failed with `SSL_ERROR_SYSCALL`. No Kotlin compile/test, Windows
+installer, current live playback or UI result was produced for this batch.
+No commit/push/PR has been made. When asked about making this the next
+checkpoint, the user explicitly selected **Keep everything local**: do not
+commit, push, open a PR or publish now. The prior green GitHub runs are only
+the baseline; wait for a later authorised checkpoint or an available local
+build environment. ADR-003 is still proposed; seven identities remain sequential.
+See verification/12 and /14 and ROADMAP for exact next actions/open gates.
+
+---
+
 ## 2026-09-06 — UI restyle: the "terrible UI" was one bad colour function (session arena/01a07563-dhun)
 
 **Trigger:** the user supplied 18 screenshots (APK under MEmu, MSI on

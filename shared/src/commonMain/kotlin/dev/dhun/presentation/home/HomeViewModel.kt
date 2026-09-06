@@ -1,6 +1,7 @@
 package dev.dhun.presentation.home
 
 import dev.dhun.core.DhunResult
+import dev.dhun.core.DhunError
 import dev.dhun.core.HomeFeed
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
@@ -8,12 +9,16 @@ import dev.dhun.data.HistoryRepository
 import dev.dhun.data.LibraryRepository
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.ToggleFavoriteUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 
 sealed interface HomeUiState {
@@ -25,85 +30,149 @@ sealed interface HomeUiState {
 
 class HomeViewModel(
     private val getHomeFeed: GetHomeFeedUseCase,
-    private val historyRepository: HistoryRepository,
-    private val libraryRepository: LibraryRepository,
+    historyRepository: HistoryRepository,
+    libraryRepository: LibraryRepository,
     private val scope: CoroutineScope,
 ) {
     private val toggleFavoriteUseCase = ToggleFavoriteUseCase(libraryRepository)
 
-    private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    // Generation, feed and request flags change atomically. A separate generation
+    // check followed by a UI write could still overwrite a concurrent refresh on
+    // the desktop's Default dispatcher (check-then-write race).
+    private data class State(
+        val generation: Long = 0,
+        val ui: HomeUiState = HomeUiState.Loading,
+        val refreshing: Boolean = false,
+        val loadingMore: Boolean = false,
+        val pageError: String? = null,
+        val completedTokens: Set<String> = emptySet(),
+        val emptyPageCount: Int = 0,
+    )
 
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
-    private val _isLoadingMore = MutableStateFlow(false)
-    /** True while the next page of home shelves is being fetched. */
-    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+    private val state = MutableStateFlow(State())
+    val uiState: StateFlow<HomeUiState> = state.map { it.ui }
+        .stateIn(scope, SharingStarted.Eagerly, HomeUiState.Loading)
+    val isRefreshing: StateFlow<Boolean> = state.map { it.refreshing }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+    val isLoadingMore: StateFlow<Boolean> = state.map { it.loadingMore }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+    val loadMoreError: StateFlow<String?> = state.map { it.pageError }
+        .stateIn(scope, SharingStarted.Eagerly, null)
+    private var feedJob: Job? = null
+    private var pageJob: Job? = null
 
     val recentlyPlayed: StateFlow<List<Track>> = historyRepository.observeRecentlyPlayed(24)
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
-
     val favoriteIds: StateFlow<Set<String>> = libraryRepository.observeFavoriteIds()
         .stateIn(scope, SharingStarted.Eagerly, emptySet())
 
-    init {
-        load()
-    }
+    init { load() }
 
-    fun load() {
-        scope.launch {
-            _uiState.value = HomeUiState.Loading
-            fetchFeed()
+    fun load() = requestFeed(refresh = false)
+    fun refresh() = requestFeed(refresh = true)
+
+    private fun requestFeed(refresh: Boolean) {
+        val request = state.updateAndGet {
+            State(
+                generation = it.generation + 1,
+                ui = if (refresh && it.ui is HomeUiState.Success) it.ui else HomeUiState.Loading,
+                refreshing = refresh,
+            )
         }
-    }
-
-    fun refresh() {
-        scope.launch {
-            _isRefreshing.value = true
-            fetchFeed()
-            _isRefreshing.value = false
-        }
-    }
-
-    private suspend fun fetchFeed() {
-        when (val result = getHomeFeed()) {
-            is DhunResult.Success -> {
-                val feed = result.value
-                if (feed.quickPicks.isEmpty() && feed.sections.isEmpty()) {
-                    _uiState.value = HomeUiState.Empty
-                } else {
-                    _uiState.value = HomeUiState.Success(feed)
+        feedJob?.cancel()
+        pageJob?.cancel()
+        feedJob = scope.launch {
+            try {
+                val result = getHomeFeed()
+                state.update { current ->
+                    if (current.generation != request.generation) current else current.copy(
+                        ui = when (result) {
+                            is DhunResult.Success -> {
+                                val feed = result.value
+                                if (feed.quickPicks.isEmpty() && feed.sections.isEmpty() && feed.continuationToken == null) {
+                                    HomeUiState.Empty
+                                } else {
+                                    HomeUiState.Success(feed)
+                                }
+                            }
+                            is DhunResult.Failure -> HomeUiState.Error(result.error.toUserMessage())
+                        },
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                state.update {
+                    if (it.generation != request.generation) it else it.copy(ui = HomeUiState.Error(DhunError.Unknown().toUserMessage()))
+                }
+            } finally {
+                state.update {
+                    if (it.generation != request.generation) it else it.copy(refreshing = false)
                 }
             }
-            is DhunResult.Failure -> {
-                _uiState.value = HomeUiState.Error(result.error.toUserMessage())
-            }
         }
     }
 
-    /**
-     * Fetches the next page of home shelves and appends it (endless scroll).
-     * Silently stops when the feed is exhausted or a page is already loading;
-     * a failed page keeps the list the user already has.
-     */
-    fun loadMore() {
-        val current = (_uiState.value as? HomeUiState.Success)?.feed ?: return
-        if (current.continuationToken == null) return
-        if (_isLoadingMore.value) return
-        scope.launch {
-            _isLoadingMore.value = true
-            when (val result = getHomeFeed.loadMore(current)) {
-                is DhunResult.Success -> _uiState.value = HomeUiState.Success(result.value)
-                is DhunResult.Failure -> Unit // keep the existing shelves
+    fun loadMore() = requestMore(retry = false)
+    fun retryLoadMore() = requestMore(retry = true)
+
+    /** One request at a time; failures wait for an explicit retry, not a recomposition loop. */
+    private fun requestMore(retry: Boolean) {
+        val before = state.value
+        val current = (before.ui as? HomeUiState.Success)?.feed ?: return
+        val token = current.continuationToken ?: return
+        if (before.refreshing || before.loadingMore || (!retry && before.pageError != null)) return
+        val request = before.copy(
+            loadingMore = true,
+            pageError = null,
+            emptyPageCount = if (retry) 0 else before.emptyPageCount,
+        )
+        // Claim BEFORE coroutine dispatch. If refresh/another request won the
+        // CAS, let its updated state trigger the next UI event instead.
+        if (!state.compareAndSet(before, request)) return
+        pageJob = scope.launch {
+            try {
+                val result = getHomeFeed.loadMore(current)
+                state.update { latest ->
+                    if (latest.generation != request.generation) return@update latest
+                    when (result) {
+                        is DhunResult.Success -> {
+                            val used = latest.completedTokens + token
+                            val feed = result.value.copy(
+                                continuationToken = result.value.continuationToken?.takeUnless { it in used },
+                            )
+                            val emptyPages = if (feed.sections.size == current.sections.size) latest.emptyPageCount + 1 else 0
+                            latest.copy(
+                                ui = HomeUiState.Success(feed),
+                                completedTokens = used,
+                                emptyPageCount = emptyPages,
+                                pageError = if (feed.continuationToken != null && emptyPages >= MAX_EMPTY_PAGES) {
+                                    "No new recommendations arrived. Retry or refresh Home."
+                                } else null,
+                            )
+                        }
+                        is DhunResult.Failure -> latest.copy(pageError = result.error.toUserMessage())
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                state.update {
+                    if (it.generation != request.generation) it else it.copy(pageError = DhunError.Unknown().toUserMessage())
+                }
+            } finally {
+                state.update {
+                    if (it.generation != request.generation) it else it.copy(loadingMore = false)
+                }
             }
-            _isLoadingMore.value = false
         }
     }
 
     fun toggleFavorite(track: Track) {
-        scope.launch {
-            toggleFavoriteUseCase(track)
-        }
+        scope.launch { toggleFavoriteUseCase(track) }
+    }
+
+    private companion object {
+        const val MAX_EMPTY_PAGES = 3
     }
 }

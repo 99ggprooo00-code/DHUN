@@ -1,0 +1,75 @@
+{
+  "onResponseReceivedActions": [
+    {
+      "appendContinuationItemsAction": {
+        "continuationItems": [
+          {
+            "musicCarouselShelfRenderer": {
+              "header": {
+                "musicCarouselShelfBasicHeaderRenderer": {
+                  "title": {
+                    "runs": [
+                      {
+                        "text": "Recommended"
+                      }
+                    ]
+                  }
+                }
+              },
+              "contents": [
+                {
+                  "musicResponsiveListItemRenderer": {
+                    "playlistItemData": {
+                      "videoId": "b"
+                    },
+                    "flexColumns": [
+                      {
+                        "musicResponsiveListItemFlexColumnRenderer": {
+                          "text": {
+                            "runs": [
+                              {
+                                "text": "Track b"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "musicResponsiveListItemFlexColumnRenderer": {
+                          "text": {
+                            "runs": [
+                              {
+                                "text": "Artist"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "targetId": "home-feed"
+      }
+    },
+    {
+      "appendContinuationItemsAction": {
+        "continuationItems": [
+          {
+            "continuationItemRenderer": {
+              "continuationEndpoint": {
+                "continuationCommand": {
+                  "token": "page-three"
+                }
+              }
+            }
+          }
+        ],
+        "targetId": "home-feed"
+      }
+    }
+  ]
+}

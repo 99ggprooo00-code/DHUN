@@ -11,13 +11,20 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
+
+      - name: Packaging and fixture helper tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: PowerShell packaging helper syntax
+        shell: pwsh
+        run: ./scripts/check_powershell_syntax.ps1
 
       - name: "Unit tests — shared domain (queue, parsers, resolvers)"
         run: ./gradlew :shared:jvmTest --no-daemon

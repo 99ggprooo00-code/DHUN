@@ -1,0 +1,95 @@
+{
+  "onResponseReceivedActions": [
+    {
+      "appendContinuationItemsAction": {
+        "continuationItems": [
+          {
+            "musicTwoRowItemRenderer": {
+              "title": {
+                "runs": [
+                  {
+                    "text": "Sidebar track"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "continuationItemRenderer": {
+              "continuationEndpoint": {
+                "continuationCommand": {
+                  "token": "shelf-next"
+                }
+              }
+            }
+          }
+        ],
+        "targetId": "horizontal-mixes"
+      }
+    },
+    {
+      "appendContinuationItemsAction": {
+        "continuationItems": [
+          {
+            "musicCarouselShelfRenderer": {
+              "header": {
+                "musicCarouselShelfBasicHeaderRenderer": {
+                  "title": {
+                    "runs": [
+                      {
+                        "text": "Recommended"
+                      }
+                    ]
+                  }
+                }
+              },
+              "contents": [
+                {
+                  "musicResponsiveListItemRenderer": {
+                    "playlistItemData": {
+                      "videoId": "b"
+                    },
+                    "flexColumns": [
+                      {
+                        "musicResponsiveListItemFlexColumnRenderer": {
+                          "text": {
+                            "runs": [
+                              {
+                                "text": "Track b"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "musicResponsiveListItemFlexColumnRenderer": {
+                          "text": {
+                            "runs": [
+                              {
+                                "text": "Artist"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "continuationItemRenderer": {
+              "continuationEndpoint": {
+                "continuationCommand": {
+                  "token": "feed-next"
+                }
+              }
+            }
+          }
+        ],
+        "targetId": "home-feed"
+      }
+    }
+  ]
+}

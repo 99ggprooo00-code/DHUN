@@ -57,8 +57,8 @@ class GetHomeFeedUseCase(
 
     /**
      * Appends the next page of home shelves to [current] (endless scroll).
-     * A no-op Success when the feed is exhausted or a page is already in
-     * flight — the caller keeps what it has rather than losing the list.
+     * A no-op Success when the feed is exhausted. The ViewModel owns the
+     * in-flight guard, retries and cross-page continuation-cycle detection.
      */
     suspend fun loadMore(current: HomeFeed): DhunResult<HomeFeed> {
         val token = current.continuationToken
@@ -66,15 +66,30 @@ class GetHomeFeedUseCase(
         return when (val r = provider.homeFeedContinuation(token)) {
             is DhunResult.Success -> {
                 val page = r.value
-                val existing = current.sections.map { it.title }.toSet()
-                val fresh = page.sections.filterNot { it.title in existing }
+                // Titles are labels, not identities: another "Recommended"
+                // shelf with different music is a NEW shelf. Drop only shelves
+                // with the same title/subtitle and the same ordered item IDs.
+                fun key(section: HomeSection) = Triple(
+                    section.title,
+                    section.subtitle,
+                    section.items.map { item ->
+                        when (item) {
+                            is dev.dhun.core.HomeItem.TrackItem -> "track:${item.track.id}"
+                            is dev.dhun.core.HomeItem.AlbumItem -> "album:${item.album.id}"
+                            is dev.dhun.core.HomeItem.ArtistItem -> "artist:${item.artist.id}"
+                            is dev.dhun.core.HomeItem.PlaylistItem -> "playlist:${item.playlist.id}"
+                        }
+                    },
+                )
+                val existing = current.sections.map(::key).toMutableSet()
+                val fresh = page.sections.filter { existing.add(key(it)) }
                 DhunResult.Success(
                     current.copy(
                         sections = current.sections + fresh,
-                        // Stop scrolling when the server sends no new token,
-                        // or when a page added nothing (pagination is done).
+                        // An empty/duplicate page may still have a NEXT page.
+                        // Stop only at exhaustion or an immediately repeated token.
                         continuationToken = page.continuationToken
-                            ?.takeIf { fresh.isNotEmpty() },
+                            ?.takeIf { it.isNotBlank() && it != token },
                     )
                 )
             }

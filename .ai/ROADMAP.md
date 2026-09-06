@@ -1,30 +1,34 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-06 (UTC)** · session **`arena/01a07581-dhun`** · `origin/main@b8f148d` · PR #26 (UI restyle), PR #27 (ADR-003 proposed, docs) and **PR #28 (mini-player removal, this session) merged** · rolling `test` build republished `2026-09-06T06:51:40Z` (the build the user's report is about) and again **`07:13:35Z` after this session's merge — the single-window build to re-test**.
+Updated **2026-09-06 (UTC)** · session **`arena/01a0759b-dhun`** · **PR #30 OPEN, authorised for merge after checks** · tested implementation **`b6d47bd`**. Main/test are still **`0920148`**, public release **07:22:29Z**, at this pre-merge checkpoint.
 
-**Phase:** **14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS.** This session's work is a desktop windowing change driven by the user's latest Windows report; the audio fix and Home endless scroll from the previous sessions remain un-re-verified on hardware.
+**Phase: 14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS.** The user explicitly requested: **“Ok complete this work then PR and merge.”** Retain this session branch; do not delete old branches or invoke unrelated Arena finalization controls. Code/installer automation can be merged after verified checks; do not mark the user-machine/audio/visual gates complete or create v0.1.0.
 
-**User report driving this session (Windows, `test` build `06:51:40Z`):** opening DHUN also opens a second small mini-player window. User direction: the separate mini-player is **not needed** — the app already has the native docked MiniPlayer above the bottom nav. **Done this session:** the second window is removed (code + docs, **PR #28 MERGED → `main@b8f148d`**).
+**Exact current files:** final evidence review in `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`, `docs/verification/12-desktop-native.md`, `docs/verification/14-release.md`, README and CHANGELOG. Last implementation: `scripts/patch_msi_upgrade.ps1`, `scripts/prepare_legacy_msi_upgrade.ps1`, `scripts/stage_msi.ps1`, `scripts/check_msi_upgrade.ps1`, `scripts/test_build_workflow.py` — installer data-safety correction.
 
-**Exact files worked on this session:**
+**Last error: resolved for the automated candidate.** Initial PR packaging run **34029598179** built MSI 1.33.1 but failed **“In-place MSI upgrade removed/changed existing userdata.”** That MSI was withheld, no merge/publication happened, and the check was not weakened. The corrected run **34030730743** at `b6d47bd` / synthetic PR merge `61bf548b62b689f67687afcd7e6b76c0a56739a4` is **SUCCESS**:
 
-- `app-desktop/…/desktop/Main.kt` — deleted the mini-player `Window` (`miniState`, `miniWindowRef`, `toggleMiniPlayer()`, the Ctrl+M branch, the `MiniPlayerContent` import); the app now opens exactly one window. Everything else (tray, SMTC, close-to-tray, geometry, shortcuts minus Ctrl+M, startup ruggedization) unchanged.
-- `app-desktop/…/desktop/ui/MiniPlayerWindow.kt` — **deleted** (its only caller was the removed window).
-- `app-desktop/…/desktop/smct/Smct.kt` — removed the mini-player-only window-movement section (`moveWindow`, `GetWindowRect`/`SetWindowPos`, `WinRect`, SWP constants); kept the minimal `User32Lib.FindWindowW` that the SMTC `GetForWindow` HWND lookup uses.
-- `shared/…/design/DhunSpacing.kt` — removed the two tokens that existed only for the second window (`miniPlayerWindowWidth`, `transportRowHeight`); `miniPlayerHeight`/`contentBottomInset` stay (docked MiniPlayer + screen content padding).
-- `docs/decisions/ADR-004-remove-separate-miniplayer-window.md` — **NEW** — records the deviation from MASTER_PROMPT Phase 12 step 3 with the user's decision (AI rule 8: locked plan item removed → ADR → user OK, which is the report above).
-- `.ai/ROADMAP.md` (this file), `.ai/KNOWN_LIMITATIONS.md`, `CHANGELOG.md`, `docs/verification/12-desktop-native.md`, `docs/verification/14-release.md`, `.ai/MASTER_PROMPT.md` (Phase 12 step 3 pointer) — updated to match.
+| Verified check | Actual result |
+|---|---|
+| Branch CI 34030728903 / PR CI 34030730736 | **PASS** — Python helpers, PowerShell syntax, shared JVM tests, Android debug build, probe/Desktop compilation |
+| Native Windows packaging 34030730743 | **PASS** — MSI **1.34.1**, UpgradeCode `31ddb86b-9666-4071-b11c-45f16fa4682d`, **112,091,136 B**, SHA256 `1a4d2fe5c9b0c8949995cbd62e5e01675a9fb8081d71eb3da74b5a834dde021c` |
+| Legacy install-over on hosted Windows | **PASS** — published **1.0.5 → 1.34.1**, userdata and cache sentinels preserved; baseline SHA256 `0683538542af97c7505cd35610e03cfb42ce92e01e07ea09c28a7364b1825add` |
+| Future upgrade-removal path | **PASS** — explicit `UPGRADINGPRODUCTCODE` flag preserves both sentinels (not a separate future-version or GUI test) |
+| Reinstall + ordinary uninstall | **PASS** — explicit uninstall removes the test userdata directory |
+| Artifact records | `msi` **9988585984**; `msi-install-check` **9988584693**; `apk` **9988526777**. APK **17,499,806 B**, SHA256 `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86` |
+| PR publishing | **SKIPPED**, as required. Only main pushes may replace the rolling test release |
 
-**Last error:** none — not a defect. The "second window" was the Phase 12 mini-player window working exactly as specced (visible at startup, always-on-top); the user judged it redundant next to the docked MiniPlayer. Its one aggravator beyond the spec: Compose Desktop 1.8.2 has no `skipTaskbar`, so it also occupied the taskbar.
+Source: run/job/check annotation/artifact APIs, not local execution or downloaded MSI inspection. The sandbox still lacks a JDK and cannot fetch release-asset/log archives; GitHub CI supplied the real compilation/package/install checks. Manual workflow dispatch is still denied (403) and was not retried; the newly authorised PR uses normal pull-request verification.
 
-**GitHub-verified this session (`gh`, not local state):** `main@b8f148d` (PR #28 merge, `2026-09-06T07:12Z`) · PR #27 merged `06:59:41Z` at `0eb8e76` · PR #26 merged `06:40:06Z` · rolling `test` release republished `2026-09-06T07:13:35Z` (`dhun-test.apk` 17,483,422 B · `dhun-test.msi` **112,009,680 B** + `.sha256`) · PR #28 CI `34018230278` pass, main CI `34018419052` + test-release `34018419047` green. All previous `arena/*` session branches were audited in the prior session — nothing unpushed; the last open leftover (PR #27) was merged this session.
+**Fix design:** jpackage's old version-specific HKCU `RM_RF…` registration drives recursive INSTALLDIR deletion during major upgrade. The unsigned-MSI finalizer adds a future upgrade-only cleaner-property guard and a narrow legacy cleanup bridge (matching DHUN upgrade identity, version, install location and owned HKCU values). Userdata is never moved/deleted by the bridge; explicit uninstall retains cleanup. A cancelled legacy transaction after successful preparation can leave the old cleanup value suppressed until a successful retry (data-safe, but not a claim of perfect rollback hygiene). Backups remain recommended. Raw `packageMsi` output must not be distributed without finalization.
 
-**Exact next step — in order:**
+**Exact next action:** commit/push the documentation-only evidence update to PR #30, inspect its CI/package reruns, then merge the same-branch PR without deleting the branch or bypassing checks. Verify automatic main CI and rolling `test` APK/MSI publishing after merge, recording real results. The next product action after successful publication is the user's Windows test: install-over without manual uninstall, saved data present, one window, uncached audible audio, Home paging and player visuals/controls. Never interpret installer sentinels as app launch/audio/visual proof.
 
-1. ✅ **PR #28 landed** — CI `34018230278` pass → merged at `b8f148d`; main CI `34018419052` + test-release `34018419047` green; rolling `test` republished `2026-09-06T07:13:35Z`: MSI **112,009,680 B** (single-window code) · APK unchanged **17,483,422 B** + `.sha256`.
-2. **User re-tests on Windows with the `07:13:35Z` build:** launching DHUN must show exactly ONE window — the main window with the docked mini-player. Same build, still open from the previous sessions: (a) does audio play now (User-Agent fix), (b) does Home endless-scroll work, (c) does the PR #26 restyle read well.
-3. Remaining Phase 14 gates, unchanged: 30-min soaks both platforms, offline-cache checks, clean uninstall, live-drill green on a residential path, then `v0.1.0`.
-4. **ADR-003 is still PROPOSED, not accepted** — if the next device report shows resolution succeeding and the CDN refusing bytes, resolve latency is not the user-facing problem; keep the identity chain sequential.
+**Hardware/product gates remain OPEN:** no current candidate app launch, VLC/audio/uncached byte validation, live Home re-test, visual acceptance, tray/SMTC/shortcut round trip, cache/recovery checks, clean-target full runtime acceptance or 30-minute soaks. The earlier user confirmed one-window startup only after manual reinstall; earlier audio/Home/UI reports were negative. ADR-003 remains **PROPOSED**; all seven own-client identities stay sequential. No stable release is earned yet.
+
+**Branch audit:** GitHub had `main` + 20 `arena/…` branches (19 older sessions), automatic deletion off. Some older heads need comparison; nothing was deleted/renamed or settings-changed. All work stays on `arena/01a0759b-dhun`.
+
+**Commit/push status:** implementation and regressions through `b6d47bd` are pushed and verified. This evidence-only update is the final pre-merge documentation; it changes no application/installer code. Latest live merged/published status will be verified against GitHub, not assumed from PR checks.
 
 ---
 
@@ -124,9 +128,9 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 09 | Artist/Album/Playlist | ✅ MERGED PR #7 @ `3fce5e5` — fixtures schema-authored (no YT egress in sandbox; live re-capture scheduled); hardware 3/3/CRUD OPEN | docs/verification/09 |
 | 10 | Library & history | ✅ MERGED PR #8 @ `d27eb37` (CI green `33842104141`) — hardware checklist OPEN | docs/verification/10 |
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
-| 12 | Desktop native | 🟨 — tray/shortcuts and SMTC phase 2 on main; Desktop compilation + MSI packaging green on `main@9294520` (`34012157207` / `34012157287`, **`1.0.5` with JVM fix**); **separate mini-player window REMOVED per user decision (ADR-004)** — docked in-app MiniPlayer is the product mini-player; Windows runtime and clean-install **still OPEN — new MSI needs install→launch verification** | docs/verification/12 · `.ai/DEBUG_LOG.md` · ADR-004 |
+| 12 | Desktop native | 🟨 — tray/shortcuts/SMTC and packaging on main; PR #28 removed the separate mini-player window (ADR-004), leaving the docked in-app MiniPlayer. Latest Desktop compile + MSI publishing green on `main@0920148` (`34018809911` / `34018809913`). Prior JVM-launch fix was confirmed by the user; the user now confirms one-window startup after manual reinstall (evidence local/pending publication); upgrade, native integrations and clean-target hygiene remain OPEN | docs/verification/12 · ADR-004 · CURRENT ACTIVE TASK |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 PRs #16/#17/#19/#20/#22/#23 **MERGED** through `main@9294520`; main CI `34012157207` and rolling test APK/MSI release `34012157287` green (`1.0.5`, MSI 112,001,488 B / APK 17,467,038 B, published `2026-09-06T04:45:40Z`). Caches, recovery, device-feedback fixes, **Windows JVM startup fix**, and Unreleased changelog all on GitHub; live drill still RED (`34011539225`); residential/recovery/offline/soaks/clean installs/v0.1.0 still OPEN | Phase 14 step table below; issue #14; docs/verification/14 |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 IN PROGRESS — implementation milestones merged through PR #28, docs through PR #29 (`main` / `test` at `0920148`); CI `34018809911` and rolling test publishing `34018809913` green, published `2026-09-06T07:22:29Z`. Audio User-Agent fix, Home continuation, bounded resolve/diagnostics, restyle and single-window code are all on GitHub. Live drill `34011539225` still RED; hardware re-tests, offline/recovery checks, clean targets, soaks and v0.1.0 remain OPEN | Phase 14 step table below; issue #14; docs/verification/14 |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -138,10 +142,10 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 |---|---|
 | SMTC spike (3-day timebox) | 🟨 **phase 2 code pushed in `7ca2f5d`, CI green `33958287878`** (`Smct.kt` — WinRT activation via JNA/combase → `GetForWindow` → `DisplayUpdater`/music metadata/remote thumbnail + retained `ButtonPressed` COM callback; corrected `IsEnabled` slot-10 probe; `-Ddhun.smct=false` off) — Windows round-trip and fallback verdict OPEN |
 | System tray (playing/paused icon, 6-item menu) | 🟨 code pushed (`DhunTray.kt` + `TrayIcons.kt`, AWT, EDT-marshaled, headless-safe) — main Desktop compile green `34001706156`; hardware OPEN |
-| Mini-player window (320×88, always-on-top, drag, click-opens-main) | ❌ **REMOVED 2026-09-06 per user decision — ADR-004** (was 🟨 code pushed: `MiniPlayerWindow.kt` + second Compose `Window`, hide-not-close, Ctrl+M). The docked in-app MiniPlayer (Phase 08) is the product mini-player; `Main.kt` now opens exactly one window. Reversal = restore the deleted files from git history |
+| Mini-player window (320×88, always-on-top, drag, click-opens-main) | ❌ **REMOVED per user decision — ADR-004**, code `a01f8ca` merged in **PR #28 @ `b8f148d`**, included in `test@0920148` (CI `34018809911` + publishing `34018809913` green). `MiniPlayerWindow.kt`, the second normal-startup `Window`, Ctrl+M and window-only helpers/tokens are gone. The docked Phase 08 MiniPlayer remains; one-window launch on the new MSI is still hardware-unverified |
 | Keyboard shortcuts (Space, ←/→ 5s, Ctrl+←/→, Ctrl+F, Ctrl+Q) | 🟨 code pushed (KeyDown-only, text-field-safe, `Key.DirectionLeft/Right`/`Spacebar`) — main Desktop compile green `34001706156`; hardware OPEN; Ctrl+M removed with the mini-player window (ADR-004) |
 | Close-to-tray (default on) + remembered geometry | 🟨 code pushed (`SettingsKeys.CLOSE_TO_TRAY`/`WINDOW_GEOMETRY`; public-AWT `Frame.getFrames()` title lookup; `WindowPosition` Dp) — main Desktop compile green `34001706156`; hardware OPEN |
-| Packaging: jpackage MSI + clean-VM install | ✅ `packageMsi` `1.0.5` with `java.sql` modules — **install → launch confirmed on hardware 2026-09-06**, no \"Failed to launch JVM\"; 🟨 clean-VM *uninstall* leaves-nothing check still unobserved |
+| Packaging: jpackage MSI + clean-VM install | ✅ MSI packaging on GitHub (`34018809913`, `test@0920148`, 112,009,680 B). The user previously confirmed install → launch of the JVM-fixed `1.0.5` build; user now reports one-window startup after manual reinstall; 🔴 in-place upgrade failed. Clean-target installation, data preservation and uninstall hygiene remain OPEN |
 | Verification doc + KNOWN_LIMITATIONS + THIRD_PARTY | ✅ done + pushed (`ffa138b`); docs/verification/12 + KNOWN_LIMITATIONS updated for the mini-player removal (ADR-004) |
 | Acceptance 1–4 (media keys / tray / installer) | 🟨 OPEN — on hardware (checklist in docs/verification/12). Acceptance 3 (separate mini-player window) is **superseded by ADR-004**; the docked mini-player is covered by the Phase 08 checklist instead |
 
@@ -156,64 +160,60 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
-### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-06, sessions `arena/01a0750c-dhun` + `arena/01a07563-dhun` + `arena/01a07581-dhun`)
+### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-06, session `arena/01a0759b-dhun`)
 
-**GitHub-verified snapshot (historical, session `arena/01a0750c-dhun`, `gh` not local state):**
-`origin/main@9294520` (PR #23 merged `2026-09-06T04:41:51Z`), main CI
-**`34012157207` success** and rolling test-release **`34012157287` success**
-(links in CURRENT ACTIVE TASK). The last *application-code* change is still
-**PR #22 @ `e90dba6`** — the Windows "Failed to launch JVM" fix (java.sql
-modules + `includeAllModules` + VLC ruggedization + startup diagnostics,
-`packageVersion` **1.0.5**). `9294520` is docs-only, so the `test`
-pre-release assets are the same `1.0.5` binaries, re-published
-`2026-09-06T04:45:40Z`.
-PR #16 merged at `290e0f6`, #17 at `29eeb93`, #19 at `6d81eb2`, #20
-at `8310383`, **#22 at `e90dba6`**, **#23 at `9294520`**. These are remote
-commits, not unpushed local work.
+**Current GitHub snapshot:** `main` and the rolling `test` tag both point to
+**`0920148`** (PR #29, docs-only). Main CI **`34018809911` success** covers
+shared JVM tests, Android debug build, probe compilation and Desktop
+compilation. Test-release **`34018809913` success** built/published APK +
+MSI + checksums at **`2026-09-06T07:22:29Z`**. Links and asset sizes are in
+CURRENT ACTIVE TASK. No open PRs; only the `test` release/tag exists.
 
-**Update (session `arena/01a07563-dhun`, 2026-09-06):** PR #24 merged at
-`c247fb4` (audio User-Agent fix + Home endless scroll — first `test` build
-with both, published `06:00:14Z`), PR #25 merged at `06:07:10Z`
-(diagnostics + bounded 45 s resolve), **PR #26 merged `06:40:06Z` at
-`ef4c8d7`** (UI restyle: tamed artwork palette, swapped transport icons,
-real glass dialogs) — main CI `34017427948` + test-release `34017427941`
-green, rolling `test` republished `2026-09-06T06:51:40Z` (`dhun-test.apk`
-17,483,422 B · `dhun-test.msi` 112,038,352 B).
+**Recent work actually merged on GitHub, not outstanding local work:**
 
-**Update (session `arena/01a07581-dhun`, 2026-09-06):** PR #27 merged
-`06:59:41Z` at `0eb8e76` (ADR-003 PROPOSED — identity-chain parallelism,
-awaiting user decision; UI-research outcome). **PR #28 MERGED `07:12Z` at
-`b8f148d`:** separate desktop mini-player window removed per user decision
-— ADR-004 (see CURRENT ACTIVE TASK; the Phase 12 table marks the step ❌
-REMOVED). PR CI `34018230278` pass; main CI `34018419052` + test-release
-`34018419047` green; rolling `test` republished `07:13:35Z` (MSI
-112,009,680 B — single-window code).
+| PR | Merge / GitHub `mergedAt` (UTC, 2026-09-06) | Landed work |
+|---|---|---|
+| #24 | `c247fb4` · `05:56:49Z` | Stream User-Agent fix (`5a89b81`) + Home continuation and regression tests |
+| #25 | `6497b1b` · `06:19:33Z` | Playback-error diagnostics + bounded 45-second resolving (`d390dd0`) |
+| #26 | `ef4c8d7` · `06:47:41Z` | UI restyle / icon fixes (`11d6f75`) + CI push coverage for `arena/**` |
+| #27 | `0eb8e76` · `06:59:41Z` | ADR-003 **proposal only**, not approval or parallelism implementation |
+| #28 | `b8f148d` · `07:10:11Z` | Separate desktop mini-player window removed (`a01f8ca`), ADR-004 and accompanying docs |
+| #29 | `0920148` · `07:18:53Z` | Post-merge documentation; no further application-code change |
+
+Earlier Phase 14 milestones remain merged: PR #16 at `290e0f6`, #17 at
+`29eeb93`, #19 at `6d81eb2`, #20 at `8310383`, #22 at `e90dba6`, and the
+PR #23 documentation at `9294520`. The old `04:45:40Z` / `06:51:40Z` /
+`07:13:35Z` publication snapshots are superseded by the current release.
 
 **Read the columns separately:** ✅ in the GitHub column completes only
 that named code/test/publishing milestone. It does **not** close the
 hardware or release gate in the last column. All Phase 14 acceptance
 criteria remain open; green build CI does not mean green live extraction.
+The repair batch is on the session branch and CI is green at `75c4a8b`; only its automated code/test checkpoint is complete, not merge/release/hardware acceptance.
 
 | Step | Complete on GitHub / evidence | Remaining gate |
 |---|---|---|
-| Error taxonomy, 429 backoff, offline banner, recovery UX | ✅ Existing typed-error paths, `RateLimitGate`, `ConnectivityMonitor`, and `PlaybackState.Recovering` merged via PR #16; recovery extended by PR #20; main CI green | 🟨 Full db-path/error-taxonomy review and real offline/429/403/forced-error behavior not verified |
-| Stream-URL cache (TTL + invalidation) | ✅ `DhunStreamCache` five-hour TTL and 403 invalidation are on main; latest playback code compiles in CI | 🟨 Stale-URL recovery on hardware |
-| Bounded audio cache — Android | ✅ `DhunAudioSegmentCache` / Media3 `SimpleCache` LRU merged in PR #16; PR #20 adds corrupt-cache direct-stream fallback; main Android build green | 🟨 Offline span replay, eviction/budget behavior, and cache-failure fallback on a device |
-| Bounded audio cache — Desktop | ✅ `AudioFileCache` + `DesktopDhunPlayer` wiring + nine cache unit tests merged in PR #17; shared tests and Desktop compile green | 🟨 Fully cached track replays offline, uncached-track error, and eviction on a libVLC desktop |
-| Daily rot-drill workflow + failure alerts | ✅ `.github/workflows/rot-drill.yml` merged; cron `17 4 * * *`; real failing probes upload logs, update issue #14, and fail the job. **Scheduled-run + alert path now has real evidence:** scheduled run `34011539225` fired, `probe` job `failure`, issue #14 auto-commented `2026-09-06T04:29:14Z` with the run link + log tail | 🟨 A **green** live production-probe verdict and the auto-close-on-recovery path are still unproven; older placeholder-workflow greens do not count |
-| Live extraction verdict / residential playback | 🔴 Latest real drill `34011539225` (schedule, ran on `main@dd1ab31` — the SHA recorded in issue #14, not `e90dba6`) and prior `33970045379` attempt 2 on `d9f4083`: `PROBE\|resolve+stream\|FAIL\|IllegalStateException: resolve: AuthRequired(detail=null)`, `PROBE\|verdict\|FAIL\|extraction-pipeline-broken`; `version`/`search`/`related` PASS; issue #14 OPEN (comment `2026-09-06T04:29:14Z`) | No green live production-probe verdict since `33944557207` (`d27eb37`, 2026-09-05T04:26Z). Verify the latest APK on a residential network; do not label Actions bot/CDN gating as proven residential failure |
-| Device-feedback recovery + artwork/splash/sheets/spacing | 🟨 PR #20 code on main, but **hardware verdict 2026-09-06 is negative: no audio plays on either platform** | 🔴 Blocking. Root cause found (User-Agent mismatch on the byte fetch) and fixed in `5a89b81` — **not yet in a published build, not yet re-verified** |
-| Install/uninstall hygiene | ✅ PR #19 per-user MSI and `DhunUserDirs` + PR #22 startup ruggedization (log + dialog + in-memory fallback); Android private-storage manifest policy on main; current MSI `1.0.5` rebuilt green at `34012157287` (112,001,488 B, `includeAllModules`) | 🟨 Clean Windows install/run/uninstall and startup-log + absence of leftover runtime data must be observed on hardware — **no \"Failed to launch JVM\" on launch** |
-| `CHANGELOG.md` (Unreleased history) | ✅ Created in PR #17 and updated in PR #19/#20; present on GitHub main (PR #22 bumps `packageVersion` to `1.0.5` but changelog `[0.1.0]` still waits for release) | Unreleased milestone complete; `[0.1.0]` entry waits for a real release |
-| Rolling **test** APK/MSI publishing | ✅ `test@9294520` (verified via `gh release view test`): `dhun-test.msi` **112,001,488 B** + `.sha256`, `dhun-test.apk` **17,467,038 B** + `.sha256`, published by `34012157287` at `2026-09-06T04:45:40Z` — the same `1.0.5` JVM-fix binaries as `34011563630` (`e90dba6`) | Not evidence for an AAB, stable v0.1.0, or clean-target installation; **MSI launch must still be verified on Windows hardware** |
-| Windows desktop startup (JVM launch) | ✅ **CLOSED on hardware 2026-09-06** — user installed and launched `dhun-test.msi` (`1.0.5`, PR #22 fix); no \"Failed to launch JVM\". APK launches too | None for launch. Clean-VM *uninstall* hygiene still unobserved; `dhun-startup.log` contents not captured |
-| **Stream byte fetch presents the resolving identity** (audio fix) | 🟨 `5a89b81` on the session branch: `StreamInfo.userAgent` populated by every resolver; Android stamps it per `open()` via `UserAgentDataSource`; desktop downloader receives it and libVLC rejection falls back to the local copy; `AudioFileCacheTest` asserts the agent reaches the socket | 🟨 **CI-green, hardware-unverified.** Run `34014443760` passed all four steps (shared `jvmTest`, `assembleDebug`, probe, desktop compile) on `e1f69b4`. Needs the next `test` build on a device |
-| **Home endless scroll** | 🟨 session branch: `HomeFeedPage` + `homeFeedContinuation` (client → provider → use case → ViewModel) + near-bottom trigger and index-safe shelf keys in `HomeScreen`; 3 new pagination tests in `UseCasesTest` | 🟨 CI-green in `34014443760` (`:shared:jvmTest` covers `shared/src/jvmTest`, so the 3 new pagination tests ran); hardware check outstanding. Search load-more was already wired and is unchanged |
-| UI quality (both apps) | 🟨 **PR #26 @ `ef4c8d7`** — artwork palette tamed (hue clamped near brand hue, muted, never red-dominant; ambient alpha 0.22 → 0.10; new `controlAccent` for all chrome), swapped skip-icon paths fixed, artwork placeholders, frosted error dialog carrying the resolve-chain `detail`, `GlassCard(opaqueBase)` for floating surfaces, genuinely translucent glass tokens, bounded desktop volume slider, Catalog tab hidden behind `AppTab.userTabs`. 2 new palette regression tests | 🟨 **CI-green (`34016873567`, `34017122707`), hardware-unverified.** Needs a device look at the next `test` build. Note: a pre-existing test asserted `backgroundTint.alpha in 0.15..0.35` — it was locking in the bad value, and was retuned |
+| **Windows-report repair batch (session branch only)** | ✅ **`75c4a8b`**, [CI **34025807972**](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972) **success**: Python checks, shared JVM regressions, Android debug build, probe/Desktop compilation. First compile errors corrected; Quick-picks projection wired into real UI | **Not merged or released at this checkpoint.** MSI packaging/data-preservation tests now pass in PR run 34030730743; app playback/live Home/visual/native runtime and release gates remain OPEN |
+| Error taxonomy, 429 backoff, offline banner, recovery UX | ✅ Existing typed-error paths, `RateLimitGate`, `ConnectivityMonitor` and `PlaybackState.Recovering` merged via PR #16; recovery extended by PR #20; current main CI `34018809911` green | 🟨 Full db-path/error-taxonomy review and real offline/429/403/forced-error behavior not verified |
+| Stream-URL cache (TTL + invalidation) | ✅ `DhunStreamCache` five-hour TTL and 403 invalidation on main; latest playback code builds in CI | 🟨 Stale-URL recovery on hardware |
+| Bounded audio cache — Android | ✅ `DhunAudioSegmentCache` / Media3 `SimpleCache` LRU merged in PR #16; PR #20 adds corrupt-cache direct-stream fallback; current Android build green | 🟨 Offline span replay, eviction/budget behavior and cache-failure fallback on a device |
+| Bounded audio cache — Desktop | ✅ `AudioFileCache` + `DesktopDhunPlayer` wiring and cache tests merged in PR #17, updated in PR #24 for User-Agent propagation; current shared tests and Desktop compile green | 🟨 Fully cached track replays offline, uncached-track error and eviction on a libVLC desktop |
+| Daily rot-drill workflow + failure alerts | ✅ `.github/workflows/rot-drill.yml` merged, cron `17 4 * * *`. **Scheduled execution and alert path verified:** run `34011539225` fired on `main@dd1ab31`, event `schedule`, failed, uploaded `rot-drill-34011539225`, and auto-commented on issue #14 at `04:29:14Z` | 🟨 A green live production-probe verdict and auto-close-on-recovery remain unproven; placeholder-workflow greens do not count |
+| Live extraction verdict / residential playback | 🔴 Latest real drill **`34011539225`**, scheduled on `dd1ab31`: `PROBE\|resolve+stream\|FAIL\|IllegalStateException: resolve via resolving(own-innertube-player -> yt-dlp): Unavailable`; own-client WATCH `Unavailable`, yt-dlp WATCH `AuthRequired` / bot-gate text; version/search/related PASS; final verdict FAIL. Source: run metadata and issue #14's preserved probe output; issue remains OPEN | No newer live probe verdict on `0920148`. Fresh Windows feedback also reports failed audio; do not dismiss this as CI-only gating. Candidate diagnostics and a real uncached playback/byte test are required |
+| Device-feedback recovery + artwork/splash/sheets/spacing | ✅ PR #20 implementation on main, followed by PR #24 audio correction, PR #25 diagnostics and PR #26 restyle; current main CI green | 🔴 Last reported device audio result was negative. Earlier corrections are **published**, but the fresh Windows re-test still fails audio, Home and visual acceptance. New repairs pass branch CI but are not released/device-tested; keep the blocker open |
+| Install/uninstall hygiene | ✅ PR #19 per-user MSI and `DhunUserDirs`, PR #22 startup ruggedization and Android private-storage policy on main; latest MSI rebuilt/published green in `34018809913` | 🟨 Fresh in-place upgrade FAILED with “Another version…”; only manual uninstall/reinstall succeeded. Corrected MSI 1.34.1 passes hosted-Windows legacy install-over, future-upgrade-removal and explicit-uninstall tests in PR run 34030730743. User-machine/full runtime hygiene still needs evidence |
+| `CHANGELOG.md` (Unreleased history) | ✅ On GitHub main, including PR #28's mini-player removal entry | Unreleased history exists; `[0.1.0]` release entry/final review waits for actual release gates |
+| Rolling **test** APK/MSI publishing | ✅ **`test@0920148`**, published **`2026-09-06T07:22:29Z`** by `34018809913`: `dhun-test.msi` **112,009,680 B**, `dhun-test.apk` **17,483,422 B**, both `.sha256` assets uploaded | Not evidence for an AAB, stable v0.1.0, clean-target installation or successful playback |
+| Windows desktop startup (JVM launch) | ✅ Earlier user-reported install → launch confirmed the PR #22 JVM fix (`1.0.5`) on 2026-09-06; that report is recorded in the verification docs on GitHub. APK launches too | No open JVM-launch defect from that report. Fresh one-window startup is user-confirmed after manual reinstall (local evidence). Startup-log capture, upgrade and clean-target hygiene remain separate gates |
+| **Stream byte fetch presents the resolving identity** (audio fix) | ✅ **PR #24 merged at `c247fb4`**: `StreamInfo.userAgent`, Android per-open `UserAgentDataSource`, desktop downloader propagation / local-file fallback and the socket-agent regression assertion are on main and in the published build; current CI `34018809911` green | 🟨 Audible uncached-track playback and failure/recovery behavior must be re-tested on both platforms; CI does not prove the CDN accepts the bytes |
+| **Home endless scroll** | ✅ **PR #24 merged at `c247fb4`**: `HomeFeedPage`, continuation through client/provider/use case/ViewModel, near-bottom trigger and index-safe shelf keys; three pagination regressions covered by shared JVM CI | 🔴 Fresh Windows re-test still does not load further Home pages. Feed-token/dedup/VM/UI repairs and regressions are on the branch with green CI, awaiting device verification. Search load-more is unchanged |
+| **Bounded resolving + playback diagnostics** | ✅ **PR #25 merged at `6497b1b`**: 45-second resolver budget, regression tests and error-detail propagation; PR #26 surfaces detail in the docked MiniPlayer too; current main CI green | 🔴 Fresh failure still had no diagnostic detail. Detail-bearing Network/Unavailable, combined engine evidence and cancellable Windows fallback are on the branch with green CI; device diagnostics still need re-test. ADR-003 remains unapproved |
+| UI quality (both apps) | ✅ **PR #26 merged at `ef4c8d7`**: restrained artwork palette / control accents, corrected skip-icon paths, artwork placeholders, frosted error dialogs, opaque-base floating glass, bounded volume slider and hidden Catalog tab; palette regressions in green shared CI | 🔴 User says styling is somewhat better but glyph position, shuffle shape and transport colours are wrong. Origin-pivot paths and bounded/centred player layout are on the branch, not visually accepted |
+| **Single-window desktop (ADR-004)** | ✅ **PR #28 merged at `b8f148d`**: second mini-player window, Ctrl+M, window-only helpers and tokens removed; docked MiniPlayer retained. Included in green `test@0920148` | User confirms **one window** after manual uninstall/reinstall; this fresh evidence is recorded locally. Do not infer tray/SMTC/shortcut acceptance or a successful install-over upgrade |
 | Android 30-minute soak | ⬜ No completed device evidence committed | Physical device, unrestricted battery/OEM settings, lock-screen controls, zero crashes/leaks; record timestamps/results |
-| Desktop 30-minute soak | ⬜ No completed desktop evidence committed | libVLC desktop, transport/tray/(docked) mini-player/SMTC or fallback, clean exit, zero crashes; record timestamps/results |
-| v0.1.0 artifacts / tag / release | ⬜ Only the rolling `test` pre-release exists; no v0.1.0 completion | APK + AAB + MSI release artifacts, clean-target runs, soaks, live drill, final docs/risk/license review, then tag/release |
-| Final release documentation review | 🟨 Docs exist on main, including limitations and verification checklists | Reconcile stale CI/live-run wording in the verification/limitations docs and attach real device evidence; README, THIRD_PARTY, RISK_REGISTER, CHANGELOG final review still open |
+| Desktop 30-minute soak | ⬜ No completed desktop evidence committed | libVLC desktop, transport/tray/docked mini-player/SMTC or fallback, clean exit, zero crashes; record timestamps/results |
+| v0.1.0 artifacts / tag / release | ⬜ GitHub has only the rolling `test` pre-release/tag; no v0.1.0 release | APK + AAB + MSI release artifacts, clean-target runs, soaks, live drill and final docs/risk/license review, then tag/release |
+| Final release documentation review | 🟨 Docs exist on main, including ADR-004, limitations and verification checklists; PR #29 is merged | Fresh Windows evidence, current release/drill reconciliation, README and icon provenance are pushed to the session branch. Update verified CI evidence at this checkpoint; final hardware/risk/license/release review remains open |
 
 Cache configuration already stored on main: `SettingsKeys.CACHE_SIZE_MB`,
 default **1024 MB**, applied on process restart on both platforms. This is
@@ -221,11 +221,13 @@ not evidence that a user-facing cache-budget control or runtime change has
 been verified. Desktop caches whole tracks, not Media3-style segments.
 
 **Phase 14 acceptance (MASTER_PROMPT):**
-1. **OPEN / red:** rot drill green **and** scheduled — cron is configured,
-   but no green live production-probe verdict or first scheduled-run proof.
+1. **OPEN / red:** rot drill green **and** scheduled — scheduled execution
+   is **proven** by `34011539225`, but that run failed; no green live
+   production-probe result for the current build. Issue #14 remains open.
 2. **OPEN:** 30-minute soaks on **both** platforms — neither logged.
 3. **OPEN:** all three release artifacts + clean-target install/run —
-   rolling test APK/MSI builds alone do not satisfy this.
+   rolling test APK/MSI builds and the prior successful launch report alone
+   do not satisfy this; AAB/release and clean-target evidence remain open.
 4. **OPEN:** KNOWN_LIMITATIONS current and honest — final reconciliation
    and hardware-informed release review not yet complete.
 

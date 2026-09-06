@@ -1,10 +1,6 @@
 package dev.dhun.core
 
-/**
- * DHUN's universal result/error taxonomy. Every layer maps failures into
- * these; user-facing messages come from [DhunError.toUserMessage] only
- * (no raw technical strings in UI).
- */
+/** DHUN's universal result/error taxonomy. Messages and diagnostics stay separate. */
 sealed interface DhunResult<out T> {
     data class Success<T>(val value: T) : DhunResult<T>
     data class Failure(val error: DhunError) : DhunResult<Nothing>
@@ -29,20 +25,18 @@ fun <T> DhunResult<T>.getOrThrow(): T = when (this) {
 
 sealed interface DhunError {
     /** No network / DNS / connection refused / timeout. */
-    data object Network : DhunError
+    data class Network(val detail: String? = null) : DhunError
 
     /** YouTube changed response shape, or our parser is wrong. */
     data class Parse(val detail: String? = null) : DhunError
 
-    /** Item exists but is unplayable/unavailable (removed, region…). */
-    data object Unavailable : DhunError
+    /** Item exists but this request is unplayable/unavailable (removed, region, client…). */
+    data class Unavailable(val detail: String? = null) : DhunError
 
     /** HTTP 429 — global backoff required. */
-    data class RateLimited(val retryAfterSeconds: Int? = null) : DhunError
+    data class RateLimited(val retryAfterSeconds: Int? = null, val detail: String? = null) : DhunError
 
-    /** Bot-gating / sign-in required for this action. [detail] carries the
-     *  per-attempt evidence (which InnerTube client, what YouTube said) —
-     *  logged and shown on the diagnostics harness screen, never in final UI. */
+    /** Bot-gating / sign-in required. Evidence belongs in diagnostics, not the headline. */
     data class AuthRequired(val detail: String? = null) : DhunError
 
     data class Unknown(val causeMessage: String? = null) : DhunError
@@ -58,14 +52,32 @@ fun DhunError.toUserMessage(): String = when (this) {
     is DhunError.Unknown -> "Something went wrong. Try again."
 }
 
-/** Technical companion to [toUserMessage] for logs and diagnostics screens. */
+/** Technical companion to [toUserMessage] for logs and the playback diagnostics UI. */
 fun DhunError.detailString(): String? = when (this) {
+    is DhunError.Network -> detail
+    is DhunError.Unavailable -> detail
     is DhunError.Parse -> detail
     is DhunError.AuthRequired -> detail
-    is DhunError.RateLimited -> "retryAfter=${retryAfterSeconds ?: "?"}s"
+    is DhunError.RateLimited -> listOfNotNull(detail, "retryAfter=${retryAfterSeconds ?: "?"}s").joinToString("; ")
     is DhunError.Unknown -> causeMessage
-    DhunError.Network, DhunError.Unavailable -> null
 }
+
+/** Attach the complete attempt summary without changing the error category or retry advice. */
+internal fun DhunError.withDetail(detail: String): DhunError = when (this) {
+    is DhunError.Network -> copy(detail = detail)
+    is DhunError.Unavailable -> copy(detail = detail)
+    is DhunError.Parse -> copy(detail = detail)
+    is DhunError.AuthRequired -> copy(detail = detail)
+    is DhunError.RateLimited -> copy(detail = detail)
+    is DhunError.Unknown -> copy(causeMessage = detail)
+}
+
+/** Bound untrusted service/tool text; never put a signed stream URL in a report. */
+internal fun diagnosticText(text: String, limit: Int = 240): String = text
+    .replace(Regex("https?://\\S+", RegexOption.IGNORE_CASE), "<url>")
+    .replace(Regex("[\\p{Cntrl}\\s]+"), " ")
+    .trim()
+    .take(limit)
 
 /** Thrown by internals; carries the taxonomy value. */
 class DhunException(val error: DhunError) : RuntimeException(error.toUserMessage())

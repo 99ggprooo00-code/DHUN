@@ -14,7 +14,6 @@ import org.schabi.newpipe.extractor.stream.StreamInfo as NPStreamInfo
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.TimeUnit
 
 /**
  * Desktop extraction engines (ADR-001):
@@ -24,98 +23,6 @@ import java.util.concurrent.TimeUnit
  *    (v0.26.5, no fix on master) — kept as a first-class implementation so
  *    the rot drill can measure its recovery, not our hopes.
  */
-
-class YtDlpStreamResolver(
-    private val binary: List<String> = locate(),
-) : StreamResolver {
-
-    override val name: String = "yt-dlp"
-
-    override suspend fun resolve(videoId: String): DhunResult<StreamInfo> =
-        withContext(Dispatchers.IO) {
-            try {
-                // player_client order mirrors OwnClientStreamResolver + the
-                // clients yt-dlp currently lists as least PO-bound. Default
-                // yt-dlp path alone was AuthRequired from Actions IPs on
-                // 2026-09-05 (runs 33961533965 / 33968950214). Explicit
-                // clients are still tokenless — no --cookies.
-                val command = binary + listOf(
-                    "--no-warnings", "--no-playlist",
-                    // Pinned so the URL yt-dlp hands back is bound to a UA we
-                    // know: googlevideo rejects byte reads from a different
-                    // agent, and the desktop cache downloader must match it.
-                    "--user-agent", YTDLP_USER_AGENT,
-                    "--extractor-args",
-                    "youtube:player_client=web_embedded,tv,tv_downgraded,tv_simply,mweb,web_safari,android",
-                    "-f", "bestaudio/bestaudio*,best",
-                    "-g",
-                    "https://www.youtube.com/watch?v=$videoId",
-                )
-                val process = ProcessBuilder(command).start()
-                val finished = process.waitFor(60, TimeUnit.SECONDS)
-                if (!finished) {
-                    process.destroyForcibly()
-                    return@withContext DhunResult.Failure(DhunError.Network) // treat as transient
-                }
-                val stdout = process.inputStream.bufferedReader().readText()
-                val stderr = process.errorStream.bufferedReader().readText()
-
-                if (process.exitValue() != 0) {
-                    val message = stderr.lineSequence().lastOrNull { it.isNotBlank() } ?: ""
-                    return@withContext DhunResult.Failure(
-                        when {
-                            // ADR-001 contract: detail carries the per-attempt evidence
-                            // (rot-drill 33961533965 failed with detail=null and the
-                            // actual yt-dlp stderr had to be inferred from code).
-                            message.contains("Sign in to confirm", ignoreCase = true) ->
-                                DhunError.AuthRequired(message.take(300))
-                            message.contains("Video unavailable", ignoreCase = true) -> DhunError.Unavailable
-                            else -> DhunError.Unknown(message.take(300))
-                        }
-                    )
-                }
-                val url = stdout.lineSequence().firstOrNull { it.startsWith("http") }
-                    ?: return@withContext DhunResult.Failure(DhunError.Parse("yt-dlp printed no URL"))
-                DhunResult.Success(
-                    StreamInfo(
-                        videoId = videoId,
-                        audioUrl = url,
-                        mimeType = "audio/webm", // bestaudio is itag 251 (opus/webm) in practice; container verified at playback
-                        codec = "opus",
-                        userAgent = YTDLP_USER_AGENT,
-                    )
-                )
-            } catch (e: java.util.concurrent.TimeoutException) {
-                DhunResult.Failure(DhunError.Network)
-            } catch (e: IOException) {
-                DhunResult.Failure(DhunError.Network)
-            } catch (e: Exception) {
-                DhunResult.Failure(DhunError.Unknown(e.message))
-            }
-        }
-
-    companion object {
-        /**
-         * UA DHUN forces on yt-dlp (`--user-agent`) and therefore the one a
-         * resolved URL expects on every subsequent byte read.
-         */
-        const val YTDLP_USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-
-        /** DHUN_YTDLP env var overrides; else `yt-dlp`; else `python3 -m yt_dlp`. */
-        fun locate(): List<String> {
-            System.getenv("DHUN_YTDLP")?.let { return listOf(it) }
-            val found = try {
-                ProcessBuilder("which", "yt-dlp").start()
-                    .inputStream.bufferedReader().readText().trim()
-            } catch (_: Exception) {
-                ""
-            }
-            return if (found.isNotEmpty()) listOf(found) else listOf("python3", "-m", "yt_dlp")
-        }
-    }
-}
 
 /**
  * NewPipe Extractor engine. Drill-watched: currently fails upstream
@@ -135,7 +42,7 @@ class NewPipeStreamResolver : StreamResolver {
                     .filter { it.averageBitrate > 0 && !it.content.isNullOrBlank() }
                     .maxByOrNull { it.averageBitrate }
                 if (best == null) {
-                    DhunResult.Failure(DhunError.Unavailable)
+                    DhunResult.Failure(DhunError.Unavailable())
                 } else {
                     DhunResult.Success(
                         StreamInfo(
@@ -150,11 +57,11 @@ class NewPipeStreamResolver : StreamResolver {
             } catch (e: ReCaptchaException) {
                 DhunResult.Failure(DhunError.RateLimited())
             } catch (e: IOException) {
-                DhunResult.Failure(DhunError.Network)
+                DhunResult.Failure(DhunError.Network())
             } catch (e: org.schabi.newpipe.extractor.exceptions.ParsingException) {
                 DhunResult.Failure(DhunError.Parse(e.message?.take(200)))
             } catch (e: org.schabi.newpipe.extractor.exceptions.ExtractionException) {
-                DhunResult.Failure(DhunError.Unavailable)
+                DhunResult.Failure(DhunError.Unavailable())
             } catch (e: Exception) {
                 DhunResult.Failure(DhunError.Unknown(e.message))
             }

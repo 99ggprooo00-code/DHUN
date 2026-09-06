@@ -7,9 +7,9 @@ package dev.dhun.core
  */
 fun Throwable.toDhunError(): DhunError = when (this) {
     is DhunException -> error
-    is java.util.concurrent.TimeoutException -> DhunError.Network
-    is java.net.UnknownHostException -> DhunError.Network
-    is java.net.ConnectException -> DhunError.Network
-    is java.io.IOException -> DhunError.Network
+    is java.util.concurrent.TimeoutException -> DhunError.Network()
+    is java.net.UnknownHostException -> DhunError.Network()
+    is java.net.ConnectException -> DhunError.Network()
+    is java.io.IOException -> DhunError.Network()
     else -> DhunError.Unknown(message)
 }

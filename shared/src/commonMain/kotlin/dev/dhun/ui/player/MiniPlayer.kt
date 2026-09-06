@@ -14,10 +14,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -191,63 +189,7 @@ fun MiniPlayer(
     }
 
     if (showErrorDialog && errorState != null) {
-        AlertDialog(
-            onDismissRequest = { showErrorDialog = false },
-            // Stock AlertDialog paints an opaque grey slab that ignored the
-            // design system entirely (visible in the device screenshots).
-            // Match the frosted M3 chrome the rest of the app uses.
-            containerColor = DhunColors.glassStrong,
-            titleContentColor = DhunColors.textPrimary,
-            textContentColor = DhunColors.textSecondary,
-            iconContentColor = DhunColors.accent,
-            tonalElevation = DhunSpacing.zero,
-            shape = DhunShapes.extraLarge,
-            title = {
-                Text(
-                    text = "Playback error",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DhunColors.textPrimary,
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = errorState.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DhunColors.textSecondary,
-                    )
-                    // Diagnostics chain, when the resolver supplied one. The
-                    // FullPlayer already surfaces this; the mini-player dialog
-                    // is where most users actually hit the error first.
-                    val detail = errorState.detail
-                    if (!detail.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                        Text(
-                            text = detail,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = DhunColors.textTertiary,
-                            maxLines = 6,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showErrorDialog = false
-                        viewModel.retry()
-                    },
-                ) {
-                    Text("Retry", color = DhunColors.accent)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showErrorDialog = false }) {
-                    Text("Close", color = DhunColors.textSecondary)
-                }
-            },
-        )
+        PlaybackErrorDialog(errorState, onDismiss = { showErrorDialog = false }, onRetry = viewModel::retry)
     }
 }
 

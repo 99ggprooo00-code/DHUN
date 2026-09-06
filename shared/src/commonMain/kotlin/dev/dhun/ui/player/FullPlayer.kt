@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,11 +51,14 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -65,6 +67,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import dev.dhun.core.PlaybackState
@@ -80,6 +84,7 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.fittedPlayerArtworkSize
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.presentation.player.PlayerViewModel
@@ -127,6 +132,11 @@ fun FullPlayer(
     val skipDirection by viewModel.skipDirection.collectAsState()
 
     val current = track
+    val playbackError = state as? PlaybackState.Error
+    var showErrorDetails by remember(playbackError) { mutableStateOf(false) }
+    if (showErrorDetails && playbackError != null) {
+        PlaybackErrorDialog(playbackError, onDismiss = { showErrorDetails = false }, onRetry = viewModel::retry)
+    }
     val colors = remember(current?.thumbnailUrl, current?.id) {
         ArtworkColorExtractor.extractFromSeed(current?.thumbnailUrl ?: current?.id ?: "")
     }
@@ -216,7 +226,10 @@ fun FullPlayer(
         )
 
         // ---- foreground -------------------------------------------------------------
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.widthIn(max = DhunSpacing.playerContentMaxWidth)
+                .fillMaxSize().align(Alignment.TopCenter),
+        ) {
             // Sheet drag handle — immersive bottom-sheet cue (M3 frosted pill).
             Box(
                 modifier = Modifier
@@ -285,14 +298,16 @@ fun FullPlayer(
                 animationSpec = DhunAnimations.mediumTween(),
                 label = "artworkStageAlpha",
             )
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(stageWeight.coerceAtLeast(0.2f))
                     .padding(horizontal = if (lyricsDominant) DhunSpacing.huge else DhunSpacing.xxxl)
+                    .clipToBounds()
                     .graphicsLayer { alpha = stageAlpha },
                 contentAlignment = Alignment.Center,
             ) {
+                val artworkSize = fittedPlayerArtworkSize(maxWidth, maxHeight)
                 val playScale by animateFloatAsState(
                     targetValue = if (isPlaying) 1f else 0.84f,
                     animationSpec = DhunAnimations.springSpec(),
@@ -306,6 +321,7 @@ fun FullPlayer(
                 val artworkScale = playScale * dominantScale
                 AnimatedContent(
                     targetState = current,
+                    modifier = Modifier.size(artworkSize),
                     transitionSpec = {
                         if (skipDirection == SkipDirection.BACKWARD) {
                             (slideInHorizontally(DhunAnimations.mediumTween()) { -it / 3 } + fadeIn(DhunAnimations.mediumTween()))
@@ -323,20 +339,13 @@ fun FullPlayer(
                     },
                     label = "artworkChange",
                 ) { t ->
-                    Box(modifier = Modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
-                        // Hi-res tier (1024): list feeds arrive at w60/w120
-                        // and upscale only to 544 — far below what this
-                        // ~0.82-width stage renders, hence the blur.
-                        ArtworkImage(
-                            imageUrl = ArtworkUrls.nowPlaying(t?.thumbnailUrl),
-                            contentDescription = t?.title,
-                            modifier = Modifier
-                                .fillMaxWidth(if (lyricsDominant) 0.36f else 0.82f)
-                                .aspectRatio(1f)
-                                .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale },
-                            shape = DhunShapes.extraLarge,
-                        )
-                    }
+                    ArtworkImage(
+                        imageUrl = ArtworkUrls.nowPlaying(t?.thumbnailUrl),
+                        contentDescription = t?.title,
+                        modifier = Modifier.fillMaxSize()
+                            .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale },
+                        shape = DhunShapes.extraLarge,
+                    )
                 }
             }
 
@@ -370,7 +379,6 @@ fun FullPlayer(
             // player never sits silently dead on an error (previously this
             // screen showed nothing and its play button was a no-op while
             // the engine sat in error-idle).
-            val playbackError = state as? PlaybackState.Error
             if (playbackError != null) {
                 Row(
                     modifier = Modifier
@@ -393,24 +401,12 @@ fun FullPlayer(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    TextButton(onClick = { showErrorDetails = true }) {
+                        Text("Details", color = DhunColors.textPrimary)
+                    }
                     TextButton(onClick = viewModel::retry) {
                         Text("Retry", color = DhunColors.error)
                     }
-                }
-                // Diagnostics: the per-identity resolve-chain verdict, or the
-                // exception chain. This is what turns a "no audio" report into
-                // an actionable one — it says whether resolution was gated or
-                // the CDN refused the bytes after a successful resolve.
-                if (!playbackError.detail.isNullOrBlank()) {
-                    Text(
-                        text = playbackError.detail,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DhunColors.textTertiary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = DhunSpacing.xxl)
-                            .padding(bottom = DhunSpacing.xs),
-                    )
                 }
             }
 
@@ -456,12 +452,16 @@ fun FullPlayer(
                     .fillMaxWidth()
                     .padding(horizontal = DhunSpacing.xxl),
             ) {
-                DhunSeekBar(
-                    positionMs = positionMs,
-                    durationMs = durationMs,
-                    accent = accent,
-                    onSeek = viewModel::seekTo,
-                )
+                // A skip must cancel an in-flight scrub, even when both tracks
+                // happen to have the same duration.
+                key(current?.id) {
+                    DhunSeekBar(
+                        positionMs = positionMs,
+                        durationMs = durationMs,
+                        accent = accent,
+                        onSeek = viewModel::seekTo,
+                    )
+                }
                 Spacer(modifier = Modifier.height(DhunSpacing.xs))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -484,7 +484,9 @@ fun FullPlayer(
             Spacer(modifier = Modifier.height(DhunSpacing.xs))
             Row(
                 modifier = Modifier
+                    .widthIn(max = DhunSpacing.playerTransportMaxWidth)
                     .fillMaxWidth()
+                    .align(Alignment.CenterHorizontally)
                     .height(DhunSpacing.playerTransportHeight)
                     .padding(horizontal = DhunSpacing.xxl),
                 verticalAlignment = Alignment.CenterVertically,
@@ -495,6 +497,7 @@ fun FullPlayer(
                     onClick = { viewModel.toggleShuffle() },
                     modifier = Modifier
                         .size(DhunSpacing.touchTarget)
+                        .semantics { selected = shuffleEnabled }
                         .clip(DhunShapes.full)
                         .background(if (shuffleEnabled) accent.copy(alpha = 0.22f) else Color.Transparent),
                     contentDescription = if (shuffleEnabled) "Disable shuffle" else "Enable shuffle",
@@ -565,7 +568,10 @@ fun FullPlayer(
                 // Repeat cycle: OFF → ALL → ONE
                 DhunIconButton(
                     onClick = { viewModel.cycleRepeatMode() },
-                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    modifier = Modifier.size(DhunSpacing.touchTarget)
+                        .semantics { selected = repeatMode != RepeatMode.OFF }
+                        .clip(DhunShapes.full)
+                        .background(if (repeatMode != RepeatMode.OFF) accent.copy(alpha = 0.22f) else Color.Transparent),
                     contentDescription = when (repeatMode) {
                         RepeatMode.OFF -> "Repeat off"
                         RepeatMode.ALL -> "Repeat all"
@@ -576,7 +582,7 @@ fun FullPlayer(
                         icon = if (repeatMode == RepeatMode.ONE) DhunIcon.RepeatOne else DhunIcon.Repeat,
                         contentDescription = null,
                         modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = if (repeatMode != RepeatMode.OFF) accent else DhunColors.textTertiary,
+                        tint = if (repeatMode != RepeatMode.OFF) accent else DhunColors.textPrimary,
                     )
                 }
             }
@@ -585,7 +591,9 @@ fun FullPlayer(
             if (isDesktop) {
                 Row(
                     modifier = Modifier
+                        .widthIn(max = DhunSpacing.playerVolumeMaxWidth)
                         .fillMaxWidth()
+                        .align(Alignment.CenterHorizontally)
                         .padding(horizontal = DhunSpacing.xxl),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -601,14 +609,13 @@ fun FullPlayer(
                     Slider(
                         value = volume,
                         onValueChange = viewModel::setVolume,
-                        modifier = Modifier.widthIn(max = DhunSpacing.artworkPlaylist),
+                        modifier = Modifier.weight(1f),
                         colors = SliderDefaults.colors(
                             thumbColor = accent,
                             activeTrackColor = accent.copy(alpha = 0.85f),
                             inactiveTrackColor = DhunColors.border,
                         ),
                     )
-                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
 
@@ -678,8 +685,8 @@ internal fun DhunSeekBar(
     } else {
         0f
     }
-    var dragging by remember { mutableStateOf(false) }
-    var dragFraction by remember { mutableFloatStateOf(0f) }
+    var dragging by remember(durationMs) { mutableStateOf(false) }
+    var dragFraction by remember(durationMs) { mutableFloatStateOf(0f) }
     val effective = if (dragging) dragFraction else progress
     val barHeight by animateDpAsState(
         targetValue = if (dragging) DhunSpacing.progressHeightActive else DhunSpacing.progressHeight,
@@ -701,14 +708,14 @@ internal fun DhunSeekBar(
                 .height(barHeight)
                 .clip(DhunShapes.full)
                 .background(DhunColors.border)
-                .pointerInput(widthPx) {
+                .pointerInput(widthPx, durationMs, onSeek) {
                     detectTapGestures { offset ->
                         if (durationMs > 0 && widthPx > 0) {
                             onSeek(((offset.x / widthPx) * durationMs).toLong().coerceIn(0, durationMs))
                         }
                     }
                 }
-                .pointerInput(widthPx) {
+                .pointerInput(widthPx, durationMs, onSeek) {
                     detectHorizontalDragGestures(
                         onDragStart = { offset ->
                             if (durationMs > 0 && widthPx > 0) {
@@ -766,6 +773,9 @@ internal fun HoldTapTransportButton(
     onRelease: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnHold by rememberUpdatedState(onHold)
+    val currentOnRelease by rememberUpdatedState(onRelease)
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pressed) 1.25f else 1f,
@@ -779,19 +789,19 @@ internal fun HoldTapTransportButton(
             .pointerInput(forward) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
+                    // Capture a matching callback pair for THIS press; a
+                    // recomposition must not stop a different player's hold.
+                    val press = TransportPress(currentOnTap, currentOnHold, currentOnRelease)
                     pressed = true
-                    val released = withTimeoutOrNull(HOLD_DELAY_MS) {
-                        waitForUpOrCancellation()
-                        true
-                    } ?: false
-                    if (released) {
+                    try {
+                        val released = withTimeoutOrNull(HOLD_DELAY_MS) {
+                            waitForUpOrCancellation() != null
+                        }
+                        press.initialWaitFinished(released)
+                        if (press.holding) waitForUpOrCancellation()
+                    } finally {
                         pressed = false
-                        onTap()
-                    } else {
-                        onHold()
-                        waitForUpOrCancellation()
-                        pressed = false
-                        onRelease()
+                        press.finish()
                     }
                 }
             },
@@ -801,7 +811,7 @@ internal fun HoldTapTransportButton(
             icon = icon,
             contentDescription = contentDescription,
             modifier = Modifier
-                .size(DhunSpacing.iconSizeLg)
+                .size(DhunSpacing.iconSize)
                 .graphicsLayer { scaleX = scale; scaleY = scale },
             tint = DhunColors.textPrimary,
         )
