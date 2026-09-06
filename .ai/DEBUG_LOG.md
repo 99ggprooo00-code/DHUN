@@ -1,5 +1,31 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — Session arena/01a076f3-dhun initialized; PR #32 CI & MSI verification PASS
+
+Session branch `arena/01a076f3-dhun` established from `main@76c68eb`. Working
+PR #32 opened to track session development and CI verification.
+- Code CI run **34037019387** PASS (job 101496835724: Python tests, PowerShell
+  syntax, shared JVM domain tests, Android debug build, probe and Desktop
+  compilation).
+- Packaging run **34037019382** PASS:
+  - MSI build job 101496835501 built MSI **1.38.1**, 112,091,136 B, SHA256
+    `324f7ece174bbb47dd70475675b881a90aea248320f04ab080200038cea8bf9b`.
+  - Hosted Windows upgrade smoke verified **1.36.1 → 1.38.1** (baseline SHA256
+    `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`),
+    preserving userdata and cache sentinels.
+  - Future upgrade-removal guard PASS (sentinels preserved under
+    `UPGRADINGPRODUCTCODE`).
+  - Reinstall + explicit uninstall PASS (userdata removed).
+  - APK build job 101496835642 PASS: 17,499,806 B, SHA256
+    `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86`.
+- Artifacts: MSI `9990543402`, MSI diagnostic `9990542277`, APK `9990511086`.
+
+All CI and synthetic packaging checks green. Hardware gates (real audio
+streaming, live Home pagination, visual acceptance, tray/SMTC, soaks)
+remain OPEN pending user device verification.
+
+---
+
 ## 2026-09-06 — PR #30 merged and repair-code test release verified
 
 User-requested merge completed at **11:52:26Z**, PR #30 →
