@@ -1,0 +1,68 @@
+{
+  "onResponseReceivedCommands": [
+    {
+      "reloadContinuationItemsCommand": {
+        "continuationItems": [
+          {
+            "musicCarouselShelfRenderer": {
+              "header": {
+                "musicCarouselShelfBasicHeaderRenderer": {
+                  "title": {
+                    "runs": [
+                      {
+                        "text": "Recommended"
+                      }
+                    ]
+                  }
+                }
+              },
+              "contents": [
+                {
+                  "musicResponsiveListItemRenderer": {
+                    "playlistItemData": {
+                      "videoId": "b"
+                    },
+                    "flexColumns": [
+                      {
+                        "musicResponsiveListItemFlexColumnRenderer": {
+                          "text": {
+                            "runs": [
+                              {
+                                "text": "Track b"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "musicResponsiveListItemFlexColumnRenderer": {
+                          "text": {
+                            "runs": [
+                              {
+                                "text": "Artist"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "continuationItemRenderer": {
+              "continuationEndpoint": {
+                "continuationCommand": {
+                  "token": "page-three"
+                }
+              }
+            }
+          }
+        ],
+        "targetId": "home-feed"
+      }
+    }
+  ]
+}

@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -35,7 +36,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
 import dev.dhun.core.HomeFeed
@@ -100,6 +100,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val loadMoreError by viewModel.loadMoreError.collectAsState()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -130,7 +131,9 @@ fun HomeScreen(
                     recentlyPlayed = recentlyPlayed,
                     isRefreshing = isRefreshing,
                     isLoadingMore = isLoadingMore,
-                    onLoadMore = { viewModel.loadMore() },
+                    loadMoreError = loadMoreError,
+                    onLoadMore = viewModel::loadMore,
+                    onRetryMore = viewModel::retryLoadMore,
                     onRefresh = { viewModel.refresh() },
                     onTrackClick = onTrackClick,
                     onAlbumClick = onAlbumClick,
@@ -153,7 +156,9 @@ private fun HomeFeedContent(
     recentlyPlayed: List<Track>,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
+    loadMoreError: String?,
     onLoadMore: () -> Unit,
+    onRetryMore: () -> Unit,
     onRefresh: () -> Unit,
     onTrackClick: (track: Track, contextQueue: List<Track>, index: Int) -> Unit,
     onAlbumClick: (Album) -> Unit,
@@ -197,7 +202,7 @@ private fun HomeFeedContent(
             val match = otherSections.filter {
                 it.title.contains(selectedMood, ignoreCase = true)
             }
-            (match + otherSections.filterNot { it in match }).distinctBy { it.title }
+            (match + otherSections.filterNot { it in match }).distinct()
         }
     }
 
@@ -214,8 +219,10 @@ private fun HomeFeedContent(
         }
     }
     val canLoadMore = feed.continuationToken != null
-    LaunchedEffect(shouldLoadMore, canLoadMore, isLoadingMore) {
-        if (shouldLoadMore && canLoadMore && !isLoadingMore) onLoadMore()
+    LaunchedEffect(shouldLoadMore, feed.continuationToken, isLoadingMore, isRefreshing, loadMoreError) {
+        if (shouldLoadMore && canLoadMore && !isLoadingMore && !isRefreshing && loadMoreError == null) {
+            onLoadMore()
+        }
     }
 
     LazyColumn(
@@ -382,8 +389,8 @@ private fun HomeFeedContent(
         }
 
         // ---- Rediscover / mixes -----------------------------------------------
-        mixSections.forEach { section ->
-            item(key = "mix_${mixSections.indexOf(section)}_${section.title}") {
+        mixSections.forEachIndexed { index, section ->
+            item(key = "mix_$index_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -396,8 +403,8 @@ private fun HomeFeedContent(
         }
 
         // ---- Charts & trending ------------------------------------------------
-        chartSections.forEach { section ->
-            item(key = "chart_${chartSections.indexOf(section)}_${section.title}") {
+        chartSections.forEachIndexed { index, section ->
+            item(key = "chart_$index_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -409,8 +416,8 @@ private fun HomeFeedContent(
         }
 
         // ---- Albums & EPs -----------------------------------------------------
-        albumSections.forEach { section ->
-            item(key = "album_${albumSections.indexOf(section)}_${section.title}") {
+        albumSections.forEachIndexed { index, section ->
+            item(key = "album_$index_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -423,13 +430,13 @@ private fun HomeFeedContent(
         }
 
         // ---- Remaining dynamic shelves (mood-filtered order) ------------------
-        orderedOther.forEach { section ->
+        orderedOther.forEachIndexed { index, section ->
             // Skip if already rendered under mix/chart/album
             val kind = GetHomeFeedUseCase.classifySection(section.title)
             if (kind == HomeShelfKind.MIX || kind == HomeShelfKind.CHARTS || kind == HomeShelfKind.ALBUMS) {
-                return@forEach
+                return@forEachIndexed
             }
-            item(key = "other_${orderedOther.indexOf(section)}_${section.title}") {
+            item(key = "other_$index_${section.title}") {
                 HomeSectionBlock(
                     section = section,
                     onTrackClick = onTrackClick,
@@ -440,20 +447,32 @@ private fun HomeFeedContent(
             }
         }
 
-        // ---- Next-page indicator ----------------------------------------------
-        if (isLoadingMore) {
-            item(key = "load_more") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = DhunSpacing.lg),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                        strokeWidth = 2.dp,
-                        color = DhunColors.accent,
-                    )
+        // Visible retry/end states: a failed continuation must not look like
+        // an exhausted feed, or retry automatically on every recomposition.
+        item(key = "pagination_status") {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(DhunSpacing.screenPadding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+            ) {
+                when {
+                    isLoadingMore -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            strokeWidth = DhunSpacing.iconStroke,
+                            color = DhunColors.accent,
+                        )
+                        Text("Loading more music…", color = DhunColors.textSecondary)
+                    }
+                    loadMoreError != null -> {
+                        Text(loadMoreError, color = DhunColors.textSecondary)
+                        TextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
+                    }
+                    canLoadMore -> TextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
+                    else -> {
+                        Text("You're all caught up", color = DhunColors.textTertiary)
+                        TextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh recommendations") }
+                    }
                 }
             }
         }
@@ -483,11 +502,11 @@ private fun HomeSectionBlock(
             )
         }
         HorizontalShelf {
-            itemsIndexed(section.items) { index, item ->
+            itemsIndexed(section.items) { _, item ->
                 when (item) {
                     is HomeItem.TrackItem -> TrackCard(
                         track = item.track,
-                        onClick = { onTrackClick(item.track, section.tracks, index) },
+                        onClick = { onTrackClick(item.track, section.tracks, section.tracks.indexOf(item.track)) },
                     )
                     is HomeItem.AlbumItem -> AlbumCard(
                         album = item.album,
@@ -626,4 +645,11 @@ private fun HomeShimmerSkeleton(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(DhunSpacing.xl))
         SectionShimmer()
     }
+}
+
+/** Hide only music actually promoted into the hero, not every later shelf with the same label. */
+internal fun quickPickShelfAlreadyShown(section: HomeSection, quickPicks: List<Track>): Boolean {
+    if (!section.title.contains("quick picks", ignoreCase = true) || section.items.isEmpty()) return false
+    val shown = quickPicks.map { it.id }.toSet()
+    return section.items.all { it is HomeItem.TrackItem && it.track.id in shown }
 }

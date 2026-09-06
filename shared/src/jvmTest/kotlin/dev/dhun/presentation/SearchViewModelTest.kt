@@ -78,15 +78,15 @@ class SearchViewModelTest {
         override suspend fun homeFeedContinuation(continuationToken: String): DhunResult<dev.dhun.core.HomeFeedPage> =
             DhunResult.Success(dev.dhun.core.HomeFeedPage())
         override suspend fun relatedTracks(videoId: String) = DhunResult.Success(emptyList<Track>())
-        override suspend fun getStreamInfo(videoId: String) = DhunResult.Failure(DhunError.Unavailable)
+        override suspend fun getStreamInfo(videoId: String) = DhunResult.Failure(DhunError.Unavailable())
         override suspend fun getLyrics(videoId: String) = DhunResult.Success(Lyrics.NotAvailable)
 
         override suspend fun artistPage(browseId: String): DhunResult<ArtistPage> =
-            DhunResult.Failure(DhunError.Unavailable)
+            DhunResult.Failure(DhunError.Unavailable())
         override suspend fun albumPage(browseId: String): DhunResult<AlbumDetail> =
-            DhunResult.Failure(DhunError.Unavailable)
+            DhunResult.Failure(DhunError.Unavailable())
         override suspend fun playlistPage(browseId: String): DhunResult<PlaylistDetail> =
-            DhunResult.Failure(DhunError.Unavailable)
+            DhunResult.Failure(DhunError.Unavailable())
     }
 
     private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {

@@ -19,6 +19,9 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Installer and fixture validation tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
       - name: "Unit tests — shared domain (queue, parsers, resolvers)"
         run: ./gradlew :shared:jvmTest --no-daemon
 

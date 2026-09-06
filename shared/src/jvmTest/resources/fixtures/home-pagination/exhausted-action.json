@@ -1,0 +1,10 @@
+{
+  "onResponseReceivedActions": [
+    {
+      "appendContinuationItemsAction": {
+        "continuationItems": [],
+        "targetId": "home-feed"
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "onResponseReceivedActions": [
+    {
+      "appendContinuationItemsAction": {
+        "continuationItems": [
+          {
+            "continuationItemRenderer": {
+              "continuationEndpoint": {
+                "continuationCommand": {
+                  "token": "feed-next"
+                }
+              }
+            }
+          }
+        ],
+        "targetId": "home-feed"
+      }
+    },
+    {
+      "appendContinuationItemsAction": {
+        "continuationItems": [
+          {
+            "continuationItemRenderer": {
+              "continuationEndpoint": {
+                "continuationCommand": {
+                  "token": "shelf-next"
+                }
+              }
+            }
+          }
+        ],
+        "targetId": "sidebar"
+      }
+    }
+  ]
+}

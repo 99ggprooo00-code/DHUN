@@ -3,6 +3,7 @@ package dev.dhun.innertube
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunException
 import dev.dhun.core.DhunResult
+import dev.dhun.core.diagnosticText
 import dev.dhun.core.HomeFeedPage
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
@@ -29,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -138,11 +140,7 @@ class InnerTubeClient(
                 put("context", context())
                 put("browseId", "FEmusic_home")
             }
-            val root = postJson("browse", body)
-            HomeFeedPage(
-                sections = parseHomeSections(root),
-                continuationToken = parseContinuationToken(root),
-            )
+            parseHomeFeedPage(postJson("browse", body))
         }
 
     /** Next page of home shelves (InnerTube `/browse` continuation). */
@@ -152,11 +150,7 @@ class InnerTubeClient(
                 put("context", context())
                 put("continuation", continuationToken)
             }
-            val root = postJson("browse", body)
-            HomeFeedPage(
-                sections = parseHomeSections(root),
-                continuationToken = parseContinuationToken(root),
-            )
+            parseHomeFeedPage(postJson("browse", body))
         }
 
     /* ---------------- browse pages (Phase 09) ---------------------------- */
@@ -252,19 +246,6 @@ class InnerTubeClient(
 
     /* ---------------- internals ------------------------------------------ */
 
-    private fun checkPlayability(root: JsonObject): JsonObject {
-        val status = root.obj("playabilityStatus").str("status")
-        val reason = root.obj("playabilityStatus").str("reason")?.take(120)
-        return when (status) {
-            "OK", "LIVE_STREAM_OFFLINE" -> root
-            "LOGIN_REQUIRED" -> throw DhunException(DhunError.AuthRequired(reason))
-            "UNPLAYABLE", "ERROR" -> throw DhunException(DhunError.Unavailable)
-            else -> throw DhunException(
-                DhunError.Parse("playabilityStatus=$status${reason?.let { " ($it)" } ?: ""}")
-            )
-        }
-    }
-
     private fun altContext(alt: AltInnertubeClient): JsonObject = buildJsonObject {
         putJsonObject("client") {
             put("clientName", alt.name)
@@ -288,7 +269,7 @@ class InnerTubeClient(
         body: JsonObject,
         alt: AltInnertubeClient,
     ): JsonObject {
-        var lastError: DhunError = DhunError.Network
+        var lastError: DhunError = DhunError.Network()
         repeat(ALT_MAX_ATTEMPTS) { attempt ->
             globalRateGate.await() // Phase 14: 429 global backoff — all calls wait out a tripped gate
             if (attempt > 0) delay(backoffMillis(attempt, lastError))
@@ -307,7 +288,7 @@ class InnerTubeClient(
                 val code = response.status.value
                 when {
                     code == 429 -> lastError = onRateLimited(response.headers["Retry-After"])
-                    code in 500..599 -> lastError = DhunError.Network
+                    code in 500..599 -> lastError = DhunError.Network("HTTP $code from ${alt.label} /$endpoint")
                     code != 200 -> throw DhunException(DhunError.Parse("HTTP $code from ${alt.label} /$endpoint"))
                     else -> return Json.parseToJsonElement(response.bodyAsText()).jsonObject
                 }
@@ -333,6 +314,9 @@ class InnerTubeClient(
 
     private suspend fun postJson(endpoint: String, body: JsonObject): JsonObject {
         val version = clientVersion()
+        // context() may have been built BEFORE the first version discovery.
+        // Keep body and X-YouTube-Client-Version aligned on the very first request.
+        val requestBody = bodyWithClientVersion(body, version)
         var lastError: DhunError = DhunError.Unknown()
         repeat(MAX_ATTEMPTS) { attempt ->
             globalRateGate.await() // Phase 14: 429 global backoff — all calls wait out a tripped gate
@@ -346,12 +330,12 @@ class InnerTubeClient(
                         append(HttpHeaders.ContentType, "application/json")
                     }
                     timeout { requestTimeoutMillis = 20_000 }
-                    setBody(body.toString())
+                    setBody(requestBody.toString())
                 }
                 val code = response.status.value
                 when {
                     code == 429 -> lastError = onRateLimited(response.headers["Retry-After"])
-                    code in 500..599 -> lastError = DhunError.Network
+                    code in 500..599 -> lastError = DhunError.Network("HTTP $code from /$endpoint")
                     code != 200 -> throw DhunException(DhunError.Parse("HTTP $code from /$endpoint"))
                     else -> return Json.parseToJsonElement(response.bodyAsText()).jsonObject
                 }
@@ -399,7 +383,7 @@ class InnerTubeClient(
         is HttpRequestTimeoutException,
         is ConnectTimeoutException,
         is SocketTimeoutException,
-        is IOException -> DhunError.Network
+        is IOException -> DhunError.Network("${t::class.simpleName}: ${diagnosticText(t.message.orEmpty())}")
         else -> DhunError.Unknown(t.message)
     }
 
@@ -533,3 +517,30 @@ class AltInnertubeClient(
     /** When set, context includes `thirdParty.embedUrl` (WEB_EMBEDDED_PLAYER). */
     internal val thirdPartyEmbedUrl: String? = null,
 )
+
+/** Preserve the service's reason instead of turning every rejection into a detail-less singleton. */
+internal fun checkPlayability(root: JsonObject): JsonObject {
+    val playability = root.obj("playabilityStatus")
+    val status = playability.str("status")
+    val screen = playability.obj("errorScreen").obj("playerErrorMessageRenderer")
+    val reasons = listOfNotNull(
+        playability.str("reason"),
+        screen.obj("reason").str("simpleText") ?: screen.allRunsText("reason", "runs"),
+        screen.obj("subreason").str("simpleText") ?: screen.allRunsText("subreason", "runs"),
+    ).distinct()
+    val detail = diagnosticText("status=$status; ${reasons.joinToString("; ")}")
+    return when (status) {
+        "OK", "LIVE_STREAM_OFFLINE" -> root
+        "LOGIN_REQUIRED" -> throw DhunException(DhunError.AuthRequired(detail))
+        "UNPLAYABLE", "ERROR" -> throw DhunException(DhunError.Unavailable(detail))
+        else -> throw DhunException(DhunError.Parse(detail))
+    }
+}
+
+internal fun bodyWithClientVersion(body: JsonObject, version: String): JsonObject {
+    val context = body.obj("context").orEmpty()
+    val client = (context["client"] as? JsonObject).orEmpty()
+    return JsonObject(body + ("context" to JsonObject(
+        context + ("client" to JsonObject(client + ("clientVersion" to JsonPrimitive(version)))),
+    )))
+}

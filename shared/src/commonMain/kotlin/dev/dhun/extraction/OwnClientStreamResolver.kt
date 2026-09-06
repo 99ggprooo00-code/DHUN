@@ -4,6 +4,9 @@ import dev.dhun.core.DhunError
 import dev.dhun.core.DhunException
 import dev.dhun.core.DhunResult
 import dev.dhun.core.StreamInfo
+import dev.dhun.core.detailString
+import dev.dhun.core.diagnosticText
+import dev.dhun.core.withDetail
 import dev.dhun.innertube.INNERTUBE_USER_AGENT
 import dev.dhun.innertube.InnerTubeClient
 import dev.dhun.innertube.arr
@@ -114,31 +117,32 @@ class OwnClientStreamResolver(
 }
 
 /**
- * Folds per-client failures into one typed error. The first non-Parse error
- * wins the type (AuthRequired/Network/… are more actionable than parser
- * noise); the summary naming every client's outcome rides along as `detail`
- * for logs and the diagnostics harness screen.
+ * Keep every client's evidence, including UNPLAYABLE/ERROR reasons. A rejected
+ * embedded client is not proof that the track is removed: rate limiting,
+ * authentication and connectivity take precedence over generic unavailability.
+ * Bound each reason, not the whole chain, so the last clients are not lost.
  */
 internal fun aggregateResolveFailures(outcomes: Map<String, DhunError>): DhunError {
     val summary = outcomes.entries.joinToString("; ") { (label, error) ->
-        val text = when (error) {
-            is DhunError.AuthRequired -> "AUTH_REQUIRED" + (error.detail?.let { "($it)" } ?: "")
-            is DhunError.Parse -> "PARSE(${error.detail ?: "response shape"})"
+        val category = when (error) {
+            is DhunError.AuthRequired -> "AUTH_REQUIRED"
+            is DhunError.Parse -> "PARSE"
             is DhunError.RateLimited -> "RATE_LIMITED"
-            DhunError.Network -> "NETWORK"
-            DhunError.Unavailable -> "UNAVAILABLE"
-            is DhunError.Unknown -> "UNKNOWN(${error.causeMessage ?: ""})"
+            is DhunError.Network -> "NETWORK"
+            is DhunError.Unavailable -> "UNAVAILABLE"
+            is DhunError.Unknown -> "UNKNOWN"
         }
-        "$label=$text"
-    }.take(400)
-    val preferred = outcomes.values.firstOrNull { it !is DhunError.Parse }
-        ?: outcomes.values.firstOrNull()
-        ?: DhunError.Parse("no attempts made")
-    return when (preferred) {
-        is DhunError.AuthRequired -> DhunError.AuthRequired(summary)
-        is DhunError.Parse -> DhunError.Parse(summary)
-        else -> preferred
+        val detail = error.detailString()?.let { "(${diagnosticText(it, 180)})" }.orEmpty()
+        "$label=$category$detail"
     }
+    val errors = outcomes.values
+    val preferred = errors.firstOrNull { it is DhunError.RateLimited }
+        ?: errors.firstOrNull { it is DhunError.AuthRequired }
+        ?: errors.firstOrNull { it is DhunError.Network }
+        ?: errors.firstOrNull { it !is DhunError.Parse }
+        ?: errors.firstOrNull()
+        ?: return DhunError.Parse("no attempts made")
+    return preferred.withDetail(summary)
 }
 
 internal fun parseStreamInfo(videoId: String, root: JsonObject): StreamInfo {

@@ -1,0 +1,20 @@
+{
+  "onResponseReceivedActions": [
+    {
+      "appendContinuationItemsAction": {
+        "continuationItems": [
+          {
+            "continuationItemRenderer": {
+              "continuationEndpoint": {
+                "continuationCommand": {
+                  "token": "page-three"
+                }
+              }
+            }
+          }
+        ],
+        "targetId": "home-feed"
+      }
+    }
+  ]
+}

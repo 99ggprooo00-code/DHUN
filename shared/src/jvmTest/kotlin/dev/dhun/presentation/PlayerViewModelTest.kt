@@ -104,11 +104,11 @@ class PlayerViewModelTest {
         override suspend fun homeFeedContinuation(continuationToken: String) =
             DhunResult.Success(dev.dhun.core.HomeFeedPage())
         override suspend fun relatedTracks(videoId: String) = related
-        override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> = DhunResult.Failure(DhunError.Unavailable)
+        override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> = DhunResult.Failure(DhunError.Unavailable())
         override suspend fun getLyrics(videoId: String) = lyrics
-        override suspend fun artistPage(browseId: String): DhunResult<ArtistPage> = DhunResult.Failure(DhunError.Unavailable)
-        override suspend fun albumPage(browseId: String): DhunResult<AlbumDetail> = DhunResult.Failure(DhunError.Unavailable)
-        override suspend fun playlistPage(browseId: String): DhunResult<PlaylistDetail> = DhunResult.Failure(DhunError.Unavailable)
+        override suspend fun artistPage(browseId: String): DhunResult<ArtistPage> = DhunResult.Failure(DhunError.Unavailable())
+        override suspend fun albumPage(browseId: String): DhunResult<AlbumDetail> = DhunResult.Failure(DhunError.Unavailable())
+        override suspend fun playlistPage(browseId: String): DhunResult<PlaylistDetail> = DhunResult.Failure(DhunError.Unavailable())
     }
 
     private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {
@@ -225,7 +225,7 @@ class PlayerViewModelTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
             val player = FakePlayer()
-            val provider = FakeProvider(related = DhunResult.Failure(DhunError.Network))
+            val provider = FakeProvider(related = DhunResult.Failure(DhunError.Network()))
             val vm = newVm(player, provider, scope)
             player.prepareQueue(listOf(track("a")), 0)
             eventually { vm.relatedState.value is RelatedUiState.Error }

@@ -191,15 +191,15 @@ class UseCasesTest {
         override suspend fun relatedTracks(videoId: String) =
             DhunResult.Success(emptyList<Track>())
         override suspend fun getStreamInfo(videoId: String) =
-            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable)
+            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable())
         override suspend fun getLyrics(videoId: String) =
             DhunResult.Success<dev.dhun.core.Lyrics>(dev.dhun.core.Lyrics.NotAvailable)
         override suspend fun artistPage(browseId: String) =
-            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable)
+            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable())
         override suspend fun albumPage(browseId: String) =
-            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable)
+            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable())
         override suspend fun playlistPage(browseId: String) =
-            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable)
+            DhunResult.Failure(dev.dhun.core.DhunError.Unavailable())
     }
 
     private fun shelf(title: String, vararg trackIds: String) = dev.dhun.core.HomeSection(
@@ -262,16 +262,15 @@ class UseCasesTest {
     }
 
     @Test
-    fun homePaginationDropsDuplicateShelvesAndStopsOnAnEmptyPage() = runBlocking {
+    fun homePaginationKeepsNewMusicWithRepeatedShelfTitles() = runBlocking {
         val provider = PagingProvider(
             first = dev.dhun.core.HomeFeedPage(
                 sections = listOf(shelf("Made for you", "a1")),
                 continuationToken = "dup",
             ),
             pages = mapOf(
-                // Same shelf title again: LazyColumn keys are title-based, so a
-                // duplicate would crash the list — and an empty page means the
-                // server is just repeating itself.
+                // A repeated label with DIFFERENT music is a new shelf, not
+                // an empty page. LazyColumn uses indexed keys, not titles.
                 "dup" to dev.dhun.core.HomeFeedPage(
                     sections = listOf(shelf("Made for you", "a9")),
                     continuationToken = "forever",
@@ -282,9 +281,37 @@ class UseCasesTest {
 
         val feed = (useCase() as DhunResult.Success).value
         val after = (useCase.loadMore(feed) as DhunResult.Success).value
-        assertEquals(1, after.sections.size, "a repeated shelf must not be appended")
-        assertEquals("a1", (after.sections[0].items[0] as dev.dhun.core.HomeItem.TrackItem).track.id)
-        assertNull(after.continuationToken, "a page that adds nothing ends pagination")
+        assertEquals(2, after.sections.size, "a repeated title must not discard new music")
+        assertEquals(listOf("a1", "a9"), after.sections.flatMap { it.tracks }.map { it.id })
+        assertEquals("forever", after.continuationToken)
+    }
+
+    @Test
+    fun duplicateOrEmptyPagesKeepAnAdvancingContinuation() = runBlocking {
+        for (nextSections in listOf(emptyList(), listOf(shelf("Recommended", "a1")))) {
+            val provider = PagingProvider(
+                first = dev.dhun.core.HomeFeedPage(listOf(shelf("Recommended", "a1")), "page2"),
+                pages = mapOf("page2" to dev.dhun.core.HomeFeedPage(nextSections, "page3")),
+            )
+            val useCase = GetHomeFeedUseCase(provider, FakeHistoryRepo)
+            val current = (useCase() as DhunResult.Success).value
+            val after = (useCase.loadMore(current) as DhunResult.Success).value
+            assertEquals(current.sections, after.sections)
+            assertEquals("page3", after.continuationToken)
+        }
+    }
+
+    @Test
+    fun repeatedTokenStopsButDoesNotDiscardNewMusic() = runBlocking {
+        val provider = PagingProvider(
+            first = dev.dhun.core.HomeFeedPage(listOf(shelf("Recommended", "a1")), "page2"),
+            pages = mapOf("page2" to dev.dhun.core.HomeFeedPage(listOf(shelf("Recommended", "a2")), "page2")),
+        )
+        val useCase = GetHomeFeedUseCase(provider, FakeHistoryRepo)
+        val current = (useCase() as DhunResult.Success).value
+        val after = (useCase.loadMore(current) as DhunResult.Success).value
+        assertEquals(listOf("a1", "a2"), after.sections.flatMap { it.tracks }.map { it.id })
+        assertNull(after.continuationToken)
     }
 
     /** Minimal fake for the pure grouping test (no DB needed). */
