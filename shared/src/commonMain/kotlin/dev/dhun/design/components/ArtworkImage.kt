@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -63,9 +66,10 @@ fun ArtworkImage(
         .crossfade(true)
         .build()
 
-    // Pulsing placeholder alpha while loading — driven by Coil's loading state
-    // via AsyncImage's `onLoading`/`onSuccess` we could toggle, but a simple
-    // always-pulsing backdrop reads well and keeps the component stateless.
+    // Load phase drives the placeholder: pulse only while the fetch is in
+    // flight; a failed load settles to a static gradient instead of pulsing
+    // forever (which read as a "skeleton that never resolves").
+    var phase by remember(imageUrl) { mutableStateOf(LoadPhase.Loading) }
     val pulse by rememberInfiniteTransition(label = "artwork-pulse")
         .animateFloat(
             initialValue = 0.6f,
@@ -73,6 +77,7 @@ fun ArtworkImage(
             animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
             label = "alpha",
         )
+    val placeholderAlpha = if (phase == LoadPhase.Loading) pulse else 1f
 
     Box(
         modifier = modifier.clip(resolvedShape),
@@ -82,22 +87,29 @@ fun ArtworkImage(
             modifier = Modifier.fillMaxSize().background(
                 Brush.linearGradient(
                     listOf(
-                        DhunColors.placeholderStart.copy(alpha = pulse),
-                        DhunColors.placeholderEnd.copy(alpha = pulse),
+                        DhunColors.placeholderStart.copy(alpha = placeholderAlpha),
+                        DhunColors.placeholderEnd.copy(alpha = placeholderAlpha),
                     ),
                 ),
             ),
         )
-        AsyncImage(
-            model = request,
-            contentDescription = contentDescription,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = contentScale,
-            // Coil handles crossfade; we keep the placeholder underneath.
-            // Error fallback: AsyncImage will keep the placeholder visible.
-        )
+        if (phase != LoadPhase.Failed) {
+            AsyncImage(
+                model = request,
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = contentScale,
+                // Coil handles crossfade; we keep the placeholder underneath.
+                onLoading = { phase = LoadPhase.Loading },
+                onSuccess = { phase = LoadPhase.Loaded },
+                onError = { phase = LoadPhase.Failed },
+            )
+        }
     }
 }
+
+/** Placeholder lifecycle for [ArtworkImage] (resets per URL). */
+private enum class LoadPhase { Loading, Loaded, Failed }
 
 /**
  * Circular variant for artist avatars.

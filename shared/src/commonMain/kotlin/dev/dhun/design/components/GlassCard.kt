@@ -42,6 +42,11 @@ fun GlassCard(
     contentPadding: androidx.compose.foundation.layout.PaddingValues? = null,
     elevated: Boolean = true,
     tint: Color = Color.Transparent,
+    /**
+     * Edge hairline. Dialogs/sheets pass a softer token so the surface melts
+     * into the scrim instead of drawing a hard boundary on dark glass.
+     */
+    borderColor: Color = DhunColors.glassEdge,
     content: @Composable BoxScope.() -> Unit,
 ) {
     @Suppress("UNUSED_VARIABLE")
@@ -73,7 +78,7 @@ fun GlassCard(
                     Modifier
                 },
             )
-            .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), shape),
+            .border(BorderStroke(DhunSpacing.border, borderColor), shape),
     ) {
         // Specular top sheen — cheap glass cue without a blur pass.
         Box(

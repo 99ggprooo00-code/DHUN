@@ -73,6 +73,17 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   scrolling.
 
 ### Fixed
+- **Android startup splash** — the connecting screen no longer prints raw
+  attempt/log lines; brand + activity indicator + static "Initializing
+  audio engine…" with a subtle corner version (diagnostics stay in Logcat).
+- **Android playback hardening** — per-segment load retries raised for
+  stall-heavy mobile networks; a corrupt segment-cache dir now degrades
+  to direct streaming (service + fallback paths) instead of killing all
+  audio; failed artwork loads settle to a static placeholder instead of
+  pulsing forever.
+- **Dialog sheets** — overflow + add-to-playlist sheets use 28 dp radii
+  with a faint edge (`GlassCard.borderColor`) so they melt into the dark
+  glass instead of drawing a hard boundary.
 - **Android playback recovery (APK "Error — tap to see")** — transient
   ExoPlayer failures (expired-URL 403s, timeouts, dropped connections,
   resolve failures) now auto-recover with a bounded re-resolve

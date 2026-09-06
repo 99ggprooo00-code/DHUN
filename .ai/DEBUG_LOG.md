@@ -1,5 +1,35 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — device screenshots: splash rawness, total APK stream failure, sheets (session arena/01a0740a-dhun)
+
+**Report:** splash shows raw attempt/log lines; APK streams nothing
+(persistent mini-player Error + never-resolving skeletons); dialog sheets
+have hard boundaries on dark glass. (Screenshots referenced but not
+viewable in sandbox — fixes from descriptions + code audit.)
+
+**Audit results:**
+- Manifest/FGS/audio-focus all correct (mediaPlayback type + permission,
+  exported MediaSessionService, handleAudioFocus/noisy, WAKE_LOCK).
+  Koin starts in Application.onCreate before any service access. No
+  cleartext anywhere (all endpoints https) — `usesCleartextTraffic=false`
+  is not the blocker.
+- Real total-failure cliff found: `SimpleCache` throws on a corrupt cache
+  dir, and BOTH engine paths (service + session-less fallback) built the
+  cache unconditionally → dead app, zero audio. Now both degrade to
+  direct streaming (`audioCache = null` path in `PlaybackGraph`).
+- Throttled/stall-y carrier reads got more per-segment retries
+  (`DefaultLoadErrorHandlingPolicy(5)`) before the error reaches the
+  recovery listener from the previous entry.
+- `ArtworkImage` pulsed its placeholder forever on failed loads (read as
+  never-resolving skeletons) → now settles static on error.
+- Splash rewritten (indicator + static line + corner version, logs to
+  Logcat only); dialogs to 28dp + `GlassCard.borderColor` (default keeps
+  old look elsewhere).
+- Still NOT done: if the device's network gates the /player endpoint or
+  googlevideo bytes per-region, no Android engine exists (ADR-001: no
+  yt-dlp on Android) — the error dialog now surfaces the exact chain for
+  the next report. Hardware verification OPEN.
+
 ## 2026-09-06 — APK "Error — tap to see" stuck-error + blurry Now Playing art (session arena/01a0740a-dhun)
 
 **Symptom:** Android build latched `PlaybackState.Error` on any ExoPlayer

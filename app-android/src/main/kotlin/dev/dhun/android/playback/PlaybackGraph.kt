@@ -37,9 +37,15 @@ object PlaybackGraph {
      * we keep a synthetic URI + the same key so CacheDataSource serves
      * local spans without a network round-trip.
      */
+    /**
+     * @param audioCache segment cache, or null to stream direct with no
+     * caching. The null path exists so a corrupt/unopenable cache dir
+     * degrades playback instead of killing the whole engine (see
+     * [buildExoPlayer]'s fallback — SimpleCache throws on corrupt state).
+     */
     fun resolvingDataSourceFactory(
         streamCache: DhunStreamCache,
-        audioCache: DhunAudioSegmentCache,
+        audioCache: DhunAudioSegmentCache?,
     ): DataSource.Factory {
         val httpFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(
@@ -50,19 +56,25 @@ object PlaybackGraph {
             .setReadTimeoutMs(25_000)
             .setAllowCrossProtocolRedirects(true)
 
-        val cacheFactory = CacheDataSource.Factory()
-            .setCache(audioCache.cache)
-            .setUpstreamDataSourceFactory(httpFactory)
-            // Prefer cache; on cache read errors fall through to network once.
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-            // Key already set on DataSpec in the resolver — do not let the
-            // default URI-based key fragment the cache across URL rotations.
-            .setCacheKeyFactory { dataSpec ->
-                dataSpec.key?.takeIf { it.isNotBlank() } ?: dataSpec.uri.toString()
-            }
+        // Outer data source: segment cache when available, plain HTTP when
+        // the cache dir is unusable (no offline replay in that mode).
+        val outerFactory: DataSource.Factory = if (audioCache != null) {
+            CacheDataSource.Factory()
+                .setCache(audioCache.cache)
+                .setUpstreamDataSourceFactory(httpFactory)
+                // Prefer cache; on cache read errors fall through to network once.
+                .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+                // Key already set on DataSpec in the resolver — do not let the
+                // default URI-based key fragment the cache across URL rotations.
+                .setCacheKeyFactory { dataSpec ->
+                    dataSpec.key?.takeIf { it.isNotBlank() } ?: dataSpec.uri.toString()
+                }
+        } else {
+            httpFactory
+        }
 
         return ResolvingDataSource.Factory(
-            cacheFactory,
+            outerFactory,
             ResolvingDataSource.Resolver { dataSpec ->
                 val videoId = try {
                     check(dataSpec.uri.scheme == "dhun") { "unexpected uri: ${dataSpec.uri}" }
@@ -78,7 +90,7 @@ object PlaybackGraph {
                         .setKey(videoId)
                         .build()
                 } catch (e: Exception) {
-                    if (audioCache.hasContent(videoId)) {
+                    if (audioCache != null && audioCache.hasContent(videoId)) {
                         android.util.Log.i(
                             "DHUN",
                             "offline/cached replay for $videoId " +
@@ -100,14 +112,31 @@ object PlaybackGraph {
         )
     }
 
+    /**
+     * Pass `audioCache = null` only as a last resort (corrupt cache dir):
+     * playback streams direct with no segment caching or offline replay.
+     * Callers must try the cached build first and fall back here on throw.
+     */
     fun buildExoPlayer(
         context: Context,
         streamCache: DhunStreamCache,
-        audioCache: DhunAudioSegmentCache = DhunAudioSegmentCache.get(context),
+        audioCache: DhunAudioSegmentCache? = DhunAudioSegmentCache.get(context),
     ): ExoPlayer {
+        // Stall-heavy mobile carriers need more per-segment retries than the
+        // default before a track is declared dead — throttled/shaped reads
+        // otherwise surface as instant errors. Anything still failing
+        // after these reaches onPlayerError, where the recovery listener
+        // runs invalidate → re-resolve.
+        val mediaSourceFactory = DefaultMediaSourceFactory(
+            resolvingDataSourceFactory(streamCache, audioCache),
+        ).setLoadErrorHandlingPolicy(
+            androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy(
+                /* minimumLoadableRetryCount = */ SEGMENT_RETRY_COUNT,
+            ),
+        )
         val player = ExoPlayer.Builder(
             context,
-            DefaultMediaSourceFactory(resolvingDataSourceFactory(streamCache, audioCache)),
+            mediaSourceFactory,
         )
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -222,4 +251,6 @@ object PlaybackGraph {
 
     private const val MAX_RETRIES = 3
     private const val RETRY_BACKOFF_MS = 1_500L
+    /** Per-segment load retries before the error reaches onPlayerError. */
+    private const val SEGMENT_RETRY_COUNT = 5
 }
