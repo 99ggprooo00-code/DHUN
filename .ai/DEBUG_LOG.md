@@ -1,5 +1,28 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-06 — Safe branch packaging route prepared; no PR/session finalization
+
+The user clarified that normal work should continue without the one-time
+Arena session-ending action. Reuse `test-release.yml` with a default-on
+`build_only` input. Its job-level guard disallows publishing from non-main
+refs regardless of the input, build tokens are contents:read, and branch
+concurrency cannot cancel main's existing release group. Reuse of the SAME
+workflow counter is deliberate: using the general CI run number for a
+candidate MSI could make a later release MSI a numeric downgrade.
+
+Added revision-bound binary manifests/checksums, read-only Windows Installer
+COM property validation, and a disposable-runner-only install-over sentinel
+check before making the MSI artifact downloadable. The script does not
+launch DHUN or claim audio/visual acceptance. PowerShell/packaging execution
+is still pending. Local Python regressions: **19 PASS**; JSON fixtures: **29
+syntax-valid**. No new release, tag, PR, branch or repository setting changed.
+
+Node runtimes were checked from the upstream action manifests: checkout v5,
+setup-python v6 and upload-artifact v6 use Node 24. The guarded, unexecuted
+publish job's existing download-artifact v4 is unchanged.
+
+---
+
 ## 2026-09-06 — Corrected branch CI GREEN; release deliberately unchanged
 
 **Verified:** [CI 34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972) on

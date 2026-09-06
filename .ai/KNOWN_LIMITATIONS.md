@@ -27,6 +27,13 @@ no live audio/uncached byte retrieval was verified, and no visual/native or
 soak acceptance is claimed.** The no-PR/no-merge/no-release boundary remains
 in force; no new downloadable candidate was published.
 
+A build-only candidate route is being prepared without PR/merge/session
+finalization: APK/MSI artifacts, checksums/provenance and actual MSI metadata
+checks, plus install-over/userdata/uninstall sentinels on a disposable
+Windows Actions runner. Packaging and those installer checks are **pending**;
+the helper/publishing-boundary Python tests pass locally. A successful
+hosted-installer smoke check still will not prove real playback or visuals.
+
 The user-provided Windows yt-dlp installation state is unknown. The old
 locator could miss an installed `yt-dlp.exe`; the new candidate checks PATH /
 `DHUN_YTDLP` and provides explicit missing-tool evidence. yt-dlp remains

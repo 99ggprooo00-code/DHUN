@@ -58,6 +58,23 @@ phone). Stable URLs:
 `…/dhun-test.msi`. What is in a build: [`CHANGELOG.md`](CHANGELOG.md)
 (`Unreleased` until `v0.1.0` earns its tag).
 
+### Branch candidates without publishing a release
+
+The existing `test-release` workflow also supports a manual **build-only**
+run on a session branch. `build_only` defaults to true; non-main refs cannot
+run the publish job even if that input is turned off. Builds use read-only
+repository permissions. APK/MSI ZIP artifacts are retained for 14 days in
+Actions (GitHub sign-in may be required), separate from the single rolling
+`test` release. No new branch, PR or release is needed.
+
+Each ZIP includes the binary, SHA256 and a `*.build-info.json` with its exact
+source SHA/run and internal MSI version. The Windows job reads the actual
+MSI's version/upgrade identity and checks install-over/data preservation on
+a disposable hosted Windows runner; that is not a user-machine/audio test.
+Use [the short Windows candidate guide](docs/verification/windows-candidate.md)
+when a successful build link is supplied. Do not download the old public
+release expecting unmerged branch fixes.
+
 ### Install / uninstall (test builds)
 
 These are **unsigned/debug test artifacts**, not store releases. Sideload

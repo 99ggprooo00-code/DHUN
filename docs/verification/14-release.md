@@ -272,7 +272,31 @@ cleanup runs once, start denial is typed, and a track ID containing `429`
 is not a rate limit. Corresponding Kotlin regressions now **PASS in the
 verified branch run**. None of this closes playback, UI or installation acceptance.
 
-**Next Windows acceptance, only with a CI-green published candidate:**
+### Build-only packaging follow-up (pending execution)
+
+The user clarified that ordinary development is allowed; only the one-time
+Arena session-ending action must be avoided. No PR/merge is being used.
+The existing packaging workflow now supports `build_only=true` dispatches
+on this session branch, with read-only build permissions, isolated branch
+concurrency and a job-level `publish` guard requiring main and publishing
+mode. Branches cannot publish. The same workflow counter supplies versions,
+avoiding a separate artifact workflow's larger counter blocking later MSI
+upgrades.
+
+New staging adds exact file checksums and source/run manifests (only
+whitelisted non-secret metadata), queries the actual MSI ProductVersion and
+stable UpgradeCode, and includes a short Windows guide. A Windows-only CI
+script is restricted to disposable Actions runners: download/checksum the
+existing release, silently install it, seed userdata/cache sentinels,
+install over it, verify those files, and check uninstall cleanup. Full logs
+are retained; this does not launch the app or validate sound/visuals.
+
+**Local results:** 19 Python tests pass (including publishing-guard truth
+table and artifact provenance tests); 29 JSON fixtures pass syntax checks.
+**Packaging/MSI/PowerShell results:** not executed yet. No new artifact or
+hardware pass may be claimed until a real run is recorded here.
+
+**Next Windows acceptance, only with a CI-green candidate artifact:**
 
 1. Record build SHA, published time, internal MSI version and SHA256.
    Quit all DHUN/tray processes. Back up test userdata before the upgrade
