@@ -10,4 +10,7 @@
     <!-- Dynamic "Now playing" shortcut (Phase 15): short label is constant;
          the long label is built per-track by NowPlayingShortcutLabels. -->
     <string name="shortcut_now_playing_short">Playing</string>
+
+    <!-- Accessibility (Phase 15): announced by TalkBack, never shown as UI text. -->
+    <string name="a11y_connecting">Initializing audio engine</string>
 </resources>

@@ -39,6 +39,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -213,7 +219,10 @@ class MainActivity : ComponentActivity() {
                                 color = DhunColors.errorContainer,
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
-                                    .fillMaxWidth(),
+                                    .fillMaxWidth()
+                                    // TalkBack announces the degraded playback
+                                    // mode when this banner appears.
+                                    .semantics { liveRegion = LiveRegionMode.Polite },
                             ) {
                                 Text(
                                     reason,
@@ -236,7 +245,12 @@ class MainActivity : ComponentActivity() {
                 if (showBatteryRationale) {
                     AlertDialog(
                         onDismissRequest = { batteryRationaleVisible.value = false },
-                        title = { Text("Keep playback reliable") },
+                        title = {
+                            Text(
+                                "Keep playback reliable",
+                                modifier = Modifier.semantics { heading() },
+                            )
+                        },
                         text = {
                             Text(
                                 "Android battery optimization can stop background music " +
@@ -463,6 +477,7 @@ private fun ConnectingScreen(log: List<String>, version: String) {
     // Consumer splash: brand + indeterminate indicator + one static status
     // line. The raw attempt/log lines stay in Logcat (via logLine) — they
     // read as a terminal on screen and never ship to users.
+    val connectingDescription = stringResource(R.string.a11y_connecting)
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -483,6 +498,11 @@ private fun ConnectingScreen(log: List<String>, version: String) {
             CircularProgressIndicator(
                 color = DhunColors.accent,
                 strokeWidth = DhunSpacing.progressStroke,
+                modifier = Modifier.semantics {
+                    // Progress spinners have no text node — give screen
+                    // readers something to announce.
+                    contentDescription = connectingDescription
+                },
             )
             Spacer(modifier = Modifier.height(DhunSpacing.lg))
             Text(
@@ -516,7 +536,9 @@ private fun FailureScreen(message: String, onRetry: () -> Unit) {
         Text(
             "Playback failed to start",
             color = DhunColors.error,
-            modifier = Modifier.padding(top = DhunSpacing.md),
+            modifier = Modifier
+                .padding(top = DhunSpacing.md)
+                .semantics { heading() },
         )
         Text(
             message,
