@@ -3,15 +3,15 @@ CREATE TABLE DownloadedTrack (
     title TEXT NOT NULL,
     artistName TEXT NOT NULL,
     albumName TEXT,
-    durationSeconds INTEGER AS kotlin.Int NOT NULL,
+    durationSeconds INTEGER NOT NULL,
     thumbnailUrl TEXT,
     localAudioPath TEXT NOT NULL,
     localArtworkPath TEXT,
-    fileSizeBytes INTEGER AS kotlin.Long NOT NULL,
+    fileSizeBytes INTEGER NOT NULL,
     mimeType TEXT NOT NULL,
-    bitrateKbps INTEGER AS kotlin.Int,
+    bitrateKbps INTEGER,
     downloadState TEXT NOT NULL,
-    downloadedAtEpochMs INTEGER AS kotlin.Long NOT NULL
+    downloadedAtEpochMs INTEGER NOT NULL
 );
 
 insertOrReplace:
