@@ -73,7 +73,11 @@ val appModule = module {
     // pool over the network chain (never the offline-first wrapper — a
     // not-yet-downloaded file must resolve over the network).
     single<DownloadStorage> { AndroidDownloadStorage(androidContext()) }
-    single<DownloadManager> {
+    // Concrete FileDownloadManager — preserved as its own singleton so
+    // tests and direct callers still see the real engine (the
+    // ForegroundServiceDownloadManager below delegates to it). DO NOT
+    // remove: the shared engine's contract is this implementation.
+    single {
         FileDownloadManager(
             repository = get<DownloadRepository>(),
             resolver = get<StreamResolver>(),
@@ -82,6 +86,17 @@ val appModule = module {
             scope = get(),
         )
     }
+    // Android-side decorator: kicks off DhunDownloadService on every
+    // enqueue so downloads survive app backgrounding / OEM killers.
+    // All other operations are pure pass-throughs.
+    single<DownloadManager> {
+        dev.dhun.android.download.ForegroundServiceDownloadManager(
+            context = androidContext(),
+            delegate = get(),
+            controller = get(),
+        )
+    }
+    single { dev.dhun.android.download.DownloadServiceController() }
     single { SaveNowPlayingUseCase(get<DataLayer>().nowPlaying) }
     single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
     single { RecordPlayUseCase(get<DataLayer>().history) }
