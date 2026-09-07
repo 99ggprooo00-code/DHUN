@@ -1,5 +1,44 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-07 — Windows second-window report: investigated, no code change warranted
+
+**Report:** on Windows, opening DHUN also opens a second small mini-player window
+alongside the real app.
+
+**Finding: already fixed, twice, and merged.** `ADR-004` records the identical
+complaint against the `test` build of `2026-09-06T06:51:40Z`. PR #28 (`b8f148d`)
+deleted `ui/MiniPlayerWindow.kt` and the second Compose `Window`; PR #34 (`d1e0408`)
+removed the remaining `JOptionPane` startup/fatal surfaces.
+
+**Static audit of `481b77b`** (exhaustive grep over `app-desktop/**/*.kt` for
+`Window(`, `ComposeWindow`, `JOptionPane`, `JDialog`, `JWindow`, `JFrame`,
+`java.awt.Window|Frame|Dialog`, `AlertDialog`, `Dialog(`, `Popup(`, `Tooltip(`,
+`SetWindowPos`, `GetWindowRect`, `moveWindow`, `FindWindow`, `CreateWindow`,
+`ShowWindow`, `HWND`):
+
+| Path | Verdict |
+|---|---|
+| `Main.kt:228` `Window(` | startup-error window — gated by `initError != null && koinInstance == null`, terminated by `return@application` at line 245 |
+| `Main.kt:420` `Window(` | the main window — normal path only |
+| `Main.kt:290` `AtomicReference<ComposeWindow>()` | holds a reference; creates nothing |
+| `Main.kt:293` `showMainWindow()` | `isVisible` / `toFront` / `requestFocus` on the existing window |
+| `DhunTray.kt` | `TrayIcon` + `PopupMenu` — not a window |
+| `Smct.kt:451/459` `FindWindowW` | **finds** the existing `SunAwtFrame` HWND for `GetForWindow`; movement calls deleted (`Smct.kt:442-443`) |
+| `JOptionPane` | 0 imports; one comment at `Main.kt:112` |
+
+**Conclusion:** two simultaneous windows are not reachable from DHUN's own code on
+`481b77b`. Either the tested build is older, or Koin init failed — in which case the
+error window *replaces* the main window, so the user would still see exactly one.
+
+**Decision: no `app-desktop` change.** Re-fixing a fixed bug adds risk without
+evidence. The open work is a hardware re-test of the rolling `test` MSI
+(`481b77b`, published `2026-09-07T04:58:25Z`); if it reproduces, `dhun-startup.log`
+distinguishes the Compose error window from a leftover AWT surface.
+
+**Boundary:** this audit is static. No Windows machine or display exists here, so
+one-window startup has never been verified on hardware for any build.
+
+
 ## 2026-09-07 — C1: Koin self-recursion in the Android `DownloadManager` decorator (coordinator `arena/01a07a07-dhun`)
 
 **Symptom (predicted, never observed on hardware):** Android app would crash at

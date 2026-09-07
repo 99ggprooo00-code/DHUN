@@ -317,3 +317,8 @@ Current-track preservation during reorder deserves a regression check.
    workflow only compiles it, so `offline-verdict|PASS` is unestablished.
 3. Decide what to do with **PR #31** (`CONFLICTING`/`DIRTY`, superseded by #32's docs).
 4. Get a green **live** rot-drill verdict to close issue #14.
+5. **Windows one-window startup re-test.** ADR-004 (PR #28) and PR #34 both landed;
+   the static audit in `.ai/DEBUG_LOG.md` finds no surviving second-window path on
+   `481b77b`, but the behaviour has never been verified on a real Windows machine.
+   Re-test the rolling `test` MSI published `2026-09-07T04:58:25Z` and capture
+   `dhun-startup.log` if a second window still appears.

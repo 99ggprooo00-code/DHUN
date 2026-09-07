@@ -42,6 +42,34 @@ hardware gate.**
   even though the probe compiles.
 
 
+## 2026-09-07 — Windows "second small window on startup": fixed twice, hardware re-test still required
+
+The user's report that opening DHUN on Windows also opens a second small mini-player
+window is **not an open code defect**. It is recorded in
+`docs/decisions/ADR-004-remove-separate-miniplayer-window.md` (ACCEPTED, user decision
+2026-09-06) against the `test` build published `2026-09-06T06:51:40Z`, and it has been
+fixed twice:
+
+- **PR #28** (`b8f148d`) deleted `ui/MiniPlayerWindow.kt`, removed the second Compose
+  `Window` from `Main.kt`, and stripped the SMTC `GetWindowRect`/`SetWindowPos` calls.
+- **PR #34** (`d1e0408`) removed every `JOptionPane` startup/fatal path — the last
+  surface able to own a second small native window.
+
+A static audit of `origin/main` @ `481b77b` finds **no surviving second-window path**:
+exactly two `Window(` calls in `Main.kt` and they are mutually exclusive (the
+startup-error window is gated by `initError != null && koinInstance == null` and ends
+in `return@application`); `JOptionPane` import count 0; no `JDialog`/`JWindow`/
+`JFrame` instantiation; `showMainWindow()` only toggles `isVisible` on the existing
+window; `DhunTray` builds a `TrayIcon` + `PopupMenu`, not a frame; `Smct` uses
+`FindWindowW` only to locate the existing `SunAwtFrame` HWND.
+
+**Limitation that remains:** this is a **static** audit. No Windows machine, display,
+or jpackage runtime exists in this environment, so the one-window startup behaviour
+has **never been verified on hardware** — not for `481b77b`, and not for any earlier
+build. Green CI compiles the desktop module; it cannot observe a window. Any user
+report against a build older than `481b77b` (published `2026-09-07T04:58:25Z`) does
+not describe the current code.
+
 ## Latest Windows result / merged repair — 2026-09-06
 
 The user's negative report (install-over fails “Another version…”, audio
