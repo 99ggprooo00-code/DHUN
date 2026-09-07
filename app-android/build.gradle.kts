@@ -55,6 +55,18 @@ android {
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+    testOptions {
+        unitTests {
+            // The shortcut-XML and nav-state tests read real app resources
+            // (R.xml.shortcuts, strings) and real framework classes through
+            // Robolectric.
+            isIncludeAndroidResources = true
+            // Robolectric loads the full framework jar per test class — the
+            // Gradle default test heap is too small for it alongside the
+            // Compose/Koin classpath.
+            all { test -> test.maxHeapSize = "1024m" }
+        }
+    }
 }
 
 kotlin {
@@ -86,4 +98,30 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.10.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // ---- Unit tests (Phase 15 scaffold) -------------------------------------
+    // This module previously had NO test source set at all (known gap,
+    // ROADMAP "CI follow-up": add :app-android:testDebugUnitTest + Robolectric
+    // incl. a Koin graph test). Versions chosen for JDK 17 / AGP 8.7 / Kotlin
+    // 2.1 compatibility; Robolectric 4.14.1 is the first line that supports
+    // the API levels this app targets.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.test.ext:junit:1.2.1")
 }
+
+// ---------------------------------------------------------------------------
+// CI EXECUTION COUPLING — remove this block once a workflow runs
+// `:app-android:testDebugUnitTest` explicitly.
+//
+// WHY: every existing CI Android path (ci.yml "Android debug build" and
+// test-release.yml "Build debug APK") invokes ONLY :app-android:assembleDebug.
+// Before this module had tests that was harmless; with a test suite it means
+// broken/failing unit tests would ship silently, because assemble is a
+// compile gate, not a test gate. The session that added the scaffold could
+// not edit .github/workflows (frozen scope), so the minimal app-android-only
+// way to make CI actually EXECUTE the suite on every PR and release build is
+// this dependency. It adds no task to the APK itself.
+// ---------------------------------------------------------------------------
+tasks.named("assembleDebug") { dependsOn("testDebugUnitTest") }

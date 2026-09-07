@@ -47,6 +47,9 @@ import androidx.media3.session.SessionToken
 import dev.dhun.android.playback.AndroidDhunPlayer
 import dev.dhun.android.playback.DhunPlaybackService
 import dev.dhun.android.playback.PlaybackGraph
+import dev.dhun.android.shortcuts.ShortcutAction
+import dev.dhun.android.shortcuts.ShortcutIntents
+import dev.dhun.android.ui.NavStatePersistence
 import dev.dhun.core.PlaybackState
 import dev.dhun.data.DataLayer
 import dev.dhun.design.DhunColors
@@ -60,7 +63,6 @@ import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
-import dev.dhun.ui.shell.DetailRoute
 import dev.dhun.ui.shell.DhunAppShell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,11 +80,10 @@ class MainActivity : ComponentActivity() {
     private var player: AndroidDhunPlayer? = null
     private var persistence: NowPlayingPersistence? = null
     private var currentNav: AppNavState? = null
-    private var restoredNavTab: String? = null
-    private var restoredPlayerExpanded = false
-    private var restoredDetailRoutes: ArrayList<String>? = null
+    // Handed to NavStatePersistence lazily by the first composition (the
+    // original per-field restore was extracted into that object for tests).
+    private var lastSavedState: Bundle? = null
 
-    private enum class ShortcutAction { SEARCH, RESUME, LIBRARY }
     private val pendingShortcut = MutableStateFlow<ShortcutAction?>(null)
     private val batteryRationaleVisible = MutableStateFlow(false)
 
@@ -105,9 +106,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        restoredNavTab = savedInstanceState?.getString(KEY_NAV_TAB)
-        restoredPlayerExpanded = savedInstanceState?.getBoolean(KEY_PLAYER_EXPANDED) ?: false
-        restoredDetailRoutes = savedInstanceState?.getStringArrayList(KEY_DETAIL_ROUTES)
+        lastSavedState = savedInstanceState
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = false
@@ -123,7 +122,7 @@ class MainActivity : ComponentActivity() {
                 // Music-app back behavior: FullPlayer collapses first, then
                 // detail pages pop; only when nothing overlays do we park the
                 // app — BACK never kills the player.
-                val nav = androidx.compose.runtime.remember { restoredNavState() }
+                val nav = androidx.compose.runtime.remember { NavStatePersistence.restore(lastSavedState) }
                 currentNav = nav
                 BackHandler { if (!nav.closeTop()) moveTaskToBack(true) }
 
@@ -261,51 +260,12 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        currentNav?.let { nav ->
-            outState.putString(KEY_NAV_TAB, nav.selectedTab.name)
-            outState.putBoolean(KEY_PLAYER_EXPANDED, nav.playerExpanded)
-            outState.putStringArrayList(
-                KEY_DETAIL_ROUTES,
-                ArrayList(nav.detailStack.map(::encodeRoute)),
-            )
-        }
+        currentNav?.let { nav -> NavStatePersistence.save(nav, outState) }
         super.onSaveInstanceState(outState)
     }
 
-    private fun restoredNavState(): AppNavState = AppNavState().apply {
-        restoredNavTab?.let { name ->
-            selectedTab = runCatching { AppTab.valueOf(name) }.getOrDefault(AppTab.HOME)
-        }
-        playerExpanded = restoredPlayerExpanded
-        restoredDetailRoutes.orEmpty().mapNotNull(::decodeRoute).forEach { route -> detailStack.add(route) }
-    }
-
-    private fun encodeRoute(route: DetailRoute): String = when (route) {
-        is DetailRoute.ArtistPage -> "artist:${route.id}"
-        is DetailRoute.AlbumPage -> "album:${route.id}"
-        is DetailRoute.PlaylistPage -> "playlist:${route.isLocal}:${route.id}"
-    }
-
-    private fun decodeRoute(value: String): DetailRoute? {
-        val parts = value.split(':', limit = 3)
-        return when (parts.firstOrNull()) {
-            "artist" -> parts.getOrNull(1)?.let(DetailRoute::ArtistPage)
-            "album" -> parts.getOrNull(1)?.let(DetailRoute::AlbumPage)
-            "playlist" -> parts.getOrNull(2)?.let { id ->
-                DetailRoute.PlaylistPage(id, parts.getOrNull(1) == "true")
-            }
-            else -> null
-        }
-    }
-
     private fun handleShortcutIntent(intent: Intent?) {
-        val action = intent?.getStringExtra(EXTRA_SHORTCUT_ACTION) ?: return
-        pendingShortcut.value = when (action) {
-            SHORTCUT_SEARCH -> ShortcutAction.SEARCH
-            SHORTCUT_RESUME -> ShortcutAction.RESUME
-            SHORTCUT_LIBRARY -> ShortcutAction.LIBRARY
-            else -> null
-        }
+        pendingShortcut.value = ShortcutIntents.actionFrom(intent)
     }
 
     override fun onDestroy() {
@@ -468,13 +428,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "DHUN"
         private const val MAX_CONNECT_ATTEMPTS = 3
-        private const val EXTRA_SHORTCUT_ACTION = "dev.dhun.android.extra.SHORTCUT_ACTION"
-        private const val KEY_NAV_TAB = "dhun.nav.tab"
-        private const val KEY_PLAYER_EXPANDED = "dhun.player.expanded"
-        private const val KEY_DETAIL_ROUTES = "dhun.nav.routes"
-        private const val SHORTCUT_SEARCH = "search"
-        private const val SHORTCUT_RESUME = "resume"
-        private const val SHORTCUT_LIBRARY = "library"
         private var batteryExemptionRequested = false
     }
 }
