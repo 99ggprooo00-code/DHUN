@@ -376,15 +376,14 @@ class LibraryViewModel(
     fun playDownloaded(track: Track) {
         setPlayContext(PlayContext.LIBRARY)
         scope.launch {
-            // Queue the whole completed-downloads list with the tapped track
-            // at the head, mirroring Favorites/History context playback, so
-            // next/prev step through the offline library. A track without a
-            // completed row (e.g. tapped mid-download) falls back to a
-            // single-track queue; OfflineFirstStreamResolver then streams it
-            // until the local file exists.
-            val queue = downloads.value
-                .filter { it.isCompleted }
-                .map { it.toTrack() }
+            // Queue the completed-downloads list — in the same newest-first
+            // order the tab renders ([downloadsForUi]) — with the tapped
+            // track at the head, mirroring Favorites/History context
+            // playback, so next/prev follow the on-screen list. A track
+            // without a completed row (e.g. tapped mid-download) falls back
+            // to a single-track queue; OfflineFirstStreamResolver then
+            // streams it until the local file exists.
+            val queue = downloadsForUi.value.completed.map { it.toTrack() }
             val idx = queue.indexOfFirst { it.id == track.id }
             if (idx >= 0) {
                 player.prepareQueue(queue, idx, playWhenReady = true)
