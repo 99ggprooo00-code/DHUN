@@ -2,6 +2,7 @@ package dev.dhun.data
 
 import app.cash.sqldelight.db.SqlDriver
 import dev.dhun.database.DhunDatabase
+import dev.dhun.download.DownloadRepository
 import kotlinx.coroutines.Dispatchers
 
 /**
@@ -45,4 +46,6 @@ class DataLayer(val db: DhunDatabase, clock: EpochClock = EpochClock.System) {
     val search: SearchRepository = SqlDelightSearchRepository(db, clock, dbIo)
     val nowPlaying: NowPlayingRepository = SqlDelightNowPlayingRepository(db, clock, dbIo)
     val lyricsCache: LyricsCacheRepository = SqlDelightLyricsCacheRepository(db, clock, dbIo)
+    /** Persistent offline downloads (ADR-006). */
+    val downloads: DownloadRepository = SqlDelightDownloadRepository(db, dbIo)
 }

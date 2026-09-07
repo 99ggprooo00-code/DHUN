@@ -62,8 +62,11 @@ sqldelight {
     databases {
         create("DhunDatabase") {
             packageName.set("dev.dhun.database")
-            // Schema v1. When v2 arrives: add src/commonMain/sqldelight/migrations/1.sqm,
-            // emit 1.db via generateCommonMainDhunDatabaseSchema, turn on verifyMigrations.
+            // Schema v3: v1 base + migrations/1.sqm (LyricsCache, v2) +
+            // migrations/2.sqm (DownloadedTrack, v3). The version is derived
+            // from the highest migration; both Android and JVM drivers run
+            // Schema.create/migrate automatically. Derive the schema .db files
+            // and enable verifyMigrations before any further schema change.
         }
     }
 }

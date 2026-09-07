@@ -51,6 +51,7 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.data.DataLayer
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
+import dev.dhun.download.DownloadManager
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.player.PlayerViewModel
@@ -193,6 +194,7 @@ class MainActivity : ComponentActivity() {
                                 nav = nav,
                                 isDesktop = false,
                                 connectivity = koin.get(),
+                                downloadManager = koin.get(),
                             )
                         }
                         s.reason?.let { reason ->
@@ -360,7 +362,15 @@ class MainActivity : ComponentActivity() {
                     Log.w(TAG, "segment cache unusable — streaming without cache", t)
                     null
                 }
-                val local = PlaybackGraph.buildExoPlayer(applicationContext, cache, segments)
+                // ADR-006: the session-less fallback also honors offline-first
+                // playback (a COMPLETED download plays from disk).
+                val downloads = try {
+                    GlobalContext.get().get<dev.dhun.data.DataLayer>().downloads
+                } catch (t: Throwable) {
+                    Log.w(TAG, "download repo unavailable — offline playback disabled", t)
+                    null
+                }
+                val local = PlaybackGraph.buildExoPlayer(applicationContext, cache, segments, downloads)
                 attach(AndroidDhunPlayer(local, activityScope, cache))
                 logLine("local player ready — audio will play; session controls degraded")
                 connectState.value = ConnectUi.Ready(

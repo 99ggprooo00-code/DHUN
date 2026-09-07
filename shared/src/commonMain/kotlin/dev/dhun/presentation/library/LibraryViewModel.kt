@@ -1,5 +1,6 @@
 package dev.dhun.presentation.library
 
+import dev.dhun.core.DownloadedTrack
 import dev.dhun.core.HistoryEntry
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
@@ -8,6 +9,7 @@ import dev.dhun.data.LibraryRepository
 import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlayContext
 import dev.dhun.data.PlaylistRepository
+import dev.dhun.download.DownloadManager
 import dev.dhun.domain.GetHistoryUseCase
 import dev.dhun.domain.HistoryDay
 import dev.dhun.player.DhunPlayer
@@ -41,6 +43,7 @@ import kotlinx.coroutines.launch
 
 enum class LibraryTab {
     PLAYLISTS,
+    DOWNLOADS,
     HISTORY,
     @Deprecated("Liked songs are now a dedicated folder inside Playlists", ReplaceWith("PLAYLISTS"))
     FAVORITES,
@@ -61,6 +64,7 @@ class LibraryViewModel(
     private val scope: CoroutineScope,
     private val persistence: NowPlayingPersistence? = null,
     private val setContext: ((PlayContext) -> Unit)? = null,
+    private val downloadManager: DownloadManager? = null,
 ) {
     private fun setPlayContext(ctx: PlayContext) {
         if (setContext != null) { setContext.invoke(ctx); return }
@@ -73,6 +77,7 @@ class LibraryViewModel(
         scope: CoroutineScope,
         persistence: NowPlayingPersistence? = null,
         setContext: ((PlayContext) -> Unit)? = null,
+        downloadManager: DownloadManager? = null,
     ) : this(
         playlists = dataLayer.playlists,
         library = dataLayer.library,
@@ -81,6 +86,7 @@ class LibraryViewModel(
         scope = scope,
         persistence = persistence,
         setContext = setContext,
+        downloadManager = downloadManager,
     )
 
     private val historyUseCase = GetHistoryUseCase(history)
@@ -150,6 +156,38 @@ class LibraryViewModel(
     /** Called on each recomposition (or on zone change) to keep day buckets correct. */
     fun refreshHistoryGrouping(offsetMs: Long = currentUtcOffsetMs()) {
         _offsetMs.value = offsetMs
+    }
+
+    // ---- Downloads (ADR-006) ----
+    val downloads: StateFlow<List<DownloadedTrack>> =
+        downloadManager?.downloads
+            ?: MutableStateFlow<List<DownloadedTrack>>(emptyList()).asStateFlow()
+
+    val hasDownloads: Boolean
+        get() = downloadManager != null
+
+    fun download(track: Track) {
+        val dm = downloadManager ?: return
+        scope.launch { runCatching { dm.enqueue(track) } }
+    }
+
+    fun removeDownload(trackId: String) {
+        val dm = downloadManager ?: return
+        scope.launch { runCatching { dm.remove(trackId) } }
+    }
+
+    fun clearDownloads() {
+        val dm = downloadManager ?: return
+        scope.launch { runCatching { dm.clearAll() } }
+    }
+
+    fun playDownloaded(track: Track) {
+        setPlayContext(PlayContext.LIBRARY)
+        scope.launch {
+            // Play the local file directly; OfflineFirstStreamResolver /
+            // PlaybackGraph route it to disk without a network round-trip.
+            player.prepareQueue(listOf(track), 0, playWhenReady = true)
+        }
     }
 
     // ---- Playlist actions ----

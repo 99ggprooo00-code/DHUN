@@ -291,7 +291,8 @@ class RepositoriesTest {
     /* ---------------- Schema ---------------- */
 
     @Test
-    fun schemaVersionIsTwo() {
-        assertEquals(2L, DhunDatabase.Schema.version)
+    fun schemaVersionIsThree() {
+        // v1 base + 1.sqm (LyricsCache) → 2 + 2.sqm (DownloadedTrack) → 3.
+        assertEquals(3L, DhunDatabase.Schema.version)
     }
 }

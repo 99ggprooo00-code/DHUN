@@ -16,11 +16,14 @@ interface StreamResolver {
 }
 
 /**
- * Sequential primary-with-failover, under one wall-clock budget. No parallel
- * identity requests (ADR-003 is unapproved). A primary 429 never starts the
- * fallback. On double failure retain both engines' evidence, not just the
- * primary's headline; otherwise a missing Windows fallback looks like an
- * unavailable track. Caller cancellation always propagates.
+ * Sequential primary-with-failover, under one wall-clock budget. The
+ * *parallelisation* of the primary's own identity chain lives inside
+ * [OwnClientStreamResolver] (ADR-003 Option C, accepted 2026-09-06: staged
+ * concurrent waves); this class only coordinates primary→fallback. A primary
+ * 429 never starts the fallback. On double failure retain both engines'
+ * evidence, not just the primary's headline; otherwise a missing Windows
+ * fallback looks like an unavailable track. Caller cancellation always
+ * propagates.
  */
 class ResolvingStreamResolver(
     private val primary: StreamResolver,

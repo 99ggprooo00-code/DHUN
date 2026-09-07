@@ -4,13 +4,14 @@ Updated every phase. Nothing hidden.
 
 ## Latest Windows result / merged repair — 2026-09-06
 
-The user reports **one window after manual uninstall/reinstall**, but
-**install-over fails (“Another version…”), audio fails, Home does not page,
-and player glyph placement/shuffle/colour styling is not accepted**. The
-report concerned the old `test@0920148`, 07:22:29Z build. PR #30 is now
-merged at `76c68eb`, with main CI 34031477321 and publishing 34031477327
-passing; the repair-code release was published 11:58:17Z with MSI 1.36.1.
-It still needs a user-machine re-test; the earlier failure cannot be
+The user's negative report (install-over fails “Another version…”, audio
+fails, Home does not page, player glyph placement/shuffle/colour styling not
+accepted) concerned the old `test@0920148`, 07:22:29Z build. That is now
+superseded: the repair code merged through PR #30 (`76c68eb`) and the branch
+accumulated through PR #32 (`862f0ac`), with main CI 34072908037 / test-release
+34072908097 passing, and the rolling `test` pre-release published 2026-09-07T01:29:28Z
+at `862f0ac` (MSI 112,136,192 B, APK 17,516,190 B). The user-machine re-test
+against this *newer* build is still required; the earlier failure cannot be
 explained away as Actions-IP-only gating.
 
 Repairs are **merged in PR #30**; the session branch is retained. Code CI passes on `b6d47bd` (branch 34030728903 / PR 34030730736).
@@ -42,8 +43,10 @@ Windows runner are not the user's complete hardware test.
 The user-provided Windows yt-dlp installation state is unknown. The old
 locator could miss an installed `yt-dlp.exe`; the new candidate checks PATH /
 `DHUN_YTDLP` and provides explicit missing-tool evidence. yt-dlp remains
-optional/user-provided, not bundled; no cookies, login, PO-token minting or
-parallel identity scheduling was added. ADR-003 remains **PROPOSED**.
+optional/user-provided, not bundled; no cookies, login or PO-token minting was
+added (ADR-003 is now ACCEPTED — Option C staged-wave fan-out — which only
+changes the *scheduling* of the existing tokenless identities, never their
+membership/order; no credentials are introduced).
 
 MSI ProductVersion must advance independently of the app's semantic version.
 The candidate keeps the stable upgrade UUID and uses a run/attempt sequence
@@ -120,7 +123,7 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
   and MSI packaging is green at 34018809913. These do not verify native
   playback/integration or the unpublished candidate. Packagers require a
   positive-major native version; the old fixed 1.0.5 prevented rolling upgrades.
-- Data layer (Phase 05+11): schema is now v2 (v1 + `LyricsCache` via `migrations/1.sqm`); the DB file is
+- Data layer (Phase 05+11+14): schema is now **v3** (v1 + `migrations/1.sqm` `LyricsCache` + `migrations/2.sqm` `DownloadedTrack`); the DB file is
   `dhun.db` (Android app-private storage — deleted with the app;
   desktop packaged = `<installDir>/userdata`, also deleted with the
   MSI/DMG/DEB; desktop `gradle run` = `%APPDATA%\DHUN` /
@@ -201,6 +204,39 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
   the user subsequently confirmed launch (and now one-window startup after
   manual reinstall). Clean-target/tray/log verification remains OPEN;
   failed install-over and failed audio are separate current blockers.
+
+## Phase 14 — ADR-006 persistent offline downloads (2026-09-07)
+
+- **Foundation + engine implemented and CI-green on PR #33 (`a1064b7`):**
+  schema v3 `DownloadedTrack` table (`migrations/2.sqm`), `DownloadRepository`
+  + `SqlDelightDownloadRepository` wired as `DataLayer.downloads`,
+  `DownloadStorage` file abstraction, `StreamDownloader` (Ktor, Range-resume,
+  progress, resolving User-Agent isolation, cancellation keeps the `.part`),
+  `DownloadManager` + `FileDownloadManager` (bounded 3-slot pool, atomic
+  `.part`→final commit, best-effort artwork, QUEUED/DOWNLOADING/COMPLETED/
+  FAILED/PAUSED state transitions), and jvmMain `JvmDownloadStorage`. Tests
+  `DownloadRepositoryTest`/`StreamDownloaderTest`/`FileDownloadManagerTest`
+  are green in `:shared:jvmTest`.
+- **Offline-first playback routing is implemented and CI-green:** the shared
+  `OfflineFirstStreamResolver` returns a `file://` URI for a COMPLETED download
+  (deferring to the network chain otherwise); Android's `PlaybackGraph`
+  routes `file://` to a `FileDataSource` (via `SchemeRoutingDataSource`) and
+  checks the download repo before the network resolver; the desktop `MusicProvider`
+  wraps its resolver with `OfflineFirstStreamResolver` and the vlcj player
+  skips cache-fill/pre-buffer when a resolve returns a local `file://` MRL.
+  Download managers are wired into both platforms' DI. **Still not
+  hardware-verified** — a real device/PC must confirm a downloaded track plays
+  offline (CI only proves compilation + unit tests).
+- **Download UI is wired but minimal:** a Library "Downloads" tab lists
+  downloads (play/remove/clear-all + storage byte summary), and a "Download for
+  offline" action appears in the track overflow menu. There is **no** per-track
+  download badge, no Android foreground/WorkManager download service (downloads
+  run on the manager's worker pool inside the app process), and no dedicated
+  storage-management screen beyond the Downloads tab's clear-all — these remain
+  open follow-ups.
+- Downloads are **persistent** (survive until the user deletes them) and are
+  distinct from the ADR-005 LRU stream cache, which is volatile and
+  evicts on budget.
 
 ## Phase 14 — robustness / rot-drill / release (2026-09-05)
 

@@ -32,11 +32,10 @@ import dev.dhun.player.DhunPlayer
 fun TrackOverflowDialog(
     track: Track,
     player: DhunPlayer,
-    isFavorite: Boolean,
-    onToggleFavorite: (Track) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
     onNavigateToArtist: ((track: Track) -> Unit)? = null,
     onNavigateToAlbum: ((track: Track) -> Unit)? = null,
+    onDownload: ((Track) -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -112,15 +111,18 @@ fun TrackOverflowDialog(
                         onAddToPlaylist(track)
                     },
                 )
-                OverflowActionRow(
-                    icon = if (isFavorite) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
-                    label = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                    iconColor = if (isFavorite) DhunColors.accent else DhunColors.textSecondary,
-                    onClick = {
-                        onToggleFavorite(track)
-                        onDismiss()
-                    },
-                )
+                if (onDownload != null) {
+                    OverflowActionRow(
+                        icon = DhunIcon.Download,
+                        label = "Download for offline",
+                        onClick = {
+                            onDismiss()
+                            onDownload(track)
+                        },
+                    )
+                }
+                // (Favorite/like was removed from this menu — it now lives as a
+                // dedicated button beside Shuffle in the FullPlayer transport.)
                 if (track.artistName.isNotBlank() && onNavigateToArtist != null) {
                     OverflowActionRow(
                         icon = DhunIcon.Person,

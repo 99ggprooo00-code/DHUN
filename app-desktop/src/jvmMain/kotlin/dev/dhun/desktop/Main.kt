@@ -26,6 +26,17 @@ import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.DhunUserDirs
 import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunTheme
+import dev.dhun.download.DownloadManager
+import dev.dhun.download.FileDownloadManager
+import dev.dhun.download.JvmDownloadStorage
+import dev.dhun.download.KtorStreamDownloader
+import dev.dhun.download.createDownloadHttpClient
+import dev.dhun.extraction.OfflineFirstStreamResolver
+import dev.dhun.extraction.OwnClientStreamResolver
+import dev.dhun.extraction.ResolvingStreamResolver
+import dev.dhun.extraction.StreamResolver
+import dev.dhun.extraction.YtDlpStreamResolver
+import dev.dhun.innertube.InnerTubeClient
 import dev.dhun.desktop.native.DhunTray
 import dev.dhun.desktop.player.DesktopDhunPlayer
 import dev.dhun.desktop.smct.Smct
@@ -44,7 +55,6 @@ import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
-import dev.dhun.provider.forDesktop
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DhunAppShell
@@ -524,6 +534,7 @@ fun main() {
                         isDesktop = true,
                         modifier = Modifier.fillMaxSize(),
                         connectivity = koin.get(),
+                        downloadManager = koin.get(),
                     )
                 }
             }
@@ -547,7 +558,41 @@ private data class WindowGeometry(val x: Long, val y: Long, val w: Long, val h: 
 
 private val desktopModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-    single<MusicProvider> { YouTubeMusicProvider.forDesktop() }
+    single { InnerTubeClient() }
+    // Network-only resolution chain (ADR-001): own-client primary, yt-dlp
+    // failover. Used by the download engine (must NOT short-circuit to a
+    // not-yet-downloaded file) and wrapped by the offline-first resolver for
+    // playback.
+    single<StreamResolver> {
+        ResolvingStreamResolver(
+            primary = OwnClientStreamResolver(get()),
+            fallback = YtDlpStreamResolver(),
+        )
+    }
+    // ADR-006 offline-first playback: a COMPLETED persistent download plays
+    // from its local file; otherwise resolve over the network chain.
+    single<MusicProvider> {
+        val client = get<InnerTubeClient>()
+        val resolver = OfflineFirstStreamResolver(
+            downloads = get<DataLayer>().downloads,
+            primary = get<StreamResolver>(),
+            fileExists = { path -> runCatching { File(path).exists() }.getOrDefault(false) },
+        )
+        YouTubeMusicProvider(client, resolver)
+    }
+    // ADR-006 persistent download manager: bounded worker pool over the
+    // network chain, writing into <data dir>/downloads (audio/ + art/).
+    single<DownloadManager> {
+        val data: DataLayer = get()
+        val storage = JvmDownloadStorage(File(DhunUserDirs.dataDir(), "downloads").absolutePath)
+        FileDownloadManager(
+            repository = data.downloads,
+            resolver = get<StreamResolver>(),
+            downloader = KtorStreamDownloader(createDownloadHttpClient(), storage),
+            storage = storage,
+            scope = get(),
+        )
+    }
     // Phase 14 bounded audio cache (desktop): whole-track files under
     // DhunUserDirs (packaged = <installDir>/userdata/cache/audio so MSI
     // uninstall removes them; unpackaged = OS user-data dir). Budget from

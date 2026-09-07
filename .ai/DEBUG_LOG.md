@@ -1,5 +1,107 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-07 — ADR-006 foundation + download engine landed (PR #33)
+
+**Implemented this session (PR #33 `arena/01a07989-dhun`):** ADR-006
+persistent offline downloads — data layer (schema v3: `DownloadedTrack` table,
+migration `2.sqm`, `SqlDelightDownloadRepository` wired into `DataLayer`),
+download engine (`DownloadManager`, resumable `StreamDownloader` with Range
+resume + `.part` atomic commit, `DownloadStorage`, `FileDownloadManager` with a
+bounded worker pool), plus jvmTests. All CI green.
+
+**Traps hit and fixed:**
+- SQLDelight `INTEGER AS kotlin.Int`/`AS kotlin.Long` on `DownloadedTrack.sq`
+  generated a required `DownloadedTrackAdapter` ctor param on `DhunDatabase`,
+  breaking `DatabaseFactory.create(driver)`; the `AS` maps also produced an
+  `Unresolved reference 'Downloaded_track'`. Fixed by reverting to plain
+  `INTEGER` (→ `Long`) + mapper conversions and importing the generated row as
+  `dev.dhun.database.DownloadedTrack as DownloadedTrackRow`.
+- `RepositoriesTest.schemaVersionIsTwo` was hardcoded to 2 while the schema is
+  v3 — fixed to `schemaVersionIsThree`.
+- `FileDownloadManagerTest` used `runTest` + `backgroundScope`, so the worker
+  never advanced; also created two separate bare in-memory repos sharing no
+  state. Rewrote with `runBlocking` + `Dispatchers.Unconfined` and one repo per
+  test; scope is cancelled in `finally`.
+
+**Status:** offline-first playback routing, platform download services
+(FGS/WorkManager), and the download UI (button, Library "Downloads" tab, track
+badging) are the remaining ADR-006 steps; hardware verification still pending.
+
+## 2026-09-07 — PR #32 merged & rolling `test` published; new session `arena/01a07989-dhun`
+
+**Merged:** PR #32 (`arena/01a076f3-dhun`) merged into `main` at
+**`862f0ac`** on 2026-09-07T01:24:20Z. Main CI **34072908037 PASS**;
+test-release **34072908097 PASS**. Rolling `test` pre-release published at
+**`862f0ac`** 2026-09-07T01:29:28Z: `dhun-test.msi` **112,136,192 B**,
+`dhun-test.apk` **17,516,190 B**, both with `.sha256` assets. Stable URLs
+unchanged.
+
+**New session state:** `arena/01a07989-dhun` branched from `862f0ac`;
+nothing local outstanding. PR #31 (`arena/01a0759b-dhun`, docs-only, `3c63dca`)
+is OPEN but **CONFLICTING** — superseded by PR #32's docs reconciliation; do
+not merge without user instruction. Issue #14 (rot-drill) still OPEN — the
+red is GitHub-runner IP gating on the live probe (a known environment
+limitation), not a user-impact defect.
+
+**Root cause of stale docs (why the reconcile commit here):** the previous
+session's CURRENT ACTIVE TASK still claimed "PR #32 OPEN" and its "exact next
+step" was to merge + publish — both now done, so the roadmap was replaced with
+the verified post-merge snapshot. Also resolved a long-standing doc
+contradiction: `KNOWN_LIMITATIONS.md` said "ADR-003 remains PROPOSED" while the
+ADR file and `OwnClientStreamResolver.kt` both say ACCEPTED (Option C staged
+wave) — reconciled to ACCEPTED. `StreamResolver.kt`'s doc comment still said
+"ADR-003 is unapproved" and `shared/build.gradle.kts` still said "Schema v1" —
+both stale and corrected.
+
+**Environment:** no local JDK/Android SDK/display; CI is the compile gate.
+The next step is to implement ADR-006 (persistent offline downloads) as a
+code-first, jvmTest-covered, CI-verified increment; hardware/device/soak and
+green live-probe gates remain OPEN and are not closable from this sandbox.
+
+## 2026-09-07 — ADR-006 foundation + download engine (PR #33, CI green)
+
+Session `arena/01a07989-dhun`, branch at `a1064b7`, PR #33.
+
+**Implemented (all in `shared`, jvmTest-green):**
+1. `core/DownloadedTrack.kt` — entity + `DownloadState` lifecycle enum.
+2. SQLDelight `DownloadedTrack.sq` + `migrations/2.sqm` (schema **v3**).
+3. `download/DownloadRepository.kt` + `SqlDelightDownloadRepository`, wired
+   as `DataLayer.downloads`.
+4. `download/DownloadStorage.kt` (filesystem abstraction), `StreamDownloader.kt`
+   (Ktor byte-downloader: Range-resume, progress, resolving User-Agent
+   isolation, `CancellationException` rethrow so pause/cancel keep the `.part`),
+   `DownloadManager.kt` (queue/progress contract),
+   `FileDownloadManager.kt` (bounded 3-slot pool, atomic `.part`→final commit,
+   best-effort artwork, PAUSED/FAILED), jvmMain `JvmDownloadStorage`.
+5. Tests: `DownloadRepositoryTest`, `StreamDownloaderTest`,
+   `FileDownloadManagerTest` (+ `TestSupport` fakes).
+
+**Two real CI failures fixed from root cause, not retried:**
+- **Schema `DownloadedTrackAdapter` compile error.** Declaring integer columns
+  as `INTEGER AS kotlin.Int`/`AS kotlin.Long` made SQLDelight emit a required
+  `DownloadedTrackAdapter` param on the `DhunDatabase` constructor, breaking
+  `DatabaseFactory.create(driver)`. Fix: drop the `AS` maps; use plain
+  `INTEGER` (→ `Long`) and convert in the repository mapper, matching the
+  existing `Track.sq` convention.
+- **Manager tests non-deterministic / a hardcoded schema version.** The
+  manager's background worker did not advance under `runTest` +
+  `backgroundScope`, and `RepositoriesTest.schemaVersionIsTwo` was stale.
+  Fix: drive the manager on a `Dispatchers.Unconfined` scope so workers run
+  inline (assert on the deterministic repository), use `runBlocking` for the
+  Ktor `StreamDownloader` tests (no virtual-time channels), and update the
+  schema-version expectation to `3`.
+
+**CI evidence (PR #33):** `build-and-test` `34075307637` PASS (shared JVM
+tests incl. download tests, Android debug build, probe + Desktop compile);
+`apk` PASS; `msi` in-flight. `:shared:jvmTest` push run `34075305385` PASS.
+
+**Not yet wired:** no UI to enqueue downloads, no offline-first playback
+routing (the Android `file://`/`FileDataSource` and Desktop vlcj local-path
+load), no platform download services, no storage UI. These are the next steps
+and are device/PC-verified only after they land (see `.ai/KNOWN_LIMITATIONS.md`).
+
+---
+
 ## 2026-09-07 — Library Liked Songs reorganization, Mini-Player revamp, Slider Hitbox expansion, & ADR-006 Offline Downloads
 
 Session `arena/01a076f3-dhun`:

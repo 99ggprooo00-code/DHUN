@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
+import dev.dhun.core.DownloadState
+import dev.dhun.core.DownloadedTrack
 import dev.dhun.core.HistoryEntry
 import dev.dhun.core.Track
 import dev.dhun.data.LocalPlaylist
@@ -86,6 +88,7 @@ fun LibraryScreen(
     val playlists by viewModel.playlistsFlow.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
     val groupedHistory by viewModel.groupedHistory.collectAsState()
+    val downloads by viewModel.downloads.collectAsState()
 
     // Keep day grouping fresh on zone changes (cheap ticker)
     LaunchedEffect(Unit) {
@@ -157,6 +160,13 @@ fun LibraryScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+            LibraryTab.DOWNLOADS -> DownloadsTab(
+                downloads = downloads,
+                onPlay = viewModel::playDownloaded,
+                onRemove = viewModel::removeDownload,
+                onClearAll = viewModel::clearDownloads,
+                modifier = Modifier.weight(1f),
+            )
             LibraryTab.HISTORY -> HistoryTab(
                 groupedHistory = groupedHistory,
                 onPlayEntry = viewModel::playHistoryEntry,
@@ -175,7 +185,7 @@ private fun LibraryTabRow(
     onSelect: (LibraryTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val visibleTabs = listOf(LibraryTab.PLAYLISTS, LibraryTab.HISTORY)
+    val visibleTabs = listOf(LibraryTab.PLAYLISTS, LibraryTab.DOWNLOADS, LibraryTab.HISTORY)
     Row(
         modifier = modifier.fillMaxWidth().height(DhunSpacing.touchTarget),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
@@ -184,6 +194,7 @@ private fun LibraryTabRow(
             val selected = (tab == selectedTab) || (tab == LibraryTab.PLAYLISTS && selectedTab == LibraryTab.FAVORITES)
             val label = when (tab) {
                 LibraryTab.PLAYLISTS -> "Playlists"
+                LibraryTab.DOWNLOADS -> "Downloads"
                 LibraryTab.HISTORY -> "History"
                 LibraryTab.FAVORITES -> "Favorites"
             }
@@ -647,6 +658,172 @@ private fun CreatePlaylistDialog(
 private fun relativeBrief(epochMs: Long): String {
     val nowMs = dev.dhun.data.EpochClock.System.nowMs()
     return LibraryViewModel.relativeTimeLabel(epochMs, nowMs)
+}
+
+/* ---------------- Downloads tab (ADR-006) ----------------------------------- */
+
+@Composable
+private fun DownloadsTab(
+    downloads: List<DownloadedTrack>,
+    onPlay: (Track) -> Unit,
+    onRemove: (String) -> Unit,
+    onClearAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (downloads.isEmpty()) {
+        EmptyView(
+            title = "No downloads yet",
+            message = "Use the download action on a track to save it for offline listening.",
+            modifier = modifier.fillMaxSize().padding(DhunSpacing.xxl),
+        )
+        return
+    }
+    var showClearConfirm by remember { mutableStateOf(false) }
+    val totalBytes = downloads.sumOf { it.fileSizeBytes }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.sm),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${downloads.size} item${if (downloads.size == 1) "" else "s"} • ${formatBytes(totalBytes)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = DhunColors.textSecondary,
+            )
+            DhunOutlinedButton(onClick = { showClearConfirm = true }) { Text("Clear all") }
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = DhunSpacing.xxxl),
+        ) {
+            itemsIndexed(downloads, key = { _, d -> d.trackId }) { _, item ->
+                DownloadRow(
+                    download = item,
+                    onPlay = { onPlay(item.toTrack()) },
+                    onRemove = { onRemove(item.trackId) },
+                )
+            }
+        }
+    }
+    if (showClearConfirm) {
+        ClearDownloadsConfirmDialog(
+            onDismiss = { showClearConfirm = false },
+            onConfirm = { onClearAll(); showClearConfirm = false },
+        )
+    }
+}
+
+@Composable
+private fun ClearDownloadsConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
+            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
+                Text("Clear all downloads?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
+                Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                Text("This deletes every downloaded track from this device. Offline playback will no longer work for them.", style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
+                Spacer(modifier = Modifier.height(DhunSpacing.md))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                    DhunButton(onClick = onConfirm) { Text("Clear") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadRow(
+    download: DownloadedTrack,
+    onPlay: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+    ) {
+        ArtworkImage(
+            imageUrl = download.thumbnailUrl,
+            contentDescription = download.title,
+            modifier = Modifier.size(DhunSpacing.touchTarget),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                download.title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = DhunColors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                stateLabel(download.downloadState) + " • " + download.artistName,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (download.isCompleted) DhunColors.textSecondary else DhunColors.accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (download.isCompleted) {
+            DhunIconButton(
+                onClick = onPlay,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Play ${download.title}",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.accent,
+                )
+            }
+        }
+        DhunIconButton(
+            onClick = onRemove,
+            modifier = Modifier.size(DhunSpacing.touchTarget),
+            contentDescription = "Remove ${download.title}",
+        ) {
+            DhunIconView(
+                icon = DhunIcon.Close,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                tint = DhunColors.textTertiary,
+            )
+        }
+    }
+}
+
+private fun stateLabel(state: DownloadState): String = when (state) {
+    DownloadState.QUEUED -> "Queued"
+    DownloadState.DOWNLOADING -> "Downloading"
+    DownloadState.COMPLETED -> "Downloaded"
+    DownloadState.FAILED -> "Failed"
+    DownloadState.PAUSED -> "Paused"
+}
+
+private fun DownloadedTrack.toTrack(): Track = Track(
+    id = trackId,
+    title = title,
+    artistName = artistName,
+    albumName = albumName,
+    durationSeconds = durationSeconds,
+    thumbnailUrl = thumbnailUrl,
+)
+
+private fun formatBytes(bytes: Long): String {
+    if (bytes <= 0) return "0 B"
+    val gb = 1024L * 1024 * 1024
+    val mb = 1024L * 1024
+    val kb = 1024L
+    return when {
+        bytes >= gb -> "${bytes / gb}.${bytes % gb * 10 / gb} GB"
+        bytes >= mb -> "${bytes / mb}.${bytes % mb * 10 / mb} MB"
+        bytes >= kb -> "${bytes / kb}.${bytes % kb * 10 / kb} KB"
+        else -> "$bytes B"
+    }
 }
 
 /* ---------------- History tab ----------------------------------------------- */
