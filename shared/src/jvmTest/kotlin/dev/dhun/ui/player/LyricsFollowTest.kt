@@ -3,6 +3,8 @@ package dev.dhun.ui.player
 import dev.dhun.core.LyricsLine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class LyricsFollowTest {
     private val lines = listOf(
@@ -67,5 +69,16 @@ class LyricsFollowTest {
     fun centeringWorksWithoutSymmetricPadding() {
         assertEquals(0f, lyricCenterScrollDelta(130, 40, 0, 300))
         assertEquals(80f, lyricCenterScrollDelta(180, 60, -40, 300))
+    }
+
+    @Test
+    fun subPixelJitterNeverTriggersARecenterAnimation() {
+        // 1px and above moves; anything finer is invisible and only twitches.
+        assertTrue(shouldRecenterLyric(1f))
+        assertTrue(shouldRecenterLyric(-0.6f))
+        assertFalse(shouldRecenterLyric(0.5f))
+        assertFalse(shouldRecenterLyric(-0.5f))
+        assertFalse(shouldRecenterLyric(0f))
+        assertFalse(shouldRecenterLyric(Float.NaN))
     }
 }

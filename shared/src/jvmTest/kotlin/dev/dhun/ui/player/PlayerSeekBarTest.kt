@@ -57,6 +57,20 @@ class PlayerSeekBarTest {
     }
 
     @Test
+    fun thumbAndScrubBubbleShareOneCenteredClampedOffset() {
+        val width = 300f
+        assertEquals(0, trackAlignedItemOffsetPx(20, width, 0f), "left edge sits flush, never overhangs")
+        assertEquals(140, trackAlignedItemOffsetPx(20, width, 0.5f), "mid fraction centers the item")
+        assertEquals(280, trackAlignedItemOffsetPx(20, width, 1f), "right edge clamps inside the track")
+        assertEquals(280, trackAlignedItemOffsetPx(20, width, 1.5f), "over-drag clamps, same as under-drag")
+        assertEquals(0, trackAlignedItemOffsetPx(20, width, -0.5f))
+        assertEquals(0, trackAlignedItemOffsetPx(400, width, 0.5f), "an item wider than the track parks at zero")
+        assertEquals(0, trackAlignedItemOffsetPx(0, width, 0.5f), "zero-size items draw nothing")
+        assertEquals(0, trackAlignedItemOffsetPx(20, Float.NaN, 0.5f), "non-finite width can never produce a garbage offset")
+        assertEquals(0, trackAlignedItemOffsetPx(20, width, Float.NEGATIVE_INFINITY))
+    }
+
+    @Test
     fun timestampFormattingIsClampedAndHourAwareAtZero() {
         assertEquals("0:00", formatMs(-500, 120_000))
         assertEquals("2:03", formatMs(123_000, 200_000))

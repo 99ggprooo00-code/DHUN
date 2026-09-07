@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -40,6 +42,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
@@ -237,23 +241,60 @@ internal fun DhunSeekBar(
             )
         }
         val thumbSize = if (dragging || focused) DhunSpacing.mdPlus else DhunSpacing.sm
+        val thumbSizePx = with(LocalDensity.current) { thumbSize.roundToPx() }
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .offset {
-                    val thumbWidth = thumbSize.roundToPx()
-                    IntOffset(
-                        (effective * widthPx - thumbWidth / 2f).toInt()
-                            .coerceIn(0, (widthPx - thumbWidth).toInt().coerceAtLeast(0)),
-                        0,
-                    )
-                }
+                .offset { IntOffset(trackAlignedItemOffsetPx(thumbSizePx, widthPx, effective), 0) }
                 .size(thumbSize)
                 .shadow(DhunSpacing.xs, DhunShapes.full, clip = false)
                 .clip(DhunShapes.full)
                 .background(fill),
         )
+        // Scrub preview: a time pill tracking the thumb while the finger
+        // holds the bar (ADR-002 P2 transport polish). Offset only — the
+        // bubble never shifts layout, and release still commits exactly once.
+        if (dragging && canSeek) {
+            val bubbleLiftPx = with(LocalDensity.current) { DhunSpacing.scrubBubbleHeight.roundToPx() }
+            // The pill is content-sized; its measured width feeds the same
+            // clamp the thumb uses, updated once after first layout.
+            val bubbleWidthPx = remember { mutableIntStateOf(0) }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .onSizeChanged { bubbleWidthPx.intValue = it.width }
+                    .offset {
+                        IntOffset(
+                            x = trackAlignedItemOffsetPx(bubbleWidthPx.intValue, widthPx, effective),
+                            y = -bubbleLiftPx,
+                        )
+                    }
+                    .height(DhunSpacing.scrubBubbleHeight)
+                    .shadow(DhunSpacing.xs, DhunShapes.medium, clip = false)
+                    .clip(DhunShapes.medium)
+                    .background(accent)
+                    .padding(horizontal = DhunSpacing.xsPlus),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = formatMs(effectiveMs, durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DhunColors.onAccent,
+                )
+            }
+        }
     }
+}
+
+/**
+ * Centers a floating item of [itemWidthPx] under [fraction] of a track that
+ * is [widthPx] wide, clamped so it never overhangs the track. Shared by the
+ * thumb and the scrub bubble so they can never drift apart.
+ */
+internal fun trackAlignedItemOffsetPx(itemWidthPx: Int, widthPx: Float, fraction: Float): Int {
+    if (itemWidthPx <= 0 || !widthPx.isFinite() || !fraction.isFinite()) return 0
+    val max = (widthPx - itemWidthPx).toInt().coerceAtLeast(0)
+    return (fraction * widthPx - itemWidthPx / 2f).toInt().coerceIn(0, max)
 }
 
 internal fun playbackProgress(positionMs: Long, durationMs: Long): Float =

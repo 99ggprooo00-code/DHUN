@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -134,6 +135,14 @@ fun MiniPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(DhunSpacing.miniPlayerHeight)
+                        // Lift feedback while the expansion swipe is in flight:
+                        // a bounded quarter-parallax, never enough to detach a
+                        // row from its committed threshold. Offset-only, so the
+                        // docked layout never re-measures.
+                        .graphicsLayer {
+                            val lift = (-dragAccumPx / 4f).coerceIn(0f, swipeThresholdPx / 4f)
+                            translationY = -lift
+                        }
                         .clickable(
                             role = Role.Button,
                             onClickLabel = if (errorState != null) "Show playback details" else "Open player",

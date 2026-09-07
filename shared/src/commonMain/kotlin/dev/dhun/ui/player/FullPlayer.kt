@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -16,6 +17,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +46,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -58,7 +61,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -91,11 +96,16 @@ import dev.dhun.presentation.player.SkipDirection
  * background + Material 3 scrim behind everything) · title/artist · custom
  * seek bar · transport · volume (desktop) · Lyrics | Queue | Related tabs.
  *
- * **Lyrics-dominant mode (ADR-002 P6):** selecting the Lyrics tab recedes
- * the centered artwork (scale/fade) and gives the lyrics surface most of
- * the vertical weight. Still the same screen — no navigation. Material 3
- * only: translucent surfaces + existing [Modifier.blur] pipeline. **No
- * Liquid Glass.**
+ * **Lyrics-dominant mode (ADR-002 P6):** selecting the Lyrics tab (or tapping
+ * the CC control) recedes the centered artwork (scale/fade) and gives the
+ * lyrics surface most of the vertical weight. Still the same screen — no
+ * navigation. Material 3 only: translucent surfaces + existing
+ * [Modifier.blur] pipeline. **No Liquid Glass.**
+ *
+ * **Blur-once backdrop (ADR-002 P4):** the full-screen blurred artwork lives
+ * in a [PlayerBackdrop] subtree keyed by [BlurredArtworkCache.keyFor], so it
+ * is prepared once per track — never per frame, and never as two stacked
+ * blurred layers during a transition.
  *
  * **Reconnecting chip:** when [PlaybackState.Recovering], a small M3
  * surface chip appears under the title (403 mid-stream recovery).
@@ -157,15 +167,14 @@ fun FullPlayer(
 
     var selectedTab by rememberSaveable { mutableIntStateOf(1) } // Queue by default
     // ADR-002 P6: Lyrics tab = lyrics-dominant layout (artwork recedes).
-    val lyricsDominant = selectedTab == 0
+    val lyricsDominant = selectedTab == LYRICS_TAB_INDEX
 
-    // ADR-002 P4: mark blur-pipeline key once per track/URL — never every frame.
+    // ADR-002 P4: one stable identity for the backdrop per track/artwork URL.
     val artworkCacheKey = remember(current?.thumbnailUrl, current?.id) {
         BlurredArtworkCache.keyFor(current?.thumbnailUrl, current?.id)
     }
-    LaunchedEffect(artworkCacheKey) {
-        if (artworkCacheKey.isNotBlank()) BlurredArtworkCache.markPrepared(artworkCacheKey)
-    }
+    // Where the CC control returns when lyrics-dominant mode closes.
+    var lastPlainTab by rememberSaveable { mutableIntStateOf(1) }
 
     Box(
         modifier = modifier
@@ -178,27 +187,23 @@ fun FullPlayer(
             ) {}
             .safeDrawingPadding(),
     ) {
-        // ---- background: Material 3 blurred artwork (once-per-track key) --------
-        // Compose blur on the layer; BlurredArtworkCache records the key so we
-        // never pretend to reprocess full-res art every frame (ADR-002).
+        // ---- background: Material 3 blurred artwork (blur once, ADR-002 P4) ----
+        // Keyed by the track's BlurredArtworkCache key: unrelated recompositions
+        // (position ticks, tab switches, stage-weight animation) never restart
+        // it, and a track change *replaces* the layer instead of crossfading two
+        // full-screen blurs. The radius animates in once when the backdrop marks
+        // itself prepared, then the layer is static. No Liquid Glass.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .blur(DhunSpacing.glassBlur * 4),  // richer frosted backdrop; still one layer
+                .clipToBounds(),
         ) {
             // Hi-res tier for the backdrop — the same Coil key as the main
             // artwork below, so the bytes are fetched once, not twice.
-            Crossfade(
-                targetState = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
-                animationSpec = DhunAnimations.slowTween(),
-                label = "bgArtwork",
-            ) { url ->
-                ArtworkImage(
-                    imageUrl = url,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    shape = RectangleShape,
-                    contentScale = ContentScale.Crop,
+            key(artworkCacheKey) {
+                PlayerBackdrop(
+                    artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
+                    cacheKey = artworkCacheKey,
                 )
             }
         }
@@ -227,60 +232,114 @@ fun FullPlayer(
             modifier = Modifier.widthIn(max = DhunSpacing.playerContentMaxWidth)
                 .fillMaxSize().align(Alignment.TopCenter),
         ) {
-            // Sheet drag handle — immersive bottom-sheet cue (M3 frosted pill).
-            Box(
+            // ADR-002 P9: swipe-down on the sheet's top strip collapses the
+            // player (never exits the app), mirroring a bottom sheet. Taps and
+            // button clicks in the strip are untouched — only a committed
+            // vertical drag beyond the MiniPlayer's own threshold collapses.
+            val collapseSwipeThresholdPx = with(LocalDensity.current) { DhunSpacing.touchTarget.toPx() }
+            var collapseDragPx by remember { mutableFloatStateOf(0f) }
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = DhunSpacing.sm),
-                contentAlignment = Alignment.Center,
+                    .pointerInput(collapseSwipeThresholdPx) {
+                        try {
+                            detectVerticalDragGestures(
+                                onDragStart = { collapseDragPx = 0f },
+                                onDragEnd = {
+                                    if (shouldCollapseFullPlayer(collapseDragPx, collapseSwipeThresholdPx)) onCollapse()
+                                    collapseDragPx = 0f
+                                },
+                                onDragCancel = { collapseDragPx = 0f },
+                            ) { change, dragAmount ->
+                                change.consume()
+                                collapseDragPx += dragAmount
+                            }
+                        } finally {
+                            collapseDragPx = 0f
+                        }
+                    },
             ) {
+                // Sheet drag handle — immersive bottom-sheet cue (M3 frosted
+                // pill). Rides the drag as a rubber-band affordance.
                 Box(
                     modifier = Modifier
-                        .width(DhunSpacing.xxxl)
-                        .height(DhunSpacing.xsPlus)
-                        .clip(DhunShapes.full)
-                        .background(DhunColors.glassEdge),
-                )
-            }
-            // Top bar: collapse / label / overflow
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(DhunSpacing.huge)
-                    .padding(horizontal = DhunSpacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DhunIconButton(
-                    onClick = onCollapse,
-                    modifier = Modifier.size(DhunSpacing.touchTarget),
-                    contentDescription = "Collapse player",
+                        .fillMaxWidth()
+                        .padding(top = DhunSpacing.sm),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    DhunIconView(
-                        icon = DhunIcon.ArrowBack,
-                        contentDescription = null,
-                        modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = DhunColors.textPrimary,
+                    Box(
+                        modifier = Modifier
+                            .width(DhunSpacing.xxxl)
+                            .height(DhunSpacing.xsPlus)
+                            .graphicsLayer {
+                                translationY = collapseDragPx.coerceIn(0f, collapseSwipeThresholdPx) / 3f
+                            }
+                            .clip(DhunShapes.full)
+                            .background(DhunColors.glassEdge),
                     )
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "NOW PLAYING",
-                    style = DhunTypographyTokens.brand,
-                    color = DhunColors.textTertiary,
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                DhunIconButton(
-                    onClick = { current?.let(onOverflowTrack) },
-                    enabled = current != null,
-                    modifier = Modifier.size(DhunSpacing.touchTarget),
-                    contentDescription = "More player actions",
+                // Top bar: collapse / label / overflow
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(DhunSpacing.huge)
+                        .padding(horizontal = DhunSpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    DhunIconView(
-                        icon = DhunIcon.MoreVert,
-                        contentDescription = null,
-                        modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = DhunColors.textSecondary,
+                    DhunIconButton(
+                        onClick = onCollapse,
+                        modifier = Modifier.size(DhunSpacing.touchTarget),
+                        contentDescription = "Collapse player",
+                    ) {
+                        DhunIconView(
+                            icon = DhunIcon.ArrowBack,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSize),
+                            tint = DhunColors.textPrimary,
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "NOW PLAYING",
+                        style = DhunTypographyTokens.brand,
+                        color = DhunColors.textTertiary,
                     )
+                    Spacer(modifier = Modifier.weight(1f))
+                    // ADR-002 rule 5: dedicated CC control toggles lyrics-dominant
+                    // mode on this very screen — entering stashes the plain tab,
+                    // leaving restores it. It never navigates away.
+                    DhunIconButton(
+                        onClick = {
+                            val (tab, plainTab) = toggleLyricsDominant(selectedTab, lastPlainTab)
+                            selectedTab = tab
+                            lastPlainTab = plainTab
+                        },
+                        enabled = current != null,
+                        modifier = Modifier
+                            .size(DhunSpacing.touchTarget)
+                            .semantics { selected = lyricsDominant },
+                        contentDescription = if (lyricsDominant) "Exit lyrics view" else "Lyrics view",
+                    ) {
+                        DhunIconView(
+                            icon = DhunIcon.ClosedCaption,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSize),
+                            tint = if (lyricsDominant) accent else DhunColors.textSecondary,
+                        )
+                    }
+                    DhunIconButton(
+                        onClick = { current?.let(onOverflowTrack) },
+                        enabled = current != null,
+                        modifier = Modifier.size(DhunSpacing.touchTarget),
+                        contentDescription = "More player actions",
+                    ) {
+                        DhunIconView(
+                            icon = DhunIcon.MoreVert,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSize),
+                            tint = DhunColors.textSecondary,
+                        )
+                    }
                 }
             }
 
@@ -648,7 +707,10 @@ fun FullPlayer(
             // still Material 3 translucent fill — not Liquid Glass.
             PlayerTabRow(
                 selectedTab = selectedTab,
-                onSelect = { selectedTab = it },
+                onSelect = {
+                    if (it != LYRICS_TAB_INDEX) lastPlainTab = it
+                    selectedTab = it
+                },
                 accent = accent,
             )
             val tabsWeight by animateFloatAsState(
@@ -685,5 +747,75 @@ fun FullPlayer(
                 )
             }
         }
+    }
+}
+
+/** Lyrics tab index within PlayerTabRow (Lyrics | Queue | Related). */
+internal const val LYRICS_TAB_INDEX = 0
+
+/**
+ * ADR-002 rule 5: the CC control toggles lyrics-dominant mode on the same
+ * screen. From a plain tab it enters lyrics and remembers where to return;
+ * from lyrics it restores that tab. Result: (newSelectedTab, newLastPlainTab).
+ */
+internal fun toggleLyricsDominant(selectedTab: Int, lastPlainTab: Int): Pair<Int, Int> =
+    if (selectedTab == LYRICS_TAB_INDEX) {
+        lastPlainTab.coerceIn(1, 2) to lastPlainTab
+    } else {
+        LYRICS_TAB_INDEX to selectedTab.coerceIn(1, 2)
+    }
+
+/** Density-aware downward swipe commits a collapse; upward/short drags never do (P9). */
+internal fun shouldCollapseFullPlayer(dragPx: Float, thresholdPx: Float): Boolean =
+    dragPx.isFinite() && thresholdPx.isFinite() && thresholdPx > 0f && dragPx >= thresholdPx
+
+/**
+ * Blurred-artwork backdrop (ADR-002 P4). [FullPlayer] mounts this inside
+ * `key(BlurredArtworkCache.keyFor(...))`, so every track change starts one
+ * fresh layer and nothing else recomposes it — the blur radius animates in
+ * exactly once per track, then the layer is static. Re-entering the player
+ * for a track whose key is already prepared skips the fade-up: the backdrop
+ * arrives pre-blurred, honouring the cache's once-per-track contract.
+ */
+@Composable
+private fun PlayerBackdrop(
+    artworkUrl: String?,
+    cacheKey: String,
+) {
+    var prepared by remember {
+        mutableStateOf(cacheKey.isNotBlank() && BlurredArtworkCache.isPrepared(cacheKey))
+    }
+    LaunchedEffect(cacheKey) {
+        if (cacheKey.isNotBlank()) {
+            BlurredArtworkCache.markPrepared(cacheKey)
+            prepared = true
+        }
+    }
+    var shown by remember { mutableStateOf(prepared) }
+    LaunchedEffect(Unit) { shown = true }
+    val backdropAlpha by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = DhunAnimations.slowTween(),
+        label = "backdropFade",
+    )
+    val blurRadius by animateDpAsState(
+        targetValue = if (prepared) DhunSpacing.glassBlur * 4 else DhunSpacing.zero,
+        animationSpec = DhunAnimations.mediumTween(),
+        label = "backdropBlurOnce",
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = backdropAlpha },
+    ) {
+        ArtworkImage(
+            imageUrl = artworkUrl,
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(blurRadius),
+            shape = RectangleShape,
+            contentScale = ContentScale.Crop,
+        )
     }
 }

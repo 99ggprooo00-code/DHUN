@@ -129,11 +129,26 @@ internal fun PlayerTabRow(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = color,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+                ) {
+                    // The lyrics tab is also the lyrics-dominant entry point
+                    // (ADR-002 rule 5), so it carries its own glyph.
+                    if (index == LYRICS_TAB_INDEX) {
+                        DhunIconView(
+                            icon = DhunIcon.Lyrics,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            tint = color,
+                        )
+                    }
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = color,
+                    )
+                }
                 Spacer(modifier = Modifier.height(DhunSpacing.xs))
                 Box(
                     modifier = Modifier
@@ -155,7 +170,7 @@ internal fun PlayerTabContent(
     modifier: Modifier = Modifier,
 ) {
     when (tab) {
-        0 -> LyricsTabContent(viewModel = viewModel, accent = accent, modifier = modifier)
+        LYRICS_TAB_INDEX -> LyricsTabContent(viewModel = viewModel, accent = accent, modifier = modifier)
         2 -> RelatedTabContent(viewModel = viewModel, accent = accent, modifier = modifier)
         else -> QueueTabContent(viewModel = viewModel, accent = accent, modifier = modifier)
     }
