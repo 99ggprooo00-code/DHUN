@@ -29,8 +29,10 @@ class NowPlayingShortcutLabelsTest {
 
     @Test
     fun `falls back to Untitled for blank or null title`() {
-        assertEquals("Untitled", NowPlayingShortcutLabels.longLabel(null, "Kavinsky"))
-        assertEquals("Untitled", NowPlayingShortcutLabels.longLabel("   ", "Kavinsky"))
+        // Artist info is still shown beside the fallback title — losing the
+        // title must not also lose the artist.
+        assertEquals("Untitled — Kavinsky", NowPlayingShortcutLabels.longLabel(null, "Kavinsky"))
+        assertEquals("Untitled — Kavinsky", NowPlayingShortcutLabels.longLabel("   ", "Kavinsky"))
         assertEquals("Untitled", NowPlayingShortcutLabels.longLabel("", ""))
     }
 
