@@ -1,5 +1,56 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-07 — PR #41's head never compiled, and a second red hid under it (`arena/01a07ad8-dhun`)
+
+**Symptom.** All three required gates red on `arena/01a07a6b-dhun` @ `7c24fde`
+(`build-and-test` ×2, `apk`, `msi`; `publish` skipped). CI annotations named one thing,
+twice:
+
+```
+shared/src/commonMain/kotlin/dev/dhun/ui/player/PlayerSeekBar.kt:L245  Unresolved reference 'width'.
+shared/src/commonMain/kotlin/dev/dhun/ui/player/PlayerSeekBar.kt:L261  Unresolved reference 'width'.
+> Task :shared:compileKotlinJvm          FAILED   (jvm + android target)
+```
+
+**Root cause.** `ff28f4a` replaced the thumb's inline offset math with the pure helper
+`trackAlignedItemOffsetPx(itemWidthPx: Int, widthPx: Float, fraction: Float)` and passed
+`width.toInt()` for `itemWidthPx`. Two errors: `width` is not a member of
+`BoxWithConstraints` scope (only `constraints` / `maxWidth` are), and the helper's first
+argument is the **item** width, not the track width. It reached the branch because the
+sandbox cannot compile (no JDK; Maven/Gradle egress refused) and the commits were pushed
+without waiting for a verdict on them.
+
+**The defect it masked.** `:app-android:testDebugUnitTest` had been failing since
+`32e38c5` (runs `34092576415` / `34092579729`) on
+`NavStatePersistenceTest."corrupt or future route entries are dropped, valid ones
+survive"` — expected 3 routes, got 4 including `ArtistPage(id=)`. `save`/`restore`
+encode routes as `artist:<id>` / `playlist:<isLocal>:<id>`, and `parts.getOrNull(1)?.let(…)`
+guards **null** only; `split(':', limit = 3)` yields `""`. A corrupt entry therefore
+restored as a live, permanently unresolvable back-stack item.
+
+**Fixes, and who owns them after the split.** This session fixed both (`f2d2359` thumb
+`thumbSize.roundToPx()` + pill measured outside its padding; `bf4449a` require non-blank
+ids). Mid-session, the a6b session revived and force-pushed `arena/01a07a6b-dhun` from
+`7c24fde` to `cd40c1f`, **retargeting #41 to the player workstream only** and
+independently fixing the same break in `d685ddc`. So `#43` was re-cut to `origin/main` +
+the 8 Android commits + the nav fix at new SHAs, and the `shared/**` fix was deliberately
+**dropped** — otherwise the same file would be patched twice by two PRs. Net rule
+recorded: when an inherited branch is *shared*, the fix follows the file owner, not the
+session that found it.
+
+**Process trap, costlier than either bug.** The handoff asserted (a) PR #41 was
+"merged-or-closed" — it was OPEN; (b) "9 commits … safe at `32e38c5`" — 13 commits, and
+`32e38c5` was red; (c) "`phase15-android-polish-status.md` written at the repo root" —
+absent from every commit on every branch. All three were one `gh` call away. The pre-push
+ritual says verify on GitHub, not locally; it applies to **inherited claims** too, or a
+false baseline propagates and the next agent trusts a merge that never happened.
+
+**Verification state.** #43's Android suite was green at `f2d2359` (`CI #339`) and at
+`00a432c` (`build-and-test` `34098780631`, `apk` + `msi` `34098780641`); those heads still
+carried the player batch, so the android-only re-cut re-runs CI and its verdict lands in
+the follow-up commit on the PR. `rot-drill` red on every branch including `main` is the
+known issue #14, not this code.
+
 ## 2026-09-07 — Windows second-window report: investigated, no code change warranted
 
 **Report:** on Windows, opening DHUN also opens a second small mini-player window
