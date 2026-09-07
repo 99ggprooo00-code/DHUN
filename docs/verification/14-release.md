@@ -1,29 +1,30 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
-RELEASE ACCEPTANCE OPEN.** PR #30 merged at **`76c68eb`**, 11:52:26Z on
-2026-09-06. Main CI **34031477321** and test-release **34031477327** passed.
-The first verified release of this repair code is `test@76c68eb`, published
-**2026-09-06T11:58:17Z**, internal MSI **1.36.1**. Later documentation-only
-builds may advance the rolling tag; always inspect the current asset identity.
+RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**
+(2026-09-07T01:24:20Z), stacking on PR #30 (`76c68eb`) and the earlier repair
+batch. Main CI **34072908037** and test-release **34072908097** passed. Rolling
+`test` pre-release published at **`862f0ac`** **2026-09-07T01:29:28Z**.
+Rolling tags are replaced on every push to main — always inspect the current
+asset identity, not a historical one.
 
 | Published asset | Size | CI-produced SHA256 |
 |---|---|---|
-| `dhun-test.msi` | 112,091,136 B | `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008` |
-| `dhun-test.apk` | 17,499,806 B | `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86` |
+| `dhun-test.msi` | 112,136,192 B | — (download-and-hash blocked in sandbox; see asset `.sha256`) |
+| `dhun-test.apk` | 17,516,190 B | — (download-and-hash blocked in sandbox; see asset `.sha256`) |
 
-Both checksum assets uploaded. Main's Windows job verified MSI identity,
-**1.0.5 → 1.36.1** with userdata/cache sentinels retained, future-upgrade
-flag removal retaining them, reinstall and explicit-uninstall cleanup.
-These are real hosted Windows Installer tests, **not app launch, sound,
-visual, media-key or soak tests**. Published sizes/tag were verified via
-GitHub APIs; hashes came from build annotations (not a separate download in
-this restricted sandbox). The publisher passed with a Node-20 deprecation
+Both `.sha256` assets are uploaded alongside each binary. Main's Windows job
+verified MSI identity, **1.0.5 → 1.36.1** with userdata/cache sentinels
+retained, future-upgrade flag removal retaining them, reinstall and
+explicit-uninstall cleanup. These are real hosted Windows Installer tests,
+**not app launch, sound, visual, media-key or soak tests**. Published sizes/tag
+were verified via GitHub APIs; the publisher passed with a Node-20 deprecation
 warning for `actions/download-artifact@v4`; no zero-warning audit is claimed.
 
 The user's last audio/Home/UI verdict was negative on the old 07:22 build.
 Only one-window startup was reported successful after manual reinstall.
-The new release needs the user's re-test. No v0.1.0 tag/release was created.
+The newer `862f0ac` build needs the user's re-test. No v0.1.0 tag/release was
+created.
 
 ## Pre-merge evidence — PR #30, b6d47bd (retained history)
 

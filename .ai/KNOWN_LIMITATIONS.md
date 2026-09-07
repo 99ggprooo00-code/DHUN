@@ -4,13 +4,14 @@ Updated every phase. Nothing hidden.
 
 ## Latest Windows result / merged repair — 2026-09-06
 
-The user reports **one window after manual uninstall/reinstall**, but
-**install-over fails (“Another version…”), audio fails, Home does not page,
-and player glyph placement/shuffle/colour styling is not accepted**. The
-report concerned the old `test@0920148`, 07:22:29Z build. PR #30 is now
-merged at `76c68eb`, with main CI 34031477321 and publishing 34031477327
-passing; the repair-code release was published 11:58:17Z with MSI 1.36.1.
-It still needs a user-machine re-test; the earlier failure cannot be
+The user's negative report (install-over fails “Another version…”, audio
+fails, Home does not page, player glyph placement/shuffle/colour styling not
+accepted) concerned the old `test@0920148`, 07:22:29Z build. That is now
+superseded: the repair code merged through PR #30 (`76c68eb`) and the branch
+accumulated through PR #32 (`862f0ac`), with main CI 34072908037 / test-release
+34072908097 passing, and the rolling `test` pre-release published 2026-09-07T01:29:28Z
+at `862f0ac` (MSI 112,136,192 B, APK 17,516,190 B). The user-machine re-test
+against this *newer* build is still required; the earlier failure cannot be
 explained away as Actions-IP-only gating.
 
 Repairs are **merged in PR #30**; the session branch is retained. Code CI passes on `b6d47bd` (branch 34030728903 / PR 34030730736).
@@ -42,8 +43,10 @@ Windows runner are not the user's complete hardware test.
 The user-provided Windows yt-dlp installation state is unknown. The old
 locator could miss an installed `yt-dlp.exe`; the new candidate checks PATH /
 `DHUN_YTDLP` and provides explicit missing-tool evidence. yt-dlp remains
-optional/user-provided, not bundled; no cookies, login, PO-token minting or
-parallel identity scheduling was added. ADR-003 remains **PROPOSED**.
+optional/user-provided, not bundled; no cookies, login or PO-token minting was
+added (ADR-003 is now ACCEPTED — Option C staged-wave fan-out — which only
+changes the *scheduling* of the existing tokenless identities, never their
+membership/order; no credentials are introduced).
 
 MSI ProductVersion must advance independently of the app's semantic version.
 The candidate keeps the stable upgrade UUID and uses a run/attempt sequence

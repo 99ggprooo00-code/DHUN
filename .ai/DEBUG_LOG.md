@@ -1,5 +1,38 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-07 — PR #32 merged & rolling `test` published; new session `arena/01a07989-dhun`
+
+**Merged:** PR #32 (`arena/01a076f3-dhun`) merged into `main` at
+**`862f0ac`** on 2026-09-07T01:24:20Z. Main CI **34072908037 PASS**;
+test-release **34072908097 PASS**. Rolling `test` pre-release published at
+**`862f0ac`** 2026-09-07T01:29:28Z: `dhun-test.msi` **112,136,192 B**,
+`dhun-test.apk` **17,516,190 B**, both with `.sha256` assets. Stable URLs
+unchanged.
+
+**New session state:** `arena/01a07989-dhun` branched from `862f0ac`;
+nothing local outstanding. PR #31 (`arena/01a0759b-dhun`, docs-only, `3c63dca`)
+is OPEN but **CONFLICTING** — superseded by PR #32's docs reconciliation; do
+not merge without user instruction. Issue #14 (rot-drill) still OPEN — the
+red is GitHub-runner IP gating on the live probe (a known environment
+limitation), not a user-impact defect.
+
+**Root cause of stale docs (why the reconcile commit here):** the previous
+session's CURRENT ACTIVE TASK still claimed "PR #32 OPEN" and its "exact next
+step" was to merge + publish — both now done, so the roadmap was replaced with
+the verified post-merge snapshot. Also resolved a long-standing doc
+contradiction: `KNOWN_LIMITATIONS.md` said "ADR-003 remains PROPOSED" while the
+ADR file and `OwnClientStreamResolver.kt` both say ACCEPTED (Option C staged
+wave) — reconciled to ACCEPTED. `StreamResolver.kt`'s doc comment still said
+"ADR-003 is unapproved" and `shared/build.gradle.kts` still said "Schema v1" —
+both stale and corrected.
+
+**Environment:** no local JDK/Android SDK/display; CI is the compile gate.
+The next step is to implement ADR-006 (persistent offline downloads) as a
+code-first, jvmTest-covered, CI-verified increment; hardware/device/soak and
+green live-probe gates remain OPEN and are not closable from this sandbox.
+
+---
+
 ## 2026-09-07 — Library Liked Songs reorganization, Mini-Player revamp, Slider Hitbox expansion, & ADR-006 Offline Downloads
 
 Session `arena/01a076f3-dhun`:

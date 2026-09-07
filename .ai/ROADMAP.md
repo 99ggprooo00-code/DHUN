@@ -1,38 +1,28 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-07 (UTC)** · session **`arena/01a076f3-dhun`** · **working PR #32 OPEN** · latest head commit on branch `arena/01a076f3-dhun`.
+Updated **2026-09-07 (UTC)** · session **`arena/01a07989-dhun`** · **PR #32 MERGED** at **`862f0ac`** (origin/main == local HEAD) · this session's working PR will advance from there.
 
-**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS.**
-Recent feature additions & UI/UX enhancements:
-1. **Playlist & Liked Songs Organization:** Integrated Liked Songs into a dedicated pinned folder card inside the Playlists tab, removing the redundant separated top-level Favorites tab.
-2. **Mini-Player UI Overhaul (Windows & Android):** Redesigned the docked Mini-Player with ambient artwork gradient wash, 2dp smoothed top progress line, circular morphing transport button, marquee title, and responsive touch/click area.
-3. **Windows Player Slider Hitbox Expansion:** Expanded `DhunSeekBar` interactive click/drag target from 4dp to full 48dp (`DhunSpacing.touchTarget`) with instant, responsive scrubbing on Windows and Android.
-4. **Offline Downloads Architecture (ADR-006):** Formulated comprehensive multiplatform architecture for persistent music downloads, storage management, and offline-first playback based on open-source music player analysis (ViMusic, InnerTune, Metrolist, SimpMusic).
+**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (docs reconcile + implementing ADR-006 offline downloads).**
 
-**Candidate PR #32 verification (session branch):**
-- Branch CI **34072628175 PASS** / **34072630528 PASS** — Python tests, PowerShell syntax, shared JVM tests, Android debug build, probe/Desktop compilation.
-- Packaging run **34072630545 PASS** — MSI **1.48.1** (112,136,192 B, SHA256 `531e95285db5f9403509fe41f74f4307f5c41a85b4bfab591e891da5123d4e03`) and Android APK build (17,516,190 B, SHA256 `91bfcc58e87df4e1733eef8b136ddcbef932b1c9e9e3e095f1fa5677352434bc`) with disposable Windows upgrade validation.
-- ADR-003 (staged wave parallel extraction), ADR-005 (next-track pre-buffering, temporary cache lifecycle, Android low-latency LoadControl, video track disablement, and per-track User-Agent stream isolation), and ADR-006 (offline music downloads architecture) documented and verified.
-- Hosted Windows upgrade smoke verified **1.36.1 → 1.48.1** (baseline SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`), preserving userdata and cache sentinels.
-
-| Published artifact | Verified size / CI-produced SHA256 |
-|---|---|
-| `dhun-test.msi` | **112,136,192 B** · `531e95285db5f9403509fe41f74f4307f5c41a85b4bfab591e891da5123d4e03` |
-| `dhun-test.apk` | **17,516,190 B** · `91bfcc58e87df4e1733eef8b136ddcbef932b1c9e9e3e095f1fa5677352434bc` |
-
-**Last error:** None on CI.
-**Current exact files:** `shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt`, `shared/src/commonMain/kotlin/dev/dhun/presentation/library/LibraryViewModel.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt`, `docs/decisions/ADR-006-offline-music-downloads-architecture.md`, `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`.
+The previous session (`arena/01a076f3-dhun`) merged **PR #32** into main at `862f0ac` and published the rolling `test` pre-release. That branch carried the accumulated work from this matrix of recent sessions: the PR #30 Windows-report repair batch (installer data safety, Home feed/pagination, playback-error diagnostics, player layout), the UI restyle/corrected glyphs (PR #26), the stream User-Agent isolation (PR #24), single-window desktop / ADR-004 (PR #28), Liked Songs into the Playlists folder, the docked Mini-Player overhaul, the 48dp slider hitbox, and the ADR-003/005/006 documents.
 
 **What is verified / merged / released / open:**
-- **Merged on main:** PR #30 at `76c68eb` (installer data safety, Home feed/pagination, diagnostics, player layout).
-- **CI-verified:** Main CI 34031477321 (PASS), test-release 34031477327 (PASS), PR #32 CI 34072628175 (PASS), PR #32 packaging 34072630545 (PASS).
-- **Released:** Rolling `test` pre-release at `76c68eb` (MSI 1.36.1, APK).
-- **Hardware-verified:** One-window startup confirmed by user on prior build. Install-over upgrade, live audio stream byte playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, and 30-min soaks remain **OPEN**.
-- **ADR-003 (Accepted):** Staged wave parallel tokenless identity chain implemented in `OwnClientStreamResolver.kt`.
-- **ADR-005 (Accepted):** Next-track pre-buffering, temporary cache lifecycle, unplayed eviction, and Android per-track User-Agent stream isolation implemented in `AudioFileCache.kt`, `DesktopDhunPlayer.kt`, and `PlaybackGraph.kt`.
-- **ADR-006 (Accepted):** Persistent offline music downloads architecture and storage management.
+- **Merged on main:** PR #32 at **`862f0ac`** (2026-09-07T01:24:20Z). It stacks on PR #30 (`76c68eb`) and the earlier repair batch.
+- **CI-verified:** Main CI **34072908037 PASS**; test-release **34072908097 PASS**. (Branch CI for the old session: `34072628175` / `34072630528` PASS; packaging `34072630545` PASS.)
+- **Released:** Rolling `test` pre-release at **`862f0ac`**, published **2026-09-07T01:29:28Z**: `dhun-test.msi` **112,136,192 B** + `dhun-test.apk` **17,516,190 B**, each with `.sha256` assets. Stable URLs unchanged (`/releases/download/test/dhun-test.{apk,msi}`).
+- **Hardware-verified:** one-window startup (user, prior build). **OPEN:** install-over upgrade, audible live-stream playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, 30-min soaks, green live rot-drill verdict.
+- **ADR-003 (Accepted):** staged-wave parallel tokenless identity chain in `OwnClientStreamResolver.kt` (KNOWN_LIMITATIONS stale "PROPOSED" reconciled this session).
+- **ADR-005 (Accepted):** next-track pre-buffering / temp-cache lifecycle / per-track User-Agent isolation in `AudioFileCache.kt`, `DesktopDhunPlayer.kt`, `PlaybackGraph.kt`.
+- **ADR-006 (Accepted):** persistent offline music downloads architecture — **implementation in progress this session** (previously only the ADR/documentation existed).
 
-**Exact next technical step:** Merge verified PR #32 to main and publish updated rolling test build. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
+**Session carry-over items:**
+- PR #31 (`arena/01a0759b-dhun`, docs-only, commit `3c63dca`) is **OPEN but CONFLICTING / superseded** by PR #32's docs reconciliation. Do not merge; it is retained for reference and will be reconciled/closed only if the user instructs.
+- Issue **#14 `[rot-drill] Live extraction probe failed`** remains **OPEN** (red is GitHub-runner IP gating, a known environment limitation, not a user-impact defect).
+
+**Last error:** None on CI.
+**Current exact files:** `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`, `docs/verification/14-release.md`, `shared/.../extraction/StreamResolver.kt` (stale ADR-003 comment), `shared/build.gradle.kts` (stale schema comment) — plus the new ADR-006 data layer (`DownloadedTrack` entity + SQLDelight table/migration + `DownloadRepository` + `DownloadManager` + `StreamDownloader`).
+
+**Exact next technical step:** Reconcile docs to the merged/published state, then implement ADR-006's persistent download layer (SQLDelight `DownloadedTrack` v3 schema + migration, `DownloadRepository`, `DownloadManager`, resumable `StreamDownloader`, offline-first playback hook) with jvmTest coverage. Blocker: none for docs/code; all hardware gates (device/Windows/libVLC/display) are unavailable in this sandbox and must be reported to the user, not inferred.
 
 ---
 
