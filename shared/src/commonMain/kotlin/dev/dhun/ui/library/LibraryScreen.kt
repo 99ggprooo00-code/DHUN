@@ -349,7 +349,7 @@ private fun LikedSongsFolderCard(
                         Brush.linearGradient(
                             listOf(
                                 DhunColors.accent,
-                                DhunColors.accentGlow,
+                                DhunColors.accentContainer,
                             ),
                         ),
                     ),
