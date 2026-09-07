@@ -46,14 +46,13 @@ class DhunDownloadService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Defensive: if a process restart redelivers the intent before the
-        // controller is attached, just promote to foreground and wait for
-        // attach() to drive real work.
-        controller.handleIntent(intent)
-        // START_NOT_STICKY: we do not want the system to recreate the
-        // service with a null intent on its own — the repository is the
-        // single source of truth, and the controller will re-arm from
-        // there on the next enqueue.
+        // The intent exists only to satisfy startForegroundService's
+        // contract — the controller attached in onCreate() is what drives
+        // real work. START_NOT_STICKY: we do not want the system to
+        // recreate the service with a null intent on its own; the
+        // repository is the single source of truth, and the next
+        // enqueue (or a process restart that re-attaches the controller)
+        // re-arms the queue.
         return START_NOT_STICKY
     }
 

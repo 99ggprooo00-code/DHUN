@@ -16,7 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -84,10 +83,11 @@ class DownloadServiceController : KoinComponent {
     }
 
     private fun observeState(scope: CoroutineScope) {
+        // No distinctUntilChanged — StateFlow already de-dupes by
+        // structural equality, and applying it is a no-op (and deprecated
+        // as of coroutines 1.7+).
         stateJob = scope.launch {
-            downloadManager.downloads
-                .distinctUntilChanged()
-                .collect { rows -> onState(rows) }
+            downloadManager.downloads.collect { rows -> onState(rows) }
         }
     }
 
