@@ -10,29 +10,29 @@ Recent feature additions & UI/UX enhancements:
 4. **Offline Downloads Architecture (ADR-006):** Formulated comprehensive multiplatform architecture for persistent music downloads, storage management, and offline-first playback based on open-source music player analysis (ViMusic, InnerTune, Metrolist, SimpMusic).
 
 **Candidate PR #32 verification (session branch):**
-- Branch CI **34064910238 PASS** / **34064908697 PASS** — Python tests, PowerShell syntax, shared JVM tests, Android debug build, probe/Desktop compilation.
-- Packaging run **34064910218 PASS** — MSI **1.40.1** and Android APK build with disposable Windows upgrade validation.
-- ADR-003 (staged wave parallel extraction), ADR-005 (next-track pre-buffering, temporary cache lifecycle, Android low-latency LoadControl, video track disablement, and per-track User-Agent stream isolation), and ADR-006 (offline music downloads architecture) documented.
-- Hosted Windows upgrade smoke verified **1.36.1 → 1.40.1** (baseline SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`), preserving userdata and cache sentinels.
+- Branch CI **34072628175 PASS** / **34072630528 PASS** — Python tests, PowerShell syntax, shared JVM tests, Android debug build, probe/Desktop compilation.
+- Packaging run **34072630545 PASS** — MSI **1.48.1** (112,136,192 B, SHA256 `531e95285db5f9403509fe41f74f4307f5c41a85b4bfab591e891da5123d4e03`) and Android APK build (17,516,190 B, SHA256 `91bfcc58e87df4e1733eef8b136ddcbef932b1c9e9e3e095f1fa5677352434bc`) with disposable Windows upgrade validation.
+- ADR-003 (staged wave parallel extraction), ADR-005 (next-track pre-buffering, temporary cache lifecycle, Android low-latency LoadControl, video track disablement, and per-track User-Agent stream isolation), and ADR-006 (offline music downloads architecture) documented and verified.
+- Hosted Windows upgrade smoke verified **1.36.1 → 1.48.1** (baseline SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`), preserving userdata and cache sentinels.
 
 | Published artifact | Verified size / CI-produced SHA256 |
 |---|---|
-| `dhun-test.msi` | **112,091,136 B** · `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008` |
-| `dhun-test.apk` | **17,499,806 B** · `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86` |
+| `dhun-test.msi` | **112,136,192 B** · `531e95285db5f9403509fe41f74f4307f5c41a85b4bfab591e891da5123d4e03` |
+| `dhun-test.apk` | **17,516,190 B** · `91bfcc58e87df4e1733eef8b136ddcbef932b1c9e9e3e095f1fa5677352434bc` |
 
 **Last error:** None on CI.
 **Current exact files:** `shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt`, `shared/src/commonMain/kotlin/dev/dhun/presentation/library/LibraryViewModel.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt`, `docs/decisions/ADR-006-offline-music-downloads-architecture.md`, `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`.
 
 **What is verified / merged / released / open:**
 - **Merged on main:** PR #30 at `76c68eb` (installer data safety, Home feed/pagination, diagnostics, player layout).
-- **CI-verified:** Main CI 34031477321 (PASS), test-release 34031477327 (PASS), PR #32 CI 34037665009 (PASS), PR #32 packaging 34037665019 (PASS).
+- **CI-verified:** Main CI 34031477321 (PASS), test-release 34031477327 (PASS), PR #32 CI 34072628175 (PASS), PR #32 packaging 34072630545 (PASS).
 - **Released:** Rolling `test` pre-release at `76c68eb` (MSI 1.36.1, APK).
 - **Hardware-verified:** One-window startup confirmed by user on prior build. Install-over upgrade, live audio stream byte playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, and 30-min soaks remain **OPEN**.
 - **ADR-003 (Accepted):** Staged wave parallel tokenless identity chain implemented in `OwnClientStreamResolver.kt`.
 - **ADR-005 (Accepted):** Next-track pre-buffering, temporary cache lifecycle, unplayed eviction, and Android per-track User-Agent stream isolation implemented in `AudioFileCache.kt`, `DesktopDhunPlayer.kt`, and `PlaybackGraph.kt`.
 - **ADR-006 (Accepted):** Persistent offline music downloads architecture and storage management.
 
-**Exact next technical step:** Maintain working PR #32, keep test suites green, and verify changes via CI. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
+**Exact next technical step:** Merge verified PR #32 to main and publish updated rolling test build. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
 
 ---
 
