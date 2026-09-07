@@ -89,10 +89,21 @@ val appModule = module {
     // Android-side decorator: kicks off DhunDownloadService on every
     // enqueue so downloads survive app backgrounding / OEM killers.
     // All other operations are pure pass-throughs.
+    //
+    // IMPORTANT: the delegate MUST be resolved against the concrete
+    // `FileDownloadManager` singleton (registered immediately above), not
+    // as an unqualified `get()`. The constructor parameter is typed
+    // `DownloadManager`, so `get()` would type-infer to `get<DownloadManager>()`
+    // — the very singleton being constructed — and recurse at first
+    // resolution. CI cannot see this: `:app-android:assembleDebug`
+    // is a type-check gate, not a resolution test, and `:app-android`
+    // has no test source set today. The :shared:jvmTest
+    // `KoinDownloadStackTest` exercises the equivalent pattern and
+    // guards against regressions of this bug class.
     single<DownloadManager> {
         dev.dhun.android.download.ForegroundServiceDownloadManager(
             context = androidContext(),
-            delegate = get(),
+            delegate = get<FileDownloadManager>(),
             controller = get(),
         )
     }
