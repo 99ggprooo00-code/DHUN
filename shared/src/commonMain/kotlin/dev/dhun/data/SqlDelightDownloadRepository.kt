@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import dev.dhun.database.Downloaded_track as DownloadedTrackRow
+import dev.dhun.database.DownloadedTrack as DownloadedTrackRow
 
 /** Serialize the enum to the stable TEXT column value (enum name). */
 internal fun DownloadState.toDbValue(): String = name
@@ -69,6 +69,10 @@ class SqlDelightDownloadRepository(
     override fun observeAll(): Flow<List<DownloadedTrack>> =
         db.downloadedTrackQueries.selectAll().asFlow().mapToList(io)
             .map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun getAll(): List<DownloadedTrack> = withContext(io) {
+        db.downloadedTrackQueries.selectAll().executeAsList().map { it.toDomain() }
+    }
 
     override fun observeCompleted(): Flow<List<DownloadedTrack>> =
         db.downloadedTrackQueries.selectCompleted().asFlow().mapToList(io)

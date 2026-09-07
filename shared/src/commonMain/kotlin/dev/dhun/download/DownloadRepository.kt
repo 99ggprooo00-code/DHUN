@@ -22,6 +22,9 @@ interface DownloadRepository {
     /** All downloads, newest first. */
     fun observeAll(): Flow<List<DownloadedTrack>>
 
+    /** One-shot snapshot of all downloads, newest first (for cleanup). */
+    suspend fun getAll(): List<DownloadedTrack>
+
     /** Only COMPLETED downloads, newest first. */
     fun observeCompleted(): Flow<List<DownloadedTrack>>
 
