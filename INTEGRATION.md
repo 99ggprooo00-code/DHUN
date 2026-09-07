@@ -202,6 +202,12 @@ verification (`checkModules()` or an `:app-android` smoke test remain a follow-u
 - test-release run `34083348445` @ `4fd9636` is still in progress; the `apk`/`msi`
   verdict is not yet in.
 
+**Head is still moving.** Agent 1 is iterating on this test: `705a946` → `4fd9636`
+(added `koin-test`) → `fb32711` (in progress at the time of writing, runs
+`34083713576` CI / `34083713580` test-release). **The last *completed* CI result for
+PR #35 is the FAILURE at `4fd9636`.** Re-check before acting on this section — the
+verdict here is accurate as of coordinator commit `8459bc2`, not indefinitely.
+
 Coordinator disclosure: the original C1 diagnosis was **static analysis only** — no
 JDK/Gradle in the sandbox, and the standing rule is git + gh only. It was never a
 reproduced stack trace.
