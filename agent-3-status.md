@@ -21,13 +21,15 @@ Shared per-track download affordances only.
 - Wired the reusable trailing row composable into:
   - Home quick-pick track rows (`HomeScreen` / `QuickPickItem`)
   - Search song/video result rows (`SearchScreen` / `TrackRow` trailing content)
+- Forwarded `downloadManager` through `DhunAppShell` → `TabContent` → `HomeScreen` / `SearchScreen`, so those row affordances receive the same manager already used by Library and `TrackOverflowDialog`.
 - Kept the existing `TrackOverflowDialog` "Download for offline" action unchanged.
 
 ## Guardrails followed
 
 - Did not modify download engine files under `shared/.../download/**`.
 - Did not modify app platform modules.
-- Did not modify Library, Player, Shell, `.ai`, or `docs` areas.
+- Did not modify Library, Player, `.ai`, or `docs` areas.
+- Modified `shared/.../ui/shell/DhunAppShell.kt` only after explicit follow-up approval to complete the `downloadManager` pass-through.
 - Did not claim hardware verification.
 
 ## Verification
@@ -38,4 +40,4 @@ Shared per-track download affordances only.
 
 ## Open handoff note
 
-`HomeScreen` and `SearchScreen` now accept an optional `DownloadManager` and render badges when provided. The app shell pass-through was intentionally left untouched because `shared/.../ui/shell/**` is outside Agent 3 scope.
+`HomeScreen` and `SearchScreen` now accept an optional `DownloadManager`, and `DhunAppShell` forwards its existing manager into both screens. When a track has a row in `downloadManager.downloads`, Home quick picks and Search song/video rows render `TrackDownloadRowActions`; those render `TrackDownloadBadge`, which observes `observeProgress(trackId)` for live percentages.
