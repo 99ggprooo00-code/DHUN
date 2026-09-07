@@ -691,15 +691,6 @@ private fun DownloadsTab(
     progressFor: (String) -> kotlinx.coroutines.flow.Flow<dev.dhun.download.DownloadProgress?>,
     modifier: Modifier = Modifier,
 ) {
-    if (downloads.totalCount == 0) {
-        EmptyView(
-            title = "No downloads yet",
-            message = "Use the download action on a track to save it for offline listening.",
-            modifier = modifier.fillMaxSize().padding(DhunSpacing.xxl),
-        )
-        return
-    }
-
     var view by remember { mutableStateOf(DownloadsView.LIST) }
     var showClearConfirm by remember { mutableStateOf(false) }
     var showBatchConfirm by remember { mutableStateOf(false) }
@@ -707,6 +698,28 @@ private fun DownloadsTab(
     val selected = remember { mutableStateOf(setOf<String>()) }
     fun toggle(id: String) {
         selected.value = if (id in selected.value) selected.value - id else selected.value + id
+    }
+
+    // Empty LIST still offers the storage view (device capacity is worth
+    // seeing even with nothing downloaded yet); MANAGE below renders
+    // capacity-only when the list is empty.
+    if (downloads.totalCount == 0 && view == DownloadsView.LIST) {
+        Column(modifier = modifier.fillMaxSize()) {
+            EmptyView(
+                title = "No downloads yet",
+                message = "Use the download action on a track to save it for offline listening.",
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(DhunSpacing.xxl),
+            )
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(bottom = DhunSpacing.lg),
+                contentAlignment = Alignment.Center,
+            ) {
+                DhunTextButton(onClick = { view = DownloadsView.MANAGE }) {
+                    Text("Manage storage", color = DhunColors.accent)
+                }
+            }
+        }
+        return
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -717,16 +730,22 @@ private fun DownloadsTab(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "${downloads.totalCount} item${if (downloads.totalCount == 1) "" else "s"} • ${formatBytes(storage.usedByDownloadsBytes)}",
-                style = MaterialTheme.typography.labelMedium,
-                color = DhunColors.textSecondary,
-            )
+            if (downloads.totalCount > 0) {
+                Text(
+                    "${downloads.totalCount} item${if (downloads.totalCount == 1) "" else "s"} • ${formatBytes(storage.usedByDownloadsBytes)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = DhunColors.textSecondary,
+                )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
                 DhunOutlinedButton(onClick = {
                     view = if (view == DownloadsView.MANAGE) DownloadsView.LIST else DownloadsView.MANAGE
                 }) { Text(if (view == DownloadsView.MANAGE) "Done" else "Storage") }
-                DhunTextButton(onClick = { showClearConfirm = true }) { Text("Clear all", color = DhunColors.error) }
+                if (downloads.totalCount > 0) {
+                    DhunTextButton(onClick = { showClearConfirm = true }) { Text("Clear all", color = DhunColors.error) }
+                }
             }
         }
 
@@ -990,8 +1009,8 @@ private fun StorageManageView(
             }
         }
 
-        // Batch-select action bar --------------------------------------------
-        Row(
+        // Batch-select action bar (hidden when there is nothing to select) ---
+        if (downloads.isNotEmpty()) Row(
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
