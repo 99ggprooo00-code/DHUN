@@ -38,6 +38,7 @@ import dev.dhun.extraction.StreamResolver
 import dev.dhun.extraction.YtDlpStreamResolver
 import dev.dhun.innertube.InnerTubeClient
 import dev.dhun.desktop.native.DhunTray
+import dev.dhun.desktop.native.SingleInstance
 import dev.dhun.desktop.player.DesktopDhunPlayer
 import dev.dhun.desktop.smct.Smct
 import dev.dhun.domain.GetHomeFeedUseCase
@@ -66,8 +67,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
+import java.awt.Frame
 import java.io.File
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
@@ -110,6 +113,20 @@ import javax.swing.SwingUtilities
  *    (<installDir>/userdata/dhun-startup.log or %TEMP%/dhun-startup.log)
  *    and renders startup failures in the sole Compose window; it never opens a
  *    second Swing/JOptionPane window.
+ *
+ * Phase 15a/27 addition (this file) — single-instance guard:
+ *  - PR #28 deleted the separate mini-player window and PR #34 deleted every
+ *    JOptionPane path, so one *process* can only own one window (re-audited in
+ *    PR #38). The uncovered path was a second *process*: launching DHUN twice
+ *    (double-click, pinned + autostart, relaunch during a slow cold start) used
+ *    to give two full windows, two tray icons, two SMTC sessions and two
+ *    writers on one `userdata/dhun.db`. [SingleInstance] now runs BEFORE the
+ *    module probes, Koin, the DB and `application {}`: the second process
+ *    handshakes over a loopback socket, asks the running one to surface, and
+ *    exits(0) without ever creating an AWT/Compose/Koin/SQLite surface.
+ *  - Surfacing reuses the tray's own "Open DHUN" focus path ([showMainWindow]),
+ *    extended to un-iconify first — so a second launch reads as *refocus*, not
+ *    *duplicate*, whether the window was visible, hidden to tray, or minimized.
  *
  * Compose Desktop 1.8.2 API notes (verified against
  * JetBrains/compose-multiplatform-core v1.8.2 sources):
@@ -171,6 +188,35 @@ fun main() {
             "java=${System.getProperty("java.version")} runtime=${System.getProperty("java.runtime.version")} " +
             "os=${System.getProperty("os.name")} jpackage.app-path=${System.getProperty("jpackage.app-path")}",
     )
+    // Phase 15a/27 single-instance guard — decided BEFORE the module probes,
+    // Koin, the database and `application {}`, so a second launch never creates
+    // a window, a tray icon, an SMTC session or a second SQLite writer. It asks
+    // the already-running instance to surface its existing window and exits.
+    val surfaceRequest = AtomicReference<() -> Unit>()
+    val surfacePending = AtomicBoolean(false)
+    val instance = SingleInstance.start(
+        // Invoked on the guard's own daemon thread — never the EDT. The
+        // callback installed below does the EDT marshaling.
+        onShow = {
+            val surface = surfaceRequest.get()
+            // The window may not be wired up yet (a third launch racing this
+            // one's startup): remember it and drain the flag once wired.
+            if (surface != null) surface() else surfacePending.set(true)
+        },
+        log = ::logStartup,
+    )
+    val instanceLease: SingleInstance.Lease? = when (instance) {
+        is SingleInstance.Startup.Primary -> instance.lease
+        SingleInstance.Startup.SecondInstance -> {
+            logStartup("DHUN second instance: the running DHUN was asked to surface — exiting without opening a window")
+            System.exit(0)
+            return
+        }
+        is SingleInstance.Startup.Unguarded -> {
+            logStartup("DHUN single-instance guard unavailable (${instance.reason}) — starting normally")
+            null
+        }
+    }
     // Early module probes — if the bundled jlink image is missing java.sql,
     // the JVM would already have failed to launch before reaching here.
     // Probing here documents the bundled modules for the log and catches
@@ -290,11 +336,29 @@ fun main() {
             val mainWindowRef = AtomicReference<ComposeWindow>()
             val smctSessionRef = AtomicReference<Smct.Session?>()
 
+            /**
+             * The one "bring DHUN back" path. The tray's "Open DHUN" item, a
+             * tray-icon click, and a second launch's [SingleInstance] SHOW
+             * signal all land here — which is what makes a relaunch read as
+             * *refocus* rather than *duplicate*. Call on the EDT.
+             */
             fun showMainWindow() {
                 val w = mainWindowRef.get() ?: return
+                // Un-iconify first: toFront()/requestFocus() alone do not restore
+                // a window the user minimized to the taskbar, so a second launch
+                // would appear to do nothing.
+                if (w.extendedState != Frame.NORMAL) w.extendedState = Frame.NORMAL
                 w.isVisible = true
                 w.toFront()
                 w.requestFocus()
+            }
+
+            // Phase 15a/27: hand the single-instance guard the EDT-marshaled
+            // focus path (its callback runs on a daemon socket thread), then
+            // drain a SHOW that arrived before the window was wired up.
+            surfaceRequest.set { SwingUtilities.invokeLater { showMainWindow() } }
+            if (surfacePending.getAndSet(false)) {
+                SwingUtilities.invokeLater { showMainWindow() }
             }
 
             fun saveGeometry() {
@@ -319,6 +383,11 @@ fun main() {
             fun quit() {
                 saveGeometry()
                 runCatching { tray.stop() }
+                // Release the loopback rendezvous port before teardown. If the
+                // JVM lingers after exitApplication(), a relaunch would still
+                // handshake with this dying instance, exit(0) itself, and leave
+                // the user with no window at all.
+                runCatching { instanceLease?.close() }
                 runCatching { smctSessionRef.getAndSet(null)?.close() }
                 runCatching { persistence.stop() }
                 runCatching { player.release() }
