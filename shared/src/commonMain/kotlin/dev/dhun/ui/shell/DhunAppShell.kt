@@ -341,6 +341,8 @@ fun DhunAppShell(
                 isDesktop = isDesktop,
                 onCollapse = { nav.playerExpanded = false },
                 onOverflowTrack = { overflowTrack = it },
+                favoriteIds = favoriteIds,
+                onToggleFavorite = { homeViewModel.toggleFavorite(it) },
                 onOpenArtist = { track ->
                     nav.playerExpanded = false
                     nav.detailStack.clear()
@@ -359,8 +361,6 @@ fun DhunAppShell(
             TrackOverflowDialog(
                 track = track,
                 player = player,
-                isFavorite = track.id in favoriteIds,
-                onToggleFavorite = { homeViewModel.toggleFavorite(it) },
                 onDownload = if (downloadManager != null) { t -> libraryVm.download(t) } else null,
                 onAddToPlaylist = { addToPlaylistTrack = it },
                 onNavigateToArtist = {

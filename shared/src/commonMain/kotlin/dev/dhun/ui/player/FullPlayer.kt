@@ -120,6 +120,8 @@ fun FullPlayer(
     onOverflowTrack: (Track) -> Unit = {},
     onOpenArtist: (Track) -> Unit = {},
     onOpenAlbum: (Track) -> Unit = {},
+    favoriteIds: Set<String> = emptySet(),
+    onToggleFavorite: (Track) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val track by viewModel.currentTrack.collectAsState()
@@ -132,6 +134,7 @@ fun FullPlayer(
     val skipDirection by viewModel.skipDirection.collectAsState()
 
     val current = track
+    val isFavorite = current?.id?.let { it in favoriteIds } ?: false
     val playbackError = state as? PlaybackState.Error
     var showErrorDetails by remember(playbackError) { mutableStateOf(false) }
     if (showErrorDetails && playbackError != null) {
@@ -492,6 +495,26 @@ fun FullPlayer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
+                // Like / favorite — sits beside (before) shuffle in the same
+                // transport cluster, so an inline change doesn't disturb the
+                // art/seek/tabs vertical layout.
+                DhunIconButton(
+                    onClick = { current?.let(onToggleFavorite) },
+                    modifier = Modifier
+                        .size(DhunSpacing.touchTarget)
+                        .clip(DhunShapes.full)
+                        .background(if (isFavorite) accent.copy(alpha = 0.22f) else Color.Transparent),
+                    enabled = current != null,
+                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                ) {
+                    DhunIconView(
+                        icon = if (isFavorite) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = if (isFavorite) accent else DhunColors.textPrimary,
+                    )
+                }
+
                 // Shuffle
                 DhunIconButton(
                     onClick = { viewModel.toggleShuffle() },
