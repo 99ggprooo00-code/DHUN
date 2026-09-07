@@ -1,5 +1,118 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-07 — Windows second-window report: investigated, no code change warranted
+
+**Report:** on Windows, opening DHUN also opens a second small mini-player window
+alongside the real app.
+
+**Finding: already fixed, twice, and merged.** `ADR-004` records the identical
+complaint against the `test` build of `2026-09-06T06:51:40Z`. PR #28 (`b8f148d`)
+deleted `ui/MiniPlayerWindow.kt` and the second Compose `Window`; PR #34 (`d1e0408`)
+removed the remaining `JOptionPane` startup/fatal surfaces.
+
+**Static audit of `481b77b`** (exhaustive grep over `app-desktop/**/*.kt` for
+`Window(`, `ComposeWindow`, `JOptionPane`, `JDialog`, `JWindow`, `JFrame`,
+`java.awt.Window|Frame|Dialog`, `AlertDialog`, `Dialog(`, `Popup(`, `Tooltip(`,
+`SetWindowPos`, `GetWindowRect`, `moveWindow`, `FindWindow`, `CreateWindow`,
+`ShowWindow`, `HWND`):
+
+| Path | Verdict |
+|---|---|
+| `Main.kt:228` `Window(` | startup-error window — gated by `initError != null && koinInstance == null`, terminated by `return@application` at line 245 |
+| `Main.kt:420` `Window(` | the main window — normal path only |
+| `Main.kt:290` `AtomicReference<ComposeWindow>()` | holds a reference; creates nothing |
+| `Main.kt:293` `showMainWindow()` | `isVisible` / `toFront` / `requestFocus` on the existing window |
+| `DhunTray.kt` | `TrayIcon` + `PopupMenu` — not a window |
+| `Smct.kt:451/459` `FindWindowW` | **finds** the existing `SunAwtFrame` HWND for `GetForWindow`; movement calls deleted (`Smct.kt:442-443`) |
+| `JOptionPane` | 0 imports; one comment at `Main.kt:112` |
+
+**Conclusion:** two simultaneous windows are not reachable from DHUN's own code on
+`481b77b`. Either the tested build is older, or Koin init failed — in which case the
+error window *replaces* the main window, so the user would still see exactly one.
+
+**Decision: no `app-desktop` change.** Re-fixing a fixed bug adds risk without
+evidence. The open work is a hardware re-test of the rolling `test` MSI
+(`481b77b`, published `2026-09-07T04:58:25Z`); if it reproduces, `dhun-startup.log`
+distinguishes the Compose error window from a leftover AWT surface.
+
+**Boundary:** this audit is static. No Windows machine or display exists here, so
+one-window startup has never been verified on hardware for any build.
+
+
+## 2026-09-07 — C1: Koin self-recursion in the Android `DownloadManager` decorator (coordinator `arena/01a07a07-dhun`)
+
+**Symptom (predicted, never observed on hardware):** Android app would crash at
+launch with a `StackOverflowError` out of Koin internals, before any user interaction
+— while `build-and-test`, `apk`, and `msi` all reported **green** on the same commit
+(`a4dc28d`, PR #35).
+
+**Root cause.** `app-android/src/main/kotlin/dev/dhun/android/di/AppModule.kt`:
+
+```kotlin
+single<DownloadManager> {
+    ForegroundServiceDownloadManager(
+        context = androidContext(),
+        delegate = get(),        // <-- inferred as get<DownloadManager>()
+        controller = get(),
+    )
+}
+```
+
+`ForegroundServiceDownloadManager` declares `private val delegate: DownloadManager`, so
+the unqualified `get()` type-infers to `get<DownloadManager>()` — **the very definition
+being constructed**. Koin 4.0.2 (`app-android/build.gradle.kts:84`) stores a singleton
+*after* its factory returns, so nothing memoises the in-progress instance and the
+resolution recurses.
+
+**Why it fires at launch, not on first download.** `MainActivity.kt:197` passes
+`downloadManager = koin.get()` into `DhunAppShell`, whose parameter is
+`downloadManager: DownloadManager? = null` (`DhunAppShell.kt:122`). That resolution
+happens during activity composition.
+
+**Why CI could not catch it.** `:app-android:assembleDebug` is a type-check gate, and
+`:app-android` has **no test source set**, so no smoke test existed. A DI cycle is a
+runtime property of the object graph, invisible to a compiler.
+
+**Fix (agent 1, `ef69f82`):** `delegate = get<FileDownloadManager>()` — explicit type,
+breaking the cycle and pointing at the concrete singleton registered immediately above.
+Regression test `shared/src/jvmTest/kotlin/dev/dhun/di/KoinDownloadStackTest.kt`
+(`705a946`).
+
+**Boundary on that test:** it lives in `:shared:jvmTest` and mirrors the production
+registration *shape* using minimal fakes, because `:app-android` has no test source
+set. It pins the pattern so the unqualified-`get()` form cannot quietly return; it
+does **not** verify the real `appModule`. A `checkModules()` call or an `:app-android`
+smoke test remains open.
+
+**Coordinator honesty note:** this diagnosis was **static analysis**. The coordinator
+has no JDK/Gradle in its sandbox and works from git + gh only, so it never produced a
+reproduced stack trace. It was posted as a review comment on PR #35 and recorded as a
+blocker in `INTEGRATION.md`; the fix was routed to agent 1, which owns
+`app-android/**`.
+
+**Gate applied and outcome:** #35 was held while red. The regression test took three
+commits to compile — `705a946` (test added; `koin-test` missing from the
+`:shared:jvmTest` classpath → run `34083073966` **failure**), `4fd9636` (added
+`koin-test`; **a wrong turn** — `KoinTest` still did not resolve, errors unchanged →
+run `34083348460` **failure** at `:shared:compileTestKotlinJvm`), `fb32711` (dropped
+`koin-test`, read Koin through `GlobalContext.get()` directly → **green**,
+`build-and-test` pass in 5m19s, run `34083713576`). **The production fix compiled
+throughout** — every annotation in both red runs was inside the test file, never
+`AppModule.kt`. Merged via PR #35 as squash `40eff1d`; main `481b77b` fully green.
+
+**Lesson worth keeping:** two consecutive red runs on a branch whose *production* code
+was correct. Reading the failing **Gradle task** (`:shared:compileTestKotlinJvm`) and
+the annotation **file paths** — rather than the PR's overall red/green — is what kept
+the C1 fix from being reverted along with its broken test.
+
+**Second finding from the same pass — C2, inert UI.** `DhunAppShell` accepted
+`downloadManager` and forwarded it to `LibraryViewModel` (line 139) and the overflow
+`onDownload` (line 364) but **not** to `HomeScreen` (line 535) or `SearchScreen`
+(line 549). Agent 3's new badges therefore compiled and rendered nothing. Fixed by
+agent 3 in `e987f64`; the coordinator's exemption to write the pass-through was not
+exercised. Related hazard: the parameter was inserted mid-list (7th of 12 / 7th of 8),
+which is safe only because both callsites use named arguments.
+
 ## 2026-09-07 — ADR-006 offline playback probe added (session `arena/01a079f6-dhun`)
 
 **Change:** Added `tools/playback-probe:offlineProbe` and a valid WAV fixture.

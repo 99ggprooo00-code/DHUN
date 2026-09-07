@@ -1,30 +1,93 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-07 (UTC)** · session **`arena/01a079f6-dhun`** · `origin/main` **`f157245`** (PR #33 merged) · shared branch PR #34 is open; verification commits are pushed through `20d8ddf`.
+Updated **2026-09-07 (UTC)** · session **`arena/01a07a07-dhun`** · **`origin/main` = `481b77b`** = rolling `test` tag (republished `04:58:25Z`) · consolidation **PR #38** open and CI-green · **ALL STABLE**.
 
-**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 persistent downloads: foundation, engine, offline-first routing, minimal UI, and deterministic probe tooling are implemented; branch CI compilation is green; runtime and hardware acceptance remain open).**
+**LIVE ITEM: the Windows "second small window on startup" report.** See *Desktop single-window startup* below — the fix is already merged twice over and a static audit finds no surviving path, so the outstanding work is a **hardware re-test**, not a code change.
 
-Boot review confirmed that ADR-006 is merged on `origin/main@f157245`. The previous roadmap snapshot incorrectly described PR #33 as open and still listed offline-first routing as pending; this session reconciles those claims and adds a mechanically runnable local-file probe under `tools/playback-probe`.
+**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 offline downloads: all six worker agents integrated and CI-green on main; hardware acceptance still open).**
 
-**ADR-006 state on `origin/main@f157245`:**
-1. **Persistent data layer:** schema v3 `DownloadedTrack` + migration, repository and `DataLayer.downloads` wiring.
-2. **Download engine:** resumable Range download, atomic `.part` promotion, bounded worker pool, artwork handling, and lifecycle states.
-3. **Offline-first playback routing:** `OfflineFirstStreamResolver` returns a completed local download as `file://`; Android `PlaybackGraph` routes that scheme to `FileDataSource`; Desktop vlcj receives a local-path MRL and skips network cache-fill.
-4. **Minimal UI and platform wiring:** Downloads library tab, download action, manager/storage DI wiring on Android and Desktop.
+This session is the **coordinator/lead** for the six parallel ADR-006 worker agents. It owns only `INTEGRATION.md`, `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, and `.ai/DEBUG_LOG.md`, and is **read-only** over `app-android/**`, `app-desktop/**`, `shared/**`, `tools/**`, and every `agent-N-status.md`. Full reconciliation detail lives in **`INTEGRATION.md`**.
 
-**This session's verification tooling:** `tools/playback-probe:offlineProbe` now persists a completed row in the real JVM SQLDelight repository, asserts a `file://` result, opens a valid WAV fixture, and fails if the network resolver is called. It is pushed in PR #34; branch CI proves compilation, while the existing workflow does not execute the runtime task.
+## **ALL STABLE — PRs #34 + #35 + #36 + #37 merged; new main head `481b77b`**
 
-**GitHub evidence:** main commit `f15724547aec` is the merged PR #33 tip. This branch is pushed through `20d8ddf`; PR CI run **34081374800** succeeded, including **Probe compiles**, and test-release run **34080947708** built the APK/MSI jobs successfully (publishing is skipped for PRs). The offline probe runtime itself was not executed by the existing CI workflow.
+| Order | PR | Agent(s) | Merged (UTC) | Main commit | Method |
+|---|---|---|---|---|---|
+| 1 | **#34** | 4 (desktop) + 5 (verify/docs) | `04:18:28Z` | `d1e0408` | merge commit (by the coordinator) |
+| 2 | **#35** | 1 (Android download FGS) | `04:47:43Z` | `40eff1d` | squash (owner session) |
+| 3 | **#37** | 6 (player UX) | `04:50:13Z` | `b6aec3a` | merge commit (owner session) |
+| 4 | **#36** | 2 (Library) + 3 (download UI) | `04:52:00Z` | **`481b77b`** | merge commit (owner session) |
 
-**Hardware gate remains OPEN:** the local probe checks shared/JVM repository-to-file loading only. Android Media3 `FileDataSource`, Desktop vlcj decoding, actual offline operation with connectivity disabled, and audible playback still require real Android device and Desktop/PC verification. No CI result can close that gate.
+**Final gate on main @ `481b77b`:** CI run `34084678724` → `build-and-test` **success**; test-release run `34084678720` → `apk` **success**, `msi` **success**, `publish` **success**. Intermediate gate after #34: CI `34082610125` + test-release `34082610094` both success (rolling `test` release replaced `04:26:24Z`, APK 17,581,785 B / MSI 112,287,744 B + `.sha256`). After #37: CI `34084576275` success; its test-release `34084576184` was **cancelled** — superseded by #36 landing minutes later, not a failure.
 
-**Agent-status review:** `agent-4-status.md` is present on the shared session branch and was reviewed. Agent 4 reports the Desktop startup-window audit and `b4a83c3` fix; local Desktop compilation and Windows runtime verification remain open. Its Desktop work is outside this session's ownership and is left unchanged. No `agent-1`, `agent-2`, `agent-3`, or `agent-6` status files are present. This session records its own status in `agent-5-status.md`.
+**Every agent's work verified present on main** (file-level checks at `481b77b`; detail in `INTEGRATION.md` §3): agent 1 FGS + `AppModule.kt:106 delegate = get<FileDownloadManager>()` + manifest `FOREGROUND_SERVICE_DATA_SYNC` · agent 2 `StorageSpace` expect/actual + Library storage management · agent 3 `DownloadAffordances.kt` + `DhunIcons.Pending` + `DhunAppShell.kt:544/559` pass-through · agent 4 `JOptionPane` import count **0** · agent 5 `OfflineMain.kt` + fixture + `offlineProbe` task · agent 6 `SyncedLyrics`/`PlayerSeekBar`/`TransportControls` + 4 test files + the 4 new `PlayerViewModel` functions. **Nothing stranded.** Only open PRs: **#38** (this consolidation) and **#31** (`CONFLICTING`/`DIRTY`, excluded).
 
-**Last error:** local Gradle execution could not start because this sandbox has no `JAVA_HOME` or `java`; the restore script could not download the toolchain due blocked TLS egress. GitHub CI remains the compile/test authority.
+## LIVE ITEM — Desktop single-window startup (ADR-004 + PR #34): fix merged, hardware re-test open
 
-**Current exact files:** `tools/playback-probe/build.gradle.kts`, `tools/playback-probe/src/main/kotlin/dev/dhun/tools/playbackprobe/OfflineMain.kt`, `tools/playback-probe/src/main/resources/fixtures/offline-track.wav`, `tools/playback-probe/README.md`, `agent-5-status.md`, `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`.
+**User report:** opening DHUN on Windows also opens a second small mini-player
+window alongside the real app; a separate mini-player is not wanted because the app
+already ships a docked in-app `MiniPlayer`.
 
-**Exact next technical step:** run the new `:tools:playback-probe:offlineProbe` task in a JDK-equipped checkout (or add an explicit CI execution step) to obtain runtime PASS evidence; retain Android/PC hardware playback as OPEN because the existing CI workflow only compiles the probe.
+**This exact report is already recorded and already fixed — twice.**
+`docs/decisions/ADR-004-remove-separate-miniplayer-window.md` quotes the identical
+complaint against the `test` build published `2026-09-06T06:51:40Z` and is marked
+**ACCEPTED (user decision, 2026-09-06)**.
+
+| Fix | Merged | What it did |
+|---|---|---|
+| **PR #28** (`b8f148d`) | `07:10:11Z` 2026-09-06 | Deleted `ui/MiniPlayerWindow.kt`; removed the second Compose `Window` from `Main.kt`; stripped the SMTC `GetWindowRect`/`SetWindowPos` window-movement calls; dropped two window-only `DhunSpacing` tokens |
+| **PR #34** (`d1e0408`) | `04:18:28Z` 2026-09-07 | Removed every `JOptionPane` startup/fatal path — the last remaining surface able to own a second small native window |
+
+**Static audit of `origin/main` @ `481b77b` — no second-window path survives:**
+- `app-desktop` contains **no** `MiniPlayerWindow.kt` (or any `*Window*.kt`).
+- `Main.kt` holds exactly **two** `Window(` calls and they are **mutually exclusive**:
+  line 228 is the startup-error window, gated by `if (initError != null &&
+  koinInstance == null)` and terminated by `return@application` at line 245; line 420
+  is the main window, reachable only on the normal path.
+- `import javax.swing.JOptionPane` count = **0** (the only textual mention is the
+  comment at `Main.kt:112` documenting its absence). No `JDialog`/`JWindow`/`JFrame`
+  instantiation anywhere.
+- `showMainWindow()` (`Main.kt:293`) only sets `isVisible`/`toFront`/`requestFocus` on
+  the **existing** `mainWindowRef` window — it never creates one.
+- `DhunTray` builds an AWT `TrayIcon` + `PopupMenu`; neither is a window.
+- `Smct.kt` uses `FindWindowW` only to **find** the existing `SunAwtFrame` HWND for
+  `GetForWindow`; the `GetWindowRect`/`SetWindowPos` movement calls that served the
+  removed mini-player are deleted (see the note at `Smct.kt:442-443`).
+
+**Conclusion:** on `481b77b`, **two simultaneous windows are not reachable from DHUN's
+own code.** Either the tested build predates `481b77b`, or Koin init failed — and in
+that case the error window *replaces* the main window rather than accompanying it, so
+the user would still see one.
+
+**Outstanding work:** re-test the rolling `test` MSI (`481b77b`, published
+`2026-09-07T04:58:25Z`, 112,492,544 B) on a real Windows machine. If a second window
+still appears, capture `<installDir>/userdata/dhun-startup.log` (or
+`%TEMP%/dhun-startup.log`) plus whether the second window has a title bar — that
+distinguishes the Compose startup-error window from a leftover AWT surface. **No
+`app-desktop` change is warranted until that re-test says otherwise.**
+
+**Cross-cutting findings, all resolved:**
+- **C1 — Koin self-recursion (agent 1): FIXED and merged.** `single<DownloadManager> { ForegroundServiceDownloadManager(delegate = get(), …) }` recursed because `delegate: DownloadManager` made the unqualified `get()` resolve the singleton being constructed; Koin 4.0.2 caches singletons *after* construction. It fired at app launch via `MainActivity.kt:197`, while **all three CI checks were green** — `:app-android:assembleDebug` is a type-check gate and `:app-android` has no test source set. Fixed `ef69f82` → `delegate = get<FileDownloadManager>()`. The regression test took three commits to compile (`705a946` → `4fd9636` wrong turn adding `koin-test` → `fb32711` using `GlobalContext.get()` directly). **The production fix compiled throughout**; both red runs failed `:shared:compileTestKotlinJvm` with every annotation inside the test file. **Residual:** the test pins the registration *shape* with fakes in `:shared:jvmTest`; the real `appModule` needs Robolectric and remains a CI follow-up.
+- **C2 — inert download badges (agent 3): CLOSED.** `DhunAppShell` did not forward `downloadManager` to `HomeScreen`/`SearchScreen`. Fixed by agent 3 in `e987f64`; verified on main at lines 544/559. The coordinator's exemption to write it was not exercised. Residual hazard: the parameter was inserted mid-list, safe only because callsites use named arguments.
+- **C3 — shared `.ai` ownership: resolved by supersession.** Agent 5 edited the three coordinator-owned docs in #34; this consolidation sits on top and agent 5's commits are **not** stripped or rewritten.
+- **Agent 1's `shared/build.gradle.kts` change: benign.** 9 insertions, 0 deletions, **one** dependency line — `implementation("io.insert-koin:koin-core-jvm:4.0.2")` inside `jvmTest.dependencies { }`, the other eight lines comments. Test-scoped only; cannot affect the shipped APK/MSI; version deliberately matches `app-android`'s `koin-android:4.0.2`; reversible by deleting one line.
+
+**Contracts verified clean:** `DownloadManager` interface unchanged on every branch · `LibraryViewModel` ctor byte-identical · `FullPlayer`/`MiniPlayer` signatures identical · `DhunIcon` gains only `Pending` · `DownloadRepository`, `DownloadedTrack`, `TrackOverflowDialog`, `StreamResolver` zero diffs · no duplicate `DownloadManager` implementation (agent 1 decorates, agents 2/3 consume).
+
+**Branch-map correction:** five of the six requested `agent/*` branch names were never created. Agents **2+3** shared `arena/01a079f5-dhun`; agents **4+5** shared `arena/01a079f6-dhun`, so neither PR could be gated per-agent. Agent 2, initially reported missing, pushed its Library Downloads + storage-management work onto agent 3's branch — **that work is now on main; do not relaunch agent 2.** Agent 6 opened PR #37 itself, so the coordinator's `gh pr create` correctly failed as a duplicate.
+
+**Merge-order deviation, recorded:** the actual order was #35 → #37 → #36, not the requested #36 → #37 → #35, because the owner sessions merged concurrently and the coordinator merged none of them. The intent behind #35-last (test against fully-integrated main) was satisfied anyway by the final gate at `481b77b`. #35 landed as a **squash** commit, so its individual commits are not on main's first-parent history. The coordinator did merge **#34** itself, under the prior explicit approval, before the one-session-one-PR constraint arrived — disclosed in `INTEGRATION.md` §2.
+
+**Open non-code gate (excluded from the verdict):** `rot-drill` is **RED** — run `34083253658` @ `d1e0408` **failure**, tracked as issue **#14**. GitHub-runner **IP gating**, a known environment limitation, **not a code defect**; no rot-drill ran at `481b77b`. A green **live** rot-drill verdict stays open on the human/device side.
+
+**HARDWARE GATES STILL OPEN — green CI is a compile/unit-test gate only, and does NOT mean downloaded tracks play offline.** Offline playback of a downloaded track (Android Media3 `FileDataSource` route; Desktop vlcj local-path load) · audible audio (streaming and offline) · live Home pagination · player visual acceptance (glyph placement, shuffle, colour styling) · tray/SMTC and agent 4's one-native-window startup claim · install-over upgrade · clean-target hygiene · 30-minute soaks including the OEM battery-saver soak agent 1's FGS exists to pass · a green **live** rot-drill verdict. Agent 5's `offlineProbe` is compiled by CI but **never executed** by the workflow, so not even `offline-verdict|PASS` is established. All of the above need a real device, PC, libVLC runtime, or display.
+
+**Last error:** none on the three merge gates — main @ `481b77b` is fully green. The only red workflow on main is `rot-drill` (issue #14, IP gating, non-code). The coordinator could not run Gradle locally (no JDK/Android SDK in the sandbox), so CI is the sole compile/test authority, and the original C1 diagnosis was **static analysis**, never a reproduced stack trace.
+
+**Current exact files (coordinator-owned only):** `INTEGRATION.md`, `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`.
+
+**Exact next technical step:** (0) **Windows re-test of `481b77b`** — install the rolling `test` MSI published `2026-09-07T04:58:25Z` and confirm exactly one window on startup; if a second window appears, attach `dhun-startup.log`. Hold all `app-desktop` edits until that result is in — the audit above says the fix is already landed, and re-fixing a fixed bug would only add risk. (1) merge consolidation **PR #38** (docs only — `INTEGRATION.md` + the three `.ai` files; the coordinator makes no source changes); (2) run the four follow-ups in `INTEGRATION.md` §8 — add `:app-android:testDebugUnitTest` + Robolectric with a `checkModules()` graph test, add a CI step that **executes** `:tools:playback-probe:offlineProbe`, decide PR #31's fate, and get a green live rot-drill verdict to close issue #14; (3) take the hardware checklist in the paragraph above to a real device/PC — **CI green is not hardware acceptance, and ADR-006's offline playback has never been demonstrated on a device.**
+
+**Superseded:** the previous CURRENT ACTIVE TASK snapshots (session `arena/01a079f6-dhun` / agent 5 at `f157245`, and this coordinator's own earlier "NOT STABLE — #35 red" verdict) are superseded by this one. The #35-red verdict was accurate when written — CI genuinely failed at `705a946` and `4fd9636` — and was made obsolete by `fb32711`. No commits were stripped; agent 5's docs are intact in main's history at `d1e0408`.
 
 ---
 
@@ -126,7 +189,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
 | 12 | Desktop native | 🟨 — tray/shortcuts/SMTC and packaging on main; PR #28 removed the separate mini-player window (ADR-004), leaving the docked in-app MiniPlayer. Latest Desktop compile + MSI publishing green on `main@0920148` (`34018809911` / `34018809913`). Prior JVM-launch fix was confirmed by the user; the user now confirms one-window startup after manual reinstall (evidence local/pending publication); upgrade, native integrations and clean-target hygiene remain OPEN | docs/verification/12 · ADR-004 · CURRENT ACTIVE TASK |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 IN PROGRESS — implementation milestones merged through PR #28, docs through PR #29 (`main` / `test` at `0920148`); CI `34018809911` and rolling test publishing `34018809913` green, published `2026-09-06T07:22:29Z`. Audio User-Agent fix, Home continuation, bounded resolve/diagnostics, restyle and single-window code are all on GitHub. Live drill `34011539225` still RED; hardware re-tests, offline/recovery checks, clean targets, soaks and v0.1.0 remain OPEN | Phase 14 step table below; issue #14; docs/verification/14 |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 IN PROGRESS — **ADR-006 offline downloads fully integrated: PRs #34/#35/#36/#37 merged, `main` / `test` at `481b77b`, ALL STABLE.** CI `34084678724` and test-release `34084678720` green; rolling test republished `2026-09-07T04:58:25Z`. Audio User-Agent fix, Home continuation, bounded resolve/diagnostics, restyle, single-window code, Android download FGS, Library storage management, per-track badges and player UX are all on GitHub. `rot-drill` still RED (issue #14, GitHub-runner IP gating, non-code); hardware re-tests, offline/recovery checks, clean targets, soaks and v0.1.0 remain OPEN | Phase 14 step table below; `INTEGRATION.md`; issue #14; docs/verification/14 |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
 trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
@@ -156,15 +219,18 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
-### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-07, session `arena/01a079f6-dhun`)
+### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-07, coordinator session `arena/01a07a07-dhun`)
 
-**Current GitHub snapshot:** `main` and the rolling `test` tag point to
-**`f157245`** (PR #33, ADR-006 foundation through offline-first routing and
-minimal UI). Main CI **`34079283259` success** and test-release
-**`34079283231` success** built/published the APK + MSI + checksums. The
-rolling `test` release was published at **`2026-09-07T03:27:18Z`**. This
-session's verification PR is not open yet; hardware and stable-release gates
-remain open.
+**Current GitHub snapshot:** `main` and the rolling `test` tag both point to
+**`481b77b`** (PR #36, the last of the six-agent ADR-006 batch). Main CI
+**`34084678724` success** (`build-and-test`) and test-release
+**`34084678720` success** (`apk` + `msi` + `publish`) built and published the
+APK + MSI + checksums; the rolling `test` release was republished at
+**`2026-09-07T04:58:25Z`** (MSI 112,492,544 B / APK 17,696,545 B + `.sha256`).
+**All four ADR-006 worker PRs are merged — `ALL STABLE`** (see
+`INTEGRATION.md`). The only red workflow on main is `rot-drill` (issue #14,
+GitHub-runner IP gating, non-code). Hardware and stable-release gates remain
+open; consolidation PR **#38** carries this documentation.
 
 **Recent work actually merged on GitHub, not outstanding local work:**
 
@@ -177,6 +243,10 @@ remain open.
 | #28 | `b8f148d` · `07:10:11Z` | Separate desktop mini-player window removed (`a01f8ca`), ADR-004 and accompanying docs |
 | #29 | `0920148` · `07:18:53Z` | Post-merge documentation; no further application-code change |
 | #33 | `f157245` · `03:19:51Z` (2026-09-07) | ADR-006 persistent downloads: data layer, engine, offline-first routing, minimal UI, and platform wiring |
+| #34 | `d1e0408` · `04:18:28Z` (2026-09-07) | Desktop single-window hardening — removed the `JOptionPane` startup/fatal Swing surfaces (agent 4); `tools/playback-probe:offlineProbe` deterministic local-file check + WAV fixture (agent 5) |
+| #35 | `40eff1d` · `04:47:43Z` (2026-09-07) | Android download foreground service (ADR-006) + the **C1 Koin self-recursion fix** + `KoinDownloadStackTest` (agent 1). Squash-merged |
+| #37 | `b6aec3a` · `04:50:13Z` (2026-09-07) | Shared player UX — synced-lyrics follow, tab selection semantics, accessible queue actions, `PlayerSeekBar` / `TransportControls` extraction (agent 6) |
+| #36 | `481b77b` · `04:52:00Z` (2026-09-07) | Library Downloads storage-management view + `StorageSpace` expect/actual (agent 2); per-track download badges + the `DhunAppShell` pass-through that closed C2 (agent 3) |
 
 Earlier Phase 14 milestones remain merged: PR #16 at `290e0f6`, #17 at
 `29eeb93`, #19 at `6d81eb2`, #20 at `8310383`, #22 at `e90dba6`, and the
@@ -192,6 +262,7 @@ The repair batch is merged through PR #30 at `76c68eb`; automated code/package c
 | Step | Complete on GitHub / evidence | Remaining gate |
 |---|---|---|
 | **Windows-report repair batch (PR #30 merged)** | ✅ **`75c4a8b`**, [CI **34025807972**](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972) **success**: Python checks, shared JVM regressions, Android debug build, probe/Desktop compilation. First compile errors corrected; Quick-picks projection wired into real UI | **Merged in PR #30 and published in the rolling test build.** MSI data-sentinel checks pass in PR/main runs; app playback/live Home/visual/native runtime and stable release gates remain OPEN |
+| **Desktop single-window startup (ADR-004 + PR #34)** | ✅ **Two independent fixes merged.** (a) PR #28 (`b8f148d`) deleted `ui/MiniPlayerWindow.kt`, removed the second Compose `Window` from `Main.kt`, and stripped the SMTC `GetWindowRect`/`SetWindowPos` window-movement calls. (b) PR #34 (`d1e0408`) removed every `JOptionPane` startup/fatal path. **Static audit of `481b77b` finds no remaining second-window path:** `Main.kt` holds exactly two `Window(` calls — line 228 (startup-error window, gated by `initError != null && koinInstance == null`, closed by `return@application` at line 245) and line 420 (main window) — and they are **mutually exclusive**. `import javax.swing.JOptionPane` count = **0**; no `JDialog`/`JWindow`/`JFrame` instantiation; `showMainWindow()` only toggles `isVisible`/`toFront` on the existing window; `DhunTray` builds an AWT `TrayIcon` + `PopupMenu`, never a frame; `Smct` uses `FindWindowW` only to *find* the existing `SunAwtFrame` HWND for `GetForWindow` | 🟨 **Hardware re-test OPEN** — the user's screenshot predates `481b77b`. Requires a real Windows machine against the rolling `test` MSI published `2026-09-07T04:58:25Z`. **On `481b77b` two simultaneous windows are not reachable from DHUN's own code** |
 | Error taxonomy, 429 backoff, offline banner, recovery UX | ✅ Existing typed-error paths, `RateLimitGate`, `ConnectivityMonitor` and `PlaybackState.Recovering` merged via PR #16; recovery extended by PR #20; current main CI `34018809911` green | 🟨 Full db-path/error-taxonomy review and real offline/429/403/forced-error behavior not verified |
 | Stream-URL cache (TTL + invalidation) | ✅ `DhunStreamCache` five-hour TTL and 403 invalidation on main; latest playback code builds in CI | 🟨 Stale-URL recovery on hardware |
 | Bounded audio cache — Android | ✅ `DhunAudioSegmentCache` / Media3 `SimpleCache` LRU merged in PR #16; PR #20 adds corrupt-cache direct-stream fallback; current Android build green | 🟨 Offline span replay, eviction/budget behavior and cache-failure fallback on a device |

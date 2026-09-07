@@ -2,6 +2,74 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-07 — Coordinator reconciliation: integration limits found while merging six ADR-006 agents
+
+Recorded by the coordinator session `arena/01a07a07-dhun`. Full detail in
+`INTEGRATION.md`. **CI green is a compile/unit-test gate only — none of this closes a
+hardware gate.**
+
+- **The Android Koin graph has no automated verification (C1).** `app-android` has
+  **no test source set**, so `:app-android:assembleDebug` is a *type-check* gate and
+  cannot see a dependency-resolution cycle. This already produced a real defect:
+  `single<DownloadManager> { ForegroundServiceDownloadManager(delegate = get(), …) }`
+  recursed because the unqualified `get()` inferred the interface being constructed,
+  and **all three checks were green** on that commit. It fired at app launch
+  (`MainActivity.kt:197` resolves `DownloadManager` during composition), not on first
+  download. Fixed in `ef69f82` as `delegate = get<FileDownloadManager>()`.
+  **Merged and green:** the fix landed via PR #35 (squash `40eff1d`, main `481b77b`).
+  **Residual:** `KoinDownloadStackTest` pins the registration *shape* with minimal
+  fakes in `:shared:jvmTest` and reads Koin through `GlobalContext.get()` — the real
+  `appModule` is **still unverified**, because exercising it needs `androidContext()`,
+  hence Robolectric plus an `:app-android:testDebugUnitTest` source set. **Standing
+  rule (from agent 1, PR #35):** any new `app-android` Koin registration that takes
+  another Koin-resolved dependency must be covered by a `checkModules()` call or a
+  `koin.get<…>()` smoke test — `:app-android:assembleDebug` will not catch it.
+- **`DownloadManager?` parameters were inserted mid-list in shared composables.**
+  Agent 3 added `downloadManager: DownloadManager? = null` as the 7th of 12 parameters
+  in `HomeScreen` and 7th of 8 in `SearchScreen`. This compiles and behaves correctly
+  **only** because every `DhunAppShell` callsite uses named arguments. A future
+  positional caller would silently misbind. Append new optional parameters at the end.
+- **Two worker sessions share one branch, so their PRs cannot be gated separately.**
+  PR #34 bundles agent 4 (desktop) + agent 5 (verify/docs); PR #36 bundles agent 2
+  (Library) + agent 3 (download UI). Merging either lands both agents at once — a
+  standing violation of the single-session-branch rule.
+- **Agent status files are not reliably in the tree.** Agent 1 added
+  `agent-1-status.md` to `.gitignore`, so its status exists only in the PR #35 body.
+  Reconciling by reading status files alone would have missed agent 1 entirely.
+- **The real Android Koin `appModule` and the offline-probe runtime task are both
+  unexercised by CI.** `ci.yml` compiles `tools/playback-probe` but never runs
+  `:tools:playback-probe:offlineProbe`, so `offline-verdict|PASS` is not established
+  even though the probe compiles.
+
+
+## 2026-09-07 — Windows "second small window on startup": fixed twice, hardware re-test still required
+
+The user's report that opening DHUN on Windows also opens a second small mini-player
+window is **not an open code defect**. It is recorded in
+`docs/decisions/ADR-004-remove-separate-miniplayer-window.md` (ACCEPTED, user decision
+2026-09-06) against the `test` build published `2026-09-06T06:51:40Z`, and it has been
+fixed twice:
+
+- **PR #28** (`b8f148d`) deleted `ui/MiniPlayerWindow.kt`, removed the second Compose
+  `Window` from `Main.kt`, and stripped the SMTC `GetWindowRect`/`SetWindowPos` calls.
+- **PR #34** (`d1e0408`) removed every `JOptionPane` startup/fatal path — the last
+  surface able to own a second small native window.
+
+A static audit of `origin/main` @ `481b77b` finds **no surviving second-window path**:
+exactly two `Window(` calls in `Main.kt` and they are mutually exclusive (the
+startup-error window is gated by `initError != null && koinInstance == null` and ends
+in `return@application`); `JOptionPane` import count 0; no `JDialog`/`JWindow`/
+`JFrame` instantiation; `showMainWindow()` only toggles `isVisible` on the existing
+window; `DhunTray` builds a `TrayIcon` + `PopupMenu`, not a frame; `Smct` uses
+`FindWindowW` only to locate the existing `SunAwtFrame` HWND.
+
+**Limitation that remains:** this is a **static** audit. No Windows machine, display,
+or jpackage runtime exists in this environment, so the one-window startup behaviour
+has **never been verified on hardware** — not for `481b77b`, and not for any earlier
+build. Green CI compiles the desktop module; it cannot observe a window. Any user
+report against a build older than `481b77b` (published `2026-09-07T04:58:25Z`) does
+not describe the current code.
+
 ## Latest Windows result / merged repair — 2026-09-06
 
 The user's negative report (install-over fails “Another version…”, audio
