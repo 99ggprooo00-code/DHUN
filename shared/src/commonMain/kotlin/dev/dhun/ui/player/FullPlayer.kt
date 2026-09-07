@@ -669,8 +669,8 @@ fun FullPlayer(
 /* ---------------- seek bar ------------------------------------------------ */
 
 /**
- * Custom seek bar: 4dp resting track, grows to 8dp while dragging; thumb is
- * drawn only while the pointer is down. Tap = seek; horizontal drag = scrub.
+ * Custom seek bar with generous 48dp interactive hitbox (Windows & mobile).
+ * Resting track 4dp, animates to 8dp while scrubbing with responsive thumb.
  */
 @Composable
 internal fun DhunSeekBar(
@@ -697,8 +697,39 @@ internal fun DhunSeekBar(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(DhunSpacing.mediumLarge),
-        contentAlignment = Alignment.CenterStart,
+            .height(DhunSpacing.touchTarget) // 48dp expanded hitbox for easy mouse & touch seeking
+            .pointerInput(durationMs, onSeek) {
+                detectTapGestures { offset ->
+                    val widthPx = size.width.toFloat()
+                    if (durationMs > 0 && widthPx > 0) {
+                        onSeek(((offset.x / widthPx) * durationMs).toLong().coerceIn(0, durationMs))
+                    }
+                }
+            }
+            .pointerInput(durationMs, onSeek) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        val widthPx = size.width.toFloat()
+                        if (durationMs > 0 && widthPx > 0) {
+                            dragging = true
+                            dragFraction = (offset.x / widthPx).coerceIn(0f, 1f)
+                        }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        val widthPx = size.width.toFloat()
+                        if (widthPx > 0) {
+                            dragFraction = (dragFraction + dragAmount / widthPx).coerceIn(0f, 1f)
+                        }
+                    },
+                    onDragEnd = {
+                        if (dragging) onSeek((dragFraction * durationMs).toLong().coerceIn(0, durationMs))
+                        dragging = false
+                    },
+                    onDragCancel = { dragging = false },
+                )
+            },
+        contentAlignment = Alignment.Center,
     ) {
         val widthPx = constraints.maxWidth.toFloat()
 
@@ -707,37 +738,10 @@ internal fun DhunSeekBar(
                 .fillMaxWidth()
                 .height(barHeight)
                 .clip(DhunShapes.full)
-                .background(DhunColors.border)
-                .pointerInput(widthPx, durationMs, onSeek) {
-                    detectTapGestures { offset ->
-                        if (durationMs > 0 && widthPx > 0) {
-                            onSeek(((offset.x / widthPx) * durationMs).toLong().coerceIn(0, durationMs))
-                        }
-                    }
-                }
-                .pointerInput(widthPx, durationMs, onSeek) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { offset ->
-                            if (durationMs > 0 && widthPx > 0) {
-                                dragging = true
-                                dragFraction = (offset.x / widthPx).coerceIn(0f, 1f)
-                            }
-                        },
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            if (widthPx > 0) {
-                                dragFraction = (dragFraction + dragAmount / widthPx).coerceIn(0f, 1f)
-                            }
-                        },
-                        onDragEnd = {
-                            if (dragging) onSeek((dragFraction * durationMs).toLong())
-                            dragging = false
-                        },
-                        onDragCancel = { dragging = false },
-                    )
-                },
+                .background(DhunColors.border),
+            contentAlignment = Alignment.CenterStart,
         ) {
-            // Fill
+            // Active Fill
             Box(
                 modifier = Modifier
                     .fillMaxWidth(effective)
@@ -745,20 +749,19 @@ internal fun DhunSeekBar(
                     .clip(DhunShapes.full)
                     .background(accent),
             )
-            // Thumb — only while touching
-            if (dragging) {
-                val thumbPx = DhunSpacing.mdPlus
-                val thumbXPx = (effective * (widthPx)).toInt()
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .offset { IntOffset((thumbXPx - with(this) { thumbPx.roundToPx() } / 2).coerceAtLeast(0), 0) }
-                        .size(thumbPx)
-                        .clip(DhunShapes.full)
-                        .background(accent),
-                )
-            }
         }
+        // Responsive Thumb
+        val thumbPx = if (dragging) DhunSpacing.mdPlus else DhunSpacing.sm
+        val thumbXPx = (effective * widthPx).toInt()
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset { IntOffset((thumbXPx - with(this) { thumbPx.roundToPx() } / 2).coerceIn(0, (widthPx - with(this) { thumbPx.roundToPx() }).toInt().coerceAtLeast(0)), 0) }
+                .size(thumbPx)
+                .shadow(DhunSpacing.xs, DhunShapes.full, clip = false)
+                .clip(DhunShapes.full)
+                .background(if (dragging) accent else accent.copy(alpha = 0.9f)),
+        )
     }
 }
 

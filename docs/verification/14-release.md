@@ -1,20 +1,31 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-Status: 🟨 **IN PROGRESS — WINDOWS UPGRADE, PLAYBACK, HOME AND UI BLOCKERS.**
-Current GitHub `main` / `test`: **`0920148`**, CI **34018809911** and publishing
-**34018809913** green; `test` published **2026-09-06T07:22:29Z** (MSI
-112,009,680 B; APK 17,483,422 B; checksum assets present). Those green runs
-verify the previously published code, **not** the repair batch below.
+Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
+RELEASE ACCEPTANCE OPEN.** PR #30 merged at **`76c68eb`**, 11:52:26Z on
+2026-09-06. Main CI **34031477321** and test-release **34031477327** passed.
+The first verified release of this repair code is `test@76c68eb`, published
+**2026-09-06T11:58:17Z**, internal MSI **1.36.1**. Later documentation-only
+builds may advance the rolling tag; always inspect the current asset identity.
 
-The fresh Windows report confirms **one-window startup after manual
-uninstall/reinstall**, but rejects install-over upgrade, audio, Home
-pagination and parts of the player layout. New source/test/doc repairs on
-`arena/01a0759b-dhun` are **pushed and CI-green at `75c4a8b`**, verified by
-[run 34025807972](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972), with later branch checks green through `455743b`. The user now explicitly authorises completing this repair batch, opening its PR and merging after checks; no stable v0.1.0 release or hardware acceptance is implied.
-No newer installer has been produced. Hardware, live extraction, soaks,
-clean-target hygiene and v0.1.0 cannot be inferred from build CI.
+| Published asset | Size | CI-produced SHA256 |
+|---|---|---|
+| `dhun-test.msi` | 112,091,136 B | `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008` |
+| `dhun-test.apk` | 17,499,806 B | `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86` |
 
-## Latest pre-merge checkpoint — PR #30, b6d47bd
+Both checksum assets uploaded. Main's Windows job verified MSI identity,
+**1.0.5 → 1.36.1** with userdata/cache sentinels retained, future-upgrade
+flag removal retaining them, reinstall and explicit-uninstall cleanup.
+These are real hosted Windows Installer tests, **not app launch, sound,
+visual, media-key or soak tests**. Published sizes/tag were verified via
+GitHub APIs; hashes came from build annotations (not a separate download in
+this restricted sandbox). The publisher passed with a Node-20 deprecation
+warning for `actions/download-artifact@v4`; no zero-warning audit is claimed.
+
+The user's last audio/Home/UI verdict was negative on the old 07:22 build.
+Only one-window startup was reported successful after manual reinstall.
+The new release needs the user's re-test. No v0.1.0 tag/release was created.
+
+## Pre-merge evidence — PR #30, b6d47bd (retained history)
 
 Code CI **34030728903** (branch) and **34030730736** (PR) pass. Native
 packaging **34030730743** passes with MSI **1.34.1** after fixing the initial

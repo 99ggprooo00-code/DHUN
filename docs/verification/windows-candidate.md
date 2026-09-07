@@ -1,7 +1,8 @@
 # Windows candidate — quick test
 
-This is an **unsigned development MSI from a branch build**, not a stable
-release. It includes Java; you do **not** need a JDK or an Android SDK.
+This is an **unsigned development MSI**, not a stable release. The repair
+code was merged in PR #30 and is now available through the rolling `test`
+release; branch artifacts can also be used when specifically identified. It includes Java; you do **not** need a JDK or an Android SDK.
 Use only the MSI artifact from a **successful** package/sentinel run. A
 failed early candidate was withheld after its installer deleted test userdata;
 plain, unfinalized `packageMsi` output is not an approved update package.
@@ -11,9 +12,10 @@ yt-dlp fallback is separate and is not bundled.
 
 ## Use the right download
 
-Download the **`msi` artifact ZIP** from the Actions run linked in the agent's
-message, then **extract the ZIP before opening the MSI**. Do not use the old
-Releases download for this candidate. The ZIP contains:
+Use the current MSI/checksum from the **rolling `test` release**, or the
+specific **`msi` artifact ZIP** linked by the agent. Discard older cached
+07:22:29Z downloads that predate the repair. For an artifact ZIP, **extract
+it before opening the MSI**. The artifact ZIP contains:
 
 - `dhun-test.msi`
 - `dhun-test.msi.sha256`

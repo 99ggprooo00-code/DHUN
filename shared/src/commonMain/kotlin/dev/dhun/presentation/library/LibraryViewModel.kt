@@ -39,7 +39,12 @@ import kotlinx.coroutines.launch
  * (SEARCH/HOME/ARTIST/ALBUM/PLAYLIST/LIBRARY/HISTORY).
  */
 
-enum class LibraryTab { PLAYLISTS, FAVORITES, HISTORY }
+enum class LibraryTab {
+    PLAYLISTS,
+    HISTORY,
+    @Deprecated("Liked songs are now a dedicated folder inside Playlists", ReplaceWith("PLAYLISTS"))
+    FAVORITES,
+}
 
 /**
  * Platform helper to supply the device UTC offset without pulling
@@ -82,7 +87,28 @@ class LibraryViewModel(
 
     private val _selectedTab = MutableStateFlow(LibraryTab.PLAYLISTS)
     val selectedTab: StateFlow<LibraryTab> = _selectedTab.asStateFlow()
-    fun selectTab(tab: LibraryTab) { _selectedTab.value = tab }
+
+    private val _viewingLikedSongs = MutableStateFlow(false)
+    val viewingLikedSongs: StateFlow<Boolean> = _viewingLikedSongs.asStateFlow()
+
+    fun selectTab(tab: LibraryTab) {
+        if (tab == LibraryTab.FAVORITES) {
+            _selectedTab.value = LibraryTab.PLAYLISTS
+            _viewingLikedSongs.value = true
+        } else {
+            _selectedTab.value = tab
+            _viewingLikedSongs.value = false
+        }
+    }
+
+    fun openLikedSongs() {
+        _selectedTab.value = LibraryTab.PLAYLISTS
+        _viewingLikedSongs.value = true
+    }
+
+    fun closeLikedSongs() {
+        _viewingLikedSongs.value = false
+    }
 
     // ---- Playlists ----
     val playlistsFlow: StateFlow<List<LocalPlaylist>> =

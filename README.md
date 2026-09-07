@@ -128,13 +128,15 @@ only on a device you are willing to experiment with.
   packaging, use a version higher than the installed build (the local
   default 1.0.6 is not higher than future CI versions). Do not reset MSI
   ProductVersion to the app's `0.1.0` semver. Quit DHUN/tray before updating.
-- **Verification warning (2026-09-06):** the published 07:22:29Z / `0920148`
-  build still failed in-place upgrade, audio and Home in the user's Windows
-  re-test. The repair batch at `75c4a8b` [passes branch CI](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972),
-  including Kotlin tests and Android/probe/Desktop builds, but is **not merged
-  or released**. The current download does **not** contain it. Manual uninstall/reinstall launched one
-  window, but did not fix audio. Upgrade data preservation and clean-target
-  uninstall cleanup remain unverified; back up test userdata before testing.
+- **Repair build available (2026-09-06):** PR #30 merged the Windows/Home/
+  player repairs. Main CI and rolling test publishing passed, including
+  native MSI install-over/data-preservation and uninstall sentinels. The
+  first verified release of this repair code was **11:58:17Z / `76c68eb`**,
+  internal MSI **1.36.1**; the rolling release can advance with later builds.
+  Use the current checksum/build identity. This is **not** proof of actual
+  sound, live Home or visual/native behavior on your machine; those checks
+  remain open. Quit DHUN/tray and back up userdata before updating. Report
+  Playback **Details** if an uncached song still fails.
 - Unsigned / SmartScreen + debug APK are why these are not
   daily-driver builds. Source of both artifacts is this repo via
   `.github/workflows/test-release.yml`.

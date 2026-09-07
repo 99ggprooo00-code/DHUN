@@ -2,21 +2,23 @@
 
 Updated every phase. Nothing hidden.
 
-## Latest Windows result / branch CI candidate — 2026-09-06
+## Latest Windows result / merged repair — 2026-09-06
 
 The user reports **one window after manual uninstall/reinstall**, but
 **install-over fails (“Another version…”), audio fails, Home does not page,
 and player glyph placement/shuffle/colour styling is not accepted**. The
-last verified published build is `test@0920148`, 07:22:29Z. This is user-facing
-impact, not something to dismiss as an Actions-IP-only failure.
+report concerned the old `test@0920148`, 07:22:29Z build. PR #30 is now
+merged at `76c68eb`, with main CI 34031477321 and publishing 34031477327
+passing; the repair-code release was published 11:58:17Z with MSI 1.36.1.
+It still needs a user-machine re-test; the earlier failure cannot be
+explained away as Actions-IP-only gating.
 
-Repairs are pushed in **PR #30**, now explicitly authorised for merge after
-checks. Code CI passes on `b6d47bd` (branch 34030728903 / PR 34030730736).
+Repairs are **merged in PR #30**; the session branch is retained. Code CI passes on `b6d47bd` (branch 34030728903 / PR 34030730736).
 Native packaging run **34030730743** also passes: MSI **1.34.1**, actual
 version/upgrade identity, published-1.0.5 install-over with userdata/cache
 sentinels preserved, upgrade-flag removal preserving data, and explicit
-uninstall cleanup after reinstall. APK/MSI artifacts exist; main/test have
-not changed at this pre-merge checkpoint.
+uninstall cleanup after reinstall. Main publishing repeated these checks
+successfully for MSI 1.36.1 and uploaded APK/MSI/checksums to `test`.
 
 The first native test caught real userdata deletion in MSI 1.33.1. That
 artifact was withheld and the PR not merged. The installer finalizer now
@@ -29,7 +31,10 @@ preparation, its old cleanup registration can remain suppressed until a
 successful retry; this preserves data but is not perfect rollback hygiene.
 
 The sandbox still cannot run Java locally. The manual dispatch API remains
-403-denied and is not retried; normal PR checks provided the native evidence.
+403-denied and is not retried; normal PR/main workflows supplied native
+verification and rolling test publishing. The publisher still reports a
+Node-20 deprecation warning for download-artifact v4; this is an action-runtime
+maintenance item, not a compiler failure or a claimed zero-warning audit.
 **No app launch, actual VLC/audio playback, live Home/user visuals, media-key
 integration or soak acceptance is claimed.** Installer sentinels on a hosted
 Windows runner are not the user's complete hardware test.

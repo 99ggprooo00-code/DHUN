@@ -10,13 +10,17 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 /**
- * Phase 14 bounded **audio-file** cache for the desktop (vlcj) player.
+ * Phase 14 bounded **audio-file** cache for the desktop (vlcj) player with
+ * ADR-005 next-track pre-buffering and temporary cache lifecycle.
  *
  * Desktop counterpart of Android's `DhunAudioSegmentCache`. libVLC plays a
  * URL or a file — it has no pluggable data-source layer like Media3 — so the
  * desktop cache stores **whole tracks**, keyed by stable video id:
  *
- * - `<dir>/<videoId>.audio` — complete file, eligible for playback/eviction.
+ * - `<dir>/<videoId>.audio` — complete file, in permanent cache, eligible for
+ *   LRU eviction.
+ * - `<dir>/<videoId>.temp`  — complete temporary pre-buffered track for the
+ *   upcoming queue item; promoted to `.audio` upon playback or deleted if unplayed.
  * - `<dir>/<videoId>.part`  — in-flight download; never served, always
  *   swept on open (crash leftovers).
  * - LRU = file `lastModified`; [touch]ed on every cache hit; oldest evicted
@@ -43,8 +47,8 @@ class AudioFileCache(
 
     init {
         dir.mkdirs()
-        // Leftover partial files from a previous crash are worthless.
-        dir.listFiles { f -> f.name.endsWith(PART_SUFFIX) }?.forEach { it.delete() }
+        // Leftover partial files and stale temp files from a previous crash/run are swept.
+        dir.listFiles { f -> f.name.endsWith(PART_SUFFIX) || f.name.endsWith(TEMP_SUFFIX) }?.forEach { it.delete() }
     }
 
     /** Complete cached file for [videoId], or null. Marks it most-recently-used. */
@@ -55,11 +59,26 @@ class AudioFileCache(
         }
     }
 
+    /** Complete temporary pre-buffered file for [videoId], or null. */
+    fun tempFileFor(videoId: String): File? {
+        val f = tempFile(videoId) ?: return null
+        return lock.withLock {
+            if (f.isFile && f.length() > 0) f else null
+        }
+    }
+
+    /** Returns permanent cached file if present, or valid temporary file if present. */
+    fun fileOrTempFor(videoId: String): File? {
+        return fileFor(videoId) ?: tempFileFor(videoId)
+    }
+
     fun has(videoId: String): Boolean = completeFile(videoId)?.let { it.isFile && it.length() > 0 } == true
+
+    fun hasTemp(videoId: String): Boolean = tempFile(videoId)?.let { it.isFile && it.length() > 0 } == true
 
     fun cachedBytes(videoId: String): Long = completeFile(videoId)?.takeIf { it.isFile }?.length() ?: 0L
 
-    /** Sum of all complete files (partials excluded — they are transient). */
+    /** Sum of all complete files (partials and temp files excluded from permanent budget). */
     fun totalBytes(): Long = completeFiles().sumOf { it.length() }
 
     /** Cached video ids, most-recently-used first. */
@@ -68,7 +87,7 @@ class AudioFileCache(
         .map { it.name.removeSuffix(AUDIO_SUFFIX) }
 
     /**
-     * Streams [url] into the cache for [videoId]. Returns the complete file,
+     * Streams [url] into the permanent cache for [videoId]. Returns the complete file,
      * or null when the download was cancelled ([cancel] set), the stream
      * ended short of [expectedBytes], or the file could not fit the budget.
      * Never throws for I/O failures — a cache miss is not a playback error.
@@ -117,12 +136,101 @@ class AudioFileCache(
         }
     }
 
-    /** Removes one entry. */
+    /**
+     * Streams [url] into temporary pre-buffer storage `<videoId>.temp` (ADR-005).
+     * Does not touch permanent cache or displace cached items until promoted.
+     */
+    fun downloadTemp(
+        videoId: String,
+        url: String,
+        expectedBytes: Long? = null,
+        cancel: AtomicBoolean = AtomicBoolean(false),
+        onProgress: ((bytes: Long) -> Unit)? = null,
+        userAgent: String? = null,
+    ): File? {
+        if (!isSafeId(videoId)) return null
+        fileFor(videoId)?.let { return it }
+        tempFileFor(videoId)?.let { return it }
+        if (expectedBytes != null && expectedBytes > maxBytes) return null
+
+        val part = File(dir, videoId + PART_SUFFIX)
+        val target = File(dir, videoId + TEMP_SUFFIX)
+        var written = 0L
+        val ok = try {
+            copyToPart(url, part, cancel, onProgress, userAgent) { written = it }
+        } catch (_: IOException) {
+            false
+        } catch (_: RuntimeException) {
+            false
+        }
+
+        if (!ok || written == 0L || (expectedBytes != null && written != expectedBytes)) {
+            part.delete()
+            return null
+        }
+        return lock.withLock {
+            target.delete()
+            if (!part.renameTo(target)) {
+                part.delete()
+                return@withLock null
+            }
+            target
+        }
+    }
+
+    /**
+     * Promotes `<videoId>.temp` to permanent `<videoId>.audio` (ADR-005).
+     * Touches LRU and applies budget eviction.
+     */
+    fun promoteTempToPermanent(videoId: String): File? {
+        if (!isSafeId(videoId)) return null
+        val temp = File(dir, videoId + TEMP_SUFFIX)
+        val target = File(dir, videoId + AUDIO_SUFFIX)
+        return lock.withLock {
+            if (!temp.isFile || temp.length() == 0L) {
+                return@withLock if (target.isFile && target.length() > 0L) {
+                    touch(target)
+                    target
+                } else null
+            }
+            target.delete()
+            if (!temp.renameTo(target)) {
+                temp.delete()
+                return@withLock null
+            }
+            touch(target)
+            evictLocked(keep = videoId)
+            target
+        }
+    }
+
+    /**
+     * Deletes temporary pre-buffered files (ADR-005 policy: unplayed pre-buffers
+     * must never remain in cache), optionally sparing [keepVideoId].
+     */
+    fun clearTemp(keepVideoId: String? = null) = lock.withLock {
+        val keepName = keepVideoId?.let { it + TEMP_SUFFIX }
+        dir.listFiles { f -> f.isFile && f.name.endsWith(TEMP_SUFFIX) }?.forEach { f ->
+            if (keepName == null || f.name != keepName) {
+                f.delete()
+            }
+        }
+        Unit
+    }
+
+    /** Deletes the temp file for a specific [videoId] if present. */
+    fun deleteTemp(videoId: String): Boolean = lock.withLock {
+        if (isSafeId(videoId)) {
+            File(dir, videoId + TEMP_SUFFIX).delete()
+        } else false
+    }
+
+    /** Removes one permanent entry. */
     fun remove(videoId: String): Boolean = lock.withLock {
         completeFile(videoId)?.delete() == true
     }
 
-    /** Deletes everything (complete + partial). */
+    /** Deletes everything (complete + temporary + partial). */
     fun clear() = lock.withLock {
         dir.listFiles()?.forEach { it.delete() }
         Unit
@@ -186,11 +294,15 @@ class AudioFileCache(
     private fun completeFile(videoId: String): File? =
         if (isSafeId(videoId)) File(dir, videoId + AUDIO_SUFFIX) else null
 
+    private fun tempFile(videoId: String): File? =
+        if (isSafeId(videoId)) File(dir, videoId + TEMP_SUFFIX) else null
+
     private fun completeFiles(): List<File> =
         dir.listFiles { f -> f.isFile && f.name.endsWith(AUDIO_SUFFIX) }?.toList() ?: emptyList()
 
     companion object {
         const val AUDIO_SUFFIX = ".audio"
+        const val TEMP_SUFFIX = ".temp"
         const val PART_SUFFIX = ".part"
         private val SAFE_ID = Regex("^[A-Za-z0-9_-]{1,64}$")
 

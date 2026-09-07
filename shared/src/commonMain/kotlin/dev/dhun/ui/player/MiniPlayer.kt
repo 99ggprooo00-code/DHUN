@@ -1,19 +1,24 @@
 package dev.dhun.ui.player
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,10 +30,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.PlaybackState
+import dev.dhun.design.ArtworkColorExtractor
+import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -40,17 +51,17 @@ import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.presentation.player.PlayerViewModel
 
 /**
- * MiniPlayer — frosted M3 glass bar docked above the bottom nav (Android) or at
- * the window bottom (desktop). Translucent multi-stop fill + hairline edge
- * (glass-morphism atmosphere — not Liquid Glass / continuous reblur).
+ * MiniPlayer — polished M3 glass bar docked above the bottom nav (Android) or at
+ * the window bottom (desktop).
  *
- * - 1dp accent progress line pinned to the top edge
- * - artwork (crossfades via Coil), marquee title, artist line with live
- *   Resolving/Buffering status
- * - play/pause + next transport
- * - tap OR swipe-up expands the FullPlayer
- *
- * Hidden entirely when nothing is loaded.
+ * Features:
+ * - Ambient gradient wash derived from artwork seed
+ * - 2dp smoothed top progress line with glowing active indicator
+ * - Rounded artwork thumbnail with subtle shadow
+ * - Marquee title and live playback status label
+ * - Refined circular transport buttons with animated play/pause morph
+ * - Tap to expand FullPlayer (or tap to view error details on failure)
+ * - Swipe-up gesture to open full-screen player
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -71,27 +82,58 @@ fun MiniPlayer(
         0f
     }
 
+    val colors = remember(track.thumbnailUrl, track.id) {
+        ArtworkColorExtractor.extractFromSeed(track.thumbnailUrl ?: track.id)
+    }
+    val ambientTint by animateColorAsState(
+        targetValue = colors.backgroundTint.copy(alpha = 0.20f),
+        animationSpec = DhunAnimations.slowTween(),
+        label = "miniPlayerAmbient",
+    )
+    val accent by animateColorAsState(
+        targetValue = colors.controlAccent,
+        animationSpec = DhunAnimations.slowTween(),
+        label = "miniPlayerAccent",
+    )
+
     var dragAccumPx by remember { mutableFloatStateOf(0f) }
-    // "Error — tap to see": an error tap opens the diagnosis dialog (with
-    // Retry) instead of just expanding to a FullPlayer that showed nothing.
     var showErrorDialog by remember { mutableStateOf(false) }
     val errorState = state as? PlaybackState.Error
+    val isPlaying = state is PlaybackState.Playing
 
-    GlassBottomBar(modifier = modifier.fillMaxWidth()) {
+    GlassBottomBar(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(DhunShapes.large)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        ambientTint,
+                        DhunColors.glassHighlight.copy(alpha = 0.15f),
+                        ambientTint.copy(alpha = 0.08f),
+                    ),
+                ),
+            ),
+    ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 1dp accent progress line -------------------------------------------------
+            // Refined progress line -------------------------------------------------
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(DhunSpacing.divider)
-                    .background(DhunColors.glassEdge.copy(alpha = 0.35f)),
+                    .height(DhunSpacing.progressHeight)
+                    .background(DhunColors.border.copy(alpha = 0.35f)),
+                contentAlignment = Alignment.CenterStart,
             ) {
                 if (progress > 0f) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(progress)
-                            .height(DhunSpacing.divider)
-                            .background(DhunColors.accent),
+                            .height(DhunSpacing.progressHeight)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(accent.copy(alpha = 0.7f), accent),
+                                ),
+                            ),
                     )
                 }
             }
@@ -119,20 +161,25 @@ fun MiniPlayer(
                             dragAccumPx += dragAmount
                         }
                     }
-                    .padding(horizontal = DhunSpacing.md),
+                    .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
             ) {
                 ArtworkImage(
                     imageUrl = track.thumbnailUrl,
                     contentDescription = track.title,
-                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    modifier = Modifier
+                        .size(DhunSpacing.touchTarget)
+                        .shadow(DhunSpacing.xs, DhunShapes.medium, clip = false),
                     shape = DhunShapes.medium,
                 )
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center,
+                ) {
                     Text(
                         text = track.title,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         color = DhunColors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -150,28 +197,56 @@ fun MiniPlayer(
                                 else -> {}
                             }
                         },
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = when (state) {
                             is PlaybackState.Error -> DhunColors.error
-                            is PlaybackState.Recovering -> DhunColors.accent
+                            is PlaybackState.Recovering -> accent
+                            is PlaybackState.Buffering, is PlaybackState.Resolving -> DhunColors.accent
                             else -> DhunColors.textTertiary
                         },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+
+                // Previous button
                 DhunIconButton(
-                    onClick = { viewModel.togglePlay() },
+                    onClick = { viewModel.previous() },
                     modifier = Modifier.size(DhunSpacing.touchTarget),
-                    contentDescription = if (state is PlaybackState.Playing) "Pause" else "Play",
+                    contentDescription = "Previous track",
                 ) {
                     DhunIconView(
-                        icon = if (state is PlaybackState.Playing) DhunIcon.Pause else DhunIcon.Play,
+                        icon = DhunIcon.SkipPrevious,
                         contentDescription = null,
-                        modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = DhunColors.textPrimary,
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        tint = DhunColors.textSecondary,
                     )
                 }
+
+                // Play / Pause circular button
+                Box(
+                    modifier = Modifier
+                        .size(DhunSpacing.touchTarget)
+                        .clip(DhunShapes.full)
+                        .background(accent.copy(alpha = 0.22f))
+                        .clickable { viewModel.togglePlay() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Crossfade(
+                        targetState = isPlaying,
+                        animationSpec = DhunAnimations.mediumTween(),
+                        label = "miniPlayPauseMorph",
+                    ) { playing ->
+                        DhunIconView(
+                            icon = if (playing) DhunIcon.Pause else DhunIcon.Play,
+                            contentDescription = if (playing) "Pause" else "Play",
+                            modifier = Modifier.size(DhunSpacing.iconSize),
+                            tint = accent,
+                        )
+                    }
+                }
+
+                // Next track button
                 DhunIconButton(
                     onClick = { viewModel.next() },
                     modifier = Modifier.size(DhunSpacing.touchTarget),
@@ -181,7 +256,7 @@ fun MiniPlayer(
                         icon = DhunIcon.SkipNext,
                         contentDescription = null,
                         modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = DhunColors.textSecondary,
+                        tint = DhunColors.textPrimary,
                     )
                 }
             }

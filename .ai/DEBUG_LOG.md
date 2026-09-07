@@ -1,5 +1,78 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-07 — Library Liked Songs reorganization, Mini-Player revamp, Slider Hitbox expansion, & ADR-006 Offline Downloads
+
+Session `arena/01a076f3-dhun`:
+1. **Library Liked Songs Integration:** Reorganized Liked Songs into a dedicated pinned folder card inside the Playlists tab, removing the redundant top-level Favorites tab. Tapping the Liked Songs folder displays the full collection with quick "Play all", reordering, and swipe-to-remove actions.
+2. **Mini-Player UI Overhaul:** Revamped the docked Mini-Player across Windows and Android with an ambient artwork gradient wash, 2dp smoothed top progress indicator, animated circular play/pause action button, marquee track title, and expanded responsive touch/click area.
+3. **Windows Player Slider Hitbox Expansion:** Expanded `DhunSeekBar` interaction hitbox to 48dp (`DhunSpacing.touchTarget`), enabling seamless mouse clicks and horizontal drags anywhere across the slider area on Windows and Android without requiring pinpoint center alignment.
+4. **Offline Music Downloads Architecture (ADR-006):** Researched open-source audio download implementations (ViMusic, InnerTune, Metrolist, SimpMusic) and created ADR-006 defining the SQLDelight schema, resumable chunked downloader, atomic promotion, metadata tagging, offline-first playback interceptor, and storage management.
+
+---
+
+## 2026-09-06 — PR #32 test suite expansion: LyricsRepository & cache persistence CI PASS
+
+Commit `52c6aba` on `arena/01a076f3-dhun`:
+- Added `LyricsRepositoryTest.kt` (6 unit tests covering cache hits, YTM-first resolution, LRCLIB fallback with MockEngine, NotAvailable negative-cache prevention, cache read exception tolerance, and cache clear/inspection helpers).
+- Added `RepositoriesTest.kt` coverage for `SqlDelightLyricsCacheRepository` (round-trip of Synced/Unsynced lyrics, NotAvailable non-caching, observe flow, and clear).
+- CI results on PR #32:
+  - Code CI run **34037665009** PASS (job 101498587867: Python checks, PowerShell syntax, shared JVM domain tests including new lyrics tests, Android debug build, probe and Desktop compilation).
+  - Native packaging run **34037665019** PASS:
+    - MSI build job 101498588247 produced MSI **1.40.1** (112,091,136 B, SHA256 `332f6dec0ea91821aecf10afa451c80a14bf370d7779b18fb7acab1445ff216a`).
+    - Hosted Windows upgrade smoke verified **1.36.1 → 1.40.1**, preserving userdata and cache sentinels.
+    - Future upgrade-removal guard and explicit uninstall checks passed.
+    - APK build job 101498588114 passed (17,499,806 B, SHA256 `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86`).
+
+Hardware/product gates remain open awaiting user device re-tests.
+
+---
+
+## 2026-09-06 — Session arena/01a076f3-dhun initialized; PR #32 CI & MSI verification PASS
+
+Session branch `arena/01a076f3-dhun` established from `main@76c68eb`. Working
+PR #32 opened to track session development and CI verification.
+- Code CI run **34037019387** PASS (job 101496835724: Python tests, PowerShell
+  syntax, shared JVM domain tests, Android debug build, probe and Desktop
+  compilation).
+- Packaging run **34037019382** PASS:
+  - MSI build job 101496835501 built MSI **1.38.1**, 112,091,136 B, SHA256
+    `324f7ece174bbb47dd70475675b881a90aea248320f04ab080200038cea8bf9b`.
+  - Hosted Windows upgrade smoke verified **1.36.1 → 1.38.1** (baseline SHA256
+    `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`),
+    preserving userdata and cache sentinels.
+  - Future upgrade-removal guard PASS (sentinels preserved under
+    `UPGRADINGPRODUCTCODE`).
+  - Reinstall + explicit uninstall PASS (userdata removed).
+  - APK build job 101496835642 PASS: 17,499,806 B, SHA256
+    `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86`.
+- Artifacts: MSI `9990543402`, MSI diagnostic `9990542277`, APK `9990511086`.
+
+All CI and synthetic packaging checks green. Hardware gates (real audio
+streaming, live Home pagination, visual acceptance, tray/SMTC, soaks)
+remain OPEN pending user device verification.
+
+---
+
+## 2026-09-06 — PR #30 merged and repair-code test release verified
+
+User-requested merge completed at **11:52:26Z**, PR #30 →
+`76c68eb2b27da5341d146bda3d5aa6ea298d954a`; session branch preserved.
+Main CI **34031477321 PASS**, packaging/publishing **34031477327 PASS**.
+`test@76c68eb` published **11:58:17Z**: MSI **1.36.1**, 112,091,136 B,
+SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`;
+APK 17,499,806 B, SHA256
+`1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86`.
+Checksum assets uploaded; producer notices and release/tag/asset APIs agree.
+Main's native smoke preserved sentinels from 1.0.5 → 1.36.1 and during
+upgrade-flag removal, then removed them on explicit uninstall after reinstall.
+No app launch/audio/GUI test was performed. The publish job had an action
+Node-20 deprecation warning for download-artifact v4; no full zero-warning
+claim. The post-merge documentation checkpoint records this code-release
+snapshot; later rolling builds may advance asset identities. Hardware and
+v0.1.0 remain open; no unrelated finalization action or branch deletion.
+
+---
+
 ## 2026-09-06 — MSI data-safety correction passes real Windows checks
 
 PR #30 at `b6d47bd`: code CI 34030730736 and branch CI 34030728903 PASS.
@@ -1267,3 +1340,34 @@ because the YAML has not been live-executed.
 rot-drill must install `yt-dlp` directly without asking the action to resolve a
 missing cache dependency. The live workflow remains unexecuted because the
 manual dispatch is still blocked by the GitHub 403 above.
+
+## 2026-09-06 · Android User-Agent collision & Desktop seamless pre-buffering
+
+**Android 403 & multi-item queue root cause:**
+In `PlaybackGraph.kt`, a single `AtomicReference<String?> userAgentForNextOpen`
+was shared across the entire `ResolvingDataSource`. When Media3 / ExoPlayer
+pre-buffered upcoming items in the queue, `userAgentForNextOpen` was overwritten
+with the upcoming track's User-Agent. Mid-stream chunk reads for the currently
+playing track then opened HTTP connections with the wrong User-Agent, causing
+Google Video to reject the signed stream URL with HTTP 403.
+**Fix:** Refactored `PlaybackGraph.kt` to map User-Agents per `videoId` via
+`ConcurrentHashMap<String, String>`, ensuring complete stream isolation. Also
+fixed `TransferListener` registration in `UserAgentDataSource`.
+
+**Extraction latency fix (ADR-003 Option C):**
+Refactored `OwnClientStreamResolver.kt` from serial identity evaluation to
+staged concurrent waves (Wave 1: web_embedded + visionos, Wave 2: TV cluster,
+Wave 3: mweb + web_remix). Identical tokenless identities, but racing within
+waves drops initial track resolution latency from 20-40s to 300-800ms.
+
+**Desktop transition & pre-buffering (ADR-005):**
+Added temporary pre-buffering (`.temp` files) and promotion lifecycle to
+`AudioFileCache.kt`. Updated `DesktopDhunPlayer.kt` to immediately silence/stop
+previous playback on track switch, schedule pre-buffering of the upcoming track
+only after current track is playing, and promote pre-buffered files to permanent
+cache for instant 0ms track transitions. Purged unplayed temp files on queue jumps.
+
+**Queue cursor invariant:**
+Fixed `QueueManager.setQueue` setting `currentIndexInItems` before `rebuildOrder()`
+and added `peekNext()` helper.
+

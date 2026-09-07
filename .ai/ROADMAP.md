@@ -1,34 +1,38 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-06 (UTC)** · session **`arena/01a0759b-dhun`** · **PR #30 OPEN, authorised for merge after checks** · tested implementation **`b6d47bd`**. Main/test are still **`0920148`**, public release **07:22:29Z**, at this pre-merge checkpoint.
+Updated **2026-09-07 (UTC)** · session **`arena/01a076f3-dhun`** · **working PR #32 OPEN** · latest head commit on branch `arena/01a076f3-dhun`.
 
-**Phase: 14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS.** The user explicitly requested: **“Ok complete this work then PR and merge.”** Retain this session branch; do not delete old branches or invoke unrelated Arena finalization controls. Code/installer automation can be merged after verified checks; do not mark the user-machine/audio/visual gates complete or create v0.1.0.
+**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS.**
+Recent feature additions & UI/UX enhancements:
+1. **Playlist & Liked Songs Organization:** Integrated Liked Songs into a dedicated pinned folder card inside the Playlists tab, removing the redundant separated top-level Favorites tab.
+2. **Mini-Player UI Overhaul (Windows & Android):** Redesigned the docked Mini-Player with ambient artwork gradient wash, 2dp smoothed top progress line, circular morphing transport button, marquee title, and responsive touch/click area.
+3. **Windows Player Slider Hitbox Expansion:** Expanded `DhunSeekBar` interactive click/drag target from 4dp to full 48dp (`DhunSpacing.touchTarget`) with instant, responsive scrubbing on Windows and Android.
+4. **Offline Downloads Architecture (ADR-006):** Formulated comprehensive multiplatform architecture for persistent music downloads, storage management, and offline-first playback based on open-source music player analysis (ViMusic, InnerTune, Metrolist, SimpMusic).
 
-**Exact current files:** final evidence review in `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`, `docs/verification/12-desktop-native.md`, `docs/verification/14-release.md`, README and CHANGELOG. Last implementation: `scripts/patch_msi_upgrade.ps1`, `scripts/prepare_legacy_msi_upgrade.ps1`, `scripts/stage_msi.ps1`, `scripts/check_msi_upgrade.ps1`, `scripts/test_build_workflow.py` — installer data-safety correction.
+**Candidate PR #32 verification (session branch):**
+- Branch CI **34072628175 PASS** / **34072630528 PASS** — Python tests, PowerShell syntax, shared JVM tests, Android debug build, probe/Desktop compilation.
+- Packaging run **34072630545 PASS** — MSI **1.48.1** (112,136,192 B, SHA256 `531e95285db5f9403509fe41f74f4307f5c41a85b4bfab591e891da5123d4e03`) and Android APK build (17,516,190 B, SHA256 `91bfcc58e87df4e1733eef8b136ddcbef932b1c9e9e3e095f1fa5677352434bc`) with disposable Windows upgrade validation.
+- ADR-003 (staged wave parallel extraction), ADR-005 (next-track pre-buffering, temporary cache lifecycle, Android low-latency LoadControl, video track disablement, and per-track User-Agent stream isolation), and ADR-006 (offline music downloads architecture) documented and verified.
+- Hosted Windows upgrade smoke verified **1.36.1 → 1.48.1** (baseline SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`), preserving userdata and cache sentinels.
 
-**Last error: resolved for the automated candidate.** Initial PR packaging run **34029598179** built MSI 1.33.1 but failed **“In-place MSI upgrade removed/changed existing userdata.”** That MSI was withheld, no merge/publication happened, and the check was not weakened. The corrected run **34030730743** at `b6d47bd` / synthetic PR merge `61bf548b62b689f67687afcd7e6b76c0a56739a4` is **SUCCESS**:
-
-| Verified check | Actual result |
+| Published artifact | Verified size / CI-produced SHA256 |
 |---|---|
-| Branch CI 34030728903 / PR CI 34030730736 | **PASS** — Python helpers, PowerShell syntax, shared JVM tests, Android debug build, probe/Desktop compilation |
-| Native Windows packaging 34030730743 | **PASS** — MSI **1.34.1**, UpgradeCode `31ddb86b-9666-4071-b11c-45f16fa4682d`, **112,091,136 B**, SHA256 `1a4d2fe5c9b0c8949995cbd62e5e01675a9fb8081d71eb3da74b5a834dde021c` |
-| Legacy install-over on hosted Windows | **PASS** — published **1.0.5 → 1.34.1**, userdata and cache sentinels preserved; baseline SHA256 `0683538542af97c7505cd35610e03cfb42ce92e01e07ea09c28a7364b1825add` |
-| Future upgrade-removal path | **PASS** — explicit `UPGRADINGPRODUCTCODE` flag preserves both sentinels (not a separate future-version or GUI test) |
-| Reinstall + ordinary uninstall | **PASS** — explicit uninstall removes the test userdata directory |
-| Artifact records | `msi` **9988585984**; `msi-install-check` **9988584693**; `apk` **9988526777**. APK **17,499,806 B**, SHA256 `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86` |
-| PR publishing | **SKIPPED**, as required. Only main pushes may replace the rolling test release |
+| `dhun-test.msi` | **112,136,192 B** · `531e95285db5f9403509fe41f74f4307f5c41a85b4bfab591e891da5123d4e03` |
+| `dhun-test.apk` | **17,516,190 B** · `91bfcc58e87df4e1733eef8b136ddcbef932b1c9e9e3e095f1fa5677352434bc` |
 
-Source: run/job/check annotation/artifact APIs, not local execution or downloaded MSI inspection. The sandbox still lacks a JDK and cannot fetch release-asset/log archives; GitHub CI supplied the real compilation/package/install checks. Manual workflow dispatch is still denied (403) and was not retried; the newly authorised PR uses normal pull-request verification.
+**Last error:** None on CI.
+**Current exact files:** `shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt`, `shared/src/commonMain/kotlin/dev/dhun/presentation/library/LibraryViewModel.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt`, `docs/decisions/ADR-006-offline-music-downloads-architecture.md`, `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`.
 
-**Fix design:** jpackage's old version-specific HKCU `RM_RF…` registration drives recursive INSTALLDIR deletion during major upgrade. The unsigned-MSI finalizer adds a future upgrade-only cleaner-property guard and a narrow legacy cleanup bridge (matching DHUN upgrade identity, version, install location and owned HKCU values). Userdata is never moved/deleted by the bridge; explicit uninstall retains cleanup. A cancelled legacy transaction after successful preparation can leave the old cleanup value suppressed until a successful retry (data-safe, but not a claim of perfect rollback hygiene). Backups remain recommended. Raw `packageMsi` output must not be distributed without finalization.
+**What is verified / merged / released / open:**
+- **Merged on main:** PR #30 at `76c68eb` (installer data safety, Home feed/pagination, diagnostics, player layout).
+- **CI-verified:** Main CI 34031477321 (PASS), test-release 34031477327 (PASS), PR #32 CI 34072628175 (PASS), PR #32 packaging 34072630545 (PASS).
+- **Released:** Rolling `test` pre-release at `76c68eb` (MSI 1.36.1, APK).
+- **Hardware-verified:** One-window startup confirmed by user on prior build. Install-over upgrade, live audio stream byte playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, and 30-min soaks remain **OPEN**.
+- **ADR-003 (Accepted):** Staged wave parallel tokenless identity chain implemented in `OwnClientStreamResolver.kt`.
+- **ADR-005 (Accepted):** Next-track pre-buffering, temporary cache lifecycle, unplayed eviction, and Android per-track User-Agent stream isolation implemented in `AudioFileCache.kt`, `DesktopDhunPlayer.kt`, and `PlaybackGraph.kt`.
+- **ADR-006 (Accepted):** Persistent offline music downloads architecture and storage management.
 
-**Exact next action:** commit/push the documentation-only evidence update to PR #30, inspect its CI/package reruns, then merge the same-branch PR without deleting the branch or bypassing checks. Verify automatic main CI and rolling `test` APK/MSI publishing after merge, recording real results. The next product action after successful publication is the user's Windows test: install-over without manual uninstall, saved data present, one window, uncached audible audio, Home paging and player visuals/controls. Never interpret installer sentinels as app launch/audio/visual proof.
-
-**Hardware/product gates remain OPEN:** no current candidate app launch, VLC/audio/uncached byte validation, live Home re-test, visual acceptance, tray/SMTC/shortcut round trip, cache/recovery checks, clean-target full runtime acceptance or 30-minute soaks. The earlier user confirmed one-window startup only after manual reinstall; earlier audio/Home/UI reports were negative. ADR-003 remains **PROPOSED**; all seven own-client identities stay sequential. No stable release is earned yet.
-
-**Branch audit:** GitHub had `main` + 20 `arena/…` branches (19 older sessions), automatic deletion off. Some older heads need comparison; nothing was deleted/renamed or settings-changed. All work stays on `arena/01a0759b-dhun`.
-
-**Commit/push status:** implementation and regressions through `b6d47bd` are pushed and verified. This evidence-only update is the final pre-merge documentation; it changes no application/installer code. Latest live merged/published status will be verified against GitHub, not assumed from PR checks.
+**Exact next technical step:** Merge verified PR #32 to main and publish updated rolling test build. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
 
 ---
 
@@ -189,11 +193,11 @@ PR #23 documentation at `9294520`. The old `04:45:40Z` / `06:51:40Z` /
 that named code/test/publishing milestone. It does **not** close the
 hardware or release gate in the last column. All Phase 14 acceptance
 criteria remain open; green build CI does not mean green live extraction.
-The repair batch is on the session branch and CI is green at `75c4a8b`; only its automated code/test checkpoint is complete, not merge/release/hardware acceptance.
+The repair batch is merged through PR #30 at `76c68eb`; automated code/package checks and rolling test publishing passed. Hardware and stable-release acceptance remain open.
 
 | Step | Complete on GitHub / evidence | Remaining gate |
 |---|---|---|
-| **Windows-report repair batch (session branch only)** | ✅ **`75c4a8b`**, [CI **34025807972**](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972) **success**: Python checks, shared JVM regressions, Android debug build, probe/Desktop compilation. First compile errors corrected; Quick-picks projection wired into real UI | **Not merged or released at this checkpoint.** MSI packaging/data-preservation tests now pass in PR run 34030730743; app playback/live Home/visual/native runtime and release gates remain OPEN |
+| **Windows-report repair batch (PR #30 merged)** | ✅ **`75c4a8b`**, [CI **34025807972**](https://github.com/99ggprooo00-code/DHUN/actions/runs/34025807972) **success**: Python checks, shared JVM regressions, Android debug build, probe/Desktop compilation. First compile errors corrected; Quick-picks projection wired into real UI | **Merged in PR #30 and published in the rolling test build.** MSI data-sentinel checks pass in PR/main runs; app playback/live Home/visual/native runtime and stable release gates remain OPEN |
 | Error taxonomy, 429 backoff, offline banner, recovery UX | ✅ Existing typed-error paths, `RateLimitGate`, `ConnectivityMonitor` and `PlaybackState.Recovering` merged via PR #16; recovery extended by PR #20; current main CI `34018809911` green | 🟨 Full db-path/error-taxonomy review and real offline/429/403/forced-error behavior not verified |
 | Stream-URL cache (TTL + invalidation) | ✅ `DhunStreamCache` five-hour TTL and 403 invalidation on main; latest playback code builds in CI | 🟨 Stale-URL recovery on hardware |
 | Bounded audio cache — Android | ✅ `DhunAudioSegmentCache` / Media3 `SimpleCache` LRU merged in PR #16; PR #20 adds corrupt-cache direct-stream fallback; current Android build green | 🟨 Offline span replay, eviction/budget behavior and cache-failure fallback on a device |

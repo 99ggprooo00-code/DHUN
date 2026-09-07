@@ -14,30 +14,27 @@ import dev.dhun.innertube.long
 import dev.dhun.innertube.obj
 import dev.dhun.innertube.str
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * The own-client resolver (ADR-001 + addenda 2026-09-02 / 2026-09-05):
- * InnerTube /player tried under a chain of tokenless client identities
- * pinned from yt-dlp master `INNERTUBE_CLIENTS`. Never signs URLs, never
- * deciphers challenges, never uses cookies / PO tokens.
+ * The own-client resolver (ADR-001 + ADR-003 staged wave parallelisation):
+ * InnerTube /player tried under staged concurrent waves of tokenless client
+ * identities pinned from yt-dlp master `INNERTUBE_CLIENTS`. Never signs URLs,
+ * never deciphers challenges, never uses cookies / PO tokens.
  *
- * Chain order (evidence-driven, drill-reorderable):
- *  1. WEB_EMBEDDED_PLAYER — no GVS PO policy in yt-dlp; embed thirdParty
- *  2. VISIONOS            — spike R5 (was tokenless even from datacenter)
- *  3. TVHTML5             — spike R3 / yt-dlp `tv`
- *  4. TVHTML5 downgraded  — yt-dlp `tv_downgraded` (older Cobalt)
- *  5. TVHTML5_SIMPLY      — yt-dlp `tv_simply`
- *  6. MWEB                — mobile web; try for progressive/direct URLs
- *  7. WEB_REMIX           — music context; often gated, last cheap try
+ * Waves (ADR-003 Option C):
+ *  Wave 1: WEB_EMBEDDED_PLAYER, VISIONOS
+ *  Wave 2: TVHTML5, TVHTML5 downgraded, TVHTML5_SIMPLY
+ *  Wave 3: MWEB, WEB_REMIX
  *
- * ANDROID/IOS deliberately omitted (yt-dlp marks GVS PO required).
- * Rot-drill 33968950214 proved web_remix+visionos+tv all AuthRequired from
- * Actions IPs — this expanded chain is the proper fix attempt, not a probe
- * weaken. Parses audio-only adaptive formats with direct URLs; falls back
- * to progressive muxed formats when adaptive URLs are withheld.
+ * Each wave races its identities concurrently. The first identity yielding
+ * direct audio wins immediately, cancelling remaining requests in that wave.
+ * Subsequent waves execute only if preceding waves fail.
  */
 class OwnClientStreamResolver(
     private val client: InnerTubeClient,
@@ -46,7 +43,26 @@ class OwnClientStreamResolver(
 
     override suspend fun resolve(videoId: String): DhunResult<StreamInfo> {
         val outcomes = LinkedHashMap<String, DhunError>()
-        for (strategy in STRATEGIES) {
+        for (wave in WAVES) {
+            val streamInfo = executeWave(videoId, wave, outcomes)
+            if (streamInfo != null) {
+                return DhunResult.Success(streamInfo)
+            }
+            if (outcomes.values.any { it is DhunError.RateLimited }) {
+                break // back off, don't hammer
+            }
+        }
+        return DhunResult.Failure(aggregateResolveFailures(outcomes))
+    }
+
+    private suspend fun executeWave(
+        videoId: String,
+        wave: List<Strategy>,
+        outcomes: MutableMap<String, DhunError>,
+    ): StreamInfo? = coroutineScope {
+        if (wave.isEmpty()) return@coroutineScope null
+        if (wave.size == 1) {
+            val strategy = wave[0]
             val response = try {
                 strategy.call(client, videoId)
             } catch (e: CancellationException) {
@@ -54,22 +70,57 @@ class OwnClientStreamResolver(
             } catch (e: DhunException) {
                 DhunResult.Failure(e.error)
             }
-            when (response) {
+            return@coroutineScope when (response) {
                 is DhunResult.Success -> try {
-                    return DhunResult.Success(
-                        parseStreamInfo(videoId, response.value)
-                            .copy(userAgent = strategy.userAgent),
-                    )
+                    parseStreamInfo(videoId, response.value).copy(userAgent = strategy.userAgent)
                 } catch (e: DhunException) {
                     outcomes[strategy.label] = e.error
+                    null
                 }
                 is DhunResult.Failure -> {
                     outcomes[strategy.label] = response.error
-                    if (response.error is DhunError.RateLimited) break // back off, don't hammer
+                    null
                 }
             }
         }
-        return DhunResult.Failure(aggregateResolveFailures(outcomes))
+
+        val channel = Channel<Pair<Strategy, DhunResult<JsonObject>>>(wave.size)
+        val jobs = wave.map { strategy ->
+            launch {
+                val res = try {
+                    strategy.call(client, videoId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: DhunException) {
+                    DhunResult.Failure(e.error)
+                }
+                channel.send(strategy to res)
+            }
+        }
+
+        var winner: StreamInfo? = null
+        var received = 0
+        while (received < wave.size) {
+            val (strategy, result) = channel.receive()
+            received++
+            when (result) {
+                is DhunResult.Success -> {
+                    try {
+                        val parsed = parseStreamInfo(videoId, result.value).copy(userAgent = strategy.userAgent)
+                        winner = parsed
+                        break
+                    } catch (e: DhunException) {
+                        outcomes[strategy.label] = e.error
+                    }
+                }
+                is DhunResult.Failure -> {
+                    outcomes[strategy.label] = result.error
+                }
+            }
+        }
+
+        jobs.forEach { it.cancel() }
+        winner
     }
 
     private class Strategy(
@@ -112,6 +163,12 @@ class OwnClientStreamResolver(
             // WEB_REMIX is the primary (non-alt) identity: its /player call
             // goes through browserHeaders(), i.e. INNERTUBE_USER_AGENT.
             Strategy("web_remix", INNERTUBE_USER_AGENT) { c, id -> c.playerResponse(id) },
+        )
+
+        private val WAVES: List<List<Strategy>> = listOf(
+            listOf(STRATEGIES[0], STRATEGIES[1]),
+            listOf(STRATEGIES[2], STRATEGIES[3], STRATEGIES[4]),
+            listOf(STRATEGIES[5], STRATEGIES[6]),
         )
     }
 }

@@ -168,4 +168,55 @@ class AudioFileCacheTest {
         assertEquals(0, shrunk.totalBytes())
         assertTrue(shrunk.ids().isEmpty())
     }
+
+    // ---- ADR-005 next-track pre-buffering and temporary cache lifecycle ----
+
+    @Test
+    fun tempPrebufferDoesNotCountTowardsPermanentBudgetUntilPromoted() {
+        body("u/perm", 500)
+        body("u/temp", 400)
+        val c = cache(1000)
+
+        assertNotNull(c.download("perm________", "u/perm"))
+        assertEquals(500, c.totalBytes())
+        assertTrue(c.has("perm________"))
+
+        val tempFile = assertNotNull(c.downloadTemp("temp________", "u/temp"))
+        assertTrue(tempFile.name.endsWith(AudioFileCache.TEMP_SUFFIX))
+        assertTrue(c.hasTemp("temp________"))
+        assertFalse(c.has("temp________")) // not yet permanent
+        assertEquals(500, c.totalBytes(), "temporary buffer is excluded from permanent total")
+
+        // Promote temp to permanent
+        val promoted = assertNotNull(c.promoteTempToPermanent("temp________"))
+        assertTrue(promoted.name.endsWith(AudioFileCache.AUDIO_SUFFIX))
+        assertTrue(c.has("temp________"))
+        assertFalse(c.hasTemp("temp________"))
+        assertEquals(900, c.totalBytes())
+    }
+
+    @Test
+    fun unplayedTempFilesAreSweptOnClearTempAndStartup() {
+        body("u/temp1", 200)
+        body("u/temp2", 200)
+        val c = cache(1000)
+        c.downloadTemp("temp1_______", "u/temp1")
+        c.downloadTemp("temp2_______", "u/temp2")
+        assertTrue(c.hasTemp("temp1_______"))
+        assertTrue(c.hasTemp("temp2_______"))
+
+        // Sparing temp1
+        c.clearTemp(keepVideoId = "temp1_______")
+        assertTrue(c.hasTemp("temp1_______"))
+        assertFalse(c.hasTemp("temp2_______"))
+
+        // Sweeping all
+        c.clearTemp()
+        assertFalse(c.hasTemp("temp1_______"))
+
+        // Re-create temp file and verify startup sweep
+        File(dir, "temp_stale___" + AudioFileCache.TEMP_SUFFIX).writeBytes(ByteArray(100))
+        val reloaded = cache(1000)
+        assertFalse(reloaded.hasTemp("temp_stale___"))
+    }
 }

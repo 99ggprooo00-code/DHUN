@@ -103,6 +103,8 @@ class DesktopDhunPlayer(
     private var pendingSeekMs = 0L
     private var cacheFillJob: Job? = null
     private var cacheFillCancel: AtomicBoolean? = null
+    private var prebufferJob: Job? = null
+    private var prebufferCancel: AtomicBoolean? = null
 
     init {
         try {
@@ -115,6 +117,7 @@ class DesktopDhunPlayer(
             mp.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
                 override fun playing(mediaPlayer: MediaPlayer) {
                     _state.value = PlaybackState.Playing(_currentTrack.value ?: UNKNOWN)
+                    schedulePrebufferNextTrack()
                 }
 
                 override fun paused(mediaPlayer: MediaPlayer) {
@@ -331,6 +334,7 @@ class DesktopDhunPlayer(
     /** Tears down libVLC resources. Call once when the app exits. */
     fun release() {
         cancelCacheFill()
+        cancelPrebuffer()
         pollJob?.cancel()
         pollJob = null
         runCatching { mediaPlayer?.release() }
@@ -364,16 +368,40 @@ class DesktopDhunPlayer(
         }
         pendingLazyStart = false
         cancelCacheFill()
+        cancelPrebuffer()
 
-        // Cache hit: local file, no network, no resolve (offline replay).
+        // Immediate silence on track switch: prevent old track audio from lingering while resolving
+        if (vlcAvailable) {
+            runCatching { mediaPlayer?.controls()?.stop() }
+        }
+        _positionMs.value = 0
+
+        // Check if this track was pre-buffered in temporary cache (ADR-005): promote and play immediately!
+        if (audioCache != null && audioCache.hasTemp(track.id)) {
+            val promoted = audioCache.promoteTempToPermanent(track.id)
+            if (promoted != null) {
+                log("pre-buffered hit: promoted temp to permanent ${track.id} (${promoted.length()} bytes) — instant playback")
+                audioCache.clearTemp(keepVideoId = null)
+                streamingRemoteUrl = null
+                localFallbackAttempted = false
+                startMedia(track, promoted.absolutePath)
+                return
+            }
+        }
+
+        // Cache hit: permanent local file, no network, no resolve (offline replay).
         val cached = audioCache?.fileFor(track.id)
         if (cached != null) {
             log("cache hit ${track.id} (${cached.length()} bytes) — playing local file")
+            audioCache?.clearTemp(keepVideoId = null)
             streamingRemoteUrl = null
             localFallbackAttempted = false
             startMedia(track, cached.absolutePath)
             return
         }
+
+        // Neither permanent nor temp: clear any unplayed stale temp files
+        audioCache?.clearTemp(keepVideoId = null)
 
         _state.value = PlaybackState.Resolving(track)
         val startedAtMs = System.currentTimeMillis()
@@ -471,6 +499,50 @@ class DesktopDhunPlayer(
     }
 
     /**
+     * ADR-005: Pre-buffering the upcoming track into temporary storage.
+     * Starts only after the current track is playing to avoid network contention.
+     */
+    private fun schedulePrebufferNextTrack() {
+        val cache = audioCache ?: return
+        val nextTrack = queueManager.peekNext(trackEnded = false) ?: return
+        // Do not pre-buffer if already in permanent or temp cache
+        if (cache.has(nextTrack.id) || cache.hasTemp(nextTrack.id)) return
+
+        cancelPrebuffer()
+        val cancel = AtomicBoolean(false)
+        prebufferCancel = cancel
+        prebufferJob = scope.launch(Dispatchers.IO) {
+            log("pre-buffering next track ${nextTrack.id} (${nextTrack.title}) …")
+            when (val result = provider.getStreamInfo(nextTrack.id)) {
+                is DhunResult.Success -> {
+                    if (cancel.get()) return@launch
+                    val info = result.value
+                    val file = cache.downloadTemp(
+                        nextTrack.id,
+                        info.audioUrl,
+                        expectedBytes = info.contentLengthBytes,
+                        cancel = cancel,
+                        userAgent = info.userAgent,
+                    )
+                    if (file != null) {
+                        log("pre-buffered next track ${nextTrack.id} (${file.length()} bytes)")
+                    }
+                }
+                is DhunResult.Failure -> {
+                    log("pre-buffer resolution failed for ${nextTrack.id}: ${result.error.detailString() ?: ""}")
+                }
+            }
+        }
+    }
+
+    private fun cancelPrebuffer() {
+        prebufferCancel?.set(true)
+        prebufferCancel = null
+        prebufferJob?.cancel()
+        prebufferJob = null
+    }
+
+    /**
      * libVLC reports failure on the MRL it was given. For a remote stream
      * that is usually the CDN refusing libVLC's own User-Agent (it cannot be
      * overridden through vlcj), not a dead URL — so before showing an error,
@@ -518,6 +590,8 @@ class DesktopDhunPlayer(
         streamingRemoteUrl = null
         localFallbackAttempted = false
         cancelCacheFill()
+        cancelPrebuffer()
+        audioCache?.clearTemp(keepVideoId = null)
         pollJob?.cancel()
         pollJob = null
         if (vlcAvailable) runCatching { mediaPlayer?.controls()?.stop() }

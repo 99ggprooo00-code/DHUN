@@ -247,6 +247,47 @@ class RepositoriesTest {
         assertNull(repo.load())
     }
 
+    /* ---------------- Lyrics cache ---------------- */
+
+    @Test
+    fun lyricsCacheSaveGetAndClear(): Unit = runBlocking {
+        val clock = FakeClock()
+        val repo = SqlDelightLyricsCacheRepository(newDb(), clock, Dispatchers.Unconfined)
+        assertNull(repo.get("t1"))
+
+        val synced = dev.dhun.core.Lyrics.Synced(
+            listOf(
+                dev.dhun.core.LyricsLine(12_340L, "Hello"),
+                dev.dhun.core.LyricsLine(65_670L, "World"),
+            ),
+        )
+        repo.put("t1", synced)
+        val fetchedSynced = repo.get("t1")
+        assertNotNull(fetchedSynced)
+        assertTrue(fetchedSynced is dev.dhun.core.Lyrics.Synced)
+        assertEquals(2, fetchedSynced.lines.size)
+        assertEquals(12_340L, fetchedSynced.lines[0].startTimeMs)
+        assertEquals("Hello", fetchedSynced.lines[0].text)
+        assertEquals(65_670L, fetchedSynced.lines[1].startTimeMs)
+        assertEquals("World", fetchedSynced.lines[1].text)
+        assertEquals(fetchedSynced, repo.observe("t1").first())
+
+        val unsynced = dev.dhun.core.Lyrics.Unsynced("Plain lyrics text")
+        repo.put("t2", unsynced)
+        val fetchedUnsynced = repo.get("t2")
+        assertNotNull(fetchedUnsynced)
+        assertTrue(fetchedUnsynced is dev.dhun.core.Lyrics.Unsynced)
+        assertEquals("Plain lyrics text", fetchedUnsynced.text)
+
+        // NotAvailable is never cached
+        repo.put("t3", dev.dhun.core.Lyrics.NotAvailable)
+        assertNull(repo.get("t3"))
+
+        repo.clear()
+        assertNull(repo.get("t1"))
+        assertNull(repo.get("t2"))
+    }
+
     /* ---------------- Schema ---------------- */
 
     @Test

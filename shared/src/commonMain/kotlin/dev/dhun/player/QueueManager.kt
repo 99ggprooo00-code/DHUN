@@ -44,9 +44,8 @@ class QueueManager(private val random: Random = Random.Default) {
         items += tracks
         shuffleEnabled = false
         repeatMode = RepeatMode.OFF
+        currentIndexInItems = if (items.isEmpty()) -1 else startIndex.coerceIn(0, items.size - 1)
         rebuildOrder()
-        orderCursor = startIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
-        currentIndexInItems = if (items.isEmpty()) -1 else orderCursor
     }
 
     fun playAt(index: Int): Track? {
@@ -127,6 +126,25 @@ class QueueManager(private val random: Random = Random.Default) {
     }
 
     /* ---------------- navigation ---------------- */
+
+    /**
+     * Inspect the next track without advancing the queue cursor.
+     */
+    fun peekNext(trackEnded: Boolean = false): Track? {
+        if (isEmpty) return null
+        if (trackEnded && repeatMode == RepeatMode.ONE) return current
+        if (orderCursor + 1 < playOrder.size) {
+            val nextIndex = playOrder[orderCursor + 1]
+            return items.getOrNull(nextIndex)
+        }
+        return when (repeatMode) {
+            RepeatMode.ALL -> {
+                val firstIndex = playOrder.firstOrNull() ?: -1
+                items.getOrNull(firstIndex)
+            }
+            else -> null
+        }
+    }
 
     /**
      * Advance. [trackEnded] true when the current track finished naturally

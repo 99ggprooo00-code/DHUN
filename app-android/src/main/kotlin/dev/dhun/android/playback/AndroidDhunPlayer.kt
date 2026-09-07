@@ -44,6 +44,7 @@ import java.util.concurrent.ConcurrentHashMap
 class AndroidDhunPlayer(
     private val player: Player,
     private val scope: CoroutineScope,
+    private val streamCache: DhunStreamCache? = null,
 ) : DhunPlayer {
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -54,6 +55,7 @@ class AndroidDhunPlayer(
     }
 
     private val trackMap = ConcurrentHashMap<String, Track>()
+    private var prefetchJob: Job? = null
 
     private val _state = MutableStateFlow<PlaybackState>(PlaybackState.Idle)
     override val state: StateFlow<PlaybackState> = _state.asStateFlow()
@@ -226,6 +228,7 @@ class AndroidDhunPlayer(
 
     fun release() {
         pollJob.cancel()
+        prefetchJob?.cancel()
         onMain {
             player.removeListener(listener)
             player.release()
@@ -233,6 +236,28 @@ class AndroidDhunPlayer(
     }
 
     /* ---------------- internals ---------------- */
+
+    private fun schedulePrefetchNextTrack() {
+        val cache = streamCache ?: return
+        if (!player.isPlaying) return
+        val currentIdx = player.currentMediaItemIndex
+        val count = player.mediaItemCount
+        if (count <= 1) return
+        val nextIdx = when {
+            currentIdx + 1 < count -> currentIdx + 1
+            player.repeatMode == Player.REPEAT_MODE_ALL -> 0
+            else -> -1
+        }
+        if (nextIdx < 0) return
+        val nextItem = runCatching { player.getMediaItemAt(nextIdx) }.getOrNull() ?: return
+        val nextId = nextItem.mediaId
+        if (nextId.isBlank()) return
+
+        prefetchJob?.cancel()
+        prefetchJob = scope.launch(Dispatchers.IO) {
+            cache.prefetch(nextId)
+        }
+    }
 
     /** Listener callbacks already arrive on main; init may run anywhere. */
     private fun refresh() {
@@ -260,6 +285,7 @@ class AndroidDhunPlayer(
                     PlaybackState.Recovering(track)
                 player.isPlaying -> {
                     StreamRecoverySignal.end()
+                    schedulePrefetchNextTrack()
                     PlaybackState.Playing(track ?: UNKNOWN)
                 }
                 player.playbackState == Player.STATE_BUFFERING ->
