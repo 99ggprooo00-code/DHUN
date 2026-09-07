@@ -7,4 +7,7 @@
     <string name="shortcut_resume_long">Resume your last queue</string>
     <string name="shortcut_library">Library</string>
     <string name="shortcut_library_long">Open your library</string>
+    <!-- Dynamic "Now playing" shortcut (Phase 15): short label is constant;
+         the long label is built per-track by NowPlayingShortcutLabels. -->
+    <string name="shortcut_now_playing_short">Playing</string>
 </resources>

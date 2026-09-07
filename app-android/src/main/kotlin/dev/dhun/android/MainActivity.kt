@@ -47,8 +47,10 @@ import androidx.media3.session.SessionToken
 import dev.dhun.android.playback.AndroidDhunPlayer
 import dev.dhun.android.playback.DhunPlaybackService
 import dev.dhun.android.playback.PlaybackGraph
+import dev.dhun.android.shortcuts.NowPlayingShortcutSync
 import dev.dhun.android.shortcuts.ShortcutAction
 import dev.dhun.android.shortcuts.ShortcutIntents
+import dev.dhun.android.shortcuts.shortcutTrack
 import dev.dhun.android.ui.NavStatePersistence
 import dev.dhun.core.PlaybackState
 import dev.dhun.data.DataLayer
@@ -66,10 +68,14 @@ import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DhunAppShell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
@@ -95,6 +101,7 @@ class MainActivity : ComponentActivity() {
 
     private val connectState = MutableStateFlow<ConnectUi>(ConnectUi.Connecting)
     private val connectLog = MutableStateFlow<List<String>>(emptyList())
+    private var shortcutSyncJob: Job? = null
 
     private fun logLine(line: String) {
         connectLog.value = connectLog.value + line
@@ -135,6 +142,11 @@ class MainActivity : ComponentActivity() {
                     val action = shortcut ?: return@LaunchedEffect
                     if (ui !is ConnectUi.Ready) return@LaunchedEffect
                     when (action) {
+                        ShortcutAction.NOW_PLAYING -> {
+                            // Dynamic shortcut: land directly in the
+                            // FullPlayer for the current queue.
+                            nav.playerExpanded = true
+                        }
                         ShortcutAction.SEARCH -> {
                             nav.selectedTab = AppTab.SEARCH
                             nav.detailStack.clear()
@@ -376,6 +388,18 @@ class MainActivity : ComponentActivity() {
                 .onFailure { Log.w(TAG, "queue restore failed", it) }
                 .onSuccess { snap -> if (snap != null) logLine("restored ${snap.queue.size} tracks (paused)") }
             pers.start()
+        }
+        // Phase 15: dynamic "Now playing" launcher shortcut — the long label
+        // follows the current track. Deduped by track id so it republishes
+        // only on actual track changes, and cancelled/re-armed on every
+        // attach() (the fallback path attaches a second engine).
+        shortcutSyncJob?.cancel()
+        shortcutSyncJob = activityScope.launch {
+            p.state
+                .map { it.shortcutTrack()?.id }
+                .distinctUntilChanged()
+                .filterNotNull()
+                .collect { NowPlayingShortcutSync(this@MainActivity).publish(p.state.value) }
         }
     }
 

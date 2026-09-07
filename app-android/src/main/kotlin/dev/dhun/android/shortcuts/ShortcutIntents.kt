@@ -11,8 +11,12 @@ import android.content.Intent
  * mapping extra-value -> [ShortcutAction] lives here — in pure code — so it
  * can be unit-tested without an emulator (the XML side is pinned by
  * `StaticShortcutsXmlTest`, which fails if the two ever drift apart).
+ *
+ * [NOW_PLAYING] is dynamic-only (published by [NowPlayingShortcutSync] as the
+ * queue advances) and intentionally has NO static declaration — a static and
+ * a dynamic shortcut with the same id would shadow each other.
  */
-enum class ShortcutAction { SEARCH, RESUME, LIBRARY }
+enum class ShortcutAction { SEARCH, RESUME, LIBRARY, NOW_PLAYING }
 
 object ShortcutIntents {
 
@@ -24,6 +28,10 @@ object ShortcutIntents {
     const val VALUE_SEARCH = "search"
     const val VALUE_RESUME = "resume"
     const val VALUE_LIBRARY = "library"
+
+    /** Dynamic-only extra value + shortcut id ("Now playing"). */
+    const val VALUE_NOW_PLAYING = "now-playing"
+    const val DYNAMIC_ID_NOW_PLAYING = "now-playing"
 
     /**
      * Maps the raw extra string to an action.

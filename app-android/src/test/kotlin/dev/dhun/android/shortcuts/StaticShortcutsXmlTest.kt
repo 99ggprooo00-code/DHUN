@@ -44,6 +44,18 @@ class StaticShortcutsXmlTest {
     }
 
     @Test
+    fun `static ids never collide with the dynamic now-playing shortcut id`() {
+        // A static shortcut with the same id would permanently shadow the
+        // dynamic one (and ShortcutManager ignores updates for it).
+        val ids = parseShortcuts().mapNotNull { it.id }
+
+        assertTrue(
+            "static shortcuts must not use the dynamic id",
+            ShortcutIntents.DYNAMIC_ID_NOW_PLAYING !in ids,
+        )
+    }
+
+    @Test
     fun `short and long labels resolve to non-blank strings`() {
         for (shortcut in parseShortcuts()) {
             assertTrue("icon missing for ${shortcut.id}", shortcut.iconRes != 0)
