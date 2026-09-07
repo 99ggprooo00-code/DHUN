@@ -51,7 +51,20 @@ reproduced stack trace. It was posted as a review comment on PR #35 and recorded
 blocker in `INTEGRATION.md`; the fix was routed to agent 1, which owns
 `app-android/**`.
 
-**Gate applied:** #35 held until `705a946` re-greens on all three checks.
+**Gate applied and outcome:** #35 was held while red. The regression test took three
+commits to compile — `705a946` (test added; `koin-test` missing from the
+`:shared:jvmTest` classpath → run `34083073966` **failure**), `4fd9636` (added
+`koin-test`; **a wrong turn** — `KoinTest` still did not resolve, errors unchanged →
+run `34083348460` **failure** at `:shared:compileTestKotlinJvm`), `fb32711` (dropped
+`koin-test`, read Koin through `GlobalContext.get()` directly → **green**,
+`build-and-test` pass in 5m19s, run `34083713576`). **The production fix compiled
+throughout** — every annotation in both red runs was inside the test file, never
+`AppModule.kt`. Merged via PR #35 as squash `40eff1d`; main `481b77b` fully green.
+
+**Lesson worth keeping:** two consecutive red runs on a branch whose *production* code
+was correct. Reading the failing **Gradle task** (`:shared:compileTestKotlinJvm`) and
+the annotation **file paths** — rather than the PR's overall red/green — is what kept
+the C1 fix from being reverted along with its broken test.
 
 **Second finding from the same pass — C2, inert UI.** `DhunAppShell` accepted
 `downloadManager` and forwarded it to `LibraryViewModel` (line 139) and the overflow

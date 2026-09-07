@@ -16,10 +16,14 @@ hardware gate.**
   and **all three checks were green** on that commit. It fired at app launch
   (`MainActivity.kt:197` resolves `DownloadManager` during composition), not on first
   download. Fixed in `ef69f82` as `delegate = get<FileDownloadManager>()`.
-  **Residual:** the new `KoinDownloadStackTest` pins the registration *shape* with
-  fakes in `:shared:jvmTest` — the real `appModule` is still unverified. Any new
-  `app-android` Koin registration that takes another Koin-resolved dependency needs a
-  `checkModules()` call or a `koin.get<…>()` smoke test.
+  **Merged and green:** the fix landed via PR #35 (squash `40eff1d`, main `481b77b`).
+  **Residual:** `KoinDownloadStackTest` pins the registration *shape* with minimal
+  fakes in `:shared:jvmTest` and reads Koin through `GlobalContext.get()` — the real
+  `appModule` is **still unverified**, because exercising it needs `androidContext()`,
+  hence Robolectric plus an `:app-android:testDebugUnitTest` source set. **Standing
+  rule (from agent 1, PR #35):** any new `app-android` Koin registration that takes
+  another Koin-resolved dependency must be covered by a `checkModules()` call or a
+  `koin.get<…>()` smoke test — `:app-android:assembleDebug` will not catch it.
 - **`DownloadManager?` parameters were inserted mid-list in shared composables.**
   Agent 3 added `downloadManager: DownloadManager? = null` as the 7th of 12 parameters
   in `HomeScreen` and 7th of 8 in `SearchScreen`. This compiles and behaves correctly
