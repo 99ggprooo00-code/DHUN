@@ -1,30 +1,48 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-07 (UTC)** · session **`arena/01a079f6-dhun`** · `origin/main` **`f157245`** (PR #33 merged) · shared branch PR #34 is open; verification commits are pushed through `20d8ddf`.
+Updated **2026-09-07 (UTC)** · session **`arena/01a07a07-dhun`** (coordinator) · **`origin/main` = `d1e0408`** (PR #34 merged, CI + apk + msi green) · coordinator PR open on `arena/01a07a07-dhun`.
 
-**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 persistent downloads: foundation, engine, offline-first routing, minimal UI, and deterministic probe tooling are implemented; branch CI compilation is green; runtime and hardware acceptance remain open).**
+**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 offline downloads: six-agent parallel build reconciled; 1 of 4 worker PRs merged; C1 blocker found and fixed, awaiting re-green).**
 
-Boot review confirmed that ADR-006 is merged on `origin/main@f157245`. The previous roadmap snapshot incorrectly described PR #33 as open and still listed offline-first routing as pending; this session reconciles those claims and adds a mechanically runnable local-file probe under `tools/playback-probe`.
+This session is the **coordinator/lead** for the six parallel ADR-006 worker agents. It owns only `INTEGRATION.md`, `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, and `.ai/DEBUG_LOG.md`, and is **read-only** over `app-android/**`, `app-desktop/**`, `shared/**`, `tools/**`, and every `agent-N-status.md`. Full reconciliation detail lives in **`INTEGRATION.md`**.
 
-**ADR-006 state on `origin/main@f157245`:**
-1. **Persistent data layer:** schema v3 `DownloadedTrack` + migration, repository and `DataLayer.downloads` wiring.
-2. **Download engine:** resumable Range download, atomic `.part` promotion, bounded worker pool, artwork handling, and lifecycle states.
-3. **Offline-first playback routing:** `OfflineFirstStreamResolver` returns a completed local download as `file://`; Android `PlaybackGraph` routes that scheme to `FileDataSource`; Desktop vlcj receives a local-path MRL and skips network cache-fill.
-4. **Minimal UI and platform wiring:** Downloads library tab, download action, manager/storage DI wiring on Android and Desktop.
+**Stability verdict: NOT STABLE — three of four worker PRs are unmerged, and PR #35's re-green after the C1 fix is still running.**
 
-**This session's verification tooling:** `tools/playback-probe:offlineProbe` now persists a completed row in the real JVM SQLDelight repository, asserts a `file://` result, opens a valid WAV fixture, and fails if the network resolver is called. It is pushed in PR #34; branch CI proves compilation, while the existing workflow does not execute the runtime task.
+**Merge-sequence log (one session = one branch = one PR = one merge; each session merges only its own PR):**
 
-**GitHub evidence:** main commit `f15724547aec` is the merged PR #33 tip. This branch is pushed through `20d8ddf`; PR CI run **34081374800** succeeded, including **Probe compiles**, and test-release run **34080947708** built the APK/MSI jobs successfully (publishing is skipped for PRs). The offline probe runtime itself was not executed by the existing CI workflow.
+| Step | PR | Agent(s) | State | Evidence |
+|---|---|---|---|---|
+| 1 | **#34** | 4 (desktop) + 5 (verify/docs) | **MERGED** `2026-09-07T04:18:28Z` → main **`d1e0408`** | CI `34082610125` success; test-release `34082610094` success (`msi`/`apk`/`publish` all success). Rolling `test` pre-release replaced `04:26:24Z` (APK 17,581,785 B / MSI 112,287,744 B + `.sha256`) |
+| 2 | #36 | 2 (Library downloads) + 3 (track download UI) | **OPEN**, held for its own session | head `c94b87d`: `apk` pass, `build-and-test` + `msi` pending |
+| 3 | #37 | 6 (player UX) | **OPEN**, held for its own session | head `96e5e32`: CI `34082466491`, apk + msi `34082466496` — **all green** |
+| 4 | #35 | 1 (Android download FGS) | **OPEN, BLOCKED → fixed, awaiting re-green** | head `705a946`: CI `34083073966` / test-release `34083073890` **in progress** |
 
-**Hardware gate remains OPEN:** the local probe checks shared/JVM repository-to-file loading only. Android Media3 `FileDataSource`, Desktop vlcj decoding, actual offline operation with connectivity disabled, and audible playback still require real Android device and Desktop/PC verification. No CI result can close that gate.
+> Step 1 was executed by the coordinator itself, under the previous explicit approval
+> of the #34 bundle, before the one-session-one-PR constraint was issued. Disclosed in
+> `INTEGRATION.md` §3 rather than hidden. **No other merge was made by the
+> coordinator**; #35, #36, #37 were left OPEN.
 
-**Agent-status review:** `agent-4-status.md` is present on the shared session branch and was reviewed. Agent 4 reports the Desktop startup-window audit and `b4a83c3` fix; local Desktop compilation and Windows runtime verification remain open. Its Desktop work is outside this session's ownership and is left unchanged. No `agent-1`, `agent-2`, `agent-3`, or `agent-6` status files are present. This session records its own status in `agent-5-status.md`.
+**Cross-cutting findings (all semantic — `git merge-tree` found zero textual conflicts in every order, including a full sequential four-way merge):**
 
-**Last error:** local Gradle execution could not start because this sandbox has no `JAVA_HOME` or `java`; the restore script could not download the toolchain due blocked TLS egress. GitHub CI remains the compile/test authority.
+- **C1 — BLOCKER, agent 1, FIXED awaiting re-green.** `app-android/.../di/AppModule.kt` registered `single<DownloadManager> { ForegroundServiceDownloadManager(delegate = get(), …) }`. Because `delegate` is typed `DownloadManager`, the unqualified `get()` inferred `get<DownloadManager>()` — the singleton being constructed. Koin 4.0.2 caches singletons *after* construction, so it recursed. Trigger: `MainActivity.kt:197` `downloadManager = koin.get()` during activity composition — **at app launch, before any download**. `:app-android:assembleDebug` is a type-check gate and `:app-android` has no test source set, so **all three checks were green at `a4dc28d`**. Fixed by agent 1 in `ef69f82` → `delegate = get<FileDownloadManager>()`; regression test `KoinDownloadStackTest.kt` in `705a946`. **Recorded limitation:** that test mirrors the registration *shape* with fakes in `:shared:jvmTest`; the real Android `appModule` is still not automatically verified.
+- **C2 — inert download badges, agent 3, FIXED on branch.** `DhunAppShell` already took `downloadManager: DownloadManager? = null` (line 122) and passed it to `LibraryViewModel` (139) and the overflow `onDownload` (364), but not to `HomeScreen`/`SearchScreen`, so agent 3's badges rendered nothing. Fixed by agent 3 in `e987f64` — both callsites now forward `downloadManager = downloadManager`. Residual hazard recorded: the parameter was inserted **mid-list** (7th of 12 / 7th of 8), safe only because both callsites use named arguments.
+- **C3 — shared `.ai` ownership.** Agent 5 edited the three docs the coordinator owns. Resolved by supersession: #34 merged, this consolidation sits on top. Agent 5's commits are **not** stripped or rewritten.
 
-**Current exact files:** `tools/playback-probe/build.gradle.kts`, `tools/playback-probe/src/main/kotlin/dev/dhun/tools/playbackprobe/OfflineMain.kt`, `tools/playback-probe/src/main/resources/fixtures/offline-track.wav`, `tools/playback-probe/README.md`, `agent-5-status.md`, `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`.
+**Contracts verified clean:** `DownloadManager` interface unchanged on every branch (`observeProgress` already existed on main) · `LibraryViewModel` constructor **byte-identical** (agent 2 added no required param) · `FullPlayer`/`MiniPlayer` signatures **identical** on `96e5e32` despite internal rework · `DhunIcon` gains only agent 3's `Pending`, agent 6 uses `MoreVert`/`Play` · `DownloadRepository`, `DownloadedTrack`, `TrackOverflowDialog`, `StreamResolver` — zero diffs. **No duplicate `DownloadManager` implementation:** agent 1 decorates the shared engine, agents 2/3 consume it.
 
-**Exact next technical step:** run the new `:tools:playback-probe:offlineProbe` task in a JDK-equipped checkout (or add an explicit CI execution step) to obtain runtime PASS evidence; retain Android/PC hardware playback as OPEN because the existing CI workflow only compiles the probe.
+**Branch-map correction:** five of the six requested `agent/*` branch names were never created — each worker is pinned to its Arena session branch. **Agents 2 and 3 share `arena/01a079f5-dhun`; agents 4 and 5 share `arena/01a079f6-dhun`** (two bundles, so neither PR can be gated per-agent). Agent 2, initially reported missing, pushed its Library Downloads + storage-management work onto agent 3's branch (`1c72af1`, `fcd4e7a`, `9c7bc80`, `e33190f`) — **the work previously recorded as never-done now exists; check before relaunching agent 2.**
+
+**Excluded:** PR #31 (`arena/01a0759b-dhun`) — GitHub reports `mergeable=CONFLICTING`, `mergeState=DIRTY`. Issue **#14** `[rot-drill] Live extraction probe failed` remains **OPEN** (GitHub-runner IP gating, known environment limitation, not a user-impact defect).
+
+**HARDWARE GATES STILL OPEN — green CI is a compile/unit-test gate only, and does NOT mean downloaded tracks play offline.** Offline playback of a downloaded track (Android Media3 `FileDataSource` route; Desktop vlcj local-path load) · audible audio (streaming and offline) · live Home pagination · player visual acceptance (glyph placement, shuffle, colour styling) · tray/SMTC and agent 4's one-native-window startup claim · install-over upgrade · clean-target hygiene · 30-minute soaks including the OEM battery-saver soak agent 1's FGS exists to pass · a green **live** rot-drill verdict. Agent 5's `offlineProbe` is deterministic shared/JVM repository-to-file verification; CI compiles it but **does not execute** the runtime task, so not even `offline-verdict|PASS` is established. All of the above need a real device, PC, libVLC runtime, or display.
+
+**Last error:** none on CI. main at `d1e0408` is fully green. The coordinator could not run Gradle locally (no JDK/Android SDK in the sandbox) — CI is the sole compile/test authority, and the C1 diagnosis was **static analysis**, never a reproduced stack trace.
+
+**Current exact files (coordinator-owned only):** `INTEGRATION.md` (new), `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`.
+
+**Exact next technical step:** (1) agent 1 confirms #35 CI green on `705a946`, then **agent 1 merges #35**; (2) the agent-2/3 session merges #36 once `build-and-test` + `msi` return green on `c94b87d`; (3) agent 6 merges #37 (already green); (4) after each merge the coordinator re-checks `gh pr checks` / `gh run list` on `origin/main` and confirms `build-and-test`, `apk`, `msi` are green before advancing — **never batched, never two shared-contract branches in one go**; (5) the coordinator then rebases this consolidation on the new main and re-issues the stability verdict. Only then is "ALL STABLE" claimable, and even then the hardware gates above stay open.
+
+**Superseded:** the previous CURRENT ACTIVE TASK (session `arena/01a079f6-dhun`, agent 5, base `f157245`, PR #34 described as open) is superseded by this coordinator consolidation. Its commits are intact in main's history at `d1e0408`; nothing was stripped. Its verification-tooling findings are carried forward in the hardware-gate paragraph above and in `.ai/DEBUG_LOG.md`.
 
 ---
 

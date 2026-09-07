@@ -1,5 +1,66 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-07 — C1: Koin self-recursion in the Android `DownloadManager` decorator (coordinator `arena/01a07a07-dhun`)
+
+**Symptom (predicted, never observed on hardware):** Android app would crash at
+launch with a `StackOverflowError` out of Koin internals, before any user interaction
+— while `build-and-test`, `apk`, and `msi` all reported **green** on the same commit
+(`a4dc28d`, PR #35).
+
+**Root cause.** `app-android/src/main/kotlin/dev/dhun/android/di/AppModule.kt`:
+
+```kotlin
+single<DownloadManager> {
+    ForegroundServiceDownloadManager(
+        context = androidContext(),
+        delegate = get(),        // <-- inferred as get<DownloadManager>()
+        controller = get(),
+    )
+}
+```
+
+`ForegroundServiceDownloadManager` declares `private val delegate: DownloadManager`, so
+the unqualified `get()` type-infers to `get<DownloadManager>()` — **the very definition
+being constructed**. Koin 4.0.2 (`app-android/build.gradle.kts:84`) stores a singleton
+*after* its factory returns, so nothing memoises the in-progress instance and the
+resolution recurses.
+
+**Why it fires at launch, not on first download.** `MainActivity.kt:197` passes
+`downloadManager = koin.get()` into `DhunAppShell`, whose parameter is
+`downloadManager: DownloadManager? = null` (`DhunAppShell.kt:122`). That resolution
+happens during activity composition.
+
+**Why CI could not catch it.** `:app-android:assembleDebug` is a type-check gate, and
+`:app-android` has **no test source set**, so no smoke test existed. A DI cycle is a
+runtime property of the object graph, invisible to a compiler.
+
+**Fix (agent 1, `ef69f82`):** `delegate = get<FileDownloadManager>()` — explicit type,
+breaking the cycle and pointing at the concrete singleton registered immediately above.
+Regression test `shared/src/jvmTest/kotlin/dev/dhun/di/KoinDownloadStackTest.kt`
+(`705a946`).
+
+**Boundary on that test:** it lives in `:shared:jvmTest` and mirrors the production
+registration *shape* using minimal fakes, because `:app-android` has no test source
+set. It pins the pattern so the unqualified-`get()` form cannot quietly return; it
+does **not** verify the real `appModule`. A `checkModules()` call or an `:app-android`
+smoke test remains open.
+
+**Coordinator honesty note:** this diagnosis was **static analysis**. The coordinator
+has no JDK/Gradle in its sandbox and works from git + gh only, so it never produced a
+reproduced stack trace. It was posted as a review comment on PR #35 and recorded as a
+blocker in `INTEGRATION.md`; the fix was routed to agent 1, which owns
+`app-android/**`.
+
+**Gate applied:** #35 held until `705a946` re-greens on all three checks.
+
+**Second finding from the same pass — C2, inert UI.** `DhunAppShell` accepted
+`downloadManager` and forwarded it to `LibraryViewModel` (line 139) and the overflow
+`onDownload` (line 364) but **not** to `HomeScreen` (line 535) or `SearchScreen`
+(line 549). Agent 3's new badges therefore compiled and rendered nothing. Fixed by
+agent 3 in `e987f64`; the coordinator's exemption to write the pass-through was not
+exercised. Related hazard: the parameter was inserted mid-list (7th of 12 / 7th of 8),
+which is safe only because both callsites use named arguments.
+
 ## 2026-09-07 — ADR-006 offline playback probe added (session `arena/01a079f6-dhun`)
 
 **Change:** Added `tools/playback-probe:offlineProbe` and a valid WAV fixture.

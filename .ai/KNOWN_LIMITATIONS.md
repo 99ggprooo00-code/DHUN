@@ -2,6 +2,42 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-07 — Coordinator reconciliation: integration limits found while merging six ADR-006 agents
+
+Recorded by the coordinator session `arena/01a07a07-dhun`. Full detail in
+`INTEGRATION.md`. **CI green is a compile/unit-test gate only — none of this closes a
+hardware gate.**
+
+- **The Android Koin graph has no automated verification (C1).** `app-android` has
+  **no test source set**, so `:app-android:assembleDebug` is a *type-check* gate and
+  cannot see a dependency-resolution cycle. This already produced a real defect:
+  `single<DownloadManager> { ForegroundServiceDownloadManager(delegate = get(), …) }`
+  recursed because the unqualified `get()` inferred the interface being constructed,
+  and **all three checks were green** on that commit. It fired at app launch
+  (`MainActivity.kt:197` resolves `DownloadManager` during composition), not on first
+  download. Fixed in `ef69f82` as `delegate = get<FileDownloadManager>()`.
+  **Residual:** the new `KoinDownloadStackTest` pins the registration *shape* with
+  fakes in `:shared:jvmTest` — the real `appModule` is still unverified. Any new
+  `app-android` Koin registration that takes another Koin-resolved dependency needs a
+  `checkModules()` call or a `koin.get<…>()` smoke test.
+- **`DownloadManager?` parameters were inserted mid-list in shared composables.**
+  Agent 3 added `downloadManager: DownloadManager? = null` as the 7th of 12 parameters
+  in `HomeScreen` and 7th of 8 in `SearchScreen`. This compiles and behaves correctly
+  **only** because every `DhunAppShell` callsite uses named arguments. A future
+  positional caller would silently misbind. Append new optional parameters at the end.
+- **Two worker sessions share one branch, so their PRs cannot be gated separately.**
+  PR #34 bundles agent 4 (desktop) + agent 5 (verify/docs); PR #36 bundles agent 2
+  (Library) + agent 3 (download UI). Merging either lands both agents at once — a
+  standing violation of the single-session-branch rule.
+- **Agent status files are not reliably in the tree.** Agent 1 added
+  `agent-1-status.md` to `.gitignore`, so its status exists only in the PR #35 body.
+  Reconciling by reading status files alone would have missed agent 1 entirely.
+- **The real Android Koin `appModule` and the offline-probe runtime task are both
+  unexercised by CI.** `ci.yml` compiles `tools/playback-probe` but never runs
+  `:tools:playback-probe:offlineProbe`, so `offline-verdict|PASS` is not established
+  even though the probe compiles.
+
+
 ## Latest Windows result / merged repair — 2026-09-06
 
 The user's negative report (install-over fails “Another version…”, audio
