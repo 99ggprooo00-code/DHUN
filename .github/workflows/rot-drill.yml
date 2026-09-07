@@ -33,19 +33,27 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install live extraction tool
+      - name: Record environment and install extractors
         run: |
-          python -m pip install --upgrade pip yt-dlp
-          # Record the engine version INTO the artifact log (run 33961533965's
-          # artifact started at Gradle, so it could not prove the yt-dlp version).
-          yt-dlp --version | tee rot-drill.log
+          {
+            echo "=== ROT-DRILL ENVIRONMENT ==="
+            echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "Runner: $(uname -s) $(uname -r) $(uname -m)"
+            echo "Java: $(java -version 2>&1 | head -n 1)"
+            echo "Python: $(python3 --version 2>&1)"
+          } 2>&1 | tee rot-drill.log
+          python -m pip install --upgrade pip yt-dlp 2>&1 | tee -a rot-drill.log
+          echo "Installed yt-dlp: $(yt-dlp --version 2>&1 || echo 'failed')" | tee -a rot-drill.log
 
-      - name: Run live search, resolve, stream, and related probe
+      - name: Run playback probes (offline + live)
         id: probe
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
+          echo "=== 1. DETERMINISTIC OFFLINE PROBE (ADR-006) ===" | tee -a rot-drill.log
+          ./gradlew :tools:playback-probe:offlineProbe --no-daemon --console=plain 2>&1 | tee -a rot-drill.log
+          echo "=== 2. LIVE EXTRACTION AND STREAM PROBE ===" | tee -a rot-drill.log
           ./gradlew :tools:playback-probe:run --no-daemon --console=plain 2>&1 | tee -a rot-drill.log
 
       - name: Upload probe log
@@ -64,28 +72,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # NOTE: no backticks anywhere in this body — inside a double-quoted
-          # bash string they execute as command substitution and swallow the
-          # text (run 33961533965's issue #14 lost the artifact name this way).
           artifact="rot-drill-${GITHUB_RUN_ID}"
           run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          issue_body="rot-drill failed on ${GITHUB_SHA}
 
-          Run: ${run_url}
-          Trigger: ${GITHUB_EVENT_NAME}
+          cat <<EOF > issue_body.md
+rot-drill failed on ${GITHUB_SHA}
 
-          The attached ${artifact} artifact contains the full engine-version + Gradle/probe log.
+Run: ${run_url}
+Trigger: ${GITHUB_EVENT_NAME}
 
-          Last probe output:
+The attached \`${artifact}\` artifact contains the full engine-version + Gradle/probe log.
 
-          $(tail -c 12000 rot-drill.log)"
+### Last probe output:
+\`\`\`
+EOF
+
+          tail -c 12000 rot-drill.log >> issue_body.md
+
+          cat <<EOF >> issue_body.md
+\`\`\`
+
+> *Note: If errors indicate bot-gating / IP challenge (\`LOGIN_REQUIRED\` / \`Sign in to confirm you’re not a bot\`), GitHub runner datacenter IPs may be gated by YouTube while residential IPs remain unaffected. Verify residential playback independently.*
+EOF
+
           open_issue=$(gh issue list --state open --limit 1 --search 'rot-drill in:title' --json number --jq '.[0].number // empty')
           if [ -n "$open_issue" ]; then
-            gh issue comment "$open_issue" --body "$issue_body"
+            gh issue comment "$open_issue" -F issue_body.md
           else
             gh issue create \
               --title "[rot-drill] Live extraction probe failed" \
-              --body "$issue_body"
+              -F issue_body.md
           fi
 
       - name: Close a recovered rot-drill issue
