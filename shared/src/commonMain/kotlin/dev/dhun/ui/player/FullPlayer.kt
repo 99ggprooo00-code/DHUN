@@ -1,27 +1,21 @@
 package dev.dhun.ui.player
 
-import dev.dhun.design.DhunTypographyTokens
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,26 +27,26 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,17 +58,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
-import androidx.compose.runtime.LaunchedEffect
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.BlurredArtworkCache
@@ -84,12 +77,12 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
-import dev.dhun.design.fittedPlayerArtworkSize
+import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
+import dev.dhun.design.fittedPlayerArtworkSize
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.player.SkipDirection
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * FullPlayer — the Phase 08 showstopper + ADR-002 polish.
@@ -132,6 +125,7 @@ fun FullPlayer(
     val shuffleEnabled by viewModel.shuffleEnabled.collectAsState()
     val volume by viewModel.volume.collectAsState()
     val skipDirection by viewModel.skipDirection.collectAsState()
+    val queueIndex by viewModel.currentQueueIndex.collectAsState()
 
     val current = track
     val isFavorite = current?.id?.let { it in favoriteIds } ?: false
@@ -161,7 +155,7 @@ fun FullPlayer(
         label = "accent",
     )
 
-    var selectedTab by remember { mutableIntStateOf(1) } // Queue by default
+    var selectedTab by rememberSaveable { mutableIntStateOf(1) } // Queue by default
     // ADR-002 P6: Lyrics tab = lyrics-dominant layout (artwork recedes).
     val lyricsDominant = selectedTab == 0
 
@@ -352,8 +346,9 @@ fun FullPlayer(
                 }
             }
 
-            // Phase 14: mid-stream 403 recovery — Material 3 surface chip (sharp text).
-            if (state is PlaybackState.Recovering) {
+            // Source-neutral resolving/buffering/recovery status, with sharp text.
+            val busyLabel = playbackBusyLabel(state)
+            if (busyLabel != null) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -371,7 +366,7 @@ fun FullPlayer(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Reconnecting…",
+                        text = busyLabel,
                         style = MaterialTheme.typography.labelMedium,
                         color = accent,
                     )
@@ -449,164 +444,168 @@ fun FullPlayer(
 
             Spacer(modifier = Modifier.height(DhunSpacing.sm))
 
-            // Seek bar + time labels
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = DhunSpacing.xxl),
-            ) {
-                // A skip must cancel an in-flight scrub, even when both tracks
-                // happen to have the same duration.
-                key(current?.id) {
-                    DhunSeekBar(
-                        positionMs = positionMs,
-                        durationMs = durationMs,
-                        accent = accent,
-                        onSeek = viewModel::seekTo,
-                    )
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.xs))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = formatMs(positionMs, durationMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DhunColors.textTertiary,
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        text = if (durationMs > 0) formatMs(durationMs, durationMs) else "--:--",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DhunColors.textTertiary,
-                    )
-                }
+            // Cancel scrubbing on a new queue occurrence, even for equal-duration tracks.
+            key(current?.id, queueIndex) {
+                PlayerTimeline(
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    accent = accent,
+                    onSeek = { target ->
+                        if (viewModel.currentTrack.value?.id == current?.id &&
+                            viewModel.currentQueueIndex.value == queueIndex
+                        ) viewModel.seekTo(target)
+                    },
+                    enabled = current != null && state !is PlaybackState.Resolving && playbackError == null,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.xxl),
+                )
             }
 
-            // Transport row — compact height with edges aligned to the
-            // title/seek column (xxl), so the seek bar, times and controls
-            // read as one balanced group instead of three loose bands.
+            // Keep the same six controls in order. Adapt padding/play size
+            // before allowing horizontal scrolling at exceptionally narrow widths;
+            // never squeeze a secondary action below its 48dp target.
             Spacer(modifier = Modifier.height(DhunSpacing.xs))
-            Row(
+            BoxWithConstraints(
                 modifier = Modifier
                     .widthIn(max = DhunSpacing.playerTransportMaxWidth)
                     .fillMaxWidth()
                     .align(Alignment.CenterHorizontally)
-                    .height(DhunSpacing.playerTransportHeight)
-                    .padding(horizontal = DhunSpacing.xxl),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .height(DhunSpacing.playerTransportHeight),
             ) {
-                // Like / favorite — sits beside (before) shuffle in the same
-                // transport cluster, so an inline change doesn't disturb the
-                // art/seek/tabs vertical layout.
-                DhunIconButton(
-                    onClick = { current?.let(onToggleFavorite) },
-                    modifier = Modifier
-                        .size(DhunSpacing.touchTarget)
-                        .clip(DhunShapes.full)
-                        .background(if (isFavorite) accent.copy(alpha = 0.22f) else Color.Transparent),
-                    enabled = current != null,
-                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                val metrics = playerTransportMetrics(maxWidth)
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .horizontalScroll(rememberScrollState(), enabled = metrics.minimumWidth > maxWidth)
+                        .width(maxOf(maxWidth, metrics.minimumWidth))
+                        .fillMaxHeight()
+                        .padding(horizontal = metrics.horizontalPadding),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    DhunIconView(
-                        icon = if (isFavorite) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
-                        contentDescription = null,
-                        modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = if (isFavorite) accent else DhunColors.textPrimary,
-                    )
-                }
-
-                // Shuffle
-                DhunIconButton(
-                    onClick = { viewModel.toggleShuffle() },
-                    modifier = Modifier
-                        .size(DhunSpacing.touchTarget)
-                        .semantics { selected = shuffleEnabled }
-                        .clip(DhunShapes.full)
-                        .background(if (shuffleEnabled) accent.copy(alpha = 0.22f) else Color.Transparent),
-                    contentDescription = if (shuffleEnabled) "Disable shuffle" else "Enable shuffle",
-                ) {
-                    DhunIconView(
-                        icon = DhunIcon.Shuffle,
-                        contentDescription = null,
-                        modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = if (shuffleEnabled) accent else DhunColors.textPrimary,
-                    )
-                }
-
-                HoldTapTransportButton(
-                    forward = false,
-                    icon = DhunIcon.SkipPrevious,
-                    contentDescription = "Previous track",
-                    onTap = { viewModel.previous() },
-                    onHold = { viewModel.beginHoldSeek(forward = false) },
-                    onRelease = { viewModel.endHoldSeek() },
-                )
-
-                // Play / pause — animated morph inside the accent disc
-                val glowAlpha by animateFloatAsState(
-                    targetValue = if (isPlaying) 0.35f else 0f,
-                    animationSpec = DhunAnimations.mediumTween(),
-                    label = "playGlow",
-                )
-                Box(
-                    modifier = Modifier
-                        .size(DhunSpacing.miniPlayerHeight)
-                        .shadow(DhunSpacing.lg, DhunShapes.full, clip = false)
-                        .clip(DhunShapes.full)
-                        .background(accent)
-                        .clickable { viewModel.togglePlay() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (glowAlpha > 0f) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer { alpha = glowAlpha }
-                                .background(Color.White),
-                        )
-                    }
-                    Crossfade(
-                        targetState = isPlaying,
-                        animationSpec = DhunAnimations.mediumTween(),
-                        label = "playPauseMorph",
-                    ) { playing ->
+                    // Like / favorite — sits beside (before) shuffle in the same
+                    // transport cluster, so an inline change doesn't disturb the
+                    // art/seek/tabs vertical layout.
+                    DhunIconButton(
+                        onClick = { current?.let(onToggleFavorite) },
+                        modifier = Modifier
+                            .size(DhunSpacing.touchTarget)
+                            .clip(DhunShapes.full)
+                            .background(if (isFavorite) accent.copy(alpha = 0.22f) else Color.Transparent),
+                        enabled = current != null,
+                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                    ) {
                         DhunIconView(
-                            icon = if (playing) DhunIcon.Pause else DhunIcon.Play,
-                            contentDescription = if (playing) "Pause" else "Play",
-                            modifier = Modifier.size(DhunSpacing.iconSizeLg),
-                            tint = DhunColors.onAccent,
+                            icon = if (isFavorite) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSize),
+                            tint = if (isFavorite) accent else DhunColors.textPrimary,
                         )
                     }
-                }
 
-                HoldTapTransportButton(
-                    forward = true,
-                    icon = DhunIcon.SkipNext,
-                    contentDescription = "Next track",
-                    onTap = { viewModel.next() },
-                    onHold = { viewModel.beginHoldSeek(forward = true) },
-                    onRelease = { viewModel.endHoldSeek() },
-                )
+                    // Shuffle
+                    DhunIconButton(
+                        onClick = { viewModel.toggleShuffle() },
+                        modifier = Modifier
+                            .size(DhunSpacing.touchTarget)
+                            .semantics { selected = shuffleEnabled }
+                            .clip(DhunShapes.full)
+                            .background(if (shuffleEnabled) accent.copy(alpha = 0.22f) else Color.Transparent),
+                        contentDescription = if (shuffleEnabled) "Disable shuffle" else "Enable shuffle",
+                    ) {
+                        DhunIconView(
+                            icon = DhunIcon.Shuffle,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSize),
+                            tint = if (shuffleEnabled) accent else DhunColors.textPrimary,
+                        )
+                    }
 
-                // Repeat cycle: OFF → ALL → ONE
-                DhunIconButton(
-                    onClick = { viewModel.cycleRepeatMode() },
-                    modifier = Modifier.size(DhunSpacing.touchTarget)
-                        .semantics { selected = repeatMode != RepeatMode.OFF }
-                        .clip(DhunShapes.full)
-                        .background(if (repeatMode != RepeatMode.OFF) accent.copy(alpha = 0.22f) else Color.Transparent),
-                    contentDescription = when (repeatMode) {
-                        RepeatMode.OFF -> "Repeat off"
-                        RepeatMode.ALL -> "Repeat all"
-                        RepeatMode.ONE -> "Repeat one"
-                    },
-                ) {
-                    DhunIconView(
-                        icon = if (repeatMode == RepeatMode.ONE) DhunIcon.RepeatOne else DhunIcon.Repeat,
-                        contentDescription = null,
-                        modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = if (repeatMode != RepeatMode.OFF) accent else DhunColors.textPrimary,
+                    key(current?.id, queueIndex, false) {
+                        HoldTapTransportButton(
+                            enabled = current != null,
+                            forward = false,
+                            icon = DhunIcon.SkipPrevious,
+                            contentDescription = "Previous track",
+                            onTap = { viewModel.previous() },
+                            onHold = { viewModel.beginHoldSeek(forward = false) },
+                            onRelease = { viewModel.endHoldSeek() },
+                        )
+                    }
+
+                    // Play / pause — animated morph inside the accent disc
+                    val glowAlpha by animateFloatAsState(
+                        targetValue = if (isPlaying) 0.35f else 0f,
+                        animationSpec = DhunAnimations.mediumTween(),
+                        label = "playGlow",
                     )
+                    Box(
+                        modifier = Modifier
+                            .size(metrics.playSize)
+                            .shadow(DhunSpacing.lg, DhunShapes.full, clip = false)
+                            .clip(DhunShapes.full)
+                            .background(accent)
+                            .semantics { contentDescription = playbackActionLabel(state) }
+                            .clickable(
+                                enabled = current != null,
+                                role = Role.Button,
+                                onClickLabel = playbackActionLabel(state),
+                                onClick = viewModel::togglePlay,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (glowAlpha > 0f) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { alpha = glowAlpha }
+                                    .background(Color.White),
+                            )
+                        }
+                        Crossfade(
+                            targetState = playbackActionIcon(state),
+                            animationSpec = DhunAnimations.mediumTween(),
+                            label = "playPauseMorph",
+                        ) { icon ->
+                            DhunIconView(
+                                icon = icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(DhunSpacing.iconSizeLg),
+                                tint = DhunColors.onAccent,
+                            )
+                        }
+                    }
+
+                    key(current?.id, queueIndex, true) {
+                        HoldTapTransportButton(
+                            enabled = current != null,
+                            forward = true,
+                            icon = DhunIcon.SkipNext,
+                            contentDescription = "Next track",
+                            onTap = { viewModel.next() },
+                            onHold = { viewModel.beginHoldSeek(forward = true) },
+                            onRelease = { viewModel.endHoldSeek() },
+                        )
+                    }
+
+                    // Repeat cycle: OFF → ALL → ONE
+                    DhunIconButton(
+                        onClick = { viewModel.cycleRepeatMode() },
+                        modifier = Modifier.size(DhunSpacing.touchTarget)
+                            .semantics { selected = repeatMode != RepeatMode.OFF }
+                            .clip(DhunShapes.full)
+                            .background(if (repeatMode != RepeatMode.OFF) accent.copy(alpha = 0.22f) else Color.Transparent),
+                        contentDescription = when (repeatMode) {
+                            RepeatMode.OFF -> "Repeat off"
+                            RepeatMode.ALL -> "Repeat all"
+                            RepeatMode.ONE -> "Repeat one"
+                        },
+                    ) {
+                        DhunIconView(
+                            icon = if (repeatMode == RepeatMode.ONE) DhunIcon.RepeatOne else DhunIcon.Repeat,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSize),
+                            tint = if (repeatMode != RepeatMode.OFF) accent else DhunColors.textPrimary,
+                        )
+                    }
                 }
             }
 
@@ -622,7 +621,7 @@ fun FullPlayer(
                 ) {
                     DhunIconView(
                         icon = DhunIcon.VolumeUp,
-                        contentDescription = "Volume",
+                        contentDescription = null,
                         modifier = Modifier.size(DhunSpacing.iconSizeSm),
                         tint = DhunColors.textSecondary,
                     )
@@ -632,7 +631,7 @@ fun FullPlayer(
                     Slider(
                         value = volume,
                         onValueChange = viewModel::setVolume,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).semantics { contentDescription = "Volume" },
                         colors = SliderDefaults.colors(
                             thumbColor = accent,
                             activeTrackColor = accent.copy(alpha = 0.85f),
@@ -686,175 +685,5 @@ fun FullPlayer(
                 )
             }
         }
-    }
-}
-
-/* ---------------- seek bar ------------------------------------------------ */
-
-/**
- * Custom seek bar with generous 48dp interactive hitbox (Windows & mobile).
- * Resting track 4dp, animates to 8dp while scrubbing with responsive thumb.
- */
-@Composable
-internal fun DhunSeekBar(
-    positionMs: Long,
-    durationMs: Long,
-    accent: Color,
-    onSeek: (Long) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val progress = if (durationMs > 0) {
-        (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-    var dragging by remember(durationMs) { mutableStateOf(false) }
-    var dragFraction by remember(durationMs) { mutableFloatStateOf(0f) }
-    val effective = if (dragging) dragFraction else progress
-    val barHeight by animateDpAsState(
-        targetValue = if (dragging) DhunSpacing.progressHeightActive else DhunSpacing.progressHeight,
-        animationSpec = DhunAnimations.fastTween(),
-        label = "seekBarHeight",
-    )
-
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(DhunSpacing.touchTarget) // 48dp expanded hitbox for easy mouse & touch seeking
-            .pointerInput(durationMs, onSeek) {
-                detectTapGestures { offset ->
-                    val widthPx = size.width.toFloat()
-                    if (durationMs > 0 && widthPx > 0) {
-                        onSeek(((offset.x / widthPx) * durationMs).toLong().coerceIn(0, durationMs))
-                    }
-                }
-            }
-            .pointerInput(durationMs, onSeek) {
-                detectHorizontalDragGestures(
-                    onDragStart = { offset ->
-                        val widthPx = size.width.toFloat()
-                        if (durationMs > 0 && widthPx > 0) {
-                            dragging = true
-                            dragFraction = (offset.x / widthPx).coerceIn(0f, 1f)
-                        }
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
-                        val widthPx = size.width.toFloat()
-                        if (widthPx > 0) {
-                            dragFraction = (dragFraction + dragAmount / widthPx).coerceIn(0f, 1f)
-                        }
-                    },
-                    onDragEnd = {
-                        if (dragging) onSeek((dragFraction * durationMs).toLong().coerceIn(0, durationMs))
-                        dragging = false
-                    },
-                    onDragCancel = { dragging = false },
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        val widthPx = constraints.maxWidth.toFloat()
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(barHeight)
-                .clip(DhunShapes.full)
-                .background(DhunColors.border),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            // Active Fill
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(effective)
-                    .fillMaxHeight()
-                    .clip(DhunShapes.full)
-                    .background(accent),
-            )
-        }
-        // Responsive Thumb
-        val thumbPx = if (dragging) DhunSpacing.mdPlus else DhunSpacing.sm
-        val thumbXPx = (effective * widthPx).toInt()
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .offset { IntOffset((thumbXPx - with(this) { thumbPx.roundToPx() } / 2).coerceIn(0, (widthPx - with(this) { thumbPx.roundToPx() }).toInt().coerceAtLeast(0)), 0) }
-                .size(thumbPx)
-                .shadow(DhunSpacing.xs, DhunShapes.full, clip = false)
-                .clip(DhunShapes.full)
-                .background(if (dragging) accent else accent.copy(alpha = 0.9f)),
-        )
-    }
-}
-
-/** Prev/next with hold-to-seek: tap = skip, hold ≥350ms = continuous seek. */
-@Composable
-internal fun HoldTapTransportButton(
-    forward: Boolean,
-    icon: DhunIcon,
-    contentDescription: String,
-    onTap: () -> Unit,
-    onHold: () -> Unit,
-    onRelease: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val currentOnTap by rememberUpdatedState(onTap)
-    val currentOnHold by rememberUpdatedState(onHold)
-    val currentOnRelease by rememberUpdatedState(onRelease)
-    var pressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 1.25f else 1f,
-        animationSpec = DhunAnimations.fastTween(),
-        label = "holdScale",
-    )
-    Box(
-        modifier = modifier
-            .size(DhunSpacing.touchTarget)
-            .clip(DhunShapes.full)
-            .pointerInput(forward) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    // Capture a matching callback pair for THIS press; a
-                    // recomposition must not stop a different player's hold.
-                    val press = TransportPress(currentOnTap, currentOnHold, currentOnRelease)
-                    pressed = true
-                    try {
-                        val released = withTimeoutOrNull(HOLD_DELAY_MS) {
-                            waitForUpOrCancellation() != null
-                        }
-                        press.initialWaitFinished(released)
-                        if (press.holding) waitForUpOrCancellation()
-                    } finally {
-                        pressed = false
-                        press.finish()
-                    }
-                }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        DhunIconView(
-            icon = icon,
-            contentDescription = contentDescription,
-            modifier = Modifier
-                .size(DhunSpacing.iconSize)
-                .graphicsLayer { scaleX = scale; scaleY = scale },
-            tint = DhunColors.textPrimary,
-        )
-    }
-}
-
-private const val HOLD_DELAY_MS = 350L
-
-internal fun formatMs(ms: Long, referenceMs: Long): String {
-    if (ms <= 0) return "0:00"
-    val totalSeconds = ms / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (referenceMs / 1000 >= 3600) {
-        "%d:%02d:%02d".format(hours, minutes, seconds)
-    } else {
-        "%d:%02d".format(minutes, seconds)
     }
 }
