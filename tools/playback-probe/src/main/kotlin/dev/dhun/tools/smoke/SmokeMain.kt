@@ -77,7 +77,6 @@ private suspend fun runAll(provider: YouTubeMusicProvider, videoId: String) {
             is Lyrics.Unsynced -> println("SMOKE|lyrics|PASS|unsynced, ${lyrics.text.lines().size} lines; first: ${lyrics.text.lines().first().take(50)}")
             is Lyrics.Synced -> println("SMOKE|lyrics|PASS|synced, ${lyrics.lines.size} lines")
             Lyrics.NotAvailable -> println("SMOKE|lyrics|PASS|not available for this track")
-            else -> println("SMOKE|lyrics|FAIL|unknown variant")
         }
         is DhunResult.Failure -> println("SMOKE|lyrics|FAIL|${r.error}")
     }
