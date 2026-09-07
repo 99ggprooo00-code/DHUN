@@ -69,8 +69,9 @@ class StaticShortcutsXmlTest {
     }
 
     @Test
-    fun `every shortcut icon points at an existing drawable resource`() {
-        for (shortcut in parseShortcuts()) {
+    fun `every shortcut icon points at an existing, distinct drawable resource`() {
+        val shortcuts = parseShortcuts()
+        for (shortcut in shortcuts) {
             assertTrue("icon attribute missing for ${shortcut.id}", shortcut.iconRes != 0)
             assertEquals(
                 "icon for ${shortcut.id} must be a drawable",
@@ -78,6 +79,13 @@ class StaticShortcutsXmlTest {
                 resources.getResourceTypeName(shortcut.iconRes),
             )
         }
+        // Phase 15: each shortcut has its own glyph (search / play / library).
+        // Distinct resource IDs = distinct icons on the long-press surface.
+        assertEquals(
+            "every static shortcut must have a distinct icon",
+            shortcuts.size,
+            shortcuts.map { it.iconRes }.toSet().size,
+        )
     }
 
     @Test
