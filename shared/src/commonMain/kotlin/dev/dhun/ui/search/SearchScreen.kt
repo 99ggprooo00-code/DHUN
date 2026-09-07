@@ -409,7 +409,10 @@ private fun SearchResultsList(
                             track = track,
                             downloadManager = downloadManager,
                             onOverflowClick = { onTrackOverflow(track) },
-                            showBadgeLabel = true,
+                            // Icon-only badge: keeps long titles readable on
+                            // narrow windows; the progress ring still shows
+                            // live percent and state stays announced.
+                            showBadgeLabel = false,
                         )
                     },
                 )
