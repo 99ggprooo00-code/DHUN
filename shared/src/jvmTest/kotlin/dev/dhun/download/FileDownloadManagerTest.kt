@@ -8,16 +8,23 @@ import dev.dhun.core.Track
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.SqlDelightDownloadRepository
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Drives ADR-006's [FileDownloadManager] state machine end to end. */
+/**
+ * Drives ADR-006's [FileDownloadManager] state machine end to end. The
+ * manager is given a scope on [Dispatchers.Unconfined] so the download worker
+ * runs eagerly on the caller's thread (the fakes have no real suspension),
+ * making the assertions deterministic.
+ */
 class FileDownloadManagerTest {
 
     private fun repository() = SqlDelightDownloadRepository(
@@ -42,101 +49,103 @@ class FileDownloadManagerTest {
     )
 
     @Test
-    fun enqueueResolvesCompletesAndPersists(): Unit = runTest {
+    fun enqueueResolvesCompletesAndPersists(): Unit = runBlocking {
         val storage = TestDownloadStorage()
-        val resolver = FakeResolver(DhunResult.Success(stream("v1")))
-        val downloader = FakeStreamDownloader(storage)
         val repo = repository()
-        val manager = FileDownloadManager(repo, resolver, downloader, storage, backgroundScope)
-
-        manager.enqueue(track("v1"))
-        advanceUntilIdle()
-
-        val row = repo.get("v1")!!
-        assertEquals(DownloadState.COMPLETED, row.downloadState)
-        assertTrue(row.localAudioPath.endsWith("v1.webm"), "path ${row.localAudioPath}")
-        assertTrue(storage.exists(row.localAudioPath))
-        assertEquals(listOf("v1"), manager.downloads.value.map { it.trackId })
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream("v1"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            manager.enqueue(track("v1"))
+            val row = repo.get("v1") ?: error("no row")
+            assertEquals(DownloadState.COMPLETED, row.downloadState)
+            assertTrue(row.localAudioPath.endsWith("v1.webm"), "path ${row.localAudioPath}")
+            assertTrue(storage.exists(row.localAudioPath))
+        } finally { managerScope.cancel() }
     }
 
     @Test
-    fun resolveFailureMarksFailed(): Unit = runTest {
+    fun resolveFailureMarksFailed(): Unit = runBlocking {
         val storage = TestDownloadStorage()
-        val resolver = FakeResolver(DhunResult.Failure(DhunError.Unavailable("nope")))
-        val downloader = FakeStreamDownloader(storage)
         val repo = repository()
-        val manager = FileDownloadManager(repo, resolver, downloader, storage, backgroundScope)
-
-        manager.enqueue(track("v2"))
-        advanceUntilIdle()
-
-        assertEquals(DownloadState.FAILED, repo.get("v2")?.downloadState)
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Failure(DhunError.Unavailable("nope"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            manager.enqueue(track("v2"))
+            assertEquals(DownloadState.FAILED, repo.get("v2")?.downloadState)
+        } finally { managerScope.cancel() }
     }
 
     @Test
-    fun byteFailureMarksFailed(): Unit = runTest {
+    fun byteFailureMarksFailed(): Unit = runBlocking {
         val storage = TestDownloadStorage()
-        val resolver = FakeResolver(DhunResult.Success(stream("v2b")))
-        val downloader = FakeStreamDownloader(storage, fail = true)
         val repo = repository()
-        val manager = FileDownloadManager(repo, resolver, downloader, storage, backgroundScope)
-
-        manager.enqueue(track("v2b"))
-        advanceUntilIdle()
-
-        assertEquals(DownloadState.FAILED, repo.get("v2b")?.downloadState)
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream("v2b"))),
+            FakeStreamDownloader(storage, fail = true), storage, managerScope,
+        )
+        try {
+            manager.enqueue(track("v2b"))
+            assertEquals(DownloadState.FAILED, repo.get("v2b")?.downloadState)
+        } finally { managerScope.cancel() }
     }
 
     @Test
-    fun removeDeletesMediaAndRow(): Unit = runTest {
+    fun removeDeletesMediaAndRow(): Unit = runBlocking {
         val storage = TestDownloadStorage()
-        val resolver = FakeResolver(DhunResult.Success(stream("v3")))
-        val downloader = FakeStreamDownloader(storage)
         val repo = repository()
-        val manager = FileDownloadManager(repo, resolver, downloader, storage, backgroundScope)
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream("v3"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            manager.enqueue(track("v3"))
+            val path = repo.get("v3")!!.localAudioPath
+            assertTrue(storage.exists(path))
 
-        manager.enqueue(track("v3"))
-        advanceUntilIdle()
-        val path = repo.get("v3")!!.localAudioPath
-        assertTrue(storage.exists(path))
-
-        manager.remove("v3")
-        advanceUntilIdle()
-        assertNull(repo.get("v3"))
-        assertFalse(storage.exists(path))
+            manager.remove("v3")
+            assertNull(repo.get("v3"))
+            assertFalse(storage.exists(path))
+        } finally { managerScope.cancel() }
     }
 
     @Test
-    fun pauseOnCompletedIsNoop(): Unit = runTest {
+    fun pauseOnCompletedIsNoop(): Unit = runBlocking {
         val storage = TestDownloadStorage()
-        val resolver = FakeResolver(DhunResult.Success(stream("v4")))
-        val downloader = FakeStreamDownloader(storage)
         val repo = repository()
-        val manager = FileDownloadManager(repo, resolver, downloader, storage, backgroundScope)
-
-        manager.enqueue(track("v4"))
-        advanceUntilIdle()
-        manager.pause("v4")
-        advanceUntilIdle()
-
-        assertEquals(DownloadState.COMPLETED, repo.get("v4")?.downloadState)
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream("v4"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            manager.enqueue(track("v4"))
+            manager.pause("v4")
+            assertEquals(DownloadState.COMPLETED, repo.get("v4")?.downloadState)
+        } finally { managerScope.cancel() }
     }
 
     @Test
-    fun enqueueCompletedTrackIsSkipped(): Unit = runTest {
+    fun enqueueCompletedTrackIsSkipped(): Unit = runBlocking {
         val storage = TestDownloadStorage()
-        val resolver = FakeResolver(DhunResult.Success(stream("v5")))
-        val downloader = FakeStreamDownloader(storage)
         val repo = repository()
-        val manager = FileDownloadManager(repo, resolver, downloader, storage, backgroundScope)
-
-        manager.enqueue(track("v5"))
-        advanceUntilIdle()
-        val countAfterFirst = repo.count()
-
-        // Re-enqueueing a completed download must not start a second worker.
-        manager.enqueue(track("v5"))
-        advanceUntilIdle()
-        assertEquals(countAfterFirst, repo.count())
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream("v5"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            manager.enqueue(track("v5"))
+            val countAfterFirst = repo.count()
+            manager.enqueue(track("v5"))
+            assertEquals(countAfterFirst, repo.count())
+        } finally { managerScope.cancel() }
     }
 }

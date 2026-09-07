@@ -7,7 +7,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -21,7 +21,7 @@ class StreamDownloaderTest {
     private fun client(engine: MockEngine): HttpClient = HttpClient(engine)
 
     @Test
-    fun downloadsBytesToStorageAndReportsProgress(): Unit = runTest {
+    fun downloadsBytesToStorageAndReportsProgress(): Unit = runBlocking {
         val storage = TestDownloadStorage()
         val engine = MockEngine { request ->
             assertTrue(request.headers[HttpHeaders.Range].isNullOrEmpty(), "no Range on first fetch")
@@ -49,7 +49,7 @@ class StreamDownloaderTest {
     }
 
     @Test
-    fun resumesFromExistingPartWithRangeHeader(): Unit = runTest {
+    fun resumesFromExistingPartWithRangeHeader(): Unit = runBlocking {
         val storage = TestDownloadStorage()
         val dest = "${storage.root}/audio/x.webm.part"
         val initial = "01234567".encodeToByteArray()
@@ -73,7 +73,7 @@ class StreamDownloaderTest {
     }
 
     @Test
-    fun nonSuccessStatusReturnsNetworkFailure(): Unit = runTest {
+    fun nonSuccessStatusReturnsNetworkFailure(): Unit = runBlocking {
         val storage = TestDownloadStorage()
         val engine = MockEngine { _ ->
             respond(content = ByteArray(0), status = HttpStatusCode.Forbidden)
