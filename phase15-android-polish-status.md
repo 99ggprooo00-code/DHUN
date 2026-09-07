@@ -14,7 +14,7 @@ Updated: 2026-09-07 (UTC) · session `arena/01a07ad8-dhun`, continuing `arena/01
 
 | PR | Scope | Shape | Merge? |
 |---|---|---|---|
-| **#43** — `arena/01a07ad8-dhun` (this session) | **`app-android/**` only** | 9 commits, 18 files, **+1010/−63**, zero `shared/**` | merge when its gates are green on the re-cut head |
+| **#43** — `arena/01a07ad8-dhun` (this session) | **`app-android/**` only** | 9 commits, 18 files, **+1010/−63**, zero `shared/**` | **CI green at `434ad92`** (`build-and-test` `34099826064`, `apk`+`msi` `34099826022`) — merge is this session's last action |
 | **#41** — `arena/01a07a6b-dhun` (its owner's) | ADR-002 player immersion = **candidate 15a**, `shared/ui/player/**` + `design/**` | 4 commits on `cd40c1f`, 11 files, +417/−86 | its owner's call |
 
 They no longer overlap and can merge in either order. They *did* overlap: #43 was built
@@ -82,11 +82,13 @@ not locally") applies to *inherited* claims, not just to your own.
 
 ## Evidence, and its limit
 
-- Green gates were seen on the pre-split heads: `CI #339` at `f2d2359`, and at `00a432c`
-  → `build-and-test` **pass** 7m5s (`34098780631`), `apk` **pass** 5m33s, `msi` **pass**
-  5m48s (`34098780641`). Those prove the Android suite passes *alongside* the player
-  batch; the android-only re-cut re-runs CI, and its verdict is recorded on the PR, not
-  asserted here.
+- **Green on the Android-only head `434ad92`: `build-and-test` pass 4m50s
+  (`34099826064`); `apk` pass 2m22s and `msi` pass 4m19s (`34099826022`); `publish`
+  skipping by design on PRs.** That is the run that matters: it executes
+  `:app-android:testDebugUnitTest` (7 classes, incl. `AppModuleGraphTest` and the
+  repaired `NavStatePersistenceTest`) against current `main`, with no player code
+  involved. The pre-split heads were green too (`CI #339` at `f2d2359`; `00a432c` =
+  `build-and-test` `34098780631`, `apk`/`msi` `34098780641`).
 - **Nothing was compiled locally.** This sandbox has no JDK (`java: command not found`)
   and no Maven/Gradle egress (SSL_ERROR_SYSCALL to `repo1.maven.org`,
   `services.gradle.org`) — CI is the only compiler, as the #42 session recorded too.
@@ -115,7 +117,7 @@ not locally") applies to *inherited* claims, not just to your own.
 
 ## Next technical step
 
-1. Read #43's checks on GitHub. Green → `gh pr merge 43 --merge`.
+1. `gh pr merge 43 --merge` — green at `434ad92`, `MERGEABLE`/`CLEAN`, main unmoved.
 2. #41 is its owner's to merge independently when green.
 3. Then the user's hardware list above. Only after that may the Phase 15 / 15a rows in
    `.ai/ROADMAP.md` leave 🟨 — and `docs/verification/15-*.md` still does not exist,
