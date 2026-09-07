@@ -13,6 +13,7 @@ import dev.dhun.download.DownloadProgress
 import dev.dhun.player.DhunPlayer
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.library.StorageSummary
+import dev.dhun.presentation.library.toTrack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,7 +40,12 @@ import kotlin.test.assertFalse
  */
 class LibraryDownloadsViewModelTest {
 
-    private fun downloaded(id: String, state: DownloadState, bytes: Long) = DownloadedTrack(
+    private fun downloaded(
+        id: String,
+        state: DownloadState,
+        bytes: Long,
+        at: Long = 1_000L,
+    ) = DownloadedTrack(
         trackId = id,
         title = "Song $id",
         artistName = "Artist $id",
@@ -52,7 +58,7 @@ class LibraryDownloadsViewModelTest {
         mimeType = "audio/webm",
         bitrateKbps = 160,
         downloadState = state,
-        downloadedAtEpochMs = 1_000L,
+        downloadedAtEpochMs = at,
     )
 
     /** Recording fake: records calls so we can assert VM delegation. */
@@ -83,6 +89,9 @@ class LibraryDownloadsViewModelTest {
     }
 
     private class NoopPlayer : DhunPlayer {
+        /** (queue track ids, start index, playWhenReady) per prepareQueue call. */
+        val prepared = mutableListOf<Triple<List<String>, Int, Boolean>>()
+
         override val state = MutableStateFlow(PlaybackState.Idle)
         override val currentTrack = MutableStateFlow<Track?>(null)
         override val queue = MutableStateFlow<List<Track>>(emptyList())
@@ -92,7 +101,9 @@ class LibraryDownloadsViewModelTest {
         override val repeatMode = MutableStateFlow(RepeatMode.OFF)
         override val shuffleEnabled = MutableStateFlow(false)
         override val volume = MutableStateFlow(1f)
-        override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {}
+        override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
+            prepared.add(Triple(tracks.map { it.id }, startIndex, playWhenReady))
+        }
         override fun addNext(track: Track) {}
         override fun addToQueue(track: Track) {}
         override fun playAt(index: Int) {}
@@ -215,6 +226,92 @@ class LibraryDownloadsViewModelTest {
             dm.progress.value = mapOf("z" to DownloadProgress("z", bytesDownloaded = 250, totalBytes = 500))
             val p = vm.progressFor("z").first()
             assertEquals(0.5f, p?.fraction)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun downloadsForUiGroupsActiveAboveCompletedNewestFirst(): Unit = runBlocking {
+        val dm = FakeDownloadManager()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val vm = LibraryViewModel(
+                dataLayer = dataLayer(), player = NoopPlayer(), scope = scope,
+                downloadManager = dm,
+            )
+            dm.state.value = listOf(
+                downloaded("a", DownloadState.COMPLETED, 1_000L, at = 1_000L),
+                downloaded("b", DownloadState.COMPLETED, 2_000L, at = 5_000L),
+                downloaded("c", DownloadState.DOWNLOADING, 0L, at = 3_000L),
+                downloaded("d", DownloadState.QUEUED, 0L, at = 4_000L),
+                downloaded("e", DownloadState.PAUSED, 0L, at = 2_000L),
+                downloaded("f", DownloadState.FAILED, 0L, at = 2_500L),
+            )
+            eventually { vm.downloadsForUi.value.totalCount == 6 }
+
+            val ui = vm.downloadsForUi.value
+            // Active section: state rank first (DOWNLOADING < QUEUED < PAUSED < FAILED),
+            // newest-first within a rank.
+            assertEquals(listOf("c", "d", "e", "f"), ui.active.map { it.trackId })
+            // Completed section: newest-first regardless of seed order.
+            assertEquals(listOf("b", "a"), ui.completed.map { it.trackId })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun playDownloadedQueuesCompletedDownloadsAsContext(): Unit = runBlocking {
+        val dm = FakeDownloadManager()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val player = NoopPlayer()
+            val vm = LibraryViewModel(
+                dataLayer = dataLayer(), player = player, scope = scope,
+                downloadManager = dm,
+            )
+            dm.state.value = listOf(
+                downloaded("a", DownloadState.COMPLETED, 1_000L, at = 1_000L),
+                downloaded("b", DownloadState.COMPLETED, 2_000L, at = 5_000L),
+                downloaded("c", DownloadState.COMPLETED, 3_000L, at = 3_000L),
+                downloaded("d", DownloadState.DOWNLOADING, 0L, at = 4_000L),
+            )
+            eventually { vm.downloadsForUi.value.totalCount == 4 }
+
+            vm.playDownloaded(vm.downloads.value.first { it.trackId == "c" }.toTrack())
+            eventually { player.prepared.size == 1 }
+
+            val (queueIds, startIndex, playWhenReady) = player.prepared.first()
+            // Queue = completed rows only, newest-first; the downloading row is excluded.
+            assertEquals(listOf("b", "c", "a"), queueIds)
+            assertEquals(1, startIndex)
+            assertTrue(playWhenReady)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun playDownloadedFallsBackToSingleTrackWithoutCompletedRow(): Unit = runBlocking {
+        val dm = FakeDownloadManager()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val player = NoopPlayer()
+            val vm = LibraryViewModel(
+                dataLayer = dataLayer(), player = player, scope = scope,
+                downloadManager = dm,
+            )
+            dm.state.value = listOf(downloaded("d", DownloadState.DOWNLOADING, 0L))
+            eventually { vm.downloads.value.size == 1 }
+
+            vm.playDownloaded(Track(id = "d", title = "Song d", artistName = "Artist d"))
+            eventually { player.prepared.size == 1 }
+
+            val (queueIds, startIndex, playWhenReady) = player.prepared.first()
+            assertEquals(listOf("d"), queueIds)
+            assertEquals(0, startIndex)
+            assertTrue(playWhenReady)
         } finally {
             scope.cancel()
         }

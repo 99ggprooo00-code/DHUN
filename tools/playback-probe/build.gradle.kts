@@ -21,7 +21,7 @@ dependencies {
 
 application {
     // `gradle :tools:playback-probe:run -PmainClass=...` switches entry points:
-    //  - MainKt        = Phase 01 extraction kill-switch probe (default)
+    //  - MainKt        = Extraction kill-switch probe & full verification suite (default)
     //  - SmokeMainKt   = Phase 02 provider-level live smoke
     //  - OfflineMainKt = ADR-006 deterministic local-file/offline probe
     mainClass.set(
@@ -40,6 +40,14 @@ tasks.register<JavaExec>("offlineProbe") {
     dependsOn(tasks.named("classes"))
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("dev.dhun.tools.playbackprobe.OfflineMainKt")
+}
+
+tasks.register<JavaExec>("smokeProbe") {
+    group = "verification"
+    description = "Live provider-level smoke check across home feed, search, suggestions, radio, lyrics, stream info"
+    dependsOn(tasks.named("classes"))
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("dev.dhun.tools.smoke.SmokeMainKt")
 }
 
 tasks.register<Copy>("resolveRuntime") {

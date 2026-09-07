@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -129,6 +130,49 @@ data class StorageSummary(
                     DownloadState.FAILED,
                 ).map { byState.getValue(it) },
                 device = device,
+            )
+        }
+    }
+}
+
+/**
+ * List model for the Library Downloads tab (ADR-006 polish): rows split into
+ * an *active* section (downloading / queued / paused / failed — the ones with
+ * live actions) and a *completed* section, each newest-first.
+ *
+ * Ordering is deliberately UI-owned: [DownloadManager.downloads] is seeded
+ * newest-first from the repository, but rows mutate in place as states churn,
+ * so the raw emission order is not stable enough for a sectioned list.
+ */
+data class DownloadsListUi(
+    val active: List<DownloadedTrack>,
+    val completed: List<DownloadedTrack>,
+) {
+    /** Same rows, flat and in list order (active section first). */
+    val all: List<DownloadedTrack> get() = active + completed
+    val totalCount: Int get() = active.size + completed.size
+
+    companion object {
+        val EMPTY = DownloadsListUi(emptyList(), emptyList())
+
+        /** In-flight first, then queued, then paused, then failed. */
+        private fun activeRank(state: DownloadState): Int = when (state) {
+            DownloadState.DOWNLOADING -> 0
+            DownloadState.QUEUED -> 1
+            DownloadState.PAUSED -> 2
+            DownloadState.FAILED -> 3
+            DownloadState.COMPLETED -> 4
+        }
+
+        fun from(rows: List<DownloadedTrack>): DownloadsListUi {
+            val (activeRows, completedRows) =
+                rows.partition { it.downloadState != DownloadState.COMPLETED }
+            return DownloadsListUi(
+                active = activeRows.sortedWith(
+                    compareBy<DownloadedTrack> { activeRank(it.downloadState) }
+                        .thenByDescending { it.downloadedAtEpochMs },
+                ),
+                completed = completedRows.sortedByDescending { it.downloadedAtEpochMs },
             )
         }
     }
@@ -251,6 +295,11 @@ class LibraryViewModel(
         downloadManager?.downloads
             ?: MutableStateFlow<List<DownloadedTrack>>(emptyList()).asStateFlow()
 
+    /** Same rows as [downloads], grouped + ordered for the sectioned tab list. */
+    val downloadsForUi: StateFlow<DownloadsListUi> =
+        downloads.map { DownloadsListUi.from(it) }
+            .stateIn(scope, SharingStarted.Eagerly, DownloadsListUi.EMPTY)
+
     val hasDownloads: Boolean
         get() = downloadManager != null
 
@@ -327,9 +376,20 @@ class LibraryViewModel(
     fun playDownloaded(track: Track) {
         setPlayContext(PlayContext.LIBRARY)
         scope.launch {
-            // Play the local file directly; OfflineFirstStreamResolver /
-            // PlaybackGraph route it to disk without a network round-trip.
-            player.prepareQueue(listOf(track), 0, playWhenReady = true)
+            // Queue the completed-downloads list — in the same newest-first
+            // order the tab renders ([downloadsForUi]) — with the tapped
+            // track at the head, mirroring Favorites/History context
+            // playback, so next/prev follow the on-screen list. A track
+            // without a completed row (e.g. tapped mid-download) falls back
+            // to a single-track queue; OfflineFirstStreamResolver then
+            // streams it until the local file exists.
+            val queue = downloadsForUi.value.completed.map { it.toTrack() }
+            val idx = queue.indexOfFirst { it.id == track.id }
+            if (idx >= 0) {
+                player.prepareQueue(queue, idx, playWhenReady = true)
+            } else {
+                player.prepareQueue(listOf(track), 0, playWhenReady = true)
+            }
         }
     }
 
@@ -490,3 +550,17 @@ class LibraryViewModel(
         }
     }
 }
+
+/**
+ * Metadata-only projection of a download row onto the player's [Track] type.
+ * Playback of a completed row routes to its local file via
+ * OfflineFirstStreamResolver; no engine detail leaks into the UI.
+ */
+internal fun DownloadedTrack.toTrack(): Track = Track(
+    id = trackId,
+    title = title,
+    artistName = artistName,
+    albumName = albumName,
+    durationSeconds = durationSeconds,
+    thumbnailUrl = thumbnailUrl,
+)

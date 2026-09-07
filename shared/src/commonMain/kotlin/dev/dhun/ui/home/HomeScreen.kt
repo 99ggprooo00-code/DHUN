@@ -546,18 +546,23 @@ private fun QuickPicksGrid(
     onTrackOverflow: (Track) -> Unit,
     downloadManager: DownloadManager?,
 ) {
-    val chunked = tracks.take(12).chunked(2)
+    // Pair each track with its original list index up front. The previous
+    // `tracks.indexOf(track)` was O(n^2) over the grid AND returned the first
+    // equal track, so a duplicate in Quick picks started playback at the
+    // wrong index (wrong queue position for the tapped row).
+    val columns = tracks.take(12)
+        .mapIndexed { index, track -> index to track }
+        .chunked(2)
     LazyRow(
         contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
-        items(chunked) { columnTracks ->
+        items(columns) { columnTracks ->
             Column(
                 verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
                 modifier = Modifier.width(DhunSpacing.dialogMinWidth),
             ) {
-                columnTracks.forEach { track ->
-                    val originalIndex = tracks.indexOf(track)
+                columnTracks.forEach { (originalIndex, track) ->
                     QuickPickItem(
                         track = track,
                         onClick = { onTrackClick(track, originalIndex) },
@@ -617,7 +622,10 @@ private fun QuickPickItem(
             track = track,
             downloadManager = downloadManager,
             onOverflowClick = onOverflow,
-            showBadgeLabel = true,
+            // Icon-only badge: the row is narrow, and text labels like
+            // "DOWNLOADING 45%" squeeze the title. The ring still shows live
+            // progress and the badge keeps its state contentDescription.
+            showBadgeLabel = false,
         )
     }
 }
