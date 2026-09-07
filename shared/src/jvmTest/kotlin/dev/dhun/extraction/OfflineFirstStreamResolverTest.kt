@@ -24,7 +24,7 @@ class OfflineFirstStreamResolverTest {
     )
 
     /** Network resolver that records it was called and fails loudly if it isn't. */
-    private class NetworkResolver(private var calls: Int = 0) : StreamResolver {
+    private class NetworkResolver(var calls: Int = 0) : StreamResolver {
         override val name: String = "network"
         override suspend fun resolve(videoId: String): DhunResult<StreamInfo> {
             calls++
