@@ -15,19 +15,25 @@ hardware, device, Windows-runtime, or audible-playback verification.
 
 ## 1. Final stability verdict
 
-**NOT STABLE — three of the four worker PRs are still unmerged, and PR #35's
-re-green after the C1 fix has not completed.**
+**NOT STABLE — three of the four worker PRs are still unmerged, and PR #35 is CI-RED
+(`:shared:compileTestKotlinJvm` fails in agent 1's companion test).**
 
 Specific red / open items, in priority order:
 
-1. **PR #35** (agent 1, `agent/download-svc` @ `705a946`) — CI **in progress**
-   (runs `34083073966` CI, `34083073890` test-release). The C1 blocker is fixed in
-   code but the gate has not returned green on the fixing head yet.
+1. **PR #35** (agent 1, `agent/download-svc` @ `4fd9636`) — **CI RED.** Run
+   `34083348460`: job **`build-and-test` FAILURE**, failing step **"Unit tests —
+   shared domain (queue, parsers, resolvers)"**, Gradle task
+   **`:shared:compileTestKotlinJvm` failed**. The previous head `705a946` failed the
+   same job/step (run `34083073966`). **Do not merge.** Worker marked **BLOCKED**.
+   Full annotations in §5 / C1.
 2. **PR #36** (agents 2 + 3, `arena/01a079f5-dhun` @ `c94b87d`) — `build-and-test`
    and `msi` **pending**; `apk` pass. Unmerged.
 3. **PR #37** (agent 6, `arena/01a079f7-dhun` @ `96e5e32`) — all three checks
    **green**, but unmerged.
-4. **Hardware gates remain OPEN** (see §6). No CI result can close them.
+4. **`rot-drill` on main is RED** — run `34083253658` completed **failure**. This is
+   issue #14's known GitHub-runner IP gating, not a regression from PR #34, but it
+   means only the three merge gates (`build-and-test`, `apk`, `msi`) are green on main.
+5. **Hardware gates remain OPEN** (see §6). No CI result can close them.
 
 Only PR #34 has landed on main.
 
@@ -41,7 +47,7 @@ Two branches each carry **two** agents (see §4).
 
 | Agent | Requested branch | Actual branch | PR | Head | CI (`build-and-test` / `apk` / `msi`) | Status file | State |
 |---|---|---|---|---|---|---|---|
-| 1 — Android download FGS | `agent/download-svc` | ✅ `agent/download-svc` | #35 | `705a946` | **in progress** / in progress / in progress | none — `.gitignore` excludes `agent-1-status.md`; status lives in the PR #35 body | **BLOCKED → fixed, awaiting re-green** |
+| 1 — Android download FGS | `agent/download-svc` | ✅ `agent/download-svc` | #35 | `4fd9636` | **FAILURE** (`34083348460`) / in progress / in progress | none — `.gitignore` excludes `agent-1-status.md`; status lives in the PR #35 body | **BLOCKED — CI red** |
 | 2 — Library downloads | `agent/library-downloads` | ❌ never created; work landed on `arena/01a079f5-dhun` | #36 (shared) | `c94b87d` | pending / pass / pending | `agent-2-status.md` (on #36's branch) | built, CI pending |
 | 3 — Track download UI | `agent/track-download-ui` | `arena/01a079f5-dhun` | #36 (shared) | `c94b87d` | pending / pass / pending | `agent-3-status.md` | built, CI pending |
 | 4 — Desktop player | `agent/desktop-player` | `arena/01a079f6-dhun` | #34 (shared) | `571f7c0` | pass / pass / pass | `agent-4-status.md` | **MERGED** |
@@ -67,7 +73,7 @@ one PR = one merge; each session merges only its own PR.**
 | 1 | **#34** | 4 + 5 | **Merged by the coordinator** at `2026-09-07T04:18:28Z` | main → **`d1e0408`** | CI run `34082610125` **success**; test-release `34082610094` **success** — jobs `msi`, `apk`, `publish` all success. Rolling `test` pre-release replaced `2026-09-07T04:26:24Z` (APK 17,581,785 B, MSI 112,287,744 B, + `.sha256` each) |
 | 2 | #36 | 2 + 3 | **HELD** — belongs to the agent-2/3 session | — | — |
 | 3 | #37 | 6 | **HELD** — belongs to the agent-6 session | — | — |
-| 4 | #35 | 1 | **HELD** — belongs to the agent-1 session; C1 must re-green first | — | — |
+| 4 | #35 | 1 | **HELD — CI RED, BLOCKED**; belongs to the agent-1 session | head `4fd9636`: run `34083348460` job `build-and-test` **FAILURE** at `:shared:compileTestKotlinJvm`; test-release `34083348445` still in progress | — |
 
 > **⚠ Deviation, recorded rather than hidden.** The coordinator merged #34 itself.
 > That happened under the *previous* instruction ("MERGING — APPROVE the #34
@@ -89,6 +95,13 @@ Excluded: **PR #31** (`arena/01a0759b-dhun`) — GitHub reports
 "do not merge without user instruction" note. **Issue #14** `[rot-drill] Live
 extraction probe failed` remains OPEN (GitHub-runner IP gating, known environment
 limitation).
+
+**Note on main's workflow set.** The three merge-gating checks on `d1e0408`
+(`build-and-test`, `apk`, `msi`) are green, but a separate scheduled workflow is red:
+`rot-drill` run **`34083253658`** completed **failure** on main. That is issue #14's
+known GitHub-runner-IP gating, not a regression introduced by PR #34 — but it means
+"origin/main is fully green" is only true of the three merge gates, not of every
+workflow. A green **live** rot-drill verdict therefore stays open on the hardware side.
 
 ---
 
@@ -150,7 +163,9 @@ green at `a4dc28d`.
 
 **Fix (by agent 1, commit `ef69f82`):** `delegate = get<FileDownloadManager>()` —
 explicit type, pointing at the concrete singleton registered immediately above.
-Verified by reading `AppModule.kt` on head `705a946`.
+Verified by reading `AppModule.kt` on head `4fd9636`. **The production fix compiles** —
+the failing Gradle task is `:shared:compileTestKotlinJvm`, and every annotation is
+inside the test file, not `AppModule.kt`.
 
 **Regression test (commit `705a946`):** `shared/src/jvmTest/kotlin/dev/dhun/di/KoinDownloadStackTest.kt`.
 **Recorded limitation:** this test uses *minimal fakes mirroring the production
@@ -158,6 +173,34 @@ shape* in `:shared:jvmTest`, not the real `app-android` `appModule`. It pins the
 registration shape so the unqualified-`get()` pattern cannot silently return; it does
 **not** verify the actual Android graph. The real graph still has no automated
 verification (`checkModules()` or an `:app-android` smoke test remain a follow-up).
+
+**⚠ That test does not compile — PR #35 is RED (current blocker).**
+
+- Run `34083073966` @ `705a946`: job `build-and-test` **failure**, step "Unit tests —
+  shared domain (queue, parsers, resolvers)". Annotations included
+  `KoinDownloadStackTest.kt:8 — Unresolved reference 'test'` and `:76 — Unresolved
+  reference 'KoinTest'`, i.e. the `koin-test` artifact was absent from the
+  `:shared:jvmTest` classpath.
+- Commit `4fd9636` ("test: add missing koin-test artifact") cleared those two — they no
+  longer appear. But run `34083348460` @ `4fd9636` **still fails the same step**, with
+  the remaining annotations all on Koin's `get`:
+  - `:131 — Type inference failed. The value of the type parameter 'T' must be
+    mentioned in input types (argument types, receiver type, or expected type).`
+  - `:124`, `:141`, `:142 — Initializer type mismatch: expected
+    'KoinDownloadStackTest.DownloadManager', actual 'MatchGroup?'`
+  - `:124`, `:132`, `:141`, `:142 — Unresolved reference. None of the following
+    candidates is applicable because of a receiver type mismatch.`
+- **Coordinator read (diagnosis only — the fix belongs to agent 1, and this is
+  `shared/**` which the coordinator must not edit):** adding the artifact made the
+  `KoinTest` *marker* resolve, but Koin's `get` is still not in scope at those call
+  sites. In Koin 4.x `get` is the extension `org.koin.core.component.get` on
+  `KoinComponent`, and `KoinTest` no longer supplies it implicitly — so the class
+  needs that import plus a `KoinComponent` receiver (or should resolve through an
+  explicit `koinApplication { … }.koin.get<T>()`). The `MatchGroup?` in the message is
+  the compiler falling back to an unrelated `get` overload once Koin's is not a
+  candidate, not a real type in the test.
+- test-release run `34083348445` @ `4fd9636` is still in progress; the `apk`/`msi`
+  verdict is not yet in.
 
 Coordinator disclosure: the original C1 diagnosis was **static analysis only** — no
 JDK/Gradle in the sandbox, and the standing rule is git + gh only. It was never a
@@ -228,7 +271,7 @@ CI compiles it but **does not execute** the runtime task, so not even
 
 | Agent | Built | CI green | Blocked | Merged |
 |---|---|---|---|---|
-| 1 | ✅ | ⬜ pending on the C1-fix head `705a946` | ✅ C1 (fixed in code, gate outstanding) | ⬜ |
+| 1 | ✅ | ❌ **RED** — `build-and-test` fails at `:shared:compileTestKotlinJvm` on `4fd9636` (and on `705a946`) | ✅ **BLOCKED** — C1 production fix landed (`ef69f82`) but the companion test `KoinDownloadStackTest.kt` does not compile | ⬜ |
 | 2 | ✅ | ⬜ pending on `c94b87d` | — | ⬜ |
 | 3 | ✅ | ⬜ pending on `c94b87d` | — | ⬜ |
 | 4 | ✅ | ✅ `34081572340` / `34081572339` | — | ✅ `d1e0408` |
