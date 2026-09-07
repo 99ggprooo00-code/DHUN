@@ -55,6 +55,10 @@ enum class DhunIcon(val pathData: String) {
     Pending("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z M7 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z M12 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z M17 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"),
     /** Material "download-for-offline" — offline library affordance. */
     Offline("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z M11 17.17L6.83 13l1.41-1.41L11 14.34l5.76-5.76 1.41 1.41L11 17.17z M11 10V6h2v4h-2z"),
+    /** Material "lyrics" — lyrics tab glyph (ADR-002 P3/P6). */
+    Lyrics("M5 5v14h14V5H5z M19 17H5V7h14v10z M7 9h10v2H7V9z M7 13h7v2H7v-2z"),
+    /** Material "closed-caption" — dedicated CC control for lyrics-dominant mode (ADR-002 rule 5). */
+    ClosedCaption("M19 4H5c-1.1 0-2 0.9-2 2v12c0 1.1 0.9 2 2 2h14c1.1 0 2-0.9 2-2V6c0-1.1-0.9-2-2-2z M11 14H9.5c-0.83 0-1.5-0.67-1.5-1.5v-3c0-0.83 0.67-1.5 1.5-1.5H11v1.5H9.5v3H11V14z M17 14h-1.5c-0.83 0-1.5-0.67-1.5-1.5v-3c0-0.83 0.67-1.5 1.5-1.5H17v1.5h-1.5v3H17V14z"),
 }
 
 private const val VIEWBOX_SIZE = 24f
