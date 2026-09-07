@@ -1,6 +1,6 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-07 (UTC)** · session **`arena/01a079f6-dhun`** · `origin/main` **`f157245`** (PR #33 merged) · shared branch PR #34 is open; verification commits are pushed through `aeec1e6`.
+Updated **2026-09-07 (UTC)** · session **`arena/01a079f6-dhun`** · `origin/main` **`f157245`** (PR #33 merged) · shared branch PR #34 is open; verification commits are pushed through `20d8ddf`.
 
 **Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 persistent downloads: foundation, engine, offline-first routing, minimal UI, and deterministic probe tooling are implemented; branch CI compilation is green; runtime and hardware acceptance remain open).**
 
@@ -14,7 +14,7 @@ Boot review confirmed that ADR-006 is merged on `origin/main@f157245`. The previ
 
 **This session's verification tooling:** `tools/playback-probe:offlineProbe` now persists a completed row in the real JVM SQLDelight repository, asserts a `file://` result, opens a valid WAV fixture, and fails if the network resolver is called. It is pushed in PR #34; branch CI proves compilation, while the existing workflow does not execute the runtime task.
 
-**GitHub evidence:** main commit `f15724547aec` is the merged PR #33 tip. This branch is pushed through `aeec1e6`; PR CI run **34080947691** succeeded, including **Probe compiles**, and test-release run **34080947708** built the APK/MSI jobs successfully (publishing is skipped for PRs). The offline probe runtime itself was not executed by the existing CI workflow.
+**GitHub evidence:** main commit `f15724547aec` is the merged PR #33 tip. This branch is pushed through `20d8ddf`; PR CI run **34081374800** succeeded, including **Probe compiles**, and test-release run **34080947708** built the APK/MSI jobs successfully (publishing is skipped for PRs). The offline probe runtime itself was not executed by the existing CI workflow.
 
 **Hardware gate remains OPEN:** the local probe checks shared/JVM repository-to-file loading only. Android Media3 `FileDataSource`, Desktop vlcj decoding, actual offline operation with connectivity disabled, and audible playback still require real Android device and Desktop/PC verification. No CI result can close that gate.
 

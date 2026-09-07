@@ -42,7 +42,7 @@
 - Local Gradle execution is BLOCKED because the sandbox has no `JAVA_HOME` and
   no `java` executable. The toolchain restore script also failed to download
   Temurin/Gradle because TLS egress is unavailable.
-- PR CI run `34080947691` passed the existing `Probe compiles` step, so the
+- PR CI run `34081374800` passed the existing `Probe compiles` step, so the
   new source and task compile on GitHub. The workflow does not execute the
   runtime task; a JDK-equipped checkout or explicit CI execution step is still
   required before claiming `offline-verdict|PASS`.

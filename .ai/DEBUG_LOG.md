@@ -25,8 +25,8 @@ verification, not Android Media3 `FileDataSource` verification, Desktop vlcj
 decoding verification, or audible playback. Real Android device and Desktop/PC
 checks remain open and must stay open in the roadmap even after CI passes.
 
-**Follow-up:** pushed commits `bf5376b`/`2706066`/`aeec1e6` are covered by PR
-CI run `34080947691`, which passed the existing `Probe compiles` step. The
+**Follow-up:** pushed commits `bf5376b`/`2706066`/`aeec1e6`/`20d8ddf` are covered by PR
+CI run `34081374800`, which passed the existing `Probe compiles` step. The
 workflow does not invoke the new runtime task, so no `offline-verdict|PASS`
 claim is made yet.
 
