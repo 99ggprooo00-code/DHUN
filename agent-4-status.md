@@ -21,7 +21,9 @@ Desktop-only ownership: `app-desktop/**`. No Android, shared, tools, `.ai`, or d
 
 - `git diff --check`: passed.
 - Desktop compile attempted with `./gradlew :app-desktop:compileKotlinJvm --no-daemon`.
-- Local compile is blocked because this Arena image has no Java runtime and no `JAVA_HOME`; GitHub CI Desktop compilation is the required available gate.
+- Local compile is blocked because this Arena image has no Java runtime and no `JAVA_HOME`.
+- GitHub `build-and-test` run `34080947691` passed, including Desktop compilation.
+- GitHub MSI job in run `34080947708` passed.
 - No Windows/device/hardware verification claimed.
 
 ## Commits
@@ -30,5 +32,4 @@ Desktop-only ownership: `app-desktop/**`. No Android, shared, tools, `.ai`, or d
 
 ## Remaining
 
-- GitHub CI must pass Desktop compilation.
 - Windows runtime confirmation should verify one native window during both normal startup and initialization failure; this is not claimed here.
