@@ -86,7 +86,7 @@ object PlaybackGraph {
         // ADR-006 offline-first: a `file://` resolve (a completed download)
         // plays straight from disk via [FileDataSource]; https streams go
         // through the cache/HTTP chain.
-        val outerFactory: DataSource.Factory = SchemeRoutingDataSource.Factory(networkFactory)
+        val outerFactory: DataSource.Factory = Factory(networkFactory)
 
         return ResolvingDataSource.Factory(
             outerFactory,
