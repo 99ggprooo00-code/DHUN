@@ -1,6 +1,6 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-07 (UTC)** · session **`arena/01a079f6-dhun`** · `origin/main` **`f157245`** (PR #33 merged) · verification PR pending.
+Updated **2026-09-07 (UTC)** · session **`arena/01a079f6-dhun`** · `origin/main` **`f157245`** (PR #33 merged) · shared branch PR #34 is open; this session's commits are pending push.
 
 **Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 persistent downloads: foundation, engine, offline-first routing, minimal UI, and deterministic probe verification are implemented; hardware acceptance remains open).**
 
@@ -18,7 +18,7 @@ Boot review confirmed that ADR-006 is merged on `origin/main@f157245`. The previ
 
 **Hardware gate remains OPEN:** the local probe checks shared/JVM repository-to-file loading only. Android Media3 `FileDataSource`, Desktop vlcj decoding, actual offline operation with connectivity disabled, and audible playback still require real Android device and Desktop/PC verification. No CI result can close that gate.
 
-**Agent-status review:** no `agent-1` through `agent-6` status files were present in this checkout. This session records its own status in `agent-5-status.md`.
+**Agent-status review:** `agent-4-status.md` is present on the shared session branch and was reviewed. Agent 4 reports the Desktop startup-window audit and `b4a83c3` fix; local Desktop compilation and Windows runtime verification remain open. Its Desktop work is outside this session's ownership and is left unchanged. No `agent-1`, `agent-2`, `agent-3`, or `agent-6` status files are present. This session records its own status in `agent-5-status.md`.
 
 **Last error:** local Gradle execution could not start because this sandbox has no `JAVA_HOME` or `java`; the restore script could not download the toolchain due blocked TLS egress. GitHub CI remains the compile/test authority.
 

@@ -10,7 +10,12 @@
   `.ai/KNOWN_LIMITATIONS.md`, `.ai/README.md`, and ADR-006.
 - Reviewed `origin/main`: `f157245` is the merged PR #33 tip. Its GitHub CI
   run `34079283259` and test-release run `34079283231` succeeded.
-- No `agent-1` through `agent-6` status files were present in the checkout;
+- `agent-4-status.md` is present on the shared session branch and was
+  reviewed. Agent 4 reports the Desktop startup-window audit and `b4a83c3`
+  fix; local Desktop compilation and Windows runtime verification remain
+  open. Its Desktop work is outside this session's ownership and was left
+  unchanged.
+- No `agent-1`, `agent-2`, `agent-3`, or `agent-6` status files are present;
   there were no other agent reports to consolidate.
 
 ## Implemented
