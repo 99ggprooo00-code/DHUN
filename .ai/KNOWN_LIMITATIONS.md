@@ -207,26 +207,39 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
 
 ## Phase 14 — ADR-006 persistent offline downloads (2026-09-07)
 
-- **Foundation + engine implemented and CI-green on PR #33 (`a1064b7`):**
-  schema v3 `DownloadedTrack` table (`migrations/2.sqm`), `DownloadRepository`
-  + `SqlDelightDownloadRepository` wired as `DataLayer.downloads`,
-  `DownloadStorage` file abstraction, `StreamDownloader` (Ktor, Range-resume,
-  progress, resolving User-Agent isolation, cancellation keeps the `.part`),
-  `DownloadManager` + `FileDownloadManager` (bounded 3-slot pool, atomic
-  `.part`→final commit, best-effort artwork, QUEUED/DOWNLOADING/COMPLETED/
-  FAILED/PAUSED state transitions), and jvmMain `JvmDownloadStorage`. Tests
+- **Foundation + engine implemented and CI-green on merged PR #33 at
+  `f157245`:** schema v3 `DownloadedTrack` table (`migrations/2.sqm`),
+  `DownloadRepository` + `SqlDelightDownloadRepository` wired as
+  `DataLayer.downloads`, `DownloadStorage` file abstraction,
+  `StreamDownloader` (Ktor, Range-resume, progress, resolving User-Agent
+  isolation, cancellation keeps the `.part`), `DownloadManager` +
+  `FileDownloadManager` (bounded 3-slot pool, atomic `.part`→final commit,
+  best-effort artwork, QUEUED/DOWNLOADING/COMPLETED/FAILED/PAUSED state
+  transitions), and jvmMain `JvmDownloadStorage`. Tests
   `DownloadRepositoryTest`/`StreamDownloaderTest`/`FileDownloadManagerTest`
   are green in `:shared:jvmTest`.
 - **Offline-first playback routing is implemented and CI-green:** the shared
   `OfflineFirstStreamResolver` returns a `file://` URI for a COMPLETED download
-  (deferring to the network chain otherwise); Android's `PlaybackGraph`
-  routes `file://` to a `FileDataSource` (via `SchemeRoutingDataSource`) and
-  checks the download repo before the network resolver; the desktop `MusicProvider`
+  (deferring to the network chain otherwise); Android's `PlaybackGraph` routes
+  `file://` to a `FileDataSource` (via `SchemeRoutingDataSource`) and checks
+  the download repo before the network resolver; the desktop `MusicProvider`
   wraps its resolver with `OfflineFirstStreamResolver` and the vlcj player
   skips cache-fill/pre-buffer when a resolve returns a local `file://` MRL.
-  Download managers are wired into both platforms' DI. **Still not
-  hardware-verified** — a real device/PC must confirm a downloaded track plays
-  offline (CI only proves compilation + unit tests).
+  Download managers are wired into both platforms' DI.
+- **Deterministic probe coverage is now available:**
+  `./gradlew :tools:playback-probe:offlineProbe --offline --no-daemon`
+  uses the real JVM SQLDelight download repository plus a valid WAV fixture,
+  asserts the completed row resolves to `file://`, opens the local file, checks
+  the RIFF/WAVE header, and fails if the network resolver is called. The
+  sandbox could not execute this command because Java/JAVA_HOME is unavailable.
+  Branch CI run `34080947691` successfully compiled the probe, but the existing
+  workflow does not execute `offlineProbe`; a JDK-equipped checkout or explicit
+  CI execution step is still needed for runtime PASS evidence.
+- **Hardware limitation remains explicit:** the probe verifies shared/JVM
+  repository-to-file loading only. It does **not** verify Android Media3
+  `FileDataSource`, Desktop vlcj decoding, airplane-mode behavior, or audible
+  offline playback. A real Android device and Desktop/PC remain mandatory for
+  those checks; no agent or CI run can close that gate.
 - **Download UI is wired but minimal:** a Library "Downloads" tab lists
   downloads (play/remove/clear-all + storage byte summary), and a "Download for
   offline" action appears in the track overflow menu. There is **no** per-track
@@ -235,8 +248,8 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
   storage-management screen beyond the Downloads tab's clear-all — these remain
   open follow-ups.
 - Downloads are **persistent** (survive until the user deletes them) and are
-  distinct from the ADR-005 LRU stream cache, which is volatile and
-  evicts on budget.
+  distinct from the ADR-005 LRU stream cache, which is volatile and evicts on
+  budget.
 
 ## Phase 14 — robustness / rot-drill / release (2026-09-05)
 
