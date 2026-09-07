@@ -1,5 +1,29 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-07 — ADR-006 offline playback probe added (session `arena/01a079f6-dhun`)
+
+**Change:** Added `tools/playback-probe:offlineProbe` and a valid WAV fixture.
+The probe uses the real JVM SQLDelight `DownloadRepository`, inserts a
+`COMPLETED` `DownloadedTrack`, resolves through `OfflineFirstStreamResolver`,
+requires a `file://` URI pointing to the committed local path, opens the file,
+checks the RIFF/WAVE header, and fails if the injected network resolver is
+called. It is exposed as:
+
+```text
+./gradlew :tools:playback-probe:offlineProbe --offline --no-daemon
+```
+
+**Verification state:** `git diff --check` passes. Local execution is blocked
+in this sandbox because neither `JAVA_HOME` nor a `java` executable exists.
+`scripts/restore-toolchain.sh` also could not download Temurin/Gradle because
+TLS egress is unavailable. GitHub CI must compile and run the probe in a
+JDK-equipped environment before the probe is marked CI-verified.
+
+**Important boundary:** this is deterministic shared/JVM repository-to-file
+verification, not Android Media3 `FileDataSource` verification, Desktop vlcj
+decoding verification, or audible playback. Real Android device and Desktop/PC
+checks remain open and must stay open in the roadmap even after CI passes.
+
 ## 2026-09-07 — ADR-006 foundation + download engine landed (PR #33)
 
 **Implemented this session (PR #33 `arena/01a07989-dhun`):** ADR-006

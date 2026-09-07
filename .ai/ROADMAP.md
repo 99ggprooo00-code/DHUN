@@ -1,34 +1,30 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-07 (UTC)** · session **`arena/01a07989-dhun`** · **PR #33 OPEN** (base `main`) · branch at `f46c586`, CI green.
+Updated **2026-09-07 (UTC)** · session **`arena/01a079f6-dhun`** · `origin/main` **`f157245`** (PR #33 merged) · verification PR pending.
 
-**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 offline downloads: foundation + engine + offline-first playback routing + minimal UI wired, all CI-verified).**
+**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 persistent downloads: foundation, engine, offline-first routing, minimal UI, and deterministic probe verification are implemented; hardware acceptance remains open).**
 
-The previous session (`arena/01a076f3-dhun`) merged **PR #32** into main at `862f0ac`. This session started from that base, reconciled stale docs, and implemented the ADR-006 persistent-download layer through offline-first playback routing and a minimal download UI.
+Boot review confirmed that ADR-006 is merged on `origin/main@f157245`. The previous roadmap snapshot incorrectly described PR #33 as open and still listed offline-first routing as pending; this session reconciles those claims and adds a mechanically runnable local-file probe under `tools/playback-probe`.
 
-**ADR-006 what's landed this session (CI-verified, `f46c586`):**
-1. **Persistent data layer (schema v3):** `core/DownloadedTrack.kt` (+ `DownloadState` lifecycle enum), SQLDelight `DownloadedTrack.sq` + `migrations/2.sqm`, `download/DownloadRepository.kt` interface + `SqlDelightDownloadRepository`, wired as `DataLayer.downloads`. Tests: `DownloadRepositoryTest`.
-2. **Download engine:** `download/DownloadStorage.kt`, `download/StreamDownloader.kt` (Ktor Range-resume + progress + User-Agent isolation), `download/DownloadManager.kt`, `download/FileDownloadManager.kt` (bounded 3-slot pool, atomic `.part`→final commit, best-effort artwork, PAUSED/FAILED), jvmMain `JvmDownloadStorage`. Tests: `StreamDownloaderTest` + `FileDownloadManagerTest`.
-3. **Offline-first playback routing:** shared `extraction/OfflineFirstStreamResolver` (COMPLETED download → `file://` URI, else delegate); Android `PlaybackGraph` routes `file://` to a `FileDataSource` via a `SchemeRoutingDataSource` and checks the download repo before the network resolver (passed into `buildExoPlayer` from the service + session-less fallback); Desktop module wraps the `MusicProvider` resolver with `OfflineFirstStreamResolver` and the vlcj player skips cache-fill/pre-buffer for local `file://` MRLs. Tests: `OfflineFirstStreamResolverTest`.
-4. **Download manager wiring + minimal UI:** `DownloadManager` registered in both Android (+ `AndroidDownloadStorage`) and Desktop DI; a Library "Downloads" tab (play/remove/clear-all + storage byte summary) and a "Download for offline" action in the track overflow menu. Android data source routing for `file://` and the desktop local-path load.
+**ADR-006 state on `origin/main@f157245`:**
+1. **Persistent data layer:** schema v3 `DownloadedTrack` + migration, repository and `DataLayer.downloads` wiring.
+2. **Download engine:** resumable Range download, atomic `.part` promotion, bounded worker pool, artwork handling, and lifecycle states.
+3. **Offline-first playback routing:** `OfflineFirstStreamResolver` returns a completed local download as `file://`; Android `PlaybackGraph` routes that scheme to `FileDataSource`; Desktop vlcj receives a local-path MRL and skips network cache-fill.
+4. **Minimal UI and platform wiring:** Downloads library tab, download action, manager/storage DI wiring on Android and Desktop.
 
-**Branch CI evidence:** `build-and-test` **34077389330 PASS** (Python checks, PowerShell syntax, shared JVM tests incl. the download + offline-first tests, Android debug build, probe + Desktop compilation). Test-release (apk/msi) PASS on the same branch.
+**This session's verification tooling:** `tools/playback-probe:offlineProbe` now persists a completed row in the real JVM SQLDelight repository, asserts a `file://` result, opens a valid WAV fixture, and fails if the network resolver is called. It is not part of `origin/main` until this session's branch is pushed and checked.
 
-**What is verified / merged / released / open:**
-- **Merged on main:** PR #32 at **`862f0ac`** (2026-09-07T01:24:20Z), stacking on PR #30 (`76c68eb`).
-- **Released:** Rolling `test` pre-release at **`862f0ac`**, published **2026-09-07T01:29:28Z** (MSI 112,136,192 B / APK 17,516,190 B, + `.sha256`). Not changed by this branch.
-- **HW OPEN:** offline playback of a downloaded track (real device/PC), install-over upgrade, audible live-stream playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, 30-min soaks, green live rot-drill verdict. All require real device/PC/libVLC/display. **Green CI does NOT mean downloaded tracks play offline.**
-- **ADR-003 (Accepted, implemented):** staged-wave tokenless chain in `OwnClientStreamResolver.kt`.
-- **ADR-005 (Accepted, implemented):** next-track pre-buffering + per-track User-Agent isolation in `AudioFileCache.kt` / `DesktopDhunPlayer.kt` / `PlaybackGraph.kt`.
+**GitHub evidence:** main commit `f15724547aec` is the merged PR #33 tip. CI run **34079283259** and test-release run **34079283231** both succeeded. Rolling `test` was published at **2026-09-07T03:27:18Z** with `dhun-test.apk` and `dhun-test.msi` plus checksums.
 
-**Session carry-over items:**
-- PR #31 (`arena/01a0759b-dhun`, docs-only) is OPEN but CONFLICTING/superseded by PR #32's docs. Do not merge without user instruction.
-- Issue **#14 `[rot-drill] Live extraction probe failed`** remains **OPEN** (red = GitHub-runner IP gating; known environment limitation, not a user-impact defect).
+**Hardware gate remains OPEN:** the local probe checks shared/JVM repository-to-file loading only. Android Media3 `FileDataSource`, Desktop vlcj decoding, actual offline operation with connectivity disabled, and audible playback still require real Android device and Desktop/PC verification. No CI result can close that gate.
 
-**Last error:** None on CI (download-manager registration commit green).
-**Current exact files:** `shared/src/commonMain/kotlin/dev/dhun/download/*.kt`, `shared/src/commonMain/kotlin/dev/dhun/extraction/OfflineFirstStreamResolver.kt`, `shared/src/commonMain/sqldelight/dev/dhun/database/DownloadedTrack.sq` + `migrations/2.sqm`, `shared/src/commonMain/kotlin/dev/dhun/data/SqlDelightDownloadRepository.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt` (Downloads tab), `shared/src/commonMain/kotlin/dev/dhun/ui/components/TrackOverflowDialog.kt` (download action), `shared/src/commonMain/kotlin/dev/dhun/presentation/library/LibraryViewModel.kt` (downloads flow), `app-android/.../download/AndroidDownloadStorage.kt`, `app-android/.../di/AppModule.kt`, `app-android/.../playback/PlaybackGraph.kt` (file:// routing), `app-desktop/.../Main.kt`, `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`, `.ai/KNOWN_LIMITATIONS.md`.
+**Agent-status review:** no `agent-1` through `agent-6` status files were present in this checkout. This session records its own status in `agent-5-status.md`.
 
-**Exact next technical step:** Finish ADR-006 for production: (1) verify downloaded-track offline playback on a real device/PC (Android `file://` FileDataSource route + Desktop vlcj local-path load — CI only proves compilation), (2) platform download services: Android foreground service / WorkManager so downloads survive app backgrounding, Desktop worker pool (manager is already wired), (3) polish UI: per-track download badge, storage-management screen, download progress percentages. Blocker: offline playback + platform services need hardware / Android manifest+service work; the foundation is CI-verified but end-to-end offline playback needs a real device/PC. Do NOT infer hardware acceptance from green CI.
+**Last error:** local Gradle execution could not start because this sandbox has no `JAVA_HOME` or `java`; the restore script could not download the toolchain due blocked TLS egress. GitHub CI remains the compile/test authority.
+
+**Current exact files:** `tools/playback-probe/build.gradle.kts`, `tools/playback-probe/src/main/kotlin/dev/dhun/tools/playbackprobe/OfflineMain.kt`, `tools/playback-probe/src/main/resources/fixtures/offline-track.wav`, `tools/playback-probe/README.md`, `agent-5-status.md`, `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`.
+
+**Exact next technical step:** run the new `:tools:playback-probe:offlineProbe` task in GitHub CI or a JDK-equipped checkout, then use its result to keep the ADR-006 routing row mechanically verified while retaining Android/PC hardware playback as OPEN. After push, re-check the session PR checks and update this block with the resulting evidence.
 
 ---
 
@@ -160,14 +156,15 @@ widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here |
 
-### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-06, session `arena/01a0759b-dhun`)
+### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-07, session `arena/01a079f6-dhun`)
 
-**Current GitHub snapshot:** `main` and the rolling `test` tag both point to
-**`0920148`** (PR #29, docs-only). Main CI **`34018809911` success** covers
-shared JVM tests, Android debug build, probe compilation and Desktop
-compilation. Test-release **`34018809913` success** built/published APK +
-MSI + checksums at **`2026-09-06T07:22:29Z`**. Links and asset sizes are in
-CURRENT ACTIVE TASK. No open PRs; only the `test` release/tag exists.
+**Current GitHub snapshot:** `main` and the rolling `test` tag point to
+**`f157245`** (PR #33, ADR-006 foundation through offline-first routing and
+minimal UI). Main CI **`34079283259` success** and test-release
+**`34079283231` success** built/published the APK + MSI + checksums. The
+rolling `test` release was published at **`2026-09-07T03:27:18Z`**. This
+session's verification PR is not open yet; hardware and stable-release gates
+remain open.
 
 **Recent work actually merged on GitHub, not outstanding local work:**
 
@@ -179,6 +176,7 @@ CURRENT ACTIVE TASK. No open PRs; only the `test` release/tag exists.
 | #27 | `0eb8e76` · `06:59:41Z` | ADR-003 **proposal only**, not approval or parallelism implementation |
 | #28 | `b8f148d` · `07:10:11Z` | Separate desktop mini-player window removed (`a01f8ca`), ADR-004 and accompanying docs |
 | #29 | `0920148` · `07:18:53Z` | Post-merge documentation; no further application-code change |
+| #33 | `f157245` · `03:19:51Z` (2026-09-07) | ADR-006 persistent downloads: data layer, engine, offline-first routing, minimal UI, and platform wiring |
 
 Earlier Phase 14 milestones remain merged: PR #16 at `290e0f6`, #17 at
 `29eeb93`, #19 at `6d81eb2`, #20 at `8310383`, #22 at `e90dba6`, and the
@@ -198,13 +196,13 @@ The repair batch is merged through PR #30 at `76c68eb`; automated code/package c
 | Stream-URL cache (TTL + invalidation) | ✅ `DhunStreamCache` five-hour TTL and 403 invalidation on main; latest playback code builds in CI | 🟨 Stale-URL recovery on hardware |
 | Bounded audio cache — Android | ✅ `DhunAudioSegmentCache` / Media3 `SimpleCache` LRU merged in PR #16; PR #20 adds corrupt-cache direct-stream fallback; current Android build green | 🟨 Offline span replay, eviction/budget behavior and cache-failure fallback on a device |
 | Bounded audio cache — Desktop | ✅ `AudioFileCache` + `DesktopDhunPlayer` wiring and cache tests merged in PR #17, updated in PR #24 for User-Agent propagation; current shared tests and Desktop compile green | 🟨 Fully cached track replays offline, uncached-track error and eviction on a libVLC desktop |
-| **Persistent offline downloads (ADR-006)** | 🟨 foundation + engine implemented & CI-green on PR #33 (`a1064b7`): schema v3 `DownloadedTrack` + migration, `DownloadRepository`/`SqlDelightDownloadRepository` wired into `DataLayer`, `DownloadStorage`, `StreamDownloader` (Range-resume, progress, UA isolation), `DownloadManager` + `FileDownloadManager` (bounded pool, atomic commit, artwork, PAUSED/FAILED), jvmMain `JvmDownloadStorage`. Tests: `DownloadRepositoryTest`, `StreamDownloaderTest`, `FileDownloadManagerTest` green | ⬜ **Offline-first playback hook** (`DownloadRepository.getCompleted` → local path with the matching Android `FileDataSource`/Desktop vlcj load), **platform download services** (Android FGS/WorkManager, Desktop worker pool), **UI** (Library "Downloaded" section, download actions/badge, storage-management), and **end-to-end offline playback on a real device/PC** are OPEN. Data+engine CI does not prove offline playback |
+| **Persistent offline downloads (ADR-006)** | 🟨 **Foundation, engine, offline-first routing, and minimal UI merged in PR #33 at `f157245` and CI-green**: schema v3 + migration, repositories, Range-resume/atomic download manager, `OfflineFirstStreamResolver`, Android `file://`/`FileDataSource` route, Desktop local-path load, and Downloads tab/action. This session adds `tools:playback-probe:offlineProbe`; branch compile/runtime evidence is pending. | ⬜ **Hardware acceptance remains OPEN**: Android foreground/WorkManager service, per-track badge/storage-management/progress polish, and real Android device + Desktop/PC offline playback/decoding/audible verification. The deterministic probe proves JVM repository-to-file loading only; CI cannot close the hardware gate. |
 | Daily rot-drill workflow + failure alerts | ✅ `.github/workflows/rot-drill.yml` merged, cron `17 4 * * *`. **Scheduled execution and alert path verified:** run `34011539225` fired on `main@dd1ab31`, event `schedule`, failed, uploaded `rot-drill-34011539225`, and auto-commented on issue #14 at `04:29:14Z` | 🟨 A green live production-probe verdict and auto-close-on-recovery remain unproven; placeholder-workflow greens do not count |
 | Live extraction verdict / residential playback | 🔴 Latest real drill **`34011539225`**, scheduled on `dd1ab31`: `PROBE\|resolve+stream\|FAIL\|IllegalStateException: resolve via resolving(own-innertube-player -> yt-dlp): Unavailable`; own-client WATCH `Unavailable`, yt-dlp WATCH `AuthRequired` / bot-gate text; version/search/related PASS; final verdict FAIL. Source: run metadata and issue #14's preserved probe output; issue remains OPEN | No newer live probe verdict on `0920148`. Fresh Windows feedback also reports failed audio; do not dismiss this as CI-only gating. Candidate diagnostics and a real uncached playback/byte test are required |
 | Device-feedback recovery + artwork/splash/sheets/spacing | ✅ PR #20 implementation on main, followed by PR #24 audio correction, PR #25 diagnostics and PR #26 restyle; current main CI green | 🔴 Last reported device audio result was negative. Earlier corrections are **published**, but the fresh Windows re-test still fails audio, Home and visual acceptance. New repairs pass branch CI but are not released/device-tested; keep the blocker open |
 | Install/uninstall hygiene | ✅ PR #19 per-user MSI and `DhunUserDirs`, PR #22 startup ruggedization and Android private-storage policy on main; latest MSI rebuilt/published green in `34018809913` | 🟨 Fresh in-place upgrade FAILED with “Another version…”; only manual uninstall/reinstall succeeded. Corrected MSI 1.34.1 passes hosted-Windows legacy install-over, future-upgrade-removal and explicit-uninstall tests in PR run 34030730743. User-machine/full runtime hygiene still needs evidence |
 | `CHANGELOG.md` (Unreleased history) | ✅ On GitHub main, including PR #28's mini-player removal entry | Unreleased history exists; `[0.1.0]` release entry/final review waits for actual release gates |
-| Rolling **test** APK/MSI publishing | ✅ **`test@0920148`**, published **`2026-09-06T07:22:29Z`** by `34018809913`: `dhun-test.msi` **112,009,680 B**, `dhun-test.apk` **17,483,422 B**, both `.sha256` assets uploaded | Not evidence for an AAB, stable v0.1.0, clean-target installation or successful playback |
+| Rolling **test** APK/MSI publishing | ✅ **`test@f157245`**, published **`2026-09-07T03:27:18Z`** after `34079283231`: `dhun-test.msi` **112,287,744 B**, `dhun-test.apk` **17,581,785 B**, both `.sha256` assets uploaded | Not evidence for an AAB, stable v0.1.0, clean-target installation or successful playback |
 | Windows desktop startup (JVM launch) | ✅ Earlier user-reported install → launch confirmed the PR #22 JVM fix (`1.0.5`) on 2026-09-06; that report is recorded in the verification docs on GitHub. APK launches too | No open JVM-launch defect from that report. Fresh one-window startup is user-confirmed after manual reinstall (local evidence). Startup-log capture, upgrade and clean-target hygiene remain separate gates |
 | **Stream byte fetch presents the resolving identity** (audio fix) | ✅ **PR #24 merged at `c247fb4`**: `StreamInfo.userAgent`, Android per-open `UserAgentDataSource`, desktop downloader propagation / local-file fallback and the socket-agent regression assertion are on main and in the published build; current CI `34018809911` green | 🟨 Audible uncached-track playback and failure/recovery behavior must be re-tested on both platforms; CI does not prove the CDN accepts the bytes |
 | **Home endless scroll** | ✅ **PR #24 merged at `c247fb4`**: `HomeFeedPage`, continuation through client/provider/use case/ViewModel, near-bottom trigger and index-safe shelf keys; three pagination regressions covered by shared JVM CI | 🔴 Fresh Windows re-test still does not load further Home pages. Feed-token/dedup/VM/UI repairs and regressions are on the branch with green CI, awaiting device verification. Search load-more is unchanged |
