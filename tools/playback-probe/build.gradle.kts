@@ -23,10 +23,23 @@ application {
     // `gradle :tools:playback-probe:run -PmainClass=...` switches entry points:
     //  - MainKt        = Phase 01 extraction kill-switch probe (default)
     //  - SmokeMainKt   = Phase 02 provider-level live smoke
+    //  - OfflineMainKt = ADR-006 deterministic local-file/offline probe
     mainClass.set(
         providers.gradleProperty("mainClass")
             .getOrElse("dev.dhun.tools.playbackprobe.MainKt")
     )
+}
+
+// Deterministic ADR-006 check. It uses only a packaged WAV fixture, the real
+// JVM SQLDelight download repository, and a network resolver that fails if
+// called. `--offline` therefore checks the local playback route without any
+// live YouTube or CDN dependency.
+tasks.register<JavaExec>("offlineProbe") {
+    group = "verification"
+    description = "Assert a completed download resolves and loads through file:// without network"
+    dependsOn(tasks.named("classes"))
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("dev.dhun.tools.playbackprobe.OfflineMainKt")
 }
 
 tasks.register<Copy>("resolveRuntime") {
