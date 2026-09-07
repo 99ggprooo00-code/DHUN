@@ -69,7 +69,6 @@ import org.koin.dsl.module
 import java.io.File
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
-import javax.swing.JOptionPane
 import javax.swing.SwingUtilities
 
 /**
@@ -109,8 +108,8 @@ import javax.swing.SwingUtilities
  *    an Error state with install instructions.
  *  - Startup now captures every exception to a log file
  *    (<installDir>/userdata/dhun-startup.log or %TEMP%/dhun-startup.log)
- *    and shows an AWT dialog so a Windows MSI user without a console sees
- *    the actual cause instead of the generic launcher message.
+ *    and renders startup failures in the sole Compose window; it never opens a
+ *    second Swing/JOptionPane window.
  *
  * Compose Desktop 1.8.2 API notes (verified against
  * JetBrains/compose-multiplatform-core v1.8.2 sources):
@@ -161,39 +160,6 @@ private fun logStartupFailure(e: Throwable) {
     } catch (_: Throwable) { }
 }
 
-private fun showStartupErrorDialog(e: Throwable) {
-    try {
-        val logPath = startupLogFile().absolutePath
-        val message = buildString {
-            appendLine("DHUN failed to start:")
-            appendLine("${e::class.simpleName}: ${e.message}")
-            appendLine()
-            appendLine("Log: $logPath")
-            appendLine()
-            appendLine("If this mentions VLC / libvlc:")
-            appendLine("  Install VLC from https://www.videolan.org/vlc/ and restart.")
-            appendLine()
-            appendLine("If this mentions java.sql / JDBC / sqlite:")
-            appendLine("  This build is missing Java modules — please report the log.")
-            appendLine()
-            appendLine("Try uninstalling + reinstalling the MSI.")
-        }
-        // Show on EDT; if we're already on EDT this still works.
-        SwingUtilities.invokeLater {
-            try {
-                JOptionPane.showMessageDialog(
-                    null,
-                    message,
-                    "DHUN — Startup Error",
-                    JOptionPane.ERROR_MESSAGE,
-                )
-            } catch (_: Throwable) { }
-        }
-        // Fallback: block EDT for 0.5s so dialog has time to appear when called from non-EDT startup path
-        // (not strictly needed, but keeps the error visible if the app exits immediately after).
-    } catch (_: Throwable) { }
-}
-
 fun main() {
     Thread.setDefaultUncaughtExceptionHandler { thread, ex ->
         System.err.println("DHUN uncaught on ${thread.name}: $ex")
@@ -221,7 +187,7 @@ fun main() {
     try {
         application {
             // Eagerly capture any initialization failure so the Windows MSI
-            // user sees a dialog + log instead of a silent exit or the
+            // user sees the single error window + log instead of a silent exit or the
             // generic \"Failed to launch JVM\" from the launcher.
             var initError: Throwable? = null
             var koinInstance: org.koin.core.Koin? = null
@@ -251,7 +217,6 @@ fun main() {
                 logStartupFailure(e)
                 System.err.println("DHUN initialization failed before window: $e")
                 e.printStackTrace()
-                showStartupErrorDialog(e)
             }
 
             if (initError != null && koinInstance == null) {
@@ -291,11 +256,6 @@ fun main() {
             val dataLayer: DataLayer = koin.get()
             val persistence: NowPlayingPersistence = koin.get()
             val settings = dataLayer.settings
-
-            if (initError != null) {
-                // We had a non-fatal init error (e.g. VLC): surface it once via dialog.
-                showStartupErrorDialog(initError!!)
-            }
 
             // Phase 12: persisted window geometry + close-to-tray (Phase 05 DB).
             val initialGeometry: WindowGeometry? = runBlocking {
@@ -543,10 +503,9 @@ fun main() {
         logStartupFailure(e)
         System.err.println("DHUN outer main failed: $e")
         e.printStackTrace()
-        showStartupErrorDialog(e)
-        // Give the dialog a moment to appear before forcing exit (JOptionPane is modal on EDT).
-        try { Thread.sleep(500) } catch (_: Throwable) { }
-        try { JOptionPane.showMessageDialog(null, "DHUN failed to launch:\n${e::class.simpleName}: ${e.message}\n\nLog: ${startupLogFile().absolutePath}", "DHUN Fatal", JOptionPane.ERROR_MESSAGE) } catch (_: Throwable) { }
+        // The application block could not create its single Compose window.
+        // Keep diagnostics in the startup log/stderr rather than spawning a
+        // second native Swing window during teardown.
         System.exit(1)
     }
 }
