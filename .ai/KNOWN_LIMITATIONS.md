@@ -2,6 +2,51 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-07 — Phase 15 Android polish (`arena/01a07ad8-dhun`) alongside 15a player immersion (`arena/01a07a6b-dhun`)
+
+**Status after the split: 15a is on `main`, Phase 15 is not finished.** The player batch
+merged as `dd0fe14` (head `cd40c1f`, `build-and-test`/`apk`/`msi` green); the Android half
+is PR #43, green at `434ad92`, unmerged. The head that started this — `7c24fde`, which
+carried *both* workstreams — **did not compile at all**, and #43 carries the fix to a test
+failure inherited from `32e38c5`. Per the contract (*done = pushed + CI green +
+hardware-verified where specified*), every Phase-15 row here is a **code + CI** claim with
+the device half still open.
+
+- **A `MERGEABLE` flag is not a health signal.** #41 was `mergeable: MERGEABLE` with
+  `build-and-test`, `apk` and `msi` all **failing**; `mergeStateStatus: UNSTABLE` was
+  the only honest field, and the session that inherited the PR trusted a platform
+  message ("merged-or-closed") instead of `gh pr view`. Read `gh pr checks` before
+  merging anything, including work you were told is finished.
+- **A compile failure hides every test result behind it.** `PlayerSeekBar.kt` failed
+  resolution, so `:shared:jvmTest` and `:app-android:testDebugUnitTest` never executed
+  on that head — the four 15a test files had not run anywhere until #41's `cd40c1f`
+  (which is green and on `main`), and a *separate*, real `NavStatePersistenceTest`
+  failure that predated the break was invisible beneath it. Two
+  defects, one red: fixing the compile error is what reveals the second. Read "CI red" as
+  *unknown*, not as *one known failure*.
+- **An Android *unit-test* failure now surfaces as a build failure.** `6f45a27` coupled
+  `:app-android:assembleDebug` to `testDebugUnitTest` so CI executes the suite; the
+  side effect is that a red test aborts the step named **"Android debug build"**, which
+  reads like a compiler problem. Check the test report before hunting syntax.
+- **Robolectric shares one JVM, so app-level `startKoin` must be re-boot safe.** The
+  first Android suite died on `KoinApplicationAlreadyStartedException` from
+  `DhunApp.onCreate` (`4816c81` → guarded in `32e38c5`). Any future Android test that
+  boots the application inherits this, and none of it is reproducible locally: the
+  sandbox has no JDK and no Maven/Gradle egress, so CI is the only compiler.
+- **Compose offset inputs have no automated gate.** `trackAlignedItemOffsetPx` is pure
+  and JVM-tested, but *what is fed to it* is not: the player PR's `ff28f4a` passed an out-of-scope
+  `width` (three red jobs), and an `onSizeChanged` placed inside rather than outside
+  `.padding(horizontal = xsPlus)` reports the text box instead of the whole pill — a
+  silent 12px clamp error no compile error, lint or test would catch. Placement
+  relative to `padding` is the whole difference; verify on device.
+- **`split(':', limit = 3)` does not reject empty payloads.** `?.let` guards null, not
+  `""`, so `"artist:"` restored `ArtistPage(id=)` onto the nav back stack forever. Any
+  string-encoded persistence in this repo needs the blank-vs-null distinction.
+- **Open by design, not omission:** tablet two-pane (`shared/ui/shell/DhunAppShell.kt`,
+  untouched), the 30-minute LeakCanary soak (never run), TalkBack, the launcher
+  long-press surface, the dynamic shortcut on a real launcher, and no
+  `docs/verification/15-*.md`.
+
 ## 2026-09-07 — Coordinator reconciliation: integration limits found while merging six ADR-006 agents
 
 Recorded by the coordinator session `arena/01a07a07-dhun`. Full detail in
@@ -20,7 +65,7 @@ hardware gate.**
   **Residual:** `KoinDownloadStackTest` pins the registration *shape* with minimal
   fakes in `:shared:jvmTest` and reads Koin through `GlobalContext.get()` — the real
   `appModule` is **still unverified**, because exercising it needs `androidContext()`,
-  hence Robolectric plus an `:app-android:testDebugUnitTest` source set. **Standing
+  hence Robolectric plus an `:app-android:testDebugUnitTest` source set. **That source set now exists, and `AppModuleGraphTest` (PR #43) resolves every `appModule` definition — CI-pending, so until #43 merges, C1 is still OPEN on `main`.** **Standing
   rule (from agent 1, PR #35):** any new `app-android` Koin registration that takes
   another Koin-resolved dependency must be covered by a `checkModules()` call or a
   `koin.get<…>()` smoke test — `:app-android:assembleDebug` will not catch it.

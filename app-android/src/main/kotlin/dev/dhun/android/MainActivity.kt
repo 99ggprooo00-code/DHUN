@@ -39,6 +39,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -47,6 +53,11 @@ import androidx.media3.session.SessionToken
 import dev.dhun.android.playback.AndroidDhunPlayer
 import dev.dhun.android.playback.DhunPlaybackService
 import dev.dhun.android.playback.PlaybackGraph
+import dev.dhun.android.shortcuts.NowPlayingShortcutSync
+import dev.dhun.android.shortcuts.ShortcutAction
+import dev.dhun.android.shortcuts.ShortcutIntents
+import dev.dhun.android.shortcuts.shortcutTrack
+import dev.dhun.android.ui.NavStatePersistence
 import dev.dhun.core.PlaybackState
 import dev.dhun.data.DataLayer
 import dev.dhun.design.DhunColors
@@ -60,14 +71,17 @@ import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
-import dev.dhun.ui.shell.DetailRoute
 import dev.dhun.ui.shell.DhunAppShell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
@@ -78,11 +92,10 @@ class MainActivity : ComponentActivity() {
     private var player: AndroidDhunPlayer? = null
     private var persistence: NowPlayingPersistence? = null
     private var currentNav: AppNavState? = null
-    private var restoredNavTab: String? = null
-    private var restoredPlayerExpanded = false
-    private var restoredDetailRoutes: ArrayList<String>? = null
+    // Handed to NavStatePersistence lazily by the first composition (the
+    // original per-field restore was extracted into that object for tests).
+    private var lastSavedState: Bundle? = null
 
-    private enum class ShortcutAction { SEARCH, RESUME, LIBRARY }
     private val pendingShortcut = MutableStateFlow<ShortcutAction?>(null)
     private val batteryRationaleVisible = MutableStateFlow(false)
 
@@ -94,6 +107,7 @@ class MainActivity : ComponentActivity() {
 
     private val connectState = MutableStateFlow<ConnectUi>(ConnectUi.Connecting)
     private val connectLog = MutableStateFlow<List<String>>(emptyList())
+    private var shortcutSyncJob: Job? = null
 
     private fun logLine(line: String) {
         connectLog.value = connectLog.value + line
@@ -105,9 +119,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        restoredNavTab = savedInstanceState?.getString(KEY_NAV_TAB)
-        restoredPlayerExpanded = savedInstanceState?.getBoolean(KEY_PLAYER_EXPANDED) ?: false
-        restoredDetailRoutes = savedInstanceState?.getStringArrayList(KEY_DETAIL_ROUTES)
+        lastSavedState = savedInstanceState
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = false
@@ -123,7 +135,7 @@ class MainActivity : ComponentActivity() {
                 // Music-app back behavior: FullPlayer collapses first, then
                 // detail pages pop; only when nothing overlays do we park the
                 // app — BACK never kills the player.
-                val nav = androidx.compose.runtime.remember { restoredNavState() }
+                val nav = androidx.compose.runtime.remember { NavStatePersistence.restore(lastSavedState) }
                 currentNav = nav
                 BackHandler { if (!nav.closeTop()) moveTaskToBack(true) }
 
@@ -136,6 +148,11 @@ class MainActivity : ComponentActivity() {
                     val action = shortcut ?: return@LaunchedEffect
                     if (ui !is ConnectUi.Ready) return@LaunchedEffect
                     when (action) {
+                        ShortcutAction.NOW_PLAYING -> {
+                            // Dynamic shortcut: land directly in the
+                            // FullPlayer for the current queue.
+                            nav.playerExpanded = true
+                        }
                         ShortcutAction.SEARCH -> {
                             nav.selectedTab = AppTab.SEARCH
                             nav.detailStack.clear()
@@ -202,7 +219,10 @@ class MainActivity : ComponentActivity() {
                                 color = DhunColors.errorContainer,
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
-                                    .fillMaxWidth(),
+                                    .fillMaxWidth()
+                                    // TalkBack announces the degraded playback
+                                    // mode when this banner appears.
+                                    .semantics { liveRegion = LiveRegionMode.Polite },
                             ) {
                                 Text(
                                     reason,
@@ -225,7 +245,12 @@ class MainActivity : ComponentActivity() {
                 if (showBatteryRationale) {
                     AlertDialog(
                         onDismissRequest = { batteryRationaleVisible.value = false },
-                        title = { Text("Keep playback reliable") },
+                        title = {
+                            Text(
+                                "Keep playback reliable",
+                                modifier = Modifier.semantics { heading() },
+                            )
+                        },
                         text = {
                             Text(
                                 "Android battery optimization can stop background music " +
@@ -261,51 +286,12 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        currentNav?.let { nav ->
-            outState.putString(KEY_NAV_TAB, nav.selectedTab.name)
-            outState.putBoolean(KEY_PLAYER_EXPANDED, nav.playerExpanded)
-            outState.putStringArrayList(
-                KEY_DETAIL_ROUTES,
-                ArrayList(nav.detailStack.map(::encodeRoute)),
-            )
-        }
+        currentNav?.let { nav -> NavStatePersistence.save(nav, outState) }
         super.onSaveInstanceState(outState)
     }
 
-    private fun restoredNavState(): AppNavState = AppNavState().apply {
-        restoredNavTab?.let { name ->
-            selectedTab = runCatching { AppTab.valueOf(name) }.getOrDefault(AppTab.HOME)
-        }
-        playerExpanded = restoredPlayerExpanded
-        restoredDetailRoutes.orEmpty().mapNotNull(::decodeRoute).forEach { route -> detailStack.add(route) }
-    }
-
-    private fun encodeRoute(route: DetailRoute): String = when (route) {
-        is DetailRoute.ArtistPage -> "artist:${route.id}"
-        is DetailRoute.AlbumPage -> "album:${route.id}"
-        is DetailRoute.PlaylistPage -> "playlist:${route.isLocal}:${route.id}"
-    }
-
-    private fun decodeRoute(value: String): DetailRoute? {
-        val parts = value.split(':', limit = 3)
-        return when (parts.firstOrNull()) {
-            "artist" -> parts.getOrNull(1)?.let(DetailRoute::ArtistPage)
-            "album" -> parts.getOrNull(1)?.let(DetailRoute::AlbumPage)
-            "playlist" -> parts.getOrNull(2)?.let { id ->
-                DetailRoute.PlaylistPage(id, parts.getOrNull(1) == "true")
-            }
-            else -> null
-        }
-    }
-
     private fun handleShortcutIntent(intent: Intent?) {
-        val action = intent?.getStringExtra(EXTRA_SHORTCUT_ACTION) ?: return
-        pendingShortcut.value = when (action) {
-            SHORTCUT_SEARCH -> ShortcutAction.SEARCH
-            SHORTCUT_RESUME -> ShortcutAction.RESUME
-            SHORTCUT_LIBRARY -> ShortcutAction.LIBRARY
-            else -> null
-        }
+        pendingShortcut.value = ShortcutIntents.actionFrom(intent)
     }
 
     override fun onDestroy() {
@@ -417,6 +403,18 @@ class MainActivity : ComponentActivity() {
                 .onSuccess { snap -> if (snap != null) logLine("restored ${snap.queue.size} tracks (paused)") }
             pers.start()
         }
+        // Phase 15: dynamic "Now playing" launcher shortcut — the long label
+        // follows the current track. Deduped by track id so it republishes
+        // only on actual track changes, and cancelled/re-armed on every
+        // attach() (the fallback path attaches a second engine).
+        shortcutSyncJob?.cancel()
+        shortcutSyncJob = activityScope.launch {
+            p.state
+                .map { it.shortcutTrack()?.id }
+                .distinctUntilChanged()
+                .filterNotNull()
+                .collect { NowPlayingShortcutSync(this@MainActivity).publish(p.state.value) }
+        }
     }
 
     private fun Throwable.toDhunStyleMessage(): String =
@@ -468,13 +466,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "DHUN"
         private const val MAX_CONNECT_ATTEMPTS = 3
-        private const val EXTRA_SHORTCUT_ACTION = "dev.dhun.android.extra.SHORTCUT_ACTION"
-        private const val KEY_NAV_TAB = "dhun.nav.tab"
-        private const val KEY_PLAYER_EXPANDED = "dhun.player.expanded"
-        private const val KEY_DETAIL_ROUTES = "dhun.nav.routes"
-        private const val SHORTCUT_SEARCH = "search"
-        private const val SHORTCUT_RESUME = "resume"
-        private const val SHORTCUT_LIBRARY = "library"
         private var batteryExemptionRequested = false
     }
 }
@@ -486,6 +477,7 @@ private fun ConnectingScreen(log: List<String>, version: String) {
     // Consumer splash: brand + indeterminate indicator + one static status
     // line. The raw attempt/log lines stay in Logcat (via logLine) — they
     // read as a terminal on screen and never ship to users.
+    val connectingDescription = stringResource(R.string.a11y_connecting)
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -506,6 +498,11 @@ private fun ConnectingScreen(log: List<String>, version: String) {
             CircularProgressIndicator(
                 color = DhunColors.accent,
                 strokeWidth = DhunSpacing.progressStroke,
+                modifier = Modifier.semantics {
+                    // Progress spinners have no text node — give screen
+                    // readers something to announce.
+                    contentDescription = connectingDescription
+                },
             )
             Spacer(modifier = Modifier.height(DhunSpacing.lg))
             Text(
@@ -539,7 +536,9 @@ private fun FailureScreen(message: String, onRetry: () -> Unit) {
         Text(
             "Playback failed to start",
             color = DhunColors.error,
-            modifier = Modifier.padding(top = DhunSpacing.md),
+            modifier = Modifier
+                .padding(top = DhunSpacing.md)
+                .semantics { heading() },
         )
         Text(
             message,
