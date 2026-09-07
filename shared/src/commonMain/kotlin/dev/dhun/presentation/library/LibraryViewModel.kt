@@ -148,6 +148,8 @@ data class DownloadsListUi(
     val active: List<DownloadedTrack>,
     val completed: List<DownloadedTrack>,
 ) {
+    /** Same rows, flat and in list order (active section first). */
+    val all: List<DownloadedTrack> get() = active + completed
     val totalCount: Int get() = active.size + completed.size
 
     companion object {
