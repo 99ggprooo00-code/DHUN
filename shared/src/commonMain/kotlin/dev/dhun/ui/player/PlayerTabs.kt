@@ -25,27 +25,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.Track
 import dev.dhun.design.DhunAnimations
@@ -81,7 +78,8 @@ internal fun PlayerTabRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(DhunSpacing.touchTarget),
+            .height(DhunSpacing.touchTarget)
+            .selectableGroup(),
     ) {
         tabTitles.forEachIndexed { index, title ->
             val selected = index == selectedTab
@@ -110,7 +108,11 @@ internal fun PlayerTabRow(
                             )
                         },
                     )
-                    .clickable { onSelect(index) },
+                    .selectable(
+                        selected = selected,
+                        role = Role.Tab,
+                        onClick = { onSelect(index) },
+                    ),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -321,117 +323,92 @@ internal fun LyricsTabContent(
 ) {
     val lyricsState by viewModel.lyricsState.collectAsState()
     val positionMs by viewModel.positionMs.collectAsState()
+    val currentTrack by viewModel.currentTrack.collectAsState()
+    val track = currentTrack
+    if (track == null) {
+        EmptyView(
+            title = "Nothing playing",
+            message = "Play a track to see its lyrics.",
+            modifier = modifier.fillMaxSize(),
+        )
+        return
+    }
 
-    when (val state = lyricsState) {
-        is LyricsUiState.Loading -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(DhunSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
-            ) {
-                repeat(7) {
-                    LoadingShimmer(modifier = Modifier.fillMaxWidth(if (it % 2 == 0) 0.9f else 0.6f).height(DhunSpacing.lg))
+    // Scroll position and manual-follow preference belong to this track, not
+    // the tab slot. This also resets plain-text lyrics on a track change.
+    key(track.id) {
+        when (val state = lyricsState) {
+            is LyricsUiState.Loading -> {
+                Column(
+                    modifier = modifier.fillMaxSize().padding(DhunSpacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+                ) {
+                    repeat(7) {
+                        LoadingShimmer(
+                            modifier = Modifier
+                                .fillMaxWidth(if (it % 2 == 0) 0.9f else 0.6f)
+                                .height(DhunSpacing.lg),
+                        )
+                    }
                 }
             }
-        }
-        is LyricsUiState.Unavailable -> {
-            EmptyView(
-                title = "No lyrics",
-                message = "Lyrics aren't available for this track yet.",
-                modifier = modifier.fillMaxSize(),
-            )
-        }
-        is LyricsUiState.Error -> {
-            ErrorView(
-                title = "Lyrics failed to load",
-                message = state.message,
-                onRetry = { viewModel.refreshLyrics() },
-                modifier = modifier.fillMaxSize(),
-            )
-        }
-        is LyricsUiState.Unsynced -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.md),
-            ) {
-                Text(
-                    text = state.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DhunColors.textSecondary,
-                    lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight,
+            is LyricsUiState.Unavailable -> {
+                EmptyView(
+                    title = "No lyrics",
+                    message = "Lyrics aren't available for this track yet.",
+                    modifier = modifier.fillMaxSize(),
+                    actionLabel = "Check again",
+                    onAction = viewModel::refreshLyrics,
                 )
-                Spacer(modifier = Modifier.height(DhunSpacing.huge))
             }
-        }
-        is LyricsUiState.Synced -> {
-            val lines = state.lines
-            val activeIndex = lines.indexOfLast { line ->
-                val start = line.startTimeMs ?: Long.MIN_VALUE
-                start <= positionMs
+            is LyricsUiState.Error -> {
+                ErrorView(
+                    title = "Lyrics failed to load",
+                    message = state.message,
+                    onRetry = viewModel::refreshLyrics,
+                    modifier = modifier.fillMaxSize(),
+                )
             }
-            val listState: LazyListState = rememberLazyListState()
-            LaunchedEffect(activeIndex) {
-                if (activeIndex > 0) {
-                    listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
+            is LyricsUiState.Unsynced -> {
+                if (state.text.isBlank()) {
+                    EmptyView(
+                        title = "No lyrics",
+                        message = "No lyric text was found for this track.",
+                        modifier = modifier.fillMaxSize(),
+                    )
+                } else {
+                    Column(
+                        modifier = modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.md),
+                        verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+                    ) {
+                        Text(
+                            text = "Not time-synced",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = DhunColors.textTertiary,
+                        )
+                        Text(
+                            text = state.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = DhunColors.textSecondary,
+                            lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight,
+                        )
+                        Spacer(modifier = Modifier.height(DhunSpacing.huge))
+                    }
                 }
             }
-            LazyColumn(
-                state = listState,
-                modifier = modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = DhunSpacing.lg, horizontal = DhunSpacing.xxl),
-                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-            ) {
-                itemsIndexed(lines) { index, line ->
-                    val active = index == activeIndex
-                    val color by animateColorAsState(
-                        targetValue = if (active) accent else DhunColors.textTertiary,
-                        animationSpec = DhunAnimations.mediumTween(),
-                        label = "lyricColor$index",
-                    )
-                    // ADR-002 P8: spring-ish scale emphasis on the active line.
-                    Text(
-                        text = line.text.ifBlank { " " },
-                        style = if (active) {
-                            MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
-                        } else {
-                            MaterialTheme.typography.bodyLarge
-                        },
-                        color = color,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                // Lightweight motion: active line pops; neighbors stay calm.
-                                scaleX = if (active) 1.04f else 1f
-                                scaleY = if (active) 1.04f else 1f
-                                alpha = if (active) 1f else 0.72f
-                            }
-                            .clip(DhunShapes.medium)
-                            .then(
-                                if (active) {
-                                    Modifier.background(
-                                        Brush.horizontalGradient(
-                                            listOf(
-                                                accent.copy(alpha = 0.12f),
-                                                Color.Transparent,
-                                                accent.copy(alpha = 0.12f),
-                                            ),
-                                        ),
-                                    )
-                                } else {
-                                    Modifier
-                                },
-                            )
-                            .clickable(enabled = line.startTimeMs != null) {
-                                line.startTimeMs?.let(viewModel::seekTo)
-                            }
-                            .padding(vertical = DhunSpacing.sm),
-                    )
-                }
-            }
+            is LyricsUiState.Synced -> SyncedLyricsContent(
+                lines = state.lines,
+                positionMs = positionMs,
+                accent = accent,
+                onSeek = { position ->
+                    // An outgoing tab/track must never seek its successor.
+                    if (viewModel.currentTrack.value?.id == track.id) viewModel.seekTo(position)
+                },
+                modifier = modifier,
+            )
         }
     }
 }
