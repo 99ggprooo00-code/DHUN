@@ -60,10 +60,13 @@ import dev.dhun.design.components.DhunOutlinedButton
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.SectionHeader
 import dev.dhun.domain.HistoryDay
+import dev.dhun.presentation.library.DownloadsListUi
 import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.library.currentUtcOffsetMs
+import dev.dhun.presentation.library.toTrack
 import dev.dhun.ui.components.DragHandleGrip
 import dev.dhun.ui.components.ReorderableList
 import kotlinx.coroutines.delay
@@ -91,7 +94,7 @@ fun LibraryScreen(
     val playlists by viewModel.playlistsFlow.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
     val groupedHistory by viewModel.groupedHistory.collectAsState()
-    val downloads by viewModel.downloads.collectAsState()
+    val downloadsUi by viewModel.downloadsForUi.collectAsState()
     val storageSummary by viewModel.storageSummary.collectAsState()
 
     // Keep day grouping fresh on zone changes (cheap ticker)
@@ -165,7 +168,7 @@ fun LibraryScreen(
                 )
             }
             LibraryTab.DOWNLOADS -> DownloadsTab(
-                downloads = downloads,
+                downloads = downloadsUi,
                 storage = storageSummary,
                 onPlay = viewModel::playDownloaded,
                 onRemove = viewModel::removeDownload,
@@ -676,7 +679,7 @@ private enum class DownloadsView { LIST, MANAGE }
 
 @Composable
 private fun DownloadsTab(
-    downloads: List<DownloadedTrack>,
+    downloads: DownloadsListUi,
     storage: dev.dhun.presentation.library.StorageSummary,
     onPlay: (Track) -> Unit,
     onRemove: (String) -> Unit,
@@ -688,7 +691,7 @@ private fun DownloadsTab(
     progressFor: (String) -> kotlinx.coroutines.flow.Flow<dev.dhun.download.DownloadProgress?>,
     modifier: Modifier = Modifier,
 ) {
-    if (downloads.isEmpty()) {
+    if (downloads.totalCount == 0) {
         EmptyView(
             title = "No downloads yet",
             message = "Use the download action on a track to save it for offline listening.",
@@ -715,7 +718,7 @@ private fun DownloadsTab(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "${downloads.size} item${if (downloads.size == 1) "" else "s"} • ${formatBytes(storage.usedByDownloadsBytes)}",
+                "${downloads.totalCount} item${if (downloads.totalCount == 1) "" else "s"} • ${formatBytes(storage.usedByDownloadsBytes)}",
                 style = MaterialTheme.typography.labelMedium,
                 color = DhunColors.textSecondary,
             )
@@ -730,12 +733,12 @@ private fun DownloadsTab(
         if (view == DownloadsView.MANAGE) {
             StorageManageView(
                 storage = storage,
-                downloads = downloads,
+                downloads = downloads.all,
                 selected = selected.value,
                 onToggle = ::toggle,
                 onSelectAll = {
-                    selected.value = if (selected.value.size == downloads.size) emptySet()
-                    else downloads.map { it.trackId }.toSet()
+                    selected.value = if (selected.value.size == downloads.totalCount) emptySet()
+                    else downloads.all.map { it.trackId }.toSet()
                 },
                 onDeleteSelected = { showBatchConfirm = true },
                 modifier = Modifier.weight(1f),
@@ -751,16 +754,43 @@ private fun DownloadsTab(
                         modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs),
                     )
                 }
-                itemsIndexed(downloads, key = { _, d -> d.trackId }) { _, item ->
-                    DownloadRow(
-                        download = item,
-                        progressFlow = progressFor(item.trackId),
-                        onPlay = { onPlay(item.toTrack()) },
-                        onRemove = { onRemove(item.trackId) },
-                        onPause = { onPause(item.trackId) },
-                        onResume = { onResume(item.trackId) },
-                        onCancel = { onCancel(item.trackId) },
-                    )
+                if (downloads.active.isNotEmpty()) {
+                    item(key = "active_header") {
+                        SectionHeader(
+                            title = "Active downloads",
+                            modifier = Modifier.padding(top = DhunSpacing.xs),
+                        )
+                    }
+                    itemsIndexed(downloads.active, key = { _, d -> d.trackId }) { _, item ->
+                        DownloadRow(
+                            download = item,
+                            progressFlow = progressFor(item.trackId),
+                            onPlay = { onPlay(item.toTrack()) },
+                            onRemove = { onRemove(item.trackId) },
+                            onPause = { onPause(item.trackId) },
+                            onResume = { onResume(item.trackId) },
+                            onCancel = { onCancel(item.trackId) },
+                        )
+                    }
+                }
+                if (downloads.completed.isNotEmpty()) {
+                    item(key = "completed_header") {
+                        SectionHeader(
+                            title = "Downloaded",
+                            modifier = Modifier.padding(top = DhunSpacing.xs),
+                        )
+                    }
+                    itemsIndexed(downloads.completed, key = { _, d -> d.trackId }) { _, item ->
+                        DownloadRow(
+                            download = item,
+                            progressFlow = progressFor(item.trackId),
+                            onPlay = { onPlay(item.toTrack()) },
+                            onRemove = { onRemove(item.trackId) },
+                            onPause = { onPause(item.trackId) },
+                            onResume = { onResume(item.trackId) },
+                            onCancel = { onCancel(item.trackId) },
+                        )
+                    }
                 }
             }
         }
@@ -768,7 +798,7 @@ private fun DownloadsTab(
 
     if (showClearConfirm) {
         ClearDownloadsConfirmDialog(
-            count = downloads.size,
+            count = downloads.totalCount,
             onDismiss = { showClearConfirm = false },
             onConfirm = { onClearAll(); selected.value = emptySet(); showClearConfirm = false },
         )
@@ -1284,15 +1314,6 @@ private fun stateLabel(state: DownloadState): String = when (state) {
     DownloadState.FAILED -> "Failed"
     DownloadState.PAUSED -> "Paused"
 }
-
-private fun DownloadedTrack.toTrack(): Track = Track(
-    id = trackId,
-    title = title,
-    artistName = artistName,
-    albumName = albumName,
-    durationSeconds = durationSeconds,
-    thumbnailUrl = thumbnailUrl,
-)
 
 private fun formatBytes(bytes: Long): String {
     if (bytes <= 0) return "0 B"
