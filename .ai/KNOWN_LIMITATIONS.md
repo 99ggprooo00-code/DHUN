@@ -4,11 +4,13 @@ Updated every phase. Nothing hidden.
 
 ## 2026-09-07 — Phase 15 Android polish (`arena/01a07ad8-dhun`) alongside 15a player immersion (`arena/01a07a6b-dhun`)
 
-**Neither PR is merged, so nothing in Phase 15 / 15a is "done".** At the time of
-writing, #41's head `7c24fde` **did not compile at all**, and #43's Android half carries
-a test failure inherited from `32e38c5`. Per the contract (*done = pushed + CI green +
-hardware-verified where specified*), every claim in the Phase-15 rows is a **pushed**
-claim.
+**Status after the split: 15a is on `main`, Phase 15 is not finished.** The player batch
+merged as `dd0fe14` (head `cd40c1f`, `build-and-test`/`apk`/`msi` green); the Android half
+is PR #43, green at `434ad92`, unmerged. The head that started this — `7c24fde`, which
+carried *both* workstreams — **did not compile at all**, and #43 carries the fix to a test
+failure inherited from `32e38c5`. Per the contract (*done = pushed + CI green +
+hardware-verified where specified*), every Phase-15 row here is a **code + CI** claim with
+the device half still open.
 
 - **A `MERGEABLE` flag is not a health signal.** #41 was `mergeable: MERGEABLE` with
   `build-and-test`, `apk` and `msi` all **failing**; `mergeStateStatus: UNSTABLE` was
@@ -17,9 +19,11 @@ claim.
   merging anything, including work you were told is finished.
 - **A compile failure hides every test result behind it.** `PlayerSeekBar.kt` failed
   resolution, so `:shared:jvmTest` and `:app-android:testDebugUnitTest` never executed
-  on that head — the four 15a test files have never run anywhere, and a *separate*,
-  real `NavStatePersistenceTest` failure that predated the break was invisible. Two
-  defects, one red: fixing the compile error is what reveals the second.
+  on that head — the four 15a test files had not run anywhere until #41's `cd40c1f`
+  (which is green and on `main`), and a *separate*, real `NavStatePersistenceTest`
+  failure that predated the break was invisible beneath it. Two
+  defects, one red: fixing the compile error is what reveals the second. Read "CI red" as
+  *unknown*, not as *one known failure*.
 - **An Android *unit-test* failure now surfaces as a build failure.** `6f45a27` coupled
   `:app-android:assembleDebug` to `testDebugUnitTest` so CI executes the suite; the
   side effect is that a red test aborts the step named **"Android debug build"**, which
@@ -30,7 +34,7 @@ claim.
   boots the application inherits this, and none of it is reproducible locally: the
   sandbox has no JDK and no Maven/Gradle egress, so CI is the only compiler.
 - **Compose offset inputs have no automated gate.** `trackAlignedItemOffsetPx` is pure
-  and JVM-tested, but *what is fed to it* is not: `ff28f4a` passed an out-of-scope
+  and JVM-tested, but *what is fed to it* is not: the player PR's `ff28f4a` passed an out-of-scope
   `width` (three red jobs), and an `onSizeChanged` placed inside rather than outside
   `.padding(horizontal = xsPlus)` reports the text box instead of the whole pill — a
   silent 12px clamp error no compile error, lint or test would catch. Placement

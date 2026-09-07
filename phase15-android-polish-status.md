@@ -15,18 +15,22 @@ Updated: 2026-09-07 (UTC) · session `arena/01a07ad8-dhun`, continuing `arena/01
 | PR | Scope | Shape | Merge? |
 |---|---|---|---|
 | **#43** — `arena/01a07ad8-dhun` (this session) | **`app-android/**` only** | 9 commits, 18 files, **+1010/−63**, zero `shared/**` | **CI green at `434ad92`** (`build-and-test` `34099826064`, `apk`+`msi` `34099826022`) — merge is this session's last action |
-| **#41** — `arena/01a07a6b-dhun` (its owner's) | ADR-002 player immersion = **candidate 15a**, `shared/ui/player/**` + `design/**` | 4 commits on `cd40c1f`, 11 files, +417/−86 | its owner's call |
+| **#41** — `arena/01a07a6b-dhun` (its owner's) | ADR-002 player immersion = **candidate 15a**, `shared/ui/player/**` + `design/**` | 4 commits `33c3a7e..cd40c1f`, 11 files, +417/−86 | **MERGED as `dd0fe14` (08:20:38Z)** — `build-and-test` ×2 + `apk` + `msi` green at `cd40c1f` |
 
-They no longer overlap and can merge in either order. They *did* overlap: #43 was built
-on #41's head while #41 still contained both workstreams, then re-cut after #41 was
-force-pushed to a player-only branch mid-session.
+They no longer overlap. They *did*: #43 was built on #41's head while that PR still
+carried both workstreams, then re-cut after the a6b session revived, force-pushed the
+branch to player-only `cd40c1f`, and merged it 25 minutes into this session. **`main`
+already has the 15a half; #43 is the only Phase-15 PR still open**, and it is
+`app-android/**`-only by construction — no `shared/**` file appears in its diff.
 
 ## How this session started — three inherited claims were false
 
 Recorded because the next agent inherits this file, not the chat log:
 
 1. *"the platform reports PR #41 as merged-or-closed; the merge never happened under my
-   control"* → `gh pr view 41` reported **OPEN**, head `7c24fde`. Nothing was merged.
+   control"* → `gh pr view 41` reported **OPEN**, head `7c24fde` — nothing had been merged. (#41 did merge, at 08:20:38Z as `dd0fe14`,
+   ~25 min after this session opened: the claim was false at handoff and only came true
+   later, through someone else's action.)
 2. *"Everything else is pushed and safe — 9 commits at `32e38c5`, push-verified"* → the
    branch held **13** commits (`c3bf45a..7c24fde` had landed after the handoff was
    written), and `32e38c5` was **red**: `NavStatePersistenceTest` was failing there in
@@ -42,7 +46,7 @@ not locally") applies to *inherited* claims, not just to your own.
 
 | Defect | Effect | Fixed in |
 |---|---|---|
-| `ff28f4a` passed an out-of-scope `width` to `trackAlignedItemOffsetPx(itemWidthPx, widthPx, fraction)` — also inverting its contract (first arg is the *item* width) | `:shared:compileKotlinJvm` + `:shared:compileDebugKotlinAndroid` → `build-and-test` ×2, `apk`, `msi` red; **no test executed anywhere** | **#41 `d685ddc`** (owner's fix). This session fixed it as `f2d2359`, then **dropped that commit from #43** so the file isn't patched twice |
+| `ff28f4a` passed an out-of-scope `width` to `trackAlignedItemOffsetPx(itemWidthPx, widthPx, fraction)` — also inverting its contract (first arg is the *item* width) | `:shared:compileKotlinJvm` + `:shared:compileDebugKotlinAndroid` → `build-and-test` ×2, `apk`, `msi` red; **no test executed anywhere** | **#41 `d685ddc`, on `main` via `dd0fe14`**. This session fixed the same break as `f2d2359`, then **dropped that commit from #43** so the file was never patched twice |
 | `NavStatePersistenceTest` — `"artist:"` decoded to `ArtistPage(id=)`; `split(':', limit = 3)` yields `""` and `?.let` guards only **null** | A corrupt entry restored onto the nav back stack, unreachable forever; red `:app-android:testDebugUnitTest`, hidden under the compile failure | **#43 `17d5123`** — every route kind requires a non-blank id; the six round-trip cases unchanged |
 
 ## What #43 delivers — `app-android`, the Phase 13 leftovers Phase 15 was scoped to
@@ -97,8 +101,9 @@ not locally") applies to *inherited* claims, not just to your own.
 - The 15a pure logic (`toggleLyricsDominant`, `shouldCollapseFullPlayer`,
   `shouldRecenterLyric`, `lyricCenterScrollDelta`, `activeLyricIndex`, `DhunIcon`
   name/path rules) was hand-checked assertion-by-assertion against its four test files:
-  every expectation matches its implementation. A hand-check is not a gate — and those
-  files live on #41, where CI is their first execution.
+  every expectation matches its implementation. A hand-check is not a gate: those files
+  were only proven by #41's green run at `cd40c1f`, which was their first execution and
+  is on `main` now.
 
 ## Hardware gates — the user's, unclaimed by either PR
 
@@ -118,7 +123,7 @@ not locally") applies to *inherited* claims, not just to your own.
 ## Next technical step
 
 1. `gh pr merge 43 --merge` — green at `434ad92`, `MERGEABLE`/`CLEAN`, main unmoved.
-2. #41 is its owner's to merge independently when green.
+2. ~~#41 when green~~ — **done**: merged as `dd0fe14`, all gates green at `cd40c1f`.
 3. Then the user's hardware list above. Only after that may the Phase 15 / 15a rows in
    `.ai/ROADMAP.md` leave 🟨 — and `docs/verification/15-*.md` still does not exist,
    because no evidence for it exists yet.

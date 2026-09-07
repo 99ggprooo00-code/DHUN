@@ -32,7 +32,8 @@ restored as a live, permanently unresolvable back-stack item.
 `thumbSize.roundToPx()` + pill measured outside its padding; `bf4449a` require non-blank
 ids). Mid-session, the a6b session revived and force-pushed `arena/01a07a6b-dhun` from
 `7c24fde` to `cd40c1f`, **retargeting #41 to the player workstream only** and
-independently fixing the same break in `d685ddc`. So `#43` was re-cut to `origin/main` +
+then merged the player workstream as `dd0fe14`, independently fixing the same break in
+`d685ddc`. So `#43` was re-cut to `origin/main` +
 the 8 Android commits + the nav fix at new SHAs, and the `shared/**` fix was deliberately
 **dropped** — otherwise the same file would be patched twice by two PRs. Net rule
 recorded: when an inherited branch is *shared*, the fix follows the file owner, not the
@@ -45,10 +46,12 @@ absent from every commit on every branch. All three were one `gh` call away. The
 ritual says verify on GitHub, not locally; it applies to **inherited claims** too, or a
 false baseline propagates and the next agent trusts a merge that never happened.
 
-**Verification state.** #43's Android suite was green at `f2d2359` (`CI #339`) and at
-`00a432c` (`build-and-test` `34098780631`, `apk` + `msi` `34098780641`); those heads still
-carried the player batch, so the android-only re-cut re-runs CI and its verdict lands in
-the follow-up commit on the PR. `rot-drill` red on every branch including `main` is the
+**Verification state.** The 15a half is on `main` (`dd0fe14`, all gates green at
+`cd40c1f`) with its own fix for defect 1; #43's Android suite is green at `434ad92`
+(`build-and-test` `34099826064`; `apk` + `msi` `34099826022`) after the re-cut dropped
+`f2d2359` from it. Earlier heads were green *with* the player batch (`CI #339` at
+`f2d2359`; `34098780631`/`34098780641` at `00a432c`) — kept to show both fixes were sound
+before the split, not as separate achievement. `rot-drill` red on every branch including `main` is the
 known issue #14, not this code.
 
 ## 2026-09-07 — Windows second-window report: investigated, no code change warranted
