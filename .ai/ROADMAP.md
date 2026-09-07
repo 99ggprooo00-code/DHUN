@@ -1,5 +1,15 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-07 (UTC)** · session **`arena/01a07a6b-dhun`** (player-immersion workstream) · **`origin/main` = `f562093`** (PR #42 desktop single-instance merged) · **PR #41 OPEN**, retargeted to `main + player commits only`, **CI GREEN** (`build-and-test` run `34099051885`).
+
+**LIVE ITEM: nothing code-open in this session.** Full-Screen player immersion polish (ADR-002 P3–P9, trajectory candidate 15a) is implemented, pushed and CI-green on **PR #41** — files: `shared/.../ui/player/{FullPlayer,PlayerTabs,PlayerSeekBar,MiniPlayer,SyncedLyrics}.kt`, `shared/.../design/{DhunIcons,DhunSpacing}.kt` + 4 mirrored `jvmTest` files. Commits `33c3a7e` (Lyrics/ClosedCaption icons + enum-uniqueness test), `9fb8e3e` (blur-once `PlayerBackdrop` keyed by `BlurredArtworkCache` + CC lyrics toggle + swipe-down collapse), `d685ddc` (scrub preview bubble + shared `trackAlignedItemOffsetPx` clamp; includes the CI fixes — `Modifier.offset{}` carries a Density receiver, not `Size`), `cd40c1f` (P8 spring lyric emphasis + sub-pixel recenter floor + MiniPlayer swipe lift). Additive only; no public signature changed; engine/presentation untouched. **Last error:** none on this head — the two earlier compile breaks were squashed into `d685ddc` before retargeting. **Hardware/visual acceptance is OPEN and stays the user's gate** (backdrop look, CC placement, bubble position, swipe feel, on a phone + a desktop window); CI proves none of it.
+
+**Shared-branch history (disclosed, nothing stranded):** this branch's head earlier carried the app-android Phase-15 agent's 9 unmerged commits; that agent relocated them to its own branch → **PR #43** (open; its stack carries my four player commits at identical SHAs plus its own equivalent `PlayerSeekBar` fix). `arena/01a07a6b-dhun` was then rebuilt as `main + player work` with `--force-with-lease` and #41's title/body updated. Whichever of #41/#43 lands second conflicts once, trivially, on `PlayerSeekBar.kt` — take main's version. PR #40 (release pipeline, other branch) unaffected.
+
+**Exact next technical step:** (1) this roadmap commit re-verifies green on PR #41; (2) `gh pr merge 41 --merge` as the **LAST** action of the session; (3) #43's owner rebases onto the new main; (4) player visual acceptance on a real device/desktop window (user), then `rot-drill`'s live-green verdict (issue #14) — none of these are claimed by CI.
+
+**Superseded:** the desktop single-instance snapshot below (session `arena/01a07a6a-dhun`, PR #42 — now merged into `f562093`), the A6 snapshot, and the coordinator's `481b77b` consolidation are all preserved verbatim below.
+
 Updated **2026-09-07 (UTC)** · session **`arena/01a07a6a-dhun`** · **`origin/main` = `62e3241`** (PR #39 merged; the A6 snapshot below is superseded) · **PR #42 OPEN**, rebased onto `62e3241`, **CI GREEN**, `MERGEABLE`/`CLEAN` · scope **`app-desktop/**` ONLY** — 2 files, **+529/−0**.
 
 **LIVE ITEM: desktop single-instance behavior — Phase 15a/27 leftover (native polish).** Files worked on: `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/native/SingleInstance.kt` (new, commit `ff74c94`) and its wiring in `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt` (commit `c5ddc58`).
@@ -374,7 +384,7 @@ stubbed, NOT scheduled** until the user picks them (Doctrine: no
 
 | # | Candidate | Why this slot |
 |---|---|---|
-| 15a | **Full-Screen player immersion polish (ADR-002 P3–P9)** — lyrics-dominant mode, blur-once cache, gesture simplicity; only after P0 extraction truth + Phase 08/11 hardware smoke | Signature UX; must not outrun streams |
+| 15a | **Full-Screen player immersion polish (ADR-002 P3–P9)** — 🟨 **code + CI green on PR #41** (`33c3a7e`..`cd40c1f`): blur-once `PlayerBackdrop` (P4), CC toggle + Lyrics tab glyph (P3/P6/rule 5), swipe-down collapse (P9), scrub preview bubble (P2 polish), spring lyric emphasis + recenter floor (P8), MiniPlayer swipe lift; `DhunIcon.Lyrics`/`ClosedCaption` + `scrubBubbleHeight` token; 4 test files. **Visual acceptance on hardware OPEN** (user gate) | Signature UX; streams proven, polish shipped — acceptance rides the device |
 | 15 | **Android native polish finish** (Phase 13 leftovers: app shortcuts, Robolectric/UI tests, tablet two-pane, 30-min soak with LeakCanary) | Same platform as the crash/FGS work just done; cheap while context is warm |
 | 16 | **Audio cache (bounded LRU) + offline replay of cached tracks** | Phase 14 item pulled forward; user-visible value, no new surface |
 | 17 | **Rot-drill GA** — wire `tools/playback-probe` into the daily cron (replacing the placeholder), auto-issue on red, 24h detection contract live | The Doctrine's maintenance leg; must exist before any public distribution |
