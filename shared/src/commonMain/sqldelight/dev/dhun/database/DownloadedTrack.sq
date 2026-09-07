@@ -1,0 +1,46 @@
+CREATE TABLE DownloadedTrack (
+    trackId TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    artistName TEXT NOT NULL,
+    albumName TEXT,
+    durationSeconds INTEGER AS kotlin.Int NOT NULL,
+    thumbnailUrl TEXT,
+    localAudioPath TEXT NOT NULL,
+    localArtworkPath TEXT,
+    fileSizeBytes INTEGER AS kotlin.Long NOT NULL,
+    mimeType TEXT NOT NULL,
+    bitrateKbps INTEGER AS kotlin.Int,
+    downloadState TEXT NOT NULL,
+    downloadedAtEpochMs INTEGER AS kotlin.Long NOT NULL
+);
+
+insertOrReplace:
+INSERT OR REPLACE INTO DownloadedTrack(
+    trackId, title, artistName, albumName, durationSeconds, thumbnailUrl,
+    localAudioPath, localArtworkPath, fileSizeBytes, mimeType, bitrateKbps,
+    downloadState, downloadedAtEpochMs)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateState:
+UPDATE DownloadedTrack SET downloadState = ? WHERE trackId = ?;
+
+selectByTrackId:
+SELECT * FROM DownloadedTrack WHERE trackId = ?;
+
+selectCompleted:
+SELECT * FROM DownloadedTrack WHERE downloadState = 'COMPLETED';
+
+selectAll:
+SELECT * FROM DownloadedTrack ORDER BY downloadedAtEpochMs DESC;
+
+deleteByTrackId:
+DELETE FROM DownloadedTrack WHERE trackId = ?;
+
+clear:
+DELETE FROM DownloadedTrack;
+
+isDownloaded:
+SELECT COUNT(*) FROM DownloadedTrack WHERE trackId = ? AND downloadState = 'COMPLETED';
+
+count:
+SELECT COUNT(*) FROM DownloadedTrack;
