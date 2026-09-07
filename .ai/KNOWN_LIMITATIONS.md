@@ -123,7 +123,7 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
   and MSI packaging is green at 34018809913. These do not verify native
   playback/integration or the unpublished candidate. Packagers require a
   positive-major native version; the old fixed 1.0.5 prevented rolling upgrades.
-- Data layer (Phase 05+11): schema is now v2 (v1 + `LyricsCache` via `migrations/1.sqm`); the DB file is
+- Data layer (Phase 05+11+14): schema is now **v3** (v1 + `migrations/1.sqm` `LyricsCache` + `migrations/2.sqm` `DownloadedTrack`); the DB file is
   `dhun.db` (Android app-private storage — deleted with the app;
   desktop packaged = `<installDir>/userdata`, also deleted with the
   MSI/DMG/DEB; desktop `gradle run` = `%APPDATA%\DHUN` /
@@ -204,6 +204,35 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
   the user subsequently confirmed launch (and now one-window startup after
   manual reinstall). Clean-target/tray/log verification remains OPEN;
   failed install-over and failed audio are separate current blockers.
+
+## Phase 14 — ADR-006 persistent offline downloads (2026-09-07)
+
+- **Foundation + engine implemented and CI-green on PR #33 (`a1064b7`):**
+  schema v3 `DownloadedTrack` table (`migrations/2.sqm`), `DownloadRepository`
+  + `SqlDelightDownloadRepository` wired as `DataLayer.downloads`,
+  `DownloadStorage` file abstraction, `StreamDownloader` (Ktor, Range-resume,
+  progress, resolving User-Agent isolation, cancellation keeps the `.part`),
+  `DownloadManager` + `FileDownloadManager` (bounded 3-slot pool, atomic
+  `.part`→final commit, best-effort artwork, QUEUED/DOWNLOADING/COMPLETED/
+  FAILED/PAUSED state transitions), and jvmMain `JvmDownloadStorage`. Tests
+  `DownloadRepositoryTest`/`StreamDownloaderTest`/`FileDownloadManagerTest`
+  are green in `:shared:jvmTest`.
+- **Not yet user-facing:** there is **no UI to enqueue a download yet**, no
+  Library "Downloaded" section, no download-action/badge, and no storage
+  management screen. `DownloadManager` is a tested library component, not a
+  wired app feature.
+- **Offline-first playback is NOT wired and would NOT yet play a downloaded
+  track.** Resolving to a local `file://` requires the platform byte layer to
+  read local files: Android uses a `ResolvingDataSource` over an HTTP/cache
+  `DataSource`, so a `file://` resolved URL would fail unless the
+  `MediaItem`/data source route is updated (e.g. `FileDataSource` /
+  `DefaultDataSource`) to handle a local path; the Desktop player loads remote
+  MRLs via vlcj and would need a local-path load first. This platform routing
+  is the immediate next step and is **device/hardware verified** only after it
+  lands. Green CI does **not** mean offline playback works.
+- Downloads are **persistent** (survive until the user deletes them) and are
+  distinct from the ADR-005 LRU stream cache, which is volatile and
+  evicts on budget.
 
 ## Phase 14 — robustness / rot-drill / release (2026-09-05)
 

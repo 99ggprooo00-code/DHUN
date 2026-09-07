@@ -31,6 +31,48 @@ The next step is to implement ADR-006 (persistent offline downloads) as a
 code-first, jvmTest-covered, CI-verified increment; hardware/device/soak and
 green live-probe gates remain OPEN and are not closable from this sandbox.
 
+## 2026-09-07 — ADR-006 foundation + download engine (PR #33, CI green)
+
+Session `arena/01a07989-dhun`, branch at `a1064b7`, PR #33.
+
+**Implemented (all in `shared`, jvmTest-green):**
+1. `core/DownloadedTrack.kt` — entity + `DownloadState` lifecycle enum.
+2. SQLDelight `DownloadedTrack.sq` + `migrations/2.sqm` (schema **v3**).
+3. `download/DownloadRepository.kt` + `SqlDelightDownloadRepository`, wired
+   as `DataLayer.downloads`.
+4. `download/DownloadStorage.kt` (filesystem abstraction), `StreamDownloader.kt`
+   (Ktor byte-downloader: Range-resume, progress, resolving User-Agent
+   isolation, `CancellationException` rethrow so pause/cancel keep the `.part`),
+   `DownloadManager.kt` (queue/progress contract),
+   `FileDownloadManager.kt` (bounded 3-slot pool, atomic `.part`→final commit,
+   best-effort artwork, PAUSED/FAILED), jvmMain `JvmDownloadStorage`.
+5. Tests: `DownloadRepositoryTest`, `StreamDownloaderTest`,
+   `FileDownloadManagerTest` (+ `TestSupport` fakes).
+
+**Two real CI failures fixed from root cause, not retried:**
+- **Schema `DownloadedTrackAdapter` compile error.** Declaring integer columns
+  as `INTEGER AS kotlin.Int`/`AS kotlin.Long` made SQLDelight emit a required
+  `DownloadedTrackAdapter` param on the `DhunDatabase` constructor, breaking
+  `DatabaseFactory.create(driver)`. Fix: drop the `AS` maps; use plain
+  `INTEGER` (→ `Long`) and convert in the repository mapper, matching the
+  existing `Track.sq` convention.
+- **Manager tests non-deterministic / a hardcoded schema version.** The
+  manager's background worker did not advance under `runTest` +
+  `backgroundScope`, and `RepositoriesTest.schemaVersionIsTwo` was stale.
+  Fix: drive the manager on a `Dispatchers.Unconfined` scope so workers run
+  inline (assert on the deterministic repository), use `runBlocking` for the
+  Ktor `StreamDownloader` tests (no virtual-time channels), and update the
+  schema-version expectation to `3`.
+
+**CI evidence (PR #33):** `build-and-test` `34075307637` PASS (shared JVM
+tests incl. download tests, Android debug build, probe + Desktop compile);
+`apk` PASS; `msi` in-flight. `:shared:jvmTest` push run `34075305385` PASS.
+
+**Not yet wired:** no UI to enqueue downloads, no offline-first playback
+routing (the Android `file://`/`FileDataSource` and Desktop vlcj local-path
+load), no platform download services, no storage UI. These are the next steps
+and are device/PC-verified only after they land (see `.ai/KNOWN_LIMITATIONS.md`).
+
 ---
 
 ## 2026-09-07 — Library Liked Songs reorganization, Mini-Player revamp, Slider Hitbox expansion, & ADR-006 Offline Downloads
