@@ -124,4 +124,10 @@ dependencies {
 // way to make CI actually EXECUTE the suite on every PR and release build is
 // this dependency. It adds no task to the APK itself.
 // ---------------------------------------------------------------------------
-tasks.named("assembleDebug") { dependsOn("testDebugUnitTest") }
+// HOW (lazy wiring): AGP creates assembleDebug AFTER the script body is
+// evaluated — an eager tasks.named("assembleDebug") throws
+// UnknownTaskException during configuration and kills EVERY job in the
+// multi-project build (even desktop/msi). matching+configureEach defers
+// until the task actually exists.
+// ---------------------------------------------------------------------------
+tasks.matching { it.name == "assembleDebug" }.configureEach { dependsOn("testDebugUnitTest") }
