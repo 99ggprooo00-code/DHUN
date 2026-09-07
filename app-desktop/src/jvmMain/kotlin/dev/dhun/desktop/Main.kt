@@ -26,6 +26,7 @@ import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.DhunUserDirs
 import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunTheme
+import dev.dhun.download.DownloadManager
 import dev.dhun.download.FileDownloadManager
 import dev.dhun.download.JvmDownloadStorage
 import dev.dhun.download.KtorStreamDownloader
@@ -580,7 +581,7 @@ private val desktopModule = module {
     }
     // ADR-006 persistent download manager: bounded worker pool over the
     // network chain, writing into <data dir>/downloads (audio/ + art/).
-    single {
+    single<DownloadManager> {
         val data: DataLayer = get()
         val storage = JvmDownloadStorage(File(DhunUserDirs.dataDir(), "downloads").absolutePath)
         FileDownloadManager(
