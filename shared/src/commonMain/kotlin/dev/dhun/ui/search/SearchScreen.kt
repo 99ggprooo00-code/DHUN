@@ -60,9 +60,11 @@ import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.TrackRow
 import dev.dhun.design.components.TrackRowShimmer
+import dev.dhun.download.DownloadManager
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.search.SearchResultsUiState
 import dev.dhun.presentation.search.SearchViewModel
+import dev.dhun.ui.components.TrackDownloadRowActions
 
 @Composable
 fun SearchScreen(
@@ -72,6 +74,7 @@ fun SearchScreen(
     onPlaylistClick: (Playlist) -> Unit = {},
     onArtistClick: (Artist) -> Unit = {},
     onTrackOverflow: (Track) -> Unit = {},
+    downloadManager: DownloadManager? = null,
     modifier: Modifier = Modifier,
 ) {
     val query by viewModel.query.collectAsState()
@@ -159,6 +162,7 @@ fun SearchScreen(
                             onPlaylistClick = onPlaylistClick,
                             onArtistClick = onArtistClick,
                             onTrackOverflow = onTrackOverflow,
+                            downloadManager = downloadManager,
                         )
                     }
                 }
@@ -386,6 +390,7 @@ private fun SearchResultsList(
     onPlaylistClick: (Playlist) -> Unit,
     onArtistClick: (Artist) -> Unit,
     onTrackOverflow: (Track) -> Unit,
+    downloadManager: DownloadManager?,
 ) {
     LazyColumn(
         state = listState,
@@ -399,7 +404,14 @@ private fun SearchResultsList(
                 TrackRow(
                     track = track,
                     onClick = { onTrackClick(track, tracks, index) },
-                    onOverflowClick = { onTrackOverflow(track) },
+                    trailing = {
+                        TrackDownloadRowActions(
+                            track = track,
+                            downloadManager = downloadManager,
+                            onOverflowClick = { onTrackOverflow(track) },
+                            showBadgeLabel = true,
+                        )
+                    },
                 )
                 HorizontalDivider(color = DhunColors.border)
             }

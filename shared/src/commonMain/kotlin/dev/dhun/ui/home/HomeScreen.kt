@@ -54,7 +54,6 @@ import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunFilterChip
-import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.LoadingShimmer
@@ -64,8 +63,10 @@ import dev.dhun.design.components.SectionShimmer
 import dev.dhun.design.components.TrackCard
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.HomeShelfKind
+import dev.dhun.download.DownloadManager
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.ui.components.TrackDownloadRowActions
 
 /**
  * Home — Material 3, deep scroll (not a 3-row stub).
@@ -91,6 +92,7 @@ fun HomeScreen(
     onPlaylistClick: (Playlist) -> Unit = {},
     onArtistClick: (Artist) -> Unit = {},
     onTrackOverflow: (Track) -> Unit = {},
+    downloadManager: DownloadManager? = null,
     onOpenLiked: () -> Unit = {},
     onOpenOffline: () -> Unit = {},
     sleepTimerLabel: String? = null,
@@ -140,6 +142,7 @@ fun HomeScreen(
                     onPlaylistClick = onPlaylistClick,
                     onArtistClick = onArtistClick,
                     onTrackOverflow = onTrackOverflow,
+                    downloadManager = downloadManager,
                     onOpenLiked = onOpenLiked,
                     onOpenOffline = onOpenOffline,
                     sleepTimerLabel = sleepTimerLabel,
@@ -165,6 +168,7 @@ private fun HomeFeedContent(
     onPlaylistClick: (Playlist) -> Unit,
     onArtistClick: (Artist) -> Unit,
     onTrackOverflow: (Track) -> Unit,
+    downloadManager: DownloadManager?,
     onOpenLiked: () -> Unit,
     onOpenOffline: () -> Unit,
     sleepTimerLabel: String?,
@@ -360,6 +364,7 @@ private fun HomeFeedContent(
                         onTrackClick(track, feed.quickPicks, index)
                     },
                     onTrackOverflow = onTrackOverflow,
+                    downloadManager = downloadManager,
                 )
             }
         }
@@ -538,6 +543,7 @@ private fun QuickPicksGrid(
     tracks: List<Track>,
     onTrackClick: (Track, Int) -> Unit,
     onTrackOverflow: (Track) -> Unit,
+    downloadManager: DownloadManager?,
 ) {
     val chunked = tracks.take(12).chunked(2)
     LazyRow(
@@ -555,6 +561,7 @@ private fun QuickPicksGrid(
                         track = track,
                         onClick = { onTrackClick(track, originalIndex) },
                         onOverflow = { onTrackOverflow(track) },
+                        downloadManager = downloadManager,
                     )
                 }
             }
@@ -567,6 +574,7 @@ private fun QuickPickItem(
     track: Track,
     onClick: () -> Unit,
     onOverflow: () -> Unit,
+    downloadManager: DownloadManager?,
 ) {
     Row(
         modifier = Modifier
@@ -604,18 +612,12 @@ private fun QuickPickItem(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        DhunIconButton(
-            onClick = onOverflow,
-            modifier = Modifier.size(DhunSpacing.touchTarget),
-            contentDescription = "More actions for ${track.title}",
-        ) {
-            DhunIconView(
-                icon = DhunIcon.MoreVert,
-                contentDescription = null,
-                modifier = Modifier.size(DhunSpacing.iconSize),
-                tint = DhunColors.textTertiary,
-            )
-        }
+        TrackDownloadRowActions(
+            track = track,
+            downloadManager = downloadManager,
+            onOverflowClick = onOverflow,
+            showBadgeLabel = true,
+        )
     }
 }
 
