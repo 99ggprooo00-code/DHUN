@@ -48,6 +48,7 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.EmptyView
+import kotlin.math.abs
 
 /** Track-keyed by the caller. User scrolling pauses follow until explicitly resumed. */
 @Composable
@@ -117,7 +118,9 @@ internal fun SyncedLyricsContent(
                 )
                 val emphasis by animateFloatAsState(
                     targetValue = if (active) 1f else 0.94f,
-                    animationSpec = DhunAnimations.mediumTween(),
+                    // ADR-002 P8: the line pops in on a spring, karaoke-style;
+                    // the color keeps a calm tween so hues never bounce.
+                    animationSpec = DhunAnimations.springSpec(),
                     label = "lyricEmphasis$index",
                 )
                 val startMs = line.startTimeMs?.takeIf { it >= 0 }
@@ -192,6 +195,12 @@ internal fun activeLyricIndex(lines: List<LyricsLine>, positionMs: Long): Int {
     return active
 }
 
+/** Offsets below one pixel stay put — the anti-twitch floor for lyric centering. */
+internal const val CENTERING_JITTER_PX = 0.5f
+
+internal fun shouldRecenterLyric(deltaPx: Float): Boolean =
+    abs(deltaPx) > CENTERING_JITTER_PX
+
 /** Offsets use LazyList coordinates, including its (possibly negative) padded viewport start. */
 internal fun lyricCenterScrollDelta(
     itemOffset: Int,
@@ -213,5 +222,7 @@ private suspend fun LazyListState.centerLyric(index: Int) {
         viewportStart = layout.viewportStartOffset,
         viewportEnd = layout.viewportEndOffset,
     )
-    if (delta != 0f) animateScrollBy(delta)
+    // Sub-pixel centering jitter is invisible; animating against it made the
+    // list twitch on every position tick. Only a real offset scrolls.
+    if (shouldRecenterLyric(delta)) animateScrollBy(delta)
 }
