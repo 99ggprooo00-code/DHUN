@@ -1,5 +1,15 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-07 — Library Liked Songs reorganization, Mini-Player revamp, Slider Hitbox expansion, & ADR-006 Offline Downloads
+
+Session `arena/01a076f3-dhun`:
+1. **Library Liked Songs Integration:** Reorganized Liked Songs into a dedicated pinned folder card inside the Playlists tab, removing the redundant top-level Favorites tab. Tapping the Liked Songs folder displays the full collection with quick "Play all", reordering, and swipe-to-remove actions.
+2. **Mini-Player UI Overhaul:** Revamped the docked Mini-Player across Windows and Android with an ambient artwork gradient wash, 2dp smoothed top progress indicator, animated circular play/pause action button, marquee track title, and expanded responsive touch/click area.
+3. **Windows Player Slider Hitbox Expansion:** Expanded `DhunSeekBar` interaction hitbox to 48dp (`DhunSpacing.touchTarget`), enabling seamless mouse clicks and horizontal drags anywhere across the slider area on Windows and Android without requiring pinpoint center alignment.
+4. **Offline Music Downloads Architecture (ADR-006):** Researched open-source audio download implementations (ViMusic, InnerTune, Metrolist, SimpMusic) and created ADR-006 defining the SQLDelight schema, resumable chunked downloader, atomic promotion, metadata tagging, offline-first playback interceptor, and storage management.
+
+---
+
 ## 2026-09-06 — PR #32 test suite expansion: LyricsRepository & cache persistence CI PASS
 
 Commit `52c6aba` on `arena/01a076f3-dhun`:

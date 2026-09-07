@@ -1,6 +1,5 @@
 package dev.dhun.ui.library
 
-import dev.dhun.design.DhunTypographyTokens
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,6 +47,7 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunIconButton
@@ -58,19 +59,20 @@ import dev.dhun.domain.HistoryDay
 import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.library.currentUtcOffsetMs
-import dev.dhun.ui.components.ReorderableList
 import dev.dhun.ui.components.DragHandleGrip
+import dev.dhun.ui.components.ReorderableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Library screen — Phase 10.
+ * Library screen — Phase 10 (updated).
  *
- * Three tabs per PROMPT_SEQUENCE.md: Playlists / Favorites / History.
- * Acceptance:
- *  1. Favorites round-trip in UI (tap plays favorites as queue, swipe removes).
- *  2. History grouped by day with relative times; long-press remove; clear-all confirmation.
- *  3. Empty states for all tabs.
+ * Liked Songs are neatly organized inside a dedicated pinned folder card
+ * right under the Playlists section, removing the separated top-level Liked/Favorites tab.
+ *
+ * Tabs:
+ *  1. Playlists (containing the Liked Songs dedicated folder + user playlists)
+ *  2. History (grouped by day)
  */
 @Composable
 fun LibraryScreen(
@@ -80,6 +82,7 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
 ) {
     val selectedTab by viewModel.selectedTab.collectAsState()
+    val viewingLikedSongs by viewModel.viewingLikedSongs.collectAsState()
     val playlists by viewModel.playlistsFlow.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
     val groupedHistory by viewModel.groupedHistory.collectAsState()
@@ -119,21 +122,41 @@ fun LibraryScreen(
         Spacer(modifier = Modifier.height(DhunSpacing.sm))
 
         when (selectedTab) {
-            LibraryTab.PLAYLISTS -> PlaylistsTab(
-                playlists = playlists,
-                onPlaylistClick = onPlaylistClick,
-                onCreatePlaylist = { name -> viewModel.createPlaylist(name) },
-                onPlayPlaylist = viewModel::playPlaylist,
-                modifier = Modifier.weight(1f),
-            )
-            LibraryTab.FAVORITES -> FavoritesTab(
-                favorites = favorites,
-                onPlayTrack = viewModel::playFavoritesTrack,
-                onPlayAll = { viewModel.playFavorites(0) },
-                onRemove = viewModel::removeFavorite,
-                onTrackOverflow = onTrackOverflow,
-                modifier = Modifier.weight(1f),
-            )
+            LibraryTab.PLAYLISTS -> {
+                if (viewingLikedSongs) {
+                    LikedSongsDetailView(
+                        favorites = favorites,
+                        onBack = { viewModel.closeLikedSongs() },
+                        onPlayTrack = viewModel::playFavoritesTrack,
+                        onPlayAll = { viewModel.playFavorites(0) },
+                        onRemove = viewModel::removeFavorite,
+                        onTrackOverflow = onTrackOverflow,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    PlaylistsTab(
+                        favoritesCount = favorites.size,
+                        onOpenLikedSongs = { viewModel.openLikedSongs() },
+                        onPlayLikedSongs = { viewModel.playFavorites(0) },
+                        playlists = playlists,
+                        onPlaylistClick = onPlaylistClick,
+                        onCreatePlaylist = { name -> viewModel.createPlaylist(name) },
+                        onPlayPlaylist = viewModel::playPlaylist,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            LibraryTab.FAVORITES -> {
+                LikedSongsDetailView(
+                    favorites = favorites,
+                    onBack = { viewModel.selectTab(LibraryTab.PLAYLISTS) },
+                    onPlayTrack = viewModel::playFavoritesTrack,
+                    onPlayAll = { viewModel.playFavorites(0) },
+                    onRemove = viewModel::removeFavorite,
+                    onTrackOverflow = onTrackOverflow,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             LibraryTab.HISTORY -> HistoryTab(
                 groupedHistory = groupedHistory,
                 onPlayEntry = viewModel::playHistoryEntry,
@@ -152,16 +175,17 @@ private fun LibraryTabRow(
     onSelect: (LibraryTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val visibleTabs = listOf(LibraryTab.PLAYLISTS, LibraryTab.HISTORY)
     Row(
         modifier = modifier.fillMaxWidth().height(DhunSpacing.touchTarget),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
-        LibraryTab.entries.forEach { tab ->
-            val selected = tab == selectedTab
+        visibleTabs.forEach { tab ->
+            val selected = (tab == selectedTab) || (tab == LibraryTab.PLAYLISTS && selectedTab == LibraryTab.FAVORITES)
             val label = when (tab) {
                 LibraryTab.PLAYLISTS -> "Playlists"
-                LibraryTab.FAVORITES -> "Favorites"
                 LibraryTab.HISTORY -> "History"
+                LibraryTab.FAVORITES -> "Favorites"
             }
             Box(
                 modifier = Modifier
@@ -188,10 +212,13 @@ private fun LibraryTabRow(
     }
 }
 
-/* ---------------- Playlists tab --------------------------------------------- */
+/* ---------------- Playlists tab with Liked Songs Folder --------------------- */
 
 @Composable
 private fun PlaylistsTab(
+    favoritesCount: Int,
+    onOpenLikedSongs: () -> Unit,
+    onPlayLikedSongs: () -> Unit,
     playlists: List<LocalPlaylist>,
     onPlaylistClick: (LocalPlaylist) -> Unit,
     onCreatePlaylist: suspend (String) -> LocalPlaylist,
@@ -201,29 +228,68 @@ private fun PlaylistsTab(
     var showCreate by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize()) {
-        if (playlists.isEmpty()) {
-            EmptyView(
-                title = "No playlists",
-                message = "Playlists you create will appear here. Create one to start collecting tracks.",
-                actionLabel = "New playlist",
-                onAction = { showCreate = true },
-                modifier = Modifier.fillMaxSize().padding(DhunSpacing.xxl),
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = DhunSpacing.xxxl),
-            ) {
-                item(key = "create") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(DhunSpacing.screenPadding),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        DhunOutlinedButton(onClick = { showCreate = true }) {
-                            Text("+ New playlist")
-                        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = DhunSpacing.xxxl),
+        ) {
+            // Liked Songs Dedicated Folder Card ------------------------------
+            item(key = "liked_songs_folder") {
+                LikedSongsFolderCard(
+                    trackCount = favoritesCount,
+                    onClick = onOpenLikedSongs,
+                    onPlay = onPlayLikedSongs,
+                    modifier = Modifier.padding(
+                        horizontal = DhunSpacing.screenPadding,
+                        vertical = DhunSpacing.sm,
+                    ),
+                )
+            }
+
+            // Playlists Section Header ---------------------------------------
+            item(key = "playlists_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Your Playlists",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = DhunColors.textPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    DhunOutlinedButton(onClick = { showCreate = true }) {
+                        DhunIconView(
+                            icon = DhunIcon.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            tint = DhunColors.accent,
+                        )
+                        Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                        Text("New playlist")
                     }
                 }
+            }
+
+            // Playlist items or empty hint -----------------------------------
+            if (playlists.isEmpty()) {
+                item(key = "empty_playlists") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.lg),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "No custom playlists yet. Tap 'New playlist' to create one.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DhunColors.textTertiary,
+                        )
+                    }
+                }
+            } else {
                 itemsIndexed(playlists, key = { _, p -> p.id }) { _, playlist ->
                     PlaylistRow(
                         playlist = playlist,
@@ -233,16 +299,240 @@ private fun PlaylistsTab(
                 }
             }
         }
+
         if (showCreate) {
             CreatePlaylistDialog(
                 onDismiss = { showCreate = false },
-                onConfirm = { name ->
-                    // The create suspend is fire-and-forget from the ViewModel
-                    // flow; we just close the dialog after launching.
-                    showCreate = false
-                },
+                onConfirm = { showCreate = false },
                 onCreate = onCreatePlaylist,
             )
+        }
+    }
+}
+
+/**
+ * Dedicated Liked Songs Folder Card — pinned at the top of the Playlists tab.
+ */
+@Composable
+private fun LikedSongsFolderCard(
+    trackCount: Int,
+    onClick: () -> Unit,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    GlassCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = DhunShapes.large,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            DhunColors.accentContainer.copy(alpha = 0.35f),
+                            Color.Transparent,
+                        ),
+                    ),
+                )
+                .padding(DhunSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(DhunSpacing.artworkThumb)
+                    .clip(DhunShapes.medium)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                DhunColors.accent,
+                                DhunColors.accentGlow,
+                            ),
+                        ),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.Favorite,
+                    contentDescription = "Liked Songs",
+                    modifier = Modifier.size(DhunSpacing.iconSizeLg),
+                    tint = DhunColors.onAccent,
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Liked Songs",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DhunColors.textPrimary,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "$trackCount song${if (trackCount == 1) "" else "s"} • Auto-playlist",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                )
+            }
+
+            if (trackCount > 0) {
+                DhunIconButton(
+                    onClick = onPlay,
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = "Play Liked Songs",
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.Play,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.accent,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Detailed Liked Songs playlist view inside the Playlists tab.
+ */
+@Composable
+private fun LikedSongsDetailView(
+    favorites: List<Track>,
+    onBack: () -> Unit,
+    onPlayTrack: (Track) -> Unit,
+    onPlayAll: () -> Unit,
+    onRemove: (String) -> Unit,
+    onTrackOverflow: (Track) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (favorites.isEmpty()) {
+        Column(modifier = modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DhunIconButton(
+                    onClick = onBack,
+                    contentDescription = "Back to Playlists",
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.ArrowBack,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.textPrimary,
+                    )
+                }
+                Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                Text(
+                    text = "Liked Songs",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DhunColors.textPrimary,
+                )
+            }
+            EmptyView(
+                title = "No liked songs yet",
+                message = "Tap the heart on any track to save it to your Liked Songs.",
+                modifier = Modifier.weight(1f).padding(DhunSpacing.xxl),
+            )
+        }
+        return
+    }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DhunIconButton(
+                onClick = onBack,
+                contentDescription = "Back to Playlists",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.ArrowBack,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
+                )
+            }
+            Spacer(modifier = Modifier.width(DhunSpacing.sm))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Liked Songs",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DhunColors.textPrimary,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "${favorites.size} song${if (favorites.size == 1) "" else "s"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DhunColors.textSecondary,
+                )
+            }
+            DhunButton(onClick = onPlayAll) {
+                DhunIconView(
+                    icon = DhunIcon.Play,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                )
+                Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                Text("Play all")
+            }
+        }
+
+        ReorderableList(
+            items = favorites,
+            onMove = { _, _ -> /* Favorites ordered by addedAt DESC */ },
+            onSwipeRemove = { _, track -> onRemove(track.id) },
+            onItemClick = { _, track -> onPlayTrack(track) },
+            modifier = Modifier.fillMaxSize(),
+        ) { _, track, dragHandle, _, _ ->
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = DhunSpacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+            ) {
+                ArtworkImage(
+                    imageUrl = track.thumbnailUrl,
+                    contentDescription = track.title,
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        track.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DhunColors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        track.artistName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DhunColors.textTertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                DhunIconButton(
+                    onClick = { onTrackOverflow(track) },
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = "More actions for ${track.title}",
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.MoreVert,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize),
+                        tint = DhunColors.textTertiary,
+                    )
+                }
+                Box(modifier = dragHandle) { DragHandleGrip() }
+            }
         }
     }
 }
@@ -357,78 +647,6 @@ private fun CreatePlaylistDialog(
 private fun relativeBrief(epochMs: Long): String {
     val nowMs = dev.dhun.data.EpochClock.System.nowMs()
     return LibraryViewModel.relativeTimeLabel(epochMs, nowMs)
-}
-
-/* ---------------- Favorites tab --------------------------------------------- */
-
-@Composable
-private fun FavoritesTab(
-    favorites: List<Track>,
-    onPlayTrack: (Track) -> Unit,
-    onPlayAll: () -> Unit,
-    onRemove: (String) -> Unit,
-    onTrackOverflow: (Track) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (favorites.isEmpty()) {
-        EmptyView(
-            title = "No favorites yet",
-            message = "Tap the heart on any track to save it here. It will sync across restarts.",
-            modifier = modifier.fillMaxSize().padding(DhunSpacing.xxl),
-        )
-        return
-    }
-    Column(modifier = modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.sm),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("${favorites.size} favorite${if (favorites.size == 1) "" else "s"}", style = MaterialTheme.typography.labelMedium, color = DhunColors.textSecondary)
-            DhunButton(onClick = onPlayAll, enabled = favorites.isNotEmpty()) {
-                DhunIconView(
-                    icon = DhunIcon.Play,
-                    contentDescription = null,
-                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                )
-                Spacer(modifier = Modifier.width(DhunSpacing.xs))
-                Text("Play all")
-            }
-        }
-        // Swipe-to-remove via ReorderableList (drag disabled by not exposing handle reorder? we keep handle but reorder is no-op grouped by favorites? Actually favorites are ordered by addedAt DESC, reordering not supported for now; we expose drag handle but move is no-op — swipe is the primary action.)
-        ReorderableList(
-            items = favorites,
-            onMove = { _, _ -> /* Favorites reordering not in v1 — keep insertion order. */ },
-            onSwipeRemove = { _, track -> onRemove(track.id) },
-            onItemClick = { index, track -> onPlayTrack(track) },
-            modifier = Modifier.fillMaxSize(),
-        ) { _, track, dragHandle, _, _ ->
-            Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = DhunSpacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
-            ) {
-                ArtworkImage(imageUrl = track.thumbnailUrl, contentDescription = track.title, modifier = Modifier.size(DhunSpacing.touchTarget))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(track.title, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(track.artistName, style = MaterialTheme.typography.labelSmall, color = DhunColors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                DhunIconButton(
-                    onClick = { onTrackOverflow(track) },
-                    modifier = Modifier.size(DhunSpacing.touchTarget),
-                    contentDescription = "More actions for ${track.title}",
-                ) {
-                    DhunIconView(
-                        icon = DhunIcon.MoreVert,
-                        contentDescription = null,
-                        modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = DhunColors.textTertiary,
-                    )
-                }
-                Box(modifier = dragHandle) { DragHandleGrip() }
-            }
-        }
-    }
 }
 
 /* ---------------- History tab ----------------------------------------------- */

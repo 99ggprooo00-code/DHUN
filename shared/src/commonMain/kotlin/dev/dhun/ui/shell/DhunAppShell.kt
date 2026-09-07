@@ -258,7 +258,7 @@ fun DhunAppShell(
                         onNavigate = { nav.push(it) },
                         onTrackOverflow = { overflowTrack = it },
                         onOpenLiked = {
-                            libraryVm.selectTab(LibraryTab.FAVORITES)
+                            libraryVm.openLikedSongs()
                             nav.selectedTab = AppTab.LIBRARY
                             nav.detailStack.clear()
                         },

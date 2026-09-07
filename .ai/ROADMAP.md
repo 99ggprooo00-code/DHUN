@@ -1,26 +1,27 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-06 (UTC)** · session **`arena/01a076f3-dhun`** · **working PR #32 OPEN** · latest head commit `52c6aba` on branch `arena/01a076f3-dhun`.
+Updated **2026-09-07 (UTC)** · session **`arena/01a076f3-dhun`** · **working PR #32 OPEN** · latest head commit on branch `arena/01a076f3-dhun`.
 
-**Phase: 14 — Robustness, rot-drill, release v0.1.0. IN PROGRESS.** Repair PR #30 was merged into main at `76c68eb` and published to the rolling `test` release (MSI 1.36.1, APK). Working session PR #32 tracks active session hardening and tests. Hardware/user-machine gates (audio playback, Home pagination, installer upgrade, visuals, tray/SMTC, soaks) remain open; no stable v0.1.0 was created.
-
-**Latest verified published build:** [`test`](https://github.com/99ggprooo00-code/DHUN/releases/tag/test) at **`76c68eb`**, published **2026-09-06T11:58:17Z**, internal MSI **1.36.1**. Main CI **34031477321 SUCCESS** and test-release **34031477327 SUCCESS**.
+**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS.**
+Recent feature additions & UI/UX enhancements:
+1. **Playlist & Liked Songs Organization:** Integrated Liked Songs into a dedicated pinned folder card inside the Playlists tab, removing the redundant separated top-level Favorites tab.
+2. **Mini-Player UI Overhaul (Windows & Android):** Redesigned the docked Mini-Player with ambient artwork gradient wash, 2dp smoothed top progress line, circular morphing transport button, marquee title, and responsive touch/click area.
+3. **Windows Player Slider Hitbox Expansion:** Expanded `DhunSeekBar` interactive click/drag target from 4dp to full 48dp (`DhunSpacing.touchTarget`) with instant, responsive scrubbing on Windows and Android.
+4. **Offline Downloads Architecture (ADR-006):** Formulated comprehensive multiplatform architecture for persistent music downloads, storage management, and offline-first playback based on open-source music player analysis (ViMusic, InnerTune, Metrolist, SimpMusic).
 
 **Candidate PR #32 verification (session branch):**
 - Branch CI **34064910238 PASS** / **34064908697 PASS** — Python tests, PowerShell syntax, shared JVM tests, Android debug build, probe/Desktop compilation.
 - Packaging run **34064910218 PASS** — MSI **1.40.1** and Android APK build with disposable Windows upgrade validation.
-- ADR-003 (staged wave parallel extraction) and ADR-005 (next-track pre-buffering, temporary cache lifecycle, Android low-latency LoadControl, video track disablement, and per-track User-Agent stream isolation) implemented and CI-green.
+- ADR-003 (staged wave parallel extraction), ADR-005 (next-track pre-buffering, temporary cache lifecycle, Android low-latency LoadControl, video track disablement, and per-track User-Agent stream isolation), and ADR-006 (offline music downloads architecture) documented.
 - Hosted Windows upgrade smoke verified **1.36.1 → 1.40.1** (baseline SHA256 `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008`), preserving userdata and cache sentinels.
-- Future upgrade removal and explicit uninstall checks **PASS**.
 
 | Published artifact | Verified size / CI-produced SHA256 |
 |---|---|
 | `dhun-test.msi` | **112,091,136 B** · `164decc74292cb5bb58fa272570d63dbff1c6c34502db7b24c5e8bd3e5ed7008` |
 | `dhun-test.apk` | **17,499,806 B** · `1b256c5a42091921206e68afd63ab8d7768431ca121bd1f292ac989d1e910c86` |
 
-**Last error:** None on CI. Previous user hardware report on the 07:22:29Z build reported failed install-over, failed audio, and Home pagination issues. The repair batch was merged in PR #30 and published in MSI 1.36.1 / APK, awaiting user hardware re-test.
-
-**Current exact files:** `shared/src/jvmTest/kotlin/dev/dhun/lyrics/LyricsRepositoryTest.kt`, `shared/src/jvmTest/kotlin/dev/dhun/data/RepositoriesTest.kt`, `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`.
+**Last error:** None on CI.
+**Current exact files:** `shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt`, `shared/src/commonMain/kotlin/dev/dhun/presentation/library/LibraryViewModel.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt`, `docs/decisions/ADR-006-offline-music-downloads-architecture.md`, `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`.
 
 **What is verified / merged / released / open:**
 - **Merged on main:** PR #30 at `76c68eb` (installer data safety, Home feed/pagination, diagnostics, player layout).
@@ -29,8 +30,9 @@ Updated **2026-09-06 (UTC)** · session **`arena/01a076f3-dhun`** · **working P
 - **Hardware-verified:** One-window startup confirmed by user on prior build. Install-over upgrade, live audio stream byte playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, and 30-min soaks remain **OPEN**.
 - **ADR-003 (Accepted):** Staged wave parallel tokenless identity chain implemented in `OwnClientStreamResolver.kt`.
 - **ADR-005 (Accepted):** Next-track pre-buffering, temporary cache lifecycle, unplayed eviction, and Android per-track User-Agent stream isolation implemented in `AudioFileCache.kt`, `DesktopDhunPlayer.kt`, and `PlaybackGraph.kt`.
+- **ADR-006 (Accepted):** Persistent offline music downloads architecture and storage management.
 
-**Exact next technical step:** Maintain working PR #32, keep test suites green, and await user hardware feedback on the published MSI 1.36.1 / APK builds. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
+**Exact next technical step:** Maintain working PR #32, keep test suites green, and verify changes via CI. Any blocker: None for automated CI/code work; hardware testing requires real device/PC.
 
 ---
 
