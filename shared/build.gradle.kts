@@ -46,6 +46,15 @@ kotlin {
         jvmTest.dependencies {
             implementation("io.ktor:ktor-client-mock:3.1.3")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            // Koin core (no Android) for the KoinDownloadStackTest regression
+            // that guards the ADR-006 Android download DI graph against the
+            // self-recursion bug class. The Android-side graph (appModule)
+            // itself needs Robolectric to exercise with androidContext() —
+            // that is a coordinator/CI follow-up. Versioned to match
+            // app-android's io.insert-koin:koin-android:4.0.2. We use the
+            // core GlobalContext.get() API directly; the koin-test artifact
+            // (KoinTest interface) is not needed for this test.
+            implementation("io.insert-koin:koin-core-jvm:4.0.2")
             // Headless icon raster regressions need the matching Skiko runtime.
             implementation(compose.desktop.currentOs)
         }

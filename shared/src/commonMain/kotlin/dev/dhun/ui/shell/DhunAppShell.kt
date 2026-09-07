@@ -260,6 +260,7 @@ fun DhunAppShell(
                         onPlayTrack = onPlayTrack,
                         onNavigate = { nav.push(it) },
                         onTrackOverflow = { overflowTrack = it },
+                        downloadManager = downloadManager,
                         onOpenLiked = {
                             libraryVm.openLikedSongs()
                             nav.selectedTab = AppTab.LIBRARY
@@ -525,6 +526,7 @@ private fun TabContent(
     onPlayTrack: (Track, List<Track>, Int) -> Unit,
     onNavigate: (DetailRoute) -> Unit,
     onTrackOverflow: (Track) -> Unit,
+    downloadManager: DownloadManager? = null,
     onOpenLiked: () -> Unit = {},
     onOpenOffline: () -> Unit = {},
     sleepTimerLabel: String? = null,
@@ -539,6 +541,7 @@ private fun TabContent(
                 onPlaylistClick = { onNavigate(DetailRoute.PlaylistPage(it.id)) },
                 onArtistClick = { onNavigate(DetailRoute.ArtistPage(it.id)) },
                 onTrackOverflow = onTrackOverflow,
+                downloadManager = downloadManager,
                 onOpenLiked = onOpenLiked,
                 onOpenOffline = onOpenOffline,
                 sleepTimerLabel = sleepTimerLabel,
@@ -553,6 +556,7 @@ private fun TabContent(
                 onPlaylistClick = { onNavigate(DetailRoute.PlaylistPage(it.id)) },
                 onArtistClick = { onNavigate(DetailRoute.ArtistPage(it.id)) },
                 onTrackOverflow = onTrackOverflow,
+                downloadManager = downloadManager,
             )
         }
         AppTab.LIBRARY -> {

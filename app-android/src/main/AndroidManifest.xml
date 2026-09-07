@@ -10,6 +10,13 @@
          blacklist — without it MIUI/OneUI/HyperOS kill background playback. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- ADR-006: persistent offline downloads. The download service runs as
+         a dataSync foreground service so downloads survive the app being
+         backgrounded or killed by OEM battery savers. WAKE_LOCK is already
+         declared above and is required for the FGS to keep the CPU alive
+         while a download is in flight on API 31+. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <application
         android:name=".DhunApp"
         android:allowBackup="false"
@@ -43,5 +50,15 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+
+        <!-- ADR-006: download foreground service. dataSync is the right
+             semantic type for user-initiated file downloads (the Android 14
+             replacement for the old "download" type) and avoids Play-Store
+             review issues. The service hosts the existing shared
+             DownloadManager — it does NOT re-implement the engine. -->
+        <service
+            android:name=".download.DhunDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>
