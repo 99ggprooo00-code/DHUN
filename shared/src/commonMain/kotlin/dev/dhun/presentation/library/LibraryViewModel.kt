@@ -1,5 +1,6 @@
 package dev.dhun.presentation.library
 
+import dev.dhun.core.DownloadState
 import dev.dhun.core.DownloadedTrack
 import dev.dhun.core.HistoryEntry
 import dev.dhun.core.Track
@@ -10,17 +11,21 @@ import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlayContext
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.download.DownloadManager
+import dev.dhun.download.DownloadProgress
 import dev.dhun.domain.GetHistoryUseCase
 import dev.dhun.domain.HistoryDay
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.NowPlayingPersistence
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -48,6 +53,89 @@ enum class LibraryTab {
     @Deprecated("Liked songs are now a dedicated folder inside Playlists", ReplaceWith("PLAYLISTS"))
     FAVORITES,
 }
+
+/**
+ * One state bucket in the storage breakdown: how many downloads are in it and
+ * how many bytes they occupy. Bytes are meaningful only for COMPLETED tracks
+ * (partial `.part` files aren't row-tracked), so other buckets report 0 bytes
+ * and are surfaced by count.
+ */
+data class DownloadGroup(
+    val state: DownloadState,
+    val count: Int,
+    val bytes: Long,
+)
+
+/**
+ * Aggregate picture of downloaded media and the volume it sits on, rendered by
+ * the Downloads storage-management view.
+ *
+ * [device] is null when the platform can't report capacity (UI then shows only
+ * "used by downloads"). [usedByDownloadsBytes] counts completed tracks;
+ * [partialBytes] is the sum the in-progress rows know about so far (best
+ * effort, from their recorded size).
+ */
+data class StorageSummary(
+    val totalTracks: Int,
+    val completedCount: Int,
+    val usedByDownloadsBytes: Long,
+    val partialBytes: Long,
+    val groups: List<DownloadGroup>,
+    val device: StorageSpace?,
+) {
+    val completedBytes: Long get() = usedByDownloadsBytes
+    val freeBytes: Long? get() = device?.freeBytes
+    val totalBytes: Long? get() = device?.totalBytes
+
+    /** 0f..1f of the *device* volume used by everything; null when unknown. */
+    val deviceUsedFraction: Float?
+        get() = device?.let { if (it.totalBytes > 0) (it.usedBytes.toFloat() / it.totalBytes).coerceIn(0f, 1f) else null }
+
+    /** 0f..1f of the *device* volume taken by downloads; null when unknown. */
+    val downloadsFractionOfDevice: Float?
+        get() = device?.let { if (it.totalBytes > 0) (usedByDownloadsBytes.toFloat() / it.totalBytes).coerceIn(0f, 1f) else null }
+
+    fun group(state: DownloadState): DownloadGroup =
+        groups.firstOrNull { it.state == state } ?: DownloadGroup(state, 0, 0L)
+
+    companion object {
+        fun empty(device: StorageSpace? = null): StorageSummary =
+            StorageSummary(0, 0, 0L, 0L, emptyList(), device)
+
+        fun from(rows: List<DownloadedTrack>, device: StorageSpace?): StorageSummary {
+            if (rows.isEmpty()) return empty(device)
+            val byState = DownloadState.entries.associateWith { state ->
+                val inState = rows.filter { it.downloadState == state }
+                DownloadGroup(
+                    state = state,
+                    count = inState.size,
+                    bytes = inState.sumOf { it.fileSizeBytes },
+                )
+            }
+            val completed = byState.getValue(DownloadState.COMPLETED)
+            val partial = listOf(DownloadState.DOWNLOADING, DownloadState.QUEUED, DownloadState.PAUSED, DownloadState.FAILED)
+                .sumOf { byState.getValue(it).bytes }
+            return StorageSummary(
+                totalTracks = rows.size,
+                completedCount = completed.count,
+                usedByDownloadsBytes = completed.bytes,
+                partialBytes = partial,
+                // Stable, meaningful ordering for the breakdown UI.
+                groups = listOf(
+                    DownloadState.COMPLETED,
+                    DownloadState.DOWNLOADING,
+                    DownloadState.QUEUED,
+                    DownloadState.PAUSED,
+                    DownloadState.FAILED,
+                ).map { byState.getValue(it) },
+                device = device,
+            )
+        }
+    }
+}
+
+/** How often the storage card re-reads device free-space while visible. */
+private const val STORAGE_REFRESH_INTERVAL_MS = 30_000L
 
 /**
  * Platform helper to supply the device UTC offset without pulling
@@ -166,14 +254,69 @@ class LibraryViewModel(
     val hasDownloads: Boolean
         get() = downloadManager != null
 
+    // Ticker that re-reads device free-space on an interval and on demand.
+    // Combined with [downloads] so the storage card refreshes as files grow
+    // / are deleted even without a row change. Cheap (one stat call).
+    private val storageTick = MutableStateFlow(0L)
+    private val storageSpace: StateFlow<StorageSpace?> =
+        flow {
+            while (true) {
+                emit(deviceStorageSpace())
+                delay(STORAGE_REFRESH_INTERVAL_MS)
+            }
+        }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    /** Aggregate download + device storage used by the Downloads/storage UI. */
+    val storageSummary: StateFlow<StorageSummary> =
+        combine(downloads, storageSpace, storageTick) { rows, space, _ ->
+            StorageSummary.from(rows, space)
+        }.stateIn(scope, SharingStarted.Eagerly, StorageSummary.empty())
+
+    /** Force a re-read of device capacity (e.g. after the user returns to the tab). */
+    fun refreshStorage() {
+        storageTick.value = storageTick.value + 1
+    }
+
+    /** Live per-track download progress (null when idle); empty flow if no engine. */
+    fun progressFor(trackId: String): Flow<DownloadProgress?> =
+        downloadManager?.observeProgress(trackId)
+            ?: MutableStateFlow<DownloadProgress?>(null).asStateFlow()
+
     fun download(track: Track) {
         val dm = downloadManager ?: return
         scope.launch { runCatching { dm.enqueue(track) } }
     }
 
+    fun pauseDownload(trackId: String) {
+        val dm = downloadManager ?: return
+        scope.launch { runCatching { dm.pause(trackId) } }
+    }
+
+    /** Resume a PAUSED download or retry a FAILED one (both re-queue from state). */
+    fun resumeDownload(trackId: String) {
+        val dm = downloadManager ?: return
+        scope.launch { runCatching { dm.resume(trackId) } }
+    }
+
+    /** Cancel an in-flight/queued download and drop its `.part` file. */
+    fun cancelDownload(trackId: String) {
+        val dm = downloadManager ?: return
+        scope.launch { runCatching { dm.cancel(trackId) } }
+    }
+
     fun removeDownload(trackId: String) {
         val dm = downloadManager ?: return
         scope.launch { runCatching { dm.remove(trackId) } }
+    }
+
+    /**
+     * Batch delete: [DownloadManager.remove] cancels any running job and deletes
+     * media + artwork + DB row, so it is valid for every [DownloadState].
+     */
+    fun removeDownloads(trackIds: Collection<String>) {
+        val dm = downloadManager ?: return
+        if (trackIds.isEmpty()) return
+        scope.launch { trackIds.forEach { id -> runCatching { dm.remove(id) } } }
     }
 
     fun clearDownloads() {
