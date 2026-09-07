@@ -92,10 +92,13 @@ class LibraryViewModelTest {
             // playlists empty at start
             eventually { vm.playlistsFlow.value.isEmpty() }
             assertEquals(LibraryTab.PLAYLISTS, vm.selectedTab.value)
-            vm.selectTab(LibraryTab.FAVORITES)
-            assertEquals(LibraryTab.FAVORITES, vm.selectedTab.value)
+            assertFalse(vm.viewingLikedSongs.value)
+            vm.openLikedSongs()
+            assertEquals(LibraryTab.PLAYLISTS, vm.selectedTab.value)
+            assertTrue(vm.viewingLikedSongs.value)
             vm.selectTab(LibraryTab.HISTORY)
             assertEquals(LibraryTab.HISTORY, vm.selectedTab.value)
+            assertFalse(vm.viewingLikedSongs.value)
 
             // create playlist
             val pl = data.playlists.create("Gym")
