@@ -231,8 +231,10 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
   uses the real JVM SQLDelight download repository plus a valid WAV fixture,
   asserts the completed row resolves to `file://`, opens the local file, checks
   the RIFF/WAVE header, and fails if the network resolver is called. The
-  sandbox could not execute this command because Java/JAVA_HOME is unavailable;
-  GitHub CI or a JDK-equipped checkout must provide the compile/run evidence.
+  sandbox could not execute this command because Java/JAVA_HOME is unavailable.
+  Branch CI run `34080947691` successfully compiled the probe, but the existing
+  workflow does not execute `offlineProbe`; a JDK-equipped checkout or explicit
+  CI execution step is still needed for runtime PASS evidence.
 - **Hardware limitation remains explicit:** the probe verifies shared/JVM
   repository-to-file loading only. It does **not** verify Android Media3
   `FileDataSource`, Desktop vlcj decoding, airplane-mode behavior, or audible

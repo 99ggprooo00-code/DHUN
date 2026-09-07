@@ -16,13 +16,19 @@ called. It is exposed as:
 **Verification state:** `git diff --check` passes. Local execution is blocked
 in this sandbox because neither `JAVA_HOME` nor a `java` executable exists.
 `scripts/restore-toolchain.sh` also could not download Temurin/Gradle because
-TLS egress is unavailable. GitHub CI must compile and run the probe in a
-JDK-equipped environment before the probe is marked CI-verified.
+TLS egress is unavailable. GitHub CI run `34080947691` compiled the probe,
+but the existing workflow does not run the runtime task; a JDK-equipped
+environment or explicit CI execution step is still needed for runtime evidence.
 
 **Important boundary:** this is deterministic shared/JVM repository-to-file
 verification, not Android Media3 `FileDataSource` verification, Desktop vlcj
 decoding verification, or audible playback. Real Android device and Desktop/PC
 checks remain open and must stay open in the roadmap even after CI passes.
+
+**Follow-up:** pushed commits `bf5376b`/`2706066`/`aeec1e6` are covered by PR
+CI run `34080947691`, which passed the existing `Probe compiles` step. The
+workflow does not invoke the new runtime task, so no `offline-verdict|PASS`
+claim is made yet.
 
 ## 2026-09-07 — ADR-006 foundation + download engine landed (PR #33)
 
