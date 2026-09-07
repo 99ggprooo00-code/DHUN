@@ -73,11 +73,22 @@ storage-management surface, and download-management actions.
 
 ## Verification status
 
-- NOT compiled locally (no Gradle per task rules) — **CI is the compile gate**;
-  awaiting `build-and-test` on the pushed branch.
-- No hardware claims. On-device storage figures, offline playback of removed/
-  retained tracks, and the Android/JVM disk-stat path remain HW-open per
-  `.ai/ROADMAP.md`.
+- **CI `build-and-test` GREEN on the PR branch — run `34082028450`** (3m56s):
+  Python/packaging checks, PowerShell syntax, **shared JVM unit tests**
+  (incl. new `LibraryDownloadsViewModelTest`), Android debug build (compiles
+  the `androidMain` `StatFs` actual), probe + Desktop compile (compiles the
+  `jvmMain` `File.usableSpace` actual). Green here = commonMain + both actual
+  source sets compile and the JVM tests pass.
+- NOT compiled locally (no Gradle per task rules) — CI is the compile gate.
+- **No hardware claims.** On-device total/free figures, offline playback of
+  retained/removed downloads, and the Android/JVM disk-stat path remain
+  HW-open per `.ai/ROADMAP.md`; green CI proves compilation + shared JVM tests
+  only.
+
+**PR:** #36 (branch `arena/01a079f5-dhun` → `main`). Note: the requested
+branch name `agent/library-downloads` is not a pushable target in this
+pinned session; work is on `arena/01a079f5-dhun` and also carries Agent-3's
+parallel per-track download-badge commits (no file overlap).
 
 ## Log
 
