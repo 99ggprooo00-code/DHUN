@@ -53,6 +53,9 @@ kotlin {
             // that is a coordinator/CI follow-up. Versioned to match
             // app-android's io.insert-koin:koin-android:4.0.2.
             implementation("io.insert-koin:koin-core-jvm:4.0.2")
+            // KoinTest (the JUnit-style KoinTest interface with get/inject
+            // helpers) lives in a separate artifact in Koin 4.x.
+            implementation("io.insert-koin:koin-test:4.0.2")
             // Headless icon raster regressions need the matching Skiko runtime.
             implementation(compose.desktop.currentOs)
         }
