@@ -277,6 +277,34 @@ class PlayerViewModel(
 
     fun moveQueueItem(from: Int, to: Int) = player.moveInQueue(from, to)
 
+    /** Append without replacing playback; used by the Related tab's explicit queue action. */
+    fun addToQueue(track: Track) = player.addToQueue(track)
+
+    /**
+     * Snapshot-aware overloads for delayed row menus / swipe completion. Queue
+     * indices alone can refer to a different occurrence after a replacement or
+     * reorder, including queues containing the same track more than once.
+     * Existing one-argument / two-argument actions remain unchanged for callers.
+     */
+    fun playQueueAt(index: Int, expectedQueue: List<Track>): Boolean {
+        if (index !in expectedQueue.indices || queue.value != expectedQueue) return false
+        playQueueAt(index)
+        return true
+    }
+
+    fun removeQueueItem(index: Int, expectedQueue: List<Track>): Boolean {
+        if (index !in expectedQueue.indices || queue.value != expectedQueue) return false
+        removeQueueItem(index)
+        return true
+    }
+
+    fun moveQueueItem(from: Int, to: Int, expectedQueue: List<Track>): Boolean {
+        if (from !in expectedQueue.indices || to !in expectedQueue.indices || from == to) return false
+        if (queue.value != expectedQueue) return false
+        moveQueueItem(from, to)
+        return true
+    }
+
     /* ---------------- tab actions ---------------- */
 
     /** Plays the related list (radio queue) from [index]. Suspends: caller launches. */

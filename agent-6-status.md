@@ -4,7 +4,7 @@ Updated: 2026-09-07 (UTC)
 
 ## State
 
-**Implementation approved; slice 1 ready for its first push, CI pending.** Hardware verification has not been performed. No Agent 6 changes are claimed CI-green until a remote run confirms them.
+**Implementation approved; slice 1 pushed and CI-green, slice 2 ready to push / CI pending.** Hardware verification has not been performed. Each check below applies only to its recorded commit.
 
 - Session branch: `arena/01a079f7-dhun`. This Arena session is fixed to that branch; implementation, incremental commits, pushes, and the PR must use it rather than the requested `agent/player-ux`.
 - Checked-out base and fetched `origin/main`: `f15724547aec4725dfa34293de1011612aeee9dd`.
@@ -30,22 +30,33 @@ Read `.ai/MASTER_PROMPT.md` and `.ai/ROADMAP.md` CURRENT ACTIVE TASK; reviewed A
 
 ## Implementation progress
 
-### Slice 1 — Lyrics and tab selection (implemented locally; first push / CI pending)
+### Slice 1 — Lyrics and tab selection (`46e46d4`, pushed and CI-green)
 
 - `PlayerTabs.kt`: selected-tab semantics (`Role.Tab` / selection group), track-keyed lyrics state, explicit no-track/blank/error states, and retry for unavailable lyrics.
 - `SyncedLyrics.kt`: centered follow including index zero and backwards seeks, manual scroll pause with "Follow lyrics", stable text measurement with animated emphasis, untimed/invalid timestamp handling, and tap-to-seek.
 - Player-only regression companion: `shared/src/jvmTest/kotlin/dev/dhun/ui/player/LyricsFollowTest.kt` (8 tests covering intro/first line, backwards seek, malformed/duplicate timestamps, and padded/wrapped-line centering).
 - Existing public presentation signatures and the Favorite transport button are unchanged. No protected paths edited.
 
+### Slice 2 — Queue and Related (implemented locally; push / CI pending)
+
+- `PlayerTabs.kt`: queue position summary, visible move-up/move-down/remove menu and accessibility actions, existing drag/swipe component reused unchanged; Related source caption, refreshable empty state, responsive placeholders, explicit queue-replacement notice, and append action with feedback.
+- Related playback now passes the displayed list to the existing scope-owned `playQueue` action, so an index cannot silently select a refreshed recommendation list and closing the tab does not cancel the preparation job.
+- `PlayerViewModel.kt`: additions only — `addToQueue` plus snapshot-aware `playQueueAt`, `removeQueueItem`, and `moveQueueItem` overloads. Original methods, signatures, and implementations unchanged.
+- Player-only regression companion: `PlayerQueueActionsTest.kt` (6 tests for duplicate occurrences, stale queues, bounds, append semantics, and displayed-list playback).
+
 ## Verification and exact next technical step
 
 - Local `git diff --check`: passed.
 - Local `./gradlew :shared:jvmTest --no-daemon`: cannot start; `JAVA_HOME is not set and no 'java' command could be found in your PATH.` This is the documented sandbox toolchain limitation, not a Kotlin test result. CI remains the compile/test gate.
-- Pre-push remote check: main CI `34079283259` is successful at `f157245`; no session-branch CI run or PR exists yet.
-- **Next:** push slice 1 to `arena/01a079f7-dhun`, inspect CI, then refine Queue/Related interactions using existing components. Follow with docked MiniPlayer expand/error behavior and seek/transport accessibility. Additive presentation changes only; preserve existing public signatures.
+- Slice 1 remote CI: [34081198767](https://github.com/99ggprooo00-code/DHUN/actions/runs/34081198767) **success** at `46e46d4`: shared JVM tests (including the 8 lyrics tests), Android debug build, probe and Desktop compilation. Rechecked on GitHub before the slice 2 push. No PR yet; slice 2 is not covered by this run.
+- **Next:** push slice 2 and inspect CI, then refine docked MiniPlayer expand/error behavior and seek/transport accessibility. Preserve the Favorite button and existing public contracts.
 - Open a PR from the session branch once the implementation has passed the compile gate. Do not merge or modify the rolling release.
 
 ## Last error / blockers
 
 - Local Gradle cannot start because the sandbox has no JDK. Remote CI is required.
 - Hardware acceptance (device/desktop visuals, audible playback, accessibility, gestures, and soaks) remains unverified.
+
+## Integration follow-up outside this agent
+
+- Source review only: `QueueManager.move` reads `current` after mutating its item list when recovering the current index. Current-track preservation during reorder deserves a playback-engine-owner regression check. This existing engine code is outside Agent 6 scope and was not changed; both drag and menu movement delegate through the existing player API.
