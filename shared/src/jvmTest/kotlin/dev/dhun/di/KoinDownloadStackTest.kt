@@ -2,10 +2,10 @@ package dev.dhun.di
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
-import org.koin.test.KoinTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -48,22 +48,16 @@ import kotlin.test.assertTrue
  * `:app-android` has no test source set, and adding `:app-android:testDebugUnitTest`
  * with Robolectric is a coordinator/CI follow-up, not in this PR. So this
  * test mirrors the production pattern with minimal fakes in `:shared`
- * (the production types `DownloadManager` and `FileDownloadManager` are
- * in `:shared` and could be used directly — minimal fakes are kept here
- * only so the test continues to compile and assert the same shape even
- * if `:shared` types are renamed).
+ * and uses the core Koin API directly (`GlobalContext.get().get<...>()`)
+ * — no `KoinTest` / `koin-test` dependency, only `koin-core-jvm`.
  *
  * ## What this test asserts
  *
- * The `single<DownloadManager> { Decorator(get()) }` registration
- * (with the fix: a concrete singleton also registered, so the only
- * `get()` is a forward reference to that concrete type via a factory
- * parameter that is NOT the registered interface type) resolves to
- * the decorator wrapping the concrete impl. This pins the SHAPE that
- * the fix uses. Anyone who changes `appModule` to use the unqualified
- * `get()` pattern should not be able to claim "the Koin test still
- * passes" because the production code is no longer the same shape
- * this test pins.
+ * The `single<DownloadManager> { Decorator(get<Impl>()) }` registration
+ * (the fix shape) resolves to the decorator wrapping the concrete impl.
+ * A future refactor that drops the explicit type and re-introduces the
+ * buggy `delegate = get()` pattern would no longer have a green smoke
+ * test to hide behind.
  *
  * ## The rule (from the PR thread)
  *
@@ -73,7 +67,7 @@ import kotlin.test.assertTrue
  * (ii) a smoke test that calls `koin.get<...>()` in a unit test.
  * `:app-android:assembleDebug` is a TYPE-CHECK gate only.
  */
-class KoinDownloadStackTest : KoinTest {
+class KoinDownloadStackTest {
 
     // ---- minimal fakes mirroring the production types ----------------------
     //
@@ -105,8 +99,7 @@ class KoinDownloadStackTest : KoinTest {
     /**
      * This is the SHAPE AppModule.kt uses after the fix: a concrete
      * singleton registered first, and a decorator registered against
-     * the interface that takes a FORWARD REFERENCE to the concrete type
-     * (here, a parameter the Koin DSL can satisfy).
+     * the interface that takes a FORWARD REFERENCE to the concrete type.
      */
     private val fixedModule = module {
         single { FileDownloadManagerImpl() }
@@ -121,7 +114,8 @@ class KoinDownloadStackTest : KoinTest {
     @Test
     fun fixedModuleResolvesDecoratorOverConcreteImpl() {
         startKoin { modules(fixedModule) }
-        val resolved: DownloadManager = get()
+        val koin = GlobalContext.get()
+        val resolved: DownloadManager = koin.get()
         assertNotNull(resolved, "DownloadManager must resolve")
         assertTrue(
             resolved is DecoratorDownloadManager,
@@ -129,7 +123,7 @@ class KoinDownloadStackTest : KoinTest {
         )
         val decorator = resolved as DecoratorDownloadManager
         assertSame(
-            get<FileDownloadManagerImpl>(),
+            koin.get<FileDownloadManagerImpl>(),
             decorator.wrapped,
             "decorator must wrap the concrete FileDownloadManagerImpl singleton",
         )
@@ -138,8 +132,9 @@ class KoinDownloadStackTest : KoinTest {
     @Test
     fun fixedModuleIsSingleton() {
         startKoin { modules(fixedModule) }
-        val a: DownloadManager = get()
-        val b: DownloadManager = get()
+        val koin = GlobalContext.get()
+        val a: DownloadManager = koin.get()
+        val b: DownloadManager = koin.get()
         assertSame(a, b, "single must be a true singleton")
     }
 }

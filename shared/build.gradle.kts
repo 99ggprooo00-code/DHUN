@@ -51,11 +51,10 @@ kotlin {
             // self-recursion bug class. The Android-side graph (appModule)
             // itself needs Robolectric to exercise with androidContext() —
             // that is a coordinator/CI follow-up. Versioned to match
-            // app-android's io.insert-koin:koin-android:4.0.2.
+            // app-android's io.insert-koin:koin-android:4.0.2. We use the
+            // core GlobalContext.get() API directly; the koin-test artifact
+            // (KoinTest interface) is not needed for this test.
             implementation("io.insert-koin:koin-core-jvm:4.0.2")
-            // KoinTest (the JUnit-style KoinTest interface with get/inject
-            // helpers) lives in a separate artifact in Koin 4.x.
-            implementation("io.insert-koin:koin-test:4.0.2")
             // Headless icon raster regressions need the matching Skiko runtime.
             implementation(compose.desktop.currentOs)
         }
