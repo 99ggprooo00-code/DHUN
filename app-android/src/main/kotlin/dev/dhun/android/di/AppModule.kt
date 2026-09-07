@@ -10,6 +10,8 @@ import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
 import dev.dhun.domain.SaveNowPlayingUseCase
+import dev.dhun.download.DownloadRepository
+import dev.dhun.extraction.OfflineFirstStreamResolver
 import dev.dhun.extraction.OwnClientStreamResolver
 import dev.dhun.extraction.StreamResolver
 import dev.dhun.innertube.InnerTubeClient
@@ -21,6 +23,7 @@ import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.lyrics.YouTubeLyricsSource
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,7 +40,18 @@ import org.koin.dsl.module
 val appModule = module {
     single { InnerTubeClient() }
     single<StreamResolver> { OwnClientStreamResolver(get()) }
-    single<MusicProvider> { YouTubeMusicProvider(get(), get()) }
+    // ADR-006: offline-first playback — a COMPLETED persistent download
+    // resolves to its local file; otherwise resolve over the network chain.
+    single<MusicProvider> {
+        YouTubeMusicProvider(
+            get(),
+            OfflineFirstStreamResolver(
+                downloads = get<DownloadRepository>(),
+                primary = get<StreamResolver>(),
+                fileExists = { path -> runCatching { File(path).exists() }.getOrDefault(false) },
+            ),
+        )
+    }
     single { DhunStreamCache(get()) }
     // Phase 14: connectivity signal for the shared offline banner.
     single<dev.dhun.core.ConnectivityMonitor> {
@@ -46,6 +60,9 @@ val appModule = module {
 
     // Phase 05 data layer: one SQLite database, repositories + use cases.
     single { DataLayer(DatabaseFactory.create(DatabaseDriverFactory(androidContext()).createDriver())) }
+    // ADR-006: persistent offline download store (COMPLETED rows drive
+    // offline-first playback in PlaybackGraph and the MusicProvider).
+    single<DownloadRepository> { get<DataLayer>().downloads }
     single { SaveNowPlayingUseCase(get<DataLayer>().nowPlaying) }
     single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
     single { RecordPlayUseCase(get<DataLayer>().history) }

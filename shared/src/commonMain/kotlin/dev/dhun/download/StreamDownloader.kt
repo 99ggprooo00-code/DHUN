@@ -3,6 +3,7 @@ package dev.dhun.download
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.client.statement.bodyAsChannel
@@ -11,6 +12,12 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.yield
+
+/**
+ * Default Ktor client for DHUN's downloader. Shared so platform modules don't
+ * need the CIO engine on their own classpath (shared already depends on it).
+ */
+fun createDownloadHttpClient(): HttpClient = HttpClient(CIO)
 
 /**
  * Downloads an audio stream URL into a [DownloadStorage] `.part` file with

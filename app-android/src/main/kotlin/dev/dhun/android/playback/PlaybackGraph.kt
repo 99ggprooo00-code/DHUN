@@ -10,12 +10,15 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.FileDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import dev.dhun.download.DownloadRepository
 import dev.dhun.player.StreamRecoverySignal
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.runBlocking
@@ -46,10 +49,14 @@ object PlaybackGraph {
      * caching. The null path exists so a corrupt/unopenable cache dir
      * degrades playback instead of killing the whole engine (see
      * [buildExoPlayer]'s fallback — SimpleCache throws on corrupt state).
+     * @param downloads ADR-006 persistent download repo, or null to disable
+     * offline-first playback. When a track has a COMPLETED download whose
+     * local file is present, playback routes to that file (no network).
      */
     fun resolvingDataSourceFactory(
         streamCache: DhunStreamCache,
         audioCache: DhunAudioSegmentCache?,
+        downloads: DownloadRepository? = null,
     ): DataSource.Factory {
         // ADR-005: Map each videoId to its resolving User-Agent so pre-buffering
         // next-track items does not clobber the active stream's User-Agent.
@@ -61,7 +68,7 @@ object PlaybackGraph {
 
         // Outer data source: segment cache when available, plain HTTP when
         // the cache dir is unusable (no offline replay in that mode).
-        val outerFactory: DataSource.Factory = if (audioCache != null) {
+        val networkFactory: DataSource.Factory = if (audioCache != null) {
             CacheDataSource.Factory()
                 .setCache(audioCache.cache)
                 .setUpstreamDataSourceFactory(userAgentHttpFactory)
@@ -76,6 +83,11 @@ object PlaybackGraph {
             userAgentHttpFactory
         }
 
+        // ADR-006 offline-first: a `file://` resolve (a completed download)
+        // plays straight from disk via [FileDataSource]; https streams go
+        // through the cache/HTTP chain.
+        val outerFactory: DataSource.Factory = SchemeRoutingDataSource.Factory(networkFactory)
+
         return ResolvingDataSource.Factory(
             outerFactory,
             ResolvingDataSource.Resolver { dataSpec ->
@@ -84,6 +96,29 @@ object PlaybackGraph {
                     dataSpec.uri.lastPathSegment ?: error("malformed dhun uri")
                 } catch (e: IllegalStateException) {
                     throw java.io.IOException("bad media uri: ${dataSpec.uri}", e)
+                }
+                // ADR-006: a COMPLETED persistent download with its file on
+                // disk resolves to that local file — no network round-trip.
+                try {
+                    val downloaded = downloads?.let { runBlocking { it.getCompleted(videoId) } }
+                    if (downloaded != null && downloaded.isCompleted) {
+                        val localFile = File(downloaded.localAudioPath)
+                        if (localFile.exists() && localFile.length() > 0) {
+                            userAgentByVideoId[videoId] = FALLBACK_USER_AGENT
+                            android.util.Log.i(
+                                "DHUN",
+                                "offline playback for $videoId from ${downloaded.localAudioPath} " +
+                                    "(${localFile.length()} bytes)",
+                            )
+                            return@Resolver dataSpec
+                                .buildUpon()
+                                .setUri(Uri.fromFile(localFile))
+                                .setKey(videoId)
+                                .build()
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("DHUN", "offline-first check failed for $videoId", e)
                 }
                 try {
                     val resolved = runBlocking { streamCache.get(videoId) }
@@ -131,6 +166,7 @@ object PlaybackGraph {
         context: Context,
         streamCache: DhunStreamCache,
         audioCache: DhunAudioSegmentCache? = DhunAudioSegmentCache.get(context),
+        downloads: DownloadRepository? = null,
     ): ExoPlayer {
         // Stall-heavy mobile carriers need more per-segment retries than the
         // default before a track is declared dead — throttled/shaped reads
@@ -138,7 +174,7 @@ object PlaybackGraph {
         // after these reaches onPlayerError, where the recovery listener
         // runs invalidate → re-resolve.
         val mediaSourceFactory = DefaultMediaSourceFactory(
-            resolvingDataSourceFactory(streamCache, audioCache),
+            resolvingDataSourceFactory(streamCache, audioCache, downloads),
         ).setLoadErrorHandlingPolicy(
             androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy(
                 /* minimumLoadableRetryCount = */ SEGMENT_RETRY_COUNT,
@@ -293,6 +329,57 @@ object PlaybackGraph {
     private const val RETRY_BACKOFF_MS = 1_500L
     /** Per-segment load retries before the error reaches onPlayerError. */
     private const val SEGMENT_RETRY_COUNT = 5
+
+    /** DataSource.Factory for [SchemeRoutingDataSource]. */
+    class Factory(private val networkFactory: DataSource.Factory) : DataSource.Factory {
+        override fun createDataSource(): DataSource =
+            SchemeRoutingDataSource(networkFactory)
+    }
+}
+
+/**
+ * Routes `file://` URIs (ADR-006 offline-first downloads) to a
+ * [FileDataSource] that reads the local file directly; every other scheme
+ * (https streaming) goes through the provided cache/HTTP factory. [open] is
+ * the only method that picks the delegate, so a single instance serves both
+ * playback modes without re-arming the pipeline.
+ */
+private class SchemeRoutingDataSource(
+    private val networkFactory: DataSource.Factory,
+) : DataSource {
+    private var delegate: DataSource? = null
+    private val listeners = CopyOnWriteArrayList<TransferListener>()
+
+    override fun addTransferListener(transferListener: TransferListener) {
+        if (!listeners.contains(transferListener)) {
+            listeners.add(transferListener)
+        }
+        delegate?.addTransferListener(transferListener)
+    }
+
+    override fun open(dataSpec: DataSpec): Long {
+        val dataSource: DataSource = if (dataSpec.uri.scheme == "file") {
+            FileDataSource()
+        } else {
+            networkFactory.createDataSource()
+        }
+        listeners.forEach { dataSource.addTransferListener(it) }
+        delegate = dataSource
+        return dataSource.open(dataSpec)
+    }
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+        delegate?.read(buffer, offset, length) ?: C.RESULT_END_OF_INPUT
+
+    override fun getUri(): Uri? = delegate?.uri
+
+    override fun getResponseHeaders(): Map<String, List<String>> =
+        delegate?.responseHeaders ?: emptyMap()
+
+    override fun close() {
+        delegate?.close()
+        delegate = null
+    }
 }
 
 /**

@@ -13,6 +13,8 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.MediaStyleNotificationHelper
 import dev.dhun.android.R
+import dev.dhun.data.DataLayer
+import dev.dhun.download.DownloadRepository
 import org.koin.core.context.GlobalContext
 
 /**
@@ -41,6 +43,10 @@ class DhunPlaybackService : MediaSessionService() {
         GlobalContext.get().get()
     }
 
+    private val downloads: DownloadRepository by lazy {
+        GlobalContext.get().get<DataLayer>().downloads
+    }
+
     /** Keeps the notification's title/artwork in step with the session. */
     private val notificationUpdater = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = updateNotification()
@@ -53,10 +59,10 @@ class DhunPlaybackService : MediaSessionService() {
         // A corrupt cache dir makes SimpleCache throw — degrade to direct
         // streaming instead of killing the service (and with it all audio).
         val player = try {
-            PlaybackGraph.buildExoPlayer(this, streamCache, audioCache)
+            PlaybackGraph.buildExoPlayer(this, streamCache, audioCache, downloads)
         } catch (t: Throwable) {
             android.util.Log.e(TAG, "segment cache unusable — streaming without cache", t)
-            PlaybackGraph.buildExoPlayer(this, streamCache, null)
+            PlaybackGraph.buildExoPlayer(this, streamCache, null, downloads)
         }
         player.addListener(notificationUpdater)
         mediaSession = MediaSession.Builder(this, player)

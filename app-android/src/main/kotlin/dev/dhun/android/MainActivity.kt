@@ -360,7 +360,15 @@ class MainActivity : ComponentActivity() {
                     Log.w(TAG, "segment cache unusable — streaming without cache", t)
                     null
                 }
-                val local = PlaybackGraph.buildExoPlayer(applicationContext, cache, segments)
+                // ADR-006: the session-less fallback also honors offline-first
+                // playback (a COMPLETED download plays from disk).
+                val downloads = try {
+                    GlobalContext.get().get<dev.dhun.data.DataLayer>().downloads
+                } catch (t: Throwable) {
+                    Log.w(TAG, "download repo unavailable — offline playback disabled", t)
+                    null
+                }
+                val local = PlaybackGraph.buildExoPlayer(applicationContext, cache, segments, downloads)
                 attach(AndroidDhunPlayer(local, activityScope, cache))
                 logLine("local player ready — audio will play; session controls degraded")
                 connectState.value = ConnectUi.Ready(

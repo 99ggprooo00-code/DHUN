@@ -466,6 +466,10 @@ class DesktopDhunPlayer(
      * Bandwidth is spent twice for a first play (stream + fill) — accepted
      * v1 trade-off for a URL-only engine; documented in KNOWN_LIMITATIONS.
      */
+    /** A `file://` (or bare path) MRL means the media is already local. */
+    private fun isLocalMediaUrl(url: String?): Boolean =
+        url == null || url.startsWith("file://") || !url.startsWith("http")
+
     private fun startCacheFill(
         videoId: String,
         url: String,
@@ -473,6 +477,12 @@ class DesktopDhunPlayer(
         userAgent: String?,
     ) {
         val cache = audioCache ?: return
+        // An offline-first (ADR-006) resolve returns a local file:// URL; a
+        // downloaded track is already on disk — there is nothing to cache-fill.
+        if (isLocalMediaUrl(url)) {
+            log("download/local hit $videoId — skipping cache fill")
+            return
+        }
         if (contentLength != null && contentLength > cache.maxBytes) return
         val cancel = AtomicBoolean(false)
         cacheFillCancel = cancel
@@ -517,6 +527,8 @@ class DesktopDhunPlayer(
                 is DhunResult.Success -> {
                     if (cancel.get()) return@launch
                     val info = result.value
+                    // A downloaded local file needs no pre-buffering.
+                    if (isLocalMediaUrl(info.audioUrl)) return@launch
                     val file = cache.downloadTemp(
                         nextTrack.id,
                         info.audioUrl,
