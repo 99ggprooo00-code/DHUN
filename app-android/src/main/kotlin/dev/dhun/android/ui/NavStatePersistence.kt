@@ -48,10 +48,13 @@ object NavStatePersistence {
 
     fun decodeRoute(value: String): DetailRoute? {
         val parts = value.split(':', limit = 3)
+        // A blank id is corrupt, not an empty page: every route id here is a YTM
+        // browse id (UC…/MPREb…/VL…) or a SQLDelight row id, so restoring one with
+        // an empty id would put an unrecoverable entry on the nav back stack.
         return when (parts.firstOrNull()) {
-            "artist" -> parts.getOrNull(1)?.let(DetailRoute::ArtistPage)
-            "album" -> parts.getOrNull(1)?.let(DetailRoute::AlbumPage)
-            "playlist" -> parts.getOrNull(2)?.let { id ->
+            "artist" -> parts.getOrNull(1)?.takeIf { it.isNotBlank() }?.let(DetailRoute::ArtistPage)
+            "album" -> parts.getOrNull(1)?.takeIf { it.isNotBlank() }?.let(DetailRoute::AlbumPage)
+            "playlist" -> parts.getOrNull(2)?.takeIf { it.isNotBlank() }?.let { id ->
                 DetailRoute.PlaylistPage(id, parts.getOrNull(1) == "true")
             }
             else -> null
