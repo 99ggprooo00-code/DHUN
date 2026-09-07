@@ -51,6 +51,7 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.data.DataLayer
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
+import dev.dhun.download.DownloadManager
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.player.PlayerViewModel
@@ -193,6 +194,7 @@ class MainActivity : ComponentActivity() {
                                 nav = nav,
                                 isDesktop = false,
                                 connectivity = koin.get(),
+                                downloadManager = koin.get(),
                             )
                         }
                         s.reason?.let { reason ->

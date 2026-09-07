@@ -49,6 +49,8 @@ enum class DhunIcon(val pathData: String) {
     Error("M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2z M13 17h-2v-2h2v2z M13 13h-2V7h2v6z"),
     /** Material "timer" — sleep timer / timed pause. */
     Timer("M15 1H9v2h6V1z M11 14h2V8h-2v6z M19.03 7.39l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61z M12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"),
+    /** Material "download" — ADR-006 offline download action. */
+    Download("M19 9h-4V3H9v6H5l7 7 7-7z M5 18v2h14v-2H5z"),
     /** Material "download-for-offline" — offline library affordance. */
     Offline("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z M11 17.17L6.83 13l1.41-1.41L11 14.34l5.76-5.76 1.41 1.41L11 17.17z M11 10V6h2v4h-2z"),
 }

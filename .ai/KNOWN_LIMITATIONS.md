@@ -217,19 +217,23 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
   FAILED/PAUSED state transitions), and jvmMain `JvmDownloadStorage`. Tests
   `DownloadRepositoryTest`/`StreamDownloaderTest`/`FileDownloadManagerTest`
   are green in `:shared:jvmTest`.
-- **Not yet user-facing:** there is **no UI to enqueue a download yet**, no
-  Library "Downloaded" section, no download-action/badge, and no storage
-  management screen. `DownloadManager` is a tested library component, not a
-  wired app feature.
-- **Offline-first playback is NOT wired and would NOT yet play a downloaded
-  track.** Resolving to a local `file://` requires the platform byte layer to
-  read local files: Android uses a `ResolvingDataSource` over an HTTP/cache
-  `DataSource`, so a `file://` resolved URL would fail unless the
-  `MediaItem`/data source route is updated (e.g. `FileDataSource` /
-  `DefaultDataSource`) to handle a local path; the Desktop player loads remote
-  MRLs via vlcj and would need a local-path load first. This platform routing
-  is the immediate next step and is **device/hardware verified** only after it
-  lands. Green CI does **not** mean offline playback works.
+- **Offline-first playback routing is implemented and CI-green:** the shared
+  `OfflineFirstStreamResolver` returns a `file://` URI for a COMPLETED download
+  (deferring to the network chain otherwise); Android's `PlaybackGraph`
+  routes `file://` to a `FileDataSource` (via `SchemeRoutingDataSource`) and
+  checks the download repo before the network resolver; the desktop `MusicProvider`
+  wraps its resolver with `OfflineFirstStreamResolver` and the vlcj player
+  skips cache-fill/pre-buffer when a resolve returns a local `file://` MRL.
+  Download managers are wired into both platforms' DI. **Still not
+  hardware-verified** — a real device/PC must confirm a downloaded track plays
+  offline (CI only proves compilation + unit tests).
+- **Download UI is wired but minimal:** a Library "Downloads" tab lists
+  downloads (play/remove/clear-all + storage byte summary), and a "Download for
+  offline" action appears in the track overflow menu. There is **no** per-track
+  download badge, no Android foreground/WorkManager download service (downloads
+  run on the manager's worker pool inside the app process), and no dedicated
+  storage-management screen beyond the Downloads tab's clear-all — these remain
+  open follow-ups.
 - Downloads are **persistent** (survive until the user deletes them) and are
   distinct from the ADR-005 LRU stream cache, which is volatile and
   evicts on budget.

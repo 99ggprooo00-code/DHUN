@@ -46,6 +46,7 @@ import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
+import dev.dhun.download.DownloadManager
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
@@ -118,6 +119,7 @@ fun DhunAppShell(
     isDesktop: Boolean = false,
     libraryViewModel: LibraryViewModel? = null,
     connectivity: ConnectivityMonitor = AlwaysOnlineConnectivityMonitor,
+    downloadManager: DownloadManager? = null,
 ) {
     val scope = rememberCoroutineScope()
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
@@ -128,12 +130,13 @@ fun DhunAppShell(
     // If the host doesn't supply a ViewModel, create one from DataLayer.
     // Wire play-context via PlayerViewModel so history rows are labeled
     // LIBRARY/HISTORY/PLAYLIST instead of UNKNOWN.
-    val libraryVm = libraryViewModel ?: remember(dataLayer, player, scope, playerViewModel) {
+    val libraryVm = libraryViewModel ?: remember(dataLayer, player, scope, playerViewModel, downloadManager) {
         LibraryViewModel(
             dataLayer = dataLayer,
             player = player,
             scope = scope,
             setContext = { ctx -> playerViewModel.setPlayContext(ctx) },
+            downloadManager = downloadManager,
         )
     }
 
@@ -358,6 +361,7 @@ fun DhunAppShell(
                 player = player,
                 isFavorite = track.id in favoriteIds,
                 onToggleFavorite = { homeViewModel.toggleFavorite(it) },
+                onDownload = if (downloadManager != null) { t -> libraryVm.download(t) } else null,
                 onAddToPlaylist = { addToPlaylistTrack = it },
                 onNavigateToArtist = {
                     val id = track.artistId

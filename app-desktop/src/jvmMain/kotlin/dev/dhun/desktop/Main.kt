@@ -534,6 +534,7 @@ fun main() {
                         isDesktop = true,
                         modifier = Modifier.fillMaxSize(),
                         connectivity = koin.get(),
+                        downloadManager = koin.get(),
                     )
                 }
             }

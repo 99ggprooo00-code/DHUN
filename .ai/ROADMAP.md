@@ -1,21 +1,23 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-07 (UTC)** · session **`arena/01a07989-dhun`** · **PR #33 OPEN** (base `main`) · branch at `a1064b7`, CI green.
+Updated **2026-09-07 (UTC)** · session **`arena/01a07989-dhun`** · **PR #33 OPEN** (base `main`) · branch at `f46c586`, CI green.
 
-**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 offline downloads foundation is implemented + CI-verified).**
+**Phase: 14 — Robustness, rot-drill, UI/UX polish & feature enhancements. IN PROGRESS (ADR-006 offline downloads: foundation + engine + offline-first playback routing + minimal UI wired, all CI-verified).**
 
-The previous session (`arena/01a076f3-dhun`) merged **PR #32** into main at `862f0ac`. This session started from that base, reconciled the stale docs, and implemented the ADR-006 persistent-download layer.
+The previous session (`arena/01a076f3-dhun`) merged **PR #32** into main at `862f0ac`. This session started from that base, reconciled stale docs, and implemented the ADR-006 persistent-download layer through offline-first playback routing and a minimal download UI.
 
-**ADR-006 what's landed this session (CI-verified):**
-1. **Persistent data layer (schema v3):** `core/DownloadedTrack.kt` (+ `DownloadState` lifecycle enum), SQLDelight `DownloadedTrack.sq` + `migrations/2.sqm`, `download/DownloadRepository.kt` interface + `SqlDelightDownloadRepository`, wired as `DataLayer.downloads`. Tests: `DownloadRepositoryTest` (round-trip, completed-only gating, state transition, newest-first, delete/clear).
-2. **Download engine:** `download/DownloadStorage.kt` (filesystem abstraction), `download/StreamDownloader.kt` (Ktor byte-downloader with Range-resume + progress + User-Agent isolation), `download/DownloadManager.kt` (queue/progress contract), `download/FileDownloadManager.kt` (concrete manager: bounded 3-slot pool, atomic commit, best-effort artwork, PAUSED/FAILED), jvmMain `JvmDownloadStorage`. Tests: `StreamDownloaderTest` + `FileDownloadManagerTest`.
+**ADR-006 what's landed this session (CI-verified, `f46c586`):**
+1. **Persistent data layer (schema v3):** `core/DownloadedTrack.kt` (+ `DownloadState` lifecycle enum), SQLDelight `DownloadedTrack.sq` + `migrations/2.sqm`, `download/DownloadRepository.kt` interface + `SqlDelightDownloadRepository`, wired as `DataLayer.downloads`. Tests: `DownloadRepositoryTest`.
+2. **Download engine:** `download/DownloadStorage.kt`, `download/StreamDownloader.kt` (Ktor Range-resume + progress + User-Agent isolation), `download/DownloadManager.kt`, `download/FileDownloadManager.kt` (bounded 3-slot pool, atomic `.part`→final commit, best-effort artwork, PAUSED/FAILED), jvmMain `JvmDownloadStorage`. Tests: `StreamDownloaderTest` + `FileDownloadManagerTest`.
+3. **Offline-first playback routing:** shared `extraction/OfflineFirstStreamResolver` (COMPLETED download → `file://` URI, else delegate); Android `PlaybackGraph` routes `file://` to a `FileDataSource` via a `SchemeRoutingDataSource` and checks the download repo before the network resolver (passed into `buildExoPlayer` from the service + session-less fallback); Desktop module wraps the `MusicProvider` resolver with `OfflineFirstStreamResolver` and the vlcj player skips cache-fill/pre-buffer for local `file://` MRLs. Tests: `OfflineFirstStreamResolverTest`.
+4. **Download manager wiring + minimal UI:** `DownloadManager` registered in both Android (+ `AndroidDownloadStorage`) and Desktop DI; a Library "Downloads" tab (play/remove/clear-all + storage byte summary) and a "Download for offline" action in the track overflow menu. Android data source routing for `file://` and the desktop local-path load.
 
-**Branch CI evidence (PR #33, `a1064b7`):** `build-and-test` **34075307637 PASS** (Python checks, PowerShell syntax, shared JVM tests incl. the new download tests, Android debug build, probe + Desktop compilation); `apk` PASS (`34075307640` job); `msi` packaging run in flight. Shared JVM test run for the fix commit `34075305385` PASS.
+**Branch CI evidence:** `build-and-test` **34077389330 PASS** (Python checks, PowerShell syntax, shared JVM tests incl. the download + offline-first tests, Android debug build, probe + Desktop compilation). Test-release (apk/msi) PASS on the same branch.
 
 **What is verified / merged / released / open:**
 - **Merged on main:** PR #32 at **`862f0ac`** (2026-09-07T01:24:20Z), stacking on PR #30 (`76c68eb`).
 - **Released:** Rolling `test` pre-release at **`862f0ac`**, published **2026-09-07T01:29:28Z** (MSI 112,136,192 B / APK 17,516,190 B, + `.sha256`). Not changed by this branch.
-- **HW OPEN:** install-over upgrade, audible live-stream playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, 30-min soaks, green live rot-drill verdict. All require real device/PC/libVLC/display.
+- **HW OPEN:** offline playback of a downloaded track (real device/PC), install-over upgrade, audible live-stream playback, live Home pagination, player visual acceptance, tray/SMTC, clean-target hygiene, 30-min soaks, green live rot-drill verdict. All require real device/PC/libVLC/display. **Green CI does NOT mean downloaded tracks play offline.**
 - **ADR-003 (Accepted, implemented):** staged-wave tokenless chain in `OwnClientStreamResolver.kt`.
 - **ADR-005 (Accepted, implemented):** next-track pre-buffering + per-track User-Agent isolation in `AudioFileCache.kt` / `DesktopDhunPlayer.kt` / `PlaybackGraph.kt`.
 
@@ -23,10 +25,10 @@ The previous session (`arena/01a076f3-dhun`) merged **PR #32** into main at `862
 - PR #31 (`arena/01a0759b-dhun`, docs-only) is OPEN but CONFLICTING/superseded by PR #32's docs. Do not merge without user instruction.
 - Issue **#14 `[rot-drill] Live extraction probe failed`** remains **OPEN** (red = GitHub-runner IP gating; known environment limitation, not a user-impact defect).
 
-**Last error:** None on CI (doc-reconcile commit `852f126` green; data-layer + schema fix + download-engine tests all green).
-**Current exact files:** `shared/src/commonMain/kotlin/dev/dhun/download/*.kt` (DownloadStorage/StreamDownloader/DownloadManager/FileDownloadManager), `shared/src/commonMain/sqldelight/dev/dhun/database/DownloadedTrack.sq` + `migrations/2.sqm`, `shared/src/commonMain/kotlin/dev/dhun/data/SqlDelightDownloadRepository.kt`, `shared/src/jvmMain/.../JvmDownloadStorage.kt`, `shared/src/jvmTest/.../download/*`, `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`, `.ai/KNOWN_LIMITATIONS.md`.
+**Last error:** None on CI (download-manager registration commit green).
+**Current exact files:** `shared/src/commonMain/kotlin/dev/dhun/download/*.kt`, `shared/src/commonMain/kotlin/dev/dhun/extraction/OfflineFirstStreamResolver.kt`, `shared/src/commonMain/sqldelight/dev/dhun/database/DownloadedTrack.sq` + `migrations/2.sqm`, `shared/src/commonMain/kotlin/dev/dhun/data/SqlDelightDownloadRepository.kt`, `shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt` (Downloads tab), `shared/src/commonMain/kotlin/dev/dhun/ui/components/TrackOverflowDialog.kt` (download action), `shared/src/commonMain/kotlin/dev/dhun/presentation/library/LibraryViewModel.kt` (downloads flow), `app-android/.../download/AndroidDownloadStorage.kt`, `app-android/.../di/AppModule.kt`, `app-android/.../playback/PlaybackGraph.kt` (file:// routing), `app-desktop/.../Main.kt`, `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`, `.ai/KNOWN_LIMITATIONS.md`.
 
-**Exact next technical step:** Finish ADR-006 for production: (1) wire `DownloadManager` into the Android/Desktop Koin DI (with platform `DownloadStorage` + Ktor client + app scope), (2) add the offline-first playback hook (`OfflineFirstStreamResolver` over `DownloadRepository.getCompleted` → local `file://`/path, with the matching Android `FileDataSource`/`file://` routing and Desktop vlcj local-path load so a downloaded track plays with zero network), (3) platform download services (Android foreground service/WorkManager, Desktop worker pool), and (4) UI: Library "Downloaded" section, download actions/badge, storage-management screen. Blocker: offline-first playback and UI are partly platform/device-bound; the data+engine foundation is CI-verified but end-to-end offline playback needs a real device/PC. Do NOT infer hardware acceptance from green CI.
+**Exact next technical step:** Finish ADR-006 for production: (1) verify downloaded-track offline playback on a real device/PC (Android `file://` FileDataSource route + Desktop vlcj local-path load — CI only proves compilation), (2) platform download services: Android foreground service / WorkManager so downloads survive app backgrounding, Desktop worker pool (manager is already wired), (3) polish UI: per-track download badge, storage-management screen, download progress percentages. Blocker: offline playback + platform services need hardware / Android manifest+service work; the foundation is CI-verified but end-to-end offline playback needs a real device/PC. Do NOT infer hardware acceptance from green CI.
 
 ---
 

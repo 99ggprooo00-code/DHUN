@@ -37,6 +37,7 @@ fun TrackOverflowDialog(
     onAddToPlaylist: (Track) -> Unit,
     onNavigateToArtist: ((track: Track) -> Unit)? = null,
     onNavigateToAlbum: ((track: Track) -> Unit)? = null,
+    onDownload: ((Track) -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -112,6 +113,16 @@ fun TrackOverflowDialog(
                         onAddToPlaylist(track)
                     },
                 )
+                if (onDownload != null) {
+                    OverflowActionRow(
+                        icon = DhunIcon.Download,
+                        label = "Download for offline",
+                        onClick = {
+                            onDismiss()
+                            onDownload(track)
+                        },
+                    )
+                }
                 OverflowActionRow(
                     icon = if (isFavorite) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
                     label = if (isFavorite) "Remove from favorites" else "Add to favorites",
