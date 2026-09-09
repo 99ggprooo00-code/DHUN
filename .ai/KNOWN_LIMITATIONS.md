@@ -404,3 +404,49 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
 - **CI green is compile + unit tests.** This environment has no libVLC and no
   audio device; nothing here claims audible EQ on hardware. Native apply is
   best-effort and silent when VLC is missing.
+
+## 2026-09-09 — Candidate 28 themes (PR #49, `arena/01a08455-themes`) — light scheme + accent selector
+
+Limits found while building it. Each is a measured or code-verified fact;
+**visual appearance on hardware is claimed nowhere.**
+
+- **Dark `error` on `errorContainer` is 3.92:1 — below WCAG AA (4.5:1) for
+  text.** Shipped values (`#CF6679` on `#4D1A24`), left byte-identical on
+  purpose: retuning them would break the "dark stays the default and
+  unchanged" guarantee, which is the whole basis of an additive theme system.
+  `DhunThemeContrastTest` therefore asserts 3:1 for that pair in dark and
+  4.5:1 in light (the new light pair, `#B00020` on `#F9DEDC`, measures
+  5.76:1). A future pass can retune the dark pair knowingly — it is a real
+  accessibility defect, recorded here rather than silently asserted away.
+- **`app-desktop` tray icons stay dark in light mode.**
+  `native/TrayIcons.kt:19-21` reads `DhunColors.surface/border/accent` in an
+  object initialiser — once, before any composition exists — so it captures
+  the default palette. Fixing it means touching a frozen file.
+- **One appearance per process, not per window.** `DhunAppearance` is a
+  process-wide snapshot-state holder, so desktop's startup-error window and
+  main window share a theme. Intended for a toggle; stated because it is a
+  constraint, not an omission.
+- **Nothing persists the choice.** A store exists (`SettingsRepository` +
+  `SettingsKeys.THEME` = `"dark" | "light" | "system"`, default `"dark"`), but
+  **no app code reads that key** — only `RepositoriesTest` — there is no
+  Settings screen, and `design` must not depend on `data` (layer inversion).
+  `DhunThemeMode.id` already uses exactly those strings, so wiring is
+  mechanical; until then a restart returns to dark. `"system"` is storable but
+  unimplemented (no `expect/actual` hook), so `fromId("system")` returns
+  `null` and falls back to dark rather than pretending to work.
+- **The toggle is dev-reachable only.** It is mounted in
+  `design/catalog/ComponentCatalogScreen.kt`, which has no entry point in
+  either app. Making it user-reachable requires editing at least one frozen
+  theme entry point (`MainActivity.kt:134`, desktop `Main.kt:278`/`:554`).
+- **Kotlin nests block comments — a path glob in a KDoc is a compile break.**
+  `shared/ui/**` inside a KDoc opens a nested comment that nothing closes, so
+  the enclosing comment never terminates and the rest of the file is
+  commented out. This bit both this session (caught by a delimiter-balance
+  sweep before push) and PR #45 (caught by CI). Do not quote path globs in
+  Kotlin comments.
+- **`workflow_dispatch` is refused for an agent session's token** (`HTTP 403:
+  Resource not accessible by integration`), and Actions job logs are unreadable
+  here (the log CDN is behind the same egress wall as Maven). If a workflow
+  only triggers on `pull_request` and that event does not fire for a given PR,
+  its jobs need a human — which is exactly how `apk`/`msi` were obtained for
+  PR #49 (run `34315184472`).
