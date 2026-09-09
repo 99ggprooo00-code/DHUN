@@ -45,6 +45,16 @@ class AndroidDhunPlayer(
     private val player: Player,
     private val scope: CoroutineScope,
     private val streamCache: DhunStreamCache? = null,
+    /**
+     * Resolve-outcome record (playback-diagnostics session, 2026-09-09).
+     * Default = the process-wide log the DI-wrapped MusicProvider writes
+     * (`ResolveObservingMusicProvider` in AppModule); inject an isolated one
+     * in tests. Lets a terminal resolve verdict (AuthRequired/Unavailable)
+     * fast-fail out of STATE_BUFFERING instead of riding out the engine's
+     * multi-minute retry cascade ("stuck buffering").
+     */
+    private val resolveOutcomes: ResolveOutcomeLog = ResolveOutcomeLog.global,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : DhunPlayer {
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -56,6 +66,15 @@ class AndroidDhunPlayer(
 
     private val trackMap = ConcurrentHashMap<String, Track>()
     private var prefetchJob: Job? = null
+
+    /**
+     * Epoch ms of the first refresh that observed STATE_BUFFERING in the
+     * current bout; 0 when not buffering. Feeds the fast-fail grace so a
+     * terminal resolve verdict only cuts in once the player has genuinely
+     * been stuck (offline cache-span replay reaches READY far faster and
+     * must never flash an error).
+     */
+    private var bufferingSinceMs = 0L
 
     private val _state = MutableStateFlow<PlaybackState>(PlaybackState.Idle)
     override val state: StateFlow<PlaybackState> = _state.asStateFlow()
@@ -218,6 +237,10 @@ class AndroidDhunPlayer(
     override fun retry() {
         onMain {
             if (player.mediaItemCount == 0) return@onMain
+            // Drop this track's terminal resolve verdict so the fresh attempt
+            // is judged on its own outcome, not instantly fast-failed by the
+            // stale one.
+            player.currentMediaItem?.mediaId?.let { resolveOutcomes.clear(it) }
             StreamRecoverySignal.end()
             player.seekTo(player.currentPosition.coerceAtLeast(0))
             player.playWhenReady = true
@@ -274,34 +297,53 @@ class AndroidDhunPlayer(
             }
             _shuffleEnabled.value = player.shuffleModeEnabled
             _volume.value = player.volume.coerceIn(0f, 1f)
-            _state.value = when {
-                player.playerError != null && !StreamRecoverySignal.active.value -> {
-                    val message = player.playerError?.let { describeErrorChain(it) } ?: "Playback error"
-                    android.util.Log.e("DHUN", "playback error: $message")
-                    PlaybackState.Error(track, message)
-                }
-                // 403 mid-stream recovery in flight (PlaybackGraph set the signal).
-                StreamRecoverySignal.active.value && track != null ->
-                    PlaybackState.Recovering(track)
-                player.isPlaying -> {
-                    StreamRecoverySignal.end()
-                    schedulePrefetchNextTrack()
-                    PlaybackState.Playing(track ?: UNKNOWN)
-                }
-                player.playbackState == Player.STATE_BUFFERING ->
-                    if (StreamRecoverySignal.active.value && track != null) {
-                        PlaybackState.Recovering(track)
-                    } else {
-                        PlaybackState.Buffering(track ?: UNKNOWN)
-                    }
-                player.playbackState == Player.STATE_READY ->
-                    PlaybackState.Paused(track ?: UNKNOWN)
-                // Restored-but-not-prepared queue (playWhenReady=false before
-                // buffering) is still a paused session, not an idle player.
-                player.mediaItemCount > 0 && player.playbackState != Player.STATE_IDLE ->
-                    PlaybackState.Paused(track ?: UNKNOWN)
-                else -> PlaybackState.Idle
+
+            val now = clock()
+            if (player.playbackState == Player.STATE_BUFFERING) {
+                if (bufferingSinceMs == 0L) bufferingSinceMs = now
+            } else {
+                bufferingSinceMs = 0L
             }
+            val bufferingForMs =
+                if (bufferingSinceMs == 0L) 0L else (now - bufferingSinceMs).coerceAtLeast(0L)
+
+            // Fresh terminal verdict for the CURRENT track, if any
+            // (AuthRequired/Unavailable — every resolve identity said no).
+            val currentId = player.currentMediaItem?.mediaId
+            val terminal = currentId?.let { resolveOutcomes.terminalFor(it, now) }
+
+            val engineErrorMessage =
+                player.playerError?.let { describeErrorChain(it) } ?: "Playback error"
+            val mapped = mapPlaybackState(
+                track = track,
+                engineError = player.playerError != null,
+                engineErrorMessage = engineErrorMessage,
+                recoveryActive = StreamRecoverySignal.active.value,
+                isPlaying = player.isPlaying,
+                playbackState = player.playbackState,
+                mediaItemCount = player.mediaItemCount,
+                terminalResolveError = terminal,
+                bufferingForMs = bufferingForMs,
+            )
+            if (mapped is PlaybackState.Playing) {
+                StreamRecoverySignal.end()
+                schedulePrefetchNextTrack()
+            }
+            if (mapped is PlaybackState.Error && player.playerError != null) {
+                android.util.Log.e("DHUN", "playback error: ${mapped.message}")
+            }
+            if (mapped is PlaybackState.Error && player.playerError == null && terminal != null) {
+                // Fast-fail: the engine's bounded retry cascade would keep
+                // this player in Buffering/Recovering for minutes while every
+                // re-resolve hits the same gate. Surface the typed verdict now.
+                android.util.Log.w(
+                    "DHUN",
+                    "fast-fail: resolve for $currentId is terminal " +
+                        "(${terminal::class.simpleName}) after ${bufferingForMs}ms buffering — " +
+                        "surfacing typed error instead of the retry cascade",
+                )
+            }
+            _state.value = mapped
         }
     }
 
@@ -346,8 +388,4 @@ class AndroidDhunPlayer(
                 .build()
         )
         .build()
-
-    companion object {
-        private val UNKNOWN = Track(id = "", title = "Unknown", artistName = "")
-    }
 }
