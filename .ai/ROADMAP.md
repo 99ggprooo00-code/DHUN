@@ -298,8 +298,10 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 IN PROGRESS — **ADR-006 offline downloads fully integrated: PRs #34/#35/#36/#37 merged, `main` / `test` at `481b77b`, ALL STABLE.** CI `34084678724` and test-release `34084678720` green; rolling test republished `2026-09-07T04:58:25Z`. Audio User-Agent fix, Home continuation, bounded resolve/diagnostics, restyle, single-window code, Android download FGS, Library storage management, per-track badges and player UX are all on GitHub. `rot-drill` still RED (issue #14, GitHub-runner IP gating, non-code); hardware re-tests, offline/recovery checks, clean targets, soaks and v0.1.0 remain OPEN | Phase 14 step table below; `INTEGRATION.md`; issue #14; docs/verification/14 |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
-trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
-widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
+trajectory below): Web/PWA, Android Auto, Cast, Android `AudioEffect` equalizer
+(desktop/shared EQ is candidate 22 this session), sync, downloads,
+Android widgets (candidate 26 is on this shared branch as PR #46), jump lists,
+optional cookie sign-in, themes beyond dark-first.
 
 ### Phase 12 step status — 🟨 IN PROGRESS (mini-player window REMOVED per ADR-004)
 
