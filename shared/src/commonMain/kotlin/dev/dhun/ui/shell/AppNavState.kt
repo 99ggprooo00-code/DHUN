@@ -28,6 +28,13 @@ sealed interface DetailRoute {
  * own BackHandler and calls [closeTop]; when nothing closes, the platform
  * default runs (Android → moveTaskToBack). FullPlayer collapses first, then
  * detail pages pop — BACK never exits the app while either is open.
+ *
+ * [detailStack] is the only navigation stack, and it means the same thing in
+ * both shell layouts; what differs is *where* its top is rendered. Below the
+ * rail breakpoint it replaces the tab content (see the shell's single-pane
+ * branch); at [DhunShellLayout.TwoPane] it is the detail pane beside the list.
+ * Nothing here encodes the layout — [DhunShellPolicy] owns that decision, so a
+ * platform caller (or a restored Bundle) keeps working unchanged.
  */
 class AppNavState {
     var selectedTab by mutableStateOf(AppTab.HOME)
@@ -38,6 +45,14 @@ class AppNavState {
 
     /** Something is covering the tab content (full player or a detail page). */
     val hasOverlay: Boolean get() = playerExpanded || detailStack.isNotEmpty()
+
+    /**
+     * A detail page is open. Unlike [hasOverlay] this ignores the player, which
+     * is the distinction the large-screen panes need: in two-pane mode a detail
+     * route does not overlay the master at all, so "overlay" and "a page is
+     * open" are no longer the same question.
+     */
+    val hasDetail: Boolean get() = detailStack.isNotEmpty()
 
     /** Closes the topmost overlay. @return true if anything closed. */
     fun closeTop(): Boolean = when {
@@ -52,8 +67,45 @@ class AppNavState {
         else -> false
     }
 
+    /**
+     * Pops exactly one [DetailRoute], leaving [playerExpanded] alone — the
+     * detail pane's own up/back affordance. @return true if a page was popped.
+     */
+    fun popDetail(): Boolean =
+        if (detailStack.isNotEmpty()) {
+            detailStack.removeAt(detailStack.lastIndex)
+            true
+        } else {
+            false
+        }
+
     /** Push a detail page; also collapses the player so navigation is visible. */
     fun push(route: DetailRoute) {
         detailStack += route
+    }
+
+    /**
+     * Nav-bar / nav-rail tap.
+     *
+     * [keepDetailOnTabChange] is the large-screen rule: with a separate detail
+     * pane the page stays open while the master switches tabs, and re-tapping
+     * the already-selected tab is the "up" affordance that pops one page. A
+     * single-pane shell passes `false`, which reproduces the shipped behavior
+     * exactly: switching tabs drops the whole stack, because a stack that is
+     * merely hidden is a stack the user cannot get back to.
+     *
+     * @return true if the tap changed anything (no current caller reads it; it
+     *   exists so the rule is testable rather than implicit in the click lambda).
+     */
+    fun selectTab(tab: AppTab, keepDetailOnTabChange: Boolean = false): Boolean {
+        val tabChanged = tab != selectedTab
+        selectedTab = tab
+        return if (keepDetailOnTabChange && !tabChanged) {
+            popDetail()
+        } else {
+            val hadDetail = detailStack.isNotEmpty()
+            detailStack.clear()
+            tabChanged || hadDetail
+        }
     }
 }
