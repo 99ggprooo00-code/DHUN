@@ -12,7 +12,8 @@ import java.awt.image.BufferedImage
  *
  * 32×32 ARGB by default (Windows scales via `setAutoSize`). Dark rounded
  * tile + DHUN accent glyph: play triangle while playing, pause bars while
- * paused/idle.
+ * paused/idle. Candidate 27 adds the idle variant (no glyph but a single
+ * accent dot) so "nothing loaded yet" is distinguishable from "paused".
  */
 object TrayIcons {
 
@@ -22,6 +23,16 @@ object TrayIcons {
 
     private fun awtColor(color: androidx.compose.ui.graphics.Color): Color =
         Color(color.red, color.green, color.blue, color.alpha)
+
+    /** Nothing loaded yet: the dark tile with one small accent dot. */
+    fun idle(size: Int = 32): BufferedImage = draw(size) { g, s ->
+        tile(g, s)
+        g.color = accent
+        val r = (s * 0.09f).toInt().coerceAtLeast(1)
+        val cx = s / 2
+        val cy = (s * 0.64f).toInt()
+        g.fillOval(cx - r, cy - r, r * 2, r * 2)
+    }
 
     fun playing(size: Int = 32): BufferedImage = draw(size) { g, s ->
         tile(g, s)

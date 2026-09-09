@@ -38,6 +38,18 @@ kotlin {
                 implementation("net.java.dev.jna:jna:5.17.0")
             }
         }
+        // Candidate 27 (jump lists / tray polish): the module's first test
+        // source set covers the PURE jump-list cores (task model, args,
+        // recents persistence, throttle decision, tray state) — no COM/AWT
+        // on any test path, so they run green on any OS. NOTE: CI's desktop
+        // gate is `:app-desktop:compileKotlinJvm` only; `:app-desktop:test`
+        // is not a CI step yet (.github is outside this batch's scope), so
+        // run `./gradlew :app-desktop:jvmTest` locally.
+        val jvmTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }
 
