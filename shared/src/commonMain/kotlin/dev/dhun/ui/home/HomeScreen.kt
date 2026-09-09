@@ -77,11 +77,12 @@ import dev.dhun.ui.components.TrackDownloadRowActions
  * 2. Quick-action chips (Liked / Offline / Sleep timer)
  * 3. Mood & genre filter chips (from feed shelf titles + defaults)
  * 4. Quick Picks responsive grid
- * 5. Listen again (history)
- * 6. Rediscover / mix shelf (when present)
- * 7. Charts & trending shelves
- * 8. Recommended albums & EPs
- * 9. Remaining InnerTube shelves
+ * 5. Recommended songs (seeded from listening history / saved songs)
+ * 6. Listen again (history)
+ * 7. Rediscover / mix shelf (when present)
+ * 8. Charts & trending shelves
+ * 9. Recommended albums & EPs
+ * 10. Remaining InnerTube shelves
  *
  * Typography is clean sans only; brand wordmark uses [DhunTypographyTokens.brand].
  */
@@ -105,6 +106,8 @@ fun HomeScreen(
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val loadMoreError by viewModel.loadMoreError.collectAsState()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
+    val recommendedSongs by viewModel.recommendedSongs.collectAsState()
+    val isLoadingRecommended by viewModel.isLoadingRecommended.collectAsState()
 
     Box(modifier = modifier.fillMaxSize()) {
         when (val state = uiState) {
@@ -132,6 +135,8 @@ fun HomeScreen(
                 HomeFeedContent(
                     feed = state.feed,
                     recentlyPlayed = recentlyPlayed,
+                    recommendedSongs = recommendedSongs,
+                    isLoadingRecommended = isLoadingRecommended,
                     isRefreshing = isRefreshing,
                     isLoadingMore = isLoadingMore,
                     loadMoreError = loadMoreError,
@@ -158,6 +163,8 @@ fun HomeScreen(
 private fun HomeFeedContent(
     feed: HomeFeed,
     recentlyPlayed: List<Track>,
+    recommendedSongs: List<Track>,
+    isLoadingRecommended: Boolean,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
     loadMoreError: String?,
@@ -367,6 +374,32 @@ private fun HomeFeedContent(
                     onTrackOverflow = onTrackOverflow,
                     downloadManager = downloadManager,
                 )
+            }
+        }
+
+        // ---- Recommended songs (seeded from listening history) ----------------
+        if (recommendedSongs.isNotEmpty()) {
+            item(key = "recommended_header") {
+                SectionHeader(
+                    title = "Recommended songs",
+                    modifier = Modifier.padding(top = DhunSpacing.lg),
+                )
+            }
+            item(key = "recommended_row") {
+                HorizontalShelf {
+                    itemsIndexed(recommendedSongs, key = { _, t -> "rec_${t.id}" }) { index, track ->
+                        TrackCard(
+                            track = track,
+                            onClick = { onTrackClick(track, recommendedSongs, index) },
+                        )
+                    }
+                }
+            }
+        } else if (isLoadingRecommended && recentlyPlayed.isNotEmpty()) {
+            // First build for a user with history: brief shimmer while the
+            // near-instant local picks resolve. Never a blocking spinner.
+            item(key = "recommended_loading") {
+                SectionShimmer(modifier = Modifier.padding(top = DhunSpacing.lg))
             }
         }
 

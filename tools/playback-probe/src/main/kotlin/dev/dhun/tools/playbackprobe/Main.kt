@@ -3,6 +3,8 @@ package dev.dhun.tools.playbackprobe
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.StreamInfo
+import dev.dhun.domain.GetHomeFeedUseCase
+import dev.dhun.domain.HomeShelfKind
 import dev.dhun.extraction.NewPipeStreamResolver
 import dev.dhun.extraction.OwnClientStreamResolver
 import dev.dhun.extraction.ResolvingStreamResolver
@@ -99,6 +101,49 @@ fun main(): Unit = runBlocking<Unit> {
         pass = false
         println("PROBE|verdict|FAIL|search broken")
         kotlin.system.exitProcess(1)
+    }
+
+    // ---- STEP 1b: HOME FEED (FEmusic_home) — diagnostic only ----------------
+    // Reports whether the tokenless Home browse returns shelves AND a
+    // continuation token. Both drive the Home screen: shelf count/kind governs
+    // how much content Home can render, and the continuation token is what
+    // powers vertical endless scroll ("load more"). Previously the drill never
+    // exercised Home, so a sparse feed or missing continuation could go
+    // unmeasured. Informational only — Home sparseness is region/account
+    // dependent and must not fail the drill verdict.
+    try {
+        when (val r = client.homeFeedPage()) {
+            is DhunResult.Success -> {
+                val feed = r.value
+                val byKind = feed.sections
+                    .groupingBy { GetHomeFeedUseCase.classifySection(it.title) }
+                    .eachCount()
+                val kindText = HomeShelfKind.entries.joinToString(", ") { k -> "$k=${byKind[k] ?: 0}" }
+                println("PROBE|home-feed|PASS|sections=${feed.sections.size} continuation=${feed.continuationToken != null}; $kindText")
+                feed.sections.take(8).forEachIndexed { i, s ->
+                    println("HOME|${i + 1}|title=${s.title}|items=${s.items.size}")
+                }
+                // When the first page advertises more, actually request the next
+                // page so the endless-scroll path is exercised against live data.
+                val token = feed.continuationToken
+                if (!token.isNullOrBlank()) {
+                    when (val next = client.homeFeedContinuation(token)) {
+                        is DhunResult.Success -> println(
+                            "PROBE|home-more|PASS|sections=${next.value.sections.size} " +
+                                "continuation=${next.value.continuationToken != null}"
+                        )
+                        is DhunResult.Failure -> println("PROBE|home-more|FAIL|${next.error}")
+                    }
+                } else {
+                    println("PROBE|home-more|SKIP|first page exhausted (no continuation token)")
+                }
+            }
+            is DhunResult.Failure -> println("PROBE|home-feed|FAIL|${r.error}")
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        println("PROBE|home-feed|FAIL|${t.javaClass.simpleName}: ${t.message?.take(200)}")
     }
 
     val topTrack = searchResult.first()
