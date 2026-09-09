@@ -60,5 +60,30 @@
             android:name=".download.DhunDownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Candidate 26: home-screen widgets — Now Playing + Quick Play.
+             Additive; each provider is a separate picker entry feeding the
+             existing playback service state via MediaController (read-only).
+             Gracefully shows "Nothing playing" when idle. -->
+        <receiver
+            android:name=".widgets.DhunNowPlayingWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_now_playing_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.DhunQuickPlayWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_play_info" />
+        </receiver>
     </application>
 </manifest>

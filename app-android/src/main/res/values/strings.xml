@@ -13,4 +13,8 @@
 
     <!-- Accessibility (Phase 15): announced by TalkBack, never shown as UI text. -->
     <string name="a11y_connecting">Initializing audio engine</string>
+
+    <!-- Widgets (candidate 26): picker descriptions. -->
+    <string name="widget_now_playing_desc">Now Playing — artwork, track and transport</string>
+    <string name="widget_quick_play_desc">Quick Play — compact play/pause</string>
 </resources>
