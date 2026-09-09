@@ -1,6 +1,5 @@
 package dev.dhun.ui.player
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -26,8 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -76,91 +73,6 @@ import dev.dhun.presentation.player.RelatedUiState
 import dev.dhun.ui.components.DragHandleGrip
 import dev.dhun.ui.components.ReorderableList
 import kotlinx.coroutines.delay
-
-private val tabTitles = listOf("Lyrics", "Queue", "Related")
-
-/* ---------------- tab header ----------------------------------------------- */
-
-@Composable
-internal fun PlayerTabRow(
-    selectedTab: Int,
-    onSelect: (Int) -> Unit,
-    accent: Color,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(DhunSpacing.touchTarget)
-            .selectableGroup(),
-    ) {
-        tabTitles.forEachIndexed { index, title ->
-            val selected = index == selectedTab
-            val color by animateColorAsState(
-                targetValue = if (selected) accent else DhunColors.textTertiary,
-                animationSpec = DhunAnimations.fastTween(),
-                label = "tabColor$index",
-            )
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(horizontal = DhunSpacing.xs)
-                    .clip(DhunShapes.large)
-                    .background(
-                        if (selected) {
-                            Brush.verticalGradient(
-                                listOf(
-                                    DhunColors.glassHighlight,
-                                    accent.copy(alpha = 0.22f),
-                                ),
-                            )
-                        } else {
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Transparent),
-                            )
-                        },
-                    )
-                    .selectable(
-                        selected = selected,
-                        role = Role.Tab,
-                        onClick = { onSelect(index) },
-                    ),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
-                ) {
-                    // The lyrics tab is also the lyrics-dominant entry point
-                    // (ADR-002 rule 5), so it carries its own glyph.
-                    if (index == LYRICS_TAB_INDEX) {
-                        DhunIconView(
-                            icon = DhunIcon.Lyrics,
-                            contentDescription = null,
-                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                            tint = color,
-                        )
-                    }
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = color,
-                    )
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.xs))
-                Box(
-                    modifier = Modifier
-                        .height(DhunSpacing.iconStroke)
-                        .width(if (selected) DhunSpacing.xxl else DhunSpacing.zero)
-                        .clip(DhunShapes.full)
-                        .background(if (selected) accent else Color.Transparent),
-                )
-            }
-        }
-    }
-}
 
 @Composable
 internal fun PlayerTabContent(

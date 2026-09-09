@@ -60,25 +60,29 @@ class PlayerControlStateTest {
     }
 
     @Test
-    fun allSixTransportTargetsFitNormalPhoneAndDesktopWidths() {
+    fun immersiveTransportTargetsFitNormalPhoneAndDesktopWidths() {
         listOf(300.dp, 320.dp, 360.dp, 400.dp).forEach { width ->
             val metrics = playerTransportMetrics(width)
             assertTrue(metrics.minimumWidth <= width, "Transport must fit $width")
-            assertTrue(metrics.playSize >= DhunSpacing.touchTarget)
+            assertTrue(metrics.playSize >= DhunSpacing.iconSize)
             assertEquals(
-                DhunSpacing.touchTarget * 5 + metrics.playSize + metrics.horizontalPadding * 2,
+                DhunSpacing.touchTarget * 2 + DhunSpacing.transportTarget + metrics.horizontalPadding * 2,
                 metrics.minimumWidth,
             )
         }
-        assertEquals(DhunSpacing.transportTarget, playerTransportMetrics(300.dp).playSize)
-        assertEquals(DhunSpacing.miniPlayerHeight, playerTransportMetrics(400.dp).playSize)
+        // Roomy widths (>= playerTransportMaxWidth) get the full-size glyphs.
+        assertEquals(DhunSpacing.huge, playerTransportMetrics(400.dp).playSize)
+        assertEquals(DhunSpacing.iconSizeLg, playerTransportMetrics(400.dp).skipSize)
+        assertEquals(DhunSpacing.xxl, playerTransportMetrics(400.dp).horizontalPadding)
     }
 
     @Test
-    fun exceptionallyNarrowTransportScrollsInsteadOfShrinkingFavoriteOrRepeat() {
+    fun narrowTransportKeeps48dpTouchTargetsAndStepsIconsDown() {
         val metrics = playerTransportMetrics(240.dp)
-        assertTrue(metrics.minimumWidth > 240.dp)
-        assertTrue(metrics.playSize >= DhunSpacing.touchTarget)
-        assertEquals(DhunSpacing.touchTarget * 5, metrics.minimumWidth - metrics.playSize - metrics.horizontalPadding * 2)
+        assertTrue(metrics.minimumWidth <= 240.dp, "240dp devices must not need scrolling")
+        assertEquals(DhunSpacing.iconSizeLg, metrics.playSize)
+        assertEquals(DhunSpacing.iconSize, metrics.skipSize)
+        assertEquals(DhunSpacing.xs, metrics.horizontalPadding)
+        assertEquals(DhunSpacing.touchTarget * 2 + DhunSpacing.transportTarget + DhunSpacing.xs * 2, metrics.minimumWidth)
     }
 }

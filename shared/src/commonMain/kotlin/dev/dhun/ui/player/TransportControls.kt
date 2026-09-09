@@ -56,6 +56,7 @@ internal fun HoldTapTransportButton(
     onRelease: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    iconSize: Dp = DhunSpacing.iconSize,
 ) {
     val currentOnTap by rememberUpdatedState(onTap)
     val currentOnHold by rememberUpdatedState(onHold)
@@ -129,7 +130,7 @@ internal fun HoldTapTransportButton(
         DhunIconView(
             icon = icon,
             contentDescription = null,
-            modifier = Modifier.size(DhunSpacing.iconSize)
+            modifier = Modifier.size(iconSize)
                 .graphicsLayer { scaleX = scale; scaleY = scale },
             tint = if (enabled) DhunColors.textPrimary else DhunColors.textTertiary,
         )
@@ -158,22 +159,28 @@ internal fun playbackBusyLabel(state: PlaybackState): String? = when (state) {
     else -> null
 }
 
+/**
+ * Immersive main-transport geometry: previous/next keep their 48dp touch
+ * targets, the play action owns the 52dp target, and the bare icons grow on
+ * roomy widths. Nothing shrinks below the touch floor — at exceptionally
+ * narrow widths the row scrolls instead (see [minimumWidth]).
+ */
 internal data class PlayerTransportMetrics(
     val horizontalPadding: Dp,
+    /** Play/pause icon size (the bare glyph — no disc). */
     val playSize: Dp,
+    /** Previous/next icon size. */
+    val skipSize: Dp,
     val minimumWidth: Dp,
 )
 
-/** Keep all five secondary targets at 48dp, including Favorite in its original slot. */
 internal fun playerTransportMetrics(availableWidth: Dp): PlayerTransportMetrics {
-    val padding = if (availableWidth >= DhunSpacing.playerTransportMaxWidth) DhunSpacing.xxl else DhunSpacing.xs
-    val secondaryWidth = DhunSpacing.touchTarget * 5
-    val playSize = if (availableWidth >= secondaryWidth + DhunSpacing.miniPlayerHeight + padding * 2) {
-        DhunSpacing.miniPlayerHeight
-    } else {
-        DhunSpacing.transportTarget
-    }
-    return PlayerTransportMetrics(padding, playSize, secondaryWidth + playSize + padding * 2)
+    val roomy = availableWidth >= DhunSpacing.playerTransportMaxWidth
+    val padding = if (roomy) DhunSpacing.xxl else DhunSpacing.xs
+    val playSize = if (roomy) DhunSpacing.huge else DhunSpacing.iconSizeLg
+    val skipSize = if (roomy) DhunSpacing.iconSizeLg else DhunSpacing.iconSize
+    val minimumWidth = DhunSpacing.touchTarget * 2 + DhunSpacing.transportTarget + padding * 2
+    return PlayerTransportMetrics(padding, playSize, skipSize, minimumWidth)
 }
 
 private const val HOLD_DELAY_MS = 350L

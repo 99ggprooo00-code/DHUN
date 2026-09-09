@@ -24,6 +24,28 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### FullPlayer immersive full-screen redesign — 2026-09-09
+- **Immersive Now Playing** — the now-playing artwork is now the entire
+  background: a sharp full-bleed copy (slide + fade on track change) over a
+  once-per-track blurred bleed of the same image (ADR-002 P4 contract kept;
+  the bleed is scaled 1.2× so the blur rim is never visible), with a smooth
+  bottom scrim that fades into the surface so the overlaid chrome stays
+  legible. The art no longer sits in a boxed card over a heavy dark wash.
+- **Overlay chrome** — title + artist, the progress bar, and transport are
+  overlaid on the artwork: circular "more" / "favorite" glass chips beside
+  the track name, plain oversized previous / play / next icons (no disc,
+  no shadow), and a bottom action row — queue · shuffle · repeat · lyrics.
+- **Queue sheet + lyrics card** — the queue glyph opens a glass bottom
+  sheet (Queue | Related tabs, drag-reorder and all queue actions kept)
+  that docks above the chrome; the lyrics glyph (CC) switches to the
+  lyrics-dominant view: a rounded card carrying the synced lyrics over a
+  blurred artwork while the sharp backdrop recedes to a darkened blur.
+  Collapse stays chevron / swipe-down / system-back — never exits the app.
+- `DhunIcon.ChevronDown` added; `playerTransportMetrics` re-derived for the
+  three-button transport (48dp skip targets + 52dp play target preserved,
+  icons step up on roomy widths) with the regression tests updated to the
+  new geometry.
+
 ### ADR-006 offline downloads + desktop single-window hardening — 2026-09-07 (PRs #33–#38 merged)
 - **Persistent offline downloads (ADR-006, PR #33 `f157245`)** — schema v3 +
   migration, download repositories, range-resume atomic `DownloadManager`,
