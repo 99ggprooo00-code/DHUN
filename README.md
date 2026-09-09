@@ -25,8 +25,15 @@ Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 
 ## License
 
-GPL-3.0 — required for legitimate reuse of the ecosystem's maintained
-extractors (NewPipe Extractor is GPL-3.0). See THIRD_PARTY.md.
+GPL-3.0 — see THIRD_PARTY.md.
+
+## Screenshots
+
+*Coming soon — home and player from test build.*
+
+## Contributors
+
+Thanks to everyone testing early builds.
 
 ## Build
 
