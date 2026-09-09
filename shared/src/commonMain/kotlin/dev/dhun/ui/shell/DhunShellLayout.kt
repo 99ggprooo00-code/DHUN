@@ -43,14 +43,16 @@ enum class DhunShellLayout {
          * Non-finite or non-positive widths (an unmeasured / collapsed window)
          * fall back to [SinglePane], the more conservative layout.
          */
-        fun of(availableWidth: Dp): DhunShellLayout =
-            if (availableWidth.isFinite() && availableWidth.value > 0f &&
+        fun of(availableWidth: Dp): DhunShellLayout {
+            val width = availableWidth.value
+            return if (width.isFinite() && width > 0f &&
                 availableWidth >= DhunSpacing.navigationRailBreakpoint
             ) {
                 TwoPane
             } else {
                 SinglePane
             }
+        }
     }
 }
 
@@ -102,8 +104,8 @@ object DhunShellPolicy {
     /**
      * Ceiling for the master pane, taken from the design system's reading
      * measure ([DhunSpacing.playerContentMaxWidth]) rather than a fresh number,
-     * so a raw `dp` literal stays out of `ui/**` and both surfaces follow the
-     * same decision. Past this width every extra dp belongs to the detail pane:
+     * so a raw dp literal stays out of the ui layer entirely and both surfaces
+     * follow the same decision. Past this width every extra dp goes to detail:
      * a list of rows does not improve when it gets wider.
      */
     val masterPaneMaxWidth: Dp get() = DhunSpacing.playerContentMaxWidth
@@ -146,11 +148,11 @@ object DhunShellPolicy {
      */
     fun panes(shellWidth: Dp, contentWidth: Dp, hasRail: Boolean = true): ShellPanes? {
         if (layoutAt(shellWidth) != DhunShellLayout.TwoPane) return null
-        if (!contentWidth.isFinite() || contentWidth <= 0.dp) return null
+        if (!contentWidth.value.isFinite() || contentWidth <= 0.dp) return null
         val allowance = railAllowance(hasRail)
-        if (!allowance.isFinite() || contentWidth <= allowance) return null
+        if (!allowance.value.isFinite() || contentWidth <= allowance) return null
         val available = contentWidth - allowance
-        if (!available.isFinite() || available <= 0.dp) return null
+        if (!available.value.isFinite() || available <= 0.dp) return null
         val master = minOf(
             masterPaneMaxWidth,
             available * MASTER_PANE_FRACTION,

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -44,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import dev.dhun.core.AlwaysOnlineConnectivityMonitor
 import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.core.Track
@@ -264,8 +264,9 @@ fun DhunAppShell(
         ) { innerPadding ->
             // The split is computed from what the Scaffold actually handed back,
             // minus the rail — see [DhunShellPolicy.panes].
-            val horizontalInsets = innerPadding.calculateLeftPadding(layoutDirection) +
-                innerPadding.calculateRightPadding(layoutDirection)
+            val direction = LocalLayoutDirection.current
+            val horizontalInsets = innerPadding.calculateLeftPadding(direction) +
+                innerPadding.calculateRightPadding(direction)
             val panes = DhunShellPolicy.panes(
                 shellWidth = maxWidth,
                 contentWidth = maxWidth - horizontalInsets,
