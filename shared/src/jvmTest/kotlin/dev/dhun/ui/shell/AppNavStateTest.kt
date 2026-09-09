@@ -101,17 +101,18 @@ class AppNavStateTest {
         nav.selectedTab = AppTab.HOME
         nav.push(DetailRoute.ArtistPage("UCkeep"))
 
-        // Two-pane: moving to another tab keeps the detail page visible.
-        assertTrue(nav.selectTab(AppTab.SEARCH))
+        // Two-pane (keepDetailOnTabChange = true): moving to another tab keeps
+        // the detail page visible, because it is not covering anything.
+        assertTrue(nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = true))
         assertEquals(AppTab.SEARCH, nav.selectedTab)
         assertEquals(1, nav.detailStack.size)
 
         // Re-tapping the active tab is the "up" affordance, so it pops one page…
-        assertTrue(nav.selectTab(AppTab.SEARCH))
+        assertTrue(nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = true))
         assertTrue(nav.detailStack.isEmpty())
 
         // …and with nothing to pop it reports that it did nothing.
-        assertFalse(nav.selectTab(AppTab.SEARCH))
+        assertFalse(nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = true))
     }
 
     @Test

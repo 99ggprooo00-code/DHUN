@@ -119,14 +119,15 @@ object DhunShellPolicy {
     val detailPaneMinWidth: Dp get() = DhunSpacing.artworkThumb + DhunSpacing.skeletonTextWidth + DhunSpacing.xxl
 
     /**
-     * Width the rail occupies when it is shown instead of the bottom bar. The
-     * rail is a `NavigationRailItem` per user tab with an icon and a label,
-     * whose standard M3 measure is [DhunSpacing.navigationBarContent]; reusing
-     * that token keeps the reservation honest without inventing a number, and
-     * the pane separator's [DhunSpacing.border] comes off the same budget.
+     * Width the rail occupies when it is shown instead of the bottom bar.
+     * [DhunSpacing.bottomNavHeight] (80dp) is the app's own dock measure and the
+     * M3 navigation-rail width — the token is shared because it is the same
+     * 80dp strip rotated, and it comfortably covers the 64dp item height
+     * [DhunSpacing.navigationBarContent] gives the bottom bar. The pane seam's
+     * [DhunSpacing.border] comes off the same budget.
      */
     fun railAllowance(hasRail: Boolean): Dp =
-        if (hasRail) maxOf(DhunSpacing.navigationBarContent, DhunSpacing.divider) else 0.dp
+        if (hasRail) maxOf(DhunSpacing.bottomNavHeight, DhunSpacing.divider) else 0.dp
 
     /** Layout the shell should render for a measured width. */
     fun layoutAt(availableWidth: Dp): DhunShellLayout = DhunShellLayout.of(availableWidth)

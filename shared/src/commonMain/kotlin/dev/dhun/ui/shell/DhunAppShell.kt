@@ -358,11 +358,13 @@ fun DhunAppShell(
                                 onCycleSleepTimer = { playerViewModel.cycleSleepTimer() },
                                 onOpenLiked = {
                                     libraryVm.openLikedSongs()
-                                    nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = layout.showsDetailPane)
+                                    // This branch *is* the two-pane case, so the rule is
+                                    // unconditional here rather than re-derived from `layout`.
+                                    nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = true)
                                 },
                                 onOpenOffline = {
                                     libraryVm.selectTab(LibraryTab.PLAYLISTS)
-                                    nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = layout.showsDetailPane)
+                                    nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = true)
                                 },
                             )
                         },

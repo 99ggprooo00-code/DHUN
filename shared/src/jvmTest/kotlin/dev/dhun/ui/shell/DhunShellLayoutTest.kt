@@ -70,21 +70,27 @@ class DhunShellLayoutTest {
 
     @Test
     fun theRailGetsItsWidthOutOfTheSplit() {
-        assertEquals(80.dp, DhunShellPolicy.railAllowance(hasRail = true))
+        // The reservation is a real token, not a number copied into the policy:
+        // 80dp is the app's dock measure, which is also the M3 rail width.
+        assertEquals(DhunSpacing.bottomNavHeight, DhunShellPolicy.railAllowance(hasRail = true))
         assertEquals(0.dp, DhunShellPolicy.railAllowance(hasRail = false))
-        // A content area narrower than the rail is not a two-pane at all.
-        assertNull(split(900.dp, 80.dp))
-        assertNull(split(900.dp, 40.dp))
+        val rail = DhunShellPolicy.railAllowance(hasRail = true)
+        // A content area no wider than the rail is not a two-pane at all.
+        assertNull(split(900.dp, rail))
+        assertNull(split(900.dp, rail - 40.dp))
     }
 
     @Test
     fun masterGrowsProportionallyThenStopsAtTheCeiling() {
+        // Content is already rail-reduced here (the shell measures it that way),
+        // so `available` is what the split divides — asserted in the policy's own
+        // Dp terms, never as a hand-computed magic number.
         val content = 840.dp
-        val rail = DhunShellPolicy.railAllowance(hasRail = true)
-        val available = content - rail
-        // Below the ceiling the split is the fraction itself. Dp arithmetic is
-        // asserted in the same terms the policy uses, not as a magic number.
-        assertEquals(available * DhunShellPolicy.MASTER_PANE_FRACTION, split(840.dp, content)?.masterWidth)
+        val available = content - DhunShellPolicy.railAllowance(hasRail = true)
+        assertEquals(
+            available * DhunShellPolicy.MASTER_PANE_FRACTION,
+            split(840.dp, content)?.masterWidth,
+        )
         // A wide desktop window: everything past the ceiling goes to the detail.
         assertEquals(DhunSpacing.playerContentMaxWidth, split(1900.dp, 1900.dp)?.masterWidth)
         assertEquals(
@@ -116,13 +122,30 @@ class DhunShellLayoutTest {
 
     @Test
     fun theDetailPaneNeverCollapsesIntoASliver() {
-        // Just past the breakpoint the ceiling-bound master (720dp) would leave
-        // the detail pane less than its floor, so the floor trims the master.
-        val width = 940.dp
+        // The invariant across the whole large-screen range, not one hand-computed
+        // number: whatever the master takes, detail keeps its floor.
+        (840..2400 step 20).forEach { shell ->
+            val content = (shell - 24).dp // pretend a system-bar inset
+            val panes = requireNotNull(split(shell.dp, content)) { "no split at $shell" }
+            val rail = DhunShellPolicy.railAllowance(hasRail = true)
+            assertTrue(
+                content - rail - panes.masterWidth >= DhunShellPolicy.detailPaneMinWidth,
+                "detail starved at ${shell}dp: master ${panes.masterWidth}, " +
+                    "floor ${DhunShellPolicy.detailPaneMinWidth}",
+            )
+        }
+    }
+
+    @Test
+    fun theMasterYieldsWhenItWouldStarveTheDetailPane() {
+        // A window just past the breakpoint with fat insets: the proportional
+        // master plus the 720dp ceiling would eat the space detail needs, so the
+        // floor trims the master to exactly `available - detailPaneMinWidth`.
         val rail = DhunShellPolicy.railAllowance(hasRail = true)
-        val panes = requireNotNull(split(width, width))
-        assertEquals(width - rail - DhunShellPolicy.detailPaneMinWidth, panes.masterWidth)
-        assertTrue(panes.masterWidth < width, "the split must never invent width the window lacks")
+        val content = 884.dp // available = 804 → 40% = 321.6, but ceiling 720 > floor ⇒ trim
+        val panes = requireNotNull(split(940.dp, content))
+        assertEquals(content - rail - DhunShellPolicy.detailPaneMinWidth, panes.masterWidth)
+        assertTrue(panes.masterWidth < content, "the split must never invent width the window lacks")
     }
 
     @Test
