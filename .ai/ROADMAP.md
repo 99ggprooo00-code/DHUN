@@ -1,16 +1,18 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-09 (UTC, latest)** · session **`arena/01a08455-themes`** — **candidate 28, "Themes beyond dark-first"** (user-approved; **dark stays the default**) · **`origin/main` = `ae212a3`** = **PR #50 MERGED** (playback diagnostics from `arena/01a08454-dhun`). Verified live, not inherited: `git fetch origin` → `ae212a3`, and `git diff --name-only d0534cd ae212a3 -- shared/src/commonMain/kotlin/dev/dhun/design` is **empty** — neither PR #45 nor PR #50 touched this session's paths.
+Updated 2026-09-09 — main at 853fc9a
 
-**This PR: #49.** Branch `arena/01a08455-themes` — *not* the batch-assigned `arena/01a08455-dhun`, which is the head of PR #46/#48 (equalizer + widgets) and was never touched by this session. **Re-cut this turn** from `d0534cd` onto `ae212a3` by cherry-picking the four code/test commits (`d2f40f6`, `7a13c92`, `6d9c89b`, `5bdd3fd`); `git diff --exit-code 0353baa HEAD -- shared/src/commonMain/kotlin/dev/dhun/design shared/src/jvmTest/kotlin/dev/dhun/design` is **empty**, i.e. the code CI already passed is byte-identical after the re-cut.
+Recent merges: #45 shell (two-pane), #46 widgets, #48 equalizer, #47 jumplist, #50 diagnostics, #49 themes, #40 release pipeline — all merged. No open PRs right now.
 
-**CI evidence (all three required gates green, at the pre-re-cut head `0353baa`):** `build-and-test` **pass** 4m34s, run `34313576925` — steps 1-9 all `success`, where step 6 is `:shared:jvmTest` (compiles + runs the two new test classes) and steps 7/9 (`:app-android:assembleDebug`, `:app-desktop:compileKotlinJvm`) are what prove the `DhunColors` accessor refactor and the `DhunTheme` signature change did not break the **frozen** Android/desktop call sites. **`apk` + `msi` PASS** in run `34315184472` (`test-release`, `workflow_dispatch`, `ref=arena/01a08455-themes`, head `0353baa`; `publish` **skipped** by design off `main`) — triggered by the **human**, because `workflow_dispatch` returns `HTTP 403` for this session's token and no `pull_request` event ever materialised for PR #49 despite a push while open plus a close+reopen. `rot-drill` red on this branch **and on `main`** = pre-existing **issue #14**, not a required gate. Actions job *logs* are unreadable from this sandbox (the log CDN sits behind the same egress wall as Maven), so the evidence is step/job conclusions, not a per-test listing.
+What's done:
+- themes (light scheme + accent) landed in f50770f (PR #49)
+- release pipeline (test-release.yml, CHANGELOG, README) landed in 853fc9a (PR #40)
+- before that: shell, widgets, equalizer, jumplist, playback fast-fail
 
-**Scope — additive.** A `light` scheme + a six-way accent selector behind a toggle. `shared/src/commonMain/kotlin/dev/dhun/design/**` + this session's own `jvmTest` + the two `.ai/` docs — **zero frozen files**, no screen rewritten. Two verified facts shaped it: (1) `shared/ui` reads `DhunColors.x` as **static object properties** (416 reads repo-wide, 274 in `shared/ui`) and reads `MaterialTheme.colorScheme` **zero** times, so a light `ColorScheme` alone would compile green and change nothing on screen — the tokens themselves had to become accessors over the active token set, while still answering correctly outside composition (`app-desktop/.../native/TrayIcons.kt:19-21` reads them at object-init); (2) there is **no Settings screen**, but a settings **store** exists — `SettingsRepository.getString/putString/observeString` (`data/Repositories.kt:71-78`) with `SettingsKeys.THEME` = `"dark" | "light" | "system"`, default `"dark"`, **read by no app code** — so `DhunThemeMode.id` uses exactly those strings and the toggle ships inside `design/**` (mounted in the catalog, a dev surface with no entry point in either app), with startup wiring + persistence left as a documented follow-up.
-
-**Last error:** none on this head. Two findings recorded because they matter: **(a)** a KDoc quoting `shared/ui/**` opened a **nested** block comment — Kotlin nests them, unlike Java — which would have commented out the rest of three files; caught by a delimiter-balance sweep before any push and fixed in `5bdd3fd`, the same bug class PR #45's snapshot reports CI finding in `ui/shell`. **(b)** dark `error` on `errorContainer` measures **3.92:1**, below WCAG AA for text — left untouched on purpose, because retuning it would break the "dark stays byte-identical" gate; recorded in KNOWN_LIMITATIONS rather than asserted away (the new light pair measures 5.76:1).
-
-**Exact next step:** (1) get `build-and-test` green on the re-cut head, and `apk`/`msi` via `workflow_dispatch` on `ref=arena/01a08455-themes` (this session cannot dispatch — 403); (2) if `main` advances again, re-cut and re-run; (3) `gh pr merge 49 --merge` **last**. **Honest limit:** CI green = compile + unit tests only — **how the light scheme looks on a device or PC is the user's gate and is claimed nowhere here**.
+Next:
+- verify release artifacts build (apk/aab/msi) on test-release, check changelog
+- hardware checks — real device audio/playback, desktop startup
+- then tag v0.1.0. Rot-drill still red on runners (issue #14, IP gating) — not blocking merge.
 
 ---
 
@@ -372,37 +374,22 @@ optional cookie sign-in, themes beyond dark-first.
 
 ### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-07, coordinator session `arena/01a07a07-dhun`)
 
-**Current GitHub snapshot:** `main` and the rolling `test` tag both point to
-**`481b77b`** (PR #36, the last of the six-agent ADR-006 batch). Main CI
-**`34084678724` success** (`build-and-test`) and test-release
-**`34084678720` success** (`apk` + `msi` + `publish`) built and published the
-APK + MSI + checksums; the rolling `test` release was republished at
-**`2026-09-07T04:58:25Z`** (MSI 112,492,544 B / APK 17,696,545 B + `.sha256`).
-**All four ADR-006 worker PRs are merged — `ALL STABLE`** (see
-`INTEGRATION.md`). The only red workflow on main is `rot-drill` (issue #14,
-GitHub-runner IP gating, non-code). Hardware and stable-release gates remain
-open; consolidation PR **#38** carries this documentation.
+**Current snapshot (2026-09-09):** `main` at 853fc9a — includes PR #40 (release pipeline), plus #49 themes, #50 diagnostics, #47 jumplist, #48 equalizer, #46 widgets, #45 shell, and earlier #38-#43. Rolling `test` tag updated with each merge. `rot-drill` still red (issue #14, runner IP) — not blocking.
 
-**Recent work actually merged on GitHub, not outstanding local work:**
+**Recent merges (all on main now):**
 
-| PR | Merge / GitHub `mergedAt` (UTC, 2026-09-06) | Landed work |
+| PR | Merged | What landed |
 |---|---|---|
-| #24 | `c247fb4` · `05:56:49Z` | Stream User-Agent fix (`5a89b81`) + Home continuation and regression tests |
-| #25 | `6497b1b` · `06:19:33Z` | Playback-error diagnostics + bounded 45-second resolving (`d390dd0`) |
-| #26 | `ef4c8d7` · `06:47:41Z` | UI restyle / icon fixes (`11d6f75`) + CI push coverage for `arena/**` |
-| #27 | `0eb8e76` · `06:59:41Z` | ADR-003 **proposal only**, not approval or parallelism implementation |
-| #28 | `b8f148d` · `07:10:11Z` | Separate desktop mini-player window removed (`a01f8ca`), ADR-004 and accompanying docs |
-| #29 | `0920148` · `07:18:53Z` | Post-merge documentation; no further application-code change |
-| #33 | `f157245` · `03:19:51Z` (2026-09-07) | ADR-006 persistent downloads: data layer, engine, offline-first routing, minimal UI, and platform wiring |
-| #34 | `d1e0408` · `04:18:28Z` (2026-09-07) | Desktop single-window hardening — removed the `JOptionPane` startup/fatal Swing surfaces (agent 4); `tools/playback-probe:offlineProbe` deterministic local-file check + WAV fixture (agent 5) |
-| #35 | `40eff1d` · `04:47:43Z` (2026-09-07) | Android download foreground service (ADR-006) + the **C1 Koin self-recursion fix** + `KoinDownloadStackTest` (agent 1). Squash-merged |
-| #37 | `b6aec3a` · `04:50:13Z` (2026-09-07) | Shared player UX — synced-lyrics follow, tab selection semantics, accessible queue actions, `PlayerSeekBar` / `TransportControls` extraction (agent 6) |
-| #36 | `481b77b` · `04:52:00Z` (2026-09-07) | Library Downloads storage-management view + `StorageSpace` expect/actual (agent 2); per-track download badges + the `DhunAppShell` pass-through that closed C2 (agent 3) |
+| #40 | 853fc9a · 2026-09-09 06:09Z | release pipeline — test-release now builds apk + aab + msi, CHANGELOG/README, draft v0.1.0 |
+| #49 | f50770f · 2026-09-09 06:02Z | themes — light scheme + accent selector (dark stays default) |
+| #50 | ae212a3 · 2026-09-09 05:34Z | playback diagnostics — fast-fail on auth errors |
+| #47 | c13b6c6 · 2026-09-09 05:21Z | Windows jump lists + tray polish |
+| #48 | 789f288 · 2026-09-09 05:08Z | equalizer (10-band + vlcj) |
+| #46 | b00a9e1 · 2026-09-09 04:54Z | widgets (Now Playing + Quick Play) |
+| #45 | d0534cd · 2026-09-09 04:44Z | shell two-pane (840dp rail) |
+| #38-#43 | 92ee545 → eda73e4 · 2026-09-07 | ADR-006, player immersion, single-instance, Android polish |
 
-Earlier Phase 14 milestones remain merged: PR #16 at `290e0f6`, #17 at
-`29eeb93`, #19 at `6d81eb2`, #20 at `8310383`, #22 at `e90dba6`, and the
-PR #23 documentation at `9294520`. The old `04:45:40Z` / `06:51:40Z` /
-`07:13:35Z` publication snapshots are superseded by the current release.
+Earlier: #24-#36 etc. remain merged (see git log).
 
 **Read the columns separately:** ✅ in the GitHub column completes only
 that named code/test/publishing milestone. It does **not** close the
@@ -433,7 +420,7 @@ The repair batch is merged through PR #30 at `76c68eb`; automated code/package c
 | **Single-window desktop (ADR-004)** | ✅ **PR #28 merged at `b8f148d`**: second mini-player window, Ctrl+M, window-only helpers and tokens removed; docked MiniPlayer retained. Included in green `test@0920148` | User confirms **one window** after manual uninstall/reinstall; this fresh evidence is recorded locally. Do not infer tray/SMTC/shortcut acceptance or a successful install-over upgrade |
 | Android 30-minute soak | ⬜ No completed device evidence committed | Physical device, unrestricted battery/OEM settings, lock-screen controls, zero crashes/leaks; record timestamps/results |
 | Desktop 30-minute soak | ⬜ No completed desktop evidence committed | libVLC desktop, transport/tray/docked mini-player/SMTC or fallback, clean exit, zero crashes; record timestamps/results |
-| v0.1.0 artifacts / tag / release | ⬜ GitHub has only the rolling `test` pre-release/tag; no v0.1.0 release | APK + AAB + MSI release artifacts, clean-target runs, soaks, live drill and final docs/risk/license review, then tag/release |
+| v0.1.0 artifacts / tag / release | 🟨 pipeline merged at 853fc9a via PR #40 — test-release now builds apk + aab + msi and draft v0.1.0; tag not yet published | Clean-target runs, soaks, live drill and final docs before tag |
 | Final release documentation review | 🟨 Docs exist on main, including ADR-004, limitations and verification checklists; PR #29 is merged | Fresh Windows evidence, current release/drill reconciliation, README and icon provenance are pushed to the session branch. Update verified CI evidence at this checkpoint; final hardware/risk/license/release review remains open |
 
 Cache configuration already stored on main: `SettingsKeys.CACHE_SIZE_MB`,
@@ -492,17 +479,17 @@ stubbed, NOT scheduled** until the user picks them (Doctrine: no
 | 15 | **Android native polish finish** (Phase 13 leftovers: app shortcuts, Robolectric/UI tests, tablet two-pane, 30-min soak with LeakCanary) | 🟨 **CODE MERGED — PR #43 → `main` as `eda73e4`** (green at head `434ad92`; post-merge `test-release` `34101231724` success) — shortcut surface (3 dedicated icons + dynamic Now Playing), the module's first test source set (7 classes) incl. the `appModule` Koin-graph gate closing the C1 residual, a11y semantics, and the nav-restore blank-id fix. **Remaining OPEN: tablet two-pane** (lives in `shared/ui/shell`) **and the 30-min LeakCanary soak** (never run); all on-device hardware gates are the user's |
 | 16 | **Audio cache (bounded LRU) + offline replay of cached tracks** | Phase 14 item pulled forward; user-visible value, no new surface |
 | 17 | **Rot-drill GA** — wire `tools/playback-probe` into the daily cron (replacing the placeholder), auto-issue on red, 24h detection contract live | The Doctrine's maintenance leg; must exist before any public distribution |
-| 18 | **Release v0.1.0** (signed debug-keystore APK + AAB, jpackage installers, CHANGELOG, README build docs, tag, GitHub release) | Phase 14; gates everything "real" |
+| 18 | **Release v0.1.0** (signed debug-keystore APK + AAB, jpackage installers, CHANGELOG, README build docs, tag, GitHub release) | 🟨 pipeline MERGED at 853fc9a via PR #40 — test-release now builds AAB + draft release; tag v0.1.0 still open |
 | 19 | **Web/PWA evaluation** (the big deferred item; hard gate: PO tokens/SABR block third-party browser streaming — see `.ai/PROBLEMS_AND_FIXES.md` P7) | Only after the kill-switch data from 17 exists; probably "no" |
 | 20 | **Android Auto** (media app on the platform; needs a stable media session — just built) | Natural once 15+18 done |
 | 21 | **Cast** | Same dependency as 20 |
-| 22 | **Equalizer** — 🟨 **this session (`arena/01a08455-dhun`)**: platform-neutral 10-band model + presentation in `shared/.../player/equalizer` and desktop actual via existing vlcj (no new dep). **`DhunPlayer` unchanged. Android `AudioEffect` is NOT in this slice.** CI green = compile + unit tests; audible EQ on hardware is the user's gate | User-picked additive slice; merge order third |
+| 22 | **Equalizer** — ✅ MERGED at 789f288 via PR #48 (10-band model + vlcj desktop) | Done — audible check on hardware still open |
 | 23 | **Cross-device sync** (experimental; local-first DB design must survive) | Explicitly experimental in the prompt |
 | 24 | **Optional cookie sign-in** (unlock age/region + personal playlists; treated as experimental) | High ToS/legal sensitivity — ADR required first |
 | 25 | **Downloads beyond cache** (bounded, offline library) | Extends 16 |
-| 26 | **Widgets** (now-playing / quick-play Android widgets) | Session foundation now exists |
-| 27 | **Windows jump lists + tray polish** | Phase 12 leftovers |
-| 28 | **Themes beyond dark-first** (accent system, light theme) | 🟨 **IN FLIGHT — PR #49, session `arena/01a08455-themes`** (user-approved 2026-09-09; re-cut onto `ae212a3`): additive `light` scheme + six-way accent selector behind a toggle, **dark stays the default**, `shared/.../design/**` + own `jvmTest` only, zero frozen files. The design system was token-ready but the tokens were *static*, so they became accessors over the active token set. `build-and-test` + `apk` + `msi` **green at `0353baa`**; re-cut head CI pending. **Visual acceptance on hardware OPEN** (user gate) |
+| 26 | **Widgets** (now-playing / quick-play Android widgets) | ✅ MERGED at b00a9e1 via PR #46 |
+| 27 | **Windows jump lists + tray polish** | ✅ MERGED at c13b6c6 via PR #47 |
+| 28 | **Themes beyond dark-first** (accent system, light theme) | ✅ MERGED at f50770f via PR #49 — light scheme + accent selector, dark stays default | Done — visual check on device still open |
 | 29 | **Store releases** (Play Store AAB + Windows store MSI, real signing) | After 18 proves the pipeline |
 | 30 | **v1.0 GA** — soak on both platforms, RISK_REGISTER review, docs finalized, tag | The finish line |
 
