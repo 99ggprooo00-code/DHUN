@@ -4,6 +4,18 @@ name: test-release
 # SAME workflow's run-number sequence, so their MSI versions cannot leap
 # ahead of a separate publishing workflow's counter and block later upgrades.
 # PR builds and manual branch runs are artifact-only; non-main refs can NEVER publish.
+#
+# v0.1.0 release candidate (release-prep session, candidate 18):
+# - `build_release_candidate: true` additionally builds and stages the
+#   debug-keystore-signed AAB (`:app-android:bundleDebug`, `testBuild` signing
+#   config) as `dhun-v0.1.0.aab` and keeps the APK/MSI job outputs. Artifacts
+#   only, any ref.
+# - `publish_v010_draft: true` (implies the AAB too) assembles the candidate
+#   APK + AAB + MSI under release-style names, re-stages their SHA256/provenance,
+#   and creates/refreshes the **DRAFT** GitHub Release tagged `v0.1.0`. A draft
+#   is private and deletable; this job NEVER publishes. It refuses to touch an
+#   already-PUBLISHED v0.1.0 release. Publishing v0.1.0 stays a manual,
+#   user-go-ahead action after the Phase 14 hardware gates.
 on:
   workflow_dispatch:
     inputs:
@@ -12,6 +24,16 @@ on:
         type: boolean
         required: true
         default: true
+      build_release_candidate:
+        description: Also build the v0.1.0 candidate AAB (debug-keystore-signed) alongside the APK/MSI artifacts
+        type: boolean
+        required: true
+        default: false
+      publish_v010_draft:
+        description: Assemble the v0.1.0 candidate artifacts and create/refresh the DRAFT v0.1.0 GitHub Release (never publishes)
+        type: boolean
+        required: true
+        default: false
   pull_request:
     branches: [main]
   push:
@@ -141,6 +163,47 @@ jobs:
             out/dhun-test.msi.build-info.json
             out/READ-ME-FIRST.md
 
+  aab:
+    # v0.1.0 release candidate only. bundleDebug is signed with the SAME
+    # committed `testBuild` debug keystore as the debug APK (AGP applies the
+    # debug build type's signing config to the debug bundle), so the AAB is a
+    # debug-keystore-signed artifact — installable for testing, NOT a
+    # Play-store release. Skipped on every push/PR event.
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_release_candidate == true || inputs.publish_v010_draft == true) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Build debug-keystore-signed AAB
+        run: ./gradlew :app-android:bundleDebug --no-daemon
+
+      - name: Stage AAB and provenance
+        run: |
+          mkdir -p out
+          cp app-android/build/outputs/bundle/debug/app-android-debug.aab out/dhun-v0.1.0.aab
+          python scripts/stage_artifact.py out/dhun-v0.1.0.aab --build-only "$BUILD_ONLY"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: aab
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            out/dhun-v0.1.0.aab
+            out/dhun-v0.1.0.aab.sha256
+            out/dhun-v0.1.0.aab.build-info.json
+
   publish:
     # This is a hard job-level boundary, not merely a shell early-return.
     # A manual branch build gets artifacts only, even if build_only=false.
@@ -187,3 +250,136 @@ jobs:
             --title "DHUN test build (auto-replaced on every update)" \
             --notes "Rolling UNVERIFIED development build of main. dhun-test.apk = Android, dhun-test.msi = Windows (playback needs a VLC install). Nothing here is stable, signed for stores, or recommended for daily-driver devices. Install only where that is acceptable. Current open checks: docs/verification/03-android-skeleton.md, docs/verification/12-desktop-native.md" \
             --prerelease
+
+  release_draft:
+    # v0.1.0 DRAFT release — the approved release-prep deliverable. Drafts are
+    # private and deletable; this job NEVER publishes and requires an explicit
+    # workflow_dispatch. Idempotent: an existing DRAFT (tag v0.1.0) is replaced;
+    # an already-PUBLISHED v0.1.0 release aborts the run so the real release
+    # can never be clobbered. Publishing v0.1.0 remains a manual action for the
+    # user after the Phase 14 hardware gates (docs/verification/14-release.md).
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_v010_draft == true }}
+    needs: [apk, msi, aab]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist/apk
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: msi
+          path: dist/msi
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: aab
+          path: dist/aab
+
+      - name: Assemble v0.1.0 assets and re-stage provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp dist/apk/dhun-test.apk      out/dhun-v0.1.0.apk
+          cp dist/msi/dhun-test.msi      out/dhun-v0.1.0.msi
+          cp dist/aab/dhun-v0.1.0.aab    out/dhun-v0.1.0.aab
+          python - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          from stage_artifact import stage_artifact
+
+          sha = os.environ['GITHUB_SHA']
+          repo = os.environ['GITHUB_REPOSITORY']
+
+          def build_info(path):
+              with open(path, encoding='utf-8') as stream:
+                  return json.load(stream)
+
+          def check_source(name, path):
+              info = build_info(path)
+              if info['sourceSha'] != sha or info['repository'] != repo:
+                  raise SystemExit(
+                      f"{name} provenance mismatch: source {info['sourceSha']} "
+                      f"in {info['repository']} != {sha} in {repo}"
+                  )
+              return info
+
+          # Integrity: every staged binary must come from THIS run/commit.
+          check_source('APK', 'dist/apk/dhun-test.apk.build-info.json')
+          msi_info = check_source('MSI', 'dist/msi/dhun-test.msi.build-info.json')
+          check_source('AAB', 'dist/aab/dhun-v0.1.0.aab.build-info.json')
+
+          # Re-stage under the release-style names so .sha256/.build-info.json
+          # describe the exact public asset bytes (same run, same commit).
+          for name in ('dhun-v0.1.0.apk', 'dhun-v0.1.0.aab'):
+              stage_artifact(Path('out') / name, os.environ, build_only=False)
+          stage_artifact(
+              Path('out') / 'dhun-v0.1.0.msi', os.environ, build_only=False,
+              installer_version=msi_info['installerVersion'],
+              upgrade_code=msi_info['upgradeCode'],
+          )
+          PY
+          ls -l out
+
+      - name: Refresh or create the DRAFT v0.1.0 release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Protect a published v0.1.0: replace drafts only.
+          if gh release view v0.1.0 --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' >/tmp/v010-state 2>/dev/null; then
+            if [ "$(cat /tmp/v010-state)" != "true" ]; then
+              echo "::error::A PUBLISHED v0.1.0 release already exists — refusing to replace it. Delete it manually only if that is truly intended."
+              exit 1
+            fi
+            echo "Replacing the existing DRAFT v0.1.0 release (cleanup-tag removes any tag the draft created)."
+            gh release delete v0.1.0 --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          fi
+
+          cat > out/v0.1.0-notes.md <<'MD'
+          ## DHUN v0.1.0 — DRAFT release candidate (NOT published)
+
+          This is a **private draft** prepared by the release-prep session
+          (2026-09-07). It is not a public release: nothing here is stable,
+          store-signed, or hardware-verified. Publishing `v0.1.0` happens only
+          after the user's explicit go-ahead AND the Phase 14 gates in
+          `docs/verification/14-release.md` (live rot-drill verdict, Android +
+          Desktop soaks, clean-target installs) are real.
+
+          Artifacts (all debug-keystore / unsigned test artifacts):
+          - `dhun-v0.1.0.apk` — Android debug APK, signed with the committed
+            public test keystore (`app-android/keystores/dhun-test.p12`);
+            sideload only.
+          - `dhun-v0.1.0.aab` — Android App Bundle, same debug-keystore
+            signature; NOT Play-upload ready. Test-install with bundletool
+            (`bundletool build-apks --mode=universal …`).
+          - `dhun-v0.1.0.msi` — Windows per-user MSI (no Authenticode
+            signature → SmartScreen warning). Playback needs a system VLC
+            install. Internal MSI ProductVersion is an installer sequence and
+            deliberately differs from the app's semantic version.
+
+          Each asset ships with a `.sha256` and a `.build-info.json` recording
+          the exact source commit, workflow run and (MSI) ProductVersion.
+          Hosted-Windows install-over sentinel checks ran in CI; that is NOT
+          proof of a real upgrade, launch, audio or hardware behavior.
+          MD
+
+          gh release create v0.1.0 \
+            out/dhun-v0.1.0.apk out/dhun-v0.1.0.apk.sha256 out/dhun-v0.1.0.apk.build-info.json \
+            out/dhun-v0.1.0.aab out/dhun-v0.1.0.aab.sha256 out/dhun-v0.1.0.aab.build-info.json \
+            out/dhun-v0.1.0.msi out/dhun-v0.1.0.msi.sha256 out/dhun-v0.1.0.msi.build-info.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "DHUN v0.1.0 (DRAFT — not published)" \
+            --notes-file out/v0.1.0-notes.md \
+            --draft
+          gh release view v0.1.0 --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,name,url --jq '{tagName,isDraft,name,url}'
