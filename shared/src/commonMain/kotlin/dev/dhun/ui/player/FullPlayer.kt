@@ -262,14 +262,12 @@ fun FullPlayer(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colorStops = mapOf(
-                            0.00f to DhunColors.background.copy(alpha = 0.28f),
-                            0.10f to Color.Transparent,
-                            0.46f to Color.Transparent,
-                            0.70f to DhunColors.background.copy(alpha = 0.55f),
-                            0.86f to DhunColors.background.copy(alpha = 0.90f),
-                            1.00f to DhunColors.background.copy(alpha = 0.97f),
-                        ),
+                        0.00f to DhunColors.background.copy(alpha = 0.28f),
+                        0.10f to Color.Transparent,
+                        0.46f to Color.Transparent,
+                        0.70f to DhunColors.background.copy(alpha = 0.55f),
+                        0.86f to DhunColors.background.copy(alpha = 0.90f),
+                        1.00f to DhunColors.background.copy(alpha = 0.97f),
                     ),
                 ),
         )
