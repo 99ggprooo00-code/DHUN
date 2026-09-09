@@ -41,6 +41,9 @@ object JumpListArgs {
     /** Prefix for "play this specific track" recent entries. */
     const val PLAY_PREFIX = "--dhun-play="
 
+    /** The per-track launch argument (`--dhun-play=<id>`). */
+    fun play(id: String): String = PLAY_PREFIX + id
+
     /** What a launched-with-args process should do. */
     sealed interface Command {
         data object Open : Command
