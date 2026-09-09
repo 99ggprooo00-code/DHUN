@@ -18,8 +18,9 @@ import androidx.compose.ui.graphics.Color
  * ## Why the tokens had to move, not just the `ColorScheme`
  *
  * Screens read `DhunColors.textPrimary` and friends as **plain object
- * properties** — 416 reads repo-wide, 274 of them in `shared/ui/**` — and
- * `MaterialTheme.colorScheme` is read **nowhere** in `shared/ui/**`. A light
+ * properties** — 416 reads repo-wide, 274 of them under the `shared/ui`
+ * screens — and `MaterialTheme.colorScheme` is read **nowhere** in them. A
+ * light
  * `ColorScheme` alone would therefore have compiled green and changed nothing
  * on screen. So [DhunColors] became a set of *accessors* over the active
  * [DhunTokens], and [DhunAppearance] holds that active set in Compose

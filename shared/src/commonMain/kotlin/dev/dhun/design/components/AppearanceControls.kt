@@ -45,7 +45,7 @@ import dev.dhun.design.DhunThemeMode
  * mounts it owns saving the choice. The store already exists
  * (`SettingsRepository` + `SettingsKeys.THEME`, whose documented values are
  * `"dark" | "light" | "system"` and match [DhunThemeMode.id] exactly); nothing
- * reads it yet, and an accent-hue key would have to be added in `data/**`.
+ * reads it yet, and an accent-hue key would have to be added in the data layer.
  * See [dev.dhun.design.DhunAppearance] for the full picture.
  */
 @Composable

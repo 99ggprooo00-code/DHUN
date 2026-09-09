@@ -103,7 +103,7 @@ class DhunAppearanceTest {
 
     @Test
     fun lightReachesEveryTokenReaderWithoutTouchingAScreen() {
-        // The 274 static DhunColors reads in shared/ui/** are the reason this
+        // The 274 static DhunColors reads in the shared/ui screens are why this
         // test exists: they have to follow the flip with no screen rewritten.
         DhunAppearance.setAppearance(DhunThemeMode.LIGHT, DhunAccent.BRAND)
 

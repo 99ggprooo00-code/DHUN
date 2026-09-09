@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
  * **These are accessors, not constants.** Each one resolves against
  * [DhunAppearance.tokens], the active [DhunTokens] set, so a theme flip
  * reaches every screen that reads `DhunColors.x` without that screen being
- * touched — `shared/ui/**` reads these tokens 274 times and never reads
+ * touched — the `shared/ui` screens read these tokens 274 times and never read
  * `MaterialTheme.colorScheme` at all.
  *
  * Reading outside a composition also works and returns the current values
