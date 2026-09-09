@@ -1,5 +1,18 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-09 (UTC)** · session **`arena/01a08455-dhun-jumplist`** (**jump lists / tray**, candidate 27 — **reassigned to a unique branch** after the `arena/01a08455-dhun` hash collision with the widgets session; merge order **last**) · **`origin/main` = `789f288`** = **PR #48 MERGED** (equalizer candidate-22 batch + CI-retrigger chore) with **PR #46** (widgets) and **PR #45** (two-pane shell) beneath it — every batch-15/22/26 worker now on `main`; verified via `gh` while waiting, not assumed. `rot-drill` red everywhere = pre-existing issue #14, not a gate.
+
+**This session — candidate 27: Windows taskbar jump lists + tray polish (Phase-12 leftovers).** Owned paths: `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/native/**` (`JumpList.kt`, `JumpListModel.kt`, `TrayState.kt`, `DhunTray.kt`, `TrayIcons.kt`), `app-desktop/build.gradle.kts` (one `kotlin("test")` jvmTest dependency — solely to enable this batch's mandated tests), `app-desktop/src/jvmTest/**`. **Frozen and untouched:** `Main.kt`, `Smct.kt`, `DesktopDhunPlayer.kt` (wiring enters through `DhunTray`, whose constructor/signatures are unchanged), `shared/**`, `app-android/**`, `tools/**`, `.github/**`, `docs/**`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`. Single-instance guard (#42) and the `-Ddhun.single-instance`/`-Ddhun.smct` conventions preserved; the new feature follows them (`-Ddhun.jump-list=false`, Windows-gated, fail-open off-OS — no Windows-only API call runs on Linux/macOS).
+
+**Shipped (branch `arena/01a08455-dhun-jumplist`):** `ICustomDestinationList.AddUserTasks` over base JNA/ole32 — ≤5 recent-track tasks (persisted session-to-session in `<userdata>/jumplist-recent.txt`), separator, Play/Pause + Open tasks; throttled+coalesced shell writes on a dedicated daemon COM thread; packaged-only (`jpackage.app-path`); no `SetAppID` (default shell identity); GUIDs/vtable slots web-verified against the SDK IDL + independent implementations before writing; call mechanism mirrors `Smct.kt`. Tray polish: idle/playing/paused tri-state icon + live-track tooltip. Pure cores unit-tested (5 classes, first `app-desktop` test source set). PR #47.
+
+**Honest limits:** no real-Windows taskbar behavior claimed — CI green = compile + tests, and the desktop CI gate is `:app-desktop:compileKotlinJvm` (compile-only; `:app-desktop:test` is not a CI step and `.github/**` is frozen, so the new jvmTest classes are authored and locally runnable, not CI-executed yet). Jump-list clicks launch `DHUN.exe --dhun-…`, which today converges on the single-instance launch-or-refocus path: Recent/Open genuinely surface the running app; the **Play/Pause verb needs a one-line `Main.kt` arg hook** (frozen this batch) — entry ships, verb is a documented follow-up; `JumpListArgs.parse` is the ready-made `when` target.
+
+**Last error:** one compile defect — `JumpListArgs.play(id)` referenced by `buildTasks` but never defined — caught by the `msi` gate (`compileKotlinJvm`, annotation `JumpListModel.kt:93`), fixed in `7a07080`; `build-and-test` (8m3s) + `apk` (2m43s) + `msi` (7m4s) all **pass** at the pre-rebase head. **Exact next step:** rebase onto `789f288` (this commit) → re-run CI green on the rebased head → `gh pr merge 47 --merge` **last**.
+
+<details>
+<summary><b>Prior snapshot (`arena/01a08455-dhun` — equalizer session, candidate 22; MERGED as `789f288` via PR #48)</b></summary>
+
 Updated **2026-09-09 (UTC)** · equalizer session **`arena/01a08455-dhun`** · **`origin/main` = `b00a9e1`** = **PR #46 MERGED** (widgets). Prior: PR #45 two-pane `d0534cd`, PR #44 `847b258`. `rot-drill` red = issue **#14** (IP gating, non-gate). GitHub-verified this session.
 
 **LIVE ITEM (this session): platform-neutral EQ model + desktop vlcj actual.** Owned: `shared/src/commonMain/kotlin/dev/dhun/player/equalizer/**` + `DesktopDhunPlayer.kt` via existing vlcj `4.8.2` + `shared/src/jvmTest/kotlin/dev/dhun/player/equalizer/**`. **`DhunPlayer.kt` unchanged.** Android `AudioEffect` not in this slice. Widgets now on `main` via PR #46 — this rebase drops the carried widgets commits and keeps equalizer-only.
@@ -10,6 +23,7 @@ Updated **2026-09-09 (UTC)** · equalizer session **`arena/01a08455-dhun`** · *
 
 **Exact next step:** finish rebase → push → new PR ( #46 already MERGED ) → `build-and-test` + `apk` + `msi` green → `gh pr merge --merge` last. **CI green = compile + unit tests. Never claim audible EQ on hardware.**
 
+</details>
 <details>
 <summary><b>Prior snapshot on this branch (widgets / original PR #46 — candidate 26)</b></summary>
 
