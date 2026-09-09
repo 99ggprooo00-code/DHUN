@@ -8,6 +8,7 @@ import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.SettingsKeys
 import dev.dhun.domain.GetHomeFeedUseCase
+import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
 import dev.dhun.domain.SaveNowPlayingUseCase
@@ -119,6 +120,7 @@ val appModule = module {
     single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
     single { RecordPlayUseCase(get<DataLayer>().history) }
     single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
+    single { GetRecommendationsUseCase(get(), get<DataLayer>().history, get<DataLayer>().library) }
 
     // Phase 14: bounded audio-segment cache (Media3 SimpleCache LRU).
     // Budget from SettingsKeys.CACHE_SIZE_MB (default 1 GiB). Changing the
@@ -153,6 +155,7 @@ val appModule = module {
     single {
         HomeViewModel(
             getHomeFeed = get(),
+            getRecommendations = get(),
             historyRepository = get<DataLayer>().history,
             libraryRepository = get<DataLayer>().library,
             scope = get(),

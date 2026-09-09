@@ -15,6 +15,7 @@ import dev.dhun.data.DataLayer
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.domain.GetHomeFeedUseCase
+import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.domain.HomeShelfKind
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.home.HomeUiState
@@ -110,6 +111,7 @@ class HomeViewModelTest {
 
             val vm = HomeViewModel(
                 getHomeFeed = useCase,
+                getRecommendations = GetRecommendationsUseCase(provider, data.history, data.library),
                 historyRepository = data.history,
                 libraryRepository = data.library,
                 scope = testScope,
@@ -136,6 +138,7 @@ class HomeViewModelTest {
 
             val vm = HomeViewModel(
                 getHomeFeed = useCase,
+                getRecommendations = GetRecommendationsUseCase(provider, data.history, data.library),
                 historyRepository = data.history,
                 libraryRepository = data.library,
                 scope = testScope,
@@ -158,6 +161,7 @@ class HomeViewModelTest {
 
             val vm = HomeViewModel(
                 getHomeFeed = useCase,
+                getRecommendations = GetRecommendationsUseCase(provider, data.history, data.library),
                 historyRepository = data.history,
                 libraryRepository = data.library,
                 scope = testScope,

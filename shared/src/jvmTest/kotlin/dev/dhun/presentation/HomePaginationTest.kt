@@ -18,6 +18,7 @@ import dev.dhun.data.HistoryRepository
 import dev.dhun.data.LibraryRepository
 import dev.dhun.data.PlayContext
 import dev.dhun.domain.GetHomeFeedUseCase
+import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
@@ -46,7 +47,13 @@ class HomePaginationTest {
         continuationToken = token,
     )
     private fun model(provider: PagingProvider, scope: CoroutineScope) =
-        HomeViewModel(GetHomeFeedUseCase(provider, History), History, Library, scope)
+        HomeViewModel(
+            getHomeFeed = GetHomeFeedUseCase(provider, History),
+            getRecommendations = GetRecommendationsUseCase(provider, History, Library),
+            historyRepository = History,
+            libraryRepository = Library,
+            scope = scope,
+        )
     private fun HomeViewModel.feed() = (uiState.value as HomeUiState.Success).feed
 
     @Test

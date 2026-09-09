@@ -3,19 +3,23 @@ package dev.dhun.presentation.home
 import dev.dhun.core.DhunResult
 import dev.dhun.core.DhunError
 import dev.dhun.core.HomeFeed
+import dev.dhun.core.HomeItem
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
 import dev.dhun.data.HistoryRepository
 import dev.dhun.data.LibraryRepository
 import dev.dhun.domain.GetHomeFeedUseCase
+import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.domain.ToggleFavoriteUseCase
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
@@ -30,6 +34,7 @@ sealed interface HomeUiState {
 
 class HomeViewModel(
     private val getHomeFeed: GetHomeFeedUseCase,
+    private val getRecommendations: GetRecommendationsUseCase,
     historyRepository: HistoryRepository,
     libraryRepository: LibraryRepository,
     private val scope: CoroutineScope,
@@ -60,16 +65,98 @@ class HomeViewModel(
         .stateIn(scope, SharingStarted.Eagerly, null)
     private var feedJob: Job? = null
     private var pageJob: Job? = null
+    private var recommendJob: Job? = null
 
     val recentlyPlayed: StateFlow<List<Track>> = historyRepository.observeRecentlyPlayed(24)
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
     val favoriteIds: StateFlow<Set<String>> = libraryRepository.observeFavoriteIds()
         .stateIn(scope, SharingStarted.Eagerly, emptySet())
 
-    init { load() }
+    /**
+     * Content for the Home "Recommended songs" row. A near-instant local pick
+     * set is published first (so the carousel never sits empty waiting on a
+     * network hop), then replaced by richer history-seeded picks when those
+     * arrive. Empty when the user has neither history nor saved songs.
+     */
+    private val _recommendedSongs = MutableStateFlow<List<Track>>(emptyList())
+    val recommendedSongs: StateFlow<List<Track>> = _recommendedSongs.asStateFlow()
+
+    private val _isLoadingRecommended = MutableStateFlow(false)
+    val isLoadingRecommended: StateFlow<Boolean> = _isLoadingRecommended.asStateFlow()
+
+    init {
+        load()
+        observeRecommendationSignals()
+    }
 
     fun load() = requestFeed(refresh = false)
     fun refresh() = requestFeed(refresh = true)
+
+    /**
+     * Rebuild the recommended row whenever the seed signal — the ordered set
+     * of the user's most recent distinct plays — changes (a new listen lands,
+     * history is cleared, etc.). Keyed on ids so unrelated history edits do
+     * not trigger a redundant network pass.
+     */
+    private fun observeRecommendationSignals() {
+        scope.launch {
+            recentlyPlayed
+                .map { recent -> recent.distinctBy { it.id }.take(RECOMMEND_SEED_SIGNAL).map { it.id } }
+                .distinctUntilChanged()
+                .collect { refreshRecommendations() }
+        }
+    }
+
+    private fun refreshRecommendations() {
+        recommendJob?.cancel()
+        val job = scope.launch {
+            _isLoadingRecommended.value = true
+            try {
+                val excludeIds = currentVisibleTrackIds()
+                // 1) Instant, offline-safe content from the user's own library.
+                val local = try {
+                    getRecommendations.localPicks(excludeIds)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                if (local.isNotEmpty()) _recommendedSongs.value = local
+
+                // 2) Best-effort network enrichment seeded from recent plays.
+                // Never blocks: on failure it returns empty and [local] stays.
+                val remote = try {
+                    getRecommendations.historySeeded(excludeIds)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                if (remote.isNotEmpty()) _recommendedSongs.value = remote
+            } finally {
+                _isLoadingRecommended.value = false
+            }
+        }
+        recommendJob = job
+    }
+
+    /**
+     * All track ids already rendered somewhere on the visible Home (quick
+     * picks + feed shelves), so recommendations never duplicate them. The
+     * Listen-again history row is deliberately NOT excluded here: the seed
+     * signal for network enrichment comes from that same history.
+     */
+    private fun currentVisibleTrackIds(): Set<String> {
+        val ids = LinkedHashSet<String>()
+        val feed = (state.value.ui as? HomeUiState.Success)?.feed ?: return ids
+        feed.quickPicks.forEach { ids.add(it.id) }
+        feed.sections.forEach { section ->
+            section.items.forEach { item ->
+                if (item is HomeItem.TrackItem) ids.add(item.track.id)
+            }
+        }
+        return ids
+    }
 
     private fun requestFeed(refresh: Boolean) {
         val request = state.updateAndGet {
@@ -174,5 +261,7 @@ class HomeViewModel(
 
     private companion object {
         const val MAX_EMPTY_PAGES = 3
+        /** Distinct recent plays that form the seed signal for recommendations. */
+        const val RECOMMEND_SEED_SIGNAL = 10
     }
 }

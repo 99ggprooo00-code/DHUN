@@ -42,6 +42,7 @@ import dev.dhun.desktop.native.SingleInstance
 import dev.dhun.desktop.player.DesktopDhunPlayer
 import dev.dhun.desktop.smct.Smct
 import dev.dhun.domain.GetHomeFeedUseCase
+import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
 import dev.dhun.domain.SaveNowPlayingUseCase
@@ -685,6 +686,7 @@ private val desktopModule = module {
     }
 
     single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
+    single { GetRecommendationsUseCase(get(), get<DataLayer>().history, get<DataLayer>().library) }
 
     // Phase 11 lyrics — cache → YTM → LRCLIB → NotAvailable, persisted in SQLDelight
     single { LrcLibSource() }
@@ -708,6 +710,7 @@ private val desktopModule = module {
     single {
         HomeViewModel(
             getHomeFeed = get(),
+            getRecommendations = get(),
             historyRepository = get<DataLayer>().history,
             libraryRepository = get<DataLayer>().library,
             scope = get(),
