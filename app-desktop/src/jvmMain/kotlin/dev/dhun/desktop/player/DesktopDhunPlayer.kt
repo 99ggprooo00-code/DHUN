@@ -9,6 +9,10 @@ import dev.dhun.core.toUserMessage
 import dev.dhun.player.AudioFileCache
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.QueueManager
+import dev.dhun.player.equalizer.EqualizerEngine
+import dev.dhun.player.equalizer.EqualizerSession
+import dev.dhun.player.equalizer.EqualizerState
+import dev.dhun.player.equalizer.VlcEqualizerCommand
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory
+import uk.co.caprica.vlcj.player.base.Equalizer as VlcEqualizer
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import java.util.concurrent.atomic.AtomicBoolean
@@ -39,6 +44,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * streams immediately and is downloaded to the cache in the background
  * (one download at a time, cancelled on track change). If resolve fails
  * (offline / cat.8 gating) and the file is cached, playback still works.
+ *
+ * Candidate 22 equalizer (additive, not on [DhunPlayer]): a shared
+ * [EqualizerSession] is applied through the existing vlcj
+ * `audio().setEqualizer` API. Missing libVLC → the session still holds
+ * state; native apply is a no-op. This is not an audible-hardware claim.
  */
 class DesktopDhunPlayer(
     private val provider: MusicProvider,
@@ -98,6 +108,15 @@ class DesktopDhunPlayer(
     private val _volume = MutableStateFlow(1f)
     override val volume: StateFlow<Float> = _volume.asStateFlow()
 
+    /**
+     * Shared EQ session. Not part of [DhunPlayer] — later UI binds this
+     * directly. Native apply is best-effort; see [applyEqualizer].
+     */
+    val equalizer = EqualizerSession(engine = EqualizerEngine { applyEqualizer(it) })
+
+    /** Retained: vlcj equalizer is GC-sensitive (native instance). */
+    private var vlcEqualizer: VlcEqualizer? = null
+
     private var pollJob: Job? = null
     private var pendingLazyStart = false // restored queue, not yet resolved
     private var pendingSeekMs = 0L
@@ -117,6 +136,8 @@ class DesktopDhunPlayer(
             mp.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
                 override fun playing(mediaPlayer: MediaPlayer) {
                     _state.value = PlaybackState.Playing(_currentTrack.value ?: UNKNOWN)
+                    // libVLC can drop the audio filter when a new MRL starts.
+                    equalizer.reapply()
                     schedulePrebufferNextTrack()
                 }
 
@@ -136,6 +157,7 @@ class DesktopDhunPlayer(
                 }
             })
             println("DHUN VLC initialized successfully")
+            equalizer.reapply()
         } catch (e: Throwable) {
             vlcInitError = e.message ?: e::class.simpleName ?: "unknown"
             System.err.println("DHUN VLC init failed (playback disabled, app continues): $e")
@@ -337,6 +359,8 @@ class DesktopDhunPlayer(
         cancelPrebuffer()
         pollJob?.cancel()
         pollJob = null
+        runCatching { mediaPlayer?.audio()?.setEqualizer(null) }
+        vlcEqualizer = null
         runCatching { mediaPlayer?.release() }
         runCatching { factory?.release() }
     }
@@ -453,6 +477,7 @@ class DesktopDhunPlayer(
             return
         }
         mp.media().play(mrl)
+        equalizer.reapply()
         startPolling()
         _state.value = PlaybackState.Buffering(track)
         val resume = pendingSeekMs
@@ -597,6 +622,32 @@ class DesktopDhunPlayer(
     }
 
     private fun log(message: String) = println("DHUN cache: $message")
+
+    /**
+     * Best-effort vlcj equalizer apply. No-op when VLC is missing or the
+     * native call throws — the shared [equalizer] session still holds
+     * state. Never throws into the session.
+     */
+    private fun applyEqualizer(state: EqualizerState) {
+        val mp = mediaPlayer ?: return
+        val f = factory ?: return
+        val command = VlcEqualizerCommand.from(state)
+        if (!command.enabled) {
+            runCatching { mp.audio().setEqualizer(null) }
+            return
+        }
+        val eq = vlcEqualizer
+            ?: runCatching { f.equalizer().newEqualizer() }.getOrNull()?.also { vlcEqualizer = it }
+            ?: return
+        runCatching { eq.setPreamp(command.preampDb) }
+        command.ampsDb.forEachIndexed { index, amp ->
+            runCatching { eq.setAmp(index, amp) }
+        }
+        // Already-attached equalizers apply via EqualizerListener on setAmp.
+        if (mp.audio().equalizer() !== eq) {
+            runCatching { mp.audio().setEqualizer(eq) }
+        }
+    }
 
     private fun stopLocked() {
         streamingRemoteUrl = null

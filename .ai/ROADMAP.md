@@ -1,39 +1,26 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-09 (UTC)** \u00b7 session **`arena/01a08455-dhun`** (**widgets**, merge order **fifth** of this batch, rebased onto new main) \u00b7 **`origin/main` = `d0534cd`** = **PR #45 MERGED** (`feat(shell): two-pane` @ `d0534cd`; `CI 34311465073` **success**, `test-release` **success**). Previous `origin/main` `847b258` now superseded. Branch `arena/01a08455-dhun` was **even** at `821663f`, now **rebased** onto `d0534cd` (2 widget commits replayed, no equalizer — scope pure). Verified via `git fetch` + `gh pr list` + `gh run list`.
+Updated **2026-09-09 (UTC)** · equalizer session **`arena/01a08455-dhun`** · **`origin/main` = `b00a9e1`** = **PR #46 MERGED** (widgets). Prior: PR #45 two-pane `d0534cd`, PR #44 `847b258`. `rot-drill` red = issue **#14** (IP gating, non-gate). GitHub-verified this session.
 
-**Board state (verified 2026-09-09 05:10Z via `gh pr list` + `gh run list`):** OPEN PRs = **#40** (`arena/01a07a6b-dhun-release`, **CONFLICTING/DIRTY**) + **#46** (`arena/01a08455-dhun` **this widgets PR**, head `821663f` pre-rebase, now rebased, **MERGEABLE** pending new CI). PR **#45** (`arena/01a08454-dhun` two-pane) **MERGED** as `d0534cd` (the rebase base). Every other worker from prior batch merged (`#43` @ `eda73e4`, `#41` @ `dd0fe14`, `#42` @ `f562093`). `rot-drill` red on every push including `main` = pre-existing issue #14, not a gate.
+**LIVE ITEM (this session): platform-neutral EQ model + desktop vlcj actual.** Owned: `shared/src/commonMain/kotlin/dev/dhun/player/equalizer/**` + `DesktopDhunPlayer.kt` via existing vlcj `4.8.2` + `shared/src/jvmTest/kotlin/dev/dhun/player/equalizer/**`. **`DhunPlayer.kt` unchanged.** Android `AudioEffect` not in this slice. Widgets now on `main` via PR #46 — this rebase drops the carried widgets commits and keeps equalizer-only.
 
-**This session \u2014 widgets (candidate 26 \u2014 ROADMAP deferred pool, now activated for this parallel batch):**
+**Exact files:** `EqualizerBands/Preset/State/Engine/Session/Presentation/VlcEqualizerCommand.kt` · equalizer `*Test.kt` · `DesktopDhunPlayer.kt` (additive) · `.ai/ROADMAP.md` · `.ai/KNOWN_LIMITATIONS.md`.
 
-*   **Scope (assigned):** home-screen app widgets \u2014 Now Playing (artwork/title/transport) + quick-play, fed by existing playback-service state, updating on track/state change, failing gracefully when idle. **Additive only.** NOT in scope: Android Auto, deep playback-engine changes, on-device widget verification (CI = compile + unit tests only; launcher rendering is the user's hardware gate).
-*   **Owned paths (this branch only, rebased):** `app-android/src/main/kotlin/dev/dhun/android/widgets/**` (5 files), `app-android/src/main/res/layout/widget_*.xml` (2), `app-android/src/main/res/xml/widget_*_info.xml` (2), `app-android/src/main/res/drawable/widget_*.xml` (6), `app-android/src/main/AndroidManifest.xml` (2 receivers), `app-android/src/main/res/values/strings.xml` (2 descriptions), `app-android/src/test/**/widgets/**` (4 classes, ~20 tests). **Frozen:** `shared/**`, `download/**`, `extraction/**`, `.github/**`, `tools/**`, `app-desktop/**`, `app-android/.../playback/DhunPlaybackService.kt` (observed read-only), `app-android/.../download/**`.
-*   **Exact files (owned-only, additive):** `widgets/DhunNowPlayingWidgetProvider.kt` \u00b7 `widgets/DhunQuickPlayWidgetProvider.kt` \u00b7 `widgets/DhunWidgetUpdater.kt` (MediaController \u2192 RemoteViews, idle fallback) \u00b7 `widgets/WidgetIntents.kt` \u00b7 `DhunWidgetState.kt` \u00b7 `res/layout/widget_now_playing.xml` \u00b7 `res/layout/widget_quick_play.xml` \u00b7 `res/xml/widget_now_playing_info.xml` \u00b7 `res/xml/widget_quick_play_info.xml` \u00b7 `res/drawable/widget_background.xml` + `widget_ic_*.xml` (5 icons) \u00b7 `src/test/.../widgets/{DhunWidgetStateTest,WidgetIntentsTest,WidgetXmlTest,DhunWidgetUpdaterTest}.kt` + `AndroidManifest.xml` receivers.
-*   **Last error:** **none** after fix `821663f` — previous 3 failures at `778dc20` were **test-correctness** (WidgetIntents not mocked, widgetCategory int vs string, dimen int vs raw) fixed in `821663f`; CI **success** for that head (`CI 34311148605` 5m7s, `test-release` `34311148558` 4m39s, `msi` pass; push `34311145646` success). Rebase onto `d0534cd` is **pending CI** — this ROADMAP commit is the rebase.
-*   **Exact next step (IN ORDER, per assignment):** (1) this ROADMAP rebase commit; (2) commit **widgets code** (already staged, owned-only) on top of `d0534cd` — **scope-gated, additive**; (3) push `arena/01a08455-dhun` (force, widgets pure, no equalizer) + ensure **own PR #46** (`MERGEABLE`) shows `build-and-test` + `apk` + `msi` **green**; (4) `git fetch` + rebase if needed + re-run CI until green (merge order fifth — after #45 which is now on main); (5) `gh pr merge 46 --merge` **last**. Honest limits apply: widget render / launcher update is **not claimed** by CI.
+**Last error:** none on the last equalizer head (`build-and-test` `34312354699` pass, `apk`+`msi` `34312354707` pass) before PR #46 merged widgets-only from a parallel push. Rebasing equalizer-only onto `b00a9e1`.
 
-**Live / remaining \u2014 beyond this widget work:**
-
-1.  **Release v0.1.0 (human-gated, candidate 18).** #40 is the pipeline (release-candidate `test-release.yml` + CHANGELOG draft). Needs human `workflow_dispatch` for a `DRAFT` `v0.1.0` release; CI alone cannot finish it.
-2.  **User hardware gates (never closable by CI):** Phase 15 launcher (icons + dynamic Now Playing tap\u2192FullPlayer + TalkBack + rotation/process-death) + 15a visuals (scrub-pill clamp, blur-once backdrop, swipe-down collapse, mini-player lift, spring lyrics) + **new widget launcher rendering / onResume auto-update on a real device** (deferred to user; CI will not claim it). Two-pane hardware gate is now also on main and is the user's.
-3.  **Open by omission:** 30-min LeakCanary soak never run; widgets quick-play surface is this session (rebase pending). Equalizer (candidate 22) lives on its own deferred branch and **must not** ride this PR — this rebase keeps it pure.
-4.  No `docs/verification/15-*.md` or `docs/verification/26-widgets.md` yet \u2014 a phase earns one when hardware evidence exists.
+**Exact next step:** finish rebase → push → new PR ( #46 already MERGED ) → `build-and-test` + `apk` + `msi` green → `gh pr merge --merge` last. **CI green = compile + unit tests. Never claim audible EQ on hardware.**
 
 <details>
-<summary><b>Prior snapshot (`arena/01a08427-dhun` — coordinator reconcile to main=`eda73e4`; MERGED as `847b258` via PR #44)</b></summary>
-Updated **2026-09-09 (UTC)** · coordinator session **`arena/01a08427-dhun`** · **`origin/main` = `eda73e4`** = **PR #43 MERGED** (state `MERGED`, head `aabd9df`, merged 08:01:57Z). Post-merge `test-release` on main = **success** (run `34101231724`). **Both Phase-15 halves are now on `main`:** candidate **15a** (ADR-002 player immersion) via **PR #41** and **Phase 15 Android native polish** (`app-android/**` only) via **PR #43** — verified from live GitHub, not inherited.
+<summary><b>Prior snapshot on this branch (widgets / original PR #46 — candidate 26)</b></summary>
 
-**Board state (verified 2026-09-09):** no worker session is mid-flight; every `agent-*.md`/`phase15-android-polish-status.md` is historical. The **only OPEN PR is #40** — the release v0.1.0 pipeline (`arena/01a07a6b-dhun-release`, head `0b3f2ed`, **MERGEABLE/CLEAN**). Its required CI is green (`build-and-test` `34229561878` pass; `apk`+`msi` `34229561792` pass; `publish`/`release_draft`/`aab` `skipping` by design). #40 is **stale through #38 only** — its CHANGELOG "Unreleased"/ROADMAP predate #39–#43 and need a refresh before merge. `rot-drill` remains red on every push incl. `main` = pre-existing **issue #14** (runner IP gating, non-code, not a merge gate).
+Candidate 26 widgets on `arena/01a08455-dhun`: Now Playing + Quick Play, MediaController read-only, idle fallback. Frozen `shared/**` / `app-desktop/**` / `DhunPlaybackService.kt`. CI green ≠ launcher rendering.
 
-**Live / remaining — nothing code-open beyond #40.**
+</details>
 
-1. **Release v0.1.0 (human-gated, candidate 18).** #40 is the pipeline (release-candidate `test-release.yml` job + CHANGELOG draft + README release docs). To complete, a human must (a) green-light merging #40 → `main`; (b) click **`workflow_dispatch`** on `test-release.yml` to build a **DRAFT** `v0.1.0` release; (c) publish manually after the Phase-14 gates. CI alone can never finish it.
-2. **The user's hardware gates** — never closable by CI: Phase 15 on-device (long-press launcher surface + three dedicated icons, dynamic "Now Playing" tap→FullPlayer, TalkBack on spinner/headings/degraded banner, rotation + process-death restore) and 15a visual (scrub-pill centering/clamp, blur-once backdrop, swipe-down collapse, mini-player lift, spring lyric emphasis).
-3. **Open by omission, not accident:** tablet two-pane (`shared/ui/shell/DhunAppShell.kt`; outside #43's `app-android/**` scope) and the 30-minute LeakCanary soak (never run).
-4. No `docs/verification/15-*.md` yet — a phase earns one when hardware evidence exists; that is the missing half.
+<details>
+<summary><b>Prior snapshot (`arena/01a08454-dhun` — PR #45 two-pane shell; MERGED as `d0534cd`)</b></summary>
 
-**Next coordinator step (this session):** reconcile this header + the phase rows to `eda73e4`/PR #43 (done here); refresh #40's stale CHANGELOG/ROADMAP before it merges; and **do not launch speculative candidate code** — roadmap Doctrine: candidates 16–30 are "not designed, not scheduled until the user picks them."
-
+Agent #2 UI shell / navigation. Two-pane at the 840dp rail breakpoint in `shared/ui/shell/**`. CI green at `e79233c`; merged as `d0534cd`. Hardware/tablet acceptance remains the user's gate.
 
 </details>
 
@@ -311,8 +298,10 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 IN PROGRESS — **ADR-006 offline downloads fully integrated: PRs #34/#35/#36/#37 merged, `main` / `test` at `481b77b`, ALL STABLE.** CI `34084678724` and test-release `34084678720` green; rolling test republished `2026-09-07T04:58:25Z`. Audio User-Agent fix, Home continuation, bounded resolve/diagnostics, restyle, single-window code, Android download FGS, Library storage management, per-track badges and player UX are all on GitHub. `rot-drill` still RED (issue #14, GitHub-runner IP gating, non-code); hardware re-tests, offline/recovery checks, clean targets, soaks and v0.1.0 remain OPEN | Phase 14 step table below; `INTEGRATION.md`; issue #14; docs/verification/14 |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
-trajectory below): Web/PWA, Android Auto, Cast, equalizer, sync, downloads,
-widgets, jump lists, optional cookie sign-in, themes beyond dark-first.
+trajectory below): Web/PWA, Android Auto, Cast, Android `AudioEffect` equalizer
+(desktop/shared EQ is candidate 22 this session), sync, downloads,
+Android widgets (candidate 26 is on this shared branch as PR #46), jump lists,
+optional cookie sign-in, themes beyond dark-first.
 
 ### Phase 12 step status — 🟨 IN PROGRESS (mini-player window REMOVED per ADR-004)
 
@@ -465,7 +454,7 @@ stubbed, NOT scheduled** until the user picks them (Doctrine: no
 | 19 | **Web/PWA evaluation** (the big deferred item; hard gate: PO tokens/SABR block third-party browser streaming — see `.ai/PROBLEMS_AND_FIXES.md` P7) | Only after the kill-switch data from 17 exists; probably "no" |
 | 20 | **Android Auto** (media app on the platform; needs a stable media session — just built) | Natural once 15+18 done |
 | 21 | **Cast** | Same dependency as 20 |
-| 22 | **Equalizer** (Android: `AudioEffect` platform EQ; desktop: libVLC audio filter) | Feature, no platform risk |
+| 22 | **Equalizer** — 🟨 **this session (`arena/01a08455-dhun`)**: platform-neutral 10-band model + presentation in `shared/.../player/equalizer` and desktop actual via existing vlcj (no new dep). **`DhunPlayer` unchanged. Android `AudioEffect` is NOT in this slice.** CI green = compile + unit tests; audible EQ on hardware is the user's gate | User-picked additive slice; merge order third |
 | 23 | **Cross-device sync** (experimental; local-first DB design must survive) | Explicitly experimental in the prompt |
 | 24 | **Optional cookie sign-in** (unlock age/region + personal playlists; treated as experimental) | High ToS/legal sensitivity — ADR required first |
 | 25 | **Downloads beyond cache** (bounded, offline library) | Extends 16 |

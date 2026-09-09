@@ -391,3 +391,16 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
 - Phase 14 Android/Desktop soak tests, clean-target installation checks, and
   release evidence remain open because this environment has no Android device,
   OEM runtime, Windows machine, libVLC runtime, or display.
+
+## 2026-09-09 — Candidate 22 equalizer (shared model + desktop vlcj; not audible)
+
+- Platform-neutral 10-band EQ (VLC `f_vlc_frequency_table_10b` + 18 VLC
+  presets) lives in `shared/.../player/equalizer`. Desktop applies it through
+  the existing vlcj `MediaPlayer.audio().setEqualizer` API. **`DhunPlayer` is
+  unchanged.** There is no Compose EQ screen in this slice — presentation is
+  a pure `EqualizerUiModel` snapshot for a later UI to bind.
+- **Android `AudioEffect` is not in this slice.** Enabling EQ on Android is a
+  later stream.
+- **CI green is compile + unit tests.** This environment has no libVLC and no
+  audio device; nothing here claims audible EQ on hardware. Native apply is
+  best-effort and silent when VLC is missing.
