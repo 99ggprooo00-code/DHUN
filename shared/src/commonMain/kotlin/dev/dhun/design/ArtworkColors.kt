@@ -39,7 +39,16 @@ data class ArtworkColors(
     val controlAccent: Color get() = primary.tamedForControls()
 
     companion object {
-        val fallback = ArtworkColors(
+        /**
+         * Used when extraction is impossible (no bitmap, decode failure,
+         * solid-colour art) or before a seed/bitmap exists.
+         *
+         * A `get()`, not a captured `val`: it follows the active accent, so
+         * picking Jade in the accent selector does not leave the fallback
+         * controls violet. Value-equality means callers and tests are
+         * unaffected by it being recomputed.
+         */
+        val fallback: ArtworkColors get() = ArtworkColors(
             primary = DhunColors.accent,
             onPrimary = DhunColors.onAccent,
             container = DhunColors.accentContainer,
@@ -68,6 +77,19 @@ data class ArtworkColors(
 /** Share of brand accent mixed into every artwork-derived control colour. */
 private const val BRAND_MIX_DEFAULT = 0.45f
 
+/** Minimum lightness a control colour may have on the dark surfaces (`#121212`). */
+internal const val DARK_LEGIBILITY_FLOOR = 0.42f
+
+/**
+ * Maximum lightness a control colour may have on the light surfaces.
+ *
+ * Not the mirror of the dark floor: 0.46 is the value at which the worst case
+ * across all six accents and a spread of artwork primaries still clears WCAG
+ * 1.4.11 (3:1) against **both** `#FFFFFF` and the `#F6F4F1` background — the
+ * measured worst case is 3.71:1 / 3.38:1 (pinned by `DhunThemeContrastTest`).
+ */
+internal const val LIGHT_LEGIBILITY_CEILING = 0.46f
+
 /** Linear mix, [t] = 0 keeps the receiver, 1 gives [other]. */
 internal fun Color.mix(other: Color, t: Float): Color {
     val k = t.coerceIn(0f, 1f)
@@ -81,13 +103,33 @@ internal fun Color.mix(other: Color, t: Float): Color {
 
 /**
  * Makes an artwork colour safe to put on interactive chrome: mixes in the
- * brand accent, then lifts it until it is legible on the near-black surface.
+ * brand accent, then moves it until it is legible on the active surface.
+ *
+ * Direction matters and is the whole reason this reads [DhunAppearance]: on
+ * the near-black dark surfaces an artwork colour can only be too *dark*, so it
+ * is lifted to a lightness floor. On light surfaces the same colour can only
+ * be too *pale*, so it is pushed down instead — flooring it there would paint
+ * an invisible play disc on white. The thresholds are measured: 0.42 against
+ * `#121212` (the shipped dark behaviour, unchanged) and 0.46 against
+ * `#FFFFFF`/`#F6F4F1` — see [LIGHT_LEGIBILITY_CEILING].
  */
 internal fun Color.tamedForControls(): Color {
     val blended = mix(DhunColors.accent, BRAND_MIX_DEFAULT)
-    // Floor the lightness so dark artwork can't yield a near-invisible disc.
     val lum = blended.luminance()
-    return if (lum < 0.42f) blended.mix(Color.White, (0.42f - lum) * 1.1f) else blended
+    return if (DhunAppearance.tokens.isLight) {
+        if (lum > LIGHT_LEGIBILITY_CEILING) {
+            blended.mix(Color.Black, (lum - LIGHT_LEGIBILITY_CEILING) * 1.1f)
+        } else {
+            blended
+        }
+    } else {
+        // Floor the lightness so dark artwork can't yield a near-invisible disc.
+        if (lum < DARK_LEGIBILITY_FLOOR) {
+            blended.mix(Color.White, (DARK_LEGIBILITY_FLOOR - lum) * 1.1f)
+        } else {
+            blended
+        }
+    }
 }
 
 internal fun Color.luminance(): Float {
