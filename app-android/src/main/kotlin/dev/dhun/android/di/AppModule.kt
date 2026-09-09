@@ -48,13 +48,20 @@ val appModule = module {
     single<StreamResolver> { OwnClientStreamResolver(get()) }
     // ADR-006: offline-first playback — a COMPLETED persistent download
     // resolves to its local file; otherwise resolve over the network chain.
+    // Playback-diagnostics (2026-09-09): wrapped in ResolveObservingMusicProvider
+    // so every resolve outcome lands in the process-wide ResolveOutcomeLog —
+    // the seam AndroidDhunPlayer uses to fast-fail a terminal (bot-gated)
+    // verdict out of the multi-minute buffering retry cascade. Engine
+    // contracts (PlaybackGraph/DhunStreamCache) are untouched.
     single<MusicProvider> {
-        YouTubeMusicProvider(
-            get(),
-            OfflineFirstStreamResolver(
-                downloads = get<DownloadRepository>(),
-                primary = get<StreamResolver>(),
-                fileExists = { path -> runCatching { File(path).exists() }.getOrDefault(false) },
+        dev.dhun.android.playback.ResolveObservingMusicProvider(
+            YouTubeMusicProvider(
+                get(),
+                OfflineFirstStreamResolver(
+                    downloads = get<DownloadRepository>(),
+                    primary = get<StreamResolver>(),
+                    fileExists = { path -> runCatching { File(path).exists() }.getOrDefault(false) },
+                ),
             ),
         )
     }
