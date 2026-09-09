@@ -33,14 +33,17 @@ import dev.dhun.core.Playlist
 import dev.dhun.core.Track
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.ArtworkColors
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTheme
+import dev.dhun.design.DhunThemeMode
 import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.DhunAppearanceControls
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunIconButton
@@ -70,7 +73,14 @@ fun ComponentCatalogScreen(
     onClose: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    DhunTheme {
+    // Candidate 28: the catalog is the one surface that drives the appearance
+    // toggle. It reads the shared holder (subscribing, so a flip recomposes
+    // this screen and re-wraps it in the new theme) and writes back through
+    // setAppearance — the same single source of truth the rest of the app
+    // reads, so the toggle is live for everything, not just this screen.
+    val mode = DhunAppearance.mode
+    val accent = DhunAppearance.accent
+    DhunTheme(mode = mode, accent = accent) {
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -89,9 +99,18 @@ fun ComponentCatalogScreen(
                     ),
                 ),
             )
-            // Scrim so foreground stays legible while still showing blur.
+            // Scrim so foreground stays legible while still showing blur. The
+            // veil flips with the theme: the black scrim is right over artwork
+            // on near-black, but over a paper-white surface it would grey the
+            // light scheme out and break the very tokens on show below.
             Box(
-                modifier = Modifier.fillMaxSize().background(DhunColors.scrim.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxSize().background(
+                    if (mode == DhunThemeMode.LIGHT) {
+                        DhunColors.surface.copy(alpha = 0.82f)
+                    } else {
+                        DhunColors.scrim.copy(alpha = 0.35f)
+                    },
+                ),
             )
 
             LazyColumn(
@@ -113,6 +132,17 @@ fun ComponentCatalogScreen(
                             DhunTextButton(onClick = onClose) { Text("Close") }
                         }
                     }
+                }
+
+                // -- Appearance (candidate 28) ------------------------------
+                item { SectionHeader(title = "Appearance — theme + accent, live") }
+                item {
+                    DhunAppearanceControls(
+                        mode = mode,
+                        accent = accent,
+                        onModeChange = { next -> DhunAppearance.setAppearance(nextMode = next) },
+                        onAccentChange = { next -> DhunAppearance.setAppearance(nextAccent = next) },
+                    )
                 }
 
                 // -- Tokens -------------------------------------------------
