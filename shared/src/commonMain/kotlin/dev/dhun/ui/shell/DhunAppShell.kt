@@ -18,7 +18,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -100,11 +103,24 @@ enum class AppTab(val title: String, val icon: DhunIcon) {
 }
 
 /**
- * The app shell: bottom nav + docked MiniPlayer + FullPlayer overlay +
- * detail-page stack (artist/album/playlist).
+ * The app shell: navigation + docked MiniPlayer + FullPlayer overlay +
+ * detail-page stack (artist/album/playlist), in one of two layouts decided by
+ * [DhunShellPolicy] from the measured width:
+ *
+ * - **[DhunShellLayout.SinglePane]** (handsets, narrow windows) — bottom bar,
+ *   a floating MiniPlayer, and a detail page that *covers* the tab content.
+ *   This branch is what shipped to devices; it is deliberately untouched
+ *   apart from moving the same `when` into [ShellMasterPane].
+ * - **[DhunShellLayout.TwoPane]** (≥ 840dp, Phase 13's "navigation rail at
+ *   width ≥ 840dp; two-pane player where space allows") — the rail, a master
+ *   column (list + MiniPlayer docked to its bottom), and a detail column that
+ *   shows the top of [AppNavState.detailStack] beside the list instead of
+ *   replacing it. The stack survives a tab switch, and Back pops it page by
+ *   page before the player sheet, so a tablet never loses a page it can see.
  *
  * Nav & overlay state live in [nav] (hoisted to the platform shell so its
  * BackHandler can coordinate: player collapses → detail pops → app default).
+ * No layout branch is allowed to change that contract — see [DhunShellPolicy.backAction].
  */
 @Composable
 fun DhunAppShell(
@@ -162,7 +178,13 @@ fun DhunAppShell(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val useNavigationRail = maxWidth >= DhunSpacing.navigationRailBreakpoint
+        // ONE decision drives both large-screen affordances: [DhunShellLayout.of]
+        // reuses the rail breakpoint token, so the rail and the intent to split
+        // can never drift apart. Below it the shell is exactly what shipped to
+        // phones; at and above it the detail stack becomes a real pane — subject
+        // to [DhunShellPolicy.panes] finding actual room in the inset content area.
+        val layout = DhunShellPolicy.layoutAt(maxWidth)
+        val useNavigationRail = layout == DhunShellLayout.TwoPane
         // Phase 14 error taxonomy: offline banner. Rendered in the Scaffold
         // topBar slot so innerPadding pushes content down while it shows.
         val isOnline by connectivity.isOnline.collectAsState()
@@ -227,103 +249,150 @@ fun DhunAppShell(
                 }
             },
             bottomBar = if (useNavigationRail) {
+                // The rail owns navigation here; the dock that used to carry the
+                // bottom bar instead (MiniPlayer) moves into the master pane.
                 {}
             } else {
                 {
                     BottomNavigationBar(
                         nav = nav,
                         playerViewModel = playerViewModel,
+                        layout = layout,
                     )
                 }
             },
         ) { innerPadding ->
+            // The split is computed from what the Scaffold actually handed back,
+            // minus the rail — see [DhunShellPolicy.panes].
+            val horizontalInsets = innerPadding.calculateLeftPadding(layoutDirection) +
+                innerPadding.calculateRightPadding(layoutDirection)
+            val panes = DhunShellPolicy.panes(
+                shellWidth = maxWidth,
+                contentWidth = maxWidth - horizontalInsets,
+                hasRail = useNavigationRail,
+            )
             Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
                 if (useNavigationRail) {
-                    AppNavigationRail(nav = nav)
+                    AppNavigationRail(nav = nav, layout = layout)
                 }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        when (val route = nav.detailStack.lastOrNull()) {
-                    null -> TabContent(
-                        tab = nav.selectedTab,
-                        homeViewModel = homeViewModel,
-                        searchViewModel = searchViewModel,
-                        libraryViewModel = libraryVm,
-                        onPlayTrack = onPlayTrack,
-                        onNavigate = { nav.push(it) },
-                        onTrackOverflow = { overflowTrack = it },
-                        downloadManager = downloadManager,
-                        onOpenLiked = {
-                            libraryVm.openLikedSongs()
-                            nav.selectedTab = AppTab.LIBRARY
-                            nav.detailStack.clear()
+                if (panes == null) {
+                    // Phone / narrow window: unchanged, including the floating
+                    // MiniPlayer above where the bottom bar would have been.
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                    ) {
+                        // `panes == null` is the single-pane case: either below the
+                        // breakpoint, or (rare) at it with insets so large that two real
+                        // columns do not fit. Either way the top of the stack covers the
+                        // tab, exactly as it does on a phone.
+                        ShellMasterPane(
+                            tab = nav.selectedTab,
+                            detailRoute = nav.detailStack.lastOrNull(),
+                            homeViewModel = homeViewModel,
+                            searchViewModel = searchViewModel,
+                            libraryViewModel = libraryVm,
+                            provider = provider,
+                            dataLayer = dataLayer,
+                            player = player,
+                            nav = nav,
+                            onPlayTrack = onPlayTrack,
+                            onPlayArtist = onPlayArtist,
+                            onPlayAlbum = onPlayAlbum,
+                            onPlayPlaylist = onPlayPlaylist,
+                            onTrackOverflow = { overflowTrack = it },
+                            downloadManager = downloadManager,
+                            sleepTimerLabel = sleepLabel,
+                            onCycleSleepTimer = { playerViewModel.cycleSleepTimer() },
+                            onOpenLiked = {
+                                libraryVm.openLikedSongs()
+                                nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = false)
+                            },
+                            onOpenOffline = {
+                                // Segment cache lives under playback; Library is the
+                                // honest destination until a dedicated Offline page.
+                                libraryVm.selectTab(LibraryTab.PLAYLISTS)
+                                nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = false)
+                            },
+                        )
+                        if (useNavigationRail && !nav.playerExpanded) {
+                            MiniPlayer(
+                                viewModel = playerViewModel,
+                                onExpand = { nav.playerExpanded = true },
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
+                            )
+                        }
+                    }
+                } else {
+                    // Large screen: a master column (tab list + docked
+                    // MiniPlayer) and a detail column. The stack survives tab
+                    // switches here — it is not covering anything any more.
+                    ShellTwoPane(
+                        panes = panes,
+                        master = {
+                            ShellMasterPane(
+                                tab = nav.selectedTab,
+                                detailRoute = null,
+                                homeViewModel = homeViewModel,
+                                searchViewModel = searchViewModel,
+                                libraryViewModel = libraryVm,
+                                provider = provider,
+                                dataLayer = dataLayer,
+                                player = player,
+                                nav = nav,
+                                onPlayTrack = onPlayTrack,
+                                onPlayArtist = onPlayArtist,
+                                onPlayAlbum = onPlayAlbum,
+                                onPlayPlaylist = onPlayPlaylist,
+                                onTrackOverflow = { overflowTrack = it },
+                                downloadManager = downloadManager,
+                                sleepTimerLabel = sleepLabel,
+                                onCycleSleepTimer = { playerViewModel.cycleSleepTimer() },
+                                onOpenLiked = {
+                                    libraryVm.openLikedSongs()
+                                    nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = layout.showsDetailPane)
+                                },
+                                onOpenOffline = {
+                                    libraryVm.selectTab(LibraryTab.PLAYLISTS)
+                                    nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = layout.showsDetailPane)
+                                },
+                            )
                         },
-                        onOpenOffline = {
-                            // Segment cache lives under playback; Library is the
-                            // honest destination until a dedicated Offline page.
-                            libraryVm.selectTab(LibraryTab.PLAYLISTS)
-                            nav.selectedTab = AppTab.LIBRARY
-                            nav.detailStack.clear()
+                        detail = {
+                            ShellDetailPane(
+                                route = nav.detailStack.lastOrNull(),
+                                provider = provider,
+                                dataLayer = dataLayer,
+                                player = player,
+                                nav = nav,
+                                onPlayArtist = onPlayArtist,
+                                onPlayAlbum = onPlayAlbum,
+                                onPlayPlaylist = onPlayPlaylist,
+                                onTrackOverflow = { overflowTrack = it },
+                            )
                         },
-                        sleepTimerLabel = sleepLabel,
-                        onCycleSleepTimer = { playerViewModel.cycleSleepTimer() },
+                        miniPlayer = if (!nav.playerExpanded) {
+                            {
+                                MiniPlayer(
+                                    viewModel = playerViewModel,
+                                    onExpand = { nav.playerExpanded = true },
+                                    modifier = Modifier.padding(
+                                        horizontal = DhunSpacing.md,
+                                        vertical = DhunSpacing.sm,
+                                    ),
+                                )
+                            }
+                        } else {
+                            {}
+                        },
                     )
-                    is DetailRoute.ArtistPage -> {
-                        val vm = remember(route.id) { ArtistViewModel(provider, player, route.id) }
-                        DisposableEffect(vm) { onDispose { vm.close() } }
-                        ArtistScreen(
-                            viewModel = vm,
-                            onBack = { nav.closeTop() },
-                            onTrackPlay = onPlayArtist,
-                            onAlbumClick = { nav.push(DetailRoute.AlbumPage(it.id)) },
-                            onArtistClick = { nav.push(DetailRoute.ArtistPage(it.id)) },
-                            onPlaylistClick = { nav.push(DetailRoute.PlaylistPage(it.id)) },
-                            onTrackOverflow = { overflowTrack = it },
-                        )
-                    }
-                    is DetailRoute.AlbumPage -> {
-                        val vm = remember(route.id) { AlbumViewModel(provider, player, route.id) }
-                        DisposableEffect(vm) { onDispose { vm.close() } }
-                        AlbumScreen(
-                            viewModel = vm,
-                            onBack = { nav.closeTop() },
-                            onTrackPlay = onPlayAlbum,
-                            onArtistClick = { nav.push(DetailRoute.ArtistPage(it.id)) },
-                            onTrackOverflow = { overflowTrack = it },
-                        )
-                    }
-                    is DetailRoute.PlaylistPage -> {
-                        val vm = remember(route.id, route.isLocal) {
-                            PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal)
-                        }
-                        DisposableEffect(vm) { onDispose { vm.close() } }
-                        PlaylistScreen(
-                            viewModel = vm,
-                            onBack = { nav.closeTop() },
-                            onTrackPlay = onPlayPlaylist,
-                            onTrackOverflow = { overflowTrack = it },
-                            onDeleted = { nav.closeTop() },
-                        )
-                    }
-                        }
-                    }
-                    if (useNavigationRail && !nav.playerExpanded) {
-                        MiniPlayer(
-                            viewModel = playerViewModel,
-                            onExpand = { nav.playerExpanded = true },
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
-                        )
-                    }
                 }
             }
         }
@@ -410,6 +479,7 @@ fun DhunAppShell(
 private fun BottomNavigationBar(
     nav: AppNavState,
     playerViewModel: PlayerViewModel,
+    layout: DhunShellLayout,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         if (!nav.playerExpanded) {
@@ -432,11 +502,16 @@ private fun BottomNavigationBar(
                 AppTab.userTabs.forEach { tab ->
                     AppBottomNavigationItem(
                         tab = tab,
-                        selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
-                        onClick = {
-                            nav.selectedTab = tab
-                            nav.detailStack.clear()
-                        },
+                        selected = DhunShellPolicy.isTabSelected(
+                            layout = layout,
+                            selectedTab = nav.selectedTab,
+                            tab = tab,
+                            detailDepth = nav.detailStack.size,
+                        ),
+                        // A bottom bar only exists in the single-pane layout, so
+                        // `false` here is the phone rule by construction: switching
+                        // tabs drops the stack that was covering the tab.
+                        onClick = { nav.selectTab(tab, keepDetailOnTabChange = false) },
                     )
                 }
             }
@@ -445,7 +520,10 @@ private fun BottomNavigationBar(
 }
 
 @Composable
-private fun AppNavigationRail(nav: AppNavState) {
+private fun AppNavigationRail(
+    nav: AppNavState,
+    layout: DhunShellLayout,
+) {
     NavigationRail(
         containerColor = DhunColors.glassStrong,
         contentColor = DhunColors.textPrimary,
@@ -454,11 +532,237 @@ private fun AppNavigationRail(nav: AppNavState) {
         AppTab.userTabs.forEach { tab ->
             AppRailNavigationItem(
                 tab = tab,
-                selected = nav.selectedTab == tab && nav.detailStack.isEmpty(),
+                selected = DhunShellPolicy.isTabSelected(
+                    layout = layout,
+                    selectedTab = nav.selectedTab,
+                    tab = tab,
+                    detailDepth = nav.detailStack.size,
+                ),
                 onClick = {
-                    nav.selectedTab = tab
-                    nav.detailStack.clear()
+                    // The rail only exists at the two-pane breakpoint, so a tab
+                    // tap there switches the master and keeps the detail pane; the
+                    // re-tap-on-the-selected-tab case pops one page (see
+                    // [AppNavState.selectTab]).
+                    nav.selectTab(tab, keepDetailOnTabChange = layout.showsDetailPane)
                 },
+            )
+        }
+    }
+}
+
+/**
+ * Master pane of the large-screen shell: the tab list, the detail pane beside
+ * it, and the MiniPlayer docked to the bottom of the **master** — never over
+ * the page the user is reading. The dock is a Column child here (no floating
+ * overlay), which is what keeps it clear of the detail column.
+ */
+@Composable
+private fun ShellTwoPane(
+    panes: ShellPanes,
+    master: @Composable () -> Unit,
+    detail: @Composable () -> Unit,
+    miniPlayer: @Composable () -> Unit,
+) {
+    Row(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.requiredWidth(panes.masterWidth).fillMaxHeight()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                master()
+            }
+            miniPlayer()
+        }
+        // Pane seam. `DhunColors.border` is the same hairline the glass cards
+        // use, so the split does not introduce a new stroke into the design.
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(DhunSpacing.border)
+                .background(DhunColors.border),
+        )
+        Box(modifier = Modifier.weight(panes.detailWeight).fillMaxHeight()) {
+            detail()
+        }
+    }
+}
+
+/**
+ * The tab content, plus — in the single-pane layout only — the detail page that
+ * covers it. Keeping both in one function is deliberate: the phone path renders
+ * the exact same `when`, so the two layouts cannot fork the browse wiring.
+ *
+ * [detailRoute] must be a plain local/parameter (`val`) for the sealed
+ * smart-casts below to hold — that is why the caller hoists it instead of
+ * reading `nav.detailStack.lastOrNull()` inline.
+ */
+@Composable
+private fun ShellMasterPane(
+    tab: AppTab,
+    detailRoute: DetailRoute?,
+    homeViewModel: HomeViewModel,
+    searchViewModel: SearchViewModel,
+    libraryViewModel: LibraryViewModel,
+    provider: MusicProvider,
+    dataLayer: DataLayer,
+    player: DhunPlayer,
+    nav: AppNavState,
+    onPlayTrack: (Track, List<Track>, Int) -> Unit,
+    onPlayArtist: (Track, List<Track>, Int) -> Unit,
+    onPlayAlbum: (Track, List<Track>, Int) -> Unit,
+    onPlayPlaylist: (Track, List<Track>, Int) -> Unit,
+    onTrackOverflow: (Track) -> Unit,
+    downloadManager: DownloadManager?,
+    sleepTimerLabel: String?,
+    onCycleSleepTimer: () -> Unit,
+    onOpenLiked: () -> Unit,
+    onOpenOffline: () -> Unit,
+) {
+    val route: DetailRoute? = detailRoute
+    when (route) {
+        null -> TabContent(
+            tab = tab,
+            homeViewModel = homeViewModel,
+            searchViewModel = searchViewModel,
+            libraryViewModel = libraryViewModel,
+            onPlayTrack = onPlayTrack,
+            onNavigate = { nav.push(it) },
+            onTrackOverflow = onTrackOverflow,
+            downloadManager = downloadManager,
+            onOpenLiked = onOpenLiked,
+            onOpenOffline = onOpenOffline,
+            sleepTimerLabel = sleepTimerLabel,
+            onCycleSleepTimer = onCycleSleepTimer,
+        )
+        is DetailRoute.ArtistPage -> {
+            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id) }
+            DisposableEffect(vm) { onDispose { vm.close() } }
+            ArtistScreen(
+                viewModel = vm,
+                onBack = { nav.closeTop() },
+                onTrackPlay = onPlayArtist,
+                onAlbumClick = { nav.push(DetailRoute.AlbumPage(it.id)) },
+                onArtistClick = { nav.push(DetailRoute.ArtistPage(it.id)) },
+                onPlaylistClick = { nav.push(DetailRoute.PlaylistPage(it.id)) },
+                onTrackOverflow = onTrackOverflow,
+            )
+        }
+        is DetailRoute.AlbumPage -> {
+            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id) }
+            DisposableEffect(vm) { onDispose { vm.close() } }
+            AlbumScreen(
+                viewModel = vm,
+                onBack = { nav.closeTop() },
+                onTrackPlay = onPlayAlbum,
+                onArtistClick = { nav.push(DetailRoute.ArtistPage(it.id)) },
+                onTrackOverflow = onTrackOverflow,
+            )
+        }
+        is DetailRoute.PlaylistPage -> {
+            val vm = remember(route.id, route.isLocal) {
+                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal)
+            }
+            DisposableEffect(vm) { onDispose { vm.close() } }
+            PlaylistScreen(
+                viewModel = vm,
+                onBack = { nav.closeTop() },
+                onTrackPlay = onPlayPlaylist,
+                onTrackOverflow = onTrackOverflow,
+                onDeleted = { nav.popDetail() },
+            )
+        }
+    }
+}
+
+/**
+ * The large-screen detail column. The page owns its own back affordance, and
+ * [AppNavState.popDetail] is the right affordance here (one page, not
+ * [AppNavState.closeTop], which would also try to collapse the player).
+ *
+ * An empty stack is **not** an error state — on a tablet the pane is reserved
+ * permanently so the layout does not jump every time a page opens or closes;
+ * it shows an idle prompt instead of a blank rectangle.
+ */
+@Composable
+private fun ShellDetailPane(
+    route: DetailRoute?,
+    provider: MusicProvider,
+    dataLayer: DataLayer,
+    player: DhunPlayer,
+    nav: AppNavState,
+    onPlayArtist: (Track, List<Track>, Int) -> Unit,
+    onPlayAlbum: (Track, List<Track>, Int) -> Unit,
+    onPlayPlaylist: (Track, List<Track>, Int) -> Unit,
+    onTrackOverflow: (Track) -> Unit,
+) {
+    when (route) {
+        null -> DetailPanePlaceholder()
+        is DetailRoute.ArtistPage -> {
+            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id) }
+            DisposableEffect(vm) { onDispose { vm.close() } }
+            ArtistScreen(
+                viewModel = vm,
+                onBack = { nav.popDetail() },
+                onTrackPlay = onPlayArtist,
+                onAlbumClick = { nav.push(DetailRoute.AlbumPage(it.id)) },
+                onArtistClick = { nav.push(DetailRoute.ArtistPage(it.id)) },
+                onPlaylistClick = { nav.push(DetailRoute.PlaylistPage(it.id)) },
+                onTrackOverflow = onTrackOverflow,
+            )
+        }
+        is DetailRoute.AlbumPage -> {
+            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id) }
+            DisposableEffect(vm) { onDispose { vm.close() } }
+            AlbumScreen(
+                viewModel = vm,
+                onBack = { nav.popDetail() },
+                onTrackPlay = onPlayAlbum,
+                onArtistClick = { nav.push(DetailRoute.ArtistPage(it.id)) },
+                onTrackOverflow = onTrackOverflow,
+            )
+        }
+        is DetailRoute.PlaylistPage -> {
+            val vm = remember(route.id, route.isLocal) {
+                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal)
+            }
+            DisposableEffect(vm) { onDispose { vm.close() } }
+            PlaylistScreen(
+                viewModel = vm,
+                onBack = { nav.popDetail() },
+                onTrackPlay = onPlayPlaylist,
+                onTrackOverflow = onTrackOverflow,
+                onDeleted = { nav.popDetail() },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailPanePlaceholder() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(DhunSpacing.xxl),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(DhunSpacing.skeletonTextWidth * 2),
+        ) {
+            DhunIconView(
+                icon = DhunIcon.Album,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.artworkThumb),
+                tint = DhunColors.textDisabled,
+            )
+            Text(
+                text = "Nothing open",
+                color = DhunColors.textSecondary,
+                fontSize = DhunTypographyTokens.titleMedium.fontSize,
+                modifier = Modifier.padding(top = DhunSpacing.md),
+            )
+            Text(
+                text = "Pick a song, artist, album or playlist on the left and it opens here.",
+                color = DhunColors.textTertiary,
+                fontSize = DhunTypographyTokens.bodySmall.fontSize,
+                modifier = Modifier.padding(top = DhunSpacing.xs),
             )
         }
     }
