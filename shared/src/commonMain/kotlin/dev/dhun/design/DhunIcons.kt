@@ -59,6 +59,8 @@ enum class DhunIcon(val pathData: String) {
     Lyrics("M5 5v14h14V5H5z M19 17H5V7h14v10z M7 9h10v2H7V9z M7 13h7v2H7v-2z"),
     /** Material "closed-caption" — dedicated CC control for lyrics-dominant mode (ADR-002 rule 5). */
     ClosedCaption("M19 4H5c-1.1 0-2 0.9-2 2v12c0 1.1 0.9 2 2 2h14c1.1 0 2-0.9 2-2V6c0-1.1-0.9-2-2-2z M11 14H9.5c-0.83 0-1.5-0.67-1.5-1.5v-3c0-0.83 0.67-1.5 1.5-1.5H11v1.5H9.5v3H11V14z M17 14h-1.5c-0.83 0-1.5-0.67-1.5-1.5v-3c0-0.83 0.67-1.5 1.5-1.5H17v1.5h-1.5v3H17V14z"),
+    /** Material "chevron-down" — the immersive FullPlayer's collapse affordance. */
+    ChevronDown("M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"),
 }
 
 private const val VIEWBOX_SIZE = 24f
