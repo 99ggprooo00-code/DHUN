@@ -100,12 +100,13 @@ class AppNavState {
     fun selectTab(tab: AppTab, keepDetailOnTabChange: Boolean = false): Boolean {
         val tabChanged = tab != selectedTab
         selectedTab = tab
-        return if (keepDetailOnTabChange && !tabChanged) {
-            popDetail()
-        } else {
+        if (!keepDetailOnTabChange) {
             val hadDetail = detailStack.isNotEmpty()
             detailStack.clear()
-            tabChanged || hadDetail
+            return tabChanged || hadDetail
         }
+        // Two-pane: a *different* tab switches the master under the page; a
+        // re-tap on the selected tab is the up affordance and pops one entry.
+        return if (tabChanged) true else popDetail()
     }
 }

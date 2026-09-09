@@ -122,30 +122,31 @@ class DhunShellLayoutTest {
 
     @Test
     fun theDetailPaneNeverCollapsesIntoASliver() {
-        // The invariant across the whole large-screen range, not one hand-computed
-        // number: whatever the master takes, detail keeps its floor.
+        // The real promise, asserted as an invariant over the whole large-screen
+        // range rather than one hand-computed split: whatever the master takes,
+        // detail keeps at least its floor.
         (840..2400 step 20).forEach { shell ->
-            val content = (shell - 24).dp // pretend a system-bar inset
-            val panes = requireNotNull(split(shell.dp, content)) { "no split at $shell" }
-            val rail = DhunShellPolicy.railAllowance(hasRail = true)
-            assertTrue(
-                content - rail - panes.masterWidth >= DhunShellPolicy.detailPaneMinWidth,
-                "detail starved at ${shell}dp: master ${panes.masterWidth}, " +
-                    "floor ${DhunShellPolicy.detailPaneMinWidth}",
-            )
+            listOf(shell - 24, shell, shell - 60).forEach { content ->
+                val panes = requireNotNull(split(shell.dp, content.dp)) { "no split at ${shell}dp" }
+                val available = content.dp - DhunShellPolicy.railAllowance(hasRail = true)
+                assertTrue(
+                    available - panes.masterWidth >= DhunShellPolicy.detailPaneMinWidth,
+                    "detail starved at ${shell}dp (content ${content}dp): master " +
+                        "${panes.masterWidth}, floor ${DhunShellPolicy.detailPaneMinWidth}",
+                )
+            }
         }
-    }
-
-    @Test
-    fun theMasterYieldsWhenItWouldStarveTheDetailPane() {
-        // A window just past the breakpoint with fat insets: the proportional
-        // master plus the 720dp ceiling would eat the space detail needs, so the
-        // floor trims the master to exactly `available - detailPaneMinWidth`.
-        val rail = DhunShellPolicy.railAllowance(hasRail = true)
-        val content = 884.dp // available = 804 → 40% = 321.6, but ceiling 720 > floor ⇒ trim
-        val panes = requireNotNull(split(940.dp, content))
-        assertEquals(content - rail - DhunShellPolicy.detailPaneMinWidth, panes.masterWidth)
-        assertTrue(panes.masterWidth < content, "the split must never invent width the window lacks")
+        // Recorded honestly rather than faked into a test: with the current tokens
+        // (0.4 fraction, 720dp ceiling) the proportion *always* leaves detail 60%
+        // of the room, so the floor is a guard that never binds — it exists so a
+        // future fraction/ceiling change cannot silently ship a sliver detail pane,
+        // not as a branch reachable today. Asserting a number from it would have
+        // been the kind of test that tests nothing while looking like one that does.
+        val atBreakpoint = requireNotNull(split(840.dp, 840.dp))
+        assertTrue(
+            atBreakpoint.masterWidth < DhunShellPolicy.masterPaneMaxWidth,
+            "the master should still be proportion-bound at the breakpoint",
+        )
     }
 
     @Test
