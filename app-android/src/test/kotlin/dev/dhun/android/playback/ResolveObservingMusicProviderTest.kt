@@ -119,8 +119,8 @@ class ResolveObservingMusicProviderTest {
     fun `non-stream calls forward to the delegate`() = runBlocking {
         val delegate = FakeProvider()
         val wrapped = ResolveObservingMusicProvider(delegate, outcomes)
-        val expected = delegate.search("query")
-        assertSame(expected, wrapped.search("query"))
+        val result = wrapped.search("query")
+        assertSame(delegate.searchResult, result)
         assertEquals(1, delegate.searchCalls)
     }
 }

@@ -53,21 +53,23 @@ class AndroidDhunPlayerFastFailTest {
 
         private fun dispatch(name: String, returnType: Class<*>, @Suppress("UNUSED_PARAMETER") args: Array<Any?>?): Any? =
             when (name) {
+                // Java-interface getter names: Kotlin property syntax on the
+                // media3 Player compiles to isX/getX methods.
                 "isPlaying" -> isPlaying
-                "playbackState" -> playbackState
-                "currentMediaItem" -> item
-                "mediaItemCount" -> 1
+                "getPlaybackState" -> playbackState
+                "getCurrentMediaItem" -> item
+                "getMediaItemCount" -> 1
                 "getMediaItemAt" -> item
-                "currentMediaItemIndex" -> 0
-                "repeatMode" -> Player.REPEAT_MODE_OFF
-                "shuffleModeEnabled" -> false
-                "volume" -> 1f
-                "playerError" -> null
-                "currentPosition" -> 0L
-                "duration" -> 0L
+                "getCurrentMediaItemIndex" -> 0
+                "getRepeatMode" -> Player.REPEAT_MODE_OFF
+                "isShuffleModeEnabled" -> false
+                "getVolume" -> 1f
+                "getPlayerError" -> null
+                "getCurrentPosition" -> 0L
+                "getDuration" -> 0L
                 "hasNextMediaItem" -> false
                 "hasPreviousMediaItem" -> false
-                "playWhenReady" -> false
+                "getPlayWhenReady" -> false
                 else -> defaultValue(returnType)
             }
 

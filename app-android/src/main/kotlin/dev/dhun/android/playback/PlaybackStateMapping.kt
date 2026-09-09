@@ -49,11 +49,16 @@ internal fun mapPlaybackState(
         return PlaybackState.Playing(track ?: UNKNOWN)
     }
     if (playbackState == Player.STATE_BUFFERING) {
-        if (terminalResolveError != null && bufferingForMs >= FAST_FAIL_GRACE_MS) {
+        if (terminalResolveError != null &&
+            ResolveOutcomeLog.isTerminal(terminalResolveError) &&
+            bufferingForMs >= FAST_FAIL_GRACE_MS
+        ) {
             // Terminal resolve verdict (every identity said no — bot-gating /
             // unplayable). The engine's bounded retries will keep churning
             // underneath for minutes; the user must not wait them out in a
             // fake "buffering" state. Human headline + technical evidence.
+            // (Terminality is re-checked here, not trusted from the caller —
+            // a transient Network/RateLimited verdict must never fast-fail.)
             return PlaybackState.Error(
                 track = track,
                 message = terminalResolveError.toUserMessage(),
