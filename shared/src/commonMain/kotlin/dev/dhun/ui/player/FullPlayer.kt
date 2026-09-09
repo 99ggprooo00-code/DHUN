@@ -349,26 +349,25 @@ fun FullPlayer(
 
                 // Open artwork field. In lyrics-dominant mode the rounded
                 // lyrics card rises into this space (ADR-002 P6); otherwise the
-                // full-bleed artwork behind it is the entire visual.
-                Box(
+                // full-bleed artwork behind it is the entire visual. The card
+                // itself carries the weight so the open field stays open in
+                // plain mode (empty visibility still reserves the space).
+                AnimatedVisibility(
+                    visible = lyricsDominant,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
+                    enter = slideInVertically(DhunAnimations.mediumTween()) { offset -> offset / 4 } +
+                        fadeIn(DhunAnimations.mediumTween()),
+                    exit = slideOutVertically(DhunAnimations.fastTween()) { offset -> offset / 4 } +
+                        fadeOut(DhunAnimations.fastTween()),
                 ) {
-                    AnimatedVisibility(
-                        visible = lyricsDominant,
-                        enter = fadeIn(DhunAnimations.mediumTween()) +
-                            slideInVertically(DhunAnimations.mediumTween()) { it / 4 },
-                        exit = fadeOut(DhunAnimations.fastTween()) +
-                            slideOutVertically(DhunAnimations.fastTween()) { it / 4 },
-                    ) {
-                        LyricsCard(
-                            artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
-                            cacheKey = artworkCacheKey,
-                            viewModel = viewModel,
-                            accent = accent,
-                        )
-                    }
+                    LyricsCard(
+                        artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
+                        cacheKey = artworkCacheKey,
+                        viewModel = viewModel,
+                        accent = accent,
+                    )
                 }
 
                 // ---- bottom chrome overlaid on the artwork ---------------------
