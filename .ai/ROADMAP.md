@@ -1,5 +1,23 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-09 (UTC)** · agent **#2 — UI shell / navigation** · session **`arena/01a08454-dhun`** · **`origin/main` = `847b258`** = **PR #44 MERGED** (`docs(roadmap)` reconcile; verified live with `gh pr view 44` → `state=MERGED`, `mergedAt=2026-09-09T03:36:59Z`; post-merge `CI` run `34307813860` **success**, `test-release` `34307813868` **success**). Branch `arena/01a08454-dhun` cut from exactly `847b258`, zero drift at boot.
+
+**Phase:** 14 (Robustness / release) — this session ships the one large-screen item the previous snapshot listed as **"open by omission, not accident: tablet two-pane (`shared/ui/shell/DhunAppShell.kt`)"**. Owned paths only: `shared/src/commonMain/kotlin/dev/dhun/ui/shell/**` + `shared/src/jvmTest/kotlin/dev/dhun/ui/shell/**`. `AppNavState` lives in `dev/dhun/ui/shell/` (there is no `ui/navigation/` package) — confirmed.
+
+**Current-phase steps, verified on GitHub, not locally:**
+1. ✅ No other session mid-flight in shell paths — the only OPEN PR was **#40** (release pipeline). ⚠️ Correction to the prior snapshot: #40 is **`CONFLICTING`/DIRTY** (`gh pr view 40` → `mergeable=CONFLICTING`, head `0b3f2ed`), not MERGEABLE/CLEAN; `arena/**` is outside my scope, so I left it alone and only record the discrepancy for its owner.
+2. ✅ Shell baseline re-read at `847b258`: at the `DhunSpacing.navigationRailBreakpoint` (840dp) the rail renders, but `detailStack.lastOrNull()` still **replaces** tab content in one pane — that is the gap being closed.
+3. ⏳ Implement two-pane (this PR) → `CI build-and-test` + `test-release apk` + `test-release msi` green on the final head → rebase if `main` advanced → `gh pr merge --merge` (my final action; first of the batch).
+4. ⛔ Hardware/tablet acceptance stays the **user's** gate — CI proves compile + unit tests only.
+
+**Files this session will touch:** `shared/src/commonMain/kotlin/dev/dhun/ui/shell/DhunAppShell.kt` (two-pane composition at the existing breakpoint; additive, phone path byte-behaving), `.../ui/shell/AppNavState.kt` (additive helpers `popDetail`/`selectTab`; `DetailRoute` shape untouched — it is a frozen Bundle persistence format consumed by `app-android/**`), new `.../ui/shell/DhunShellLayout.kt` (pure policy: layout at width, pane split, back disposition, tab-selection rule), new `shared/src/jvmTest/kotlin/dev/dhun/ui/shell/*Test.kt`, and this `CURRENT ACTIVE TASK` block only. **Forbidden and untouched:** `design/**`, `download/**`, `extraction/**`, `innertube/**`, `provider/**`, `.github/**`, `tools/**`, `app-android/**`, `app-desktop/**`.
+
+**Last error:** none yet — no code written at the time of this block.
+
+**Exact next step:** write `DhunShellLayout.kt` (pure decision layer + tests), rewire `DhunAppShell.kt` to render master(list + MiniPlayer dock)/detail(top of `detailStack`, placeholder when empty) panes at ≥840dp while keeping <840dp behavior identical, then commit → push → PR → CI gates.
+
+<details>
+<summary><b>Prior snapshot (`arena/01a08427-dhun` — coordinator reconcile to main=`eda73e4`; MERGED as `847b258` via PR #44)</b></summary>
 Updated **2026-09-09 (UTC)** · coordinator session **`arena/01a08427-dhun`** · **`origin/main` = `eda73e4`** = **PR #43 MERGED** (state `MERGED`, head `aabd9df`, merged 08:01:57Z). Post-merge `test-release` on main = **success** (run `34101231724`). **Both Phase-15 halves are now on `main`:** candidate **15a** (ADR-002 player immersion) via **PR #41** and **Phase 15 Android native polish** (`app-android/**` only) via **PR #43** — verified from live GitHub, not inherited.
 
 **Board state (verified 2026-09-09):** no worker session is mid-flight; every `agent-*.md`/`phase15-android-polish-status.md` is historical. The **only OPEN PR is #40** — the release v0.1.0 pipeline (`arena/01a07a6b-dhun-release`, head `0b3f2ed`, **MERGEABLE/CLEAN**). Its required CI is green (`build-and-test` `34229561878` pass; `apk`+`msi` `34229561792` pass; `publish`/`release_draft`/`aab` `skipping` by design). #40 is **stale through #38 only** — its CHANGELOG "Unreleased"/ROADMAP predate #39–#43 and need a refresh before merge. `rot-drill` remains red on every push incl. `main` = pre-existing **issue #14** (runner IP gating, non-code, not a merge gate).
@@ -12,6 +30,9 @@ Updated **2026-09-09 (UTC)** · coordinator session **`arena/01a08427-dhun`** ·
 4. No `docs/verification/15-*.md` yet — a phase earns one when hardware evidence exists; that is the missing half.
 
 **Next coordinator step (this session):** reconcile this header + the phase rows to `eda73e4`/PR #43 (done here); refresh #40's stale CHANGELOG/ROADMAP before it merges; and **do not launch speculative candidate code** — roadmap Doctrine: candidates 16–30 are "not designed, not scheduled until the user picks them."
+
+
+</details>
 
 <details>
 <summary><b>Prior snapshot (`arena/01a07ad8-dhun` — PR #43 Android Phase-15 half; MERGED as `eda73e4`)</b></summary>
