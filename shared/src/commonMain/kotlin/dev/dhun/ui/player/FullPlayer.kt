@@ -8,8 +8,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -94,7 +92,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.toDp
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
@@ -361,9 +358,9 @@ fun FullPlayer(
                     AnimatedVisibility(
                         visible = lyricsDominant,
                         enter = fadeIn(DhunAnimations.mediumTween()) +
-                            scaleIn(DhunAnimations.mediumTween(), initialScale = 0.96f),
+                            slideInVertically(DhunAnimations.mediumTween()) { it / 4 },
                         exit = fadeOut(DhunAnimations.fastTween()) +
-                            scaleOut(DhunAnimations.fastTween(), targetScale = 0.96f),
+                            slideOutVertically(DhunAnimations.fastTween()) { it / 4 },
                     ) {
                         LyricsCard(
                             artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
@@ -379,7 +376,7 @@ fun FullPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .onSizeChanged { chromeHeightPx.intValue = it.height }
-                        .padding(horizontal = DhunSpacing.xxl, bottom = DhunSpacing.md),
+                        .padding(start = DhunSpacing.xxl, end = DhunSpacing.xxl, bottom = DhunSpacing.md),
                 ) {
                     // Source-neutral resolving/buffering/recovery status.
                     val busyLabel = playbackBusyLabel(state)
@@ -577,7 +574,7 @@ fun FullPlayer(
                                 .widthIn(max = DhunSpacing.playerVolumeMaxWidth)
                                 .fillMaxWidth()
                                 .align(Alignment.CenterHorizontally)
-                                .padding(top = DhunSpacing.sm, horizontal = DhunSpacing.xxl),
+                                .padding(top = DhunSpacing.sm, start = DhunSpacing.xxl, end = DhunSpacing.xxl),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             DhunIconView(
@@ -671,7 +668,7 @@ fun FullPlayer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .fillMaxHeight(QUEUE_PANEL_HEIGHT_FRACTION)
-                            .padding(bottom = with(LocalDensity.current) { chromeHeightPx.intValue.toDp() }),
+                            .padding(bottom = Dp(chromeHeightPx.intValue.toFloat())),
                         shape = DhunShapes.bottomSheet,
                     ) {
                         Column(modifier = Modifier.fillMaxSize()) {
@@ -1013,7 +1010,8 @@ private fun ImmersivePlayButton(
             .size(DhunSpacing.transportTarget)
             .clip(DhunShapes.full)
             .border(
-                BorderStroke(DhunSpacing.border, if (focused) DhunColors.accent else Color.Transparent, DhunShapes.full),
+                BorderStroke(DhunSpacing.border, if (focused) DhunColors.accent else Color.Transparent),
+                DhunShapes.full,
             )
             .semantics(mergeDescendants = true) {
                 role = Role.Button
