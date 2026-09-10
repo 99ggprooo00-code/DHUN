@@ -233,10 +233,12 @@ class InnerTubeClient(
     suspend fun altPlayerResponse(
         videoId: String,
         alt: AltInnertubeClient,
+        visitorData: String? = null,
+        signatureTimestamp: String? = null,
     ): DhunResult<JsonObject> =
         resultify {
             val root = postAltJson("player", buildJsonObject {
-                put("context", altContext(alt))
+                put("context", altContext(alt, visitorData, signatureTimestamp))
                 put("videoId", videoId)
                 put("contentCheckOk", true)
                 put("racyCheckOk", true)
@@ -246,13 +248,27 @@ class InnerTubeClient(
 
     /* ---------------- internals ------------------------------------------ */
 
-    private fun altContext(alt: AltInnertubeClient): JsonObject = buildJsonObject {
+    private fun altContext(
+        alt: AltInnertubeClient,
+        visitorData: String? = null,
+        signatureTimestamp: String? = null,
+    ): JsonObject = buildJsonObject {
         putJsonObject("client") {
             put("clientName", alt.name)
             put("clientVersion", alt.version)
             put("hl", "en")
             put("gl", country)
             alt.contextExtras.forEach { (key, value) -> put(key, value) }
+            // Anonymous visitor identity required by YouTube to avoid LOGIN_REQUIRED.
+            visitorData?.let { put("visitorData", it) }
+        }
+        // playbackContext with signatureTimestamp corroborates the session.
+        signatureTimestamp?.let { ts ->
+            putJsonObject("playbackContext") {
+                put("contentPlaybackContext") {
+                    put("signatureTimestamp", ts)
+                }
+            }
         }
         // Embedded-player clients need a non-YouTube thirdParty.embedUrl
         // (yt-dlp uses e.g. reddit.com). Without it WEB_EMBEDDED_PLAYER
@@ -281,6 +297,7 @@ class InnerTubeClient(
                         append("X-YouTube-Client-Name", alt.headerId)
                         append("X-YouTube-Client-Version", alt.version)
                         append(HttpHeaders.ContentType, "application/json")
+                        append("X-Goog-Visitor-Id", visitorData ?: "")
                     }
                     timeout { requestTimeoutMillis = 12_000 }
                     setBody(body.toString())
