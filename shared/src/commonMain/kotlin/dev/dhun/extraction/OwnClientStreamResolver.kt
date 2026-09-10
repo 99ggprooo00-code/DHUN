@@ -166,7 +166,7 @@ class OwnClientStreamResolver(
         )
 
         private val WAVES: List<List<Strategy>> = listOf(
-            listOf(STRATEGIES[0], STRATEGIES[1]),
+            listOf(STRATEGIES[1]),
             listOf(STRATEGIES[2], STRATEGIES[3], STRATEGIES[4]),
             listOf(STRATEGIES[5], STRATEGIES[6]),
         )
