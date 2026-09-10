@@ -6,9 +6,9 @@ Updated **2026-09-10 (UTC)** · session **`arena/01a0897a-dhun`** — **PR #57: 
 
 **Files:** `innertube/InnerTubeClient.kt` · `extraction/OwnClientStreamResolver.kt` · `jvmTest/.../AltPlayerIdentityTest.kt` (new) · `jvmTest/.../InnerTubeRequestTest.kt` · `.ai/ROADMAP.md` · `.ai/KNOWN_LIMITATIONS.md`.
 
-**Last error / CI:** ✅ **round 4 ALL GREEN on equivalent code head `f68ae9b`** (pre-#59-rebase; base change docs-only): `build-and-test` 4m43s (`34438056184`), `apk` 2m43s + `msi` 6m5s (`34438056164`), `build` 2m24s (`34438056136`). Round 5 (post-rebase) pending; nothing claimed green on the new head until CI says so (no JDK in sandbox). `rot-drill` = issue #14 / 0-job noise per #59, not a gate.
+**Last error / CI:** ✅ **ALL GREEN on head `2bbfdf5`** (rebased onto `06a35fb`): `build-and-test` pass 5m14s (`34438622182`), `apk` pass 2m14s + `msi` pass 6m41s (`34438622209`), `build` pass 2m23s (`34438622173`); `aab`/`publish`/`release_draft` skipping by design. Full history: r1 red (nested-placement bug, self-caught) → fixed; r2 green except msi version-policy (#56's merge republished the baseline mid-flight) → rebased onto `be51d7d`; r3 all green → #58 merged → rebased onto `7d621f8`; r4 all green → #59 merged → rebased onto `06a35fb`; r5 all green here. `rot-drill` = issue #14 / 0-job noise per #59, not a gate. This lag-commit records the green; docs only.
 
-**Exact next step:** (1) push rebased head → require all gates green; (2) **merge #57 — awaiting user approval**; (3) on-device re-test of `qSay_8xzijg` (**CI proves compile + unit only, never audible playback**); (4) if gated still, new per-identity verdict → report §11. NOT in slice: `web_remix` primary-path identity, Android outer resolve budget.
+**Exact next step:** (1) ✅ done — head `2bbfdf5` green on all gates; (2) **merge #57 — awaiting user approval**; (3) on-device re-test of `qSay_8xzijg` (**CI proves compile + unit only, never audible playback**); (4) if gated still, new per-identity verdict → report §11. NOT in slice: `web_remix` primary-path identity, Android outer resolve budget.
 
 ---
 
