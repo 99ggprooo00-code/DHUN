@@ -253,10 +253,20 @@ class InnerTubeClient(
     ): DhunResult<JsonObject> =
         resultify {
             val root = postAltJson("player", buildJsonObject {
-                put("context", altContext(alt, visitorData, signatureTimestamp))
+                put("context", altContext(alt, visitorData))
                 put("videoId", videoId)
                 put("contentCheckOk", true)
                 put("racyCheckOk", true)
+                // Top-level sibling of context/videoId per the InnerTube
+                // schema (yt-dlp sends it here, not inside context):
+                // playbackContext corroborates the session for this call.
+                signatureTimestamp?.let { ts ->
+                    putJsonObject("playbackContext") {
+                        putJsonObject("contentPlaybackContext") {
+                            put("signatureTimestamp", ts)
+                        }
+                    }
+                }
             }, alt, visitorData)
             checkPlayability(root)
         }
@@ -333,7 +343,6 @@ class InnerTubeClient(
     private fun altContext(
         alt: AltInnertubeClient,
         visitorData: String? = null,
-        signatureTimestamp: String? = null,
     ): JsonObject = buildJsonObject {
         putJsonObject("client") {
             put("clientName", alt.name)
@@ -343,14 +352,6 @@ class InnerTubeClient(
             alt.contextExtras.forEach { (key, value) -> put(key, value) }
             // Anonymous visitor identity required by YouTube to avoid LOGIN_REQUIRED.
             visitorData?.let { put("visitorData", it) }
-        }
-        // playbackContext with signatureTimestamp corroborates the session.
-        signatureTimestamp?.let { ts ->
-            putJsonObject("playbackContext") {
-                putJsonObject("contentPlaybackContext") {
-                    put("signatureTimestamp", ts)
-                }
-            }
         }
         // Embedded-player clients need a non-YouTube thirdParty.embedUrl
         // (yt-dlp uses e.g. reddit.com). Without it WEB_EMBEDDED_PLAYER
