@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class InnerTubeRequestTest {
@@ -67,6 +68,74 @@ class InnerTubeRequestTest {
             assertTrue(error.detailString().orEmpty().contains("status=$status"))
             assertTrue(error.detailString().orEmpty().contains("This client cannot play"))
         }
+    }
+
+    /**
+     * Drives one alt-identity `/player` call through [MockEngine] and hands back
+     * what actually went on the wire: the JSON body and the visitor header.
+     */
+    private fun altPlayerRequest(visitorData: String?, signatureTimestamp: String?): Pair<JsonObject, String?> {
+        var capturedBody: JsonObject? = null
+        var capturedVisitorHeader: String? = null
+        val engine = MockEngine { request ->
+            capturedBody = obj((request.body as TextContent).text)
+            capturedVisitorHeader = request.headers["X-Goog-Visitor-Id"]
+            respond(
+                """{"playabilityStatus":{"status":"OK"},"videoDetails":{"videoId":"vid1"}}""",
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val result = runBlocking {
+                InnerTubeClient(http).altPlayerResponse(
+                    "vid1",
+                    InnerTubeClient.ALT_CLIENT_VISIONOS,
+                    visitorData = visitorData,
+                    signatureTimestamp = signatureTimestamp,
+                )
+            }
+            assertTrue(result is DhunResult.Success)
+        } finally {
+            http.close()
+        }
+        return (capturedBody ?: error("the alt /player request never reached the engine")) to capturedVisitorHeader
+    }
+
+    /**
+     * PR #55 made visitorData/signatureTimestamp optional on the alt identities.
+     * Nothing supplies them yet, so "absent from the request" is the behavior
+     * every resolve wave depends on — pinned here, because `put(key) { … }`
+     * inside `buildJsonObject` (instead of `putJsonObject`) compiled as a
+     * lambda-typed JsonElement and left `main` red at `073083c` for four jobs.
+     */
+    @Test
+    fun altPlayerSendsNoSessionFieldsWhenNoneWereCaptured() {
+        val (body, visitorHeader) = altPlayerRequest(visitorData = null, signatureTimestamp = null)
+        val context = body.obj("context") ?: error("no context in the alt /player body")
+        assertEquals("VISIONOS", context.obj("client").str("clientName"))
+        assertNull(context.obj("client")?.get("visitorData"))
+        assertNull(context["playbackContext"])
+        assertNull(visitorHeader)
+    }
+
+    /**
+     * When a session IS known, it must appear in all three places the server
+     * reads it from — `context.client.visitorData`, the mirrored
+     * `X-Goog-Visitor-Id` header, and `signatureTimestamp` nested inside
+     * `context.playbackContext.contentPlaybackContext`.
+     */
+    @Test
+    fun altPlayerCarriesCapturedSessionFieldsOnTheWire() {
+        val (body, visitorHeader) =
+            altPlayerRequest(visitorData = "CgtFaK3zEXAMPLE", signatureTimestamp = "24061")
+        val context = body.obj("context") ?: error("no context in the alt /player body")
+        assertEquals("CgtFaK3zEXAMPLE", context.obj("client").str("visitorData"))
+        assertEquals(
+            "24061",
+            context.obj("playbackContext").obj("contentPlaybackContext").str("signatureTimestamp"),
+        )
+        assertEquals("CgtFaK3zEXAMPLE", visitorHeader)
     }
 
     @Test

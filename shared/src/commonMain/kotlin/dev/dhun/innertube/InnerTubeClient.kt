@@ -229,6 +229,14 @@ class InnerTubeClient(
      * Raw player response under an ALTERNATE InnerTube client identity
      * (see [AltInnertubeClient]) — VISIONOS / TVHTML5 have different, laxer
      * bot-gating profiles than web clients and no PO-token requirement.
+     *
+     * [visitorData] / [signatureTimestamp] are the anonymous-session fields
+     * YouTube increasingly expects on `/player` (PR #55). Both are optional
+     * and **omitted entirely when null** — no caller supplies them yet, so the
+     * wire format of the resolve chain is unchanged until ADR-007 decides how
+     * a visitor session is obtained and proven. Sending an empty or invented
+     * value is a different request, not a neutral one: see
+     * `.ai/KNOWN_LIMITATIONS.md` (2026-09-10).
      */
     suspend fun altPlayerResponse(
         videoId: String,
@@ -242,7 +250,7 @@ class InnerTubeClient(
                 put("videoId", videoId)
                 put("contentCheckOk", true)
                 put("racyCheckOk", true)
-            }, alt)
+            }, alt, visitorData)
             checkPlayability(root)
         }
 
@@ -260,12 +268,17 @@ class InnerTubeClient(
             put("gl", country)
             alt.contextExtras.forEach { (key, value) -> put(key, value) }
             // Anonymous visitor identity required by YouTube to avoid LOGIN_REQUIRED.
+            // Absent (not empty) when no session was captured — see altPlayerResponse.
             visitorData?.let { put("visitorData", it) }
         }
         // playbackContext with signatureTimestamp corroborates the session.
+        // `putJsonObject`, not `put`: inside buildJsonObject there is no
+        // put(key) { … } lambda overload, and a trailing lambda here resolves to
+        // put(key, JsonElement?) with the lambda coerced — that is what made
+        // main red at `073083c` ("Function0<JsonElement?> but JsonElement expected").
         signatureTimestamp?.let { ts ->
             putJsonObject("playbackContext") {
-                put("contentPlaybackContext") {
+                putJsonObject("contentPlaybackContext") {
                     put("signatureTimestamp", ts)
                 }
             }
@@ -284,6 +297,7 @@ class InnerTubeClient(
         endpoint: String,
         body: JsonObject,
         alt: AltInnertubeClient,
+        visitorData: String? = null,
     ): JsonObject {
         var lastError: DhunError = DhunError.Network()
         repeat(ALT_MAX_ATTEMPTS) { attempt ->
@@ -297,7 +311,10 @@ class InnerTubeClient(
                         append("X-YouTube-Client-Name", alt.headerId)
                         append("X-YouTube-Client-Version", alt.version)
                         append(HttpHeaders.ContentType, "application/json")
-                        append("X-Goog-Visitor-Id", visitorData ?: "")
+                        // Mirrors context.client.visitorData. Only when one is known:
+                        // an empty X-Goog-Visitor-Id is a malformed session, not a
+                        // neutral default, and this method is called for every identity.
+                        visitorData?.let { append("X-Goog-Visitor-Id", it) }
                     }
                     timeout { requestTimeoutMillis = 12_000 }
                     setBody(body.toString())
