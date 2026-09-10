@@ -30,14 +30,16 @@ the call sites, not the PR title:
   retained-but-untried, and `WEB_EMBEDDED_PLAYER` (with its `thirdParty.embedUrl`) now only
   runs if a wave is re-cut. Consequence: fewer identities before the 429/timeout cascade,
   and one less identity in the per-identity diagnostic string.
-- **`main` build health** was red from `073083c` (merged as `6e4d057`, `2026-09-10T03:10Z`)
+- **`main` build health** WAS red from `073083c` (merged as `6e4d057`, `2026-09-10T03:10Z`)
   through `58d9ac8`: `:shared:compileKotlinJvm` / `:shared:compileDebugKotlinAndroid` failed
   in `InnerTubeClient.kt`, so `build-and-test`, `apk`, `msi`, the new `Build APK` workflow
   and `rot-drill` were all red, and `rot-drill`'s probe verdicts on those SHAs are
   **worthless** (it builds the app before it probes). The rolling `test` build is frozen at
   `cd97464` (`2026-09-10T02:02:44Z`), i.e. PRs #51/#52 are merged but unpublished.
-  Repaired on `arena/01a08976-dhun`; until that merges, nothing merged after `cd97464` is
-  in any downloadable artifact.
+  **Repaired and merged as `be51d7d` (PR #56) on `2026-09-10T04:21:16Z`**; `main` CI
+  `34436859375`, test-release `183` (`apk`/`msi`/`publish`) and `Build APK` run `6` are
+  green, and the rolling `test` build now ships `be51d7d` (published `04:25:25Z`) — i.e.
+  #51, #52 and the docs pushes are finally in a downloadable artifact.
 - **Environment trap, restated because it is the actual cause:** this sandbox has no JDK and
   no Maven/Gradle or Actions-log egress, so **CI is the only compiler and check-run
   annotations are the only log**. Pushing code that has never been compiled is normal here;

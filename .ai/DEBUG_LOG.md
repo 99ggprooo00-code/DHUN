@@ -57,11 +57,23 @@ shrank resolve Wave 1 from `[web_embedded, visionos]` to `[visionos]`, leaving
 `STRATEGIES[0]` in the list but unreachable from any wave. **A knob nobody turns is not a
 fix; and a merged commit that changes no bytes on the wire cannot change server behavior.**
 
-**Fix + state.** `putJsonObject`, threaded parameter with a null-guarded header, 2
-`MockEngine` tests pinning the alt `/player` body/headers in both states, corrected
-`build-apk.yml`, new workflow contract test, ROADMAP/limitations/docs. Unmerged at the time
-of writing, therefore **not done**; CI on the branch head is the only authority, and the
-user's device remains the only proof of audible playback.
+**Fix + verification state.** `putJsonObject`, threaded parameter with a null-guarded
+header, 2 `MockEngine` tests pinning the alt `/player` body/headers in both states,
+corrected `build-apk.yml`, new workflow contract test, ROADMAP/limitations/docs.
+**Merged as `be51d7d` (PR #56, `2026-09-10T04:21:16Z`) and green on `main`:**
+`build-and-test` `34436859375` success — including the Python workflow-contract step,
+`:shared:jvmTest` and the Android debug build with its coupled suite — `apk`/`msi`/`publish`
+run `183` success, `Build APK` run `6` success. The masked suites turned out clean, so
+`073083c` had no hidden second failure. **What this does NOT verify:** that the request
+shape is what YouTube wants (nothing sent, no caller), and that audio is audible — the
+user's device is still the only proof of that, and issue #14 stays open.
+
+**Lesson, filed where it will be read:** the two errors were one patch touching three
+layers (`altPlayerResponse` → `altContext` → `postAltJson`) with the middle edited and the
+bottom forgotten, in a sandbox that cannot compile. The countermeasure is not "be
+careful": it is (a) never merge a PR whose `gh pr checks` are not green, and (b) give the
+blind spots a static gate that CI actually runs — here, a Python workflow-contract test,
+the same trick `scripts/test_build_workflow.py` uses for the release pipeline.
 
 ## 2026-09-07 — PR #41's head never compiled, and a second red hid under it (`arena/01a07ad8-dhun`)
 
