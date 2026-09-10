@@ -1,5 +1,24 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-10 (UTC)** · session **`arena/01a08976-dhun`** (repair-`main`) · **`origin/main` = `58d9ac8`** and it is **RED**: `build-and-test`, `apk` and `msi` fail on every push to `main` since `073083c`, and the brand-new `Build APK` workflow has never been green. Everything here is read **off GitHub** (`gh api …/check-runs/…/annotations`, `gh pr checks 55`, `gh api …/commits?per_page=12`, `gh api …/actions/workflows/*/runs?branch=main`), not from the sandbox: this clone is shallow at `58d9ac8`, working tree clean, zero local-only commits, and **there is no JDK in this sandbox — CI is the only compiler.**
+
+**File under work:** `shared/src/commonMain/kotlin/dev/dhun/innertube/InnerTubeClient.kt`, plus its `jvmTest` (`shared/src/jvmTest/kotlin/dev/dhun/innertube/InnerTubeRequestTest.kt`), `.github/workflows/build-apk.yml`, `scripts/test_apk_workflow.py` and the three `.ai/` docs.
+
+**Last error — two independent causes, both on `main`:**
+1. `:shared:compileKotlinJvm` / `:shared:compileDebugKotlinAndroid` → `InnerTubeClient.kt:268 Argument type mismatch: actual type is 'Function0<JsonElement?>', but 'JsonElement' was expected` and `InnerTubeClient.kt:300 Unresolved reference 'visitorData'`. **PR #55 (`073083c`, merged as `6e4d057` at `2026-09-10T03:10:17Z`) went in with all three required gates RED at its own head** (`build-and-test` run `34431384898`, `apk`+`msi` run `34431384983`). Causes: `put("contentPlaybackContext") { … }` inside `buildJsonObject` — that builder has no `put(key) { }` lambda overload, nested objects need `putJsonObject` — and a `visitorData` reference inside `postAltJson`, which was never given the parameter.
+2. `.github/workflows/build-apk.yml` (added by the *next* push, `58d9ac8`) → `ProjectSelectionException: Cannot locate tasks that match ':app:assembleDebug' as project 'app' is ambiguous in root project 'dhun'. Candidates are: 'app-android', 'app-desktop'` (run `34434063405`); its upload path `app/build/outputs/apk/debug/app-debug.apk` has never existed in this repo either.
+
+**Fixed on this branch (CI verdict pending, so nothing below is marked done):** `putJsonObject("contentPlaybackContext")`; `visitorData` threaded into `postAltJson` and `X-Goog-Visitor-Id` sent **only when a session is actually known** — as merged it fired an empty visitor header on every alt `/player` request, i.e. a *different*, worse request than pre-#55; two `MockEngine` tests pinning the alt-player body+headers in both states (supplied / unsupplied); `build-apk.yml` → `:app-android:assembleDebug`, real artifact path, `checkout@v5`/`setup-java@v5` (kills the Node-20 deprecation warnings), `permissions: contents: read`; new `scripts/test_apk_workflow.py`, which fails any workflow naming a module or a `*/build/outputs/...` path that `settings.gradle.kts` does not include — verified red against the old file and green against the new (24/24 python tests locally, the only suite runnable here).
+
+**What PR #55 did *not* do — do not read this fix as "playback repaired":** `altPlayerResponse`'s `visitorData`/`signatureTimestamp` default to `null` and **all six `altPlayerResponse` call sites in `OwnClientStreamResolver.kt` pass nothing**, so no session material reaches the wire; Android's `AUTH_REQUIRED("Sign in to confirm you're not a bot")` chain (issue #14) is untouched. #55 also shrank resolve Wave 1 from `[web_embedded, visionos]` to `[visionos]`, leaving `STRATEGIES[0]` in the list but never tried by any wave. `signatureTimestamp` is additionally typed `String?` where the InnerTube `contentPlaybackContext` field is normally a number — deliberately left alone rather than invented, and recorded in `.ai/KNOWN_LIMITATIONS.md`.
+
+**Exact next step:** (1) push this branch, open the PR, require `build-and-test` **and** `apk`/`msi` green on the head — and read the *whole* CI log, because a compile failure masks the suites behind it: `:shared:jvmTest` and `:app-android:testDebugUnitTest` have not executed on `main` since `cd97464`; (2) `gh pr merge --merge` only when green — `main` red freezes the rolling `test` build at `cd97464` (published `2026-09-10T02:02:44Z`) and blocks every parallel session; (3) then the actual root-fix decision, **ADR-007** (draft on open PR #54, status PROPOSED — a locked-decision change, so it needs the user's OK and its own gates) rather than another protocol guess. Board check: **PR #53 must NOT be merged as-is** — its `.ai/ROADMAP.md` diff is `+17/−513`, i.e. it would delete nearly this whole file from a stale base. `rot-drill` red on `main` (`34434063405`… run `106`) is pre-existing issue #14 (GitHub-runner IP gating) and is not one of the three required gates.
+
+---
+
+<details>
+<summary><b>Prior snapshot (`arena/01a08455-themes` — candidate 28 "themes beyond dark-first"; MERGED as `f50770f` via PR #49 on 2026-09-09, and its "next step" list is therefore closed)</b></summary>
+
 Updated **2026-09-09 (UTC, latest)** · session **`arena/01a08455-themes`** — **candidate 28, "Themes beyond dark-first"** (user-approved; **dark stays the default**) · **`origin/main` = `ae212a3`** = **PR #50 MERGED** (playback diagnostics from `arena/01a08454-dhun`). Verified live, not inherited: `git fetch origin` → `ae212a3`, and `git diff --name-only d0534cd ae212a3 -- shared/src/commonMain/kotlin/dev/dhun/design` is **empty** — neither PR #45 nor PR #50 touched this session's paths.
 
 **This PR: #49.** Branch `arena/01a08455-themes` — *not* the batch-assigned `arena/01a08455-dhun`, which is the head of PR #46/#48 (equalizer + widgets) and was never touched by this session. **Re-cut this turn** from `d0534cd` onto `ae212a3` by cherry-picking the four code/test commits (`d2f40f6`, `7a13c92`, `6d9c89b`, `5bdd3fd`); `git diff --exit-code 0353baa HEAD -- shared/src/commonMain/kotlin/dev/dhun/design shared/src/jvmTest/kotlin/dev/dhun/design` is **empty**, i.e. the code CI already passed is byte-identical after the re-cut.
@@ -12,7 +31,7 @@ Updated **2026-09-09 (UTC, latest)** · session **`arena/01a08455-themes`** — 
 
 **Exact next step:** (1) get `build-and-test` green on the re-cut head, and `apk`/`msi` via `workflow_dispatch` on `ref=arena/01a08455-themes` (this session cannot dispatch — 403); (2) if `main` advances again, re-cut and re-run; (3) `gh pr merge 49 --merge` **last**. **Honest limit:** CI green = compile + unit tests only — **how the light scheme looks on a device or PC is the user's gate and is claimed nowhere here**.
 
----
+</details>
 
 <details>
 <summary><b>Prior snapshot (`arena/01a08454-dhun` — Android playback diagnostics; MERGED as `ae212a3` via PR #50)</b></summary>
@@ -335,15 +354,20 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 | 09 | Artist/Album/Playlist | ✅ MERGED PR #7 @ `3fce5e5` — fixtures schema-authored (no YT egress in sandbox; live re-capture scheduled); hardware 3/3/CRUD OPEN | docs/verification/09 |
 | 10 | Library & history | ✅ MERGED PR #8 @ `d27eb37` (CI green `33842104141`) — hardware checklist OPEN | docs/verification/10 |
 | 11 | Lyrics (LRCLIB + YTM) | ✅ MERGED PR #8 @ `d27eb37` — test tracks live-pre-verified (4 synced EN/HI/KR/ES + 1 unsynced JP); hardware 5-acceptance OPEN | docs/verification/11 |
-| 12 | Desktop native | 🟨 — tray/shortcuts/SMTC and packaging on main; PR #28 removed the separate mini-player window (ADR-004), leaving the docked in-app MiniPlayer. **PR #42 (this session) adds the single-instance guard: a second launch now refocuses the running window instead of opening a second one (+529/−0, `app-desktop` only, CI green at `c5ddc58`).** Latest Desktop compile + MSI publishing green on `main@0920148` (`34018809911` / `34018809913`). Prior JVM-launch fix was confirmed by the user; the user now confirms one-window startup after manual reinstall (evidence local/pending publication); upgrade, native integrations and clean-target hygiene remain OPEN | docs/verification/12 · ADR-004 · CURRENT ACTIVE TASK |
+| 12 | Desktop native | 🟨 — tray/shortcuts/SMTC and packaging on main; PR #28 removed the separate mini-player window (ADR-004), leaving the docked in-app MiniPlayer. **PR #42 merged as `f562093` (`2026-09-07T07:56Z`): the single-instance guard — a second launch refocuses the running window instead of opening a second one (+529/−0, `app-desktop` only, CI green at `c5ddc58`).** Latest Desktop compile + MSI publishing green on `main@0920148` (`34018809911` / `34018809913`). Prior JVM-launch fix was confirmed by the user; the user now confirms one-window startup after manual reinstall (evidence local/pending publication); upgrade, native integrations and clean-target hygiene remain OPEN | docs/verification/12 · ADR-004 · CURRENT ACTIVE TASK |
 | 13 | Android polish (insets, shortcuts, tablet, soak) | 🟨 code + CI green (`8669e09` + `c2a86df` + `4de9795`, run `33958894084`); rotation/shortcut/insets/tablet/OEM soak evidence OPEN. **PR #43 MERGED as `eda73e4` supplied the missing automated half — `app-android` had no test source set at all** (7 Robolectric/JVM classes, incl. `AppModuleGraphTest`, the C1 regression gate) | `MainActivity.kt`, `DhunAppShell.kt`, `shortcuts.xml` |
-| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 IN PROGRESS — **ADR-006 offline downloads fully integrated: PRs #34/#35/#36/#37 merged, `main` / `test` at `481b77b`, ALL STABLE.** CI `34084678724` and test-release `34084678720` green; rolling test republished `2026-09-07T04:58:25Z`. Audio User-Agent fix, Home continuation, bounded resolve/diagnostics, restyle, single-window code, Android download FGS, Library storage management, per-track badges and player UX are all on GitHub. `rot-drill` still RED (issue #14, GitHub-runner IP gating, non-code); hardware re-tests, offline/recovery checks, clean targets, soaks and v0.1.0 remain OPEN | Phase 14 step table below; `INTEGRATION.md`; issue #14; docs/verification/14 |
+| 14 | Robustness + rot-drill CI + release v0.1.0 | 🟨 IN PROGRESS — **`main` is RED from `073083c` (PR #55, merged with its own gates red) through `58d9ac8`: `build-and-test`/`apk`/`msi`/`Build APK` all fail on two `InnerTubeClient.kt` compile errors plus a `:app:assembleDebug` task for a module that does not exist. Repaired on `arena/01a08976-dhun`, CI pending ⇒ `main` is NOT green and nothing merged after `cd97464` is built or published.** Earlier: **ADR-006 offline downloads fully integrated: PRs #34/#35/#36/#37 merged, `main` / `test` at `481b77b`, ALL STABLE.** CI `34084678724` and test-release `34084678720` green; rolling test republished `2026-09-07T04:58:25Z`. Audio User-Agent fix, Home continuation, bounded resolve/diagnostics, restyle, single-window code, Android download FGS, Library storage management, per-track badges and player UX are all on GitHub. `rot-drill` still RED (issue #14, GitHub-runner IP gating, non-code); hardware re-tests, offline/recovery checks, clean targets, soaks and v0.1.0 remain OPEN | Phase 14 step table below; `INTEGRATION.md`; issue #14; docs/verification/14 |
 
 Deferred to v2 (NOT designed, NOT stubbed — the "Phase 15–30" pool, see
-trajectory below): Web/PWA, Android Auto, Cast, Android `AudioEffect` equalizer
-(desktop/shared EQ is candidate 22 this session), sync, downloads,
-Android widgets (candidate 26 is on this shared branch as PR #46), jump lists,
-optional cookie sign-in, themes beyond dark-first.
+trajectory below): Web/PWA, Android Auto, Cast, sync, optional cookie sign-in.
+**Shipped since 2026-09-07 (verified on GitHub, merged; code-only claims):**
+shared/platform `AudioEffect`-style EQ (candidate 22 — PRs #46/#48, `789f288`),
+Android home-screen widgets (candidate 26 — PR #46, `b00a9e1`), Windows jump
+lists (candidate 27 — PR #47, `c13b6c6`), themes beyond dark-first (candidate
+28 — PR #49, `f50770f`), FullPlayer immersion (candidate 15a — PRs #41/#51),
+persistent downloads (ADR-006 — PRs #33/#35/#36). Each remains code + CI only:
+their hardware/visual gates are open, and all of them ride on a `main` that is
+currently red.
 
 ### Phase 12 step status — 🟨 IN PROGRESS (mini-player window REMOVED per ADR-004)
 
@@ -370,18 +394,22 @@ optional cookie sign-in, themes beyond dark-first.
 | Tablet / large-screen navigation | 🟨 shared shell switches to an 840dp `NavigationRail` and docks MiniPlayer; tablet two-pane and visual verification OPEN — **not attempted by Phase 15**: it lives in `shared/ui/shell/DhunAppShell.kt`, outside `app-android/**`, and nothing was forked Android-side |
 | Acceptance 1–4 (rotation, back stack, shortcuts, 30-minute unrestricted battery soak) | 🟨 OPEN — requires CI plus real Android/device/OEM evidence; no Phase 13 acceptance is complete here. PR #43 supplies the automated half for rotation/shortcuts only; **the 30-minute LeakCanary soak was never run** |
 
-### Phase 14 step status — 🟨 IN PROGRESS (GitHub verified 2026-09-07, coordinator session `arena/01a07a07-dhun`)
+### Phase 14 step status — 🟨 IN PROGRESS (re-verified on GitHub 2026-09-10 by `arena/01a08976-dhun`; previous verification: 2026-09-07 coordinator `arena/01a07a07-dhun`)
 
-**Current GitHub snapshot:** `main` and the rolling `test` tag both point to
-**`481b77b`** (PR #36, the last of the six-agent ADR-006 batch). Main CI
-**`34084678724` success** (`build-and-test`) and test-release
-**`34084678720` success** (`apk` + `msi` + `publish`) built and published the
-APK + MSI + checksums; the rolling `test` release was republished at
-**`2026-09-07T04:58:25Z`** (MSI 112,492,544 B / APK 17,696,545 B + `.sha256`).
-**All four ADR-006 worker PRs are merged — `ALL STABLE`** (see
-`INTEGRATION.md`). The only red workflow on main is `rot-drill` (issue #14,
-GitHub-runner IP gating, non-code). Hardware and stable-release gates remain
-open; consolidation PR **#38** carries this documentation.
+**GitHub snapshot, 2026-09-10, read off GitHub (`gh api`, `gh pr checks`, `gh release view`):**
+`main` = **`58d9ac8`** and it is **RED**. The last green `main` CI is run **`435`** at
+**`cd97464`** (`2026-09-10T01:57:52Z`); since then **`build-and-test`** (`457` `458`),
+**`apk` + `msi`** (`178` `179`), the new **`Build APK`** workflow (`1` `2`) and
+**`rot-drill`** (`105` `106`) all fail. Root cause: **PR #55 was merged with its own
+required gates red** (`073083c`: `build-and-test` `34431384898` fail, `apk`/`msi`
+`34431384983` fail) and broke `:shared:compileKotlinJvm`. Details and the repair are in
+**CURRENT ACTIVE TASK** at the top of this file.
+
+Consequences, stated plainly: the rolling **`test`** pre-release still ships
+**`cd97464`** (published `2026-09-10T02:02:44Z`; `dhun-test.apk` 17,840,191 B +
+`.sha256`, plus the MSI + `.sha256`), so it **does** contain PRs #42–#52 and **does
+not** contain #55; and every code step merged after `cd97464` is **unbuildable and
+unpublished** until the repair lands. No Phase-14 hardware gate moved.
 
 **Recent work actually merged on GitHub, not outstanding local work:**
 
@@ -398,6 +426,25 @@ open; consolidation PR **#38** carries this documentation.
 | #35 | `40eff1d` · `04:47:43Z` (2026-09-07) | Android download foreground service (ADR-006) + the **C1 Koin self-recursion fix** + `KoinDownloadStackTest` (agent 1). Squash-merged |
 | #37 | `b6aec3a` · `04:50:13Z` (2026-09-07) | Shared player UX — synced-lyrics follow, tab selection semantics, accessible queue actions, `PlayerSeekBar` / `TransportControls` extraction (agent 6) |
 | #36 | `481b77b` · `04:52:00Z` (2026-09-07) | Library Downloads storage-management view + `StorageSpace` expect/actual (agent 2); per-track download badges + the `DhunAppShell` pass-through that closed C2 (agent 3) |
+
+**Merged after that snapshot — every row verified on GitHub 2026-09-10 (`gh pr view
+--json mergedAt,mergeCommit`), not claimed from a local checkout:**
+
+| PR | Merged (UTC) | Main commit | Landed work |
+|---|---|---|---|
+| #42 | `2026-09-07T07:56Z` | `f562093` | Desktop single-instance guard (second launch refocuses; fail-open, identity-token handshake) — Phase 12 leftover |
+| #43 | `2026-09-07T08:33Z` | `eda73e4` | Phase 15 Android polish: `app-android` test source set (7 Robolectric/JVM classes incl. the C1 Koin-graph gate), shortcut accents + dynamic Now Playing, nav-state restore fix |
+| #44 | `2026-09-09T03:36Z` | `847b258` | docs: ROADMAP reconcile to `main=eda73e4` |
+| #45 | `2026-09-09T04:44Z` | `d0534cd` | Shared shell two-pane layout at the 840dp rail breakpoint (candidate #2's Phase-13 tablet row) |
+| #46 | `2026-09-09T04:54Z` | `b00a9e1` | Equalizer model + desktop vlcj actual; carries Android home-screen widgets (candidates 22 + 26) |
+| #48 | `2026-09-09T05:08Z` | `789f288` | Platform-neutral equalizer + desktop vlcj actual (re-cut of #46's batch) |
+| #47 | `2026-09-09T05:21Z` | `c13b6c6` | Windows taskbar jump lists + tray tri-state/tooltip polish (candidate 27, Phase 12 leftover) |
+| #50 | `2026-09-09T05:34Z` | `ae212a3` | Android playback diagnostics: `ResolveOutcomeLog` + buffering-grace `PlaybackState` mapping + fast-fail terminal verdicts out of the "stuck buffering" cascade |
+| #49 | `2026-09-09T06:02Z` | `f50770f` | Themes beyond dark-first: light scheme + six-way accent selector (candidate 28), `DhunColors` → accessors over the active token set; dark byte-identical |
+| #51 | `2026-09-09T13:40Z` | `8a61672` | FullPlayer immersive full-screen redesign (ADR-002 P3–P9) + lyrics `AnimatedVisibility` hoist |
+| #52 | `2026-09-09T17:20Z` | `d581bb9` | Home "Recommended songs" seeded from history + probe Home-feed diagnostic step (shelves + continuation) |
+| — | `2026-09-10T01:57Z` | `ec71c98` + `cd97464` | docs: PO-token/InnerTubeX Android-playback research (`docs/`-side notes in `.ai/`); CI **green** at `cd97464` |
+| #55 | `2026-09-10T03:10Z` | `6e4d057` | **Merged RED — does not compile.** Optional `visitorData`/`signatureTimestamp` on alt `/player` + Wave 1 shrink; the knobs are **inert** (no caller passes them), so issue #14 is **not** fixed by it. Repaired by this session |
 
 Earlier Phase 14 milestones remain merged: PR #16 at `290e0f6`, #17 at
 `29eeb93`, #19 at `6d81eb2`, #20 at `8310383`, #22 at `e90dba6`, and the
@@ -419,8 +466,8 @@ The repair batch is merged through PR #30 at `76c68eb`; automated code/package c
 | Bounded audio cache — Android | ✅ `DhunAudioSegmentCache` / Media3 `SimpleCache` LRU merged in PR #16; PR #20 adds corrupt-cache direct-stream fallback; current Android build green | 🟨 Offline span replay, eviction/budget behavior and cache-failure fallback on a device |
 | Bounded audio cache — Desktop | ✅ `AudioFileCache` + `DesktopDhunPlayer` wiring and cache tests merged in PR #17, updated in PR #24 for User-Agent propagation; current shared tests and Desktop compile green | 🟨 Fully cached track replays offline, uncached-track error and eviction on a libVLC desktop |
 | **Persistent offline downloads (ADR-006)** | 🟨 **Foundation, engine, offline-first routing, and minimal UI merged in PR #33 at `f157245` and CI-green**: schema v3 + migration, repositories, Range-resume/atomic download manager, `OfflineFirstStreamResolver`, Android `file://`/`FileDataSource` route, Desktop local-path load, and Downloads tab/action. This session adds `tools:playback-probe:offlineProbe`; branch compile evidence is green in `34080947691`, while runtime evidence is not produced by the existing workflow. **Downloads-UI polish (agent A6, PR #39):** `DownloadsListUi` sectioned ordering, queue-context `playDownloaded`, storage view reachable from the empty tab, Home quick-picks duplicate-index fix, icon-only badges on Home/Search rows + 3 JVM tests — merged state tracked via PR #39; CI-gated only. | ⬜ **Hardware acceptance remains OPEN**: Android foreground/WorkManager service, per-track badge/storage-management/progress polish, and real Android device + Desktop/PC offline playback/decoding/audible verification. The deterministic probe proves JVM repository-to-file loading only; CI cannot close the hardware gate. |
-| Daily rot-drill workflow + failure alerts | ✅ `.github/workflows/rot-drill.yml` merged, cron `17 4 * * *`. **Scheduled execution and alert path verified:** run `34011539225` fired on `main@dd1ab31`, event `schedule`, failed, uploaded `rot-drill-34011539225`, and auto-commented on issue #14 at `04:29:14Z` | 🟨 A green live production-probe verdict and auto-close-on-recovery remain unproven; placeholder-workflow greens do not count |
-| Live extraction verdict / residential playback | 🔴 Latest real drill **`34011539225`**, scheduled on `dd1ab31`: `PROBE\|resolve+stream\|FAIL\|IllegalStateException: resolve via resolving(own-innertube-player -> yt-dlp): Unavailable`; own-client WATCH `Unavailable`, yt-dlp WATCH `AuthRequired` / bot-gate text; version/search/related PASS; final verdict FAIL. Source: run metadata and issue #14's preserved probe output; issue remains OPEN | No newer live probe verdict on `0920148`. Fresh Windows feedback also reports failed audio; do not dismiss this as CI-only gating. Candidate diagnostics and a real uncached playback/byte test are required |
+| Daily rot-drill workflow + failure alerts | ✅ `.github/workflows/rot-drill.yml` merged, cron `17 4 * * *`. **Scheduled execution and alert path verified:** run `34011539225` fired on `main@dd1ab31`, event `schedule`, failed, uploaded `rot-drill-34011539225`, and auto-commented on issue #14 at `04:29:14Z` | 🟨 A green live production-probe verdict and auto-close-on-recovery remain unproven; placeholder-workflow greens do not count · **Streak verified 2026-09-10:** runs `105` (`main@6e4d057`) and `106` (`main@58d9ac8`) red, as are `101`–`104` — but those four ran on a `main` that no longer compiles, so a probe verdict there is meaningless; the first drill after the repair is what actually measures extraction |
+| Live extraction verdict / residential playback | 🔴 Latest real drill **`34011539225`**, scheduled on `dd1ab31`: `PROBE\|resolve+stream\|FAIL\|IllegalStateException: resolve via resolving(own-innertube-player -> yt-dlp): Unavailable`; own-client WATCH `Unavailable`, yt-dlp WATCH `AuthRequired` / bot-gate text; version/search/related PASS; final verdict FAIL. Source: run metadata and issue #14's preserved probe output; issue remains OPEN | No newer live probe verdict on `0920148`. Fresh Windows feedback also reports failed audio; do not dismiss this as CI-only gating. Candidate diagnostics and a real uncached playback/byte test are required · **2026-09-10:** still `🔴`. PR #55's `visitorData`/`signatureTimestamp` plumbing is merged but **inert** (no caller supplies it), so no new live verdict exists; ADR-007 (open PR #54, PROPOSED) is the decision path and needs the user's OK
 | Device-feedback recovery + artwork/splash/sheets/spacing | ✅ PR #20 implementation on main, followed by PR #24 audio correction, PR #25 diagnostics and PR #26 restyle; current main CI green | 🔴 Last reported device audio result was negative. Earlier corrections are **published**, but the fresh Windows re-test still fails audio, Home and visual acceptance. New repairs pass branch CI but are not released/device-tested; keep the blocker open |
 | Install/uninstall hygiene | ✅ PR #19 per-user MSI and `DhunUserDirs`, PR #22 startup ruggedization and Android private-storage policy on main; latest MSI rebuilt/published green in `34018809913` | 🟨 Fresh in-place upgrade FAILED with “Another version…”; only manual uninstall/reinstall succeeded. Corrected MSI 1.34.1 passes hosted-Windows legacy install-over, future-upgrade-removal and explicit-uninstall tests in PR run 34030730743. User-machine/full runtime hygiene still needs evidence |
 | `CHANGELOG.md` (Unreleased history) | ✅ On GitHub main, including PR #28's mini-player removal entry | Unreleased history exists; `[0.1.0]` release entry/final review waits for actual release gates |
@@ -431,6 +478,8 @@ The repair batch is merged through PR #30 at `76c68eb`; automated code/package c
 | **Bounded resolving + playback diagnostics** | ✅ **PR #25 merged at `6497b1b`**: 45-second resolver budget, regression tests and error-detail propagation; PR #26 surfaces detail in the docked MiniPlayer too; current main CI green | 🔴 Fresh failure still had no diagnostic detail. Detail-bearing Network/Unavailable, combined engine evidence and cancellable Windows fallback are on the branch with green CI; device diagnostics still need re-test. ADR-003 remains unapproved |
 | UI quality (both apps) | ✅ **PR #26 merged at `ef4c8d7`**: restrained artwork palette / control accents, corrected skip-icon paths, artwork placeholders, frosted error dialogs, opaque-base floating glass, bounded volume slider and hidden Catalog tab; palette regressions in green shared CI | 🔴 User says styling is somewhat better but glyph position, shuffle shape and transport colours are wrong. Origin-pivot paths and bounded/centred player layout are on the branch, not visually accepted |
 | **Single-window desktop (ADR-004)** | ✅ **PR #28 merged at `b8f148d`**: second mini-player window, Ctrl+M, window-only helpers and tokens removed; docked MiniPlayer retained. Included in green `test@0920148` | User confirms **one window** after manual uninstall/reinstall; this fresh evidence is recorded locally. Do not infer tray/SMTC/shortcut acceptance or a successful install-over upgrade |
+| **`main` build health** (the precondition every other row depends on) | 🟨 **Repaired on this branch, unmerged ⇒ NOT done.** `main` @ `58d9ac8`/`6e4d057` fails `build-and-test`, `apk`, `msi` on `InnerTubeClient.kt:268` (`put(key){…}` inside `buildJsonObject` — needs `putJsonObject`) and `:300` (`visitorData` referenced in `postAltJson`, which never received it) — PR #55 merged with its gates red — plus `Build APK` failing on a non-existent `:app:assembleDebug` module. Branch adds the two fixes, 2 `MockEngine` wire-shape tests and `scripts/test_apk_workflow.py` (module/artifact-path contract, verified red-then-green). CI verdict on the branch head is the only thing that can turn this ✅ | 🟨 Green `build-and-test` + `apk` + `msi` on the repair head, merged to `main`, rolling `test` republished. Compile green also *reveals* `:shared:jvmTest` / `:app-android:testDebugUnitTest`, which have not run on `main` since `cd97464` |
+| **Extraction auth root cause (issue #14, ADR-007 track)** | ⬜ **Open, and owned by ADR-007 — not by this session.** What is on GitHub: the diagnosis (`ResolveOutcomeLog` + fast-fail, PR #50 @ `ae212a3`), the research comparison (`ec71c98`/`cd97464`) and the PROPOSED ADR-007 draft on open PR #54. What is **not**: any accepted decision, any token-bearing identity, any Android PO-token/attestation path. Per ADR-001/003 the chain stays tokenless, so gated networks still resolve to `AuthRequired` | 🔴 User decision on ADR-007 options A–D, then a live probe verdict + on-device audible playback. Nothing here may be recorded as "extraction fixed" |
 | Android 30-minute soak | ⬜ No completed device evidence committed | Physical device, unrestricted battery/OEM settings, lock-screen controls, zero crashes/leaks; record timestamps/results |
 | Desktop 30-minute soak | ⬜ No completed desktop evidence committed | libVLC desktop, transport/tray/docked mini-player/SMTC or fallback, clean exit, zero crashes; record timestamps/results |
 | v0.1.0 artifacts / tag / release | ⬜ GitHub has only the rolling `test` pre-release/tag; no v0.1.0 release | APK + AAB + MSI release artifacts, clean-target runs, soaks, live drill and final docs/risk/license review, then tag/release |

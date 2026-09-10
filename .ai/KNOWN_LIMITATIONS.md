@@ -2,6 +2,48 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-10 — Android auth-gating is **not** fixed; PR #55's session fields are inert, and `main` was red
+
+**Do not read "the visitorData PR merged" as "playback repaired".** Verified by reading
+the call sites, not the PR title:
+
+- `InnerTubeClient.altPlayerResponse(videoId, alt, visitorData = null, signatureTimestamp = null)`
+  — **every one of the six call sites in `extraction/OwnClientStreamResolver.kt` passes
+  neither**, so `context.client.visitorData`, `contentPlaybackContext.signatureTimestamp`
+  and `X-Goog-Visitor-Id` are absent from every request. Android's failure mode is
+  unchanged: on bot-gated networks YouTube answers `LOGIN_REQUIRED` →
+  `DhunError.AuthRequired("Sign in to confirm you're not a bot")` (issue #14, and the
+  user's own Windows residential network fails the same way — this is **not** a
+  CI-IP-only problem).
+- The correct way to *obtain* a visitor session / attestation is a **decision, not a
+  patch**: `docs/decisions/ADR-007-android-stream-attestation.md` (status **PROPOSED**,
+  drafted on open PR #54) lays out options A–D. Per ADR-001/ADR-003 the chain is locked
+  tokenless, so nothing here may be improvised — an ADR + the user's OK come first, and a
+  live probe verdict + on-device audio come after. Until then the fix is a typed, immediate
+  error (`ResolveOutcomeLog`, PR #50), never a fake token.
+- `signatureTimestamp` is typed `String?` and emitted as a JSON string. YouTube's
+  `contentPlaybackContext.signatureTimestamp` is conventionally a number (yt-dlp sends an
+  integer). Left as-is on purpose: with no caller and no live capture, choosing the wire
+  type would be guessing. Settled together with ADR-007 and pinned by a test then.
+- **Resolve Wave 1 shrank** (PR #55): `[web_embedded, visionos]` → `[visionos]`.
+  `web_embedded` is still in `STRATEGIES` but unreachable from every wave, so it is
+  retained-but-untried, and `WEB_EMBEDDED_PLAYER` (with its `thirdParty.embedUrl`) now only
+  runs if a wave is re-cut. Consequence: fewer identities before the 429/timeout cascade,
+  and one less identity in the per-identity diagnostic string.
+- **`main` build health** was red from `073083c` (merged as `6e4d057`, `2026-09-10T03:10Z`)
+  through `58d9ac8`: `:shared:compileKotlinJvm` / `:shared:compileDebugKotlinAndroid` failed
+  in `InnerTubeClient.kt`, so `build-and-test`, `apk`, `msi`, the new `Build APK` workflow
+  and `rot-drill` were all red, and `rot-drill`'s probe verdicts on those SHAs are
+  **worthless** (it builds the app before it probes). The rolling `test` build is frozen at
+  `cd97464` (`2026-09-10T02:02:44Z`), i.e. PRs #51/#52 are merged but unpublished.
+  Repaired on `arena/01a08976-dhun`; until that merges, nothing merged after `cd97464` is
+  in any downloadable artifact.
+- **Environment trap, restated because it is the actual cause:** this sandbox has no JDK and
+  no Maven/Gradle or Actions-log egress, so **CI is the only compiler and check-run
+  annotations are the only log**. Pushing code that has never been compiled is normal here;
+  merging it is not. `gh pr checks <n>` must be read before every merge — a `MERGEABLE`
+  PR with red gates is exactly what produced this incident.
+
 ## 2026-09-07 — Phase 15 Android polish (`arena/01a07ad8-dhun`) alongside 15a player immersion (`arena/01a07a6b-dhun`)
 
 **Status after the split: 15a is on `main`, Phase 15 is not finished.** The player batch
