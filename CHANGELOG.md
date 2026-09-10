@@ -24,6 +24,29 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — `main` build + debug-APK workflow — 2026-09-10
+- **`main` no longer compiles since `073083c`** (PR #55, merged with its
+  `build-and-test`/`apk`/`msi` checks failing): `InnerTubeClient.altContext`
+  nested `contentPlaybackContext` with `put(key) { … }`, which
+  `buildJsonObject` does not offer, and the `X-Goog-Visitor-Id` header was
+  read from a `visitorData` parameter `postAltJson` never had. Both fixed —
+  `putJsonObject`, and the parameter threaded through.
+- **The alt-identity `/player` request is byte-for-byte unchanged** unless a
+  caller supplies session material, and none does: `visitorData` and
+  `signatureTimestamp` stay optional and null by default, so the header is
+  omitted rather than sent empty. **This does not repair gated playback** —
+  `AUTH_REQUIRED` on Android (issue #14) is an open ADR-007 decision, not a
+  patch. Two `MockEngine` tests now pin the request body/headers in both
+  states.
+- **`Build APK` workflow corrected:** it ran `./gradlew :app:assembleDebug`,
+  which this repo has no module for (Gradle: "project 'app' is ambiguous…
+  Candidates are: 'app-android', 'app-desktop'"), and uploaded a path that has
+  never existed. It now builds `:app-android:assembleDebug` and uploads
+  `app-android/build/outputs/apk/debug/app-android-debug.apk`; action versions
+  bumped off the deprecated Node-20 pair. `scripts/test_apk_workflow.py`
+  fails any workflow whose `*/build/outputs/...` path is not under a module
+  `settings.gradle.kts` includes, so the mistake cannot return silently.
+
 ### FullPlayer immersive full-screen redesign — 2026-09-09
 - **Immersive Now Playing** — the now-playing artwork is now the entire
   background: a sharp full-bleed copy (slide + fade on track change) over a

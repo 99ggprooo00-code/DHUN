@@ -1,5 +1,68 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-10 — PR #55 merged with all three gates red; `main` could not compile for 6 CI runs (`arena/01a08976-dhun`)
+
+**Symptom.** Four required-gate jobs red on `main`, and the pattern is what makes it
+interesting — it is not one failure but two, stacked 6 minutes apart:
+
+```
+shared/src/commonMain/kotlin/dev/dhun/innertube/InnerTubeClient.kt:268
+    Argument type mismatch: actual type is 'Function0<JsonElement?>', but 'JsonElement' was expected.
+shared/src/commonMain/kotlin/dev/dhun/innertube/InnerTubeClient.kt:300
+    Unresolved reference 'visitorData'.
+> Task :shared:compileKotlinJvm            FAILED   (jvm + android target → CI, apk, msi)
+> Task :shared:compileDebugKotlinAndroid   FAILED
+
+Build APK · run 34434063405, step "Assemble debug APK"
+    ProjectSelectionException: Cannot locate tasks that match ':app:assembleDebug' as
+    project 'app' is ambiguous in root project 'dhun'. Candidates are: 'app-android', 'app-desktop'.
+```
+
+Red runs, all on `main`: CI `456`(PR head)/`457`/`458`, test-release `177`/`178`/`179`,
+`Build APK` `1`/`2`, rot-drill `104`/`105`/`106`.
+
+**Root cause (three, independent).**
+1. **`put(key) { … }` does not exist on `JsonObjectBuilder`.** `altContext` nested an
+   object with `put("contentPlaybackContext") { … }`; the lambda was matched against
+   `put(key: String, value: JsonElement?)` and Kotlin reported the coercion, not the
+   missing overload. Correct form is `putJsonObject`. Anyone who has only written
+   Java-style builders will reach for the wrong one, and **the sandbox cannot compile**
+   (no JDK; Maven/Gradle egress refused), so the author never saw it.
+2. **A patch that spans layers must thread its parameters.** `visitorData`/`signatureTimestamp`
+   were added to `altPlayerResponse` + `altContext`, but the header was added in
+   `postAltJson`, whose signature was never changed. The fix threads
+   `visitorData: String? = null` into `postAltJson` and sends `X-Goog-Visitor-Id`
+   **only when non-null** — as merged, every alt `/player` request would have carried an
+   *empty* visitor header, i.e. a different and strictly worse request than before.
+3. **`build-apk.yml` was written from a generic Android template.** This repo's modules are
+   `:app-android` / `:app-desktop` / `:shared` / `:tools:playback-probe`; there is no `:app`,
+   and `app/build/outputs/apk/debug/app-debug.apk` has never existed. Now pinned by
+   `scripts/test_apk_workflow.py`, which cross-checks every workflow's
+   `*/build/outputs/...` path against `settings.gradle.kts` (proven to go red on the old file).
+
+**The process defect underneath.** #55 was merged while `build-and-test`, `apk` and `msi`
+were **all failing at its own head** (`gh pr checks 55` shows `fail` ×3 next to a
+`MERGED` state). A red head merged into `main` is not a small thing here: the rolling
+`test` pre-release republishes only on a green push to `main`, so it is frozen at
+`cd97464` and **every PR merged after it — #51, #52, the docs pushes — ships no artifact at
+all**. Second-order effect, and the reason "CI red" must be read as *unknown*: a compile
+failure suppresses the suites behind it, so `:shared:jvmTest` and
+`:app-android:testDebugUnitTest` have not executed on `main` since `cd97464`.
+
+**Also recorded because it will be misread as a fix.** The `visitorData`/`signatureTimestamp`
+parameters are **inert**: all six `altPlayerResponse` call sites in
+`OwnClientStreamResolver.kt` pass nothing, so no session material reaches the wire and
+issue #14's `AUTH_REQUIRED("Sign in to confirm you're not a bot")` is untouched. #55 also
+shrank resolve Wave 1 from `[web_embedded, visionos]` to `[visionos]`, leaving
+`STRATEGIES[0]` in the list but unreachable from any wave. **A knob nobody turns is not a
+fix; and a merged commit that changes no bytes on the wire cannot change server behavior.**
+
+**Fix + state.** `putJsonObject`, threaded parameter with a null-guarded header, 2
+`MockEngine` tests pinning the alt `/player` body/headers in both states, corrected
+`build-apk.yml`, new workflow contract test, ROADMAP/limitations/docs. Unmerged at the time
+of writing, therefore **not done**; CI on the branch head is the only authority, and the
+user's device remains the only proof of audible playback.
+
 ## 2026-09-07 — PR #41's head never compiled, and a second red hid under it (`arena/01a07ad8-dhun`)
 
 **Symptom.** All three required gates red on `arena/01a07a6b-dhun` @ `7c24fde`
