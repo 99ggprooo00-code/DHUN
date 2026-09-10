@@ -1,5 +1,17 @@
 name: Build APK
 
+# Fast, artifact-only debug APK for every push to main and every PR — the
+# job a reviewer/agent uses to sanity-check "does Android still assemble"
+# without waiting on the release pipeline. The rolling `test` pre-release
+# publishes its own APK from `.github/workflows/test-release.yml`; this one
+# only uploads a run-scoped artifact.
+#
+# Module names are not guesses in this repo: the Android application module is
+# `:app-android` (settings.gradle.kts), NOT `:app` — `:app` is *ambiguous*
+# (candidates `app-android`, `app-desktop`) and Gradle fails the task lookup.
+# The debug output is `app-android/build/outputs/apk/debug/app-android-debug.apk`,
+# the same path test-release.yml copies out as `dhun-test.apk`.
+
 on:
   push:
     branches: [main]
@@ -7,28 +19,33 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: gradle
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Assemble debug APK
-        run: ./gradlew :app:assembleDebug
+        run: ./gradlew :app-android:assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app-android/build/outputs/apk/debug/app-android-debug.apk
