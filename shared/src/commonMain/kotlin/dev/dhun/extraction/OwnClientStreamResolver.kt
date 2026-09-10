@@ -14,6 +14,7 @@ import dev.dhun.innertube.long
 import dev.dhun.innertube.obj
 import dev.dhun.innertube.str
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -28,7 +29,8 @@ import kotlinx.serialization.json.contentOrNull
  * never deciphers challenges, never uses cookies / PO tokens.
  *
  * Waves (ADR-003 Option C):
- *  Wave 1: WEB_EMBEDDED_PLAYER, VISIONOS
+ *  Wave 1: VISIONOS (WEB_EMBEDDED_PLAYER dropped: structurally 152-18 on
+ *    catalogue tracks, never a gate escape)
  *  Wave 2: TVHTML5, TVHTML5 downgraded, TVHTML5_SIMPLY
  *  Wave 3: MWEB, WEB_REMIX
  *
@@ -42,9 +44,19 @@ class OwnClientStreamResolver(
     override val name: String = "own-innertube-player"
 
     override suspend fun resolve(videoId: String): DhunResult<StreamInfo> {
+        // One anonymous visitor identity per resolve, raced by every wave:
+        // without visitorData + signatureTimestamp YouTube answers
+        // LOGIN_REQUIRED to all tokenless identities (2026-09-10 device
+        // evidence). Both providers are cached and fail-open (null), so a
+        // sourcing failure degrades to the legacy request — never worse.
+        val identity = coroutineScope {
+            val visitorData = async { client.visitorDataOrNull() }
+            val sts = async { client.signatureTimestampOrNull(videoId) }
+            PlayerIdentity(visitorData.await(), sts.await())
+        }
         val outcomes = LinkedHashMap<String, DhunError>()
         for (wave in WAVES) {
-            val streamInfo = executeWave(videoId, wave, outcomes)
+            val streamInfo = executeWave(videoId, wave, identity, outcomes)
             if (streamInfo != null) {
                 return DhunResult.Success(streamInfo)
             }
@@ -58,13 +70,14 @@ class OwnClientStreamResolver(
     private suspend fun executeWave(
         videoId: String,
         wave: List<Strategy>,
+        identity: PlayerIdentity,
         outcomes: MutableMap<String, DhunError>,
     ): StreamInfo? = coroutineScope {
         if (wave.isEmpty()) return@coroutineScope null
         if (wave.size == 1) {
             val strategy = wave[0]
             val response = try {
-                strategy.call(client, videoId)
+                strategy.call(client, videoId, identity)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: DhunException) {
@@ -88,7 +101,7 @@ class OwnClientStreamResolver(
         val jobs = wave.map { strategy ->
             launch {
                 val res = try {
-                    strategy.call(client, videoId)
+                    strategy.call(client, videoId, identity)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: DhunException) {
@@ -123,6 +136,17 @@ class OwnClientStreamResolver(
         winner
     }
 
+    /**
+     * Anonymous session corroboration raced by every alt identity in a
+     * resolve. Either field may be `null` (sourcing is fail-open); `null`
+     * fields are omitted from the request, preserving the legacy wire
+     * format exactly.
+     */
+    private data class PlayerIdentity(
+        val visitorData: String?,
+        val signatureTimestamp: String?,
+    )
+
     private class Strategy(
         val label: String,
         /**
@@ -131,7 +155,7 @@ class OwnClientStreamResolver(
          * all the way to the byte-reading layer.
          */
         val userAgent: String,
-        val call: suspend (InnerTubeClient, String) -> DhunResult<JsonObject>,
+        val call: suspend (InnerTubeClient, String, PlayerIdentity) -> DhunResult<JsonObject>,
     )
 
     companion object {
@@ -139,30 +163,60 @@ class OwnClientStreamResolver(
             Strategy(
                 "web_embedded",
                 InnerTubeClient.ALT_CLIENT_WEB_EMBEDDED.userAgent,
-            ) { c, id ->
-                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_WEB_EMBEDDED)
+            ) { c, id, identity ->
+                c.altPlayerResponse(
+                    id,
+                    InnerTubeClient.ALT_CLIENT_WEB_EMBEDDED,
+                    identity.visitorData,
+                    identity.signatureTimestamp,
+                )
             },
-            Strategy("visionos", InnerTubeClient.ALT_CLIENT_VISIONOS.userAgent) { c, id ->
-                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_VISIONOS)
+            Strategy("visionos", InnerTubeClient.ALT_CLIENT_VISIONOS.userAgent) { c, id, identity ->
+                c.altPlayerResponse(
+                    id,
+                    InnerTubeClient.ALT_CLIENT_VISIONOS,
+                    identity.visitorData,
+                    identity.signatureTimestamp,
+                )
             },
-            Strategy("tv", InnerTubeClient.ALT_CLIENT_TV.userAgent) { c, id ->
-                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV)
+            Strategy("tv", InnerTubeClient.ALT_CLIENT_TV.userAgent) { c, id, identity ->
+                c.altPlayerResponse(
+                    id,
+                    InnerTubeClient.ALT_CLIENT_TV,
+                    identity.visitorData,
+                    identity.signatureTimestamp,
+                )
             },
             Strategy(
                 "tv_downgraded",
                 InnerTubeClient.ALT_CLIENT_TV_DOWNGRADED.userAgent,
-            ) { c, id ->
-                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV_DOWNGRADED)
+            ) { c, id, identity ->
+                c.altPlayerResponse(
+                    id,
+                    InnerTubeClient.ALT_CLIENT_TV_DOWNGRADED,
+                    identity.visitorData,
+                    identity.signatureTimestamp,
+                )
             },
-            Strategy("tv_simply", InnerTubeClient.ALT_CLIENT_TV_SIMPLY.userAgent) { c, id ->
-                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_TV_SIMPLY)
+            Strategy("tv_simply", InnerTubeClient.ALT_CLIENT_TV_SIMPLY.userAgent) { c, id, identity ->
+                c.altPlayerResponse(
+                    id,
+                    InnerTubeClient.ALT_CLIENT_TV_SIMPLY,
+                    identity.visitorData,
+                    identity.signatureTimestamp,
+                )
             },
-            Strategy("mweb", InnerTubeClient.ALT_CLIENT_MWEB.userAgent) { c, id ->
-                c.altPlayerResponse(id, InnerTubeClient.ALT_CLIENT_MWEB)
+            Strategy("mweb", InnerTubeClient.ALT_CLIENT_MWEB.userAgent) { c, id, identity ->
+                c.altPlayerResponse(
+                    id,
+                    InnerTubeClient.ALT_CLIENT_MWEB,
+                    identity.visitorData,
+                    identity.signatureTimestamp,
+                )
             },
             // WEB_REMIX is the primary (non-alt) identity: its /player call
             // goes through browserHeaders(), i.e. INNERTUBE_USER_AGENT.
-            Strategy("web_remix", INNERTUBE_USER_AGENT) { c, id -> c.playerResponse(id) },
+            Strategy("web_remix", INNERTUBE_USER_AGENT) { c, id, _ -> c.playerResponse(id) },
         )
 
         private val WAVES: List<List<Strategy>> = listOf(

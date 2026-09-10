@@ -68,7 +68,9 @@ internal fun HttpRequestBuilder.browserHeaders() {
  * own-client resolver. Per the extraction doctrine and ADR-001: this client
  * never signs URLs, never deciphers challenges, never spoofs attestation.
  * It speaks a small, drill-watched set of InnerTube client identities
- * (WEB_REMIX for metadata; web_embedded/visionos/tv/tv_simply/mweb chain for /player).
+ * (WEB_REMIX for metadata; visionos/tv/tv_simply/mweb chain for /player —
+ * web_embedded was dropped from the race: YT Music catalogue tracks are not
+ * embeddable, so it can only ever answer 152-18).
  */
 class InnerTubeClient(
     private val httpClient: HttpClient = defaultHttpClient(),
@@ -76,6 +78,13 @@ class InnerTubeClient(
 ) {
     @Volatile
     private var cachedClientVersion: String? = null
+
+    @Volatile
+    private var cachedVisitorData: String? = null
+
+    /** Player-JS URL to the `signatureTimestamp` extracted from it. */
+    @Volatile
+    private var cachedSts: Pair<String, String>? = null
 
     suspend fun clientVersion(forceRefresh: Boolean = false): String {
         cachedClientVersion?.takeIf { !forceRefresh }?.let { return it }
@@ -227,16 +236,14 @@ class InnerTubeClient(
 
     /**
      * Raw player response under an ALTERNATE InnerTube client identity
-     * (see [AltInnertubeClient]) — VISIONOS / TVHTML5 have different, laxer
-     * bot-gating profiles than web clients and no PO-token requirement.
+     * (see [AltInnertubeClient]).
      *
-     * [visitorData] / [signatureTimestamp] are the anonymous-session fields
-     * YouTube increasingly expects on `/player` (PR #55). Both are optional
-     * and **omitted entirely when null** — no caller supplies them yet, so the
-     * wire format of the resolve chain is unchanged until ADR-007 decides how
-     * a visitor session is obtained and proven. Sending an empty or invented
-     * value is a different request, not a neutral one: see
-     * `.ai/KNOWN_LIMITATIONS.md` (2026-09-10).
+     * Bot-gating note (2026-09-10, on-device evidence): every tokenless
+     * identity tried so far — including VISIONOS and TVHTML5 — can answer
+     * `LOGIN_REQUIRED` ("Sign in to confirm you're not a bot") when the
+     * request carries no anonymous visitor identity. So [visitorData] (also
+     * sent as the `X-Goog-Visitor-Id` header) and [signatureTimestamp] are
+     * attached when provided; both `null` preserves the legacy wire format.
      */
     suspend fun altPlayerResponse(
         videoId: String,
@@ -254,6 +261,73 @@ class InnerTubeClient(
             checkPlayability(root)
         }
 
+    /**
+     * Anonymous visitor identity (`context.client.visitorData` /
+     * `X-Goog-Visitor-Id`), read from the YouTube homepage's embedded
+     * player config — the same place yt-dlp takes it from. Cached per
+     * process (this client is a Koin `single` on both apps), so every
+     * /player call in a session presents one stable visitor.
+     *
+     * Fail-open by design: any fetch/parse failure returns `null` and the
+     * request goes out exactly as before — never worse.
+     */
+    suspend fun visitorDataOrNull(forceRefresh: Boolean = false): String? {
+        cachedVisitorData?.takeIf { !forceRefresh }?.let { return it }
+        val html = try {
+            httpClient.get("$WWW_BASE/") {
+                headers {
+                    append(HttpHeaders.UserAgent, INNERTUBE_USER_AGENT)
+                    append(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9")
+                }
+            }.bodyAsText()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            return null
+        }
+        return parseVisitorDataFromHomepage(html)?.also { cachedVisitorData = it }
+    }
+
+    /**
+     * Player `signatureTimestamp` (`sts`) for [videoId], extracted from the
+     * watch page's player JS URL and then the JS itself — the yt-dlp shape:
+     * watch page → `/s/player/…/base.js` → `signatureTimestamp:<digits>`.
+     * Cached per player-JS URL (player builds — and their `sts` — rotate
+     * every few weeks, not per track).
+     *
+     * Fail-open by design: any fetch/parse failure returns `null` and the
+     * request goes out without `playbackContext` — never worse.
+     */
+    suspend fun signatureTimestampOrNull(videoId: String, forceRefresh: Boolean = false): String? {
+        val jsUrl = try {
+            val watchHtml = httpClient.get("$WWW_BASE/watch?v=$videoId") {
+                headers {
+                    append(HttpHeaders.UserAgent, INNERTUBE_USER_AGENT)
+                    append(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9")
+                }
+            }.bodyAsText()
+            parsePlayerJsUrl(watchHtml) ?: return null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            return null
+        }
+        if (!forceRefresh && cachedSts?.first == jsUrl) return cachedSts?.second
+        val js = try {
+            httpClient.get(jsUrl) {
+                headers {
+                    append(HttpHeaders.UserAgent, INNERTUBE_USER_AGENT)
+                    append(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9")
+                }
+            }.bodyAsText()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            return null
+        }
+        return parseSignatureTimestampFromPlayerJs(js)?.also { cachedSts = jsUrl to it }
+    }
+
     /* ---------------- internals ------------------------------------------ */
 
     private fun altContext(
@@ -268,14 +342,9 @@ class InnerTubeClient(
             put("gl", country)
             alt.contextExtras.forEach { (key, value) -> put(key, value) }
             // Anonymous visitor identity required by YouTube to avoid LOGIN_REQUIRED.
-            // Absent (not empty) when no session was captured — see altPlayerResponse.
             visitorData?.let { put("visitorData", it) }
         }
         // playbackContext with signatureTimestamp corroborates the session.
-        // `putJsonObject`, not `put`: inside buildJsonObject there is no
-        // put(key) { … } lambda overload, and a trailing lambda here resolves to
-        // put(key, JsonElement?) with the lambda coerced — that is what made
-        // main red at `073083c` ("Function0<JsonElement?> but JsonElement expected").
         signatureTimestamp?.let { ts ->
             putJsonObject("playbackContext") {
                 putJsonObject("contentPlaybackContext") {
@@ -311,9 +380,7 @@ class InnerTubeClient(
                         append("X-YouTube-Client-Name", alt.headerId)
                         append("X-YouTube-Client-Version", alt.version)
                         append(HttpHeaders.ContentType, "application/json")
-                        // Mirrors context.client.visitorData. Only when one is known:
-                        // an empty X-Goog-Visitor-Id is a malformed session, not a
-                        // neutral default, and this method is called for every identity.
+                        // Anonymous visitor identity; omitted (not empty) when unknown.
                         visitorData?.let { append("X-Goog-Visitor-Id", it) }
                     }
                     timeout { requestTimeoutMillis = 12_000 }
@@ -569,6 +636,43 @@ internal fun checkPlayability(root: JsonObject): JsonObject {
         "UNPLAYABLE", "ERROR" -> throw DhunException(DhunError.Unavailable(detail))
         else -> throw DhunException(DhunError.Parse(detail))
     }
+}
+
+/**
+ * Anonymous visitor identity from YouTube homepage HTML. ytcfg embeds it as
+ * `"VISITOR_DATA":"…"`, and embedded InnerTube contexts as
+ * `"visitorData":"…"` — same value, two spellings; accept either.
+ * Returns `null` when the page carries no usable identity.
+ */
+internal fun parseVisitorDataFromHomepage(html: String): String? {
+    if (html.isEmpty()) return null
+    val match = Regex("\"visitorData\"\\s*:\\s*\"([^\"]+)\"").find(html)
+        ?: Regex("\"VISITOR_DATA\"\\s*:\\s*\"([^\"]+)\"").find(html)
+    return match?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+}
+
+/**
+ * Absolute player-JS URL from watch-page HTML. The page embeds either a
+ * path (`/s/player/…/base.js`) or a full `https://www.youtube.com/…` URL;
+ * both are returned absolutized against [wwwBase].
+ * Returns `null` when no player JS reference is found.
+ */
+internal fun parsePlayerJsUrl(watchHtml: String, wwwBase: String = "https://www.youtube.com"): String? {
+    if (watchHtml.isEmpty()) return null
+    val match = Regex("\"((?:https?://(?:www\\.)?youtube\\.com)?/s/player/[^\"]+?/base\\.js)\"")
+        .find(watchHtml) ?: return null
+    val raw = match.groupValues[1]
+    return if (raw.startsWith("http")) raw else wwwBase + raw
+}
+
+/**
+ * Player `signatureTimestamp` (`sts`) from player-JS source, e.g.
+ * `signatureTimestamp:19855`. Returns `null` when absent.
+ */
+internal fun parseSignatureTimestampFromPlayerJs(playerJs: String): String? {
+    if (playerJs.isEmpty()) return null
+    return Regex("signatureTimestamp\\s*:\\s*(\\d+)")
+        .find(playerJs)?.groupValues?.get(1)
 }
 
 internal fun bodyWithClientVersion(body: JsonObject, version: String): JsonObject {
