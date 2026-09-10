@@ -2,6 +2,28 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-10 — the daily rot-drill is **not running**, and its "red" runs are 0-job noise
+
+Two separate things were conflated across many sessions and are separated here:
+
+- **Noise:** `.github/workflows/rot-drill.yml` has only `schedule` +
+  `workflow_dispatch` triggers. The red `rot-drill` entries on pushes and PR
+  branches (`104`–`113` on 2026-09-10 alone) are GitHub's **no-matching-trigger
+  runs with 0 jobs** — they carry no probe verdict and must never be cited as
+  extraction evidence. (`…/actions/runs/<id>/jobs → total_count: 0` is the test.)
+- **Real gap:** the last `event=schedule` run is **#10, `2026-09-07T04:28Z`
+  (failure, `d1e0408`)**, and #2/#3/#4 (09-03…09-05) were **green**. **Three
+  daily slots (09-08, 09-09, 09-10) never fired** although the workflow is
+  `state=active`. Cause is not determinable from the API, so it is recorded as
+  open, not explained away. Impact: the maintenance contract's "breakage
+  detected within 24 hours" is not currently held, and a red live extraction
+  (issue #14) could sit unnoticed for days.
+- **Who can act:** an agent cannot — `gh workflow run` returns **HTTP 403** for
+  this session's token. A human should press **Run workflow** on `main` and
+  check Settings → Actions (schedule/allow-list). Until a green-or-red
+  **scheduled** verdict exists, "drill is red because of issue #14" is a claim
+  about run `34011539225`/`#10`, not about today.
+
 ## 2026-09-10 — Android auth-gating is **not** fixed; PR #55's session fields are inert, and `main` was red
 
 **Do not read "the visitorData PR merged" as "playback repaired".** Verified by reading

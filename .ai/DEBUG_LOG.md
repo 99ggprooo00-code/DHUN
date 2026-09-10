@@ -68,6 +68,21 @@ run `183` success, `Build APK` run `6` success. The masked suites turned out cle
 shape is what YouTube wants (nothing sent, no caller), and that audio is audible — the
 user's device is still the only proof of that, and issue #14 stays open.
 
+**Addendum found in the same verification pass — the drill's "red" was partly noise.**
+`rot-drill.yml` triggers on `schedule` + `workflow_dispatch` only. Every
+`event=push` rot-drill run (today's `104`–`113`, and the ones cited in past
+snapshots) has **0 jobs** and a `failure` conclusion — GitHub's no-matching-trigger
+artifact. `gh api …/actions/runs/<id>/jobs --jq .total_count` returns `0`, which is the
+whole test. Filtering by `event=schedule` shows the honest picture: #10 @
+2026-09-07T04:28Z failed (real, and it did auto-comment on issue #14 as designed),
+#2/#3/#4 on 09-03…09-05 were **green**, and **no schedule has fired since 09-07** even
+though the workflow reports `state=active`. Agents cannot force one —
+`gh workflow run rot-drill.yml` → `HTTP 403 Resource not accessible by integration`.
+Two rules follow: *never cite a workflow run whose job count is 0*, and *verify a
+scheduled workflow by its `event=schedule` runs, not by the noise in the run list* — a
+silent three-day gap in the very job that watches extraction is the doctrine failing
+open.
+
 **Lesson, filed where it will be read:** the two errors were one patch touching three
 layers (`altPlayerResponse` → `altContext` → `postAltJson`) with the middle edited and the
 bottom forgotten, in a sandbox that cannot compile. The countermeasure is not "be
