@@ -104,8 +104,10 @@ class InnerTubeRequestTest {
 
     /**
      * PR #55 made visitorData/signatureTimestamp optional on the alt identities.
-     * Nothing supplies them yet, so "absent from the request" is the behavior
-     * every resolve wave depends on — pinned here, because `put(key) { … }`
+     * The resolver supplies them when sourcing succeeds — but when it cannot
+     * (fail-open nulls), "absent from the request" is the behavior every
+     * resolve wave depends on: no `visitorData`, no top-level
+     * `playbackContext`, no visitor header. Pinned here, because `put(key) { … }`
      * inside `buildJsonObject` (instead of `putJsonObject`) compiled as a
      * lambda-typed JsonElement and left `main` red at `073083c` for four jobs.
      */
@@ -116,14 +118,17 @@ class InnerTubeRequestTest {
         assertEquals("VISIONOS", context.obj("client").str("clientName"))
         assertNull(context.obj("client")?.get("visitorData"))
         assertNull(context["playbackContext"])
+        assertNull(body["playbackContext"])
         assertNull(visitorHeader)
     }
 
     /**
      * When a session IS known, it must appear in all three places the server
      * reads it from — `context.client.visitorData`, the mirrored
-     * `X-Goog-Visitor-Id` header, and `signatureTimestamp` nested inside
-     * `context.playbackContext.contentPlaybackContext`.
+     * `X-Goog-Visitor-Id` header, and `signatureTimestamp` inside the
+     * TOP-LEVEL `playbackContext.contentPlaybackContext` (a sibling of
+     * `context`/`videoId` per the InnerTube schema — yt-dlp sends it there,
+     * not nested inside `context`).
      */
     @Test
     fun altPlayerCarriesCapturedSessionFieldsOnTheWire() {
@@ -133,7 +138,7 @@ class InnerTubeRequestTest {
         assertEquals("CgtFaK3zEXAMPLE", context.obj("client").str("visitorData"))
         assertEquals(
             "24061",
-            context.obj("playbackContext").obj("contentPlaybackContext").str("signatureTimestamp"),
+            body.obj("playbackContext").obj("contentPlaybackContext").str("signatureTimestamp"),
         )
         assertEquals("CgtFaK3zEXAMPLE", visitorHeader)
     }
