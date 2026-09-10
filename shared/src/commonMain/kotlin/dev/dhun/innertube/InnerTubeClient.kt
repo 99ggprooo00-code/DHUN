@@ -261,9 +261,14 @@ class InnerTubeClient(
                 // schema (yt-dlp sends it here, not inside context):
                 // playbackContext corroborates the session for this call.
                 signatureTimestamp?.let { ts ->
-                    putJsonObject("playbackContext") {
-                        putJsonObject("contentPlaybackContext") {
-                            put("signatureTimestamp", ts)
+                    // JSON number, not string: InnerTube is protobuf-backed and
+                    // yt-dlp sends an integer; an unparseable value omits the
+                    // field instead of sending a mistyped one.
+                    ts.toLongOrNull()?.let { sts ->
+                        putJsonObject("playbackContext") {
+                            putJsonObject("contentPlaybackContext") {
+                                put("signatureTimestamp", sts)
+                            }
                         }
                     }
                 }

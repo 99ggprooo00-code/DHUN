@@ -11,6 +11,7 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -140,10 +141,9 @@ class AltPlayerIdentityTest {
             val contextClient = body.obj("context").obj("client")
             assertEquals("VISITOR_ABC", contextClient?.str("visitorData"))
             assertEquals("VISIONOS", contextClient?.str("clientName"))
-            assertEquals(
-                "19912",
-                body.obj("playbackContext").obj("contentPlaybackContext")?.str("signatureTimestamp"),
-            )
+            val sts = body.obj("playbackContext").obj("contentPlaybackContext")?.get("signatureTimestamp")
+            assertTrue(sts is JsonPrimitive && !sts.isString, "sts must be a JSON number, was: $sts")
+            assertEquals("19912", (sts as JsonPrimitive).content)
             assertEquals("VISITOR_ABC", capturedVisitorHeader)
         } finally {
             http.close()
