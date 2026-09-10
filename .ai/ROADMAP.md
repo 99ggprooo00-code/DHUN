@@ -1,5 +1,24 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-10 (UTC, CI green)** · session **`arena/01a0890b-dhun`** (this branch; verified live via `git fetch` + `gh`, not inherited). User approved research this turn.
+
+**Current phase and active scope:** Phase 14 extraction-reliability follow-up — resume, do not restart. PR #52 (Home "Recommended songs") is merged on `main`; the live problem is the Android/Windows stream-resolution asymmetry (Windows rescues via yt-dlp in ~5–10 s; Android has no fallback and stalls — tokenless InnerTube `/player` bot-gating, issue #14). Active scope is **research**: on-device PO-token/BotGuard minting (vivi-music `vivizzz007/vivi-music` / InnerTubeX as the concrete reference) as the primary root-fix candidate, login/cookies as an optional layer. **No extraction identity-chain code change is being made** — AI rule 8 / ADR-001..006 (ADR + real data first) still applies.
+
+**Exact files/task currently being worked on:** research track — SHIPPED: `docs/research/02-innertubex-potoken-comparison.md` (vivi/InnerTubeX-vs-DHUN source comparison; pins: vivi `fcd8996`, innertubex `v0.2.6`, all GPL-3.0), `docs/decisions/ADR-007-android-stream-attestation.md` (**PROPOSED**, not accepted — no implementation authorized), `docs/decisions/README.md` index. Key correction recorded: InnerTubeX is a MetrolistGroup dependency, not vivi's own engine; vivi's own code is the WebView minter + wiring. No source file touched.
+
+**Last actual error:** none — PR #54 is CI-green (docs-only change; `rot-drill` is not a required gate).
+
+**Local / pushed / CI / merged / released / hardware:** PUSHED on `arena/01a0890b-dhun`: `97e4c3d` (roadmap reconcile) + `98f453d` (research docs) + `39e3b9e`/`2d86e0b` (roadmap). Working PR: **#54** (this session's single PR) — all three required gates **GREEN**: `build-and-test` pass 5m10s (run `34428010715`), `apk` pass 2m34s + `msi` pass 4m22s (run `34428010713`); `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`. MERGED on `main` (`origin/main` = `cd97464`): PR #52 at `d581bb9`, then a direct-to-main research commit plus its removal. OPEN: PR #53 (old branch's docs reconcile). RELEASED/HARDWARE: nothing new — no extraction fix is merged, released, or hardware-verified; audible playback remains the user's hardware gate. **Not merged** — merge awaits the user's explicit instruction.
+
+**Evidence:** PR #54 = `https://github.com/99ggprooo00-code/DHUN/pull/54`; CI runs `34428010715` + `34428010713`; issue #14 still OPEN.
+
+**Exact next technical step:** await the user's ADR-007 verdict (the 4 open questions in the ADR — esp. whether the Android/Desktop extraction split is acceptable and whether D-hardening lands first as its own PR). No implementation until ADR acceptance; no merge until explicitly instructed. **Blockers:** ADR-007 awaiting user verdict (rules out all extraction code work); Windows yt-dlp proof + `adb logcat` still unsupplied; sandbox has no JDK/Gradle (CI is the only compile gate). PR #53 belongs to the old session branch — untouched by this session.
+
+---
+
+<details>
+<summary><b>Prior snapshot (`arena/01a08455-themes` — candidate 28 themes, PR #49)</b></summary>
+
 Updated **2026-09-09 (UTC, latest)** · session **`arena/01a08455-themes`** — **candidate 28, "Themes beyond dark-first"** (user-approved; **dark stays the default**) · **`origin/main` = `ae212a3`** = **PR #50 MERGED** (playback diagnostics from `arena/01a08454-dhun`). Verified live, not inherited: `git fetch origin` → `ae212a3`, and `git diff --name-only d0534cd ae212a3 -- shared/src/commonMain/kotlin/dev/dhun/design` is **empty** — neither PR #45 nor PR #50 touched this session's paths.
 
 **This PR: #49.** Branch `arena/01a08455-themes` — *not* the batch-assigned `arena/01a08455-dhun`, which is the head of PR #46/#48 (equalizer + widgets) and was never touched by this session. **Re-cut this turn** from `d0534cd` onto `ae212a3` by cherry-picking the four code/test commits (`d2f40f6`, `7a13c92`, `6d9c89b`, `5bdd3fd`); `git diff --exit-code 0353baa HEAD -- shared/src/commonMain/kotlin/dev/dhun/design shared/src/jvmTest/kotlin/dev/dhun/design` is **empty**, i.e. the code CI already passed is byte-identical after the re-cut.
@@ -12,7 +31,7 @@ Updated **2026-09-09 (UTC, latest)** · session **`arena/01a08455-themes`** — 
 
 **Exact next step:** (1) get `build-and-test` green on the re-cut head, and `apk`/`msi` via `workflow_dispatch` on `ref=arena/01a08455-themes` (this session cannot dispatch — 403); (2) if `main` advances again, re-cut and re-run; (3) `gh pr merge 49 --merge` **last**. **Honest limit:** CI green = compile + unit tests only — **how the light scheme looks on a device or PC is the user's gate and is claimed nowhere here**.
 
----
+</details>
 
 <details>
 <summary><b>Prior snapshot (`arena/01a08454-dhun` — Android playback diagnostics; MERGED as `ae212a3` via PR #50)</b></summary>
@@ -522,6 +541,12 @@ likely outcome is a written "no" — that is also a valid completion.
 - **Repo sanitization:** no secrets/device data/credentials in the repo;
   sanitized fixtures; `THIRD_PARTY.md` complete; no build output committed.
 - **Rolling release:** `test` tag replaced, never appended; stable URLs.
+
+---
+
+> Operational phase-by-phase prompts (audit + rewritten sequence):
+> [.ai/PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md).
+d; stable URLs.
 
 ---
 
