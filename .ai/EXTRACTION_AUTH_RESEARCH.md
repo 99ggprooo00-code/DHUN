@@ -63,6 +63,18 @@ The VIVI implementation is strong evidence that anonymous Android playback does 
 
 This is evidence about an implementation strategy, not proof that VIVI's exact dependency/version remains valid for DHUN or that the same endpoint sequence is still accepted by YouTube at DHUN implementation time.
 
+### 5.1 Stronger finding from the InnerTubeX library itself
+
+Direct inspection of the upstream `MetrolistGroup/innertubex` source makes the boundary clearer than the VIVI app wrapper alone.
+
+`TokenProvider` is a small injected interface with explicit capabilities (`providers`, `usesWebView`), `getPoToken(videoId, visitorData, cookie)`, optional `prewarm`, invalidation, and close hooks. Its `PoTokenResult` carries separate player-request and streaming-data token values plus the visitor data, and its `toString()` deliberately reports only token presence rather than token contents. Source: https://github.com/MetrolistGroup/innertubex/blob/13f8e4d36d249024cfe356c9cd67cd7fd8ee6493/src/commonMain/kotlin/com/metrolist/innertubex/extraction/TokenProvider.kt
+
+`PlayerClientDirector` is the other critical boundary. It selects playback clients based on content/auth/token capabilities, uses an explicit **8-second player-request timeout**, and gives PO-token acquisition its own **18-second upper bound**. It can first try an un-tokenized request, then retry with a token when the selected client requires it. The resulting token is split into player and GVS/streaming-data bindings and is rejected if the visitor binding or required token fields do not match. Source: https://github.com/MetrolistGroup/innertubex/blob/13f8e4d36d249024cfe356c9cd67cd7fd8ee6493/src/commonMain/kotlin/com/metrolist/innertubex/extraction/PlayerClientDirector.kt
+
+`InnerTubeExtractor` injects this director into a higher-level extraction API and also prewarms both player configuration and token generation when the provider advertises capabilities. Its default token provider is explicitly an unavailable provider, so token support is optional at the library boundary rather than baked into every caller. Source: https://github.com/MetrolistGroup/innertubex/blob/13f8e4d36d249024cfe356c9cd67cd7fd8ee6493/src/commonMain/kotlin/com/metrolist/innertubex/extraction/InnerTubeExtractor.kt
+
+**DHUN implication:** the best architectural lesson is not “copy InnerTubeX”; it is **separate token acquisition from client selection and stream extraction, expose capability/timeout semantics, and bind returned tokens to the same visitor/client/request identity**. That boundary maps naturally to an ADR discussion.
+
 ## 6. DHUN integration options to compare in the ADR
 
 ### Option A — PO-token provider + compatible InnerTube extraction (primary)
@@ -146,5 +158,8 @@ The safest likely architecture is a dedicated Android token-provider boundary wi
 - VIVI `InnerTubeXPlayer.kt` at inspected revision `fcd89968f7b0002d4dcca2546ab7034cfce28f4f`
 - VIVI `PoTokenGenerator.kt` at inspected revision `fcd89968f7b0002d4dcca2546ab7034cfce28f4f`
 - VIVI `PoTokenWebView.kt` at inspected revision `fcd89968f7b0002d4dcca2546ab7034cfce28f4f`
+- Metrolist InnerTubeX `TokenProvider.kt` at revision `13f8e4d36d249024cfe356c9cd67cd7fd8ee6493`
+- Metrolist InnerTubeX `PlayerClientDirector.kt` at revision `13f8e4d36d249024cfe356c9cd67cd7fd8ee6493`
+- Metrolist InnerTubeX `InnerTubeExtractor.kt` at revision `13f8e4d36d249024cfe356c9cd67cd7fd8ee6493`
 
 No claim in this document means that the researched mechanism is currently implemented in DHUN, CI-verified, released, or hardware-verified.
