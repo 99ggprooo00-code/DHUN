@@ -1,6 +1,6 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-10 (UTC)** · session **`arena/01a0890b-dhun`** (this branch; verified live this turn via `git fetch` + `gh`, not inherited).
+Updated **2026-09-10 (UTC, later)** · session **`arena/01a0890b-dhun`** (this branch; verified live via `git fetch` + `gh`, not inherited). User approved research this turn.
 
 **Current phase and active scope:** Phase 14 extraction-reliability follow-up — resume, do not restart. PR #52 (Home "Recommended songs") is merged on `main`; the live problem is the Android/Windows stream-resolution asymmetry (Windows rescues via yt-dlp in ~5–10 s; Android has no fallback and stalls — tokenless InnerTube `/player` bot-gating, issue #14). Active scope is **research**: on-device PO-token/BotGuard minting (vivi-music `vivizzz007/vivi-music` / InnerTubeX as the concrete reference) as the primary root-fix candidate, login/cookies as an optional layer. **No extraction identity-chain code change is being made** — AI rule 8 / ADR-001..006 (ADR + real data first) still applies.
 
@@ -541,6 +541,12 @@ likely outcome is a written "no" — that is also a valid completion.
 - **Repo sanitization:** no secrets/device data/credentials in the repo;
   sanitized fixtures; `THIRD_PARTY.md` complete; no build output committed.
 - **Rolling release:** `test` tag replaced, never appended; stable URLs.
+
+---
+
+> Operational phase-by-phase prompts (audit + rewritten sequence):
+> [.ai/PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md).
+d; stable URLs.
 
 ---
 
