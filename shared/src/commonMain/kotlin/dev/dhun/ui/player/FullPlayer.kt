@@ -361,21 +361,14 @@ fun FullPlayer(
                     )
                     // Lyrics-dominant mode (ADR-002 P6) raises a rounded card
                     // into the same field while the sharp artwork recedes.
-                    AnimatedVisibility(
+                    LyricsCardOverlay(
                         visible = lyricsDominant,
+                        artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
+                        cacheKey = artworkCacheKey,
+                        viewModel = viewModel,
+                        accent = accent,
                         modifier = Modifier.fillMaxSize(),
-                        enter = slideInVertically(DhunAnimations.mediumTween()) { offset -> offset / 4 } +
-                            fadeIn(DhunAnimations.mediumTween()),
-                        exit = slideOutVertically(DhunAnimations.fastTween()) { offset -> offset / 4 } +
-                            fadeOut(DhunAnimations.fastTween()),
-                    ) {
-                        LyricsCard(
-                            artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
-                            cacheKey = artworkCacheKey,
-                            viewModel = viewModel,
-                            accent = accent,
-                        )
-                    }
+                    )
                 }
 
                 // ---- bottom control cluster -----------------------------------
@@ -922,6 +915,41 @@ private fun ArtworkHeroField(
                 )
             }
         }
+    }
+}
+
+/**
+ * Raises the lyrics card into the artwork hero field (ADR-002 P6).
+ *
+ * A standalone composable rather than an inline `AnimatedVisibility` inside
+ * the field's `Box`: `BoxScope` carries the layout-scope marker, which hides
+ * the surrounding `ColumnScope` and with it the column-scoped
+ * `AnimatedVisibility` overload. Here the plain overload resolves, and
+ * enter/exit are passed explicitly, so the motion is unchanged.
+ */
+@Composable
+private fun LyricsCardOverlay(
+    visible: Boolean,
+    artworkUrl: String?,
+    cacheKey: String,
+    viewModel: PlayerViewModel,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = slideInVertically(DhunAnimations.mediumTween()) { offset -> offset / 4 } +
+            fadeIn(DhunAnimations.mediumTween()),
+        exit = slideOutVertically(DhunAnimations.fastTween()) { offset -> offset / 4 } +
+            fadeOut(DhunAnimations.fastTween()),
+    ) {
+        LyricsCard(
+            artworkUrl = artworkUrl,
+            cacheKey = cacheKey,
+            viewModel = viewModel,
+            accent = accent,
+        )
     }
 }
 
