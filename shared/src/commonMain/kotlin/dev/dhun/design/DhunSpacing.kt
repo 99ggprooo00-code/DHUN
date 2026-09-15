@@ -42,7 +42,26 @@ object DhunSpacing {
     val playerTransportHeight = 72.dp
     val playerContentMaxWidth = 720.dp
     val playerTransportMaxWidth = 400.dp
-    val playerArtworkMaxSize = 360.dp
+    /**
+     * Largest sharp cover in Now Playing. The hero first consumes the actual
+     * stage width/height, then stops here on generous tablet/desktop windows
+     * so it remains a deliberate album-art focal point rather than a wall.
+     */
+    val playerArtworkMaxSize = 640.dp
+    /** The breathing room that makes the hero land at roughly 80–92% of a phone's width. */
+    val playerArtworkHorizontalInset = md
+    val playerArtworkVerticalInset = sm
+    /** Headroom around the animated cover, so its existing play/skip motion cannot clip at the stage edge. */
+    val playerArtworkAnimationInset = xs
+    /** Space reserved above artwork when the collapse header overlays a wide player. */
+    val playerArtworkHeaderInset = huge + md
+    /** Wide/landscape layout: artwork receives the remaining room beside this compact chrome column. */
+    val playerWideLayoutMinWidth = 480.dp
+    val playerWideControlsMinWidth = 240.dp
+    val playerWideControlsMaxWidth = 400.dp
+    val playerWideLayoutGap = sm
+    /** Short viewports use tighter non-touch spacing so the hero and every control still fit. */
+    val playerCompactControlsHeight = 640.dp
     /**
      * Shortest Queue/Related sheet that still shows a header and real rows.
      * The sheet asks for a share of the room above the control cluster but

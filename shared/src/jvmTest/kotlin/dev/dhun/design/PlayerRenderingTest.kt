@@ -62,10 +62,12 @@ class PlayerRenderingTest {
     }
 
     @Test
-    fun artworkFitsTheHeightAsWellAsTheWidth() {
+    fun artworkConsumesItsMeasuredHeroFieldUntilTheDesktopCeiling() {
         assertEquals(180.dp, fittedPlayerArtworkSize(1_400.dp, 180.dp))
         assertEquals(280.dp, fittedPlayerArtworkSize(280.dp, 600.dp))
+        assertEquals(640.dp, DhunSpacing.playerArtworkMaxSize, "desktop/tablet ceiling must stay intentionally large")
         assertEquals(DhunSpacing.playerArtworkMaxSize, fittedPlayerArtworkSize(1_400.dp, 800.dp))
+        assertEquals(DhunSpacing.playerArtworkMaxSize, fittedPlayerArtworkSize(688.dp, 760.dp))
         assertEquals(0.dp, fittedPlayerArtworkSize(800.dp, 0.dp))
     }
 }
