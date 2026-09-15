@@ -2,6 +2,7 @@ package dev.dhun.android.widgets
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.XmlResourceParser
 import androidx.test.core.app.ApplicationProvider
 import dev.dhun.android.R
 import org.junit.Assert.assertEquals
@@ -54,8 +55,16 @@ class WidgetXmlTest {
         assertEquals(2, quick.targetCellHeight)
         // Decoding itself is part of the contract: a silently unreadable
         // dimension would let the assertion below pass on a null.
-        assertTrue("minHeight must decode to a positive dp value", (quick.minHeightDp ?: -1f) > 0f)
-        assertTrue("minHeight must decode to a positive dp value", (quick.minWidthDp ?: -1f) > 0f)
+        // The raw text is echoed into the message: if a future aapt2 changes
+        // how a compiled dimension is printed, the failure says what it said.
+        assertTrue(
+            "minHeight must decode to a positive dp value (parser reported '${quick.minHeightRaw}')",
+            (quick.minHeightDp ?: -1f) > 0f,
+        )
+        assertTrue(
+            "minWidth must decode to a positive dp value (parser reported '${quick.minWidthRaw}')",
+            (quick.minWidthDp ?: -1f) > 0f,
+        )
         assertTrue("minHeight ${quick.minHeightDp}dp exceeds a 2x2 slot (~110dp)", quick.minHeightDp!! <= 110f)
         assertTrue("minWidth ${quick.minWidthDp}dp exceeds a 2x2 slot (~110dp)", quick.minWidthDp!! <= 110f)
         // Resizing may only shrink down to the same floor; it grows the card,
@@ -294,15 +303,12 @@ class WidgetXmlTest {
      * may report — `dp`, `dip`, or `d`. Any other unit (sp/px/mm/%) is
      * rejected: a slot-size contract is meaningless unless it is dp. A
      * `@dimen/...` reference is resolved the way the launcher would.
+     *
+     * Typed as [XmlResourceParser], not [XmlPullParser]: only the former (via
+     * AttributeSet) exposes the resource-id and typed accessors this needs.
      */
-    private fun readDimensionDp(parser: XmlPullParser, attr: String): Float? {
-        val raw = parser.getAttributeValue(ANDROID_NS, attr)?.trim()
-        if (raw != null) {
-            val match = DIMENSION_MAGNITUDE.find(raw) ?: return null
-            val magnitude = match.value.toFloatOrNull() ?: return null
-            val unit = raw.substring(match.range.last + 1).trim().lowercase()
-            return if (unit.isEmpty() || unit == "dp" || unit == "dip" || unit == "d") magnitude else null
-        }
+    private fun readDimensionDp(parser: XmlResourceParser, attr: String): Float? {
+        fromText(parser.getAttributeValue(ANDROID_NS, attr))?.let { return it }
         val id = parser.getAttributeResourceValue(ANDROID_NS, attr, 0)
         if (id == 0) return null
         return runCatching {
@@ -310,6 +316,15 @@ class WidgetXmlTest {
             val density = resources.displayMetrics.density
             if (px > 0f && density > 0f) px / density else null
         }.getOrNull()
+    }
+
+    /** Numeric magnitude of a compiled dimension string, when it is dp-based. */
+    private fun fromText(raw: String?): Float? {
+        val text = raw?.trim() ?: return null
+        val match = DIMENSION_MAGNITUDE.find(text) ?: return null
+        val magnitude = match.value.toFloatOrNull() ?: return null
+        val unit = text.substring(match.range.last + 1).trim().lowercase()
+        return if (unit.isEmpty() || unit == "dp" || unit == "dip" || unit == "d") magnitude else null
     }
 
     companion object {
