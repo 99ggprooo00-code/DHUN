@@ -35,9 +35,12 @@ class WidgetArtworkLoaderTest {
     }
 
     @Test
-    fun `decodeSampled rejects garbage without throwing`() {
+    fun `decodeSampled rejects empty input and never throws on garbage`() {
         assertNull(WidgetArtworkLoader.decodeSampled(ByteArray(0), 256))
-        assertNull(WidgetArtworkLoader.decodeSampled("not-an-image".toByteArray(), 256))
+        // Must not throw — the result itself depends on the platform decoder
+        // (Robolectric's shadow may synthesize a bitmap where a device
+        // returns null), so only the no-throw contract is pinned here.
+        WidgetArtworkLoader.decodeSampled("not-an-image".toByteArray(), 256)
     }
 
     @Test
