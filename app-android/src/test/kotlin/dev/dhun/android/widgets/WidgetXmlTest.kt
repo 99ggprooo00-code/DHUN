@@ -52,15 +52,15 @@ class WidgetXmlTest {
         val quick = parseWidgetInfo(R.xml.widget_quick_play_info)
         assertEquals(2, quick.targetCellWidth)
         assertEquals(2, quick.targetCellHeight)
-        val minW = dimensionDp(quick.minWidthRaw)
-        val minH = dimensionDp(quick.minHeightRaw)
-        assertNotNull("minWidth is not a dp literal", minW)
-        assertNotNull("minHeight is not a dp literal", minH)
-        assertTrue("minHeight ${minH}dp exceeds a 2x2 slot (~110dp)", minH!! <= 110f)
-        assertTrue("minWidth ${minW}dp exceeds a 2x2 slot (~110dp)", minW!! <= 110f)
-        // Resizing may only shrink down to the same floor, and grows the card,
+        // Decoding itself is part of the contract: a silently unreadable
+        // dimension would let the assertion below pass on a null.
+        assertTrue("minHeight must decode to a positive dp value", (quick.minHeightDp ?: -1f) > 0f)
+        assertTrue("minHeight must decode to a positive dp value", (quick.minWidthDp ?: -1f) > 0f)
+        assertTrue("minHeight ${quick.minHeightDp}dp exceeds a 2x2 slot (~110dp)", quick.minHeightDp!! <= 110f)
+        assertTrue("minWidth ${quick.minWidthDp}dp exceeds a 2x2 slot (~110dp)", quick.minWidthDp!! <= 110f)
+        // Resizing may only shrink down to the same floor; it grows the card,
         // never the minimum.
-        val minResizeH = dimensionDp(quick.minResizeHeightRaw)
+        val minResizeH = quick.minResizeHeightDp
         if (minResizeH != null) assertTrue("minResizeHeight exceeds the slot", minResizeH <= 110f)
     }
 
@@ -201,12 +201,14 @@ class WidgetXmlTest {
         val initialLayout: Int,
         val minWidthRaw: String?,
         val minHeightRaw: String?,
+        val minWidthDp: Float?,
+        val minHeightDp: Float?,
+        val minResizeHeightDp: Float?,
         val widgetCategoryInt: Int,
         val targetCellWidth: Int,
         val targetCellHeight: Int,
         val previewLayout: Int,
         val minResizeWidthRaw: String?,
-        val minResizeHeightRaw: String?,
         val maxResizeWidthRaw: String?,
         val maxResizeHeightRaw: String?,
         val resizeModeRaw: String?,
@@ -218,12 +220,14 @@ class WidgetXmlTest {
         var layout = 0
         var minW: String? = null
         var minH: String? = null
+        var minWDp: Float? = null
+        var minHDp: Float? = null
+        var minResizeHDp: Float? = null
         var catInt = 0
         var cellW = -1
         var cellH = -1
         var preview = 0
         var minResizeW: String? = null
-        var minResizeH: String? = null
         var maxResizeW: String? = null
         var maxResizeH: String? = null
         var resizeMode: String? = null
@@ -232,10 +236,14 @@ class WidgetXmlTest {
             while (parser.next() != XmlPullParser.END_DOCUMENT) {
                 if (parser.eventType == XmlPullParser.START_TAG && parser.name == "appwidget-provider") {
                     layout = parser.getAttributeResourceValue(ANDROID_NS, "initialLayout", 0)
-                    // minWidth/minHeight are dimension literals (e.g. 110dp) — read as raw
-                    // string; getAttributeIntValue returns 0 for raw dimens in Robolectric.
+                    // minWidth/minHeight: the raw text is only good for a
+                    // "declared at all" check — aapt2 stores dimensions as a
+                    // TypedValue, so the magnitude comes from readDimensionDp.
                     minW = parser.getAttributeValue(ANDROID_NS, "minWidth")
                     minH = parser.getAttributeValue(ANDROID_NS, "minHeight")
+                    minWDp = readDimensionDp(parser, "minWidth")
+                    minHDp = readDimensionDp(parser, "minHeight")
+                    minResizeHDp = readDimensionDp(parser, "minResizeHeight")
                     // widgetCategory="home_screen" is compiled to 1; read as int.
                     catInt = parser.getAttributeIntValue(ANDROID_NS, "widgetCategory", 0)
                     // targetCellWidth/Height are integers — getAttributeValue returns
@@ -244,7 +252,6 @@ class WidgetXmlTest {
                     cellH = parser.getAttributeIntValue(ANDROID_NS, "targetCellHeight", -1)
                     preview = parser.getAttributeResourceValue(ANDROID_NS, "previewLayout", 0)
                     minResizeW = parser.getAttributeValue(ANDROID_NS, "minResizeWidth")
-                    minResizeH = parser.getAttributeValue(ANDROID_NS, "minResizeHeight")
                     maxResizeW = parser.getAttributeValue(ANDROID_NS, "maxResizeWidth")
                     maxResizeH = parser.getAttributeValue(ANDROID_NS, "maxResizeHeight")
                     resizeMode = parser.getAttributeValue(ANDROID_NS, "resizeMode")
@@ -255,8 +262,9 @@ class WidgetXmlTest {
             parser.close()
         }
         return WidgetInfo(
-            layout, minW, minH, catInt, cellW, cellH, preview,
-            minResizeW, minResizeH, maxResizeW, maxResizeH, resizeMode, period,
+            layout, minW, minH, minWDp, minHDp, minResizeHDp,
+            catInt, cellW, cellH, preview,
+            minResizeW, maxResizeW, maxResizeH, resizeMode, period,
         )
     }
 
@@ -276,13 +284,38 @@ class WidgetXmlTest {
         return ids
     }
 
-    /** `110dp` -> 110f; anything that is not a dp literal -> null. */
-    private fun dimensionDp(raw: String?): Float? {
-        val value = raw?.trim()?.takeIf { it.endsWith("dp") } ?: return null
-        return value.dropLast(2).toFloatOrNull()
+    /**
+     * Attribute magnitude in dp.
+     *
+     * A compiled dimension attribute does NOT come back as the source text:
+     * `110dp` is stored as a packed complex value and printed by the parser as
+     * `110d`, so an `endsWith("dp")` test finds nothing (this cost a CI cycle).
+     * Match the leading number instead and accept the unit spellings a host
+     * may report — `dp`, `dip`, or `d`. Any other unit (sp/px/mm/%) is
+     * rejected: a slot-size contract is meaningless unless it is dp. A
+     * `@dimen/...` reference is resolved the way the launcher would.
+     */
+    private fun readDimensionDp(parser: XmlPullParser, attr: String): Float? {
+        val raw = parser.getAttributeValue(ANDROID_NS, attr)?.trim()
+        if (raw != null) {
+            val match = DIMENSION_MAGNITUDE.find(raw) ?: return null
+            val magnitude = match.value.toFloatOrNull() ?: return null
+            val unit = raw.substring(match.range.last + 1).trim().lowercase()
+            return if (unit.isEmpty() || unit == "dp" || unit == "dip" || unit == "d") magnitude else null
+        }
+        val id = parser.getAttributeResourceValue(ANDROID_NS, attr, 0)
+        if (id == 0) return null
+        return runCatching {
+            val px = resources.getDimension(id)
+            val density = resources.displayMetrics.density
+            if (px > 0f && density > 0f) px / density else null
+        }.getOrNull()
     }
 
     companion object {
         const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
+
+        /** Leading numeric magnitude of a dimension literal: `110dp`, `110d`, `-2.5`. */
+        val DIMENSION_MAGNITUDE: Regex = Regex("^-?\\d+(?:\\.\\d+)?")
     }
 }
