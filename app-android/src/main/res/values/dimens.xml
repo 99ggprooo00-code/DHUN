@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Corner radius of the widget card. On API 31+ this is redefined in
+         values-v31 to alias the launcher's own system radius, so our silhouette
+         matches the host's clip exactly. Pre-S hosts apply no radius of their
+         own, and 28dp is the M3 widget chrome the app was designed against.
+
+         Read by BOTH the static chrome (@drawable/widget_background) and the
+         runtime glass bitmap (WidgetGlass) — one value, two renderers. -->
+    <dimen name="widget_corner_radius">28dp</dimen>
+</resources>

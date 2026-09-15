@@ -24,6 +24,59 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — one widget only: Quick Play survives, Now Playing deleted — 2026-09-15
+- **Now Playing is gone**, on device feedback after PR #61. It "added but
+  couldn't load": its layout declared `minHeight="140dp"` for a 4×2 slot that
+  measures ~110dp, and the reporting launcher refuses an oversized widget
+  instead of growing it a row. DHUN ships **Quick Play** as its single
+  home-screen widget. Removed: the provider, all three tier layouts, its
+  picker preview, its `appwidget-provider` XML, its manifest receiver and its
+  picker string.
+- **Quick Play's identity is frozen on purpose.** The provider class,
+  `widget_quick_play`/`widget_quick_play_wide`, every view id and
+  `xml/widget_quick_play_info.xml` keep their exact names — an instance
+  already sitting on a home screen is only revived by the update while those
+  identifiers are unchanged. `WidgetXmlTest` pins "exactly one widget receiver
+  in the manifest" and asserts the declared minimums still fit a 2×2 cell, so
+  the size bug that killed Now Playing cannot return silently.
+- **AMOLED card in every palette and mode.** `widget_background` is now
+  `#000000` in light *and* dark, pre-S and on Material You hosts; the whole
+  `values-night-v31` overlay is deleted because the palette is no longer
+  mode-dependent. Wallpaper tint is kept on the accent only
+  (`system_accent1_200` / `system_accent1_900` on API 31+): play disc,
+  progress fill and any future active toggle follow the wallpaper, the card
+  does not.
+- **Corners use the launcher's radius, not our guess.** A new
+  `@dimen/widget_corner_radius` resolves to the platform's
+  `system_app_widget_background_radius` on API 31+ and falls back to 28dp
+  below that. It is read by both renderers — the static `widget_background`
+  chrome and the runtime glass bitmap — so the card silhouette and the host's
+  clip agree instead of one outrunning the other.
+- **Sharper glass**: the `WidgetGlass` edge cap goes 256 → 320 px. A flat fill
+  upscaled from 256 read soft at 2×2; 320² ARGB is 400 KB, and artwork
+  (256² ≈ 256 KB) still rides the same transaction comfortably inside the
+  ~1 MB binder limit.
+- **Size tiers stay a Quick Play feature** by decision: the small 2×2 layout
+  is the floor, and the wide tier (artwork + next) takes over at ≥ 200dp.
+- `DhunWidgetUpdater` is now single-provider: the Now Playing builders, id
+  lookups and tier functions are deleted, and the shared engine — snapshot →
+  `DhunWidgetState`, two-phase artwork push, glass, service-push plus
+  controller-pull — is what remains.
+- Tests: Now Playing assertions dropped; Quick Play coverage extended (tier
+  boundaries at 199/200dp, both tiers against idle/playing/paused states,
+  slot-fit and single-receiver guards), plus new `WidgetPaletteLightModeTest`
+  / `WidgetPaletteDarkModeTest` for the AMOLED contract and glass coverage
+  for the radius resolution and the 320px budget.
+- `scripts/check_widget_refs.py` — the toolchain-free static gate for this
+  area (XML well-formedness, `R.*`/`@res` reference resolution, "Now Playing
+  is gone", and Kotlin comment/string nesting). It earned its place by
+  catching an *unclosed block comment*: Kotlin comments nest, so a
+  `@android:color/*` glob written inside KDoc swallows the closing `*/`.
+  That shipped once and cost a CI cycle.
+- **Name collision, on purpose left alone**: "Now Playing" as the *in-app*
+  player screen (the entry below, PR #62) is untouched — only the home-screen
+  widget that shared the name is gone.
+
 ### Fixed — Now Playing: fit-to-card artwork, bottom-docked controls, working queue sheet — 2026-09-15
 - **Artwork is no longer zoomed/cropped.** The now-playing cover is a square,
   clipped card sized by `fittedPlayerArtworkSize` (fits the width, the height
@@ -68,6 +121,10 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   middle, dark at the bottom, never flat black) and the duration label.
 
 ### Changed — home-screen widgets rebuilt (Material You) — 2026-09-15
+*Superseded in part by the "one widget only" entry at the top of this
+section: the two-widget set and the wallpaper-tinted card described below
+were replaced by a single Quick Play widget on an AMOLED card.*
+
 - **Both widgets redesigned around Material You**: dynamic wallpaper-tinted
   palette on API 31+ (light + dark), 28dp rounded card, filled accent play
   disc, rounded artwork well, and a real layout preview in the widget

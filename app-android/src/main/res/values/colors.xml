@@ -2,11 +2,14 @@
 <resources>
     <color name="ic_launcher_background">#0A0A0A</color>
 
-    <!-- Widget fallback palette (pre-S / no dynamic color): DHUN dark-first.
-         On API 31+ these names resolve to system_accent/system_neutral ramps
-         (values-v31 + values-night-v31) so the widgets follow Material You.
-         Layouts and drawables reference ONLY these names — never hardcode. -->
-    <color name="widget_background">#1C1B22</color>
+    <!-- Widget palette — AMOLED by decision (device feedback, 2026-09-15):
+         the card is deep black #000000 in EVERY palette and mode, light and
+         dark, pre-S and on Material You hosts. Wallpaper tint is kept ONLY on
+         the accents (play disc, progress fill, active toggles), which is what
+         values-v31 overrides; the names below are the fallback and, for every
+         non-accent role, the final answer. Layouts and drawables reference
+         ONLY these names — never hardcode. -->
+    <color name="widget_background">#000000</color>
     <color name="widget_on_background">#E6E1E9</color>
     <color name="widget_secondary">#9D99A9</color>
     <color name="widget_accent">#BB86FC</color>

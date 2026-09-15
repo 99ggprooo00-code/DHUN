@@ -12,7 +12,7 @@ import android.content.ComponentName as AndroidComponentName
 import dev.dhun.android.playback.DhunPlaybackService
 
 /**
- * Shared transport executor for both widget providers.
+ * Shared transport executor for the widget providers.
  *
  * Each action connects a short-lived [MediaController] to the existing
  * [DhunPlaybackService] session, applies one player command, then refreshes

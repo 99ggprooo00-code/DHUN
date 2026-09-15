@@ -6,11 +6,13 @@ import android.content.Intent
 import dev.dhun.android.MainActivity
 
 /**
- * Intent contract for DHUN home-screen widgets.
+ * Intent contract for the DHUN home-screen widget.
  *
- * Both widget providers ([DhunNowPlayingWidgetProvider] and
- * [DhunQuickPlayWidgetProvider]) use these actions for transport.
- * [WidgetTransport] handles them by connecting a short-lived
+ * [DhunQuickPlayWidgetProvider] uses these actions for transport, and every
+ * action stays in the contract even when the shipped layouts host only part
+ * of it: the strings are persisted inside live PendingIntents on users' home
+ * screens, so renaming or dropping one silently breaks taps on already-placed
+ * widgets. [WidgetTransport] handles them by connecting a short-lived
  * [androidx.media3.session.MediaController] to [dev.dhun.android.playback.DhunPlaybackService]
  * and issuing the corresponding player command — the widget never talks
  * to ExoPlayer directly. All actions are `PendingIntent.getBroadcast`

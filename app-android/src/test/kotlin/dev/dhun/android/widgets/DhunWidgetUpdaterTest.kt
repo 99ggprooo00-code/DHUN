@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.dhun.android.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -14,7 +15,8 @@ import org.robolectric.annotation.Config
 /**
  * Rendering contract for the widget RemoteViews (no MediaController, no launcher).
  * Verifies that the updater maps [DhunWidgetState] → RemoteViews without
- * crashing and with the right text/icon choices. Real artwork fetch / live
+ * crashing, with the right tier for the size the host reports, and that the
+ * snapshot → state mapping is loss-free. Real artwork fetch / live
  * MediaController polling is not exercised — hardware gate.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -25,14 +27,8 @@ class DhunWidgetUpdaterTest {
 
     @Test
     fun `idle state renders placeholder texts and play icon`() {
-        val views = DhunWidgetUpdater.buildNowPlayingViews(context, DhunWidgetState.idle())
-        assertNotNull(views)
-        // RemoteViews is a parcel-like holder; we at least prove the layout id is the expected one.
-        // The id is not directly exposed, but the object is non-null and internally holds the layout.
-        // Spot-check the state mapping instead: idle's textual contract.
+        // The textual contract lives in the state; the builder must accept it.
         assertEquals("Nothing playing", DhunWidgetState.idle().title)
-        // The now-playing view for idle uses the play glyph (not pause).
-        // Verify via a second path: quick-play for idle also shows play.
         val quick = DhunWidgetUpdater.buildQuickPlayViewsForId(context, DhunWidgetState.idle(), 1)
         assertNotNull(quick)
     }
@@ -42,8 +38,6 @@ class DhunWidgetUpdaterTest {
         val playing = DhunWidgetState(title = "A", artist = "B", isPlaying = true, hasTrack = true)
         val paused = DhunWidgetState(title = "A", artist = "B", isPlaying = false, hasTrack = true)
         // Building must not throw for either.
-        assertNotNull(DhunWidgetUpdater.buildNowPlayingViews(context, playing))
-        assertNotNull(DhunWidgetUpdater.buildNowPlayingViews(context, paused))
         assertNotNull(DhunWidgetUpdater.buildQuickPlayViewsForId(context, playing, 2))
         assertNotNull(DhunWidgetUpdater.buildQuickPlayViewsForId(context, paused, 2))
         // Verify the pure state contract (icon choice is `isPlaying && hasTrack`).
@@ -54,52 +48,50 @@ class DhunWidgetUpdaterTest {
     @Test
     fun `per-id builders do not clash across widget instances`() {
         val state = DhunWidgetState.fromMetadata("Track", "Artist", isPlaying = false)
-        val v1 = DhunWidgetUpdater.buildNowPlayingViewsForId(context, state, 10)
-        val v2 = DhunWidgetUpdater.buildNowPlayingViewsForId(context, state, 11)
+        val v1 = DhunWidgetUpdater.buildQuickPlayViewsForId(context, state, 10)
+        val v2 = DhunWidgetUpdater.buildQuickPlayViewsForId(context, state, 11)
         assertNotNull(v1)
         assertNotNull(v2)
-        // The two RemoteViews should be distinct objects (different PendingIntents).
-        // Reference equality is sufficient for the intent-scoping guarantee.
-        assertNotNull(v1 !== v2)
+        // Distinct objects — each carries its own instance-scoped PendingIntents.
+        assertTrue(v1 !== v2)
+    }
+
+    @Test
+    fun `unknown host size falls back to the small tier`() {
+        // 0/0 is what tests and pre-API-31 launchers report. The floor tier is
+        // the only one guaranteed to fit, so it must win.
+        assertNotNull(DhunWidgetUpdater.buildQuickPlayViewsForId(context, DhunWidgetState.idle(), 5, null, 0))
+        assertEquals(R.layout.widget_quick_play, DhunWidgetUpdater.layoutForQuickPlay(0))
     }
 
     // ------------------------------------------------------------ responsive
 
     @Test
-    fun `now playing tier selection follows width then height`() {
+    fun `quick play tier selection follows width at the exact boundary`() {
+        assertEquals(R.layout.widget_quick_play, DhunWidgetUpdater.layoutForQuickPlay(110))
+        assertEquals(R.layout.widget_quick_play, DhunWidgetUpdater.layoutForQuickPlay(199))
+        assertEquals(R.layout.widget_quick_play_wide, DhunWidgetUpdater.layoutForQuickPlay(200))
+        assertEquals(R.layout.widget_quick_play_wide, DhunWidgetUpdater.layoutForQuickPlay(650))
+        // A nonsensical size never selects the wider tier.
+        assertEquals(R.layout.widget_quick_play, DhunWidgetUpdater.layoutForQuickPlay(-5))
+    }
+
+    @Test
+    fun `wide tier threshold is the documented constant`() {
+        // Layouts and the launcher's resize hints are tuned to this number.
+        assertEquals(200, DhunWidgetUpdater.QUICK_WIDE_MIN_WIDTH_DP)
         assertEquals(
-            R.layout.widget_now_playing,
-            DhunWidgetUpdater.layoutForNowPlaying(minWidthDp = 250, maxHeightDp = 140),
+            R.layout.widget_quick_play_wide,
+            DhunWidgetUpdater.layoutForQuickPlay(DhunWidgetUpdater.QUICK_WIDE_MIN_WIDTH_DP),
         )
         assertEquals(
-            R.layout.widget_now_playing_compact,
-            DhunWidgetUpdater.layoutForNowPlaying(minWidthDp = 150, maxHeightDp = 140),
-        )
-        assertEquals(
-            R.layout.widget_now_playing_tall,
-            DhunWidgetUpdater.layoutForNowPlaying(minWidthDp = 250, maxHeightDp = 200),
-        )
-        // Narrow wins over tall — a thin strip cannot host the toggle row.
-        assertEquals(
-            R.layout.widget_now_playing_compact,
-            DhunWidgetUpdater.layoutForNowPlaying(minWidthDp = 150, maxHeightDp = 300),
-        )
-        // Unknown host size (0/0) falls back to the standard tier.
-        assertEquals(
-            R.layout.widget_now_playing,
-            DhunWidgetUpdater.layoutForNowPlaying(minWidthDp = 0, maxHeightDp = 0),
+            R.layout.widget_quick_play,
+            DhunWidgetUpdater.layoutForQuickPlay(DhunWidgetUpdater.QUICK_WIDE_MIN_WIDTH_DP - 1),
         )
     }
 
     @Test
-    fun `quick play tier selection follows width`() {
-        assertEquals(R.layout.widget_quick_play, DhunWidgetUpdater.layoutForQuickPlay(0))
-        assertEquals(R.layout.widget_quick_play, DhunWidgetUpdater.layoutForQuickPlay(150))
-        assertEquals(R.layout.widget_quick_play_wide, DhunWidgetUpdater.layoutForQuickPlay(250))
-    }
-
-    @Test
-    fun `every tier builds for idle and full playback states`() {
+    fun `both tiers build for idle and full playback states`() {
         val states = listOf(
             DhunWidgetState.idle(),
             DhunWidgetState.fromPlayback(
@@ -119,14 +111,15 @@ class DhunWidgetUpdaterTest {
         var id = 100
         for (state in states) {
             for (artwork in listOf(null, art)) {
-                assertNotNull(DhunWidgetUpdater.buildNowPlayingViews(context, state, artwork))
-                // Compact / standard / tall.
-                assertNotNull(DhunWidgetUpdater.buildNowPlayingViewsForId(context, state, id++, artwork, 150, 140))
-                assertNotNull(DhunWidgetUpdater.buildNowPlayingViewsForId(context, state, id++, artwork, 250, 140))
-                assertNotNull(DhunWidgetUpdater.buildNowPlayingViewsForId(context, state, id++, artwork, 250, 200))
-                // Quick small / wide.
-                assertNotNull(DhunWidgetUpdater.buildQuickPlayViewsForId(context, state, id++, artwork, 150))
+                // Small (2x2) and wide (resized) tiers, at reported and
+                // unknown host sizes — the ids the binding skips are part of
+                // the contract, so nothing may throw here.
+                assertNotNull(DhunWidgetUpdater.buildQuickPlayViewsForId(context, state, id++, artwork, 110))
                 assertNotNull(DhunWidgetUpdater.buildQuickPlayViewsForId(context, state, id++, artwork, 250))
+                assertNotNull(DhunWidgetUpdater.buildQuickPlayViewsForId(context, state, id++, artwork, 0))
+                assertNotNull(
+                    DhunWidgetUpdater.buildQuickPlayViewsForId(context, state, id++, artwork, 250, 200),
+                )
             }
         }
     }
@@ -144,7 +137,52 @@ class DhunWidgetUpdaterTest {
                 shuffleEnabled = true, repeatMode = repeat,
                 hasNext = true, hasPrevious = true, artworkKey = null,
             )
-            assertNotNull(DhunWidgetUpdater.buildNowPlayingViewsForId(context, state, 7, null, 250, 200))
+            assertNotNull(DhunWidgetUpdater.buildQuickPlayViewsForId(context, state, 7, null, 110))
         }
+    }
+
+    // -------------------------------------------------------------- mapping
+
+    @Test
+    fun `snapshot maps onto the state contract`() {
+        val snapshot = DhunWidgetUpdater.PlaybackSnapshot(
+            title = "  Nightcall  ",
+            artist = "Kavinsky",
+            isPlaying = true,
+            positionMs = 90_000L,
+            durationMs = 180_000L,
+            shuffleEnabled = true,
+            repeatMode = DhunWidgetState.REPEAT_ALL,
+            hasNext = true,
+            hasPrevious = false,
+            artworkUri = "https://img/one.jpg",
+            artworkData = null,
+            artworkKey = "https://img/one.jpg",
+        )
+        val state = DhunWidgetUpdater.stateOf(snapshot)
+        assertEquals("Nightcall", state.title)
+        assertEquals("Kavinsky", state.artist)
+        assertEquals(500, state.progressPermille)
+        assertEquals("1:30", state.positionText)
+        assertEquals("3:00", state.durationText)
+        assertTrue(state.shuffleEnabled)
+        assertEquals(DhunWidgetState.REPEAT_ALL, state.repeatMode)
+        assertEquals("https://img/one.jpg", state.artworkKey)
+    }
+
+    @Test
+    fun `blank snapshot collapses to idle instead of stale data`() {
+        val snapshot = DhunWidgetUpdater.PlaybackSnapshot(
+            title = " ", artist = null, isPlaying = false, positionMs = 0L, durationMs = 0L,
+            shuffleEnabled = false, repeatMode = DhunWidgetState.REPEAT_OFF,
+            hasNext = false, hasPrevious = false,
+            artworkUri = null, artworkData = null, artworkKey = null,
+        )
+        assertTrue(DhunWidgetUpdater.stateOf(snapshot).isIdle)
+    }
+
+    @Test
+    fun `progress tick cadence is the documented ten seconds`() {
+        assertEquals(10_000L, DhunWidgetUpdater.PROGRESS_TICK_MS)
     }
 }

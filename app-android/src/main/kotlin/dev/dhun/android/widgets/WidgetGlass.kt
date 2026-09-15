@@ -10,36 +10,50 @@ import androidx.core.content.ContextCompat
 import dev.dhun.android.R
 
 /**
- * Renders the translucent card behind widget content — flat Material You
- * tint at [FILL_ALPHA], Google Search widget style, with fully-opaque
- * text/controls on top.
+ * Renders the card behind widget content — AMOLED deep black (`#000000`, every
+ * palette and mode) at [FILL_ALPHA], flat Google Search widget style, with
+ * fully-opaque text/controls on top. Wallpaper tint is deliberately *not*
+ * applied to the card: only the accents (play disc, progress fill, and any
+ * toggle a tier hosts) follow Material You, so the widget reads as a black
+ * glass tile on any wallpaper and kills pixels on AMOLED screens.
  *
- * Why a runtime bitmap: XML drawables cannot apply translucency to the
- * dynamic system colors (`@android:color/system_accent1_*` are opaque and
- * there is no alpha-combining mechanism in resources). So the tint is
- * resolved at runtime ([ContextCompat.getColor] follows the wallpaper +
- * light/dark mode) and composited here. Deliberately flat — no sheen, no
- * faux edge: that is the M3 widget language, and it keeps dense content
- * (small text, progress, five buttons) legible over busy wallpapers. True
- * blur-behind is not exposed to app widgets on any API level;
- * translucency over the wallpaper is the platform's glass look.
+ * Why a runtime bitmap: XML drawables cannot apply translucency to colors
+ * (framework `system_…` colors are opaque and there is no alpha-combining
+ * mechanism in resources), so the fill is resolved at runtime ([ContextCompat.getColor])
+ * and composited here. Deliberately flat — no sheen, no faux edge: that is the
+ * M3 widget language, and it keeps dense content (small text, progress,
+ * buttons) legible. True blur-behind is not exposed to app widgets on any API
+ * level; translucency over the wallpaper is the platform's glass look.
  *
- * Bitmaps are aspect-correct per widget instance (from the host's reported
- * dp size) but capped at [MAX_EDGE_PX] — a flat fill upscales invisibly and
- * keeps the RemoteViews transaction far under the binder limit. Results are
- * cached; a theme change resolves new colors and therefore new cache keys,
- * so the card follows light/dark switches within one push.
+ * Corners match the *launcher's own* clip: `@dimen/widget_corner_radius`
+ * resolves to the platform's `system_app_widget_background_radius` on API 31+
+ * and to [CORNER_RADIUS_DP] below that, so the card silhouette and the host's
+ * rounded-rect mask agree instead of one outrunning the other.
+ *
+ * Bitmaps are aspect-correct per widget instance (from the host's reported dp
+ * size) but capped at [MAX_EDGE_PX] — a flat fill upscales invisibly and keeps
+ * the RemoteViews transaction under the binder limit even alongside artwork.
+ * Results are cached under size + radius + resolved fill, so a config change
+ * (a resize, a host that reports a different system radius, an OEM override of
+ * the color) yields a new card within one push instead of a stale bitmap. The
+ * accent is not part of this bitmap at all: it lives in the drawables the
+ * layout resolves per push, which is exactly why a black card and a tinted
+ * play disc coexist.
  */
 object WidgetGlass {
 
     /** Fill opacity — "a little transparent", Google Search widget style. */
     const val FILL_ALPHA = 0.80f
 
-    /** Card corner radius, matching the M3 widget chrome. */
+    /**
+     * Card corner radius used when the platform exposes no system widget radius
+     * (pre-S launchers, or a host whose resources deny the lookup). On API 31+
+     * the system dimen wins — see [cornerRadiusPx].
+     */
     const val CORNER_RADIUS_DP = 28f
 
-    /** Longest bitmap edge in px — a flat fill upscales invisibly. */
-    const val MAX_EDGE_PX = 256
+    /** Longest bitmap edge in px — sharp enough that corners read crisp at 2×2. */
+    const val MAX_EDGE_PX = 320
 
     private const val CACHE_ENTRIES = 12
 
@@ -59,12 +73,28 @@ object WidgetGlass {
         val (px, py) = scaledSize((dw * density).toInt(), (dh * density).toInt(), MAX_EDGE_PX)
         val fullW = dw * density
         val scale = if (fullW > 0f) px / fullW else 1f
-        val radiusPx = (CORNER_RADIUS_DP * density * scale).coerceAtMost(minOf(px, py) / 2f)
+        // The system dimen is already in real display px — scale it into
+        // bitmap space exactly like the card edges are.
+        val radiusPx = (cornerRadiusPx(context) * scale).coerceAtMost(minOf(px, py) / 2f)
         val fill = ContextCompat.getColor(context, R.color.widget_background)
         val key = "$px,$py,${radiusPx.toInt()},$fill"
         cache.get(key) ?: bitmap(px, py, radiusPx, applyAlpha(fill, FILL_ALPHA))
             .also { runCatching { cache.put(key, it) } }
     }.getOrNull()
+
+    /**
+     * Card corner radius in real display px: the launcher's system radius on
+     * API 31+ (`@dimen/widget_corner_radius` aliases it in `values-v31`),
+     * [CORNER_RADIUS_DP] × density otherwise or on any lookup failure.
+     */
+    internal fun cornerRadiusPx(context: Context): Float {
+        val px = runCatching { context.resources.getDimension(R.dimen.widget_corner_radius) }.getOrNull()
+        if (px != null && px > 0f) return px
+        return fallbackRadiusPx(context.resources.displayMetrics.density)
+    }
+
+    /** Pure fallback math — [CORNER_RADIUS_DP] at a sane density. Testable hook. */
+    internal fun fallbackRadiusPx(density: Float): Float = CORNER_RADIUS_DP * density.coerceIn(1f, 3f)
 
     /** Test hook — clears the cache between cases. */
     internal fun evictAll() {
