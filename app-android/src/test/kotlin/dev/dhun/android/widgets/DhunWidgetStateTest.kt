@@ -87,7 +87,7 @@ class DhunWidgetStateTest {
     // ------------------------------------------------------------- progress
 
     @Test
-    fun `formatTime renders m:ss and h-mm-ss`() {
+    fun `formatTime renders m-ss and h-mm-ss`() {
         assertEquals("0:00", DhunWidgetState.formatTime(0L))
         assertEquals("0:05", DhunWidgetState.formatTime(5_000L))
         assertEquals("1:01", DhunWidgetState.formatTime(61_000L))
