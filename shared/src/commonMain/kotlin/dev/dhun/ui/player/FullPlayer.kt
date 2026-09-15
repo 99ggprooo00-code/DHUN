@@ -1225,7 +1225,9 @@ private fun ImmersivePlayButton(
  * Height and bottom inset come from [queuePanelMetrics] — a share of the room
  * actually left above the measured control cluster, floored at
  * [DhunSpacing.queuePanelMinHeight] — so the sheet is a real, readable panel
- * on a phone and on a desktop window instead of a thin translucent sliver.
+ * on a phone and on a desktop window instead of a thin translucent sliver. Its
+ * width is capped to the player content budget so a wide window gets readable
+ * rows rather than one stretched line.
  * It paints an opaque base under the glass (like every other sheet in the
  * app) because translucent-over-artwork left the rows illegible, and it
  * closes through two obvious affordances: the header ✕ and the queue glyph in
@@ -1252,10 +1254,16 @@ private fun QueueSheet(
         ) {
             GlassBottomBar(
                 modifier = Modifier
+                    // Same width budget as the player's own content column, so
+                    // a wide desktop window gets a centred, readable sheet
+                    // instead of rows stretched across the whole screen.
+                    .widthIn(max = DhunSpacing.playerContentMaxWidth)
                     .fillMaxWidth()
                     .padding(bottom = metrics.bottomInset)
                     .height(metrics.height),
-                shape = DhunShapes.bottomSheet,
+                // All four corners round: the sheet floats above the control
+                // cluster, it does not touch the bottom edge.
+                shape = DhunShapes.extraLarge,
                 opaqueBase = true,
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {

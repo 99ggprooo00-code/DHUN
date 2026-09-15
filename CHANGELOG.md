@@ -53,7 +53,10 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   (floored at the new `DhunSpacing.queuePanelMinHeight`), never overflows the
   safe area, and still docks above the chrome. The sheet also paints an opaque
   base under the glass (`GlassBottomBar(opaqueBase = true)`) — the strongest
-  glass token is ~72% translucent, which was unreadable over artwork.
+  glass token is ~72% translucent, which was unreadable over artwork. On a
+  wide window it is capped to `DhunSpacing.playerContentMaxWidth` and centred
+  (all four corners rounded, since it floats above the cluster rather than
+  touching the bottom edge).
 - **Readable queue rows + an obvious way out.** Rows keep 48dp artwork (was
   44dp), title, artist, current-track highlight and tap-to-play, and gain the
   track duration (`queueRowDurationLabel`: `m:ss`, `h:mm:ss` past an hour,
