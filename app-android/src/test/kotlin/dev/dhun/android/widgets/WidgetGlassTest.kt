@@ -31,8 +31,15 @@ class WidgetGlassTest {
     }
 
     @Test
+    fun `fill stays a little transparent — google search widget style`() {
+        // Pinned so the card can only drift deliberately: dense widget content
+        // needs more opacity than a one-glyph search bar.
+        assertEquals(0.80f, WidgetGlass.FILL_ALPHA, 0.001f)
+    }
+
+    @Test
     fun `applyAlpha replaces the channel and clamps`() {
-        assertEquals(0xB31C1B22.toInt(), WidgetGlass.applyAlpha(0xFF1C1B22.toInt(), 0.70f))
+        assertEquals(0xCC1C1B22.toInt(), WidgetGlass.applyAlpha(0xFF1C1B22.toInt(), 0.80f))
         assertEquals(0xFF123456.toInt(), WidgetGlass.applyAlpha(0x80123456.toInt(), 1f))
         assertEquals(0x00123456, WidgetGlass.applyAlpha(0xFF123456.toInt(), -1f))
         assertEquals(0xFF123456.toInt(), WidgetGlass.applyAlpha(0xFF123456.toInt(), 2f))
@@ -48,7 +55,7 @@ class WidgetGlassTest {
 
     @Test
     fun `bitmap composites without throwing and keeps geometry`() {
-        val out = WidgetGlass.bitmap(200, 100, 20f, 0xB31C1B22.toInt(), 0x29FFFFFF)
+        val out = WidgetGlass.bitmap(200, 100, 20f, 0xCC1C1B22.toInt())
         assertNotNull(out)
         assertEquals(200, out.width)
         assertEquals(100, out.height)

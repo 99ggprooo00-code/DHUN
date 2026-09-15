@@ -3,49 +3,42 @@ package dev.dhun.android.widgets
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.Shader
 import android.util.LruCache
 import androidx.core.content.ContextCompat
 import dev.dhun.android.R
 
 /**
- * Renders the frosted-glass card behind widget content.
+ * Renders the translucent card behind widget content — flat Material You
+ * tint at [FILL_ALPHA], Google Search widget style, with fully-opaque
+ * text/controls on top.
  *
  * Why a runtime bitmap: XML drawables cannot apply translucency to the
  * dynamic system colors (`@android:color/system_accent1_*` are opaque and
  * there is no alpha-combining mechanism in resources). So the tint is
  * resolved at runtime ([ContextCompat.getColor] follows the wallpaper +
- * light/dark mode) and composited here: tinted fill at [FILL_ALPHA], a soft
- * top sheen, and a hairline edge. True blur-behind is not exposed to app
- * widgets on any API level — translucency over the wallpaper is the
- * platform's glass look, and fully-opaque text/controls on top keep it
- * legible.
+ * light/dark mode) and composited here. Deliberately flat — no sheen, no
+ * faux edge: that is the M3 widget language, and it keeps dense content
+ * (small text, progress, five buttons) legible over busy wallpapers. True
+ * blur-behind is not exposed to app widgets on any API level;
+ * translucency over the wallpaper is the platform's glass look.
  *
  * Bitmaps are aspect-correct per widget instance (from the host's reported
- * dp size) but capped at [MAX_EDGE_PX] — glass is soft gradients, so
- * upscaling in the [android.widget.ImageView] is invisible and keeps the
- * RemoteViews transaction far under the binder limit. Results are cached;
- * a theme change resolves new colors and therefore new cache keys, so the
- * glass follows light/dark switches within one push.
+ * dp size) but capped at [MAX_EDGE_PX] — a flat fill upscales invisibly and
+ * keeps the RemoteViews transaction far under the binder limit. Results are
+ * cached; a theme change resolves new colors and therefore new cache keys,
+ * so the card follows light/dark switches within one push.
  */
 object WidgetGlass {
 
-    /** Fill opacity of the glass card. */
-    const val FILL_ALPHA = 0.70f
-
-    /** Peak opacity of the top sheen. */
-    const val SHEEN_ALPHA = 0.12f
-
-    /** Fraction of the card height the sheen covers. */
-    const val SHEEN_FRACTION = 0.45f
+    /** Fill opacity — "a little transparent", Google Search widget style. */
+    const val FILL_ALPHA = 0.80f
 
     /** Card corner radius, matching the M3 widget chrome. */
     const val CORNER_RADIUS_DP = 28f
 
-    /** Longest bitmap edge in px — glass gradients upscale invisibly. */
+    /** Longest bitmap edge in px — a flat fill upscales invisibly. */
     const val MAX_EDGE_PX = 256
 
     private const val CACHE_ENTRIES = 12
@@ -68,9 +61,8 @@ object WidgetGlass {
         val scale = if (fullW > 0f) px / fullW else 1f
         val radiusPx = (CORNER_RADIUS_DP * density * scale).coerceAtMost(minOf(px, py) / 2f)
         val fill = ContextCompat.getColor(context, R.color.widget_background)
-        val stroke = ContextCompat.getColor(context, R.color.widget_outline)
-        val key = "$px,$py,${radiusPx.toInt()},$fill,$stroke"
-        cache.get(key) ?: bitmap(px, py, radiusPx, applyAlpha(fill, FILL_ALPHA), stroke)
+        val key = "$px,$py,${radiusPx.toInt()},$fill"
+        cache.get(key) ?: bitmap(px, py, radiusPx, applyAlpha(fill, FILL_ALPHA))
             .also { runCatching { cache.put(key, it) } }
     }.getOrNull()
 
@@ -79,16 +71,12 @@ object WidgetGlass {
         runCatching { cache.evictAll() }
     }
 
-    /**
-     * Composites fill + sheen + edge stroke. Pure drawing — no resources,
-     * no cache.
-     */
+    /** Flat rounded fill. Pure drawing — no resources, no cache. */
     internal fun bitmap(
         widthPx: Int,
         heightPx: Int,
         radiusPx: Float,
         fillArgb: Int,
-        strokeArgb: Int,
     ): Bitmap {
         val w = widthPx.coerceAtLeast(1)
         val h = heightPx.coerceAtLeast(1)
@@ -96,31 +84,8 @@ object WidgetGlass {
         val canvas = Canvas(out)
         val rect = RectF(0f, 0f, w.toFloat(), h.toFloat())
         val radius = radiusPx.coerceIn(0f, minOf(w, h) / 2f)
-
         val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fillArgb }
         canvas.drawRoundRect(rect, radius, radius, fill)
-
-        // Top sheen: white fading to transparent; CLAMP holds transparency
-        // below the sheen band so one draw covers the card.
-        val sheenH = (h * SHEEN_FRACTION).coerceAtLeast(1f)
-        val sheen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                0f, 0f, 0f, sheenH,
-                applyAlpha(0xFFFFFF, SHEEN_ALPHA),
-                0x00000000,
-                Shader.TileMode.CLAMP,
-            )
-        }
-        canvas.drawRoundRect(rect, radius, radius, sheen)
-
-        val strokeW = (minOf(w, h) / 128f).coerceAtLeast(1f)
-        val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = strokeW
-            color = strokeArgb
-        }
-        val inset = strokeW / 2f
-        canvas.drawRoundRect(RectF(inset, inset, w - inset, h - inset), radius, radius, edge)
         return out
     }
 

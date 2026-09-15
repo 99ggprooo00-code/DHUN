@@ -40,7 +40,7 @@ import dev.dhun.android.playback.DhunPlaybackService
  * Layouts are responsive per instance ([layoutForNowPlaying],
  * [layoutForQuickPlay]) from the host's reported size, and re-selected on
  * every push plus `onAppWidgetOptionsChanged` (resize). Every tier sits on a
- * frosted-glass card ([WidgetGlass]) with fully-opaque content on top.
+ * translucent M3 card ([WidgetGlass]) with fully-opaque content on top.
  */
 object DhunWidgetUpdater {
 
@@ -523,7 +523,7 @@ object DhunWidgetUpdater {
     }
 
     /**
-     * Paints the frosted-glass card behind the content. Falls back to the
+     * Paints the translucent card behind the content. Falls back to the
      * solid chrome if the glass bitmap cannot be rendered.
      */
     private fun RemoteViews.applyGlass(

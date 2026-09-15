@@ -44,10 +44,12 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 - **Live updates**: `DhunPlaybackService` pushes widget state on every player
   event (debounced) plus a 10s progress tick while playing — no more stale
   track info. The controller-pull path remains for the app-dead case.
-- **Frosted-glass card**: the M3 tint is rendered at runtime as a translucent
-  rounded bitmap (70% fill + top sheen + hairline edge) with opaque content
-  on top — wallpaper shows through on every API level, and the tint still
-  follows light/dark mode. Picker previews are static solid mockups.
+- **Translucent M3 card**: the dynamic tint is rendered at runtime as a flat
+  translucent rounded card (80% — Google Search widget style, no sheen or
+  faux edge) with opaque content on top. True blur is not exposed to widgets
+  on any API level, so translucency over the wallpaper is the platform's
+  glass look; the tint still follows wallpaper + light/dark mode. Picker
+  previews are static solid mockups.
 - Tests: state/progress/time-format, tier selection, artwork pipeline, glass
   renderer, new intent actions, and the XML/drawable/palette contract are
   pinned (`DhunWidgetStateTest`, `DhunWidgetUpdaterTest`,
