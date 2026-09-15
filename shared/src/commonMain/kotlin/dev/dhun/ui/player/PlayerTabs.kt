@@ -179,7 +179,7 @@ internal fun QueueTabContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
             ) {
-                Box(modifier = Modifier.size(DhunSpacing.compactTarget).clip(DhunShapes.medium)) {
+                Box(modifier = Modifier.size(DhunSpacing.touchTarget).clip(DhunShapes.medium)) {
                     ArtworkImage(
                         imageUrl = track.thumbnailUrl,
                         contentDescription = null, // The adjacent title already labels the row.
@@ -220,6 +220,16 @@ internal fun QueueTabContent(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                // Length, so a row can be judged without playing it. Unknown
+                // durations show nothing rather than a misleading "0:00".
+                queueRowDurationLabel(track.durationSeconds)?.let { duration ->
+                    Text(
+                        text = duration,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DhunColors.textTertiary,
+                        maxLines = 1,
+                    )
+                }
                 QueueRowActions(
                     track = track,
                     index = index,
@@ -233,6 +243,18 @@ internal fun QueueTabContent(
             }
         }
     }
+}
+
+/**
+ * Row length for queue rows: `m:ss`, or `h:mm:ss` past an hour.
+ *
+ * Null when the provider never told us the duration (or gave a nonsense one),
+ * so the row shows no time column instead of a permanent `0:00`.
+ */
+internal fun queueRowDurationLabel(durationSeconds: Int?): String? {
+    val seconds = durationSeconds?.takeIf { it > 0 } ?: return null
+    val ms = seconds.toLong() * 1_000L
+    return formatMs(ms, ms)
 }
 
 /** Visible keyboard-friendly alternatives to drag and swipe; shared list stays unchanged. */

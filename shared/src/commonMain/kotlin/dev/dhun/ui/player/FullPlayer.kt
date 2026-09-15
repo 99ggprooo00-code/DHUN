@@ -92,6 +92,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
@@ -108,26 +109,41 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.GlassBottomBar
+import dev.dhun.design.fittedPlayerArtworkSize
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.player.SkipDirection
 
 /**
  * FullPlayer — the immersive, full-screen Now Playing view.
  *
- * The now-playing artwork **is** the screen: a sharp full-bleed copy of the
- * artwork (slide + fade on track change) sits over a once-per-track blurred,
- * enlarged bleed of the same image, and a smooth bottom scrim fades into the
- * surface so the overlaid chrome — title, artist, progress bar, transport —
- * stays legible without boxing the art into a card.
+ * Two artwork layers, one source: a **fit-to-card** sharp artwork in the upper
+ * field, over a once-per-track **blurred, darkened bleed** of the same image
+ * that carries the whole screen and glows behind the controls at the bottom.
  *
- * Layout (top → bottom): collapse strip (drag down to dismiss) · open
- * artwork field · bottom overlay: busy/error state · title + artist with
- * overflow & favourite chips · progress · previous/play/next · volume
- * (desktop) · queue / shuffle / repeat / lyrics action row.
+ * Layout (top → bottom):
+ *  1. collapse strip (drag down to dismiss);
+ *  2. artwork hero field — a square, clipped card holding the *entire* cover
+ *     (`ContentScale.Fit`: nothing is cropped, so faces/covers are never cut
+ *     off) sized by [dev.dhun.design.fittedPlayerArtworkSize] so it respects
+ *     both axes and the max-artwork token. In lyrics-dominant mode the rounded
+ *     lyrics card rises into this same field;
+ *  3. bottom control cluster, docked to the bottom edge: busy/error state ·
+ *     title + artist with overflow & favourite chips · progress ·
+ *     previous/play/next · volume (desktop) · queue / shuffle / repeat /
+ *     lyrics action row. It sits over a **blurred, darkened** copy of the same
+ *     artwork ([playerAmbientScrimStops]), never over the sharp thumbnail —
+ *     the sharp art stays in its card up top.
+ *
+ * The bottom cluster is bottom-docked by construction: the hero field is a
+ * `weight(1f)` box that is *always* emitted, so the chrome can never drift up
+ * under the top bar (an invisible `AnimatedVisibility` used to emit no layout
+ * node at all, which hoisted the whole control cluster to the top of the
+ * screen).
  *
  * **Queue panel:** the queue glyph opens a glass bottom sheet
- * (Queue | Related) that docks above the chrome; the artwork stays
- * full-bleed behind it.
+ * (Queue | Related) with a real height ([queuePanelMetrics]) that docks above
+ * the chrome, so rows stay readable at 48dp artwork + title + artist +
+ * duration, with the current track highlighted and an explicit close control.
  *
  * **Lyrics-dominant mode (ADR-002 P6):** the lyrics glyph (CC) recedes the
  * sharp artwork to a darkened blur and raises a rounded card carrying the
@@ -238,35 +254,13 @@ fun FullPlayer(
                 indication = null,
             ) {},
     ) {
-        // ---- full-bleed immersive backdrop (runs under the status bar) ------
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clipToBounds(),
-        ) {
-            ImmersiveBackdrop(
-                track = current,
-                skipDirection = skipDirection,
-                isPlaying = isPlaying,
-                lyricsDominant = lyricsDominant,
-                cacheKey = artworkCacheKey,
-            )
-        }
-        // Smooth fade into the surface: legible chrome at the bottom while the
-        // artwork stays visible across the upper field.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0.00f to DhunColors.background.copy(alpha = 0.28f),
-                        0.10f to Color.Transparent,
-                        0.46f to Color.Transparent,
-                        0.70f to DhunColors.background.copy(alpha = 0.55f),
-                        0.86f to DhunColors.background.copy(alpha = 0.90f),
-                        1.00f to DhunColors.background.copy(alpha = 0.97f),
-                    ),
-                ),
+        // ---- artwork backdrop (runs under the status bar) -------------------
+        // Blurred once per track, darkened towards the bottom so the control
+        // cluster reads over it; the sharp thumbnail never reaches down here.
+        ArtworkBackdrop(
+            track = current,
+            lyricsDominant = lyricsDominant,
+            cacheKey = artworkCacheKey,
         )
 
         // ---- foreground (inside the safe drawing area) ------------------------
@@ -347,30 +341,41 @@ fun FullPlayer(
                     }
                 }
 
-                // Open artwork field. In lyrics-dominant mode the rounded
-                // lyrics card rises into this space (ADR-002 P6); otherwise the
-                // full-bleed artwork behind it is the entire visual. The card
-                // itself carries the weight so the open field stays open in
-                // plain mode (empty visibility still reserves the space).
-                AnimatedVisibility(
-                    visible = lyricsDominant,
+                // ---- artwork hero field ------------------------------------
+                // The field is a `weight(1f)` box that is emitted on every
+                // composition: it always claims the space between the top bar
+                // and the control cluster, which is what keeps the cluster
+                // docked to the bottom edge instead of riding up under the
+                // top bar.
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    enter = slideInVertically(DhunAnimations.mediumTween()) { offset -> offset / 4 } +
-                        fadeIn(DhunAnimations.mediumTween()),
-                    exit = slideOutVertically(DhunAnimations.fastTween()) { offset -> offset / 4 } +
-                        fadeOut(DhunAnimations.fastTween()),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    LyricsCard(
+                    ArtworkHeroField(
+                        track = current,
+                        skipDirection = skipDirection,
+                        isPlaying = isPlaying,
+                        lyricsDominant = lyricsDominant,
+                    )
+                    // Lyrics-dominant mode (ADR-002 P6) raises a rounded card
+                    // into the same field while the sharp artwork recedes.
+                    LyricsCardOverlay(
+                        visible = lyricsDominant,
                         artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
                         cacheKey = artworkCacheKey,
                         viewModel = viewModel,
                         accent = accent,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
 
-                // ---- bottom chrome overlaid on the artwork ---------------------
+                // ---- bottom control cluster -----------------------------------
+                // Last child of the hero/animation column, so it is docked to
+                // the bottom edge and sits over the blurred artwork backdrop
+                // (never over the sharp thumbnail, which stays in its card).
+                // Its measured height is the queue sheet's bottom inset.
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -515,8 +520,8 @@ fun FullPlayer(
 
                     Spacer(modifier = Modifier.height(DhunSpacing.sm))
 
-                    // Main transport — plain oversized icons over the artwork
-                    // (the reference's sleek look: no disc, no shadow).
+                    // Main transport — plain oversized icons over the blurred
+                    // backdrop (the reference's sleek look: no disc, no shadow).
                     BoxWithConstraints(
                         modifier = Modifier
                             .widthIn(max = DhunSpacing.playerTransportMaxWidth)
@@ -650,8 +655,12 @@ fun FullPlayer(
                 }
             }
 
-            // Queue / Related sheet — docks above the chrome while the
-            // artwork stays full-bleed behind it.
+            // ---- queue / related sheet ------------------------------------
+            // Docks above the control cluster with a real, measured height. A
+            // bare height fraction minus a *pixel* value interpreted as dp is
+            // what used to starve the sheet on Android (density ~2.75 left no
+            // row height at all — the tap looked dead) and leave a thin,
+            // unreadable bar on desktop.
             AnimatedVisibility(
                 visible = panelOpen && !lyricsDominant,
                 enter = slideInVertically(DhunAnimations.mediumTween()) { it } +
@@ -659,34 +668,14 @@ fun FullPlayer(
                 exit = slideOutVertically(DhunAnimations.fastTween()) { it } +
                     fadeOut(DhunAnimations.fastTween()),
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.BottomCenter,
-                ) {
-                    GlassBottomBar(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight(QUEUE_PANEL_HEIGHT_FRACTION)
-                            .padding(bottom = Dp(chromeHeightPx.intValue.toFloat())),
-                        shape = DhunShapes.bottomSheet,
-                    ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            PanelTabRow(
-                                selectedTab = panelTab,
-                                onSelect = onPanelTabSelect,
-                                accent = accent,
-                                modifier = Modifier.padding(top = DhunSpacing.sm),
-                            )
-                            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                                PlayerTabContent(
-                                    tab = panelTab,
-                                    viewModel = viewModel,
-                                    accent = accent,
-                                )
-                            }
-                        }
-                    }
-                }
+                QueueSheet(
+                    viewModel = viewModel,
+                    selectedTab = panelTab,
+                    onSelectTab = onPanelTabSelect,
+                    onClose = onQueueToggle,
+                    accent = accent,
+                    chromeHeightPx = chromeHeightPx.intValue,
+                )
             }
         }
     }
@@ -695,8 +684,53 @@ fun FullPlayer(
 /** Lyrics tab index within the player's plain tab set (Lyrics | Queue | Related). */
 internal const val LYRICS_TAB_INDEX = 0
 
-/** Share of the screen the Queue/Related sheet occupies above the chrome. */
-private const val QUEUE_PANEL_HEIGHT_FRACTION = 0.52f
+/** Share of the room above the chrome the Queue/Related sheet aims to fill. */
+private const val QUEUE_PANEL_HEIGHT_FRACTION = 0.68f
+
+/**
+ * Geometry of the Queue/Related sheet: how tall it is, and how far it floats
+ * above the bottom edge so the control cluster underneath stays reachable.
+ *
+ * [bottomInset] is the chrome height converted from **pixels** to dp — the
+ * conversion is the whole point: passing raw pixels to `Dp()` inflated the
+ * inset by the display density, which on a phone (~2.75×) consumed the entire
+ * sheet and left it as an empty translucent bar.
+ */
+internal data class QueuePanelMetrics(val height: Dp, val bottomInset: Dp)
+
+/**
+ * Panel geometry for [availableHeight] of safe-area room and a measured chrome
+ * height of [chromeHeight] (both dp, [chromeHeight] already density-correct).
+ *
+ * The sheet never grows past the room above the chrome and never collapses
+ * below [DhunSpacing.queuePanelMinHeight] unless there is simply less room
+ * than that — in which case it takes the room it has instead of overflowing.
+ */
+internal fun queuePanelMetrics(
+    availableHeight: Dp,
+    chromeHeight: Dp,
+    fraction: Float = QUEUE_PANEL_HEIGHT_FRACTION,
+): QueuePanelMetrics {
+    val available = availableHeight.coerceAtLeast(DhunSpacing.zero)
+    val chrome = chromeHeight.coerceIn(DhunSpacing.zero, available)
+    val room = available - chrome
+    if (room <= DhunSpacing.zero) return QueuePanelMetrics(DhunSpacing.zero, chrome)
+    val desired = room * fraction.coerceIn(0f, 1f)
+    val floor = DhunSpacing.queuePanelMinHeight.coerceAtMost(room)
+    return QueuePanelMetrics(desired.coerceIn(floor, room), chrome)
+}
+
+/**
+ * Converts a measured pixel height (`onSizeChanged`) into dp.
+ *
+ * Density is the only correct divisor: `Dp(px)` treats a *pixel* count as dp,
+ * which is 2–3.5× too many on a phone screen. A non-finite/non-positive
+ * density degrades to 1:1 instead of inf/NaN.
+ */
+internal fun chromeHeightDp(pixelHeight: Int, density: Float): Dp {
+    val safeDensity = if (density.isFinite() && density > 0f) density else 1f
+    return (pixelHeight.coerceAtLeast(0) / safeDensity).dp
+}
 
 /**
  * ADR-002 rule 5: the lyrics (CC) control toggles lyrics-dominant mode on the
@@ -716,45 +750,37 @@ internal fun shouldCollapseFullPlayer(dragPx: Float, thresholdPx: Float): Boolea
     dragPx.isFinite() && thresholdPx.isFinite() && thresholdPx > 0f && dragPx >= thresholdPx
 
 /**
- * The immersive backdrop — full-bleed artwork behind the whole screen.
+ * The blurred-artwork backdrop that carries the whole screen.
  *
  * Three layers, back to front:
  *  1. [PlayerBackdrop] — the blurred, enlarged bleed (blur once, ADR-002 P4),
  *     scaled past the screen edges so the blur never shows a hard rim;
- *  2. the sharp full-bleed artwork, which animates (slide + fade) on track
- *     changes. It lives OUTSIDE the keyed backdrop subtree so a track change
- *     crossfades instead of replacing the layer mid-transition;
+ *  2. the ambient scrim ([playerAmbientScrimStops]) — a vertical gradient in
+ *     the surface colour, still fully transparent across the middle so the
+ *     blur *glows* there and heavy towards the bottom so the control cluster
+ *     (title, progress, transport) is legible over it;
  *  3. a dim that deepens while lyrics-dominant so the lyrics card reads.
+ *
+ * The sharp artwork is **not** here: it lives in its own fit-to-card hero
+ * ([ArtworkHeroField]) so a portrait screen never has to crop a 16:9 cover to
+ * fill. Nothing in this composable animates per frame.
  */
 @Composable
-private fun ImmersiveBackdrop(
+private fun ArtworkBackdrop(
     track: Track?,
-    skipDirection: SkipDirection,
-    isPlaying: Boolean,
     lyricsDominant: Boolean,
     cacheKey: String,
 ) {
     val dimColor by animateColorAsState(
-        targetValue = Color.Black.copy(alpha = if (lyricsDominant) 0.52f else 0.30f),
+        targetValue = Color.Black.copy(alpha = if (lyricsDominant) 0.52f else 0.16f),
         animationSpec = DhunAnimations.slowTween(),
         label = "backdropDim",
     )
-    val sharpAlpha by animateFloatAsState(
-        targetValue = if (lyricsDominant) 0f else 1f,
-        animationSpec = DhunAnimations.mediumTween(),
-        label = "sharpArtAlpha",
-    )
-    val playScale by animateFloatAsState(
-        targetValue = if (isPlaying) 1.03f else 1f,
-        animationSpec = DhunAnimations.springSpec(),
-        label = "backdropPlayScale",
-    )
-
     Box(modifier = Modifier.fillMaxSize()) {
-        // Hi-res tier for the backdrop — the same Coil key as the sharp layer
-        // below, so the bytes are fetched once, not twice. Keyed by the
-        // track's BlurredArtworkCache key: unrelated recompositions (position
-        // ticks, tab switches, dim crossfades) never restart it.
+        // Hi-res tier for the backdrop — the same Coil key as the hero card,
+        // so the bytes are fetched once, not twice. Keyed by the track's
+        // BlurredArtworkCache key: unrelated recompositions (position ticks,
+        // tab switches, dim crossfades) never restart it.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -767,6 +793,80 @@ private fun ImmersiveBackdrop(
                 )
             }
         }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(ambientScrimBrush()),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(dimColor),
+        )
+    }
+}
+
+/**
+ * Ambient scrim color stops (`offset to alpha`, alphas applied to the surface
+ * colour): clear across the middle so the blurred bleed glows, dark towards
+ * the bottom so titles, progress and transport stay legible, and light at the
+ * very top so the "NOW PLAYING" strip reads under the status bar.
+ *
+ * Kept as data (not a hard-coded brush) so the legibility contract — clears
+ * out in the middle, darkens monotonically towards the bottom, never fully
+ * opaque — is unit-tested rather than eyeballed.
+ */
+internal fun playerAmbientScrimStops(): List<Pair<Float, Float>> = listOf(
+    0.00f to 0.30f,
+    0.16f to 0.10f,
+    0.42f to 0.00f,
+    0.58f to 0.24f,
+    0.72f to 0.52f,
+    0.86f to 0.78f,
+    1.00f to 0.92f,
+)
+
+/** [playerAmbientScrimStops] as the brush the backdrop actually paints. */
+@Composable
+private fun ambientScrimBrush(): Brush = Brush.verticalGradient(
+    colorStops = playerAmbientScrimStops()
+        .map { (offset, alpha) -> offset to DhunColors.background.copy(alpha = alpha) }
+        .toTypedArray(),
+)
+
+/**
+ * The sharp artwork, fit to a square card in the upper field.
+ *
+ * The card is sized by [fittedPlayerArtworkSize], so it respects the width,
+ * the *height* and the max-artwork token, and the image inside is drawn with
+ * [ContentScale.Fit]: a 16:9 cover or a square avatar is shown whole — never
+ * cropped/zoomed — with the blurred backdrop showing through the letterbox
+ * bands instead of black bars. Slide + fade on track change, a gentle
+ * play-scale, and a fade-out while lyrics-dominant (ADR-002 P6).
+ */
+@Composable
+private fun ArtworkHeroField(
+    track: Track?,
+    skipDirection: SkipDirection,
+    isPlaying: Boolean,
+    lyricsDominant: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val sharpAlpha by animateFloatAsState(
+        targetValue = if (lyricsDominant) 0f else 1f,
+        animationSpec = DhunAnimations.mediumTween(),
+        label = "sharpArtAlpha",
+    )
+    val playScale by animateFloatAsState(
+        targetValue = if (isPlaying) 1.02f else 1f,
+        animationSpec = DhunAnimations.springSpec(),
+        label = "heroPlayScale",
+    )
+    BoxWithConstraints(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        val cardSize = fittedPlayerArtworkSize(maxWidth, maxHeight)
         AnimatedContent(
             targetState = track,
             transitionSpec = {
@@ -784,33 +884,77 @@ private fun ImmersiveBackdrop(
                         )
                 }
             },
-            label = "immersiveArtworkChange",
+            contentAlignment = Alignment.Center,
+            label = "heroArtworkChange",
         ) { t ->
-            ArtworkImage(
-                imageUrl = ArtworkUrls.nowPlaying(t?.thumbnailUrl),
-                contentDescription = t?.title,
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .size(cardSize)
                     .graphicsLayer {
                         alpha = sharpAlpha
                         scaleX = playScale
                         scaleY = playScale
-                    },
-                shape = RectangleShape,
-                contentScale = ContentScale.Crop,
-            )
+                    }
+                    .clip(DhunShapes.artworkHero)
+                    .background(DhunColors.scrim.copy(alpha = 0.35f))
+                    .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.artworkHero)
+                    // Whole cover, never cropped: a taller card than the source
+                    // aspect shows the blurred backdrop in the free bands.
+                    .padding(DhunSpacing.xs),
+                contentAlignment = Alignment.Center,
+            ) {
+                ArtworkImage(
+                    imageUrl = ArtworkUrls.nowPlaying(t?.thumbnailUrl),
+                    contentDescription = t?.title,
+                    modifier = Modifier.fillMaxSize(),
+                    shape = DhunShapes.artwork,
+                    contentScale = ContentScale.Fit,
+                    // Let the blurred bleed show in the free bands: the whole
+                    // cover stays visible and the card still reads as artwork.
+                    placeholderBase = false,
+                )
+            }
         }
-        // Depth: deepens behind the lyrics card, stays subtle in main mode.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(dimColor),
+    }
+}
+
+/**
+ * Raises the lyrics card into the artwork hero field (ADR-002 P6).
+ *
+ * A standalone composable rather than an inline `AnimatedVisibility` inside
+ * the field's `Box`: `BoxScope` carries the layout-scope marker, which hides
+ * the surrounding `ColumnScope` and with it the column-scoped
+ * `AnimatedVisibility` overload. Here the plain overload resolves, and
+ * enter/exit are passed explicitly, so the motion is unchanged.
+ */
+@Composable
+private fun LyricsCardOverlay(
+    visible: Boolean,
+    artworkUrl: String?,
+    cacheKey: String,
+    viewModel: PlayerViewModel,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = slideInVertically(DhunAnimations.mediumTween()) { offset -> offset / 4 } +
+            fadeIn(DhunAnimations.mediumTween()),
+        exit = slideOutVertically(DhunAnimations.fastTween()) { offset -> offset / 4 } +
+            fadeOut(DhunAnimations.fastTween()),
+    ) {
+        LyricsCard(
+            artworkUrl = artworkUrl,
+            cacheKey = cacheKey,
+            viewModel = viewModel,
+            accent = accent,
         )
     }
 }
 
 /**
- * Blurred-artwork bleed (ADR-002 P4). [ImmersiveBackdrop] mounts this inside
+ * Blurred-artwork bleed (ADR-002 P4). [ArtworkBackdrop] mounts this inside
  * `key(BlurredArtworkCache.keyFor(...))`, so every track change starts one
  * fresh layer and nothing else recomposes it — the blur radius animates in
  * exactly once per track, then the layer is static. Re-entering the player
@@ -1071,6 +1215,130 @@ private fun ImmersivePlayButton(
                     .graphicsLayer { scaleX = scale; scaleY = scale },
                 tint = if (enabled) DhunColors.textPrimary else DhunColors.textDisabled,
             )
+        }
+    }
+}
+
+/**
+ * The Queue / Related sheet.
+ *
+ * Height and bottom inset come from [queuePanelMetrics] — a share of the room
+ * actually left above the measured control cluster, floored at
+ * [DhunSpacing.queuePanelMinHeight] — so the sheet is a real, readable panel
+ * on a phone and on a desktop window instead of a thin translucent sliver. Its
+ * width is capped to the player content budget so a wide window gets readable
+ * rows rather than one stretched line.
+ * It paints an opaque base under the glass (like every other sheet in the
+ * app) because translucent-over-artwork left the rows illegible, and it
+ * closes through two obvious affordances: the header ✕ and the queue glyph in
+ * the bottom action row.
+ */
+@Composable
+private fun QueueSheet(
+    viewModel: PlayerViewModel,
+    selectedTab: Int,
+    onSelectTab: (Int) -> Unit,
+    onClose: () -> Unit,
+    accent: Color,
+    chromeHeightPx: Int,
+) {
+    val density = LocalDensity.current
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val metrics = queuePanelMetrics(
+            availableHeight = maxHeight,
+            chromeHeight = chromeHeightDp(chromeHeightPx, density.density),
+        )
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            GlassBottomBar(
+                modifier = Modifier
+                    // Same width budget as the player's own content column, so
+                    // a wide desktop window gets a centred, readable sheet
+                    // instead of rows stretched across the whole screen.
+                    .widthIn(max = DhunSpacing.playerContentMaxWidth)
+                    .fillMaxWidth()
+                    .padding(bottom = metrics.bottomInset)
+                    .height(metrics.height),
+                // All four corners round: the sheet floats above the control
+                // cluster, it does not touch the bottom edge.
+                shape = DhunShapes.extraLarge,
+                opaqueBase = true,
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    QueueSheetHeader(
+                        title = if (selectedTab == 2) "Related" else "Up next",
+                        onClose = onClose,
+                    )
+                    PanelTabRow(
+                        selectedTab = selectedTab,
+                        onSelect = onSelectTab,
+                        accent = accent,
+                        modifier = Modifier.padding(horizontal = DhunSpacing.sm),
+                    )
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        PlayerTabContent(
+                            tab = selectedTab,
+                            viewModel = viewModel,
+                            accent = accent,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Sheet header: grab pill, what the sheet holds, and a 48dp close target —
+ * the queue glyph below only *toggles*, so the sheet needs its own visible way
+ * out on both touch and mouse.
+ */
+@Composable
+private fun QueueSheetHeader(title: String, onClose: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.sm)) {
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .width(DhunSpacing.xxxl)
+                    .height(DhunSpacing.xsPlus)
+                    .clip(DhunShapes.full)
+                    .background(DhunColors.glassEdge),
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(DhunSpacing.huge)
+                .padding(start = DhunSpacing.lg, end = DhunSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = DhunColors.textPrimary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            DhunIconButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .size(DhunSpacing.touchTarget)
+                    .clip(DhunShapes.full)
+                    .background(DhunColors.glassStrong)
+                    .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.full),
+                contentDescription = "Close queue",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = DhunColors.textPrimary,
+                )
+            }
         }
     }
 }

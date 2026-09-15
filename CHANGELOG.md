@@ -24,6 +24,49 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — Now Playing: fit-to-card artwork, bottom-docked controls, working queue sheet — 2026-09-15
+- **Artwork is no longer zoomed/cropped.** The now-playing cover is a square,
+  clipped card sized by `fittedPlayerArtworkSize` (fits the width, the height
+  and `DhunSpacing.playerArtworkMaxSize`) and drawn with `ContentScale.Fit`
+  inside it, so a cover is shown whole — nothing is cut off on Android or
+  Windows. Free bands reveal the blurred backdrop below instead of grey bars
+  (`ArtworkImage(placeholderBase = false)`), and the card keeps its slide/fade
+  per track plus a light play-scale.
+- **The control cluster is docked to the bottom.** The artwork field between
+  the top bar and the chrome is now a `weight(1f)` box that is emitted on
+  every composition. It used to be an invisible `AnimatedVisibility`, which
+  emits no layout node at all once its exit transition finishes — so the
+  weight vanished and title/progress/transport/action row rode up under the
+  "NOW PLAYING" bar. Lyrics-dominant mode still raises its card into that
+  same field.
+- **Blurred, darkened artwork backdrop behind the controls.** The sharp
+  full-bleed copy is gone; the screen is carried by the once-per-track blurred
+  bleed (`BlurredArtworkCache`, blur-before-scrim order kept) plus a
+  bottom-weighted scrim (`playerAmbientScrimStops`) that stays transparent
+  across the middle so the blur glows and darkens monotonically towards the
+  bottom so titles, progress and transport stay legible.
+- **"More songs"/queue opens a usable panel on both platforms.** The sheet's
+  bottom inset was a *pixel* count handed to `Dp()`, i.e. 2–3.5× too large on
+  Android (density ≈ 2.75 left no row height at all, so the tap looked dead)
+  and enough to squeeze desktop into a thin bar. Inset and height now come
+  from `chromeHeightDp` + `queuePanelMetrics`, which guarantees a real height
+  (floored at the new `DhunSpacing.queuePanelMinHeight`), never overflows the
+  safe area, and still docks above the chrome. The sheet also paints an opaque
+  base under the glass (`GlassBottomBar(opaqueBase = true)`) — the strongest
+  glass token is ~72% translucent, which was unreadable over artwork. On a
+  wide window it is capped to `DhunSpacing.playerContentMaxWidth` and centred
+  (all four corners rounded, since it floats above the cluster rather than
+  touching the bottom edge).
+- **Readable queue rows + an obvious way out.** Rows keep 48dp artwork (was
+  44dp), title, artist, current-track highlight and tap-to-play, and gain the
+  track duration (`queueRowDurationLabel`: `m:ss`, `h:mm:ss` past an hour,
+  nothing when the provider reported no length). The sheet has a header with a
+  grab pill, an `Up next`/`Related` title and a 48dp ✕ close target beside the
+  existing queue-glyph toggle.
+- Tests: `PlayerSheetLayoutTest` pins the artwork-fit contract, the
+  panel-geometry/px→dp regressions, the backdrop scrim contract (clear in the
+  middle, dark at the bottom, never flat black) and the duration label.
+
 ### Changed — home-screen widgets rebuilt (Material You) — 2026-09-15
 - **Both widgets redesigned around Material You**: dynamic wallpaper-tinted
   palette on API 31+ (light + dark), 28dp rounded card, filled accent play
