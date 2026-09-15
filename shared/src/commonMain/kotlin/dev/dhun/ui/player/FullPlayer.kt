@@ -275,8 +275,12 @@ fun FullPlayer(
         // reduces the cover to the sliver left above a vertical control stack.
         Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val layoutMode = fullPlayerLayoutMode(maxWidth, maxHeight)
-                val compactControls = usesCompactPlayerControls(maxHeight)
+                // Capture constraints before entering Row/Column scopes, whose
+                // own scope markers deliberately hide BoxWithConstraints' axes.
+                val availableWidth = maxWidth
+                val availableHeight = maxHeight
+                val layoutMode = fullPlayerLayoutMode(availableWidth, availableHeight)
+                val compactControls = usesCompactPlayerControls(availableHeight)
 
                 @Composable
                 fun Controls(compact: Boolean, controlsModifier: Modifier = Modifier) {
@@ -386,7 +390,7 @@ fun FullPlayer(
                             Spacer(modifier = Modifier.width(DhunSpacing.playerWideLayoutGap))
                             Box(
                                 modifier = Modifier
-                                    .width(playerWideControlsWidth(maxWidth))
+                                    .width(playerWideControlsWidth(availableWidth))
                                     .fillMaxHeight(),
                                 contentAlignment = Alignment.BottomCenter,
                             ) {
