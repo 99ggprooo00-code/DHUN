@@ -2,10 +2,15 @@ package dev.dhun.ui.player
 
 import androidx.compose.ui.unit.dp
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.fittedPlayerArtworkSize
+import dev.dhun.design.fullPlayerLayoutMode
+import dev.dhun.design.playerWideControlsWidth
+import dev.dhun.design.usesCompactPlayerControls
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -31,11 +36,12 @@ class PlayerSheetLayoutTest {
     /* -------- bug 1: fit-to-card artwork, both axes ---------------------- */
 
     @Test
-    fun heroArtworkFitsTheFieldOnPhoneAndDesktopAndNeverExceedsTheCardToken() {
-        // (field width, field height) as measured inside the hero box.
+    fun heroArtworkUsesThePaddedFieldOnPhoneAndDesktopAndNeverOverflows() {
+        // (field width, field height) as measured inside the hero stage.
         val fields = listOf(
-            353.dp to 380.dp, // phone portrait, after chrome
-            680.dp to 276.dp, // desktop window, wide + short
+            328.dp to 380.dp, // 360dp phone after the 16dp side inset
+            361.dp to 520.dp, // 393dp phone: 91.9% of the safe content width
+            688.dp to 760.dp, // 720dp content column after the same inset
             1_400.dp to 800.dp, // huge window: the token caps it
             120.dp to 240.dp, // narrow pane
         )
@@ -47,6 +53,46 @@ class PlayerSheetLayoutTest {
             assertEquals(minOf(width, height, DhunSpacing.playerArtworkMaxSize), size)
         }
         assertEquals(0.dp, fittedPlayerArtworkSize(320.dp, 0.dp), "no field, no artwork")
+    }
+
+    @Test
+    fun portraitHeroKeepsTheCoverInTheRequestedWidthRange() {
+        val phoneWidths = listOf(360.dp, 393.dp)
+        phoneWidths.forEach { screenWidth ->
+            val stageWidth = screenWidth -
+                DhunSpacing.playerArtworkHorizontalInset * 2 -
+                DhunSpacing.playerArtworkAnimationInset * 2
+            val cover = fittedPlayerArtworkSize(stageWidth, 600.dp)
+            val fraction = cover.value / screenWidth.value
+            assertTrue(
+                fraction in 0.80f..0.92f,
+                "$cover should be 80–92% of a $screenWidth portrait player, was ${fraction * 100}%",
+            )
+        }
+    }
+
+    @Test
+    fun wideViewportsGiveArtworkHeightInsteadOfStarvingItAboveChrome() {
+        assertEquals(FullPlayerLayoutMode.Stacked, fullPlayerLayoutMode(393.dp, 823.dp))
+        assertEquals(FullPlayerLayoutMode.Wide, fullPlayerLayoutMode(873.dp, 393.dp))
+        assertEquals(FullPlayerLayoutMode.Wide, fullPlayerLayoutMode(1_200.dp, 780.dp))
+        assertEquals(FullPlayerLayoutMode.Stacked, fullPlayerLayoutMode(479.dp, 320.dp))
+        assertEquals(FullPlayerLayoutMode.Stacked, fullPlayerLayoutMode(480.dp, 480.dp))
+
+        // A compact landscape control column leaves a real artwork pane; it
+        // never asks the stacked layout to squeeze art above all controls.
+        val controls = playerWideControlsWidth(873.dp)
+        assertTrue(controls >= DhunSpacing.playerWideControlsMinWidth)
+        assertTrue(controls <= DhunSpacing.playerWideControlsMaxWidth)
+        assertTrue(controls + DhunSpacing.playerWideLayoutGap < 873.dp)
+    }
+
+    @Test
+    fun shortViewportsCompactOnlySpacingNotTouchTargets() {
+        assertTrue(usesCompactPlayerControls(DhunSpacing.playerCompactControlsHeight))
+        assertFalse(usesCompactPlayerControls(DhunSpacing.playerCompactControlsHeight + 1.dp))
+        assertFalse(usesCompactPlayerControls(0.dp))
+        assertEquals(0.dp, playerWideControlsWidth(0.dp))
     }
 
     /* -------- bug 3: the queue sheet is never a thin bar ----------------- */

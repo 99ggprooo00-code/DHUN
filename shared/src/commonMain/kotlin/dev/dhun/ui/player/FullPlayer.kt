@@ -82,9 +82,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -109,7 +111,11 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.GlassBottomBar
+import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.fittedPlayerArtworkSize
+import dev.dhun.design.fullPlayerLayoutMode
+import dev.dhun.design.playerWideControlsWidth
+import dev.dhun.design.usesCompactPlayerControls
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.player.SkipDirection
 
@@ -120,25 +126,24 @@ import dev.dhun.presentation.player.SkipDirection
  * field, over a once-per-track **blurred, darkened bleed** of the same image
  * that carries the whole screen and glows behind the controls at the bottom.
  *
- * Layout (top → bottom):
- *  1. collapse strip (drag down to dismiss);
- *  2. artwork hero field — a square, clipped card holding the *entire* cover
- *     (`ContentScale.Fit`: nothing is cropped, so faces/covers are never cut
- *     off) sized by [dev.dhun.design.fittedPlayerArtworkSize] so it respects
- *     both axes and the max-artwork token. In lyrics-dominant mode the rounded
- *     lyrics card rises into this same field;
- *  3. bottom control cluster, docked to the bottom edge: busy/error state ·
- *     title + artist with overflow & favourite chips · progress ·
- *     previous/play/next · volume (desktop) · queue / shuffle / repeat /
- *     lyrics action row. It sits over a **blurred, darkened** copy of the same
- *     artwork ([playerAmbientScrimStops]), never over the sharp thumbnail —
- *     the sharp art stays in its card up top.
+ * Layout:
+ *  1. **Stacked / portrait** — collapse strip, dominant artwork hero, then
+ *     metadata / progress / transport / queue-shuffle-repeat-lyrics chrome;
+ *  2. **Wide / landscape and desktop** — the same hero and control cluster
+ *     share a row, so the cover uses the viewport height instead of collapsing
+ *     into the strip above a tall control stack;
+ *  3. the hero sizes itself from its *measured, safely padded field* through
+ *     [dev.dhun.design.fittedPlayerArtworkSize]. It is `ContentScale.Fit`, so
+ *     square album art stays square and non-square artwork is never stretched
+ *     or unnecessarily cropped. In lyrics-dominant mode the rounded lyrics
+ *     card rises into this same reusable stage.
  *
- * The bottom cluster is bottom-docked by construction: the hero field is a
- * `weight(1f)` box that is *always* emitted, so the chrome can never drift up
- * under the top bar (an invisible `AnimatedVisibility` used to emit no layout
- * node at all, which hoisted the whole control cluster to the top of the
- * screen).
+ * In stacked mode the hero is an always-emitted `weight(1f)` field, so the
+ * chrome remains bottom-docked instead of drifting below the header. Busy
+ * state is an overlay inside that stable field rather than a new chrome row:
+ * buffering cannot steal artwork space or collapse its placeholder. The
+ * chrome sits over a **blurred, darkened** copy of the art
+ * ([playerAmbientScrimStops]), never over the sharp cover.
  *
  * **Queue panel:** the queue glyph opens a glass bottom sheet
  * (Queue | Related) with a real height ([queuePanelMetrics]) that docks above
@@ -263,421 +268,612 @@ fun FullPlayer(
             cacheKey = artworkCacheKey,
         )
 
-        // ---- foreground (inside the safe drawing area) ------------------------
+        // ---- foreground (inside the safe drawing area) --------------------
+        // The whole player shares one common layout. Portrait keeps the
+        // familiar artwork-above-chrome hierarchy; a short/wide viewport moves
+        // the exact same control cluster beside the hero, so landscape never
+        // reduces the cover to the sliver left above a vertical control stack.
         Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-            Column(
-                modifier = Modifier.widthIn(max = DhunSpacing.playerContentMaxWidth)
-                    .fillMaxSize()
-                    .align(Alignment.TopCenter),
-            ) {
-                // Collapse strip: sheet drag handle + top bar. A committed
-                // downward drag past the threshold collapses (never exits the
-                // app); taps and button clicks are untouched.
-                val collapseSwipeThresholdPx = with(LocalDensity.current) { DhunSpacing.touchTarget.toPx() }
-                var collapseDragPx by remember { mutableFloatStateOf(0f) }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pointerInput(collapseSwipeThresholdPx) {
-                            try {
-                                detectVerticalDragGestures(
-                                    onDragStart = { collapseDragPx = 0f },
-                                    onDragEnd = {
-                                        if (shouldCollapseFullPlayer(collapseDragPx, collapseSwipeThresholdPx)) onCollapse()
-                                        collapseDragPx = 0f
-                                    },
-                                    onDragCancel = { collapseDragPx = 0f },
-                                ) { change, dragAmount ->
-                                    change.consume()
-                                    collapseDragPx += dragAmount
-                                }
-                            } finally {
-                                collapseDragPx = 0f
-                            }
-                        },
-                ) {
-                    // Sheet drag handle — subtle frosted pill, rides the drag
-                    // as a rubber-band affordance.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = DhunSpacing.sm),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .width(DhunSpacing.xxxl)
-                                .height(DhunSpacing.xsPlus)
-                                .graphicsLayer {
-                                    translationY = collapseDragPx.coerceIn(0f, collapseSwipeThresholdPx) / 3f
-                                }
-                                .clip(DhunShapes.full)
-                                .background(DhunColors.glassEdge),
-                        )
-                    }
-                    // Top bar: collapse / label / (balance slot)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(DhunSpacing.huge)
-                            .padding(horizontal = DhunSpacing.sm),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        PlayerChipButton(
-                            icon = DhunIcon.ChevronDown,
-                            contentDescription = "Collapse player",
-                            tint = DhunColors.textPrimary,
-                            onClick = onCollapse,
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        Text(
-                            text = "NOW PLAYING",
-                            style = DhunTypographyTokens.brand,
-                            color = DhunColors.textTertiary,
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        // Invisible balance slot keeps the label centred.
-                        Spacer(modifier = Modifier.size(DhunSpacing.compactTarget))
-                    }
-                }
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                // Capture constraints before entering Row/Column scopes, whose
+                // own scope markers deliberately hide BoxWithConstraints' axes.
+                val availableWidth = maxWidth
+                val availableHeight = maxHeight
+                val layoutMode = fullPlayerLayoutMode(availableWidth, availableHeight)
+                val compactControls = usesCompactPlayerControls(availableHeight)
 
-                // ---- artwork hero field ------------------------------------
-                // The field is a `weight(1f)` box that is emitted on every
-                // composition: it always claims the space between the top bar
-                // and the control cluster, which is what keeps the cluster
-                // docked to the bottom edge instead of riding up under the
-                // top bar.
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ArtworkHeroField(
-                        track = current,
-                        skipDirection = skipDirection,
-                        isPlaying = isPlaying,
-                        lyricsDominant = lyricsDominant,
-                    )
-                    // Lyrics-dominant mode (ADR-002 P6) raises a rounded card
-                    // into the same field while the sharp artwork recedes.
-                    LyricsCardOverlay(
-                        visible = lyricsDominant,
-                        artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
-                        cacheKey = artworkCacheKey,
+                @Composable
+                fun Controls(compact: Boolean, controlsModifier: Modifier = Modifier) {
+                    PlayerControlCluster(
                         viewModel = viewModel,
+                        state = state,
+                        current = current,
+                        positionMs = positionMs,
+                        durationMs = durationMs,
+                        repeatMode = repeatMode,
+                        shuffleEnabled = shuffleEnabled,
+                        volume = volume,
+                        queueIndex = queueIndex,
+                        isDesktop = isDesktop,
+                        isFavorite = isFavorite,
                         accent = accent,
-                        modifier = Modifier.fillMaxSize(),
+                        panelOpen = panelOpen,
+                        lyricsDominant = lyricsDominant,
+                        compact = compact,
+                        onOverflowTrack = onOverflowTrack,
+                        onOpenArtist = onOpenArtist,
+                        onToggleFavorite = onToggleFavorite,
+                        onQueueToggle = onQueueToggle,
+                        onLyricsToggle = onLyricsToggle,
+                        onShowErrorDetails = { showErrorDetails = true },
+                        onHeightChanged = { chromeHeightPx.intValue = it },
+                        modifier = controlsModifier,
                     )
                 }
 
-                // ---- bottom control cluster -----------------------------------
-                // Last child of the hero/animation column, so it is docked to
-                // the bottom edge and sits over the blurred artwork backdrop
-                // (never over the sharp thumbnail, which stays in its card).
-                // Its measured height is the queue sheet's bottom inset.
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onSizeChanged { chromeHeightPx.intValue = it.height }
-                        .padding(start = DhunSpacing.xxl, end = DhunSpacing.xxl, bottom = DhunSpacing.md),
-                ) {
-                    // Source-neutral resolving/buffering/recovery status.
-                    val busyLabel = playbackBusyLabel(state)
-                    if (busyLabel != null) {
-                        Box(
+                when (layoutMode) {
+                    FullPlayerLayoutMode.Stacked -> {
+                        Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = DhunSpacing.xs)
-                                .clip(DhunShapes.large)
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            DhunColors.glassHighlight,
-                                            DhunColors.glass,
-                                        ),
-                                    ),
-                                )
-                                .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
-                            contentAlignment = Alignment.Center,
+                                .widthIn(max = DhunSpacing.playerContentMaxWidth)
+                                .fillMaxSize()
+                                .align(Alignment.TopCenter),
                         ) {
-                            Text(
-                                text = busyLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = accent,
-                            )
-                        }
-                    }
+                            PlayerHeader(onCollapse = onCollapse)
 
-                    // Playback failure — message + one-tap recovery inline, so
-                    // the player never sits silently dead on an error.
-                    if (playbackError != null) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = DhunSpacing.xs)
-                                .clip(DhunShapes.large)
-                                .background(DhunColors.errorContainer.copy(alpha = 0.55f))
-                                .border(
-                                    BorderStroke(DhunSpacing.border, DhunColors.borderError),
-                                    DhunShapes.large,
-                                )
-                                .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = playbackError.message,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = DhunColors.error,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { showErrorDetails = true }) {
-                                Text("Details", color = DhunColors.textPrimary)
-                            }
-                            TextButton(onClick = viewModel::retry) {
-                                Text("Retry", color = DhunColors.error)
-                            }
-                        }
-                    }
-
-                    // Title / artist + overflow & favourite chips (fade-update
-                    // via Crossfade). The chips are the reference's circular
-                    // "more / like" affordances beside the track name.
-                    Crossfade(
-                        targetState = current,
-                        animationSpec = DhunAnimations.mediumTween(),
-                        label = "titleFade",
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { t ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-                        ) {
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                horizontalAlignment = Alignment.Start,
+                            // Always emitted: this weighted stage is the source
+                            // of truth for the room between header and chrome.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
                             ) {
-                                Text(
-                                    text = t?.title.orEmpty(),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = DhunColors.textPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.basicMarquee(),
-                                )
-                                Text(
-                                    text = t?.artistName.orEmpty(),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = DhunColors.textSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.clickable(
-                                        enabled = t != null,
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                    ) { t?.let(onOpenArtist) },
+                                PlayerArtworkStage(
+                                    track = current,
+                                    skipDirection = skipDirection,
+                                    isPlaying = isPlaying,
+                                    lyricsDominant = lyricsDominant,
+                                    busyLabel = playbackBusyLabel(state),
+                                    artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
+                                    cacheKey = artworkCacheKey,
+                                    viewModel = viewModel,
+                                    accent = accent,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(
+                                            horizontal = DhunSpacing.playerArtworkHorizontalInset,
+                                            vertical = DhunSpacing.playerArtworkVerticalInset,
+                                        ),
                                 )
                             }
-                            PlayerChipButton(
-                                icon = DhunIcon.MoreVert,
-                                contentDescription = "More player actions",
-                                enabled = t != null,
-                                tint = DhunColors.textSecondary,
-                                onClick = { t?.let(onOverflowTrack) },
-                            )
-                            PlayerChipButton(
-                                icon = if (isFavorite) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
-                                contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                                enabled = t != null,
-                                tint = if (isFavorite) accent else DhunColors.textPrimary,
-                                onClick = { t?.let(onToggleFavorite) },
-                            )
+                            Controls(compact = compactControls)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
-
-                    // Cancel scrubbing on a new queue occurrence, even for
-                    // equal-duration tracks.
-                    key(current?.id, queueIndex) {
-                        PlayerTimeline(
-                            positionMs = positionMs,
-                            durationMs = durationMs,
-                            accent = accent,
-                            onSeek = { target ->
-                                if (viewModel.currentTrack.value?.id == current?.id &&
-                                    viewModel.currentQueueIndex.value == queueIndex
-                                ) viewModel.seekTo(target)
-                            },
-                            enabled = current != null && state !is PlaybackState.Resolving && playbackError == null,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
-
-                    // Main transport — plain oversized icons over the blurred
-                    // backdrop (the reference's sleek look: no disc, no shadow).
-                    BoxWithConstraints(
-                        modifier = Modifier
-                            .widthIn(max = DhunSpacing.playerTransportMaxWidth)
-                            .fillMaxWidth()
-                            .align(Alignment.CenterHorizontally),
-                    ) {
-                        val metrics = playerTransportMetrics(maxWidth)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState(), enabled = metrics.minimumWidth > maxWidth)
-                                .width(maxOf(maxWidth, metrics.minimumWidth))
-                                .padding(horizontal = metrics.horizontalPadding),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            key(current?.id, queueIndex, false) {
-                                HoldTapTransportButton(
-                                    enabled = current != null,
-                                    forward = false,
-                                    icon = DhunIcon.SkipPrevious,
-                                    iconSize = metrics.skipSize,
-                                    contentDescription = "Previous track",
-                                    onTap = { viewModel.previous() },
-                                    onHold = { viewModel.beginHoldSeek(forward = false) },
-                                    onRelease = { viewModel.endHoldSeek() },
+                    FullPlayerLayoutMode.Wide -> {
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            // The hero remains a distinct, reusable stage. The
+                            // overlay header reserves only its own space; it no
+                            // longer steals a whole artwork row from a landscape
+                            // player or a desktop window.
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            ) {
+                                PlayerArtworkStage(
+                                    track = current,
+                                    skipDirection = skipDirection,
+                                    isPlaying = isPlaying,
+                                    lyricsDominant = lyricsDominant,
+                                    busyLabel = playbackBusyLabel(state),
+                                    artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
+                                    cacheKey = artworkCacheKey,
+                                    viewModel = viewModel,
+                                    accent = accent,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(
+                                            start = DhunSpacing.playerArtworkHorizontalInset,
+                                            top = DhunSpacing.playerArtworkHeaderInset,
+                                            end = DhunSpacing.playerArtworkHorizontalInset,
+                                            bottom = DhunSpacing.playerArtworkVerticalInset,
+                                        ),
+                                )
+                                PlayerHeader(
+                                    onCollapse = onCollapse,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .align(Alignment.TopCenter),
                                 )
                             }
-                            ImmersivePlayButton(
-                                state = state,
-                                enabled = current != null,
-                                iconSize = metrics.playSize,
-                                onClick = viewModel::togglePlay,
-                            )
-                            key(current?.id, queueIndex, true) {
-                                HoldTapTransportButton(
-                                    enabled = current != null,
-                                    forward = true,
-                                    icon = DhunIcon.SkipNext,
-                                    iconSize = metrics.skipSize,
-                                    contentDescription = "Next track",
-                                    onTap = { viewModel.next() },
-                                    onHold = { viewModel.beginHoldSeek(forward = true) },
-                                    onRelease = { viewModel.endHoldSeek() },
-                                )
+                            Spacer(modifier = Modifier.width(DhunSpacing.playerWideLayoutGap))
+                            Box(
+                                modifier = Modifier
+                                    .width(playerWideControlsWidth(availableWidth))
+                                    .fillMaxHeight(),
+                                contentAlignment = Alignment.BottomCenter,
+                            ) {
+                                Controls(compact = compactControls)
                             }
                         }
                     }
+                }
 
-                    // Volume (desktop only — Android uses hardware keys)
-                    if (isDesktop) {
-                        Row(
-                            modifier = Modifier
-                                .widthIn(max = DhunSpacing.playerVolumeMaxWidth)
-                                .fillMaxWidth()
-                                .align(Alignment.CenterHorizontally)
-                                .padding(top = DhunSpacing.sm, start = DhunSpacing.xxl, end = DhunSpacing.xxl),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            DhunIconView(
-                                icon = DhunIcon.VolumeUp,
-                                contentDescription = null,
-                                modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                                tint = DhunColors.textSecondary,
-                            )
-                            Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                            // Bounded width: a full-bleed slider at 100% volume
-                            // read as a giant coloured error bar across the
-                            // window.
-                            Slider(
-                                value = volume,
-                                onValueChange = viewModel::setVolume,
-                                modifier = Modifier.weight(1f).semantics { contentDescription = "Volume" },
-                                colors = SliderDefaults.colors(
-                                    thumbColor = accent,
-                                    activeTrackColor = accent.copy(alpha = 0.85f),
-                                    inactiveTrackColor = DhunColors.border,
-                                ),
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
-
-                    // Bottom action row — queue / shuffle / repeat / lyrics,
-                    // the reference's sleek icon strip.
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = DhunSpacing.sm),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        ImmersiveIconAction(
-                            icon = DhunIcon.QueueMusic,
-                            contentDescription = if (panelOpen) "Close queue" else "Open queue",
-                            active = panelOpen,
-                            enabled = current != null,
-                            accent = accent,
-                            onClick = onQueueToggle,
-                        )
-                        ImmersiveIconAction(
-                            icon = DhunIcon.Shuffle,
-                            contentDescription = if (shuffleEnabled) "Disable shuffle" else "Enable shuffle",
-                            active = shuffleEnabled,
-                            enabled = current != null,
-                            accent = accent,
-                            onClick = { viewModel.toggleShuffle() },
-                        )
-                        ImmersiveIconAction(
-                            icon = if (repeatMode == RepeatMode.ONE) DhunIcon.RepeatOne else DhunIcon.Repeat,
-                            contentDescription = when (repeatMode) {
-                                RepeatMode.OFF -> "Repeat off"
-                                RepeatMode.ALL -> "Repeat all"
-                                RepeatMode.ONE -> "Repeat one"
-                            },
-                            active = repeatMode != RepeatMode.OFF,
-                            enabled = current != null,
-                            accent = accent,
-                            onClick = { viewModel.cycleRepeatMode() },
-                        )
-                        ImmersiveIconAction(
-                            icon = DhunIcon.ClosedCaption,
-                            contentDescription = if (lyricsDominant) "Exit lyrics view" else "Lyrics view",
-                            active = lyricsDominant,
-                            enabled = current != null,
-                            accent = accent,
-                            onClick = onLyricsToggle,
-                        )
-                    }
+                // ---- queue / related sheet ------------------------------------
+                // Docks above the control cluster with a real, measured height. A
+                // bare height fraction minus a *pixel* value interpreted as dp is
+                // what used to starve the sheet on Android (density ~2.75 left no
+                // row height at all — the tap looked dead) and leave a thin,
+                // unreadable bar on desktop.
+                AnimatedVisibility(
+                    visible = panelOpen && !lyricsDominant,
+                    enter = slideInVertically(DhunAnimations.mediumTween()) { it } +
+                        fadeIn(DhunAnimations.mediumTween()),
+                    exit = slideOutVertically(DhunAnimations.fastTween()) { it } +
+                        fadeOut(DhunAnimations.fastTween()),
+                ) {
+                    QueueSheet(
+                        viewModel = viewModel,
+                        selectedTab = panelTab,
+                        onSelectTab = onPanelTabSelect,
+                        onClose = onQueueToggle,
+                        accent = accent,
+                        chromeHeightPx = chromeHeightPx.intValue,
+                    )
                 }
             }
+        }
+    }
+}
 
-            // ---- queue / related sheet ------------------------------------
-            // Docks above the control cluster with a real, measured height. A
-            // bare height fraction minus a *pixel* value interpreted as dp is
-            // what used to starve the sheet on Android (density ~2.75 left no
-            // row height at all — the tap looked dead) and leave a thin,
-            // unreadable bar on desktop.
-            AnimatedVisibility(
-                visible = panelOpen && !lyricsDominant,
-                enter = slideInVertically(DhunAnimations.mediumTween()) { it } +
-                    fadeIn(DhunAnimations.mediumTween()),
-                exit = slideOutVertically(DhunAnimations.fastTween()) { it } +
-                    fadeOut(DhunAnimations.fastTween()),
+/**
+ * The persistent metadata / timeline / transport cluster. It stays in one
+ * reusable composable so portrait places it below the hero while wide
+ * viewports dock the exact same accessible controls beside it.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PlayerControlCluster(
+    viewModel: PlayerViewModel,
+    state: PlaybackState,
+    current: Track?,
+    positionMs: Long,
+    durationMs: Long,
+    repeatMode: RepeatMode,
+    shuffleEnabled: Boolean,
+    volume: Float,
+    queueIndex: Int,
+    isDesktop: Boolean,
+    isFavorite: Boolean,
+    accent: Color,
+    panelOpen: Boolean,
+    lyricsDominant: Boolean,
+    compact: Boolean,
+    onOverflowTrack: (Track) -> Unit,
+    onOpenArtist: (Track) -> Unit,
+    onToggleFavorite: (Track) -> Unit,
+    onQueueToggle: () -> Unit,
+    onLyricsToggle: () -> Unit,
+    onShowErrorDetails: () -> Unit,
+    onHeightChanged: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val playbackError = state as? PlaybackState.Error
+    val horizontalPadding = if (compact) DhunSpacing.md else DhunSpacing.xxl
+    val bottomPadding = if (compact) DhunSpacing.xs else DhunSpacing.md
+    val itemSpacing = if (compact) DhunSpacing.xs else DhunSpacing.sm
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .onSizeChanged { onHeightChanged(it.height) }
+            .padding(start = horizontalPadding, end = horizontalPadding, bottom = bottomPadding),
+    ) {
+        // Playback failure — message + one-tap recovery inline, so
+        // the player never sits silently dead on an error.
+        if (playbackError != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = DhunSpacing.xs)
+                    .clip(DhunShapes.large)
+                    .background(DhunColors.errorContainer.copy(alpha = 0.55f))
+                    .border(
+                        BorderStroke(DhunSpacing.border, DhunColors.borderError),
+                        DhunShapes.large,
+                    )
+                    .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                QueueSheet(
-                    viewModel = viewModel,
-                    selectedTab = panelTab,
-                    onSelectTab = onPanelTabSelect,
-                    onClose = onQueueToggle,
-                    accent = accent,
-                    chromeHeightPx = chromeHeightPx.intValue,
+                Text(
+                    text = playbackError.message,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = DhunColors.error,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { onShowErrorDetails() }) {
+                    Text("Details", color = DhunColors.textPrimary)
+                }
+                TextButton(onClick = viewModel::retry) {
+                    Text("Retry", color = DhunColors.error)
+                }
+            }
+        }
+
+        // Title / artist + overflow & favourite chips (fade-update
+        // via Crossfade). The chips are the reference's circular
+        // "more / like" affordances beside the track name.
+        Crossfade(
+            targetState = current,
+            animationSpec = DhunAnimations.mediumTween(),
+            label = "titleFade",
+            modifier = Modifier.fillMaxWidth(),
+        ) { t ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    Text(
+                        text = t?.title.orEmpty(),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = DhunColors.textPrimary,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.basicMarquee(),
+                    )
+                    Text(
+                        text = t?.artistName.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DhunColors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable(
+                            enabled = t != null,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { t?.let(onOpenArtist) },
+                    )
+                }
+                PlayerChipButton(
+                    icon = DhunIcon.MoreVert,
+                    contentDescription = "More player actions",
+                    enabled = t != null,
+                    tint = DhunColors.textSecondary,
+                    onClick = { t?.let(onOverflowTrack) },
+                )
+                PlayerChipButton(
+                    icon = if (isFavorite) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                    enabled = t != null,
+                    tint = if (isFavorite) accent else DhunColors.textPrimary,
+                    onClick = { t?.let(onToggleFavorite) },
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(itemSpacing))
+
+        // Cancel scrubbing on a new queue occurrence, even for
+        // equal-duration tracks.
+        key(current?.id, queueIndex) {
+            PlayerTimeline(
+                positionMs = positionMs,
+                durationMs = durationMs,
+                accent = accent,
+                onSeek = { target ->
+                    if (viewModel.currentTrack.value?.id == current?.id &&
+                        viewModel.currentQueueIndex.value == queueIndex
+                    ) viewModel.seekTo(target)
+                },
+                enabled = current != null && state !is PlaybackState.Resolving && playbackError == null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(itemSpacing))
+
+        // Main transport — plain oversized icons over the blurred
+        // backdrop (the reference's sleek look: no disc, no shadow).
+        BoxWithConstraints(
+            modifier = Modifier
+                .widthIn(max = DhunSpacing.playerTransportMaxWidth)
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally),
+        ) {
+            val metrics = playerTransportMetrics(maxWidth)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState(), enabled = metrics.minimumWidth > maxWidth)
+                    .width(maxOf(maxWidth, metrics.minimumWidth))
+                    .padding(horizontal = metrics.horizontalPadding),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                key(current?.id, queueIndex, false) {
+                    HoldTapTransportButton(
+                        enabled = current != null,
+                        forward = false,
+                        icon = DhunIcon.SkipPrevious,
+                        iconSize = metrics.skipSize,
+                        contentDescription = "Previous track",
+                        onTap = { viewModel.previous() },
+                        onHold = { viewModel.beginHoldSeek(forward = false) },
+                        onRelease = { viewModel.endHoldSeek() },
+                    )
+                }
+                ImmersivePlayButton(
+                    state = state,
+                    enabled = current != null,
+                    iconSize = metrics.playSize,
+                    onClick = viewModel::togglePlay,
+                )
+                key(current?.id, queueIndex, true) {
+                    HoldTapTransportButton(
+                        enabled = current != null,
+                        forward = true,
+                        icon = DhunIcon.SkipNext,
+                        iconSize = metrics.skipSize,
+                        contentDescription = "Next track",
+                        onTap = { viewModel.next() },
+                        onHold = { viewModel.beginHoldSeek(forward = true) },
+                        onRelease = { viewModel.endHoldSeek() },
+                    )
+                }
+            }
+        }
+
+        // Volume (desktop only — Android uses hardware keys)
+        if (isDesktop) {
+            Row(
+                modifier = Modifier
+                    .widthIn(max = DhunSpacing.playerVolumeMaxWidth)
+                    .fillMaxWidth()
+                    .align(Alignment.CenterHorizontally)
+                    .padding(top = itemSpacing, start = horizontalPadding, end = horizontalPadding),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.VolumeUp,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = DhunColors.textSecondary,
+                )
+                Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                // Bounded width: a full-bleed slider at 100% volume
+                // read as a giant coloured error bar across the
+                // window.
+                Slider(
+                    value = volume,
+                    onValueChange = viewModel::setVolume,
+                    modifier = Modifier.weight(1f).semantics { contentDescription = "Volume" },
+                    colors = SliderDefaults.colors(
+                        thumbColor = accent,
+                        activeTrackColor = accent.copy(alpha = 0.85f),
+                        inactiveTrackColor = DhunColors.border,
+                    ),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(itemSpacing))
+
+        // Bottom action row — queue / shuffle / repeat / lyrics,
+        // the reference's sleek icon strip.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = DhunSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            ImmersiveIconAction(
+                icon = DhunIcon.QueueMusic,
+                contentDescription = if (panelOpen) "Close queue" else "Open queue",
+                active = panelOpen,
+                enabled = current != null,
+                accent = accent,
+                onClick = onQueueToggle,
+            )
+            ImmersiveIconAction(
+                icon = DhunIcon.Shuffle,
+                contentDescription = if (shuffleEnabled) "Disable shuffle" else "Enable shuffle",
+                active = shuffleEnabled,
+                enabled = current != null,
+                accent = accent,
+                onClick = { viewModel.toggleShuffle() },
+            )
+            ImmersiveIconAction(
+                icon = if (repeatMode == RepeatMode.ONE) DhunIcon.RepeatOne else DhunIcon.Repeat,
+                contentDescription = when (repeatMode) {
+                    RepeatMode.OFF -> "Repeat off"
+                    RepeatMode.ALL -> "Repeat all"
+                    RepeatMode.ONE -> "Repeat one"
+                },
+                active = repeatMode != RepeatMode.OFF,
+                enabled = current != null,
+                accent = accent,
+                onClick = { viewModel.cycleRepeatMode() },
+            )
+            ImmersiveIconAction(
+                icon = DhunIcon.ClosedCaption,
+                contentDescription = if (lyricsDominant) "Exit lyrics view" else "Lyrics view",
+                active = lyricsDominant,
+                enabled = current != null,
+                accent = accent,
+                onClick = onLyricsToggle,
+            )
+        }
+    }
+}
+
+/**
+ * Collapse handle and title strip. In a stacked player it owns the top row;
+ * in a wide player it overlays only the artwork pane, preserving vertical room
+ * for the hero without changing its swipe-down/back contract.
+ */
+@Composable
+private fun PlayerHeader(
+    onCollapse: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val collapseSwipeThresholdPx = with(LocalDensity.current) { DhunSpacing.touchTarget.toPx() }
+    var collapseDragPx by remember { mutableFloatStateOf(0f) }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(collapseSwipeThresholdPx) {
+                try {
+                    detectVerticalDragGestures(
+                        onDragStart = { collapseDragPx = 0f },
+                        onDragEnd = {
+                            if (shouldCollapseFullPlayer(collapseDragPx, collapseSwipeThresholdPx)) onCollapse()
+                            collapseDragPx = 0f
+                        },
+                        onDragCancel = { collapseDragPx = 0f },
+                    ) { change, dragAmount ->
+                        change.consume()
+                        collapseDragPx += dragAmount
+                    }
+                } finally {
+                    collapseDragPx = 0f
+                }
+            },
+    ) {
+        // Sheet drag handle — subtle frosted pill, rides the drag as a
+        // rubber-band affordance.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = DhunSpacing.sm),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(DhunSpacing.xxxl)
+                    .height(DhunSpacing.xsPlus)
+                    .graphicsLayer {
+                        translationY = collapseDragPx.coerceIn(0f, collapseSwipeThresholdPx) / 3f
+                    }
+                    .clip(DhunShapes.full)
+                    .background(DhunColors.glassEdge),
+            )
+        }
+        // Top bar: collapse / label / (balance slot).
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(DhunSpacing.huge)
+                .padding(horizontal = DhunSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PlayerChipButton(
+                icon = DhunIcon.ChevronDown,
+                contentDescription = "Collapse player",
+                tint = DhunColors.textPrimary,
+                onClick = onCollapse,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "NOW PLAYING",
+                style = DhunTypographyTokens.brand,
+                color = DhunColors.textTertiary,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            // Invisible balance slot keeps the label centred.
+            Spacer(modifier = Modifier.size(DhunSpacing.compactTarget))
+        }
+    }
+}
+
+/**
+ * The full artwork boundary shared by normal and lyrics-dominant player modes.
+ * It owns the sharp art, the future-facing lyrics replacement, and transient
+ * loading/buffering status without letting any of those states change the
+ * stage's measured size.
+ */
+@Composable
+private fun PlayerArtworkStage(
+    track: Track?,
+    skipDirection: SkipDirection,
+    isPlaying: Boolean,
+    lyricsDominant: Boolean,
+    busyLabel: String?,
+    artworkUrl: String?,
+    cacheKey: String,
+    viewModel: PlayerViewModel,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.clipToBounds()) {
+        ArtworkHeroField(
+            track = track,
+            skipDirection = skipDirection,
+            isPlaying = isPlaying,
+            lyricsDominant = lyricsDominant,
+            // Reserve real layout headroom for the existing lightweight play
+            // scale and slide transition; no transform is used to fake size.
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(DhunSpacing.playerArtworkAnimationInset),
+        )
+        LyricsCardOverlay(
+            visible = lyricsDominant,
+            artworkUrl = artworkUrl,
+            cacheKey = cacheKey,
+            viewModel = viewModel,
+            accent = accent,
+            modifier = Modifier.fillMaxSize(),
+        )
+        PlayerStatusPill(
+            label = busyLabel,
+            accent = accent,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = DhunSpacing.sm),
+        )
+    }
+}
+
+/**
+ * Resolving/buffering/recovery is an overlay on the stable hero stage rather
+ * than a row in the bottom cluster. That keeps the artwork at its allocated
+ * size while the player is busy and announces state changes without hiding
+ * transport or the progress timeline.
+ */
+@Composable
+private fun PlayerStatusPill(
+    label: String?,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    if (label == null) return
+    Box(
+        modifier = modifier
+            .clip(DhunShapes.full)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(DhunColors.glassHighlight, DhunColors.glassStrong),
+                ),
+            )
+            .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.full)
+            .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.xs),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = accent,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
     }
 }
 
@@ -897,10 +1093,7 @@ private fun ArtworkHeroField(
                     }
                     .clip(DhunShapes.artworkHero)
                     .background(DhunColors.scrim.copy(alpha = 0.35f))
-                    .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.artworkHero)
-                    // Whole cover, never cropped: a taller card than the source
-                    // aspect shows the blurred backdrop in the free bands.
-                    .padding(DhunSpacing.xs),
+                    .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.artworkHero),
                 contentAlignment = Alignment.Center,
             ) {
                 ArtworkImage(
