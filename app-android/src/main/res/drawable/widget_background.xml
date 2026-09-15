@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget chrome: Material You card — large rounding, dynamic surface, hairline outline. -->
+<!-- Widget chrome: AMOLED card — launcher-matched rounding (@dimen/
+     widget_corner_radius), hairline outline for wallpaper-independent edges.
+     This is the FALLBACK surface: the live card is a runtime bitmap
+     (WidgetGlass), and this drawable renders when glass cannot be produced
+     and, unmodified, as the static picker preview. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <solid android:color="@color/widget_background" />
-    <corners android:radius="28dp" />
+    <corners android:radius="@dimen/widget_corner_radius" />
     <stroke
         android:width="1dp"
         android:color="@color/widget_outline" />

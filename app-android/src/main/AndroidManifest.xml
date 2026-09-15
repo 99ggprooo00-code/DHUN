@@ -61,20 +61,22 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- Candidate 26: home-screen widgets — Now Playing + Quick Play.
-             Additive; each provider is a separate picker entry feeding the
-             existing playback service state via MediaController (read-only).
-             Gracefully shows "Nothing playing" when idle. -->
-        <receiver
-            android:name=".widgets.DhunNowPlayingWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_now_playing_info" />
-        </receiver>
+        <!-- Candidate 26: home-screen widget — Quick Play, the only widget
+             DHUN ships. It feeds the existing playback service state via
+             MediaController (read-only) and gracefully shows "Nothing
+             playing" when idle.
+
+             Now Playing (the former 4×2 companion) was deleted on device
+             feedback: its 140dp minimum height exceeded a 4×2 slot (~110dp),
+             and strict launchers refuse to add a widget that does not fit
+             rather than growing it a row. Its provider name, layout ids and
+             picker metadata are all gone; do NOT reintroduce a second
+             receiver without re-checking slot sizing.
+
+             The Quick Play provider name, its layouts, view ids and
+             @xml/widget_quick_play_info are load-bearing: an instance already
+             sitting on a home screen keeps working across an app update only
+             while every one of those identifiers is unchanged. -->
         <receiver
             android:name=".widgets.DhunQuickPlayWidgetProvider"
             android:exported="true">

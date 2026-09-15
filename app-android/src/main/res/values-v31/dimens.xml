@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Exact system radius: the same dimen the launcher masks placed widgets
+         with, so the card corners never outrun the host's clip (device
+         feedback asked for the launcher's radius, not our guess). -->
+    <dimen name="widget_corner_radius">@android:dimen/system_app_widget_background_radius</dimen>
+</resources>

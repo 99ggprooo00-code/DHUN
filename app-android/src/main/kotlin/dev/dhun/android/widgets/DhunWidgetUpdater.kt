@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.View
 import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
@@ -20,38 +19,34 @@ import dev.dhun.android.R
 import dev.dhun.android.playback.DhunPlaybackService
 
 /**
- * Pushes DHUN widget RemoteViews for every widget instance.
+ * Pushes DHUN widget RemoteViews for every **Quick Play** instance — the one
+ * home-screen widget DHUN ships (Now Playing was removed on device feedback:
+ * its 4×2 slot sizing made strict launchers fail to load it).
  *
  * Two data paths feed the same renderer:
  * - **Service push** ([pushFromPlayer]) — [DhunPlaybackService] calls this
  *   from its player listener on every track/play/shuffle/repeat change plus
  *   a 10 s progress tick while playing. No controller round-trip, so track
  *   changes land on the launcher within a frame or two.
- * - **Controller pull** ([requestUpdate]) — providers, transport actions and
- *   the system `updatePeriodMillis` safety net read the *existing* session
- *   via a short-lived [MediaController]. Covers the app-dead case (binding
- *   wakes the service) and instances the service never saw.
+ * - **Controller pull** ([requestUpdate]) — the provider, transport actions
+ *   and the system `updatePeriodMillis` safety net read the *existing*
+ *   session via a short-lived [MediaController]. Covers the app-dead case
+ *   (binding wakes the service) and instances the service never saw.
  *
  * Both paths push in two phases: text/controls immediately (with a cached
  * artwork bitmap when warm), then again when [WidgetArtworkLoader] delivers
  * the decoded bitmap. If the service is unreachable the idle placeholder
  * from [DhunWidgetState.idle] renders instead of stale data.
  *
- * Layouts are responsive per instance ([layoutForNowPlaying],
- * [layoutForQuickPlay]) from the host's reported size, and re-selected on
- * every push plus `onAppWidgetOptionsChanged` (resize). Every tier sits on a
- * translucent M3 card ([WidgetGlass]) with fully-opaque content on top.
+ * The layout is responsive per instance ([layoutForQuickPlay]) from the
+ * host's reported size, re-selected on every push plus
+ * `onAppWidgetOptionsChanged` (resize). Both tiers sit on the AMOLED glass
+ * card ([WidgetGlass]) with fully-opaque content on top.
  */
 object DhunWidgetUpdater {
 
     private const val TAG = "DHUN_WIDGET"
     private const val CONTROLLER_TIMEOUT_MS = 3000L
-
-    /** Now Playing shows the compact tier below this width. */
-    const val COMPACT_MAX_WIDTH_DP = 200
-
-    /** Now Playing shows the tall tier (times + shuffle/repeat) at/above this height. */
-    const val TALL_MIN_HEIGHT_DP = 180
 
     /** Quick Play shows the wide tier (artwork + next) at/above this width. */
     const val QUICK_WIDE_MIN_WIDTH_DP = 200
@@ -60,8 +55,6 @@ object DhunWidgetUpdater {
     const val PROGRESS_TICK_MS = 10_000L
 
     /** Fallback glass size when the host reports no size (tests, old launchers). */
-    const val GLASS_DEFAULT_NOW_WIDTH_DP = 250
-    const val GLASS_DEFAULT_NOW_HEIGHT_DP = 140
     const val GLASS_DEFAULT_QUICK_WIDTH_DP = 110
     const val GLASS_DEFAULT_QUICK_HEIGHT_DP = 110
 
@@ -88,14 +81,13 @@ object DhunWidgetUpdater {
 
     // ------------------------------------------------------------------ entry
 
-    /** Request an update for *all* DHUN widget instances (both providers). */
+    /** Request an update for every Quick Play instance. */
     fun requestUpdate(context: Context) {
         val appContext = context.applicationContext
         val manager = AppWidgetManager.getInstance(appContext)
-        val nowPlayingIds = idsFor(manager, appContext, DhunNowPlayingWidgetProvider::class.java)
         val quickPlayIds = idsFor(manager, appContext, DhunQuickPlayWidgetProvider::class.java)
-        if (nowPlayingIds.isEmpty() && quickPlayIds.isEmpty()) return
-        fetchStateAndPush(appContext, manager, nowPlayingIds, quickPlayIds)
+        if (quickPlayIds.isEmpty()) return
+        fetchStateAndPush(appContext, manager, quickPlayIds)
     }
 
     /**
@@ -110,33 +102,25 @@ object DhunWidgetUpdater {
             return
         }
         val manager = runCatching { AppWidgetManager.getInstance(appContext) }.getOrNull() ?: return
-        val nowPlayingIds = idsFor(manager, appContext, DhunNowPlayingWidgetProvider::class.java)
         val quickPlayIds = idsFor(manager, appContext, DhunQuickPlayWidgetProvider::class.java)
-        if (nowPlayingIds.isEmpty() && quickPlayIds.isEmpty()) return
+        if (quickPlayIds.isEmpty()) return
         val snapshot = runCatching { snapshotOfPlayer(player) }.getOrNull()
         if (snapshot == null) {
-            pushState(appContext, manager, DhunWidgetState.idle(), null, nowPlayingIds, quickPlayIds)
+            pushState(appContext, manager, DhunWidgetState.idle(), null, quickPlayIds)
             return
         }
-        pushSnapshot(appContext, manager, snapshot, nowPlayingIds, quickPlayIds)
+        pushSnapshot(appContext, manager, snapshot, quickPlayIds)
     }
 
-    /** Push a specific state to a set of widget ids (used by tests and fallback). */
+    /** Push a specific state to every id of the (single) shipped widget. */
     internal fun pushState(
         context: Context,
         manager: AppWidgetManager,
         state: DhunWidgetState,
-        artwork: Bitmap? = null,
-        nowPlayingIds: IntArray,
+        artwork: Bitmap?,
         quickPlayIds: IntArray,
     ) {
         lastPushed = state
-        for (id in nowPlayingIds) {
-            runCatching {
-                val views = buildNowPlayingViewsForId(context, state, id, artwork)
-                manager.updateAppWidget(id, views)
-            }
-        }
         for (id in quickPlayIds) {
             runCatching {
                 val views = buildQuickPlayViewsForId(context, state, id, artwork)
@@ -150,12 +134,11 @@ object DhunWidgetUpdater {
     private fun fetchStateAndPush(
         context: Context,
         manager: AppWidgetManager,
-        nowPlayingIds: IntArray,
         quickPlayIds: IntArray,
     ) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             Handler(Looper.getMainLooper()).post {
-                fetchStateAndPush(context, manager, nowPlayingIds, quickPlayIds)
+                fetchStateAndPush(context, manager, quickPlayIds)
             }
             return
         }
@@ -163,14 +146,14 @@ object DhunWidgetUpdater {
             SessionToken(context, AndroidComponentName(context, DhunPlaybackService::class.java))
         } catch (e: Exception) {
             Log.w(TAG, "session token unavailable — showing idle", e)
-            pushState(context, manager, DhunWidgetState.idle(), null, nowPlayingIds, quickPlayIds)
+            pushState(context, manager, DhunWidgetState.idle(), null, quickPlayIds)
             return
         }
         val pending = try {
             MediaController.Builder(context, token).buildAsync()
         } catch (e: Exception) {
             Log.w(TAG, "controller build failed — showing idle", e)
-            pushState(context, manager, DhunWidgetState.idle(), null, nowPlayingIds, quickPlayIds)
+            pushState(context, manager, DhunWidgetState.idle(), null, quickPlayIds)
             return
         }
 
@@ -179,7 +162,7 @@ object DhunWidgetUpdater {
             if (!pending.isDone) {
                 pending.cancel(true)
                 Log.w(TAG, "controller connect timeout — showing idle")
-                pushState(context, manager, DhunWidgetState.idle(), null, nowPlayingIds, quickPlayIds)
+                pushState(context, manager, DhunWidgetState.idle(), null, quickPlayIds)
             }
         }
         handler.postDelayed(timeoutRunnable, CONTROLLER_TIMEOUT_MS)
@@ -191,14 +174,14 @@ object DhunWidgetUpdater {
                     val controller = pending.get()
                     val snapshot = runCatching { snapshotOfController(controller) }.getOrNull()
                     if (snapshot == null) {
-                        pushState(context, manager, DhunWidgetState.idle(), null, nowPlayingIds, quickPlayIds)
+                        pushState(context, manager, DhunWidgetState.idle(), null, quickPlayIds)
                     } else {
-                        pushSnapshot(context, manager, snapshot, nowPlayingIds, quickPlayIds)
+                        pushSnapshot(context, manager, snapshot, quickPlayIds)
                     }
                     handler.postDelayed({ runCatching { controller.release() } }, 1000L)
                 } catch (e: Exception) {
                     Log.w(TAG, "controller unavailable — showing idle", e)
-                    pushState(context, manager, DhunWidgetState.idle(), null, nowPlayingIds, quickPlayIds)
+                    pushState(context, manager, DhunWidgetState.idle(), null, quickPlayIds)
                     runCatching { pending.cancel(true) }
                 }
             },
@@ -211,18 +194,18 @@ object DhunWidgetUpdater {
         context: Context,
         manager: AppWidgetManager,
         snapshot: PlaybackSnapshot,
-        nowPlayingIds: IntArray,
         quickPlayIds: IntArray,
     ) {
         val state = stateOf(snapshot)
-        pushState(context, manager, state, WidgetArtworkLoader.cached(state.artworkKey), nowPlayingIds, quickPlayIds)
+        pushState(context, manager, state, WidgetArtworkLoader.cached(state.artworkKey), quickPlayIds)
         val key = state.artworkKey ?: return
         if (WidgetArtworkLoader.cached(key) != null) return
         val deliver: (Bitmap?) -> Unit = { bitmap ->
-            // Drop late arrivals for a track we already moved past.
+            // Drop late arrivals for a track we already moved past. Instances
+            // added while the decode was in flight are picked up here too.
             if (bitmap != null && lastPushed?.artworkKey == key) {
                 val current = lastPushed ?: state
-                pushState(context, manager, current, bitmap, nowPlayingIdsFor(context), quickPlayIdsFor(context))
+                pushState(context, manager, current, bitmap, quickPlayIdsFor(context))
             }
         }
         if (snapshot.artworkData != null) {
@@ -326,14 +309,10 @@ object DhunWidgetUpdater {
 
     /**
      * Tier selection is pure (dp in, layout out) so resize behavior is
-     * unit-testable without a launcher.
+     * unit-testable without a launcher. Small is the floor: an instance the
+     * host reports no size for (tests, old launchers) must never pick the
+     * wider, taller layout.
      */
-    internal fun layoutForNowPlaying(minWidthDp: Int, maxHeightDp: Int): Int = when {
-        minWidthDp in 1 until COMPACT_MAX_WIDTH_DP -> R.layout.widget_now_playing_compact
-        maxHeightDp >= TALL_MIN_HEIGHT_DP -> R.layout.widget_now_playing_tall
-        else -> R.layout.widget_now_playing
-    }
-
     internal fun layoutForQuickPlay(minWidthDp: Int): Int = when {
         minWidthDp >= QUICK_WIDE_MIN_WIDTH_DP -> R.layout.widget_quick_play_wide
         else -> R.layout.widget_quick_play
@@ -341,74 +320,14 @@ object DhunWidgetUpdater {
 
     // ------------------------------------------------------------- RemoteViews
 
-    internal fun buildNowPlayingViews(
-        context: Context,
-        state: DhunWidgetState,
-        artwork: Bitmap? = null,
-    ): RemoteViews =
-        RemoteViews(context.packageName, R.layout.widget_now_playing).apply {
-            applyCommon(context, state, artwork, this)
-            applyGlass(context, this, GLASS_DEFAULT_NOW_WIDTH_DP, GLASS_DEFAULT_NOW_HEIGHT_DP)
-        }
-
-    internal fun buildNowPlayingViewsForId(
+    internal fun buildQuickPlayViewsForId(
         context: Context,
         state: DhunWidgetState,
         appWidgetId: Int,
         artwork: Bitmap? = null,
     ): RemoteViews {
         val (minWidthDp, maxHeightDp) = liveOptions(context, appWidgetId)
-        return buildNowPlayingViewsForId(context, state, appWidgetId, artwork, minWidthDp, maxHeightDp)
-    }
-
-    internal fun buildNowPlayingViewsForId(
-        context: Context,
-        state: DhunWidgetState,
-        appWidgetId: Int,
-        artwork: Bitmap?,
-        minWidthDp: Int,
-        maxHeightDp: Int,
-    ): RemoteViews {
-        val layout = layoutForNowPlaying(minWidthDp, maxHeightDp)
-        return RemoteViews(context.packageName, layout).apply {
-            applyCommon(context, state, artwork, this)
-            val glassW = if (minWidthDp > 0) minWidthDp else GLASS_DEFAULT_NOW_WIDTH_DP
-            val glassH = if (maxHeightDp > 0) maxHeightDp else GLASS_DEFAULT_NOW_HEIGHT_DP
-            applyGlass(context, this, glassW, glassH)
-            setOnClickPendingIntent(
-                R.id.widget_prev,
-                WidgetIntents.prevIntent(context, DhunNowPlayingWidgetProvider::class.java, appWidgetId),
-            )
-            setOnClickPendingIntent(
-                R.id.widget_play_pause,
-                WidgetIntents.playPauseIntent(context, DhunNowPlayingWidgetProvider::class.java, appWidgetId),
-            )
-            setOnClickPendingIntent(
-                R.id.widget_next,
-                WidgetIntents.nextIntent(context, DhunNowPlayingWidgetProvider::class.java, appWidgetId),
-            )
-            if (layout == R.layout.widget_now_playing_tall) {
-                setOnClickPendingIntent(
-                    R.id.widget_shuffle,
-                    WidgetIntents.shuffleIntent(context, DhunNowPlayingWidgetProvider::class.java, appWidgetId),
-                )
-                setOnClickPendingIntent(
-                    R.id.widget_repeat,
-                    WidgetIntents.repeatIntent(context, DhunNowPlayingWidgetProvider::class.java, appWidgetId),
-                )
-            }
-            setOnClickPendingIntent(R.id.widget_root, WidgetIntents.openAppIntent(context, appWidgetId))
-        }
-    }
-
-    internal fun buildQuickPlayViewsForId(
-        context: Context,
-        state: DhunWidgetState,
-        appWidgetId: Int,
-        artwork: Bitmap? = null,
-    ): RemoteViews {
-        val (minWidthDp, _) = liveOptions(context, appWidgetId)
-        return buildQuickPlayViewsForId(context, state, appWidgetId, artwork, minWidthDp)
+        return buildQuickPlayViewsForId(context, state, appWidgetId, artwork, minWidthDp, maxHeightDp)
     }
 
     internal fun buildQuickPlayViewsForId(
@@ -417,12 +336,14 @@ object DhunWidgetUpdater {
         appWidgetId: Int,
         artwork: Bitmap?,
         minWidthDp: Int,
+        maxHeightDp: Int = GLASS_DEFAULT_QUICK_HEIGHT_DP,
     ): RemoteViews {
         val layout = layoutForQuickPlay(minWidthDp)
         return RemoteViews(context.packageName, layout).apply {
             applyCommon(context, state, artwork, this)
             val glassW = if (minWidthDp > 0) minWidthDp else GLASS_DEFAULT_QUICK_WIDTH_DP
-            applyGlass(context, this, glassW, GLASS_DEFAULT_QUICK_HEIGHT_DP)
+            val glassH = if (maxHeightDp > 0) maxHeightDp else GLASS_DEFAULT_QUICK_HEIGHT_DP
+            applyGlass(context, this, glassW, glassH)
             setOnClickPendingIntent(
                 R.id.widget_play_pause,
                 WidgetIntents.playPauseIntent(context, DhunQuickPlayWidgetProvider::class.java, appWidgetId),
@@ -438,11 +359,12 @@ object DhunWidgetUpdater {
     }
 
     /**
-     * Shared binding for every tier. RemoteViews actions are null-safe at
+     * Shared binding for both tiers. RemoteViews actions are null-safe at
      * apply time — ids absent from a tier's layout are silently skipped —
-     * so one binding serves all five layouts.
+     * so one binding serves the small and the wide layout, and stays ready
+     * for tiers added later.
      */
-    private fun RemoteViews.applyCommon(
+    private fun applyCommon(
         context: Context,
         state: DhunWidgetState,
         artwork: Bitmap?,
@@ -460,59 +382,14 @@ object DhunWidgetUpdater {
             R.id.widget_play_pause,
             context.getString(if (playing) R.string.widget_cd_pause else R.string.widget_cd_play),
         )
-        views.setContentDescription(R.id.widget_prev, context.getString(R.string.widget_cd_previous))
         views.setContentDescription(R.id.widget_next, context.getString(R.string.widget_cd_next))
         views.setContentDescription(R.id.widget_artwork, context.getString(R.string.widget_cd_artwork))
 
-        // Progress + times.
+        // Progress: permille of the duration, empty when idle or unknown.
         views.setProgressBar(R.id.widget_progress, 1000, state.progressPermille, false)
-        views.setTextViewText(R.id.widget_position, state.positionText)
-        views.setTextViewText(R.id.widget_duration, state.durationText)
-        views.setViewVisibility(
-            R.id.widget_times_row,
-            if (state.hasProgress) View.VISIBLE else View.GONE,
-        )
 
-        // Shuffle / repeat toggles (tall tier). Active = accent, idle = secondary.
-        val accent = ContextCompat.getColor(context, R.color.widget_accent)
-        val secondary = ContextCompat.getColor(context, R.color.widget_secondary)
-        views.setImageViewResource(
-            R.id.widget_repeat,
-            if (state.repeatMode == DhunWidgetState.REPEAT_ONE) {
-                R.drawable.widget_ic_repeat_one
-            } else {
-                R.drawable.widget_ic_repeat
-            },
-        )
-        runCatching {
-            views.setInt(R.id.widget_shuffle, "setColorFilter", if (state.shuffleEnabled) accent else secondary)
-            val repeatActive = state.repeatMode != DhunWidgetState.REPEAT_OFF
-            views.setInt(R.id.widget_repeat, "setColorFilter", if (repeatActive) accent else secondary)
-        }
-        views.setContentDescription(
-            R.id.widget_shuffle,
-            context.getString(
-                if (state.shuffleEnabled) R.string.widget_cd_shuffle_on else R.string.widget_cd_shuffle_off,
-            ),
-        )
-        views.setContentDescription(
-            R.id.widget_repeat,
-            context.getString(
-                when (state.repeatMode) {
-                    DhunWidgetState.REPEAT_ALL -> R.string.widget_cd_repeat_all
-                    DhunWidgetState.REPEAT_ONE -> R.string.widget_cd_repeat_one
-                    else -> R.string.widget_cd_repeat_off
-                },
-            ),
-        )
-
-        // Dim skip buttons at queue edges / when idle; play stays full-strength.
-        runCatching {
-            val prevAlpha = edgeAlpha(state, state.hasPrevious)
-            val nextAlpha = edgeAlpha(state, state.hasNext)
-            views.setFloat(R.id.widget_prev, "setAlpha", prevAlpha)
-            views.setFloat(R.id.widget_next, "setAlpha", nextAlpha)
-        }
+        // Dim next at the queue edge / when idle; play stays full-strength.
+        runCatching { views.setFloat(R.id.widget_next, "setAlpha", edgeAlpha(state, state.hasNext)) }
 
         // Artwork: decoded bitmap wins, else the note placeholder.
         if (artwork != null) {
@@ -523,10 +400,10 @@ object DhunWidgetUpdater {
     }
 
     /**
-     * Paints the translucent card behind the content. Falls back to the
-     * solid chrome if the glass bitmap cannot be rendered.
+     * Paints the card behind the content. Falls back to the solid chrome if
+     * the glass bitmap cannot be rendered.
      */
-    private fun RemoteViews.applyGlass(
+    private fun applyGlass(
         context: Context,
         views: RemoteViews,
         widthDp: Int,
@@ -550,12 +427,6 @@ object DhunWidgetUpdater {
 
     private fun idsFor(manager: AppWidgetManager, context: Context, provider: Class<*>): IntArray =
         runCatching { manager.getAppWidgetIds(ComponentName(context, provider)) }.getOrDefault(intArrayOf())
-
-    private fun nowPlayingIdsFor(context: Context): IntArray =
-        runCatching {
-            AppWidgetManager.getInstance(context)
-                .getAppWidgetIds(ComponentName(context, DhunNowPlayingWidgetProvider::class.java))
-        }.getOrDefault(intArrayOf())
 
     private fun quickPlayIdsFor(context: Context): IntArray =
         runCatching {

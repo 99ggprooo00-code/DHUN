@@ -14,11 +14,16 @@
     <!-- Accessibility (Phase 15): announced by TalkBack, never shown as UI text. -->
     <string name="a11y_connecting">Initializing audio engine</string>
 
-    <!-- Widgets (candidate 26): picker descriptions. -->
-    <string name="widget_now_playing_desc">Now Playing — artwork, track and transport</string>
+    <!-- Widgets (candidate 26): picker description. Quick Play is the only
+         widget DHUN ships — the Now Playing entry was deleted with it. -->
     <string name="widget_quick_play_desc">Quick Play — compact play/pause</string>
 
-    <!-- Widget TalkBack labels (RemoteViews content descriptions). -->
+    <!-- Widget TalkBack labels (RemoteViews content descriptions).
+         previous/shuffle/repeat are kept on purpose: the shipped Quick Play
+         tiers do not host those buttons, but WidgetTransport still serves
+         ACTION_PREV/SHUFFLE/REPEAT and the shared engine binds them whenever
+         a tier exposes the ids. Same for widget_ic_prev/shuffle/repeat/
+         repeat_one. Deleting either would be a contract change, not cleanup. -->
     <string name="widget_cd_play">Play</string>
     <string name="widget_cd_pause">Pause</string>
     <string name="widget_cd_next">Next</string>

@@ -15,14 +15,17 @@ import org.xmlpull.v1.XmlPullParser
 
 /**
  * Pins the widget surfaces to a contract:
- *  - both widget_info XMLs exist and parse,
- *  - initialLayout points at the expected layout,
+ *  - the Quick Play info XML exists, parses, and fits the slot it promises,
  *  - required AppWidgetProvider attributes are present,
- *  - layouts contain the view ids the Kotlin updater expects,
- *  - manifest registers both receivers for APPWIDGET_UPDATE.
+ *  - the layouts contain the view ids the Kotlin updater binds,
+ *  - the manifest registers exactly one widget receiver, and it is Quick Play.
  *
- * A silent rename of a layout id or a missing receiver breaks the widget
- * on a real launcher with zero compile error — this test is the gate.
+ * Two things this guards against, both learned on device:
+ *  - a silent rename of a layout id or a missing receiver breaks the widget on
+ *    a real launcher with zero compile error;
+ *  - an instance whose declared minimums exceed a launcher cell is refused
+ *    outright ("couldn't load") by strict launchers, which is what killed the
+ *    Now Playing widget — so the size math is asserted here, not eyeballed.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -32,104 +35,51 @@ class WidgetXmlTest {
     private val resources get() = context.resources
 
     @Test
-    fun `both widget info xmls exist and declare an initial layout`() {
-        val nowPlaying = parseWidgetInfo(R.xml.widget_now_playing_info)
-        assertEquals(R.layout.widget_now_playing, nowPlaying.initialLayout)
-        assertTrue("minWidth missing for now playing", !nowPlaying.minWidthRaw.isNullOrBlank())
-        assertTrue("minHeight missing for now playing", !nowPlaying.minHeightRaw.isNullOrBlank())
-        // widgetCategory="home_screen" is compiled to int 1 (WIDGET_CATEGORY_HOME_SCREEN)
-        assertEquals(1, nowPlaying.widgetCategoryInt)
-
+    fun `quick play info exists and declares an initial layout`() {
         val quickPlay = parseWidgetInfo(R.xml.widget_quick_play_info)
         assertEquals(R.layout.widget_quick_play, quickPlay.initialLayout)
         assertTrue("minWidth missing for quick play", !quickPlay.minWidthRaw.isNullOrBlank())
         assertTrue("minHeight missing for quick play", !quickPlay.minHeightRaw.isNullOrBlank())
+        // widgetCategory="home_screen" is compiled to int 1 (WIDGET_CATEGORY_HOME_SCREEN)
         assertEquals(1, quickPlay.widgetCategoryInt)
     }
 
     @Test
-    fun `now playing and quick play have distinct info and layouts`() {
-        val now = parseWidgetInfo(R.xml.widget_now_playing_info)
-        val quick = parseWidgetInfo(R.xml.widget_quick_play_info)
-        // Distinct picker entries = distinct initial layouts + different min sizes.
-        assertTrue(now.initialLayout != quick.initialLayout)
-        assertTrue(now.minWidthRaw != quick.minWidthRaw || now.minHeightRaw != quick.minHeightRaw)
-    }
-
-    @Test
-    fun `widget infos declare target cells resize bounds and live previews`() {
-        val now = parseWidgetInfo(R.xml.widget_now_playing_info)
-        assertEquals(4, now.targetCellWidth)
-        assertEquals(2, now.targetCellHeight)
-        assertEquals(R.layout.widget_preview_now_playing, now.previewLayout)
-        assertTrue("minResizeWidth missing", !now.minResizeWidthRaw.isNullOrBlank())
-        assertTrue("maxResizeHeight missing", !now.maxResizeHeightRaw.isNullOrBlank())
-
+    fun `quick play fits the two by two slot it targets`() {
+        // The bug that deleted Now Playing: minHeight 140dp > a 4x2 slot (~110dp),
+        // and strict launchers error out instead of growing the widget a row.
+        // Quick Play must never re-grow its own minimum past its target cells.
         val quick = parseWidgetInfo(R.xml.widget_quick_play_info)
         assertEquals(2, quick.targetCellWidth)
         assertEquals(2, quick.targetCellHeight)
+        val minW = dimensionDp(quick.minWidthRaw)
+        val minH = dimensionDp(quick.minHeightRaw)
+        assertNotNull("minWidth is not a dp literal", minW)
+        assertNotNull("minHeight is not a dp literal", minH)
+        assertTrue("minHeight ${minH}dp exceeds a 2x2 slot (~110dp)", minH!! <= 110f)
+        assertTrue("minWidth ${minW}dp exceeds a 2x2 slot (~110dp)", minW!! <= 110f)
+        // Resizing may only shrink down to the same floor, and grows the card,
+        // never the minimum.
+        val minResizeH = dimensionDp(quick.minResizeHeightRaw)
+        if (minResizeH != null) assertTrue("minResizeHeight exceeds the slot", minResizeH <= 110f)
+    }
+
+    @Test
+    fun `quick play info declares target cells resize bounds and a live preview`() {
+        val quick = parseWidgetInfo(R.xml.widget_quick_play_info)
         assertEquals(R.layout.widget_preview_quick_play, quick.previewLayout)
         assertTrue("minResizeWidth missing", !quick.minResizeWidthRaw.isNullOrBlank())
+        assertTrue("maxResizeWidth missing", !quick.maxResizeWidthRaw.isNullOrBlank())
+        assertTrue("maxResizeHeight missing", !quick.maxResizeHeightRaw.isNullOrBlank())
+        assertTrue("resizeMode missing", !quick.resizeModeRaw.isNullOrBlank())
+        // Self-refresh safety net on top of the service push path.
+        assertEquals(1_800_000, quick.updatePeriodMillis)
+        // Picker description must exist — a missing string kills the entry.
+        assertTrue(resources.getString(R.string.widget_quick_play_desc).isNotBlank())
     }
 
     @Test
-    fun `now playing layout contains the transport view ids updater expects`() {
-        // Inflate via Robolectric resources check — avoids needing a real launcher.
-        // We parse the XML to verify ids are present; the updater sets them via RemoteViews.
-        val ids = layoutIds(R.layout.widget_now_playing)
-        assertTrue("widget_root missing", R.id.widget_root in ids)
-        assertTrue("widget_glass missing", R.id.widget_glass in ids)
-        assertTrue("widget_artwork missing", R.id.widget_artwork in ids)
-        assertTrue("widget_title missing", R.id.widget_title in ids)
-        assertTrue("widget_artist missing", R.id.widget_artist in ids)
-        assertTrue("widget_prev missing", R.id.widget_prev in ids)
-        assertTrue("widget_play_pause missing", R.id.widget_play_pause in ids)
-        assertTrue("widget_play_pause_icon missing", R.id.widget_play_pause_icon in ids)
-        assertTrue("widget_next missing", R.id.widget_next in ids)
-        assertTrue("widget_progress missing", R.id.widget_progress in ids)
-    }
-
-    @Test
-    fun `compact tall and wide tiers contain their ids`() {
-        val compact = layoutIds(R.layout.widget_now_playing_compact)
-        assertTrue(R.id.widget_root in compact)
-        assertTrue(R.id.widget_glass in compact)
-        assertTrue(R.id.widget_artwork in compact)
-        assertTrue(R.id.widget_title in compact)
-        assertTrue(R.id.widget_play_pause in compact)
-        assertTrue(R.id.widget_play_pause_icon in compact)
-        assertTrue(R.id.widget_progress in compact)
-
-        val tall = layoutIds(R.layout.widget_now_playing_tall)
-        assertTrue(R.id.widget_root in tall)
-        assertTrue(R.id.widget_glass in tall)
-        assertTrue(R.id.widget_artwork in tall)
-        assertTrue(R.id.widget_title in tall)
-        assertTrue(R.id.widget_artist in tall)
-        assertTrue(R.id.widget_play_pause in tall)
-        assertTrue(R.id.widget_play_pause_icon in tall)
-        assertTrue(R.id.widget_prev in tall)
-        assertTrue(R.id.widget_next in tall)
-        assertTrue(R.id.widget_shuffle in tall)
-        assertTrue(R.id.widget_repeat in tall)
-        assertTrue(R.id.widget_progress in tall)
-        assertTrue(R.id.widget_position in tall)
-        assertTrue(R.id.widget_duration in tall)
-        assertTrue(R.id.widget_times_row in tall)
-
-        val wide = layoutIds(R.layout.widget_quick_play_wide)
-        assertTrue(R.id.widget_root in wide)
-        assertTrue(R.id.widget_glass in wide)
-        assertTrue(R.id.widget_artwork in wide)
-        assertTrue(R.id.widget_title in wide)
-        assertTrue(R.id.widget_play_pause in wide)
-        assertTrue(R.id.widget_play_pause_icon in wide)
-        assertTrue(R.id.widget_next in wide)
-        assertTrue(R.id.widget_progress in wide)
-    }
-
-    @Test
-    fun `quick play layout contains its ids`() {
+    fun `quick play small tier contains the ids the updater binds`() {
         val ids = layoutIds(R.layout.widget_quick_play)
         assertTrue(R.id.widget_root in ids)
         assertTrue(R.id.widget_glass in ids)
@@ -141,48 +91,56 @@ class WidgetXmlTest {
     }
 
     @Test
-    fun `preview layouts are static mockups with core ids`() {
-        val now = layoutIds(R.layout.widget_preview_now_playing)
-        assertTrue(R.id.widget_root in now)
-        assertTrue(R.id.widget_title in now)
-        assertTrue(R.id.widget_artist in now)
-        assertTrue(R.id.widget_play_pause in now)
-        assertTrue(R.id.widget_play_pause_icon in now)
-        assertTrue(R.id.widget_progress in now)
+    fun `quick play wide tier adds artwork and next`() {
+        val ids = layoutIds(R.layout.widget_quick_play_wide)
+        assertTrue(R.id.widget_root in ids)
+        assertTrue(R.id.widget_glass in ids)
+        assertTrue(R.id.widget_artwork in ids)
+        assertTrue(R.id.widget_title in ids)
+        assertTrue(R.id.widget_artist in ids)
+        assertTrue(R.id.widget_play_pause in ids)
+        assertTrue(R.id.widget_play_pause_icon in ids)
+        assertTrue(R.id.widget_next in ids)
+        assertTrue(R.id.widget_progress in ids)
+        // The small tier must NOT carry the wide-only extras: the updater only
+        // wires the next-intent when the wide layout is chosen, and RemoteViews
+        // would silently drop the binding otherwise.
+        val small = layoutIds(R.layout.widget_quick_play)
+        assertTrue(R.id.widget_artwork !in small)
+        assertTrue(R.id.widget_next !in small)
+    }
 
+    @Test
+    fun `preview layout is a static mockup with core ids`() {
         val quick = layoutIds(R.layout.widget_preview_quick_play)
         assertTrue(R.id.widget_root in quick)
         assertTrue(R.id.widget_title in quick)
         assertTrue(R.id.widget_play_pause in quick)
+        assertTrue(R.id.widget_play_pause_icon in quick)
         assertTrue(R.id.widget_progress in quick)
     }
 
     @Test
-    fun `manifest registers both widget receivers for APPWIDGET_UPDATE`() {
+    fun `manifest registers exactly one widget receiver and it is quick play`() {
         val pm = context.packageManager
         val receivers = pm.getPackageInfo(context.packageName, PackageManager.GET_RECEIVERS).receivers
             ?: emptyArray()
-        val names = receivers.map { it.name }.toSet()
-        assertTrue(
-            "DhunNowPlayingWidgetProvider receiver missing",
-            names.any { it.endsWith("DhunNowPlayingWidgetProvider") },
+        val widgetReceivers = receivers.filter { it.name.endsWith("WidgetProvider") }
+        // Exactly one widget ships. Re-adding a provider is a deliberate act
+        // (with slot sizing re-checked), not something that happens quietly.
+        assertEquals(
+            "expected exactly one widget receiver, got ${widgetReceivers.map { it.name }}",
+            1,
+            widgetReceivers.size,
         )
-        assertTrue(
-            "DhunQuickPlayWidgetProvider receiver missing",
-            names.any { it.endsWith("DhunQuickPlayWidgetProvider") },
-        )
-        // Both must handle APPWIDGET_UPDATE — check the intent filter via raw manifest parsing
-        // (PackageManager doesn't expose filter details in Robolectric shadow).
-        // We instead directly parse the merged manifest xml via resources? Simpler: assert the xml exists
-        // and the receiver is exported (required for AppWidgetManager to send broadcasts).
-        val nowInfo = receivers.first { it.name.endsWith("DhunNowPlayingWidgetProvider") }
-        assertTrue("now playing widget must be exported", nowInfo.exported)
-        val quickInfo = receivers.first { it.name.endsWith("DhunQuickPlayWidgetProvider") }
-        assertTrue("quick play widget must be exported", quickInfo.exported)
+        val quick = widgetReceivers.single()
+        assertTrue("Quick Play receiver renamed", quick.name.endsWith("DhunQuickPlayWidgetProvider"))
+        // Exported is required for AppWidgetManager to deliver broadcasts.
+        assertTrue("quick play widget must be exported", quick.exported)
     }
 
     @Test
-    fun `widget background and icon drawables exist`() {
+    fun `background drawables and icon drawables exist`() {
         assertNotNull(resources.getDrawable(R.drawable.widget_background, null))
         assertNotNull(resources.getDrawable(R.drawable.widget_play_circle, null))
         assertNotNull(resources.getDrawable(R.drawable.widget_artwork_bg, null))
@@ -198,8 +156,9 @@ class WidgetXmlTest {
     }
 
     @Test
-    fun `widget palette and talkback strings resolve`() {
-        // Layouts reference these — a missing color/string breaks inflation on device.
+    fun `widget palette talkback strings and radius dimen resolve`() {
+        // Layouts reference these — a missing color/string/dimen breaks
+        // inflation on device.
         val palette = listOf(
             R.color.widget_background,
             R.color.widget_on_background,
@@ -228,6 +187,12 @@ class WidgetXmlTest {
         for (res in labels) {
             assertTrue(resources.getString(res).isNotBlank())
         }
+        // Both renderers (static chrome + runtime glass) read this one dimen.
+        // On API 31+ it aliases a *platform* dimen, which a Robolectric table
+        // may or may not carry, so only positivity is pinned — a miss is
+        // tolerated in production by WidgetGlass' own fallback.
+        val radius = runCatching { resources.getDimension(R.dimen.widget_corner_radius) }.getOrNull()
+        assertTrue("corner radius dimen must be positive when resolvable", radius == null || radius > 0f)
     }
 
     // -- helpers
@@ -241,28 +206,36 @@ class WidgetXmlTest {
         val targetCellHeight: Int,
         val previewLayout: Int,
         val minResizeWidthRaw: String?,
+        val minResizeHeightRaw: String?,
+        val maxResizeWidthRaw: String?,
         val maxResizeHeightRaw: String?,
+        val resizeModeRaw: String?,
+        val updatePeriodMillis: Int,
     )
 
     private fun parseWidgetInfo(resId: Int): WidgetInfo {
         val parser = resources.getXml(resId)
         var layout = 0
-        var wRaw: String? = null
-        var hRaw: String? = null
+        var minW: String? = null
+        var minH: String? = null
         var catInt = 0
         var cellW = -1
         var cellH = -1
         var preview = 0
         var minResizeW: String? = null
+        var minResizeH: String? = null
+        var maxResizeW: String? = null
         var maxResizeH: String? = null
+        var resizeMode: String? = null
+        var period = -1
         try {
             while (parser.next() != XmlPullParser.END_DOCUMENT) {
                 if (parser.eventType == XmlPullParser.START_TAG && parser.name == "appwidget-provider") {
                     layout = parser.getAttributeResourceValue(ANDROID_NS, "initialLayout", 0)
-                    // minWidth/minHeight are dimension literals (e.g. 250dp) — read as raw string;
-                    // getAttributeIntValue returns 0 for raw dimen in Robolectric.
-                    wRaw = parser.getAttributeValue(ANDROID_NS, "minWidth")
-                    hRaw = parser.getAttributeValue(ANDROID_NS, "minHeight")
+                    // minWidth/minHeight are dimension literals (e.g. 110dp) — read as raw
+                    // string; getAttributeIntValue returns 0 for raw dimens in Robolectric.
+                    minW = parser.getAttributeValue(ANDROID_NS, "minWidth")
+                    minH = parser.getAttributeValue(ANDROID_NS, "minHeight")
                     // widgetCategory="home_screen" is compiled to 1; read as int.
                     catInt = parser.getAttributeIntValue(ANDROID_NS, "widgetCategory", 0)
                     // targetCellWidth/Height are integers — getAttributeValue returns
@@ -271,13 +244,20 @@ class WidgetXmlTest {
                     cellH = parser.getAttributeIntValue(ANDROID_NS, "targetCellHeight", -1)
                     preview = parser.getAttributeResourceValue(ANDROID_NS, "previewLayout", 0)
                     minResizeW = parser.getAttributeValue(ANDROID_NS, "minResizeWidth")
+                    minResizeH = parser.getAttributeValue(ANDROID_NS, "minResizeHeight")
+                    maxResizeW = parser.getAttributeValue(ANDROID_NS, "maxResizeWidth")
                     maxResizeH = parser.getAttributeValue(ANDROID_NS, "maxResizeHeight")
+                    resizeMode = parser.getAttributeValue(ANDROID_NS, "resizeMode")
+                    period = parser.getAttributeIntValue(ANDROID_NS, "updatePeriodMillis", -1)
                 }
             }
         } finally {
             parser.close()
         }
-        return WidgetInfo(layout, wRaw, hRaw, catInt, cellW, cellH, preview, minResizeW, maxResizeH)
+        return WidgetInfo(
+            layout, minW, minH, catInt, cellW, cellH, preview,
+            minResizeW, minResizeH, maxResizeW, maxResizeH, resizeMode, period,
+        )
     }
 
     private fun layoutIds(layoutRes: Int): Set<Int> {
@@ -294,6 +274,12 @@ class WidgetXmlTest {
             parser.close()
         }
         return ids
+    }
+
+    /** `110dp` -> 110f; anything that is not a dp literal -> null. */
+    private fun dimensionDp(raw: String?): Float? {
+        val value = raw?.trim()?.takeIf { it.endsWith("dp") } ?: return null
+        return value.dropLast(2).toFloatOrNull()
     }
 
     companion object {

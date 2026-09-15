@@ -7,10 +7,19 @@ import android.content.Intent
 import android.os.Bundle
 
 /**
- * Compact **Quick Play** widget — title, play disc and progress, with a wide
- * tier (artwork + skip) when resized past 200dp. Shares the
- * [DhunWidgetUpdater] data path and [WidgetTransport] actions with
- * [DhunNowPlayingWidgetProvider]; appears as a separate picker entry.
+ * Compact **Quick Play** widget — the only home-screen widget DHUN ships.
+ * Title/artist, an accent play disc and a progress bar; a wide tier
+ * (artwork + skip) takes over when the instance is resized past
+ * [DhunWidgetUpdater.QUICK_WIDE_MIN_WIDTH_DP].
+ *
+ * Live updates arrive as service pushes ([DhunWidgetUpdater.pushFromPlayer],
+ * wired in [dev.dhun.android.playback.DhunPlaybackService]); this provider
+ * only handles system callbacks and transport taps, which delegate to the
+ * shared [WidgetTransport].
+ *
+ * This class name, both layouts, every view id and `@xml/widget_quick_play_info`
+ * are a compatibility contract: an instance already placed on a launcher is
+ * only revived by an app update while those identifiers are untouched.
  */
 class DhunQuickPlayWidgetProvider : AppWidgetProvider() {
 

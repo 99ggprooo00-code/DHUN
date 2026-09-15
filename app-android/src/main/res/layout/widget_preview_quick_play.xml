@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Static widget-picker preview for Quick Play (see widget_preview_now_playing). -->
+<!-- Static widget-picker preview for Quick Play. The live card is a runtime
+     bitmap (WidgetGlass), which never runs for previews, so this mockup uses
+     the solid chrome (@drawable/widget_background, same system radius) with
+     sample content instead. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
