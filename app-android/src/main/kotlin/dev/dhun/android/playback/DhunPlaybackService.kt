@@ -6,6 +6,9 @@ import android.app.NotificationManager
 import android.content.pm.ServiceInfo
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -13,6 +16,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.MediaStyleNotificationHelper
 import dev.dhun.android.R
+import dev.dhun.android.widgets.DhunWidgetUpdater
 import dev.dhun.data.DataLayer
 import dev.dhun.download.DownloadRepository
 import org.koin.core.context.GlobalContext
@@ -54,6 +58,61 @@ class DhunPlaybackService : MediaSessionService() {
         override fun onPlaybackStateChanged(playbackState: Int) = updateNotification()
     }
 
+    /**
+     * Pushes widget updates on every meaningful player event, so the
+     * home-screen widgets track the session live instead of polling.
+     * Debounced — bursts (e.g. prepare → ready → playing) collapse into one
+     * push. Widget failures are swallowed: a launcher hiccup must never
+     * affect playback.
+     */
+    private val widgetHandler = Handler(Looper.getMainLooper())
+    private var lastWidgetPushMs = 0L
+    private val widgetSyncListener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            mediaSession?.let { pushWidgets(it.player, force = true) }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            mediaSession?.let { pushWidgets(it.player, force = true) }
+            if (isPlaying) scheduleWidgetTick() else widgetHandler.removeCallbacks(widgetTick)
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            mediaSession?.let { pushWidgets(it.player) }
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            mediaSession?.let { pushWidgets(it.player, force = true) }
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            mediaSession?.let { pushWidgets(it.player, force = true) }
+        }
+    }
+
+    /** Re-pushes position while playing so widget progress bars advance. */
+    private val widgetTick = object : Runnable {
+        override fun run() {
+            widgetHandler.removeCallbacks(this)
+            val player = mediaSession?.player ?: return
+            if (!player.isPlaying) return
+            pushWidgets(player)
+            widgetHandler.postDelayed(this, DhunWidgetUpdater.PROGRESS_TICK_MS)
+        }
+    }
+
+    private fun pushWidgets(player: Player, force: Boolean = false) {
+        val now = SystemClock.uptimeMillis()
+        if (!force && now - lastWidgetPushMs < WIDGET_PUSH_DEBOUNCE_MS) return
+        lastWidgetPushMs = now
+        runCatching { DhunWidgetUpdater.pushFromPlayer(this, player) }
+    }
+
+    private fun scheduleWidgetTick() {
+        widgetHandler.removeCallbacks(widgetTick)
+        widgetHandler.postDelayed(widgetTick, DhunWidgetUpdater.PROGRESS_TICK_MS)
+    }
+
     override fun onCreate() {
         super.onCreate()
         // A corrupt cache dir makes SimpleCache throw — degrade to direct
@@ -65,6 +124,7 @@ class DhunPlaybackService : MediaSessionService() {
             PlaybackGraph.buildExoPlayer(this, streamCache, null, downloads)
         }
         player.addListener(notificationUpdater)
+        player.addListener(widgetSyncListener)
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(PlaybackGraph.sessionActivityIntent(this))
             .build()
@@ -139,8 +199,10 @@ class DhunPlaybackService : MediaSessionService() {
         mediaSession
 
     override fun onDestroy() {
+        widgetHandler.removeCallbacks(widgetTick)
         mediaSession?.run {
             player.removeListener(notificationUpdater)
+            player.removeListener(widgetSyncListener)
             player.release()
             release()
         }
@@ -152,5 +214,7 @@ class DhunPlaybackService : MediaSessionService() {
         const val NOTIFICATION_ID = 1
         const val CHANNEL_ID = "dhun_playback"
         const val TAG = "DHUN"
+        /** Collapses event bursts into a single widget push. */
+        const val WIDGET_PUSH_DEBOUNCE_MS = 800L
     }
 }

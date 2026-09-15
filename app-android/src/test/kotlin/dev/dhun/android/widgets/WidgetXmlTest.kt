@@ -57,26 +57,104 @@ class WidgetXmlTest {
     }
 
     @Test
+    fun `widget infos declare target cells resize bounds and live previews`() {
+        val now = parseWidgetInfo(R.xml.widget_now_playing_info)
+        assertEquals(4, now.targetCellWidth)
+        assertEquals(2, now.targetCellHeight)
+        assertEquals(R.layout.widget_preview_now_playing, now.previewLayout)
+        assertTrue("minResizeWidth missing", !now.minResizeWidthRaw.isNullOrBlank())
+        assertTrue("maxResizeHeight missing", !now.maxResizeHeightRaw.isNullOrBlank())
+
+        val quick = parseWidgetInfo(R.xml.widget_quick_play_info)
+        assertEquals(2, quick.targetCellWidth)
+        assertEquals(2, quick.targetCellHeight)
+        assertEquals(R.layout.widget_preview_quick_play, quick.previewLayout)
+        assertTrue("minResizeWidth missing", !quick.minResizeWidthRaw.isNullOrBlank())
+    }
+
+    @Test
     fun `now playing layout contains the transport view ids updater expects`() {
         // Inflate via Robolectric resources check — avoids needing a real launcher.
         // We parse the XML to verify ids are present; the updater sets them via RemoteViews.
         val ids = layoutIds(R.layout.widget_now_playing)
         assertTrue("widget_root missing", R.id.widget_root in ids)
+        assertTrue("widget_glass missing", R.id.widget_glass in ids)
         assertTrue("widget_artwork missing", R.id.widget_artwork in ids)
         assertTrue("widget_title missing", R.id.widget_title in ids)
         assertTrue("widget_artist missing", R.id.widget_artist in ids)
         assertTrue("widget_prev missing", R.id.widget_prev in ids)
         assertTrue("widget_play_pause missing", R.id.widget_play_pause in ids)
+        assertTrue("widget_play_pause_icon missing", R.id.widget_play_pause_icon in ids)
         assertTrue("widget_next missing", R.id.widget_next in ids)
+        assertTrue("widget_progress missing", R.id.widget_progress in ids)
+    }
+
+    @Test
+    fun `compact tall and wide tiers contain their ids`() {
+        val compact = layoutIds(R.layout.widget_now_playing_compact)
+        assertTrue(R.id.widget_root in compact)
+        assertTrue(R.id.widget_glass in compact)
+        assertTrue(R.id.widget_artwork in compact)
+        assertTrue(R.id.widget_title in compact)
+        assertTrue(R.id.widget_play_pause in compact)
+        assertTrue(R.id.widget_play_pause_icon in compact)
+        assertTrue(R.id.widget_progress in compact)
+
+        val tall = layoutIds(R.layout.widget_now_playing_tall)
+        assertTrue(R.id.widget_root in tall)
+        assertTrue(R.id.widget_glass in tall)
+        assertTrue(R.id.widget_artwork in tall)
+        assertTrue(R.id.widget_title in tall)
+        assertTrue(R.id.widget_artist in tall)
+        assertTrue(R.id.widget_play_pause in tall)
+        assertTrue(R.id.widget_play_pause_icon in tall)
+        assertTrue(R.id.widget_prev in tall)
+        assertTrue(R.id.widget_next in tall)
+        assertTrue(R.id.widget_shuffle in tall)
+        assertTrue(R.id.widget_repeat in tall)
+        assertTrue(R.id.widget_progress in tall)
+        assertTrue(R.id.widget_position in tall)
+        assertTrue(R.id.widget_duration in tall)
+        assertTrue(R.id.widget_times_row in tall)
+
+        val wide = layoutIds(R.layout.widget_quick_play_wide)
+        assertTrue(R.id.widget_root in wide)
+        assertTrue(R.id.widget_glass in wide)
+        assertTrue(R.id.widget_artwork in wide)
+        assertTrue(R.id.widget_title in wide)
+        assertTrue(R.id.widget_play_pause in wide)
+        assertTrue(R.id.widget_play_pause_icon in wide)
+        assertTrue(R.id.widget_next in wide)
+        assertTrue(R.id.widget_progress in wide)
     }
 
     @Test
     fun `quick play layout contains its ids`() {
         val ids = layoutIds(R.layout.widget_quick_play)
         assertTrue(R.id.widget_root in ids)
+        assertTrue(R.id.widget_glass in ids)
         assertTrue(R.id.widget_title in ids)
         assertTrue(R.id.widget_artist in ids)
         assertTrue(R.id.widget_play_pause in ids)
+        assertTrue(R.id.widget_play_pause_icon in ids)
+        assertTrue(R.id.widget_progress in ids)
+    }
+
+    @Test
+    fun `preview layouts are static mockups with core ids`() {
+        val now = layoutIds(R.layout.widget_preview_now_playing)
+        assertTrue(R.id.widget_root in now)
+        assertTrue(R.id.widget_title in now)
+        assertTrue(R.id.widget_artist in now)
+        assertTrue(R.id.widget_play_pause in now)
+        assertTrue(R.id.widget_play_pause_icon in now)
+        assertTrue(R.id.widget_progress in now)
+
+        val quick = layoutIds(R.layout.widget_preview_quick_play)
+        assertTrue(R.id.widget_root in quick)
+        assertTrue(R.id.widget_title in quick)
+        assertTrue(R.id.widget_play_pause in quick)
+        assertTrue(R.id.widget_progress in quick)
     }
 
     @Test
@@ -106,11 +184,50 @@ class WidgetXmlTest {
     @Test
     fun `widget background and icon drawables exist`() {
         assertNotNull(resources.getDrawable(R.drawable.widget_background, null))
+        assertNotNull(resources.getDrawable(R.drawable.widget_play_circle, null))
+        assertNotNull(resources.getDrawable(R.drawable.widget_artwork_bg, null))
+        assertNotNull(resources.getDrawable(R.drawable.widget_progress, null))
         assertNotNull(resources.getDrawable(R.drawable.widget_ic_play, null))
         assertNotNull(resources.getDrawable(R.drawable.widget_ic_pause, null))
         assertNotNull(resources.getDrawable(R.drawable.widget_ic_next, null))
         assertNotNull(resources.getDrawable(R.drawable.widget_ic_prev, null))
+        assertNotNull(resources.getDrawable(R.drawable.widget_ic_shuffle, null))
+        assertNotNull(resources.getDrawable(R.drawable.widget_ic_repeat, null))
+        assertNotNull(resources.getDrawable(R.drawable.widget_ic_repeat_one, null))
         assertNotNull(resources.getDrawable(R.drawable.widget_ic_music_note, null))
+    }
+
+    @Test
+    fun `widget palette and talkback strings resolve`() {
+        // Layouts reference these — a missing color/string breaks inflation on device.
+        val palette = listOf(
+            R.color.widget_background,
+            R.color.widget_on_background,
+            R.color.widget_secondary,
+            R.color.widget_accent,
+            R.color.widget_on_accent,
+            R.color.widget_track,
+            R.color.widget_outline,
+            R.color.widget_artwork_scrim,
+        )
+        for (res in palette) {
+            resources.getColor(res, null)
+        }
+        val labels = listOf(
+            R.string.widget_cd_play,
+            R.string.widget_cd_pause,
+            R.string.widget_cd_next,
+            R.string.widget_cd_previous,
+            R.string.widget_cd_artwork,
+            R.string.widget_cd_shuffle_on,
+            R.string.widget_cd_shuffle_off,
+            R.string.widget_cd_repeat_off,
+            R.string.widget_cd_repeat_all,
+            R.string.widget_cd_repeat_one,
+        )
+        for (res in labels) {
+            assertTrue(resources.getString(res).isNotBlank())
+        }
     }
 
     // -- helpers
@@ -120,6 +237,11 @@ class WidgetXmlTest {
         val minWidthRaw: String?,
         val minHeightRaw: String?,
         val widgetCategoryInt: Int,
+        val targetCellWidth: Int,
+        val targetCellHeight: Int,
+        val previewLayout: Int,
+        val minResizeWidthRaw: String?,
+        val maxResizeHeightRaw: String?,
     )
 
     private fun parseWidgetInfo(resId: Int): WidgetInfo {
@@ -128,6 +250,11 @@ class WidgetXmlTest {
         var wRaw: String? = null
         var hRaw: String? = null
         var catInt = 0
+        var cellW = -1
+        var cellH = -1
+        var preview = 0
+        var minResizeW: String? = null
+        var maxResizeH: String? = null
         try {
             while (parser.next() != XmlPullParser.END_DOCUMENT) {
                 if (parser.eventType == XmlPullParser.START_TAG && parser.name == "appwidget-provider") {
@@ -138,12 +265,19 @@ class WidgetXmlTest {
                     hRaw = parser.getAttributeValue(ANDROID_NS, "minHeight")
                     // widgetCategory="home_screen" is compiled to 1; read as int.
                     catInt = parser.getAttributeIntValue(ANDROID_NS, "widgetCategory", 0)
+                    // targetCellWidth/Height are integers — getAttributeValue returns
+                    // null for non-string compiled values, so read as int.
+                    cellW = parser.getAttributeIntValue(ANDROID_NS, "targetCellWidth", -1)
+                    cellH = parser.getAttributeIntValue(ANDROID_NS, "targetCellHeight", -1)
+                    preview = parser.getAttributeResourceValue(ANDROID_NS, "previewLayout", 0)
+                    minResizeW = parser.getAttributeValue(ANDROID_NS, "minResizeWidth")
+                    maxResizeH = parser.getAttributeValue(ANDROID_NS, "maxResizeHeight")
                 }
             }
         } finally {
             parser.close()
         }
-        return WidgetInfo(layout, wRaw, hRaw, catInt)
+        return WidgetInfo(layout, wRaw, hRaw, catInt, cellW, cellH, preview, minResizeW, maxResizeH)
     }
 
     private fun layoutIds(layoutRes: Int): Set<Int> {

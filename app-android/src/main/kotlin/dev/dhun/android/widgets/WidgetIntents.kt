@@ -6,25 +6,27 @@ import android.content.Intent
 import dev.dhun.android.MainActivity
 
 /**
- * Intent contract for DHUN home-screen widgets (candidate 26).
+ * Intent contract for DHUN home-screen widgets.
  *
  * Both widget providers ([DhunNowPlayingWidgetProvider] and
  * [DhunQuickPlayWidgetProvider]) use these actions for transport.
- * The provider's [onReceive] handles them by connecting a short-lived
+ * [WidgetTransport] handles them by connecting a short-lived
  * [androidx.media3.session.MediaController] to [dev.dhun.android.playback.DhunPlaybackService]
  * and issuing the corresponding player command — the widget never talks
  * to ExoPlayer directly. All actions are `PendingIntent.getBroadcast`
  * targeting the provider that owns the widget id.
  *
  * Adding a new transport requires a new [ACTION_*] constant, a new
- * [PendingIntent] factory below, and a new `when` branch in each
- * provider — pinned by [WidgetIntentsTest].
+ * [PendingIntent] factory below, and a branch in [WidgetTransport] —
+ * pinned by [WidgetIntentsTest].
  */
 object WidgetIntents {
 
     const val ACTION_PLAY_PAUSE = "dev.dhun.android.widgets.PLAY_PAUSE"
     const val ACTION_NEXT = "dev.dhun.android.widgets.NEXT"
     const val ACTION_PREV = "dev.dhun.android.widgets.PREV"
+    const val ACTION_SHUFFLE = "dev.dhun.android.widgets.SHUFFLE"
+    const val ACTION_REPEAT = "dev.dhun.android.widgets.REPEAT"
     const val ACTION_OPEN_APP = "dev.dhun.android.widgets.OPEN_APP"
 
     /** Extra carrying the originating widget id (used for scoped updates). */
@@ -35,6 +37,8 @@ object WidgetIntents {
     private const val RC_NEXT = 2000
     private const val RC_PREV = 3000
     private const val RC_OPEN = 4000
+    private const val RC_SHUFFLE = 5000
+    private const val RC_REPEAT = 6000
 
     fun playPauseIntent(context: Context, providerClass: Class<*>, appWidgetId: Int): PendingIntent =
         broadcastFor(context, providerClass, ACTION_PLAY_PAUSE, appWidgetId, RC_PLAY_PAUSE)
@@ -44,6 +48,14 @@ object WidgetIntents {
 
     fun prevIntent(context: Context, providerClass: Class<*>, appWidgetId: Int): PendingIntent =
         broadcastFor(context, providerClass, ACTION_PREV, appWidgetId, RC_PREV)
+
+    /** Tapping shuffle flips the player's shuffle mode. */
+    fun shuffleIntent(context: Context, providerClass: Class<*>, appWidgetId: Int): PendingIntent =
+        broadcastFor(context, providerClass, ACTION_SHUFFLE, appWidgetId, RC_SHUFFLE)
+
+    /** Tapping repeat cycles OFF → ALL → ONE. */
+    fun repeatIntent(context: Context, providerClass: Class<*>, appWidgetId: Int): PendingIntent =
+        broadcastFor(context, providerClass, ACTION_REPEAT, appWidgetId, RC_REPEAT)
 
     /** Tap on the widget body — opens the app (expanded FullPlayer if a queue exists). */
     fun openAppIntent(context: Context, appWidgetId: Int): PendingIntent {
