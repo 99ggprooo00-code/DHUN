@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Artwork well: rounded scrim behind the note placeholder / loaded bitmap
+     (the bitmap itself is rounded in WidgetArtworkLoader so corners blend). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_artwork_scrim" />
+    <corners android:radius="16dp" />
+</shape>

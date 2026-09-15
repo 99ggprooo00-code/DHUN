@@ -24,6 +24,31 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — home-screen widgets rebuilt (Material You) — 2026-09-15
+- **Both widgets redesigned around Material You**: dynamic wallpaper-tinted
+  palette on API 31+ (light + dark), 28dp rounded card, filled accent play
+  disc, rounded artwork well, and a real layout preview in the widget
+  picker (`previewLayout`). Pre-S falls back to a DHUN dark-first palette.
+- **Real artwork**: the updater decodes the session's `artworkUri` off-thread
+  (sampled, center-cropped, rounded, 256px binder-safe) with an LRU cache;
+  text pushes instantly and artwork lands when ready. Stale-track arrivals
+  are dropped.
+- **Progress + times**: position/duration from the session drive a progress
+  bar on every tier, with `m:ss`/`h:mm:ss` labels on the tall tier.
+- **More controls**: shuffle toggle and repeat cycle (off → all → one) join
+  prev/play/next on the tall Now Playing tier; both providers share one
+  transport executor (`WidgetTransport`).
+- **Responsive tiers**: Now Playing picks compact (< 200dp wide), standard,
+  or tall (≥ 180dp high) per instance; Quick Play picks small or wide
+  (artwork + skip at ≥ 200dp). Both are resizable with target cells declared.
+- **Live updates**: `DhunPlaybackService` pushes widget state on every player
+  event (debounced) plus a 10s progress tick while playing — no more stale
+  track info. The controller-pull path remains for the app-dead case.
+- Tests: state/progress/time-format, tier selection, artwork pipeline, new
+  intent actions, and the XML/drawable/palette contract are pinned
+  (`DhunWidgetStateTest`, `DhunWidgetUpdaterTest`, `WidgetArtworkLoaderTest`,
+  `WidgetTransportTest`, `WidgetIntentsTest`, `WidgetXmlTest`).
+
 ### Fixed — `main` build + debug-APK workflow — 2026-09-10
 - **`main` no longer compiles since `073083c`** (PR #55, merged with its
   `build-and-test`/`apk`/`msi` checks failing): `InnerTubeClient.altContext`

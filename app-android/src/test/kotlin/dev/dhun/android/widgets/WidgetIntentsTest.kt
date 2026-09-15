@@ -22,6 +22,8 @@ class WidgetIntentsTest {
         assertEquals("dev.dhun.android.widgets.PLAY_PAUSE", WidgetIntents.ACTION_PLAY_PAUSE)
         assertEquals("dev.dhun.android.widgets.NEXT", WidgetIntents.ACTION_NEXT)
         assertEquals("dev.dhun.android.widgets.PREV", WidgetIntents.ACTION_PREV)
+        assertEquals("dev.dhun.android.widgets.SHUFFLE", WidgetIntents.ACTION_SHUFFLE)
+        assertEquals("dev.dhun.android.widgets.REPEAT", WidgetIntents.ACTION_REPEAT)
         assertEquals("dev.dhun.android.widgets.OPEN_APP", WidgetIntents.ACTION_OPEN_APP)
         assertEquals("widgetId", WidgetIntents.EXTRA_WIDGET_ID)
     }
@@ -32,9 +34,11 @@ class WidgetIntentsTest {
             WidgetIntents.ACTION_PLAY_PAUSE,
             WidgetIntents.ACTION_NEXT,
             WidgetIntents.ACTION_PREV,
+            WidgetIntents.ACTION_SHUFFLE,
+            WidgetIntents.ACTION_REPEAT,
             WidgetIntents.ACTION_OPEN_APP,
         )
-        assertEquals(4, actions.size)
+        assertEquals(6, actions.size)
     }
 
     @Test

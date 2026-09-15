@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Now Playing, standard tier (default 4×2): artwork + title/artist + play disc,
-     with prev / progress / next on the second row. Tapping the card opens DHUN. -->
+<!-- Now Playing, compact tier (narrow widths < 200dp): single row, prev folded away. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -8,7 +7,7 @@
     android:background="@drawable/widget_background"
     android:orientation="vertical"
     android:gravity="center_vertical"
-    android:padding="14dp">
+    android:padding="12dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,8 +17,8 @@
 
         <ImageView
             android:id="@+id/widget_artwork"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:background="@drawable/widget_artwork_bg"
             android:scaleType="centerCrop"
             android:src="@drawable/widget_ic_music_note"
@@ -29,7 +28,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="10dp"
             android:orientation="vertical"
             android:gravity="center_vertical">
 
@@ -41,7 +40,7 @@
                 android:maxLines="1"
                 android:text="Nothing playing"
                 android:textColor="@color/widget_on_background"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -50,55 +49,11 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="1dp"
                 android:text="Tap to open DHUN"
                 android:textColor="@color/widget_secondary"
-                android:textSize="12sp" />
+                android:textSize="11sp" />
         </LinearLayout>
-
-        <FrameLayout
-            android:id="@+id/widget_play_pause"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/widget_play_circle"
-            android:contentDescription="@string/widget_cd_play">
-
-            <ImageView
-                android:id="@+id/widget_play_pause_icon"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_gravity="center"
-                android:src="@drawable/widget_ic_play" />
-        </FrameLayout>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <ImageView
-            android:id="@+id/widget_prev"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:padding="8dp"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/widget_ic_prev"
-            android:contentDescription="@string/widget_cd_previous" />
-
-        <ProgressBar
-            android:id="@+id/widget_progress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="0dp"
-            android:layout_height="4dp"
-            android:layout_weight="1"
-            android:layout_marginHorizontal="4dp"
-            android:max="1000"
-            android:progress="0"
-            android:progressDrawable="@drawable/widget_progress" />
 
         <ImageView
             android:id="@+id/widget_next"
@@ -108,5 +63,31 @@
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@drawable/widget_ic_next"
             android:contentDescription="@string/widget_cd_next" />
+
+        <FrameLayout
+            android:id="@+id/widget_play_pause"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/widget_play_circle"
+            android:contentDescription="@string/widget_cd_play">
+
+            <ImageView
+                android:id="@+id/widget_play_pause_icon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/widget_ic_play" />
+        </FrameLayout>
     </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/widget_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginTop="8dp"
+        android:max="1000"
+        android:progress="0"
+        android:progressDrawable="@drawable/widget_progress" />
 </LinearLayout>
