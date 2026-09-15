@@ -39,7 +39,9 @@ import dev.dhun.design.DhunShapes
  * - crossfade when the image arrives (Coil's request.crossfade)
  * - pulsing placeholder while loading (infinite alpha)
  * - error gradient (placeholderStart → placeholderEnd) when load fails or url is null
- * - contentScale = Crop, rounded corners via [shape]
+ * - contentScale = Crop by default (list/card art), rounded corners via [shape]
+ * - `contentScale = Fit` + `placeholderBase = false` for the area-correct
+ *   now-playing card, which must never crop the cover
  */
 @Composable
 fun ArtworkImage(
@@ -49,6 +51,18 @@ fun ArtworkImage(
     shape: Shape = DhunShapes.artwork,
     cornerRadius: Dp? = null,
     contentScale: ContentScale = ContentScale.Crop,
+    /**
+     * Opaque placeholder wash painted *behind* the image.
+     *
+     * Leave it on for cropped artwork — it is what makes a loading (or
+     * failed) image read as artwork rather than a hole. Turn it **off** when
+     * the image is drawn with `ContentScale.Fit` over a backdrop that already
+     * shows the same artwork: the letterbox bands then reveal that backdrop
+     * (FullPlayer's blurred bleed) instead of a flat grey bar, and nothing is
+     * ever cropped to avoid the bands. Null/blank/failed URLs still get the
+     * glyph placeholder either way.
+     */
+    placeholderBase: Boolean = true,
 ) {
     val resolvedShape: Shape = if (cornerRadius != null) RoundedCornerShape(cornerRadius) else shape
 
@@ -80,16 +94,18 @@ fun ArtworkImage(
         modifier = modifier.clip(resolvedShape),
     ) {
         // Placeholder layer (shows through with alpha while Coil fades in)
-        Box(
-            modifier = Modifier.fillMaxSize().background(
-                Brush.linearGradient(
-                    listOf(
-                        DhunColors.placeholderStart.copy(alpha = placeholderAlpha),
-                        DhunColors.placeholderEnd.copy(alpha = placeholderAlpha),
+        if (placeholderBase) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(
+                    Brush.linearGradient(
+                        listOf(
+                            DhunColors.placeholderStart.copy(alpha = placeholderAlpha),
+                            DhunColors.placeholderEnd.copy(alpha = placeholderAlpha),
+                        ),
                     ),
                 ),
-            ),
-        )
+            )
+        }
         if (phase == LoadPhase.Failed) {
             // A failed load used to leave a flat grey rectangle — the device
             // screenshots are full of them. Show the same glyph placeholder

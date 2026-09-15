@@ -43,6 +43,12 @@ object DhunSpacing {
     val playerContentMaxWidth = 720.dp
     val playerTransportMaxWidth = 400.dp
     val playerArtworkMaxSize = 360.dp
+    /**
+     * Shortest Queue/Related sheet that still shows a header and real rows.
+     * The sheet asks for a share of the room above the control cluster but
+     * never drops below this while that room exists.
+     */
+    val queuePanelMinHeight = 280.dp
     val playerVolumeMaxWidth = 240.dp
     val playerDiagnosticsMaxHeight = 320.dp
     val contentBottomInset = 112.dp  // room above frosted mini+nav dock

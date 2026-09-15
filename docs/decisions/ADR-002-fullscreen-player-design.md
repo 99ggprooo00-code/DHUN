@@ -211,3 +211,28 @@ Cross-cutting with Home/shell (not Liquid Glass):
 - Shell ambient wash from now-playing seed colors (cheap); FullPlayer keeps
   real once-per-track blur + lyrics-dominant.
 - Nav bar = M3 `surfaceContainer` tonal surface, not a glass renderer.
+
+## Addendum — 2026-09-15 review fixes (artwork fit, bottom cluster, queue sheet)
+
+Device review of the 2026-09-09 "the artwork **is** the screen" reading found
+three defects. They are fixed inside the same rules (M3 only, blur once per
+track, no Liquid Glass), and the layout contract is restated so a future
+polish pass does not re-introduce them:
+
+- **Rule 1 (structure) is re-asserted over full-bleed art.** The sharp artwork
+  is a **fit-to-card** square in the upper field (sized by
+  `fittedPlayerArtworkSize`), never a crop-to-fill backdrop: a now-playing
+  screen that cuts faces off is a defect, not a style. The blurred bleed
+  behind it stays full-bleed and is what darkens towards the bottom.
+- **The control cluster is bottom-docked by construction.** `weight(1f)` on a
+  box that is always emitted — not on an `AnimatedVisibility`, which emits no
+  layout node once its exit transition has finished and therefore silently
+  releases the space that held the chrome down.
+- **Chrome over blurred art, never over the sharp thumbnail**: one ambient
+  scrim (`playerAmbientScrimStops`) that clears out mid-screen so the blur
+  glows and darkens monotonically to the bottom for title / progress /
+  transport legibility.
+- **Queue sheet geometry is measured, not guessed**: a pixel-measured chrome
+  height is converted to dp before use as the sheet's bottom inset, the sheet
+  is floored at `DhunSpacing.queuePanelMinHeight`, and it paints an opaque
+  base under the glass so rows read on a phone and on a Windows window.
