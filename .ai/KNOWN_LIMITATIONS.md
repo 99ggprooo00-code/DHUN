@@ -2,6 +2,10 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-10 (later) — #57 wires the session fields; device proof still open (`arena/01a0897a-dhun`)
+
+Supersedes the "inert" bullets of the "auth-gating is **not** fixed" entry below (kept verbatim — true on `main@be51d7d`): PR #57 sources `visitorData` (YouTube-homepage ytcfg) and `signatureTimestamp` (watch page → base.js, emitted as a JSON **number**), both cached and fail-open, and `OwnClientStreamResolver.resolve()` races them through all 7 alt strategies; `playbackContext` moved top-level per the InnerTube schema. **Still** honestly open: whether YouTube's gate clears — no on-device audio demonstrated with these fields, CI proves compile + unit only. ADR-007 (PR #54) stays the fallback if the gate survives.
+
 ## 2026-09-10 — the daily rot-drill is **not running**, and its "red" runs are 0-job noise
 
 Two separate things were conflated across many sessions and are separated here:
