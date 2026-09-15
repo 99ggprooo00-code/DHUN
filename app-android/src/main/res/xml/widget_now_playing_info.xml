@@ -10,7 +10,7 @@
     android:targetCellHeight="2"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_now_playing"
-    android:previewLayout="@layout/widget_now_playing"
+    android:previewLayout="@layout/widget_preview_now_playing"
     android:previewImage="@drawable/widget_ic_music_note"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"

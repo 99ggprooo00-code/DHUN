@@ -10,7 +10,7 @@
     android:targetCellHeight="2"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_quick_play"
-    android:previewLayout="@layout/widget_quick_play"
+    android:previewLayout="@layout/widget_preview_quick_play"
     android:previewImage="@drawable/widget_ic_play"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"

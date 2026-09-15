@@ -61,14 +61,14 @@ class WidgetXmlTest {
         val now = parseWidgetInfo(R.xml.widget_now_playing_info)
         assertEquals(4, now.targetCellWidth)
         assertEquals(2, now.targetCellHeight)
-        assertEquals(R.layout.widget_now_playing, now.previewLayout)
+        assertEquals(R.layout.widget_preview_now_playing, now.previewLayout)
         assertTrue("minResizeWidth missing", !now.minResizeWidthRaw.isNullOrBlank())
         assertTrue("maxResizeHeight missing", !now.maxResizeHeightRaw.isNullOrBlank())
 
         val quick = parseWidgetInfo(R.xml.widget_quick_play_info)
         assertEquals(2, quick.targetCellWidth)
         assertEquals(2, quick.targetCellHeight)
-        assertEquals(R.layout.widget_quick_play, quick.previewLayout)
+        assertEquals(R.layout.widget_preview_quick_play, quick.previewLayout)
         assertTrue("minResizeWidth missing", !quick.minResizeWidthRaw.isNullOrBlank())
     }
 
@@ -78,6 +78,7 @@ class WidgetXmlTest {
         // We parse the XML to verify ids are present; the updater sets them via RemoteViews.
         val ids = layoutIds(R.layout.widget_now_playing)
         assertTrue("widget_root missing", R.id.widget_root in ids)
+        assertTrue("widget_glass missing", R.id.widget_glass in ids)
         assertTrue("widget_artwork missing", R.id.widget_artwork in ids)
         assertTrue("widget_title missing", R.id.widget_title in ids)
         assertTrue("widget_artist missing", R.id.widget_artist in ids)
@@ -92,6 +93,7 @@ class WidgetXmlTest {
     fun `compact tall and wide tiers contain their ids`() {
         val compact = layoutIds(R.layout.widget_now_playing_compact)
         assertTrue(R.id.widget_root in compact)
+        assertTrue(R.id.widget_glass in compact)
         assertTrue(R.id.widget_artwork in compact)
         assertTrue(R.id.widget_title in compact)
         assertTrue(R.id.widget_play_pause in compact)
@@ -100,6 +102,7 @@ class WidgetXmlTest {
 
         val tall = layoutIds(R.layout.widget_now_playing_tall)
         assertTrue(R.id.widget_root in tall)
+        assertTrue(R.id.widget_glass in tall)
         assertTrue(R.id.widget_artwork in tall)
         assertTrue(R.id.widget_title in tall)
         assertTrue(R.id.widget_artist in tall)
@@ -116,6 +119,7 @@ class WidgetXmlTest {
 
         val wide = layoutIds(R.layout.widget_quick_play_wide)
         assertTrue(R.id.widget_root in wide)
+        assertTrue(R.id.widget_glass in wide)
         assertTrue(R.id.widget_artwork in wide)
         assertTrue(R.id.widget_title in wide)
         assertTrue(R.id.widget_play_pause in wide)
@@ -128,11 +132,29 @@ class WidgetXmlTest {
     fun `quick play layout contains its ids`() {
         val ids = layoutIds(R.layout.widget_quick_play)
         assertTrue(R.id.widget_root in ids)
+        assertTrue(R.id.widget_glass in ids)
         assertTrue(R.id.widget_title in ids)
         assertTrue(R.id.widget_artist in ids)
         assertTrue(R.id.widget_play_pause in ids)
         assertTrue(R.id.widget_play_pause_icon in ids)
         assertTrue(R.id.widget_progress in ids)
+    }
+
+    @Test
+    fun `preview layouts are static mockups with core ids`() {
+        val now = layoutIds(R.layout.widget_preview_now_playing)
+        assertTrue(R.id.widget_root in now)
+        assertTrue(R.id.widget_title in now)
+        assertTrue(R.id.widget_artist in now)
+        assertTrue(R.id.widget_play_pause in now)
+        assertTrue(R.id.widget_play_pause_icon in now)
+        assertTrue(R.id.widget_progress in now)
+
+        val quick = layoutIds(R.layout.widget_preview_quick_play)
+        assertTrue(R.id.widget_root in quick)
+        assertTrue(R.id.widget_title in quick)
+        assertTrue(R.id.widget_play_pause in quick)
+        assertTrue(R.id.widget_progress in quick)
     }
 
     @Test

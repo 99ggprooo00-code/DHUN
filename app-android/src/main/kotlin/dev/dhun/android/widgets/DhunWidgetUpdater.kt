@@ -39,7 +39,8 @@ import dev.dhun.android.playback.DhunPlaybackService
  *
  * Layouts are responsive per instance ([layoutForNowPlaying],
  * [layoutForQuickPlay]) from the host's reported size, and re-selected on
- * every push plus `onAppWidgetOptionsChanged` (resize).
+ * every push plus `onAppWidgetOptionsChanged` (resize). Every tier sits on a
+ * frosted-glass card ([WidgetGlass]) with fully-opaque content on top.
  */
 object DhunWidgetUpdater {
 
@@ -57,6 +58,12 @@ object DhunWidgetUpdater {
 
     /** Service progress-tick cadence while playing. */
     const val PROGRESS_TICK_MS = 10_000L
+
+    /** Fallback glass size when the host reports no size (tests, old launchers). */
+    const val GLASS_DEFAULT_NOW_WIDTH_DP = 250
+    const val GLASS_DEFAULT_NOW_HEIGHT_DP = 140
+    const val GLASS_DEFAULT_QUICK_WIDTH_DP = 110
+    const val GLASS_DEFAULT_QUICK_HEIGHT_DP = 110
 
     /** Read-only snapshot of whatever the player exposes to widgets. */
     data class PlaybackSnapshot(
@@ -341,6 +348,7 @@ object DhunWidgetUpdater {
     ): RemoteViews =
         RemoteViews(context.packageName, R.layout.widget_now_playing).apply {
             applyCommon(context, state, artwork, this)
+            applyGlass(context, this, GLASS_DEFAULT_NOW_WIDTH_DP, GLASS_DEFAULT_NOW_HEIGHT_DP)
         }
 
     internal fun buildNowPlayingViewsForId(
@@ -364,6 +372,9 @@ object DhunWidgetUpdater {
         val layout = layoutForNowPlaying(minWidthDp, maxHeightDp)
         return RemoteViews(context.packageName, layout).apply {
             applyCommon(context, state, artwork, this)
+            val glassW = if (minWidthDp > 0) minWidthDp else GLASS_DEFAULT_NOW_WIDTH_DP
+            val glassH = if (maxHeightDp > 0) maxHeightDp else GLASS_DEFAULT_NOW_HEIGHT_DP
+            applyGlass(context, this, glassW, glassH)
             setOnClickPendingIntent(
                 R.id.widget_prev,
                 WidgetIntents.prevIntent(context, DhunNowPlayingWidgetProvider::class.java, appWidgetId),
@@ -410,6 +421,8 @@ object DhunWidgetUpdater {
         val layout = layoutForQuickPlay(minWidthDp)
         return RemoteViews(context.packageName, layout).apply {
             applyCommon(context, state, artwork, this)
+            val glassW = if (minWidthDp > 0) minWidthDp else GLASS_DEFAULT_QUICK_WIDTH_DP
+            applyGlass(context, this, glassW, GLASS_DEFAULT_QUICK_HEIGHT_DP)
             setOnClickPendingIntent(
                 R.id.widget_play_pause,
                 WidgetIntents.playPauseIntent(context, DhunQuickPlayWidgetProvider::class.java, appWidgetId),
@@ -506,6 +519,24 @@ object DhunWidgetUpdater {
             views.setImageViewBitmap(R.id.widget_artwork, artwork)
         } else {
             views.setImageViewResource(R.id.widget_artwork, R.drawable.widget_ic_music_note)
+        }
+    }
+
+    /**
+     * Paints the frosted-glass card behind the content. Falls back to the
+     * solid chrome if the glass bitmap cannot be rendered.
+     */
+    private fun RemoteViews.applyGlass(
+        context: Context,
+        views: RemoteViews,
+        widthDp: Int,
+        heightDp: Int,
+    ) {
+        val glass = runCatching { WidgetGlass.forWidget(context, widthDp, heightDp) }.getOrNull()
+        if (glass != null) {
+            views.setImageViewBitmap(R.id.widget_glass, glass)
+        } else {
+            views.setImageViewResource(R.id.widget_glass, R.drawable.widget_background)
         }
     }
 
