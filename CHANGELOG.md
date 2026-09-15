@@ -67,6 +67,12 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   slot-fit and single-receiver guards), plus new `WidgetPaletteLightModeTest`
   / `WidgetPaletteDarkModeTest` for the AMOLED contract and glass coverage
   for the radius resolution and the 320px budget.
+- `scripts/check_widget_refs.py` — the toolchain-free static gate for this
+  area (XML well-formedness, `R.*`/`@res` reference resolution, "Now Playing
+  is gone", and Kotlin comment/string nesting). It earned its place by
+  catching an *unclosed block comment*: Kotlin comments nest, so a
+  `@android:color/*` glob written inside KDoc swallows the closing `*/`.
+  That shipped once and cost a CI cycle.
 - **Name collision, on purpose left alone**: "Now Playing" as the *in-app*
   player screen (the entry below, PR #62) is untouched — only the home-screen
   widget that shared the name is gone.
@@ -115,9 +121,9 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   middle, dark at the bottom, never flat black) and the duration label.
 
 ### Changed — home-screen widgets rebuilt (Material You) — 2026-09-15
-*Superseded in part by the entry above: the two-widget set and the
-wallpaper-tinted card described below were replaced by a single Quick Play
-widget on an AMOLED card.*
+*Superseded in part by the "one widget only" entry at the top of this
+section: the two-widget set and the wallpaper-tinted card described below
+were replaced by a single Quick Play widget on an AMOLED card.*
 
 - **Both widgets redesigned around Material You**: dynamic wallpaper-tinted
   palette on API 31+ (light + dark), 28dp rounded card, filled accent play

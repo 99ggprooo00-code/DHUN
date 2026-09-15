@@ -18,8 +18,8 @@ import dev.dhun.android.R
  * glass tile on any wallpaper and kills pixels on AMOLED screens.
  *
  * Why a runtime bitmap: XML drawables cannot apply translucency to colors
- * (`@android:color/*` are opaque and there is no alpha-combining mechanism in
- * resources), so the fill is resolved at runtime ([ContextCompat.getColor])
+ * (framework `system_…` colors are opaque and there is no alpha-combining
+ * mechanism in resources), so the fill is resolved at runtime ([ContextCompat.getColor])
  * and composited here. Deliberately flat — no sheen, no faux edge: that is the
  * M3 widget language, and it keeps dense content (small text, progress,
  * buttons) legible. True blur-behind is not exposed to app widgets on any API
@@ -33,8 +33,12 @@ import dev.dhun.android.R
  * Bitmaps are aspect-correct per widget instance (from the host's reported dp
  * size) but capped at [MAX_EDGE_PX] — a flat fill upscales invisibly and keeps
  * the RemoteViews transaction under the binder limit even alongside artwork.
- * Results are cached; a theme change resolves new colors and therefore new
- * cache keys, so the card follows light/dark switches within one push.
+ * Results are cached under size + radius + resolved fill, so a config change
+ * (a resize, a host that reports a different system radius, an OEM override of
+ * the color) yields a new card within one push instead of a stale bitmap. The
+ * accent is not part of this bitmap at all: it lives in the drawables the
+ * layout resolves per push, which is exactly why a black card and a tinted
+ * play disc coexist.
  */
 object WidgetGlass {
 

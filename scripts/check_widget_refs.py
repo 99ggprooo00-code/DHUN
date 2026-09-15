@@ -111,6 +111,91 @@ for p, tree in parsed.items():
                 if (typ, name) not in res:
                     errors.append(f"UNRESOLVED @{typ}/{name} in {os.path.relpath(p, ROOT)} (attr {k})")
 
+# ---------- 4b. Kotlin lexical sanity (no compiler here)
+# Catches the failure mode a real build catches instantly: Kotlin block
+# comments NEST, so a `/*` sequence inside KDoc (e.g. a `@android:color/*`
+# glob) opens a nested comment and the trailing `*/` leaves the file unclosed
+# -- "Syntax error: Unclosed comment", plus a cascade of bogus "Unresolved
+# reference" errors in every file that touches the type.
+
+def kotlin_lex_problems(text):
+    """Return a list of lexical complaints: unclosed comment/string/char."""
+    probs = []
+    i, n = 0, len(text)
+    line = 1
+    depth = 0
+    state = "code"  # code | line_comment | block_comment | string | raw_string | char
+    while i < n:
+        c = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        if c == "\n":
+            line += 1
+            if state == "line_comment":
+                state = "code"
+            elif state in ("string", "char"):
+                probs.append(f"unterminated {state} (line {line - 1})")
+                state = "code"
+            i += 1
+            continue
+        if state == "code":
+            if c == "/" and nxt == "/":
+                state = "line_comment"; i += 2; continue
+            if c == "/" and nxt == "*":
+                state = "block_comment"; depth = 1; i += 2; continue
+            if text.startswith('"""', i):
+                state = "raw_string"; i += 3; continue
+            if c == '"':
+                state = "string"; i += 1; continue
+            if c == "'":
+                state = "char"; i += 1; continue
+            i += 1
+            continue
+        if state == "line_comment":
+            # a stray `/*` inside a comment is harmless, but `*/` here is the
+            # real signal of a mismatched opener on the same line
+            if c == "/" and nxt == "*":
+                probs.append(f"line comment opens a block comment (line {line})")
+            i += 1
+            continue
+        if state == "block_comment":
+            if c == "/" and nxt == "*":
+                depth += 1; i += 2; continue
+            if c == "*" and nxt == "/":
+                depth -= 1; i += 2
+                if depth == 0:
+                    state = "code"
+                continue
+            i += 1
+            continue
+        if state == "raw_string":
+            if text.startswith('"""', i):
+                state = "code"; i += 3; continue
+            i += 1
+            continue
+        if state == "string":
+            if c == "\\":
+                i += 2; continue
+            if c == '"':
+                state = "code"; i += 1; continue
+            i += 1
+            continue
+        if state == "char":
+            if c == "\\":
+                i += 2; continue
+            if c == "'":
+                state = "code"; i += 1; continue
+            i += 1
+            continue
+    if state == "block_comment":
+        probs.append(f"unclosed comment (nesting depth {depth} at EOF)")
+    elif state in ("string", "raw_string"):
+        probs.append(f"unclosed string literal at EOF (state {state})")
+    return probs
+
+for p in kt_files:
+    for msg in kotlin_lex_problems(open(p, encoding="utf-8").read()):
+        errors.append(f"KOTLIN LEX {os.path.relpath(p, ROOT)}: {msg}")
+
 # ---------- 5. Now Playing must be gone
 NP = re.compile(r"widget_now_playing|DhunNowPlayingWidgetProvider|widget_preview_now_playing|TALL_MIN_HEIGHT_DP|COMPACT_MAX_WIDTH_DP|layoutForNowPlaying|buildNowPlayingViews|values-night-v31")
 for p in kt_files + xml_files:
