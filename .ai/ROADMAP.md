@@ -9,7 +9,7 @@ Updated **2026-09-16 (UTC)** · session **`arena/01a0aa5e-dhun`** — **PR #68 f
 
 **Files:** `shared/…/design/components/HorizontalRail.kt` · `shared/…/jvmTest/…/HorizontalRailTest.kt` · `.github/workflows/ci.yml` · `app-android/build.gradle.kts` (comment only) · `scripts/test_ci_workflow.py` (new) · `CHANGELOG.md` · `.ai/KNOWN_LIMITATIONS.md` · this file.
 
-**Last error / CI:** none on this head yet — local Gradle remains impossible (no JDK; Maven/Gradle/dl.google.com egress-blocked → `curl` returns `000`). `python3 -m unittest discover -s scripts -p 'test_*.py'` = **27 OK** locally (was 24; +3 `test_ci_workflow`). CI is the Kotlin compiler.
+**Last error / CI:** first CI on PR #69 red — `HorizontalRail.kt:217 Unresolved reference 'minimumFlingVelocity'` (`:shared:compileKotlinJvm` / `compileDebugKotlinAndroid`, runs `35102094935` / `35102094887`). CMP 1.8.2 `ViewConfiguration` has no such property; fling floor is now `MouseRailFling.MIN_FLING_VELOCITY_PX_PER_SEC = 50f`. Local Gradle remains impossible. `python3 -m unittest discover -s scripts -p 'test_*.py'` = **27 OK**.
 
 **Exact next step:** push this branch → open **one** session PR → require `build-and-test` + `apk` + `msi` green on the head. Then the user's hardware gate for #68 (backdrop / BACK / rails) **plus** a mouse flick on a rail. Do **not** merge until asked. ADR-007 (#54) and #53 (do-not-merge ROADMAP wipe) are unchanged.
 

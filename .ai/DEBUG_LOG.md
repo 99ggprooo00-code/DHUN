@@ -1,5 +1,23 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-16 — `viewConfiguration.minimumFlingVelocity` does not exist in CMP 1.8.2 (`arena/01a0aa5e-dhun`)
+
+**Symptom.** First CI on PR #69 (`35102094935` / apk `35102094887`) red on
+`:shared:compileKotlinJvm` and `:shared:compileDebugKotlinAndroid`:
+`HorizontalRail.kt:217 Unresolved reference 'minimumFlingVelocity'`.
+
+**Root cause.** Compose Multiplatform 1.8.2 `ViewConfiguration` (the receiver
+on `PointerInputScope`) exposes `touchSlop` / timeout millis, not
+`minimumFlingVelocity`. That property exists on Android `ViewConfiguration`
+and on later Compose; it is not on the pinned 1.8.2 common interface.
+
+**Fix.** Pin `MouseRailFling.MIN_FLING_VELOCITY_PX_PER_SEC = 50f` — Android's
+unscaled `MINIMUM_FLING_VELOCITY` — and pass that into `shouldFling`. Tests
+already used 50f.
+
+**Verification.** Re-push; CI is the compiler. Hardware feel of the floor is
+still the user's gate.
+
 ## 2026-09-10 — PR #55 merged with all three gates red; `main` could not compile for 6 CI runs (`arena/01a08976-dhun`)
 
 **Symptom.** Four required-gate jobs red on `main`, and the pattern is what makes it

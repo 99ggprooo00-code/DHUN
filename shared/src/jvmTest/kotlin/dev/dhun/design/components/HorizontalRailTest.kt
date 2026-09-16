@@ -96,9 +96,10 @@ class HorizontalRailTest {
     fun aSlowMouseReleaseDoesNotFling() {
         // Below the platform minimum the rail must stop dead — a click-drag
         // that already ended on the pointer-up frame is not a fling.
-        assertTrue(!MouseRailFling.shouldFling(velocityPxPerSec = 40f, minimumFlingVelocity = 50f))
-        assertTrue(!MouseRailFling.shouldFling(velocityPxPerSec = -40f, minimumFlingVelocity = 50f))
-        assertTrue(!MouseRailFling.shouldFling(velocityPxPerSec = 0f, minimumFlingVelocity = 50f))
+        val min = MouseRailFling.MIN_FLING_VELOCITY_PX_PER_SEC
+        assertTrue(!MouseRailFling.shouldFling(velocityPxPerSec = min - 10f, minimumFlingVelocity = min))
+        assertTrue(!MouseRailFling.shouldFling(velocityPxPerSec = -(min - 10f), minimumFlingVelocity = min))
+        assertTrue(!MouseRailFling.shouldFling(velocityPxPerSec = 0f, minimumFlingVelocity = min))
     }
 
     @Test

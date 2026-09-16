@@ -214,7 +214,10 @@ fun Modifier.dhunMouseDragScroll(
                 }
                 if (!completed) return@awaitEachGesture
                 val pointerVelocityX = tracker.calculateVelocity().x
-                if (!MouseRailFling.shouldFling(pointerVelocityX, viewConfiguration.minimumFlingVelocity)) {
+                // CMP 1.8.2 ViewConfiguration has no minimumFlingVelocity
+                // (Android View / later Compose do). Pin the same 50 px/s
+                // floor Android's unscaled MINIMUM_FLING_VELOCITY uses.
+                if (!MouseRailFling.shouldFling(pointerVelocityX, MouseRailFling.MIN_FLING_VELOCITY_PX_PER_SEC)) {
                     return@awaitEachGesture
                 }
                 val contentVelocity = MouseRailFling.contentVelocityFromPointer(pointerVelocityX)
@@ -311,6 +314,13 @@ private fun DhunRailScrollbar(
  * framework spline fling, which we do not replace.
  */
 object MouseRailFling {
+
+    /**
+     * Slowest flick that still coasts, in px/s. Compose 1.8.2's
+     * `ViewConfiguration` does not expose `minimumFlingVelocity`; this is
+     * Android's unscaled `ViewConfiguration.MINIMUM_FLING_VELOCITY` (50).
+     */
+    const val MIN_FLING_VELOCITY_PX_PER_SEC = 50f
 
     /** A requested decay frame that the rail could not swallow means we hit an edge. */
     const val STOP_EPSILON_PX = 0.5f
