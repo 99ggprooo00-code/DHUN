@@ -1,32 +1,68 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-16 (UTC)** · session **`arena/01a0ab74-dhun`**.
+Updated **2026-09-16 (UTC, after the #74 merge)** · session **`arena/01a0ac91-dhun`**.
 
-**GitHub evidence:** PR #73 CLOSED unmerged, superseded by **PR #74**,
-which preserves all commits through `ce5cb18`. At `19c7b0d`, all four
-checks PASS: `build-and-test` (35134174898), `apk` + `msi` (35134174968),
-`build` (35134174949). Main remains `5023b38` before merge.
+**GitHub evidence (verified live this session via `gh`/API, not assumed):**
+`origin/main` = `c5b1793` (PR #74 merge, 2026-09-16T18:36:09Z; PR #73
+closed unmerged, superseded by #74). Post-merge CI on `c5b1793`:
+build-and-test **35135429018** success · Build APK **35135429102**
+success · test-release **35135429240** success. Rolling `test`
+pre-release republished **2026-09-16 18:41:19 UTC** at exactly
+`c5b1793` — `dhun-test.apk`, `dhun-test.msi` + both `.sha256` sidecars
+all `uploaded` (release API). PR #74's final comments carry the
+pre-merge (final head `ade145b`, four checks green) and post-merge
+evidence.
 
-**Verified fixes:** `DhunAppearanceTest.kt` pins S5's `#D5798A` error
-and matching translucent border, with baseline name/comments updated.
-No other test assertion pins the old hue. `PlaybackGraph.kt` now uses
-an AudioManager instance for `generateAudioSessionId()`. CI compiled
-and tested shared, Android and desktop; no local JDK or hardware claims.
+**This session (S1 — diagnosis + hygiene + docs; no code, no local
+build, no hardware claims):**
+- Reconciled the full 189-run rot-drill history from the GitHub API:
+  the schedule fired daily 09-02 → 09-07 (4 green, 2 red — both red
+  pre-#57); it has been **silent since 2026-09-07 04:28 UTC** (9 missed
+  04:17 UTC windows, repo active daily, workflow `state: active`, id
+  **348098190**); **0-job push runs** occur on every push since
+  09-07 05:56 (`event: push`, 0 jobs, `failure`, `failure_reason: null`)
+  although **no version of the file ever had a `push:` trigger**
+  (verified at 6 SHAs, 09-01 → `c5b1793`). Working diagnosis:
+  GitHub-side trigger-registration anomaly around the 09-07 06:17 file
+  edit (`da9d779`) — the registry name still shows the file path, not
+  `rot-drill`. Details: KNOWN_LIMITATIONS + `docs/runbooks/rot-drill.md`.
+- Capability check (once, per standing rule): no JDK/Gradle/Android SDK
+  → CI is the compiler; `gh` + GitHub API reachable; the local clone is
+  **shallow (depth 1)** — GitHub API is the history source of truth.
+- `gh workflow run rot-drill.yml --ref main` → **HTTP 403**
+  re-confirmed: the live dispatch stays an operator task.
+- Closed stale PR #53 per the recorded §3 decision (superseded by the
+  re-baseline; the research track continues in open PR #54).
+- Issue #14 could **not** be commented on from this token (issue-comment
+  writes return 403; PR comments work) — its reconciliation is recorded
+  here, in KNOWN_LIMITATIONS and the runbook instead; the rot-drill
+  workflow (`issues: write`) updates #14 on the next live run. Note: a
+  test comment on PR #54 ("test-ping (delete me)") could not be deleted
+  by this token (delete 403) — safe to remove manually.
 
-**Last error:** none on `19c7b0d`. This documentation follow-up still
-requires its own CI check before merge.
+**Last error:** none blocking. No local tests were run; no hardware
+claims.
 
-**Exact next step:** push this evidence → require all four checks green
-on final PR #74 head → merge (user explicitly authorized) → verify
-post-merge main CI and rolling `test` release. S4/S5 code and audit work
-is CI-verified; merge/release publication pending. No new feature stage.
+**Exact next step (BLOCKED on operator — exact guide in
+`docs/runbooks/rot-drill.md`, "Observed anomalies" section):**
+1. Operator: Actions → `rot-drill` → **Run workflow** on `main`
+   (current head `c5b1793…`) → watch the probe job → live verdict (the
+   S1 exit criterion).
+2. Operator: same page — confirm the workflow is enabled and note the
+   schedule state. If the next 04:17 UTC window is missed after the
+   manual run, restore the schedule: trivial commit to `main` + one
+   manual run (workflow change → needs user OK per S1), or a GitHub
+   support ticket (workflow id 348098190, last scheduled run
+   34083253658, missed windows 09-08 → 09-16).
+3. Record the verdict line in `docs/verification/14-release.md`
+   (green → #14 auto-close path proven; red → new evidence, check
+   contingency triggers T1/T2), then proceed to Stage S2.
 
-**Remaining gates, in order:** S1 user Actions dispatch
-(`docs/runbooks/rot-drill.md`); S3 device evidence
-(`docs/runbooks/s3-hardware-checklist.md`); S6 signing, clean installs,
-soaks and explicit go-ahead. No hardware success or release readiness
-claimed. Work stays sequential; one asserted patch per file, marker
-verification, full diff review before every push.
+S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`) and S6
+(soaks, clean installs, signing decisions, tag, explicit go-ahead)
+remain user-gated; nothing in this session authorizes a tag or a stable
+release. Work stays sequential; one asserted patch per file per block,
+marker verification, full diff review against main before every push.
 
 ---
 
@@ -107,6 +143,23 @@ instructions be stored permanently in `.ai/`).
 | 6 | **Single agent** (2026-09-16): no parallel agents; stages are sequential. | MASTER_PROMPT §7/§8 |
 | 7 | **Re-baseline hierarchy** (2026-09-16): code > tests/CI > accepted ADRs > master prompt > roadmap > historical research > old plans. Never implement paper that contradicts verified behavior. | MASTER_PROMPT §9 |
 | 8 | **Compilation-warning policy:** "zero warnings" = address warnings surfacing in CI annotations for the compiled modules; library-internal warnings DHUN cannot fix go to KNOWN_LIMITATIONS, not workarounds. | CI annotations |
+| 9 | **Autonomy boundary (2026-09-16 handoff):** act without asking for routine permission; merge routine fixes ONLY after required CI is green on the exact final head; verify post-merge CI and rolling `test` publication. NOT authorized: signing decisions, the `v0.1.0` tag, stable-release publication, bypassing S1/S3. | This session's behavior |
+| 10 | **Document before merge, not after:** before every merge update CURRENT ACTIVE TASK + KNOWN_LIMITATIONS with the changes, verified CI evidence, remaining blockers and exact next step; documentation rides in the PR; CI green on the PR's final head (including the docs commit) before merging; post-merge results recorded afterward in the PR comment and reconciled in the next documentation update — never pre-claimed. | Rules block above |
+| 11 | **Tool discipline:** one asserted patch per file per block; grep-verify every edit; read the full diff against current main before every push. | Session behavior |
+| 12 | **Blocked work:** when blocked on hardware, unavailable GitHub actions, or release/signing decisions, give an exact step-by-step guide and continue only genuinely unblocked work permitted by the stage gates; never invent features or mark blocked gates complete. | rot-drill.md / s3-hardware-checklist.md |
+| 13 | **Sandbox capability rule:** check capabilities ONCE per session (JDK, `gh`, egress). If no JDK: CI is the compiler — inspect failed step names via `gh run view --json jobs` and diagnose through code review; never claim local tests ran; never infer an exact failure from a step name alone. | KNOWN_LIMITATIONS |
+
+**Handoff record (2026-09-16, session `arena/01a0ac91-dhun`):** PR #73
+closed unmerged, superseded by PR #74, merged as `c5b1793` (S4/S5
+changes, palette-test fix, Android AudioManager API fix). Post-merge CI
+(35135429018 / 35135429102 / 35135429240) and rolling `test`
+publication (18:41:19 UTC at exactly `c5b1793`, all four assets)
+verified — evidence in PR #74's final comments. S1 remains blocked on
+the operator dispatch (`workflow_dispatch` 403 re-verified this
+session); the rot-drill schedule breakage and 0-job push noise are now
+fully diagnosed (see CURRENT ACTIVE TASK + KNOWN_LIMITATIONS). S3 needs
+real-device evidence; S6 needs explicit user go-ahead. No v0.1.0 tag,
+no stable release, no signing decision was made or is authorized.
 
 ---
 
@@ -116,9 +169,11 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 🟨 code merged + CI green, **hardware verification open** ·
 ⬜ not started · 🔴 blocked/open problem.
 
-**`main@d555959` (2026-09-16): CI green** (`build-and-test`,
-`Build APK`, `test-release` apk+msi+publish all pass). Rolling `test`
-pre-release current.
+**`main@c5b1793` (2026-09-16, after PR #74 merge): post-merge CI green**
+(build-and-test 35135429018, Build APK 35135429102, test-release
+35135429240 — all success on the merge SHA). Rolling `test` pre-release
+republished 2026-09-16 18:41:19 UTC at exactly `c5b1793` (apk + msi +
+both `.sha256` sidecars).
 
 ### 2a. Build history — Phases 01–16 (ALL code-merged; do not re-implement)
 
@@ -148,16 +203,19 @@ All are 🟨/⬜ — closing them is Stage S3.
 
 | Stage | Objective | Status | Gate |
 |---|---|---|---|
-| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | ⬜ | ≥1 scheduled/dispatched drill verdict on current `main` + artifact |
+| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | ⬜ diagnosis done 09-16 (schedule dead since 09-07, 0-job noise identified); live verdict awaits operator dispatch | ≥1 scheduled/dispatched drill verdict on current `main` + artifact |
 | **S2** | Architectural cleanup (dead harness UI, PR #53/#54 hygiene, docs index, stale root notes) | ⬜ | CI green; zero dead screens; PRs resolved |
 | **S3** | Hardware verification round 1 (core loop both platforms, signed checklists) | ⬜ | `docs/verification/` checklists signed with build SHAs |
-| **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | ⬜ | Every shipped key reachable or removed; EQ decision recorded |
-| **S5** | Testing + hardening (contrast fix, dep audit, THIRD_PARTY review) | ⬜ | CI green; contrast ≥4.5:1 or re-recorded exception; review logged |
+| **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | 🟨 code merged + CI green (PR #74); S4 hardware boxes ride in S3 | Every shipped key reachable or removed; EQ decision recorded |
+| **S5** | Testing + hardening (contrast fix, dep audit, THIRD_PARTY review) | ✅ merged (PR #74): CI green; contrast 4.66:1 asserted both schemes (`DhunThemeContrastTest`); dep audit all-HOLD with post-tag upgrade order (`.ai/DEPENDENCY_AUDIT.md`); THIRD_PARTY reviewed | CI green; contrast ≥4.5:1 or re-recorded exception; review logged |
 | **S6** | Release v0.1.0 (soaks, clean installs, signing decisions, tag) | ⬜ | ALL S1–S5 gates + user go-ahead → tag + publish |
 
 Full tasking per stage: `MASTER_PROMPT.md` §7. Execution order is
 fixed: S1 → S2 → S3 → S4 → S5 → S6. S3 needs the user (devices); S1
-needs the user (Actions click — agents get 403).
+needs the user (Actions click — agents get 403, re-verified 2026-09-16).
+Note: S4/S5 CODE was executed out of stage order with user authorization
+and merged in PR #74 (2026-09-16); the S4 hardware boxes ride in S3.
+Remaining work order is unchanged: S1 → S2 → S3 → S6.
 
 ---
 
@@ -165,11 +223,13 @@ needs the user (Actions click — agents get 403).
 
 | Item | State | Decision |
 |---|---|---|
-| PR #53 `docs: reconcile extraction playback research handoff` (+182/−513, would wipe this file from a stale base) | OPEN, stale since 09-10 | **Close unmerged** (user's call to click; nothing in it survives the re-baseline) |
-| PR #54 `docs: PO-token/InnerTubeX research + ADR proposal` (+326/−1, ADR-007 PROPOSED) | OPEN, research-only | **Keep as contingency reference** (merge docs-only with ADR-007 staying PROPOSED, or leave open — user's call). NEVER implement without trigger T1/T2 + explicit go-ahead |
-| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN, 7 comments, last real verdict 09-07 (`34011539225`, pre-#57 chain) | Keep open; S1 re-baselines it with a fresh verdict. All "red rot-drill" push runs since are **0-job noise** (`total_count: 0`), not verdicts |
+| PR #53 `docs: reconcile extraction playback research handoff` (+182/−513, would wipe this file from a stale base) | **CLOSED unmerged 2026-09-16** (session `arena/01a0ac91-dhun`, per this decision) | Superseded by the re-baseline; the research track continues in open PR #54. Nothing in it survived. |
+| PR #54 `docs: PO-token/InnerTubeX research + ADR proposal` (+326/−1, ADR-007 PROPOSED) | OPEN, research-only | **Keep as contingency reference** (merge docs-only with ADR-007 staying PROPOSED, or leave open — user's call). NEVER implement without trigger T1/T2 + explicit go-ahead. (A labeled agent test comment "test-ping (delete me)" from 2026-09-16 could not be deleted by the agent token — safe to remove manually.) |
+| PR #73 `S4: settings surface (slice 1: page + persistence + desktop EQ)` | CLOSED unmerged 2026-09-16 | Superseded by PR #74, which preserves all commits through `ce5cb18`. |
+| PR #74 `S4/S5: settings, EQ and hardening with palette and Android build fixes` | **MERGED as `c5b1793`** (2026-09-16T18:36:09Z) | Four checks green on final head `ade145b`; post-merge CI + rolling `test` publication verified (see CURRENT ACTIVE TASK). |
+| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; last LIVE verdicts `34011539225` (09-06) + `34083253658` (09-07), both RED, pre-#57 chain | Keep open; S1 re-baselines it with a fresh verdict on `main@c5b1793`. Schedule silent since 09-07 04:28 (9 missed windows); every later push run is **0-job noise** (0 jobs, `failure_reason: null`, file never had a `push:` trigger) — not verdicts. Agent token cannot comment on issues (403, 2026-09-16); the rot-drill workflow (`issues: write`) updates #14 on the next live run. |
 | Issue #60 `Guest-First + Optional YTM Login` | OPEN (future plan, self-declared not-current) | v2 backlog (§8). Guest-first is already the architecture — no action now |
-| Issue #63 `Security hardening…` | OPEN (enhancement) | v2 backlog (§8). No action in S1–S6 except S5's dep/license review |
+| Issue #63 `Security hardening…` | OPEN (enhancement) | v2 backlog (§8). No action in S1–S6 except S5's dep/license review (done in PR #74) |
 
 ---
 
@@ -224,12 +284,20 @@ needs the user (Actions click — agents get 403).
 
 ## 7. Completion execution order (single agent — exact sequence)
 
-1. Merge this re-baseline (user review).
-2. **S1** (needs user: Actions *Run workflow* click + Settings check).
+1. ~~Merge this re-baseline (user review).~~ **DONE** — merged as PR #72
+   (main `5023b38`, 2026-09-16T17:08:09Z).
+2. **S1** — **IN PROGRESS**: PR #53 closed (2026-09-16); full rot-drill
+   diagnosis recorded (§3 + KNOWN_LIMITATIONS + runbook). Remaining:
+   user's Actions *Run workflow* click on `main@c5b1793` + Settings
+   check (+ user OK if the schedule fix touches the workflow file).
 3. **S2** (agent: dead-code + PR/docs hygiene).
-4. **S3** (user drives devices; agent records + fixes fallout).
-5. **S4** (agent: settings/themes/EQ/jump-list verb).
-6. **S5** (agent: tests/hardening/audit).
+4. **S3** (user drives devices; agent records + fixes fallout) — includes
+   the S4 hardware boxes (settings, EQ, jump-list verb, close-to-tray).
+5. ~~**S4** (agent: settings/themes/EQ/jump-list verb).~~ CODE MERGED in
+   PR #74 (2026-09-16, user-authorized) — hardware boxes moved to S3.
+6. ~~**S5** (agent: tests/hardening/audit).~~ MERGED in PR #74
+   (2026-09-16): contrast gate, sts revalidation, palette baseline,
+   dependency audit, THIRD_PARTY review.
 7. **S6** (soaks + clean installs + user go-ahead → release).
 8. v2 backlog (§8) only after v0.1.0 — in user-picked order.
 

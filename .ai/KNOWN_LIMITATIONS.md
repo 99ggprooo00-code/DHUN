@@ -2,6 +2,51 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 (late) — S1 rot-drill diagnosis + post-merge reconciliation (`arena/01a0ac91-dhun`)
+
+Evidence-first reconciliation after the PR #74 merge; no code changed,
+no local build, no hardware claims.
+
+- **Post-merge state verified on GitHub (not assumed):** `main@c5b1793`
+  passed build-and-test 35135429018, Build APK 35135429102 and
+  test-release 35135429240; the rolling `test` pre-release was
+  republished 2026-09-16 18:41:19 UTC at exactly `c5b1793` (apk + msi
+  + both `.sha256` sidecars). S4/S5 code (settings, Android EQ,
+  jump-list verb, contrast/sts hardening, dependency audit) is on
+  `main` via PR #74.
+- **Rot-drill full lifecycle reconciled from the GitHub API (all 189
+  runs):** the schedule fired daily 09-02 → 09-07 (green 09-02/03/04/05;
+  RED 34011539225 on 09-06 and 34083253658 on 09-07 — both pre-#57-chain
+  SHAs `dd1ab31`/`d1e0408`); it has been **silent since 09-07 04:28
+  UTC** — 9 missed 04:17 UTC windows (09-08 → 09-16) with the repo
+  active daily and the workflow registry `state: active` (id
+  **348098190**). **Every push since 09-07 05:56 UTC created a 0-job
+  `push` run** (0 jobs, `conclusion: failure`, `failure_reason: null`)
+  although the file has **no `push:` trigger in any version** (verified
+  at 6 SHAs, 09-01 → `c5b1793`). Working diagnosis: GitHub-side
+  trigger-registration anomaly around the 09-07 06:17 file edit
+  (`da9d779`) — the registry name still shows the file path, not
+  `rot-drill`. Fix options (in `docs/runbooks/rot-drill.md`): force
+  re-registration (trivial commit to `main` + one manual run — needs
+  user OK as a workflow change) or a GitHub support ticket (workflow id
+  348098190). The 0-job runs are **not** extraction evidence and are
+  never cited as verdicts (e.g. 35135427771 on the merge push).
+- **Capability re-check (this session):** no JDK/Gradle/Android SDK →
+  CI is the compiler; `gh` + GitHub API reachable; **the local clone is
+  shallow (depth 1)** — all history claims above come from the GitHub
+  API, not local `git log`.
+- **`gh workflow run rot-drill.yml --ref main` → HTTP 403**
+  (integration token), re-confirmed 2026-09-16 — dispatch stays an
+  operator task. Additionally, **issue-comment writes are 403 for this
+  token** (PR comments work), so issue #14 could not be updated by
+  comment; the reconciliation is recorded here, in ROADMAP and the
+  runbook instead, and the rot-drill workflow (`issues: write`) will
+  update #14 on the next live run. A test comment on PR #54 could not
+  be deleted (delete 403) — remove manually.
+- **Board hygiene:** stale PR #53 closed unmerged per the recorded
+  ROADMAP §3 decision (superseded by the re-baseline; the research
+  track lives in open PR #54).
+
 ## 2026-09-16 — S5 continuation: stale palette regression baseline
 
 `DhunAppearanceTest` still expected the pre-S5 error and border hue after
