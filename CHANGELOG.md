@@ -70,6 +70,14 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   releases the native effect on destroy. The Settings EQ section is now live
   on both platforms (audible proof needs S3 hardware).
 
+### Fixed — Stage S5 stream-perf — 2026-09-16
+- **`sts` revalidation budget** (`InnerTubeClient`): the ~1 MB watch-page GET
+  that ran on *every* resolve now runs once per 26 resolves
+  (`STS_REVALIDATE_EVERY = 25` cached serves between re-checks) —
+  count-based, not wall-clock, because commonMain has no clock without a new
+  `expect/actual`. `forceRefresh` still bypasses; a failed revalidation fails
+  open to `null`, backs off a full budget, and keeps serving the stale cache
+  meanwhile. (Resolves the PERF/MEDIUM second-look finding.)
 ### Changed — Stage S2 architectural cleanup — 2026-09-16
 - **Dead harness UI deleted** (~680 lines): `HarnessScreen`,
   `HarnessViewModel`, `DesktopHarness*` had zero call sites (only an

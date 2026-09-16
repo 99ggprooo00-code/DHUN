@@ -58,6 +58,10 @@ not inherited:
   on every cold resolve, part of the desktop startup budget. Fix:
   TTL-guard sts revalidation (reuse cached sts if validated within
   N hours; re-fetch watch page only on TTL expiry or AuthRequired).
+  **RESOLVED 2026-09-16 (S5):** count-based budget instead of wall-clock TTL
+  (`STS_REVALIDATE_EVERY = 25`; commonMain has no clock) — 1 watch GET per 26
+  resolves, forceRefresh bypasses, failed revalidation backs off + serves
+  stale. Covered in `AltPlayerIdentityTest`.
 - **[BUG-RISK/LOW-MEDIUM — S2 or S5 one-liner]
   `cancelCacheFill()` nulls the job WITHOUT cancelling it**
   (`DesktopDhunPlayer.kt`): only the AtomicBoolean is set, so a fill
