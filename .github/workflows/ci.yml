@@ -46,3 +46,10 @@ jobs:
       # PRs touching app-desktop (Phase 12/14) must fail here, not after merge.
       - name: Desktop compiles
         run: ./gradlew :app-desktop:compileKotlinJvm --no-daemon
+
+      # The desktop jvmTest source set (jump-list/tray pure cores) exists
+      # since candidate 27 but was never executed by CI — compileKotlinJvm
+      # only compiles jvmMain. It runs after the compile step so a compile
+      # break and a red test fail different, honestly-named steps.
+      - name: "Unit tests — Desktop (JVM)"
+        run: ./gradlew :app-desktop:jvmTest --no-daemon

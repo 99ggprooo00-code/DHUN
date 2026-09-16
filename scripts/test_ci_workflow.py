@@ -5,6 +5,11 @@ testDebugUnitTest. That coupling is easy to miss: a red test aborted a step
 named "Android debug build", and if AGP ever stopped honouring the lazy
 dependsOn the suite would silently stop running. ci.yml must name the
 Gradle task as its own step, before assembleDebug.
+
+The desktop suite had the mirror-image gap: the jvmTest source set existed
+but no workflow step executed it — compileKotlinJvm only compiles jvmMain.
+ci.yml must name :app-desktop:jvmTest as its own step, after the compile
+step so each failure keeps an honest name.
 """
 
 import unittest
@@ -35,6 +40,20 @@ class CiWorkflowTest(unittest.TestCase):
 
     def test_shared_jvm_tests_still_run(self):
         self.assertIn("./gradlew :shared:jvmTest", self.text)
+
+    def test_desktop_unit_suite_is_a_named_step(self):
+        self.assertIn("./gradlew :app-desktop:jvmTest", self.text)
+        self.assertIn("Unit tests — Desktop (JVM)", self.text)
+
+    def test_desktop_unit_suite_runs_after_desktop_compile(self):
+        compile_at = self.text.index("./gradlew :app-desktop:compileKotlinJvm")
+        test_at = self.text.index("./gradlew :app-desktop:jvmTest")
+        self.assertLess(
+            compile_at,
+            test_at,
+            "the desktop suite must run after the compile step so a compile "
+            "break fails Desktop compiles, not Unit tests",
+        )
 
 
 if __name__ == "__main__":
