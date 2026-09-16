@@ -2,6 +2,68 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 — second-look code findings (same session, engine-room read)
+
+Read end to end: `InnerTubeClient`, `OwnClientStreamResolver`,
+`PlaybackGraph`, `DesktopDhunPlayer`, `AndroidDhunPlayer`,
+`PlayerViewModel`, `DhunStreamCache`, `RateLimitGate`,
+`QueueManager`, sheet-transition math. No CRITICAL/HIGH found; two
+items worth scheduling, rest nits/notes. All verified against code,
+not inherited:
+
+- **[PERF/MEDIUM — S5] `signatureTimestampOrNull` fetches the watch
+  page on EVERY resolve** (`InnerTubeClient.kt:316-346`). The
+  base.js→sts mapping is cached, but the watch-page GET that yields
+  the jsUrl runs unconditionally per track: +1 RTT and ~0.5–1 MB HTML
+  on every cold resolve, part of the desktop startup budget. Fix:
+  TTL-guard sts revalidation (reuse cached sts if validated within
+  N hours; re-fetch watch page only on TTL expiry or AuthRequired).
+- **[BUG-RISK/LOW-MEDIUM — S2 or S5 one-liner]
+  `cancelCacheFill()` nulls the job WITHOUT cancelling it**
+  (`DesktopDhunPlayer.kt`): only the AtomicBoolean is set, so a fill
+  blocked in a socket read keeps consuming bandwidth after a skip;
+  `handlePlaybackError`'s `fill?.join()` can also see `null` while a
+  fill is actually running (narrow race → premature Error instead of
+  local-copy recovery). `cancelPrebuffer()` in the same file does it
+  right (`job?.cancel()`); mirror that + a test.
+- **[UNVERIFIED/LOW — S3 checklist] vlcj volume scale mapping**
+  (`DesktopDhunPlayer.kt`: init `volume()/100f`, set `(v*100)`).
+  Assumes native 0–100. If libVLC's native range differs, init still
+  coerces safely but max-slider may cap below true max. Needs one
+  hardware comparison (DHUN max vs VLC-app max). NOT claimed as a bug.
+- **[NIT/LOW — S5] `PlaybackGraph.retries` never reset on success.**
+  Per-track error counts accumulate for the process lifetime; a track
+  that recovered once has fewer retries left hours later. Clear on
+  STATE_READY/playing. Memory bounded by distinct tracks (trivial).
+- **[NIT/LOW] `checkPlayability` passes `LIVE_STREAM_OFFLINE` as OK**
+  → downstream "no formats" Parse error. Harmless for a music app;
+  could map to Unavailable("live stream") if touched.
+- **[NOTE] `visitorData` cached forever, never revalidated.**
+  Fail-open covers fetch failure, not mid-session staleness (stale
+  value likely behaves as no value). Extraction-maintenance note.
+- **[NOTE] Desktop concurrent bandwidth**: stream + cache-fill +
+  prebuffer-next can run together (prebuffer correctly waits for the
+  `playing` event). Documented trade-off; S3 slow-network soak should
+  watch startup behavior.
+- **[NOTE] `playCurrentLocked` holds `opMutex` across network
+  resolve**: transport ops queue behind a slow resolve (45s budget
+  worst case). Prevents overlap bugs; accepted trade-off.
+- **[CORRECTION] ADR-005 is implemented on BOTH platforms** — Android
+  via `DhunStreamCache.prefetch` (`AndroidDhunPlayer.kt:281`) +
+  Media3 queue, Desktop via prebuffer + temp cache — not "desktop
+  half" as first reported.
+- **[CONFIRMED GOOD]** Sheet math (`relatedSheetTravel*`, frozen
+  capture, finite-guards, floor/ceiling coherence) holds up to
+  reading — PR #67's claims verified in code, no bug found.
+  ExoPlayer tuning (500 ms playback buffer, audio-only tracks,
+  UA-per-videoId isolation, key-stable cache) is careful work,
+  consistent with the user's "Android buffering fine" report.
+  `RateLimitGate` (monotonic, extend-only) and `DhunStreamCache`
+  (5 h TTL, UA-paired, invalidate-on-403) are correct.
+  `QueueManager.setQueue` coerces bounds; `PlayerViewModel`
+  collectors die with `activityScope` (cancelled in onDestroy) /
+  app scope on desktop — no leak.
+
 ## 2026-09-16 — project re-baselined (`arena/01a0ab12-dhun`, base `d555959`)
 
 Docs-only session: `.ai/MASTER_PROMPT.md` → v3, `.ai/ROADMAP.md`
