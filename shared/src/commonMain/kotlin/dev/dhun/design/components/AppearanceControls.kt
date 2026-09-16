@@ -83,8 +83,14 @@ fun DhunAppearanceControls(
             style = MaterialTheme.typography.labelMedium,
             color = DhunColors.textTertiary,
         )
+        // A real horizontal rail (more accents than fit a narrow window), so
+        // it gets the same desktop affordance as the LazyRow rails: hold and
+        // slide with the mouse.
+        val accentRowState = rememberScrollState()
         Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            modifier = Modifier
+                .horizontalScroll(accentRowState)
+                .dhunMouseDragScroll(accentRowState),
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {

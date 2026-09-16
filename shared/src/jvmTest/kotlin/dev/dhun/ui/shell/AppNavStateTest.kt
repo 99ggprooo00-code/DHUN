@@ -126,6 +126,142 @@ class AppNavStateTest {
         assertTrue(nav.detailStack.isEmpty(), "a covered stack is a stale stack")
     }
 
+    // ------------------------------------------------- tab back (Phase 16)
+
+    @Test
+    fun backFromSearchReturnsToHomeInsteadOfExitingTheApp() {
+        // The reported Android bug: Search is a tab, not a stack entry, so
+        // BACK used to find nothing to close and handed the gesture straight to
+        // the platform — the app appeared to exit from a screen in use.
+        val nav = AppNavState()
+        nav.selectTab(AppTab.SEARCH)
+
+        assertTrue(nav.hasTabHistory, "a non-root tab must have somewhere to go back to")
+        assertTrue(nav.onBack(), "BACK must be handled by the shell, not the platform")
+        assertEquals(AppTab.HOME, nav.selectedTab)
+    }
+
+    @Test
+    fun backFromLibraryReturnsToHomeInsteadOfExitingTheApp() {
+        val nav = AppNavState()
+        nav.selectTab(AppTab.LIBRARY)
+
+        assertTrue(nav.onBack())
+        assertEquals(AppTab.HOME, nav.selectedTab)
+    }
+
+    @Test
+    fun backWalksTheTabsInReverseOrderAndStopsAtTheRoot() {
+        val nav = AppNavState()
+        nav.selectTab(AppTab.SEARCH)
+        nav.selectTab(AppTab.LIBRARY)
+
+        assertTrue(nav.onBack())
+        assertEquals(AppTab.SEARCH, nav.selectedTab)
+        assertTrue(nav.onBack())
+        assertEquals(AppTab.HOME, nav.selectedTab)
+
+        // At the root there is nowhere left to go: the platform default runs,
+        // and repeated presses can never invent a tab or loop.
+        assertFalse(nav.hasTabHistory)
+        assertFalse(nav.popTab())
+        assertFalse(nav.onBack())
+        assertEquals(AppTab.HOME, nav.selectedTab)
+        assertFalse(nav.onBack())
+        assertEquals(AppTab.HOME, nav.selectedTab)
+    }
+
+    @Test
+    fun aDeeperScreenPopsBeforeTheTabIsLeft() {
+        // Home → Search → artist → BACK → Search → BACK → Home. One press moves
+        // one layer: the page first, the tab only once no page is open.
+        val nav = AppNavState()
+        nav.selectTab(AppTab.SEARCH)
+        nav.push(DetailRoute.ArtistPage("UCsearchresult"))
+
+        assertTrue(nav.onBack())
+        assertEquals(AppTab.SEARCH, nav.selectedTab)
+        assertTrue(nav.detailStack.isEmpty())
+
+        assertTrue(nav.onBack())
+        assertEquals(AppTab.HOME, nav.selectedTab)
+    }
+
+    @Test
+    fun thePlayerStillCollapsesBeforePagesAndTabs() {
+        val nav = AppNavState()
+        nav.selectTab(AppTab.LIBRARY)
+        nav.push(DetailRoute.PlaylistPage("42", isLocal = true))
+        nav.playerExpanded = true
+
+        assertTrue(nav.onBack())
+        assertFalse(nav.playerExpanded)
+        assertEquals(AppTab.LIBRARY, nav.selectedTab, "collapsing the player is not navigation")
+
+        assertTrue(nav.onBack())
+        assertEquals(AppTab.LIBRARY, nav.selectedTab, "one press pops one page only")
+        assertTrue(nav.onBack())
+        assertEquals(AppTab.HOME, nav.selectedTab)
+    }
+
+    @Test
+    fun tabHistoryIgnoresConsecutiveDuplicatesAndStaysBounded() {
+        val nav = AppNavState()
+        // Re-tapping the current tab records nothing (it is not a move).
+        nav.selectTab(AppTab.SEARCH)
+        nav.selectTab(AppTab.SEARCH)
+        nav.selectTab(AppTab.SEARCH)
+        assertEquals(listOf(AppTab.HOME), nav.tabHistoryEntries())
+
+        // A long browsing session cannot grow the list without bound.
+        repeat(AppNavState.MAX_TAB_HISTORY * 3) { i ->
+            nav.selectTab(if (i % 2 == 0) AppTab.SEARCH else AppTab.LIBRARY)
+        }
+        assertTrue(nav.tabHistoryEntries().size <= AppNavState.MAX_TAB_HISTORY)
+        // …and BACK still lands on a real tab rather than nowhere.
+        assertTrue(nav.onBack())
+        assertTrue(nav.selectedTab in AppTab.userTabs)
+    }
+
+    @Test
+    fun directTabAssignmentsAlsoLandInTheBackHistory() {
+        // Launcher shortcuts, the "Liked songs"/"Offline" affordances and
+        // restored state all write selectedTab directly rather than going
+        // through selectTab; none of them may be skipped by BACK.
+        val nav = AppNavState()
+        nav.selectedTab = AppTab.LIBRARY
+
+        assertTrue(nav.onBack())
+        assertEquals(AppTab.HOME, nav.selectedTab)
+    }
+
+    @Test
+    fun onBackAgreesWithTheShellBackPolicy() {
+        // AppNavState.onBack is the executor, DhunShellPolicy.backAction the
+        // stated rule: the two must not drift apart.
+        val nav = AppNavState()
+        assertEquals(
+            ShellBackAction.PlatformDefault,
+            DhunShellPolicy.backAction(
+                DhunShellLayout.SinglePane,
+                playerExpanded = nav.playerExpanded,
+                detailDepth = nav.detailStack.size,
+                hasTabHistory = nav.hasTabHistory,
+            ).action,
+        )
+
+        nav.selectTab(AppTab.SEARCH)
+        assertEquals(
+            ShellBackAction.ReturnToPreviousTab,
+            DhunShellPolicy.backAction(
+                DhunShellLayout.SinglePane,
+                playerExpanded = nav.playerExpanded,
+                detailDepth = nav.detailStack.size,
+                hasTabHistory = nav.hasTabHistory,
+            ).action,
+        )
+    }
+
     @Test
     fun catalogIsNeverANavBarTabButSurvivesRestoredState() {
         // Deep links / process-death restore may name CATALOG, so it stays in

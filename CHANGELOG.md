@@ -24,6 +24,32 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — Home/Search/Library backdrop, Android tab BACK, Windows rails — 2026-09-16
+- **The app now sits on the song you are playing.** Home, Search and Library get
+  an edge-to-edge background built from the **currently playing** track's
+  artwork: blurred 64dp, darkened, overscaled past the edges so no blur rim
+  shows, and painted *under* the existing glass surfaces. It follows playback —
+  change the track and the backdrop crossfades on whichever of the three screens
+  you are on — and it never borrows artwork from whatever the screen is listing.
+  When there is no artwork to show (no thumbnail, blank or failed URL, or an
+  Android below 12 where a real blur does not exist) the previous DHUN background
+  is what you get, unchanged; nothing broken, empty or placeholder-shaped is ever
+  stretched across a screen.
+- **Android BACK no longer leaves the app from Search or Library.** Those are
+  tabs, not pages on the navigation stack, so Back had nothing to close and
+  parked the app. Back now walks the navigation history: the full player
+  collapses, then one page pops, then the tab returns to the tab you came from,
+  and only Home — the landing screen — hands Back to the system as before.
+  Playback is untouched by all of it, and the walk survives rotation and process
+  death.
+- **Windows: horizontal shelves can finally be moved sideways.** Compose refuses
+  mouse drags on scrollable containers, and a vertical mouse wheel is (correctly)
+  a vertical control, so on Windows the albums/artists/playlists/chip rails could
+  only be reached with a trackpad. They now support **hold the pointer and
+  slide**, plus a glassy scrollbar that fades in while a rail moves, shows how
+  much is off-screen and can be dragged. Trackpad two-finger panning and
+  Shift+wheel keep working exactly as before, and ordinary vertical page
+  scrolling is unchanged — no page was made sideways-scrollable.
 ### Fixed — the Full Player rises *with* the Related/Queue sheet — 2026-09-16
 - **One composition, not one moving picture.** PR #66 made the panel and the
   player share a transition, but it left the control cluster

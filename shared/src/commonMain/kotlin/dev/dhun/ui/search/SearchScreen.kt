@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -50,6 +49,7 @@ import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunFilterChip
+import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
@@ -250,7 +250,7 @@ private fun FilterChipsRow(
     selectedFilter: SearchFilter,
     onFilterSelected: (SearchFilter) -> Unit,
 ) {
-    LazyRow(
+    DhunHorizontalRail(
         contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
         modifier = Modifier.padding(bottom = DhunSpacing.sm, top = DhunSpacing.xs),
@@ -426,7 +426,7 @@ private fun SearchResultsList(
                 SectionHeader(title = "Artists")
             }
             item(key = "artists_row") {
-                LazyRow(
+                DhunHorizontalRail(
                     contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                     horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                 ) {
@@ -446,7 +446,7 @@ private fun SearchResultsList(
                 SectionHeader(title = "Albums")
             }
             item(key = "albums_row") {
-                LazyRow(
+                DhunHorizontalRail(
                     contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                     horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                 ) {
@@ -466,7 +466,7 @@ private fun SearchResultsList(
                 SectionHeader(title = "Playlists")
             }
             item(key = "playlists_row") {
-                LazyRow(
+                DhunHorizontalRail(
                     contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                     horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                 ) {

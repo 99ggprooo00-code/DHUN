@@ -216,6 +216,50 @@ class DhunShellLayoutTest {
     }
 
     @Test
+    fun aTabThatIsNotTheRootGoesBackBeforeThePlatformDefault() {
+        // Phase 16: Search and Library are tabs, not stack entries. With
+        // nothing overlaying them, BACK used to be the platform default and the
+        // app appeared to exit from a screen the user was still using.
+        val fromSearch = DhunShellPolicy.backAction(
+            DhunShellLayout.SinglePane,
+            playerExpanded = false,
+            detailDepth = 0,
+            hasTabHistory = true,
+        )
+        assertEquals(ShellBackAction.ReturnToPreviousTab, fromSearch.action)
+        assertFalse(fromSearch.detailPaneOpen)
+
+        // At the root tab the platform default is still the only exit path.
+        val atHome = DhunShellPolicy.backAction(
+            DhunShellLayout.SinglePane,
+            playerExpanded = false,
+            detailDepth = 0,
+            hasTabHistory = false,
+        )
+        assertEquals(ShellBackAction.PlatformDefault, atHome.action)
+    }
+
+    @Test
+    fun pagesAndThePlayerStillTakePriorityOverSteppingBackATab() {
+        val withPlayer = DhunShellPolicy.backAction(
+            DhunShellLayout.SinglePane,
+            playerExpanded = true,
+            detailDepth = 0,
+            hasTabHistory = true,
+        )
+        assertEquals(ShellBackAction.CollapsePlayer, withPlayer.action)
+
+        val withPage = DhunShellPolicy.backAction(
+            DhunShellLayout.TwoPane,
+            playerExpanded = false,
+            detailDepth = 1,
+            hasTabHistory = true,
+        )
+        assertEquals(ShellBackAction.PopDetail, withPage.action)
+        assertTrue(withPage.detailPaneOpen)
+    }
+
+    @Test
     fun aNegativeStackDepthIsTreatedAsEmpty() {
         val back = DhunShellPolicy.backAction(DhunShellLayout.TwoPane, playerExpanded = false, detailDepth = -7)
         assertEquals(ShellBackAction.PlatformDefault, back.action)

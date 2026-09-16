@@ -133,11 +133,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             DhunTheme {
                 // Music-app back behavior: FullPlayer collapses first, then
-                // detail pages pop; only when nothing overlays do we park the
-                // app — BACK never kills the player.
+                // detail pages pop, then the tab steps back to the tab it came
+                // from — Search and Library are *tabs*, not stack entries, so
+                // without that step BACK found nothing to close and parked the
+                // app from a screen the user was still using. Only at Home with
+                // nothing open do we park it. BACK never kills the player.
                 val nav = androidx.compose.runtime.remember { NavStatePersistence.restore(lastSavedState) }
                 currentNav = nav
-                BackHandler { if (!nav.closeTop()) moveTaskToBack(true) }
+                BackHandler { if (!nav.onBack()) moveTaskToBack(true) }
 
                 val ui by connectState.collectAsState()
                 val shortcut by pendingShortcut.collectAsState()

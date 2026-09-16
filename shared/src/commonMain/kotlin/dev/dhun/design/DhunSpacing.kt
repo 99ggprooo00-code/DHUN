@@ -104,6 +104,8 @@ object DhunSpacing {
     val glassBlur = 16.dp
     val progressHeight = 4.dp
     val progressHeightActive = 8.dp
+    /** Glassy thumb of a horizontal rail's scrollbar (see DhunHorizontalRail). */
+    val railScrollbar = 4.dp
     /** Scrub preview bubble: one label line, sized to read at a glance mid-drag. */
     val scrubBubbleHeight = 22.dp
     val border = 1.dp

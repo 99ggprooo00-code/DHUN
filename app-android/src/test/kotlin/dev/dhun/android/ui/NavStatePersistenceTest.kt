@@ -100,6 +100,52 @@ class NavStatePersistenceTest {
     }
 
     @Test
+    fun `tab back history survives a round trip so BACK still reaches the previous tab`() {
+        // Phase 16: Search/Library are tabs, and their back history is what
+        // keeps Android BACK from parking the app. Losing it on rotate would
+        // drop the user to Home from the tab they were on.
+        val original = AppNavState().apply {
+            selectTab(AppTab.SEARCH)
+            selectTab(AppTab.LIBRARY)
+        }
+        assertEquals(listOf(AppTab.HOME, AppTab.SEARCH), original.tabHistoryEntries())
+
+        val bundle = Bundle().also { NavStatePersistence.save(original, it) }
+        val restored = NavStatePersistence.restore(bundle)
+
+        assertEquals(AppTab.LIBRARY, restored.selectedTab)
+        assertEquals(original.tabHistoryEntries(), restored.tabHistoryEntries())
+        assertTrue(restored.onBack())
+        assertEquals(AppTab.SEARCH, restored.selectedTab)
+        assertTrue(restored.onBack())
+        assertEquals(AppTab.HOME, restored.selectedTab)
+        // JUnit's assertFalse takes the message first, unlike kotlin.test's.
+        assertFalse("the root tab hands BACK to the platform", restored.onBack())
+    }
+
+    @Test
+    fun `an unknown or absent tab history restores clean instead of inventing tabs`() {
+        val fromOldBundle = NavStatePersistence.restore(
+            Bundle().apply { putString(NavStatePersistence.KEY_NAV_TAB, AppTab.SEARCH.name) },
+        )
+        // No saved history (older format string, or a fresh install): BACK from
+        // Search still lands on Home rather than doing nothing.
+        assertTrue(fromOldBundle.onBack())
+        assertEquals(AppTab.HOME, fromOldBundle.selectedTab)
+
+        val corrupt = NavStatePersistence.restore(
+            Bundle().apply {
+                putString(NavStatePersistence.KEY_NAV_TAB, AppTab.LIBRARY.name)
+                putStringArrayList(
+                    NavStatePersistence.KEY_TAB_HISTORY,
+                    arrayListOf("HOME", "NOT_A_TAB", "SEARCH"),
+                )
+            },
+        )
+        assertEquals(listOf(AppTab.HOME, AppTab.SEARCH), corrupt.tabHistoryEntries())
+    }
+
+    @Test
     fun `playlist route keeps the local flag through encode-decode`() {
         val local = NavStatePersistence.encodeRoute(DetailRoute.PlaylistPage("15", isLocal = true))
         val remote = NavStatePersistence.encodeRoute(DetailRoute.PlaylistPage("VL_x", isLocal = false))
