@@ -1,37 +1,31 @@
 # CURRENT ACTIVE TASK
 
 Updated **2026-09-16 (UTC)** · session **`arena/01a0ab12-dhun`** —
-**UI/navigation adjustment package** (shared `commonMain` + Android
-restore + desktop keys; no extraction/playback change) · base =
-**`ebc2157`** (re-baseline docs, unmerged — this branch carries both).
+**Stage S2 cleanup on top of the nav package** · **PR #72 OPEN**
+(re-baseline + nav fixes; CI running at last check: `apk` + `build`
+pass, `build-and-test` + `msi` pending).
 
-**What this slice changes:** five verified navigation defects —
-(1) `push()` collapses the player per its own KDoc (overflow "Go to
-artist/album" + "open playlist" from above the FullPlayer read as dead
-taps); (2) two-pane master renders the tab, not a duplicate detail
-page; (3) desktop Escape runs the shared back contract (no keyboard
-back existed); (4) overflow search-redirect fallbacks collapse the
-player; (5) CATALOG sanitized to Home on restore (+ dropped from
-restored history). Tests: +1 `AppNavStateTest`, +2
-`NavStatePersistenceTest`, CATALOG shared-test comment corrected.
+**What this commit adds (S2):** dead harness UI deleted (4 files +
+DI registration + graph-test lines); root session notes archived to
+`docs/history/`; `14-release.md` current-status notice;
+`cancelCacheFill()` now cancels the job (mirrors prebuffer).
+PR #53/#54 left for the user (close #53 unmerged; keep #54 as
+contingency reference — user's click).
 
-**Files:** `shared/…/ui/shell/{AppNavState,DhunAppShell}.kt` ·
-`app-android/…/ui/NavStatePersistence.kt` ·
-`app-desktop/…/Main.kt` · `shared/…/jvmTest/…/AppNavStateTest.kt` ·
-`app-android/…/ui/NavStatePersistenceTest.kt` · `CHANGELOG.md` · this
-file.
+**Files (this commit):** 4 harness deletions · `AppModule.kt` ·
+`AppModuleGraphTest.kt` · `DesktopDhunPlayer.kt` · `docs/history/` ·
+`docs/verification/14-release.md` · `CHANGELOG.md` · this file.
 
-**Last error:** none yet — CI is the compiler (no JDK; egress-blocked).
+**Last error:** none — CI is the compiler (no JDK; egress-blocked).
 
-**Exact next step:** push → CI must be green (`:shared:jvmTest` for
-the push test, `:app-android:testDebugUnitTest` for the restore
-tests, desktop compile for Escape) → PR review + merge decision (do
-**not** merge until asked). Hardware feel (two-pane split, Escape,
-overflow-from-player) is the user's gate.
+**Exact next step:** push → require `build-and-test` + `apk` + `msi`
+green on PR #72 → PR review + merge decision (do **not** merge until
+asked). Then: **Stage S1 needs the user** (Actions *Run workflow*
+click — agents get 403), **Stage S3 needs the user** (devices).
 
-**Explicitly NOT claimed:** on-device behavior of any of the five
-fixes; visual/UI restyling (none attempted — see the report for what
-needs the user's eyes).
+**Explicitly NOT claimed:** on-device behavior of the nav fixes or
+the cancel fix; UI restyling (deferred past v0.1.0 by user decision —
+only S3-found functional UI bugs get fixed before the tag).
 
 ---
 

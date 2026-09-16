@@ -6,7 +6,6 @@ import dev.dhun.android.download.DownloadServiceController
 import dev.dhun.android.download.ForegroundServiceDownloadManager
 import dev.dhun.android.playback.DhunAudioSegmentCache
 import dev.dhun.android.playback.DhunStreamCache
-import dev.dhun.android.ui.HarnessViewModel
 import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.data.DataLayer
 import dev.dhun.domain.GetHomeFeedUseCase

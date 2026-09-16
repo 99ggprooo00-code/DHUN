@@ -1,5 +1,15 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
+> **Status note (2026-09-16, Stage S2):** the body below is a
+> point-in-time log whose merge chain ends at PR #32 (`862f0ac`,
+> 2026-09-07). It is kept verbatim as history. Current state:
+> `main@d555959` (PR #71 merged, CI green, rolling `test`
+> republished); Phases 01–16 code-merged with hardware gates open;
+> completion tracked as Stages S1–S6 in `.ai/ROADMAP.md`. No v0.1.0
+> tag/release exists. The rot-drill schedule has been silent since
+> 2026-09-07 (Stage S1); push-triggered "red rot-drill" runs are
+> 0-job noise, not verdicts — see `.ai/KNOWN_LIMITATIONS.md`.
+
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
 RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**
 (2026-09-07T01:24:20Z), stacking on PR #30 (`76c68eb`) and the earlier repair

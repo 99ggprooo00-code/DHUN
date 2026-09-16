@@ -24,6 +24,18 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — Stage S2 architectural cleanup — 2026-09-16
+- **Dead harness UI deleted** (~680 lines): `HarnessScreen`,
+  `HarnessViewModel`, `DesktopHarness*` had zero call sites (only an
+  Android DI registration); v2 Phase 06 had ordered their deletion.
+  DI registration + `AppModuleGraphTest` lines removed with them.
+- **Root session notes archived** to `docs/history/` (read-only):
+  `agent-2…6-status.md` + `phase15-android-polish-status.md`.
+- **`docs/verification/14-release.md`** gains a current-status notice
+  (its merge chain ended at PR #32); body kept verbatim as history.
+- **Desktop cache-fill cancel fixed**: `cancelCacheFill()` now cancels
+  the coroutine as well as flagging it (mirrors `cancelPrebuffer`).
+
 ### Fixed — navigation adjustment package — 2026-09-16
 - **Pushing a page now collapses the player, as documented.**
   `AppNavState.push()` promised this in its KDoc but never did it, so
