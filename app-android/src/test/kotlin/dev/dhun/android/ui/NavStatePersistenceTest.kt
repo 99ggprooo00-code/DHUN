@@ -119,7 +119,8 @@ class NavStatePersistenceTest {
         assertEquals(AppTab.SEARCH, restored.selectedTab)
         assertTrue(restored.onBack())
         assertEquals(AppTab.HOME, restored.selectedTab)
-        assertFalse(restored.onBack(), "the root tab hands BACK to the platform")
+        // JUnit's assertFalse takes the message first, unlike kotlin.test's.
+        assertFalse("the root tab hands BACK to the platform", restored.onBack())
     }
 
     @Test
