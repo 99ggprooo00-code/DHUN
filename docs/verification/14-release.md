@@ -3,12 +3,16 @@
 > **Status note (2026-09-16, Stage S2):** the body below is a
 > point-in-time log whose merge chain ends at PR #32 (`862f0ac`,
 > 2026-09-07). It is kept verbatim as history. Current state:
-> `main@d555959` (PR #71 merged, CI green, rolling `test`
-> republished); Phases 01–16 code-merged with hardware gates open;
+> `main@c5b1793` (PR #74 merged 2026-09-16; post-merge CI
+> 35135429018 / 35135429102 / 35135429240 green; rolling `test`
+> republished 18:41:19 UTC at exactly `c5b1793`); Phases 01–16
+> code-merged with hardware gates open; S4/S5 code merged (PR #74);
 > completion tracked as Stages S1–S6 in `.ai/ROADMAP.md`. No v0.1.0
 > tag/release exists. The rot-drill schedule has been silent since
-> 2026-09-07 (Stage S1); push-triggered "red rot-drill" runs are
-> 0-job noise, not verdicts — see `.ai/KNOWN_LIMITATIONS.md`.
+> 2026-09-07 04:28 UTC (diagnosed 2026-09-16, Stage S1); the
+> push-triggered "red rot-drill" runs are 0-job noise (the file never
+> had a `push:` trigger), not verdicts — see
+> `.ai/KNOWN_LIMITATIONS.md` + `docs/runbooks/rot-drill.md`.
 
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
 RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**
