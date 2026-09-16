@@ -1,5 +1,27 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-16 — FullPlayer and LyricsCard lacked Android <12 blur fallback guard (`arena/01a0aa7a-dhun`)
+
+**Symptom.** On Android versions below API 31 (minSdk is 26, so Android 8.0–11),
+`Modifier.blur` is a RenderEffect no-op. While `NowPlayingBackdrop` guarded against
+this via `supportsRealtimeBlur` to prevent sharp stretched album covers from being
+drawn behind Home/Search/Library, `FullPlayer`'s `PlayerBackdrop` bleed layer and
+`LyricsCard` lacked this guard and would draw unblurred sharp artwork behind controls
+and lyrics text.
+
+**Root cause.** `FullPlayer.kt` called `ArtworkImage` with `.blur(blurRadius)` directly
+without checking `supportsRealtimeBlur`.
+
+**Fix.** Added `shouldRenderPlayerBackdrop` in `FullPlayer.kt` and `shouldRenderBackdrop`
+in `NowPlayingBackdropPolicy.kt` that check both non-blank artwork URL and
+`supportsRealtimeBlur`. On devices lacking realtime blur, `PlayerBackdrop` and `LyricsCard`
+suppress the sharp artwork layer, gracefully falling back to the clean dark surface,
+ambient gradient scrim, and readable text.
+
+**Verification.** Unit tests added in `NowPlayingBackdropPolicyTest` and `PlayerSheetLayoutTest`
+passed in CI `build-and-test` run 35106060769. Packaging passed in `build` run 35106060727
+and `apk`/`msi` in run 35106060559.
+
 ## 2026-09-16 — `viewConfiguration.minimumFlingVelocity` does not exist in CMP 1.8.2 (`arena/01a0aa5e-dhun`)
 
 **Symptom.** First CI on PR #69 (`35102094935` / apk `35102094887`) red on

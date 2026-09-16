@@ -21,12 +21,18 @@ Updated **2026-09-16 (UTC)** · session **`arena/01a0aa7a-dhun`** — **PR #70: 
 
 **Verification status:**
 - **Local:** `python3 -m unittest discover -s scripts -p 'test_*.py'` = 27 OK.
-- **CI-verified:** PR #70 open, initial commit `f7871b3` green on `apk` & `build`.
+- **CI-verified:** PR #70 head commit `8167272` verified 100% green:
+  - `build-and-test` (CI run 35106060769) pass in 5m16s (all 10 steps passed including `:shared:jvmTest`, `:app-android:testDebugUnitTest`, `:app-android:assembleDebug`, probe compile, desktop compile).
+  - `build` (Build APK run 35106060727) pass in 2m41s.
+  - `apk` & `msi` (test-release run 35106060559) pass in 2m35s & 6m34s.
+- **Artifact checksums:**
+  - `dhun-test.apk` SHA-256: `fb3459c12e961095702c3c951154a0fc1971d52d375de9cab9d204d2be63d2cb`
+  - `dhun-test.msi` SHA-256: `9b8ac8d6f02c439d8970e4da39bf8290c89c1c23ec9b041590e4c1fafe00723d`
 - **Merged:** Base `e93d5f4` merged to `main`.
 - **Released:** Rolling `test` pre-release updated.
 - **Hardware-verified:** None claimed; on-device visual appearance on physical Android 8–11 devices remains an open hardware gate.
 
-**Exact next technical step & blockers:** Push implementation commit to PR #70, verify all CI gates green (`build-and-test`, `build`, `apk`, `msi`), and await user instruction before merging. Blockers: none.
+**Exact next technical step & blockers:** Await user review and explicit merge instruction for PR #70 (`gh pr merge 70 --merge`). Do NOT merge until instructed. Blockers: none.
 
 ---
 
