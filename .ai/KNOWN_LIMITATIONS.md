@@ -2,6 +2,15 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 — S5 continuation: stale palette regression baseline
+
+`DhunAppearanceTest` still expected the pre-S5 error and border hue after
+production tokens were retuned. Both expectations now match `#D5798A`;
+the baseline name/comments explicitly allow this intentional change.
+CI verification is pending on the replacement for PR #73; no local JDK
+or hardware verification is claimed. S1 dispatch and S3 device checks
+remain user-blocked; S6 is not authorized by the autonomous merge approval.
+
 ## 2026-09-16 — S4 slice 1: settings with keys but no behaviour
 
 Verified by grep (no app caller outside tests — only `UseCasesTest`

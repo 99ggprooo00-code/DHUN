@@ -219,7 +219,8 @@ object PlaybackGraph {
         // track the player ever creates belongs to this session. On failure
         // (id generation is best-effort) playback is unaffected; EQ bypasses.
         runCatching {
-            val sessionId = android.media.AudioManager.generateAudioSessionId()
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val sessionId = audioManager.generateAudioSessionId()
             if (sessionId > 0) {
                 player.setAudioSessionId(sessionId)
                 dev.dhun.android.equalizer.AndroidAudioSession.sessionId = sessionId

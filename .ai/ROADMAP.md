@@ -1,38 +1,32 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-16 (UTC)** · session **`arena/01a0ab12-dhun`** —
-**PR #73 OPEN** (S4 slices 1–3: Settings page + jump-list verb + Android EQ)
-· user authorized autonomous merge — only S1 dispatch (agent 403), S3
-hardware, and release/signing decisions escalate with step-by-step guides.
+Updated **2026-09-16 (UTC)** · session **`arena/01a0ab74-dhun`**.
 
-**What this commit adds (S4 repairs):** re-applies S4 changes lost to
-batched-edit clobbering/fuzzy-splice corruption — shell `settingsVm`
-creation, shell call-site duplication removal, second master + detail call
-args, `TabContent` signature, `NavStatePersistence` decode arm, Library header (was
-spliced into `LikedSongsFolderCard`), protocol-test cruft removal — plus two
-genuine fixes found in review (EQ rebind flag, `Double.coerceIn` Float
-overload). Full branch diff vs `main` reviewed hunk-by-hunk.
+**GitHub evidence:** PR #73 remains OPEN at `ce5cb18`; `build-and-test`,
+`apk`, and `build` failed; `msi` passed. Its commits have been carried
+forward intact into this fixed session branch; a replacement PR will
+supersede #73. Main remains `5023b38`.
 
-**Files (this commit):** `DhunAppShell.kt` · `NavStatePersistence.kt` ·
-`LibraryScreen.kt` · `SingleInstanceProtocolTest.kt` ·
-`AndroidEqualizerEngine.kt` · `EqualizerBandMapper.kt` ·
-`SettingsViewModel.kt` (doc path) · this file.
+**Current fix:** `DhunAppearanceTest.kt` now pins S5's `#D5798A` error
+and matching translucent border; renamed baseline test and comments
+acknowledge the deliberate contrast retune. No other test assertion pins
+the old hue (historical contrast comments are retained).
+`PlaybackGraph.kt` also now calls `generateAudioSessionId()` on the context
+AudioManager instance, not statically (APK build step failed on #73).
 
-**Last error:** CI red on `92468e5` (`:shared:jvmTest` step) — my S5 const insert split a two-line `const val` declaration (anchor matched only its first line). Fixed by moving the const after the full declaration. Lesson: anchors must cover the ENTIRE statement, and every new hunk gets re-read before push. Earlier: CI red on `040dd71`/`bbc5c3c` —
-corrupted + missing shell edits (see above). Tool lesson recorded: NEVER
-batch multiple edits to the SAME file in one message (last-writer-wins
-clobber + fuzzy-splice corruption); one asserted python patch per file,
-grep-verify every marker, read the full diff before pushing.
+**Last error:** shared-domain JVM test step failed on #73. This fix is
+not yet CI-verified; no local JDK. CI is the compiler.
 
-**Exact next step:** push → require `build-and-test` + `apk` + `msi` +
-`build` green on PR #73 → merge (authorized) → post-merge `main` CI +
-`test` release check → S4 done → start **S5** (stream-perf: sts TTL guard).
-**Stage S1 needs the user** (Actions *Run workflow* click — agents get
-403), **Stage S3 needs the user** (devices).
+**Exact next step:** push replacement PR → require `build-and-test`,
+`apk`, `msi`, `build` green → merge (user explicitly authorized) → verify
+post-merge main CI and rolling `test` release. S4/S5 implementation and
+audits are carried forward, not new backlog work.
 
-**Explicitly NOT claimed:** on-device behavior of the nav fixes or
-the cancel fix; UI restyling (deferred past v0.1.0 by user decision —
-only S3-found functional UI bugs get fixed before the tag).
+**Remaining gates:** S1 user Actions dispatch (`docs/runbooks/rot-drill.md`);
+S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`); S6 signing,
+clean installs, soaks and explicit go-ahead. No hardware success or release
+readiness claimed. Work stays sequential; one asserted patch per file,
+marker verification, full diff review before every push.
 
 ---
 
