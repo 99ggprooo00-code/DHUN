@@ -2,31 +2,31 @@
 
 Updated **2026-09-16 (UTC)** · session **`arena/01a0ab74-dhun`**.
 
-**GitHub evidence:** PR #73 remains OPEN at `ce5cb18`; `build-and-test`,
-`apk`, and `build` failed; `msi` passed. Its commits have been carried
-forward intact into this fixed session branch; a replacement PR will
-supersede #73. Main remains `5023b38`.
+**GitHub evidence:** PR #73 CLOSED unmerged, superseded by **PR #74**,
+which preserves all commits through `ce5cb18`. At `19c7b0d`, all four
+checks PASS: `build-and-test` (35134174898), `apk` + `msi` (35134174968),
+`build` (35134174949). Main remains `5023b38` before merge.
 
-**Current fix:** `DhunAppearanceTest.kt` now pins S5's `#D5798A` error
-and matching translucent border; renamed baseline test and comments
-acknowledge the deliberate contrast retune. No other test assertion pins
-the old hue (historical contrast comments are retained).
-`PlaybackGraph.kt` also now calls `generateAudioSessionId()` on the context
-AudioManager instance, not statically (APK build step failed on #73).
+**Verified fixes:** `DhunAppearanceTest.kt` pins S5's `#D5798A` error
+and matching translucent border, with baseline name/comments updated.
+No other test assertion pins the old hue. `PlaybackGraph.kt` now uses
+an AudioManager instance for `generateAudioSessionId()`. CI compiled
+and tested shared, Android and desktop; no local JDK or hardware claims.
 
-**Last error:** shared-domain JVM test step failed on #73. This fix is
-not yet CI-verified; no local JDK. CI is the compiler.
+**Last error:** none on `19c7b0d`. This documentation follow-up still
+requires its own CI check before merge.
 
-**Exact next step:** push replacement PR → require `build-and-test`,
-`apk`, `msi`, `build` green → merge (user explicitly authorized) → verify
-post-merge main CI and rolling `test` release. S4/S5 implementation and
-audits are carried forward, not new backlog work.
+**Exact next step:** push this evidence → require all four checks green
+on final PR #74 head → merge (user explicitly authorized) → verify
+post-merge main CI and rolling `test` release. S4/S5 code and audit work
+is CI-verified; merge/release publication pending. No new feature stage.
 
-**Remaining gates:** S1 user Actions dispatch (`docs/runbooks/rot-drill.md`);
-S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`); S6 signing,
-clean installs, soaks and explicit go-ahead. No hardware success or release
-readiness claimed. Work stays sequential; one asserted patch per file,
-marker verification, full diff review before every push.
+**Remaining gates, in order:** S1 user Actions dispatch
+(`docs/runbooks/rot-drill.md`); S3 device evidence
+(`docs/runbooks/s3-hardware-checklist.md`); S6 signing, clean installs,
+soaks and explicit go-ahead. No hardware success or release readiness
+claimed. Work stays sequential; one asserted patch per file, marker
+verification, full diff review before every push.
 
 ---
 

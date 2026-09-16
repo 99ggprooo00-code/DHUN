@@ -7,9 +7,12 @@ Updated every phase. Nothing hidden.
 `DhunAppearanceTest` still expected the pre-S5 error and border hue after
 production tokens were retuned. Both expectations now match `#D5798A`;
 the baseline name/comments explicitly allow this intentional change.
-CI verification is pending on the replacement for PR #73; no local JDK
-or hardware verification is claimed. S1 dispatch and S3 device checks
-remain user-blocked; S6 is not authorized by the autonomous merge approval.
+CI verification PASSED on PR #74 at `19c7b0d`: shared/Android/desktop tests,
+APK, MSI and build checks all green. The Android build also required
+calling `generateAudioSessionId()` on the context AudioManager instance,
+not statically. No local JDK or hardware verification is claimed. S1
+dispatch and S3 device checks remain user-blocked; S6 is not authorized
+by the autonomous merge approval.
 
 ## 2026-09-16 — S4 slice 1: settings with keys but no behaviour
 
