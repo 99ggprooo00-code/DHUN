@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -54,6 +53,7 @@ import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunFilterChip
+import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
@@ -274,12 +274,12 @@ private fun HomeFeedContent(
             }
         }
 
-        // ---- Quick-action chips (LazyRow, same pattern as the mood row:
+        // ---- Quick-action chips (rail, same pattern as the mood row:
         // symmetric edge padding via contentPadding holds while scrolling —
         // horizontalScroll + padding drops the trailing inset at scroll end,
         // which read as uneven chip spacing) ----------------------------------
         item(key = "quick_actions") {
-            LazyRow(
+            DhunHorizontalRail(
                 contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             ) {
@@ -340,7 +340,7 @@ private fun HomeFeedContent(
 
         // ---- Mood & genre chips -----------------------------------------------
         item(key = "mood_chips") {
-            LazyRow(
+            DhunHorizontalRail(
                 contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                 horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             ) {
@@ -563,7 +563,7 @@ private fun HomeSectionBlock(
 
 @Composable
 private fun HorizontalShelf(content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
-    LazyRow(
+    DhunHorizontalRail(
         contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         modifier = Modifier.padding(top = DhunSpacing.sm),
@@ -586,7 +586,7 @@ private fun QuickPicksGrid(
     val columns = tracks.take(12)
         .mapIndexed { index, track -> index to track }
         .chunked(2)
-    LazyRow(
+    DhunHorizontalRail(
         contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {

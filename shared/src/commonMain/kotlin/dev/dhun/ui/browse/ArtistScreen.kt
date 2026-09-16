@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -50,6 +49,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.ErrorView
@@ -305,7 +305,7 @@ private fun ArtistContent(
             item(key = "albums") {
                 Column {
                     SectionHeader(title = "Albums")
-                    LazyRow(
+                    DhunHorizontalRail(
                         contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                     ) {
@@ -322,7 +322,7 @@ private fun ArtistContent(
             item(key = "singles") {
                 Column {
                     SectionHeader(title = "Singles & EPs")
-                    LazyRow(
+                    DhunHorizontalRail(
                         contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                     ) {
@@ -339,7 +339,7 @@ private fun ArtistContent(
             item(key = "featured") {
                 Column {
                     SectionHeader(title = "Featured on")
-                    LazyRow(
+                    DhunHorizontalRail(
                         contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                     ) {
@@ -356,7 +356,7 @@ private fun ArtistContent(
             item(key = "related") {
                 Column {
                     SectionHeader(title = "Fans might also like")
-                    LazyRow(
+                    DhunHorizontalRail(
                         contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
                         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                     ) {

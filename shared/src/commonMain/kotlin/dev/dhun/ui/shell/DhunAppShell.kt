@@ -61,6 +61,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.GlassBottomBar
+import dev.dhun.design.components.NowPlayingBackdrop
 import dev.dhun.player.DhunPlayer
 import dev.dhun.presentation.browse.AlbumViewModel
 import dev.dhun.presentation.browse.ArtistViewModel
@@ -104,6 +105,13 @@ enum class AppTab(val title: String, val icon: DhunIcon) {
     companion object {
         /** Tabs the nav bar / rail actually offers. */
         val userTabs: List<AppTab> = listOf(HOME, SEARCH, LIBRARY)
+
+        /**
+         * The tab BACK bottoms out at — the app's landing screen. From here the
+         * platform default runs (Android parks the app, playback untouched);
+         * there is no tab beneath it, so the walk can never loop.
+         */
+        val root: AppTab = HOME
     }
 }
 
@@ -199,8 +207,9 @@ fun DhunAppShell(
             val mins = ((ms + 59_999L) / 60_000L).toInt().coerceAtLeast(1)
             "Sleep · ${mins}m"
         }
-        // Lightweight ambient wash from now-playing art (seed hash — no
-        // continuous full-res blur; FullPlayer still owns the real blur layer).
+        // Ambient wash from now-playing art, derived from a seed hash so it
+        // costs nothing per frame — it tints the shell over the real blurred
+        // artwork backdrop below, it does not replace it.
         val ambient by animateColorAsState(
             targetValue = currentTrack?.let {
                 ArtworkColorExtractor.extractFromSeed(it.thumbnailUrl ?: it.id).backgroundTint
@@ -208,33 +217,46 @@ fun DhunAppShell(
             animationSpec = DhunAnimations.slowTween(),
             label = "shellAmbient",
         )
-        // Ambient glass wash from now-playing (seed tint — lightweight).
-        // FullPlayer still owns the real once-per-track artwork blur layer.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(DhunColors.background)
-                .background(
-                    Brush.verticalGradient(
-                        // Restrained: the old 0.42 wash tinted whole screens
-                        // brown/green and made list art look dirty.
-                        colorStops = arrayOf(
-                            0.0f to ambient.copy(alpha = 0.30f),
-                            0.22f to ambient.copy(alpha = 0.10f),
-                            0.45f to Color.Transparent,
-                            1.0f to Color.Transparent,
+        // Backdrop, back to front:
+        //   1. the DHUN base colour,
+        //   2. the blurred, darkened artwork of the **currently playing** song
+        //      ([NowPlayingBackdrop] — drawn only when there is artwork to show
+        //      and the platform can really blur, so the base stays the fallback),
+        //   3. the ambient tint wash, kept *over* the artwork so the app reads
+        //      in its own palette rather than in the album's.
+        // Home, Search and Library all live inside this Box, so one backdrop
+        // serves all three and it is already correct when you switch tabs.
+        Box(modifier = Modifier.fillMaxSize().background(DhunColors.background)) {
+            NowPlayingBackdrop(
+                artworkUrl = currentTrack?.thumbnailUrl,
+                modifier = Modifier.fillMaxSize(),
+            )
+            // Ambient glass wash from now-playing (seed tint — lightweight).
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            // Restrained: the old 0.42 wash tinted whole screens
+                            // brown/green and made list art look dirty.
+                            colorStops = arrayOf(
+                                0.0f to ambient.copy(alpha = 0.30f),
+                                0.22f to ambient.copy(alpha = 0.10f),
+                                0.45f to Color.Transparent,
+                                1.0f to Color.Transparent,
+                            ),
+                        ),
+                    )
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                ambient.copy(alpha = 0.08f),
+                                Color.Transparent,
+                            ),
                         ),
                     ),
-                )
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            ambient.copy(alpha = 0.08f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
+            )
+        }
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,

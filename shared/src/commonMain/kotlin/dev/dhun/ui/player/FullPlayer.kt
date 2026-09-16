@@ -112,6 +112,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
+import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.fittedPlayerArtworkSize
@@ -695,10 +696,18 @@ private fun PlayerControlCluster(
                 .align(Alignment.CenterHorizontally),
         ) {
             val metrics = playerTransportMetrics(maxWidth)
+            // CASE B, not a carousel: this row is only scrollable when the
+            // window is narrower than the transport's minimum width. It stays
+            // that way (no page-wide sideways scroll); the desktop-only gain is
+            // that a mouse can now hold and slide it, since Compose refuses
+            // mouse drags on `scrollable` containers.
+            val transportOverflows = metrics.minimumWidth > maxWidth
+            val transportScrollState = rememberScrollState()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState(), enabled = metrics.minimumWidth > maxWidth)
+                    .horizontalScroll(transportScrollState, enabled = transportOverflows)
+                    .dhunMouseDragScroll(transportScrollState, enabled = transportOverflows)
                     .width(maxOf(maxWidth, metrics.minimumWidth))
                     .padding(horizontal = metrics.horizontalPadding),
                 verticalAlignment = Alignment.CenterVertically,

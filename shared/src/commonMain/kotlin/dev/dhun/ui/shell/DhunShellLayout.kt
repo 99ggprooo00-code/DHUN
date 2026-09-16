@@ -82,6 +82,16 @@ enum class ShellBackAction {
     /** Pop exactly one [DetailRoute]; on two-pane layouts the pane shows what is underneath. */
     PopDetail,
 
+    /**
+     * Leave this tab for the one it was reached from ([AppNavState.popTab]).
+     *
+     * This is the step Android was missing (Phase 16). Search and Library are
+     * tabs, not stack entries, so BACK on them used to fall straight through to
+     * [PlatformDefault] and park the app from a screen the user was still
+     * using. The root tab is never one of these — see [DhunShellPolicy.backAction].
+     */
+    ReturnToPreviousTab,
+
     /** Nothing the shell owns is open; the platform default runs (Android → moveTaskToBack). */
     PlatformDefault,
 }
@@ -175,23 +185,29 @@ object DhunShellPolicy {
 
     /**
      * What the platform BackHandler should do. Player first, then exactly one
-     * detail route: this ordering is the program-level contract stated in
-     * [AppNavState] (BACK never exits the app while an overlay is open). On a
-     * two-pane collapse it also reports that the detail pane is still showing a
-     * page, which is what keeps Back from also switching the master away.
+     * detail route, then one tab back: this ordering is the program-level
+     * contract stated in [AppNavState] (BACK never exits the app while an
+     * overlay is open, and never leaves a tab the user can still go back from).
+     * On a two-pane collapse it also reports that the detail pane is still
+     * showing a page, which is what keeps Back from also switching the master
+     * away.
      *
      * [detailDepth] below zero is treated as zero, so a buggy caller cannot
-     * invent routes that do not exist.
+     * invent routes that do not exist. [hasTabHistory] is
+     * [AppNavState.hasTabHistory]: false at the root tab, which is what makes
+     * "Home → Back → platform default" the one and only exit path.
      */
     fun backAction(
         layout: DhunShellLayout,
         playerExpanded: Boolean,
         detailDepth: Int,
+        hasTabHistory: Boolean = false,
     ): ShellBack {
         val depth = if (detailDepth < 0) 0 else detailDepth
         val action = when {
             playerExpanded -> ShellBackAction.CollapsePlayer
             depth > 0 -> ShellBackAction.PopDetail
+            hasTabHistory -> ShellBackAction.ReturnToPreviousTab
             else -> ShellBackAction.PlatformDefault
         }
         return ShellBack(action, layout.showsDetailPane && depth > 0)
