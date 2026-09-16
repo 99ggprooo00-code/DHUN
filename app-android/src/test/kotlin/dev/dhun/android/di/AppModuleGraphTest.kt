@@ -111,6 +111,5 @@ class AppModuleGraphTest {
         koin.get<CoroutineScope>()
         koin.get<HomeViewModel>()
         koin.get<SearchViewModel>()
-        koin.get<HarnessViewModel>()
     }
 }
