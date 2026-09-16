@@ -263,11 +263,28 @@ class AppNavStateTest {
     }
 
     @Test
-    fun catalogIsNeverANavBarTabButSurvivesRestoredState() {
-        // Deep links / process-death restore may name CATALOG, so it stays in
-        // the enum; the bar must not offer it (it shipped once as a fourth tab
-        // full of swatches).
+    fun catalogIsNeverANavBarTabButStaysInTheEnum() {
+        // CATALOG stays a parseable enum entry (old bundles / deep links may
+        // name it) but the bar must not offer it (it shipped once as a fourth
+        // tab full of swatches). Restore sanitizes it to the root tab — pinned
+        // in app-android's NavStatePersistenceTest, which owns the Bundle format.
         assertEquals(listOf(AppTab.HOME, AppTab.SEARCH, AppTab.LIBRARY), AppTab.userTabs)
         assertEquals(AppTab.CATALOG, AppTab.valueOf("CATALOG"))
+    }
+
+    @Test
+    fun pushCollapsesThePlayerSoThePageIsVisible() {
+        // Pushes issued from above the player (overflow "Go to artist/album",
+        // add-to-playlist "open playlist") used to land invisibly under the
+        // expanded FullPlayer and read as dead taps.
+        val nav = AppNavState()
+        nav.playerExpanded = true
+        nav.push(DetailRoute.ArtistPage("UCx"))
+        assertFalse(nav.playerExpanded)
+        assertEquals(DetailRoute.ArtistPage("UCx"), nav.detailStack.last())
+        // BACK then pops the page; the player stays collapsed, never reopens.
+        assertTrue(nav.onBack())
+        assertTrue(nav.detailStack.isEmpty())
+        assertFalse(nav.playerExpanded)
     }
 }

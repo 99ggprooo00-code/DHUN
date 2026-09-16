@@ -1,39 +1,37 @@
 # CURRENT ACTIVE TASK
 
 Updated **2026-09-16 (UTC)** · session **`arena/01a0ab12-dhun`** —
-**full project re-baseline + master-prompt/roadmap rewrite** (docs
-only; no app, extraction, playback-engine or ADR change) · base =
-**`d555959`** = **PR #71 MERGED** (all CI green, rolling `test`
-republished).
+**UI/navigation adjustment package** (shared `commonMain` + Android
+restore + desktop keys; no extraction/playback change) · base =
+**`ebc2157`** (re-baseline docs, unmerged — this branch carries both).
 
-**What this session changes:** `.ai/MASTER_PROMPT.md` → **v3**
-(re-baselined: revised extraction doctrine, corrected stack —
-CIO/CIO-not-OkHttp, platform logging, shared navigator both
-platforms — build history Phases 01–16, sequential completion Stages
-S1–S6, single-agent rule); this file → **re-baselined roadmap**
-(status from live code/CI/GitHub, session-snapshot archaeology
-collapsed, v2 trajectory numbers retired); `.ai/KNOWN_LIMITATIONS.md`
-+ `.ai/RISK_REGISTER.md` reconciled; `docs/decisions/README.md` gains
-the missing ADR-006 entry.
+**What this slice changes:** five verified navigation defects —
+(1) `push()` collapses the player per its own KDoc (overflow "Go to
+artist/album" + "open playlist" from above the FullPlayer read as dead
+taps); (2) two-pane master renders the tab, not a duplicate detail
+page; (3) desktop Escape runs the shared back contract (no keyboard
+back existed); (4) overflow search-redirect fallbacks collapse the
+player; (5) CATALOG sanitized to Home on restore (+ dropped from
+restored history). Tests: +1 `AppNavStateTest`, +2
+`NavStatePersistenceTest`, CATALOG shared-test comment corrected.
 
-**Files:** `.ai/MASTER_PROMPT.md` · `.ai/ROADMAP.md` (this file) ·
-`.ai/KNOWN_LIMITATIONS.md` · `.ai/RISK_REGISTER.md` ·
-`docs/decisions/README.md` · `CHANGELOG.md`.
+**Files:** `shared/…/ui/shell/{AppNavState,DhunAppShell}.kt` ·
+`app-android/…/ui/NavStatePersistence.kt` ·
+`app-desktop/…/Main.kt` · `shared/…/jvmTest/…/AppNavStateTest.kt` ·
+`app-android/…/ui/NavStatePersistenceTest.kt` · `CHANGELOG.md` · this
+file.
 
-**Last error:** none — docs-only branch; local Gradle impossible (no
-JDK; Maven/Gradle/dl.google.com egress-blocked), so validation is
-`python3 -m unittest discover -s scripts -p 'test_*.py'` + CI.
+**Last error:** none yet — CI is the compiler (no JDK; egress-blocked).
 
-**Exact next step:** PR review + merge decision for this re-baseline
-(do **not** merge until asked). After merge, the next session starts
-at **Stage S1** (restore the rot drill — needs a human click; agents
-get 403 on dispatch). ADR-007 (#54) stays PROPOSED contingency;
-#53 stays do-not-merge (recommendation: close unmerged — user's call).
+**Exact next step:** push → CI must be green (`:shared:jvmTest` for
+the push test, `:app-android:testDebugUnitTest` for the restore
+tests, desktop compile for Escape) → PR review + merge decision (do
+**not** merge until asked). Hardware feel (two-pane split, Escape,
+overflow-from-player) is the user's gate.
 
-**Explicitly NOT claimed:** any behavior change, any hardware
-verification, any playback/extraction verdict. Device behavior in this
-file ("Android works well, Windows acceptable") is the **user's
-2026-09-16 report**, not this session's measurement.
+**Explicitly NOT claimed:** on-device behavior of any of the five
+fixes; visual/UI restyling (none attempted — see the report for what
+needs the user's eyes).
 
 ---
 

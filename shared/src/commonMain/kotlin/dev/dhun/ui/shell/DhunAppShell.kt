@@ -381,7 +381,12 @@ fun DhunAppShell(
                         master = {
                             ShellMasterPane(
                                 tab = nav.selectedTab,
-                                detailRoute = detailRoute,
+                                // The detail pane beside this column already
+                                // renders the route — the master must show the
+                                // TAB list, not the same page twice (which also
+                                // double-loads its data). Passing the route here
+                                // used to hide the tab content behind a duplicate.
+                                detailRoute = null,
                                 homeViewModel = homeViewModel,
                                 searchViewModel = searchViewModel,
                                 libraryViewModel = libraryVm,
@@ -493,6 +498,10 @@ fun DhunAppShell(
                     if (id != null) {
                         nav.push(DetailRoute.ArtistPage(id))
                     } else {
+                        // Same visibility rule as [AppNavState.push]: the
+                        // redirect must be seen even when issued from above
+                        // the expanded player.
+                        nav.playerExpanded = false
                         nav.detailStack.clear()
                         searchViewModel.onQueryChange(track.artistName)
                         searchViewModel.performSearch(track.artistName, dev.dhun.innertube.SearchFilter.ARTISTS)

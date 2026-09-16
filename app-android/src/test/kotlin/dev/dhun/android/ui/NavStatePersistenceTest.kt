@@ -146,6 +146,36 @@ class NavStatePersistenceTest {
     }
 
     @Test
+    fun `a restored catalog tab lands on home instead of the closeless screen`() {
+        // CATALOG has no nav-bar entry and its onClose is a no-op: restoring
+        // onto it (old bundle, debug session) would strand the user.
+        val restored = NavStatePersistence.restore(
+            Bundle().apply { putString(NavStatePersistence.KEY_NAV_TAB, AppTab.CATALOG.name) },
+        )
+        assertEquals(AppTab.HOME, restored.selectedTab)
+        assertFalse("the root tab hands BACK to the platform", restored.onBack())
+    }
+
+    @Test
+    fun `catalog entries are dropped from restored tab history`() {
+        val restored = NavStatePersistence.restore(
+            Bundle().apply {
+                putString(NavStatePersistence.KEY_NAV_TAB, AppTab.LIBRARY.name)
+                putStringArrayList(
+                    NavStatePersistence.KEY_TAB_HISTORY,
+                    arrayListOf("HOME", "CATALOG", "SEARCH"),
+                )
+            },
+        )
+        assertEquals(listOf(AppTab.HOME, AppTab.SEARCH), restored.tabHistoryEntries())
+        // BACK walks the sanitized history and never lands on CATALOG.
+        assertTrue(restored.onBack())
+        assertEquals(AppTab.SEARCH, restored.selectedTab)
+        assertTrue(restored.onBack())
+        assertEquals(AppTab.HOME, restored.selectedTab)
+    }
+
+    @Test
     fun `playlist route keeps the local flag through encode-decode`() {
         val local = NavStatePersistence.encodeRoute(DetailRoute.PlaylistPage("15", isLocal = true))
         val remote = NavStatePersistence.encodeRoute(DetailRoute.PlaylistPage("VL_x", isLocal = false))

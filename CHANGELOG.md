@@ -24,6 +24,29 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — navigation adjustment package — 2026-09-16
+- **Pushing a page now collapses the player, as documented.**
+  `AppNavState.push()` promised this in its KDoc but never did it, so
+  "Go to artist/album" from the track overflow dialog and "open
+  playlist" from add-to-playlist landed invisibly under the expanded
+  FullPlayer and read as dead taps. The collapse is now real, and the
+  overflow search-redirect fallbacks collapse too. Pinned by
+  `pushCollapsesThePlayerSoThePageIsVisible`.
+- **Two-pane master shows the tab list again.** The large-screen master
+  column was rendering the detail route a second time instead of the
+  tab content — the same page twice, its data loaded twice, and the
+  tab list unreachable while a page was open. The master now renders
+  the tab (`detailRoute = null`); the detail pane keeps the page.
+- **Desktop: Escape is Back.** The desktop window had shortcuts for
+  transport, search and quit but no way to collapse the player or pop
+  a page from the keyboard. Escape now runs the shared back contract
+  (collapse → pop page → previous tab).
+- **Restoring onto CATALOG no longer strands the user.** The developer
+  catalog has no nav-bar entry and a no-op close; an old bundle or
+  debug session naming it (or carrying it in tab history) now
+  sanitizes to Home on restore. Pinned by two
+  `NavStatePersistenceTest` cases.
+
 ### Changed — full project re-baseline (docs only) — 2026-09-16
 - **`.ai/MASTER_PROMPT.md` → v3.** Rewritten from the live repo
   (`main@d555959`): revised extraction doctrine (own-client wave chain

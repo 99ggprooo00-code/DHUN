@@ -100,7 +100,8 @@ import javax.swing.SwingUtilities
  *    Compose window's component listener), restored via WindowPosition
  *  - keyboard shortcuts (window-scope [Window.onKeyEvent], receives only keys
  *    the focused node didn't consume): Space play/pause, ←/→ seek ±5 s,
- *    Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+Q quit
+ *    Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+Q quit, Escape back
+ *    (collapse player → pop page → previous tab, the shared back contract)
  *
  * Phase 14 ruggedization — \"Failed to launch JVM\" investigation:
  *  - jpackage bundles a jlink-minimized runtime; missing JDK modules (notably
@@ -506,6 +507,12 @@ fun main() {
                 onKeyEvent = { event ->
                     if (event.type != KeyEventType.KeyDown) return@Window false
                     when {
+                        // Desktop has no system back: Escape is the shared
+                        // back contract (collapse player → pop page → prev tab).
+                        event.key == Key.Escape -> {
+                            nav.onBack()
+                            true
+                        }
                         event.isCtrlPressed && event.key == Key.Q -> {
                             quit()
                             true

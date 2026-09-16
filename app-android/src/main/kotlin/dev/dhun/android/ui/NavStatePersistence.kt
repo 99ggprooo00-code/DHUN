@@ -39,7 +39,11 @@ object NavStatePersistence {
      */
     fun restore(savedInstanceState: Bundle?): AppNavState = AppNavState().apply {
         savedInstanceState?.getString(KEY_NAV_TAB)?.let { name ->
-            selectedTab = runCatching { AppTab.valueOf(name) }.getOrDefault(AppTab.root)
+            // CATALOG is developer scaffolding with no nav-bar entry and no
+            // working close: restoring onto it would strand the user. An old
+            // bundle (or a debug session) naming it lands on the root tab.
+            val tab = runCatching { AppTab.valueOf(name) }.getOrDefault(AppTab.root)
+            selectedTab = if (tab == AppTab.CATALOG) AppTab.root else tab
         }
         playerExpanded = savedInstanceState?.getBoolean(KEY_PLAYER_EXPANDED) ?: false
         savedInstanceState?.getStringArrayList(KEY_DETAIL_ROUTES).orEmpty()
@@ -50,7 +54,10 @@ object NavStatePersistence {
         // instead of inventing a tab the user never visited.
         setTabHistory(
             savedInstanceState?.getStringArrayList(KEY_TAB_HISTORY).orEmpty()
-                .mapNotNull { name -> runCatching { AppTab.valueOf(name) }.getOrNull() },
+                .mapNotNull { name -> runCatching { AppTab.valueOf(name) }.getOrNull() }
+                // A restored CATALOG history entry would make BACK land on the
+                // closeless developer screen — drop it like an unknown name.
+                .filter { it != AppTab.CATALOG },
         )
     }
 
