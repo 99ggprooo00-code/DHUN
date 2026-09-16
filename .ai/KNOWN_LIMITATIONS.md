@@ -2,6 +2,22 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 — desktop unit tests execute in CI (`arena/01a0aa8e-dhun`)
+
+Closes the gap candidate 27 recorded and every entry since repeated: the five
+`app-desktop/src/jvmTest` classes (jump-list/tray pure cores) were authored and
+locally runnable but **never executed by CI**, because the desktop gate was
+`:app-desktop:compileKotlinJvm` only. `ci.yml` now runs `:app-desktop:jvmTest`
+as a named step after the compile step, and `scripts/test_ci_workflow.py` pins
+both the step and its order. What is **not** established:
+
+- **The green must still be proven meaningful by mutation** (see ROADMAP): a
+  deliberately broken desktop expectation has to go red on the new step and be
+  reverted. Until that run exists, "CI runs the tests" is a claim about YAML,
+  not about execution.
+- **Still no local build.** No JDK; Maven/Gradle/dl.google.com egress-blocked.
+  CI is the only compiler, exactly as before.
+
 ## 2026-09-16 (session `arena/01a0aa7a-dhun`) — Android <12 backdrop guard unified across FullPlayer and NowPlayingBackdrop
 
 - **Android <12 devices consistently receive clean dark fallback without sharp bleed.**

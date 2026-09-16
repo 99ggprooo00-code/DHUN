@@ -1,5 +1,22 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-16 (UTC)** · session **`arena/01a0aa8e-dhun`** — **named `:app-desktop:jvmTest` CI step** (`.github/workflows/ci.yml` + `scripts/test_ci_workflow.py`) · base = **`ebad6ec`** = **PR #70 MERGED**.
+
+**What this branch changes:** the last silent-skip in `ci.yml` — no app, extraction, playback-engine or ADR change. The five `app-desktop/src/jvmTest` classes (jump-list/tray pure cores, candidate 27, PR #47) exist on `main` but CI only runs `:app-desktop:compileKotlinJvm`, which compiles `jvmMain` and never executes `jvmTest`: a red desktop test is currently *impossible*, and any future desktop test would be decorative. `ci.yml` now runs `./gradlew :app-desktop:jvmTest` as **"Unit tests — Desktop (JVM)"** *after* "Desktop compiles", so a compile break and a test failure fail different, honestly-named steps. `scripts/test_ci_workflow.py` pins the named step and its order; the stale NOTE in `app-desktop/build.gradle.kts` (comment-only) is corrected to match.
+
+**Files:** `.github/workflows/ci.yml` · `scripts/test_ci_workflow.py` · `app-desktop/build.gradle.kts` (comment only) · `CHANGELOG.md` · `.ai/KNOWN_LIMITATIONS.md` · this file.
+
+**Last error / CI:** `main` CI on `ebad6ec` still in progress when this was written (runs `35112234701` / `35112234707` / `35112234744`) — re-check before opening the PR; a red merge commit would be #70's, not this slice's. Local Gradle still impossible (no JDK; Maven/Gradle/dl.google.com egress-blocked → `curl` returns `000`), so CI is the compiler. `python3 -m unittest discover -s scripts -p 'test_*.py'` = **29 OK** locally (27 + 2 new pins). Mutation proof (deliberately break one desktop expectation → new step red → revert → green): pending.
+
+**Exact next step:** push this branch → open **one** session PR → require `build-and-test` + `apk` + `msi` green on the head → mutation run → revert → green again → record the run IDs here. Do **not** merge until asked. ADR-007 (#54) and #53 (do-not-merge ROADMAP wipe) are unchanged.
+
+**Explicitly NOT claimed:** anything about the desktop app itself — no behaviour changed, no Windows hardware involved, no jump-list/tray re-verification. Only that the existing tests now run where a red one can be seen.
+
+---
+
+<details>
+<summary><b>Prior snapshot (`arena/01a0aa7a-dhun` — PR #70 Android <12 backdrop guard; MERGED as `ebad6ec`)</b></summary>
+
 Updated **2026-09-16 (UTC)** · session **`arena/01a0aa7a-dhun`** — **PR #70: Android <12 backdrop guard unified across FullPlayer and NowPlayingBackdrop** · base = **`e93d5f4`** = **PR #69 MERGED**.
 
 **Current state & active scope:**
@@ -33,6 +50,8 @@ Updated **2026-09-16 (UTC)** · session **`arena/01a0aa7a-dhun`** — **PR #70: 
 - **Hardware-verified:** None claimed; on-device visual appearance on physical Android 8–11 devices remains an open hardware gate.
 
 **Exact next technical step & blockers:** Await user review and explicit merge instruction for PR #70 (`gh pr merge 70 --merge`). Do NOT merge until instructed. Blockers: none.
+
+</details>
 
 ---
 
