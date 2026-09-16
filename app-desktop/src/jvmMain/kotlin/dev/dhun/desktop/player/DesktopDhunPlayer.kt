@@ -530,6 +530,11 @@ class DesktopDhunPlayer(
     private fun cancelCacheFill() {
         cacheFillCancel?.set(true)
         cacheFillCancel = null
+        // Cancel the coroutine as well as flagging it (mirrors
+        // cancelPrebuffer): dropping the reference alone lets a fill
+        // blocked in a socket read keep consuming bandwidth after a skip,
+        // and lets handlePlaybackError observe "no fill" while one runs.
+        cacheFillJob?.cancel()
         cacheFillJob = null
     }
 

@@ -36,7 +36,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.koin.androidContext
-import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 /**
@@ -171,6 +170,4 @@ val appModule = module {
             scope = get(),
         )
     }
-
-    viewModel { dev.dhun.android.ui.HarnessViewModel(get(), get()) }
 }

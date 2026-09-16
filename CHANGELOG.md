@@ -24,6 +24,65 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — Stage S2 architectural cleanup — 2026-09-16
+- **Dead harness UI deleted** (~680 lines): `HarnessScreen`,
+  `HarnessViewModel`, `DesktopHarness*` had zero call sites (only an
+  Android DI registration); v2 Phase 06 had ordered their deletion.
+  DI registration + `AppModuleGraphTest` lines removed with them.
+- **Root session notes archived** to `docs/history/` (read-only):
+  `agent-2…6-status.md` + `phase15-android-polish-status.md`.
+- **`docs/verification/14-release.md`** gains a current-status notice
+  (its merge chain ended at PR #32); body kept verbatim as history.
+- **Desktop cache-fill cancel fixed**: `cancelCacheFill()` now cancels
+  the coroutine as well as flagging it (mirrors `cancelPrebuffer`).
+
+### Fixed — navigation adjustment package — 2026-09-16
+- **Pushing a page now collapses the player, as documented.**
+  `AppNavState.push()` promised this in its KDoc but never did it, so
+  "Go to artist/album" from the track overflow dialog and "open
+  playlist" from add-to-playlist landed invisibly under the expanded
+  FullPlayer and read as dead taps. The collapse is now real, and the
+  overflow search-redirect fallbacks collapse too. Pinned by
+  `pushCollapsesThePlayerSoThePageIsVisible`.
+- **Two-pane master shows the tab list again.** The large-screen master
+  column was rendering the detail route a second time instead of the
+  tab content — the same page twice, its data loaded twice, and the
+  tab list unreachable while a page was open. The master now renders
+  the tab (`detailRoute = null`); the detail pane keeps the page.
+- **Desktop: Escape is Back.** The desktop window had shortcuts for
+  transport, search and quit but no way to collapse the player or pop
+  a page from the keyboard. Escape now runs the shared back contract
+  (collapse → pop page → previous tab).
+- **Restoring onto CATALOG no longer strands the user.** The developer
+  catalog has no nav-bar entry and a no-op close; an old bundle or
+  debug session naming it (or carrying it in tab history) now
+  sanitizes to Home on restore. Pinned by two
+  `NavStatePersistenceTest` cases.
+
+### Changed — full project re-baseline (docs only) — 2026-09-16
+- **`.ai/MASTER_PROMPT.md` → v3.** Rewritten from the live repo
+  (`main@d555959`): revised extraction doctrine (own-client wave chain
+  acknowledged as the production primary, NewPipe as drill watch,
+  ADR-007 as contingency gated by triggers T1/T2), corrected stack
+  (Ktor CIO, platform logging, shared navigator on both platforms),
+  build history Phases 01–16 (all code-merged), and sequential
+  single-agent completion Stages S1–S6. v2's phase text is preserved
+  in git history — it must never be implemented from again.
+- **`.ai/ROADMAP.md` rewritten.** 122 KB of session snapshots
+  collapsed (full text in the file's git history); standing user
+  directives kept; new live status from code/CI/GitHub; v2 trajectory
+  numbers retired (several "candidates" already shipped); PR/issue
+  hygiene recorded (#53 close-unmerged, #54 contingency reference,
+  #14 needs a fresh S1 verdict, #60/#63 are v2 backlog).
+- **Reconciled:** `.ai/KNOWN_LIMITATIONS.md` (re-baseline entry;
+  pre-#57 "playback broken" entries marked stale-but-kept),
+  `.ai/RISK_REGISTER.md` (drill outage + own-client rot now head the
+  table; repaired risks retired, not deleted),
+  `docs/decisions/README.md` (missing ADR-006 entry added; ADR-007
+  PROPOSED pointer added).
+- **No behavior change.** No app, extraction, playback-engine or ADR
+  change in this session.
+
 ### Fixed — desktop unit tests now execute in CI — 2026-09-16
 - **`:app-desktop:jvmTest` is a named CI step.** The five jump-list/tray
   test classes existed since candidate 27 but CI only ran

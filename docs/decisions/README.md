@@ -7,3 +7,5 @@ of them is being challenged, not before.
 - [ADR-003](ADR-003-parallel-identity-chain.md) — Staged wave parallel identity chain (Option C, 2026-09-06)
 - [ADR-004](ADR-004-remove-separate-miniplayer-window.md) — Remove the separate desktop mini-player window (user decision 2026-09-06; the docked in-app MiniPlayer is the product mini-player)
 - [ADR-005](ADR-005-next-track-prebuffering-and-temp-cache.md) — Next-track pre-buffering, temporary cache lifecycle, and stream isolation (2026-09-06)
+- [ADR-006](ADR-006-offline-music-downloads-architecture.md) — Persistent offline downloads: schema v3, range-resume engine, offline-first routing (ACCEPTED 2026-09-07)
+- ADR-007 (PROPOSED, not filed — lives on open PR #54) — Android stream attestation / PO-token options A–D. Contingency reference only: implement solely on triggers T1/T2 (MASTER_PROMPT §2) with the user's explicit go-ahead.

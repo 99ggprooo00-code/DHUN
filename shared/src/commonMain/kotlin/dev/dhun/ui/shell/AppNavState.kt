@@ -156,8 +156,15 @@ class AppNavState {
      */
     fun onBack(): Boolean = closeTop() || popTab()
 
-    /** Push a detail page; also collapses the player so navigation is visible. */
+    /**
+     * Push a detail page; also collapses the player so the navigation is
+     * visible. Without the collapse, a push issued from above the player
+     * (track overflow "Go to artist/album", add-to-playlist "open
+     * playlist") lands invisibly under the expanded FullPlayer and the tap
+     * reads as dead — every caller of this function wants to SEE the page.
+     */
     fun push(route: DetailRoute) {
+        playerExpanded = false
         detailStack += route
     }
 

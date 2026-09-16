@@ -2,6 +2,98 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 — second-look code findings (same session, engine-room read)
+
+Read end to end: `InnerTubeClient`, `OwnClientStreamResolver`,
+`PlaybackGraph`, `DesktopDhunPlayer`, `AndroidDhunPlayer`,
+`PlayerViewModel`, `DhunStreamCache`, `RateLimitGate`,
+`QueueManager`, sheet-transition math. No CRITICAL/HIGH found; two
+items worth scheduling, rest nits/notes. All verified against code,
+not inherited:
+
+- **[PERF/MEDIUM — S5] `signatureTimestampOrNull` fetches the watch
+  page on EVERY resolve** (`InnerTubeClient.kt:316-346`). The
+  base.js→sts mapping is cached, but the watch-page GET that yields
+  the jsUrl runs unconditionally per track: +1 RTT and ~0.5–1 MB HTML
+  on every cold resolve, part of the desktop startup budget. Fix:
+  TTL-guard sts revalidation (reuse cached sts if validated within
+  N hours; re-fetch watch page only on TTL expiry or AuthRequired).
+- **[BUG-RISK/LOW-MEDIUM — S2 or S5 one-liner]
+  `cancelCacheFill()` nulls the job WITHOUT cancelling it**
+  (`DesktopDhunPlayer.kt`): only the AtomicBoolean is set, so a fill
+  blocked in a socket read keeps consuming bandwidth after a skip;
+  `handlePlaybackError`'s `fill?.join()` can also see `null` while a
+  fill is actually running (narrow race → premature Error instead of
+  local-copy recovery). `cancelPrebuffer()` in the same file does it
+  right (`job?.cancel()`); mirror that + a test.
+- **[UNVERIFIED/LOW — S3 checklist] vlcj volume scale mapping**
+  (`DesktopDhunPlayer.kt`: init `volume()/100f`, set `(v*100)`).
+  Assumes native 0–100. If libVLC's native range differs, init still
+  coerces safely but max-slider may cap below true max. Needs one
+  hardware comparison (DHUN max vs VLC-app max). NOT claimed as a bug.
+- **[NIT/LOW — S5] `PlaybackGraph.retries` never reset on success.**
+  Per-track error counts accumulate for the process lifetime; a track
+  that recovered once has fewer retries left hours later. Clear on
+  STATE_READY/playing. Memory bounded by distinct tracks (trivial).
+- **[NIT/LOW] `checkPlayability` passes `LIVE_STREAM_OFFLINE` as OK**
+  → downstream "no formats" Parse error. Harmless for a music app;
+  could map to Unavailable("live stream") if touched.
+- **[NOTE] `visitorData` cached forever, never revalidated.**
+  Fail-open covers fetch failure, not mid-session staleness (stale
+  value likely behaves as no value). Extraction-maintenance note.
+- **[NOTE] Desktop concurrent bandwidth**: stream + cache-fill +
+  prebuffer-next can run together (prebuffer correctly waits for the
+  `playing` event). Documented trade-off; S3 slow-network soak should
+  watch startup behavior.
+- **[NOTE] `playCurrentLocked` holds `opMutex` across network
+  resolve**: transport ops queue behind a slow resolve (45s budget
+  worst case). Prevents overlap bugs; accepted trade-off.
+- **[CORRECTION] ADR-005 is implemented on BOTH platforms** — Android
+  via `DhunStreamCache.prefetch` (`AndroidDhunPlayer.kt:281`) +
+  Media3 queue, Desktop via prebuffer + temp cache — not "desktop
+  half" as first reported.
+- **[CONFIRMED GOOD]** Sheet math (`relatedSheetTravel*`, frozen
+  capture, finite-guards, floor/ceiling coherence) holds up to
+  reading — PR #67's claims verified in code, no bug found.
+  ExoPlayer tuning (500 ms playback buffer, audio-only tracks,
+  UA-per-videoId isolation, key-stable cache) is careful work,
+  consistent with the user's "Android buffering fine" report.
+  `RateLimitGate` (monotonic, extend-only) and `DhunStreamCache`
+  (5 h TTL, UA-paired, invalidate-on-403) are correct.
+  `QueueManager.setQueue` coerces bounds; `PlayerViewModel`
+  collectors die with `activityScope` (cancelled in onDestroy) /
+  app scope on desktop — no leak.
+
+## 2026-09-16 — project re-baselined (`arena/01a0ab12-dhun`, base `d555959`)
+
+Docs-only session: `.ai/MASTER_PROMPT.md` → v3, `.ai/ROADMAP.md`
+rewritten around build history (Phases 01–16, all code-merged) and
+sequential completion Stages S1–S6 (single-agent era — the user runs
+one agent at a time from here on). What this changes about the entries
+below:
+
+- **Device playback reports are the user's, not CI's.** "Android works
+  well / Windows acceptable" (2026-09-16) is a user report on recent
+  `test` builds. No live drill verdict exists on the current chain
+  (last real one: `34011539225` @ `dd1ab31`, 2026-09-07, pre-#57), so
+  every pre-2026-09-16 "playback broken / gated" entry below is
+  **stale evidence, kept for history** — re-baselined by Stage S1, not
+  deleted.
+- **PO-token / InnerTubeX / ADR-007 research (open PR #54) is
+  contingency reference, not backlog.** Implementation is gated by
+  triggers T1/T2 (MASTER_PROMPT §2) + the user's explicit go-ahead.
+- **PR #53 is do-not-merge** (stale ROADMAP wipe); recommendation is
+  close-unmerged (user's call). Issue #60 (guest-first login) and #63
+  (security hardening) are v2 backlog, not S1–S6 work.
+- **No Settings screen exists.** `SettingsKeys` (theme, cache budget,
+  close-to-tray…) are keys without UI — recorded as the Stage S4 gap.
+- **Dead code identified, not yet removed:** the Phase 03/04 harness
+  screens (`HarnessScreen`, `DesktopHarness*`, ~680 lines, no call
+  sites — v2 Phase 06 ordered deletion) are Stage S2 work.
+- **Trajectory candidate numbers (15–30) are retired** — several
+  shipped already (EQ, widgets, jump lists, themes). Remaining ideas
+  are the unnumbered v2 backlog in ROADMAP §8.
+
 ## 2026-09-16 — desktop unit tests execute in CI (`arena/01a0aa8e-dhun`)
 
 Closes the gap candidate 27 recorded and every entry since repeated: the five

@@ -1,664 +1,446 @@
-# DHUN — Master Prompt (v2, Feasibility-Corrected)
+# DHUN — Master Prompt (v3, Re-baselined 2026-09-16)
 
-> This file replaces the original 30-phase master plan.
-> Why it was replaced: [PROBLEMS_AND_FIXES.md](PROBLEMS_AND_FIXES.md).
-> Summary of what changed: 30 phases → 14 · 3 platforms → 2 (Web deferred) ·
-> hand-rolled InnerTube extraction → maintained extractors + daily rot drill ·
-> docs-first → code-first · license ambiguity → GPL-3.0.
-> The full audit of the original 30-phase prompt set and the rewritten,
-> fully-detailed phase-by-phase prompts live in
-> [PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md).
+> **Document status: CURRENT.** This file describes the project **as it
+> exists today and as it should be completed from here forward**. It
+> supersedes the v2 "Feasibility-Corrected" master prompt below — v2's
+> phase definitions (01–14) are retained as build history, not as future
+> work: all 14 phases have merged code on `main`.
+>
+> **Re-baseline record (2026-09-16, session `arena/01a0ab12-dhun`):**
+> the project was audited against the live repository (`main@d555959`,
+> PRs #1–#71), open PRs (#53, #54), open issues (#14, #60, #63), CI, and
+> ADRs 001–006. Why the rewrite was needed:
+> - The v2 doctrine ("never hand-roll extraction, NewPipe is THE engine")
+>   was superseded in practice by ADR-001 (interim) + PR #55/#57: the
+>   production primary is now DHUN's own InnerTube player-client chain
+>   with session corroboration sourced from YouTube pages. The doctrine
+>   below is rewritten to match that reality instead of forbidding it.
+> - Phases 01–14 are code-complete; post-14 extras (downloads, EQ,
+>   widgets, jump lists, themes, player immersion, Phase-16 UI slice)
+>   shipped without a plan owning them. They are now recorded as
+>   Phases 15–16 (merged).
+> - The remaining work is **verification, hardening and release**, not
+>   feature construction. The completion plan is therefore stages S1–S6,
+>   sequential, single-agent (per the user's 2026-09-16 decision: no more
+>   parallel agents).
+> - Corrected stale stack claims: Ktor uses the **CIO** engine (not
+>   OkHttp); logging is platform-native (Kermit was never adopted);
+>   navigation is the shared custom `AppNavState` on **both** platforms
+>   (Navigation Compose was never adopted).
+>
+> **Where v2 went:** the full v2 text (14-phase build prompts) is
+> preserved in git history (`git log -- .ai/MASTER_PROMPT.md`) and its
+> phase table is summarized in §"Build history" below. The original
+> 30-phase audit still lives in
+> [PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md) (historical reference only).
 
 ---
 
-## What DHUN Is
+## 1. What DHUN Is (today)
 
-DHUN is a serious, cross-platform music application streaming from
-YouTube Music.
+DHUN is a working, cross-platform music application streaming from
+YouTube Music — **past feature construction, into verification and
+release hardening.**
 
-- **v1 platforms:** Android (primary) and Windows/Linux/macOS Desktop
-  (secondary, shared codebase).
-- **Web:** explicitly deferred. Not designed, not stubbed, not promised.
-- **UI philosophy:** premium glassy design, artwork-driven, dark-first,
-  ViMusic-quality. This is not a prototype. This is a real application.
-- **License:** GPL-3.0. Non-negotiable (see PROBLEMS_AND_FIXES.md P5).
+- **Platforms:** Android (primary) and Desktop (Windows first;
+  Linux/macOS free via JVM). Web is deferred (v2 candidate, likely "no").
+- **Current surface:** Home, Search, Library (Playlists / Favorites /
+  History / Downloads), Artist / Album / Playlist pages, MiniPlayer +
+  immersive FullPlayer (Lyrics | Queue | Related), synced lyrics,
+  persistent offline downloads, queue engine with shuffle/repeat,
+  history-seeded recommendations, Android widgets (Quick Play), Windows
+  tray + jump lists + SMTC + single-instance, light/dark themes with
+  accent selector (dev-reachable; wiring open), desktop 10-band EQ
+  (Android EQ open).
+- **UI philosophy (unchanged):** premium glassy design,
+  artwork-driven, dark-first, ViMusic-quality. FullPlayer background is
+  real blurred artwork; Home/Search/Library sit on the now-playing
+  blurred backdrop (PR #68).
+- **License:** GPL-3.0. Non-negotiable.
 
 ---
 
-## The One Doctrine That Decides Everything
+## 2. The Doctrine (revised — read carefully)
 
-**Extraction is a maintenance problem, not an implementation problem.**
+**v2 said:** *"Extraction is a maintenance problem; therefore DHUN never
+hand-rolls stream extraction — NewPipe Extractor is THE engine."*
 
-Every open YouTube Music client that hand-rolled stream extraction is now
-archived or broken (ViMusic, RiMusic, InnerTune, SmPm — see audit P1/P2).
-YouTube enforces PO tokens + SABR; clients `android_music`/`ios_music` now
-require sign-in per video; clients that work tokenless change monthly.
+**What actually happened:** NewPipe Extractor v0.26.5 broke upstream
+during the Phase 01 spike (2026-09-01) with no upstream fix; YouTube
+simultaneously began bot-gating tokenless `/player` identities
+(`LOGIN_REQUIRED` / "Sign in to confirm you're not a bot"). Waiting
+would have frozen the project. ADR-001 (accepted 2026-09-01) therefore
+made DHUN's **own InnerTube player-client chain** the interim primary,
+and PR #55/#57 (merged 2026-09-10/15) added anonymous session
+corroboration (`visitorData` + `signatureTimestamp`, sourced from
+YouTube pages, cached, fail-open). User reports as of 2026-09-16:
+**Android playback works well; Windows playback is acceptable.**
 
-Therefore DHUN **never hand-rolls stream extraction**:
+**The revised doctrine:**
 
-| Layer | Implementation | Why |
+> **DHUN owns a minimal, drill-watched extraction surface, and treats
+> every line of it as borrowed time.**
+>
+> 1. The production primary is the **own-client staged-wave resolver**
+>    (`OwnClientStreamResolver`: VISIONOS → TV×3 → MWEB/WEB_REMIX,
+>    ADR-003 Option C) with fail-open session corroboration. This *is*
+>    hand-rolled extraction — the thing v2 forbade — adopted deliberately
+>    because every maintained engine was broken or gated first.
+> 2. **Desktop fallback:** user-provided `yt-dlp` subprocess (not
+>    bundled; `DHUN_YTDLP` or PATH). **Android has no fallback** — the
+>    own-client chain is the only engine (ADR-001).
+> 3. **NewPipe Extractor stays a pinned dependency in a non-fatal
+>    recovery watch**, never the production primary, until the rot drill
+>    proves upstream recovery (ADR-001's standing rule — unchanged).
+> 4. **No PO tokens, no BotGuard, no attestation, no cookies, no
+>    sign-in** unless a trigger below fires. That research (open PR #54 /
+>    proposed ADR-007) is **contingency reference material**, not a
+>    backlog item.
+> 5. The maintenance contract stands and is currently **in breach**: the
+>    daily rot drill has not executed on schedule since 2026-09-07
+>    (restoring it is completion Stage S1 — the single most urgent task).
+
+| Layer | Implementation (actual) | Status |
 |---|---|---|
-| Search / browse / related / suggestions / YTM lyrics | DHUN's own thin InnerTube client (`WEB_REMIX`, metadata only) | These endpoints are stable and tokenless; owning them keeps DHUN independent |
-| **Stream URL resolution** | **NewPipe Extractor** (GPL-3.0, pure Java) — in-process on Android AND Desktop | One dependency absorbs YouTube's breakage on both platforms; maintained daily by the NewPipe team |
-| Desktop fallback extraction | **yt-dlp** subprocess (Unlicense), optional | Fastest-moving extractor in existence; used only if NewPipe Extractor fails |
-| Lyrics fallback | LRCLIB public API | Keyless, stable, synced lyrics |
+| Search / browse / home / related / suggestions / YTM lyrics | Own thin InnerTube client (`WEB_REMIX`, metadata only) | ✅ working |
+| Stream URL resolution (both platforms) | `OwnClientStreamResolver` + `ResolvingStreamResolver` 45s budget + `OfflineFirstStreamResolver` wrapper | ✅ working per user report; drill proof open |
+| Desktop fallback extraction | `YtDlpStreamResolver` (user-provided binary) | ✅ wired; hardware proof open |
+| NewPipe Extractor | Pinned dep, drill watch only | ⏳ waits on upstream + drill |
+| Lyrics | LRCLIB (synced) → YTM text → cache | ✅ shipped; 5-track check open |
+| Attestation / PO-token path (ADR-007) | PROPOSED, unimplemented | 🛑 contingency only |
 
-And DHUN accepts the maintenance contract, stated openly in the README:
-*streaming clients rot; when extraction breaks, DHUN ships a patch release —
-fast. A daily CI job (the "rot drill") detects breakage within 24 hours.*
-
----
-
-## What Happened Before (Reference Only)
-
-The repository `99ggprooo00-code/dhun-music-failed` is the previous attempt.
-Established facts (do not re-research):
-
-- It was a **GPL-3.0 fork of Nagi** — C#/.NET 10/WinUI 3, **local-file
-  player only**. Its own rules prohibited unofficial extraction, so it
-  structurally could never become DHUN (audit P4).
-- It produced excellent documentation and an app that never attempted the
-  core mission. That failure mode — **docs-first, code-second** — is what
-  this master prompt is designed to prevent.
-- Nothing from it is reused. Not concepts-into-code, not code. One lesson
-  document exists: PROBLEMS_AND_FIXES.md. Done.
+**Contingency triggers (implement ADR-007 options ONLY if):**
+- T1: reproducible `AuthRequired`/gating failures on residential
+  (non-datacenter) networks with the current chain, confirmed by a
+  green-CI build + captured probe output — not by CI-runner IPs alone.
+- T2: rot drill red on the production chain ≥14 days with no upstream
+  recovery (per RISK_REGISTER).
+- Until a trigger fires, extraction work is **forbidden** except:
+  client-version bumps, wave/identity maintenance, and drill upkeep.
 
 ---
 
-## Non-Negotiable Requirements
+## 3. Non-Negotiable Requirements (current)
 
-### Platforms (revised)
-- **Android:** full music player — background playback, media session,
-  lock screen + notification controls, queue, playlists, lyrics.
-- **Desktop (Windows first; Linux/macOS free via JVM):** windowed app,
-  system tray, media-key integration (SMTC where feasible, documented
-  fallback if not), mini-player (docked in-app — ADR-004), keyboard
-  shortcuts, installer.
-- **Web:** cut from v1. No compatibility shims, no `expect/actual` stubs,
-  no dead code "for later."
+### Platforms
+- **Android:** full player — Media3 background playback, media session,
+  notification + lock-screen controls, queue, playlists, lyrics,
+  downloads with foreground service, widgets, shortcuts. minSdk 26;
+  real blur is API 31+ with a designed dark fallback below (PR #70).
+- **Desktop:** single-window app (ADR-004 — never re-add a second
+  window), system tray, media keys, SMTC where stable (round-trip
+  unverified), jump lists, single-instance guard, close-to-tray,
+  keyboard shortcuts, per-user unsigned MSI (test-grade until release
+  signing is decided).
+- **Web:** cut. No shims, no stubs, no dead code "for later."
 
-### Music source (revised)
-- YouTube Music via the Doctrine (table above). No paid API. No keys.
-- **Extraction proof precedes everything** (Phase 01). If audio cannot be
-  resolved and played on real hardware in week one, everything stops until
-  it can.
+### Music source
+- YouTube Music via the revised doctrine above. No paid API. No keys.
+  Guest-first, account-optional (issue #60 is the v2 direction; no
+  login exists or is required).
 
-### UI (unchanged from the original vision)
-- Glassy translucent surfaces with **real blur**, layered depth,
-  artwork-driven backgrounds, prominent artwork, rounded surfaces, subtle
-  borders/shadows/gradients, dark-first, premium typography, animations and
-  micro-interactions, every state designed (hover/focus/pressed/loading/
-  error/empty), mini-player and full player both designed properly.
-- NOT: generic dashboards, default component-library look, "AI app"
-  aesthetics.
+### UI
+- Glassy translucent surfaces with **real blur** where the platform
+  supports it (Android 12+/Skiko), graceful dark fallback below;
+  artwork-driven backgrounds; dark-first (light theme exists but is
+  dev-reachable only); premium typography; every state designed.
+- NOT: generic dashboards, default component-library look.
 
-### Architecture (unchanged in shape, revised in content)
+### Architecture (actual — see §5 for the map)
 ```
 ┌─────────────────────────────────────┐
-│   UI (Compose Multiplatform)        │  shared screens; platform accents
+│   UI (Compose Multiplatform)        │  shared screens; platform shells
 ├─────────────────────────────────────┤
-│   Application layer                 │  screen models, state, navigation
+│   Presentation                      │  ViewModels (Home/Search/Library/
+│                                     │  Player/Browse), shared navigator
 ├─────────────────────────────────────┤
-│   Domain layer                      │  use cases, entities, interfaces
+│   Domain                            │  use cases, entities, interfaces
 ├─────────────────────────────────────┤
 │   Provider abstraction              │  MusicProvider interface
 ├──────────────────┬──────────────────┤
-│ InnerTube client │ Extraction engine│
-│ (metadata only)  │ NewPipe Extractor│
-│                  │ (+ yt-dlp, desktop fallback)
+│ InnerTube client │ Extraction chain │  own-client waves (primary) /
+│ (metadata only)  │ yt-dlp (desktop  │  NewPipe (watch only)
+│                  │ fallback only)   │
 ├──────────────────┴──────────────────┤
 │   Playback: Media3 (Android) · vlcj (Desktop)
+│   Data: SQLDelight (schema v3) · Koin DI · Coil 3 · Ktor/CIO
 └─────────────────────────────────────┘
 ```
 
 ---
 
-## Technology Stack — LOCKED
+## 4. Technology Stack — CORRECTED AND LOCKED
 
-Decisions are made. They are not re-opened without a written ADR proving a
-blocking defect.
+Corrections vs v2 are marked **(corrected)**. Locked means: not
+re-opened without a written ADR proving a blocking defect.
 
 | Concern | Decision | Notes |
 |---|---|---|
-| Language/KMP | **Kotlin Multiplatform** | Targets: `androidTarget()` + `jvm()` only. No JS/native targets. |
-| UI | **Compose Multiplatform** | Shared screens Android+Desktop; platform adapters where needed |
-| Android playback | **Media3 / ExoPlayer** | MediaSessionService, notification, lock screen for free |
-| Desktop playback | **vlcj (libVLC)** | Proven HTTP-audio streaming; SPI-free JNA binding |
-| Extraction | **NewPipe Extractor** (dependency) | Runs on both targets |
-| Extraction fallback | **yt-dlp subprocess** (desktop only, optional at runtime) | Feature-flagged |
-| InnerTube metadata | **DHUN's own client** (Ktor + kotlinx.serialization) | `WEB_REMIX`; search/browse/next/suggestions/YTM lyrics only |
-| DB | **SQLDelight 2.x** | Android + JVM drivers only |
-| Networking | **Ktor client** | OkHttp engine both platforms |
-| DI | **Koin** | KMP-first |
-| Android navigation | **Navigation Compose** | |
-| Desktop navigation | Small custom navigator over shared screen models | |
-| Images | **Coil 3** (Compose Multiplatform) | |
-| Lyrics | LRCLIB API + YTM lyrics via InnerTube | |
-| Logging | Kermit | |
+| Language/KMP | **Kotlin Multiplatform** | Targets: `androidTarget()` + `jvm()` only |
+| UI | **Compose Multiplatform 1.8.2** (shared) + AndroidX Compose (android shell) | Shared screens; platform shells |
+| Android playback | **Media3 1.5.1** (ExoPlayer + MediaSessionService) | `dhun://track/<id>` resolving source, segment cache, 403 recovery, fast-fail diagnostics |
+| Desktop playback | **vlcj 4.8.2** (system libVLC) | Whole-track cache, next-track prebuffer, EQ |
+| Stream resolution | **Own InnerTube wave chain** (primary) | **(corrected)** was "NewPipe THE engine"; ADR-001 interim, still in force |
+| Desktop fallback | **yt-dlp subprocess** (user-provided, optional) | Feature-present, not bundled |
+| Recovery watch | **NewPipe Extractor** (pinned, non-fatal) | **(corrected)** was primary; drill-watched |
+| InnerTube metadata | **Own client** (Ktor + kotlinx.serialization) | `WEB_REMIX` + alt identities for `/player` |
+| DB | **SQLDelight 2.x** (schema v3) | Android + JVM drivers |
+| Networking | **Ktor 3.1.3, CIO engine** | **(corrected)** v2 said OkHttp; code uses CIO everywhere |
+| DI | **Koin 4.0.2** | KMP-first; `appModule` graph test exists |
+| Navigation | **Shared custom `AppNavState`** (both platforms) | **(corrected)** v2 said Navigation Compose on Android; never adopted — deliberate simplification |
+| Images | **Coil 3.1.0** | Crossfade, tiered sizes (544 list / 1024 player) |
+| Lyrics | LRCLIB + YTM lyrics | Persisted cache |
+| Logging | **Platform-native** (`android.util.Log` / JDK logging) | **(corrected)** Kermit was never adopted; do not add a logging framework now |
+| Desktop native | **JNA 5.17** (SMTC, jump lists) | Base JNA only; fail-open off-Windows |
 
-**Explicitly rejected:** Flutter (desktop audio + channels weakness),
-Electron/Tauri (separate UI codebase = the Nagi mistake), separate backend
-(no server; client-only app), Compose for Web / Kotlin-JS (experimental),
-Room (Android-only), Hilt (not KMP).
+**Still explicitly rejected:** Flutter, Electron/Tauri, separate
+backend, Compose for Web / Kotlin-JS, Room, Hilt, account sign-in for
+core playback (guest-first per #60).
 
 ---
 
-## Repository Structure
+## 5. Repository Structure (actual)
 
 ```
 DHUN/
-├── MASTER_PROMPT.md            # this file
-├── PROBLEMS_AND_FIXES.md       # plan audit (the "why")
-├── ROADMAP.md                  # phase status tracker, kept current
-├── README.md
-├── LICENSE                     # GPL-3.0
-├── THIRD_PARTY.md              # every dependency: name, license, commit/tag
-├── KNOWN_LIMITATIONS.md        # honest list, updated every phase
-├── RISK_REGISTER.md            # extraction rot, SMTC, kill-switch criteria
-├── .gitignore
-├── .github/workflows/
-│   ├── ci.yml                  # build + unit tests (Android + Desktop)
-│   └── rot-drill.yml           # daily extraction suite vs live YouTube
-├── build.gradle.kts
-├── settings.gradle.kts
-├── gradle/libs.versions.toml
-│
+├── .ai/                        # agent operating files (NOT product docs)
+│   ├── MASTER_PROMPT.md        # this file (the contract)
+│   ├── ROADMAP.md              # live status + completion plan (CURRENT ACTIVE TASK at top)
+│   ├── KNOWN_LIMITATIONS.md    # honest gaps, updated every session
+│   ├── DEBUG_LOG.md            # incidents: stack → root cause → fix
+│   ├── PROBLEMS_AND_FIXES.md   # HISTORICAL: why v1 died (do not rewrite)
+│   ├── PROMPT_SEQUENCE.md      # HISTORICAL: original 30-phase audit (do not rewrite)
+│   └── RISK_REGISTER.md        # extraction rot, drill, kill-switch criteria
+├── docs/
+│   ├── decisions/              # ADRs 001–006 ACCEPTED; 007 PROPOSED on open PR #54
+│   ├── research/               # spike findings (short, factual)
+│   └── verification/           # per-phase on-hardware logs (many gates OPEN)
 ├── shared/                     # KMP module (android+jvm)
 │   └── src/{commonMain,androidMain,jvmMain}/kotlin/dev/dhun/
-│       ├── core/               # entities, DhunResult, errors
-│       ├── innertube/          # OWN InnerTube metadata client
-│       ├── extraction/         # NewPipe Extractor adapter (+ yt-dlp bridge, jvm)
-│       ├── provider/           # MusicProvider impl wiring the two above
-│       ├── player/             # PlayerState, QueueManager (shared logic)
-│       ├── data/               # SQLDelight db, repositories
-│       ├── lyrics/             # LRCLIB + YTM sources, LRC parser
+│       ├── core/               # entities, DhunResult, errors, gates
+│       ├── innertube/          # OWN InnerTube metadata + alt player client
+│       ├── extraction/         # own-client waves; Resolving/OfflineFirst;
+│       │                       # jvmMain: yt-dlp + NewPipe watch
+│       ├── provider/           # MusicProvider + YouTubeMusicProvider
+│       ├── player/             # DhunPlayer, QueueManager, persistence, EQ model
+│       ├── data/               # SQLDelight db, repositories, settings keys
+│       ├── download/           # ADR-006 engine (common) + platform storage
+│       ├── lyrics/             # LRCLIB + YTM sources, LRC parser, cache
 │       ├── domain/             # use cases
-│       └── design/             # tokens, glass components, artwork colors
-│
-├── app-android/                # Compose UI (Android), Media3 service, DI
-├── app-desktop/                # Compose UI (Desktop), vlcj, tray, packaging
-│
-├── tools/playback-probe/       # Phase 01 CLI harness — PROVES extraction
+│       ├── presentation/       # ViewModels (home/search/library/player/browse)
+│       ├── ui/                 # ALL screens incl. shell, player, design consumers
+│       └── design/             # tokens, glass components, artwork, catalog
+├── app-android/                # shell activity, Media3 service+graph, widgets,
+│                               # shortcuts, downloads FGS, DI (Koin)
+├── app-desktop/                # Compose window, vlcj player, tray, SMTC,
+│                               # jump lists, single-instance, packaging
+├── tools/playback-probe/       # Phase 01 CLI harness — STILL the rot drill's probe
+│                               # (+ OfflineMain deterministic check, SmokeMain)
 ├── tests/fixtures/             # captured InnerTube JSON for parser tests
-└── docs/
-    ├── research/               # spike findings (short, factual)
-    ├── decisions/              # ADRs (only real decisions)
-    └── verification/           # per-phase on-hardware verification logs
+├── scripts/                    # python packaging/CI-contract gates (29 tests)
+└── .github/workflows/          # ci.yml · test-release.yml · build-apk.yml ·
+                                # rot-drill.yml (schedule BROKEN — see S1)
 ```
 
-Rules: no `apps/{android,windows,web}` split (that assumed 3 native apps).
-No placeholder modules for cut platforms. Every directory that exists,
-earns its existence.
+---
+
+## 6. Build history — Phases 01–16 (all code-merged; hardware gates open)
+
+Phases 01–14 are the v2 locked plan. Every one has merged,
+CI-green code on `main`. "🟨" = code merged, on-hardware verification
+open. Nothing below needs re-implementation — only the verification and
+hardening in §7.
+
+| # | Phase | Status | What actually shipped (deviations in italic) |
+|---|---|---|---|
+| 01 | Extraction spike | 🟨 merged | Probe (search/resolve/audio-bytes/related) ✅; *NewPipe broken upstream → ADR-001 own-client interim* |
+| 02 | Provider & domain core | 🟨 merged | Entities, `DhunResult`, InnerTube metadata client, `StreamResolver` chain, `MusicProvider`, `QueueManager`, `DhunPlayer` ✅ |
+| 03 | Android skeleton + playback | 🟨 merged | Media3 service, lock screen, FGS, battery-exemption handoff, 403 recovery, segment cache, fast-fail diagnostics ✅ |
+| 04 | Desktop skeleton + playback | 🟨 merged | vlcj player, window-state persist ✅; *shared harness, not separate* |
+| 05 | Data layer | 🟨 merged | SQLDelight schema v3, 7+ repos, use cases, now-playing restore ✅ |
+| 06 | Design system | 🟨 merged | Tokens, GlassCard real blur, ArtworkImage, color extraction, catalog ✅; *harness screens never deleted (~680 lines dead code — see S2)* |
+| 07 | Home & Search | 🟨 merged | Home shelves, search + suggestions + filters + overflow ✅ |
+| 08 | Player UI | 🟨 merged | MiniPlayer + immersive FullPlayer + Queue/Related sheet ✅; *coordinated sheet transition (PR #66/#67), backdrop (PR #68)* |
+| 09 | Artist/Album/Playlist | 🟨 merged | Browse parsers + pages + local playlist CRUD ✅ |
+| 10 | Library & History | 🟨 merged | Tabs, favorites, history, RecordPlay ✅ |
+| 11 | Lyrics | 🟨 merged | LRCLIB + YTM + cache + synced UI ✅ |
+| 12 | Desktop native | 🟨 merged | Tray, shortcuts, SMTC (unverified), close-to-tray, MSI, single-instance, jump lists ✅; *separate mini-player REMOVED (ADR-004)* |
+| 13 | Android polish | 🟨 merged | Edge-to-edge, shortcuts, rotation restore + Robolectric tests, 840dp rail, two-pane shell ✅; *soak never run* |
+| 14 | Robustness + rot-drill + release prep | 🟨 merged | Error taxonomy, caches, rolling `test` release pipeline, v0.1.0 DRAFT prep ✅; *drill schedule broken; soaks open; no tag* |
+| 15 | Beyond-plan extras (merged, unplanned) | 🟨 merged | ADR-006 downloads, desktop EQ, Quick Play widget, jump lists, themes (dev-only), player immersion, recommendations, playback diagnostics, visitorData/sts (PR #57) |
+| 16 | UI/platform repair slice (merged 2026-09-16) | 🟨 merged | Now-playing backdrop, Android tab BACK, Windows rails + fling, Android<12 guard, named CI test steps (PRs #66–#71) |
+
+**Deliberate deviations from v2, all accepted:** own-client extraction
+primary (ADR-001); staged-wave parallelism (ADR-003); next-track
+prebuffer desktop (ADR-005); offline downloads (ADR-006); no separate
+mini-player (ADR-004); shared navigator both platforms; CIO engine;
+platform logging; themes/EQ/widgets/jump-lists shipped from the v2
+"deferred" pool by user approval.
+
+**Never implement from v2's phase text again.** If a v2 phase step
+contradicts shipped code, the code wins; file the correction in
+KNOWN_LIMITATIONS, don't rewrite the code to match v2.
 
 ---
 
-## The Sequence — 14 Phases
+## 7. Completion plan — Stages S1–S6 (sequential, single-agent)
 
-Each phase: objective → build → verify on hardware → tests → docs touched
-→ commit. **A phase is done when the feature runs on real hardware and the
-verification log says so.** Compiling is not done. Documents are not done.
-(See AI Rules at the end.)
+The user runs **one agent at a time** (2026-09-16 decision — parallel
+agents did not work out). Stages run **in order**; each stage's
+acceptance gates the next. File-level tasking lives in
+[ROADMAP.md](ROADMAP.md).
 
----
+### Stage S1 — Restore the maintenance contract (FIRST — nothing else matters if extraction is blind)
+- **Objective:** the rot drill runs daily again and produces a live
+  verdict on the current chain; issue #14 reflects reality.
+- Tasks: human presses *Run workflow* on `rot-drill.yml@main` +
+  Settings → Actions inspection (agents get 403); fix schedule or
+  cadence; close/supersede stale PR #53 (do-not-merge); record fresh
+  verdict on #14 (green → auto-close path proven; red → new evidence,
+  check contingency triggers T1/T2); silence or fix the 0-job
+  push-noise (docs-only: stop citing it; optionally add `paths-ignore`
+  or a no-op job — needs user OK as a workflow change).
+- **Acceptance:** ≥1 scheduled (or manually dispatched) drill verdict
+  on current `main`, artifact attached, #14 updated.
+- **Files:** `.github/workflows/rot-drill.yml`, issue #14, ROADMAP,
+  KNOWN_LIMITATIONS. **Tests:** none (live verdict IS the test).
 
-### Phase 01 — Extraction Spike (the phase everything depends on)
+### Stage S2 — Architectural cleanup (small, safe, unblocks review)
+- **Objective:** remove dead/confusing weight; zero behavior change.
+- Tasks: delete dead harness UI (`HarnessScreen`, `DesktopHarness*`,
+  Android DI registration) OR wire it behind a debug flag — delete is
+  preferred (v2 Phase 06 ordered deletion); fix `docs/decisions`
+  index (ADR-006 missing); reconcile stale `docs/verification/14-release.md`
+  header (ends at PR #32); archive or delete root `agent-*-status.md`
+  + `phase15-android-polish-status.md` into `docs/` history or delete
+  (they are superseded session notes); decide PR #54 (merge
+  research-docs-only with ADR-007 staying PROPOSED, or keep open as the
+  contingency reference — user call).
+- **Acceptance:** CI green; no dead screens; decisions index complete;
+  PR #53/#54 resolved (closed or merged-docs).
+- **Tests:** existing suites must stay green; no new tests required
+  except keeping DI-graph tests passing.
 
-**Objective:** Prove the Doctrine on real hardware before any app code.
-Time-box: 1 week of calendar time, hard stop.
+### Stage S3 — Hardware verification round 1 (user + agent; the gates that only a device can close)
+- **Objective:** convert "CI-green" into "works on hardware" for the
+  core loop on both platforms.
+- Tasks (each recorded in `docs/verification/` with build identity):
+  Android: install `test` APK → search → play → lock-screen controls →
+  background survival → 403-recovery sanity → backdrop/BACK/rails feel
+  → widget add/interact → download → offline play. Desktop: install
+  `test` MSI on clean Windows (+VLC) → launch-once (single-instance) →
+  play → tray → media keys/SMTC → jump list → close-to-tray → upgrade
+  over previous (data preserved) → uninstall (data removed).
+- **Acceptance:** checklists in `docs/verification/03/04/08/12/14`
+  signed with build SHAs; any failure becomes a tracked fix, not a
+  silent skip.
+- **Tests:** none new — evidence logs ARE the deliverable.
 
-**Build — `tools/playback-probe/` (CLI, Kotlin JVM):**
-1. Search: own InnerTube `WEB_REMIX` call to `/youtubei/v1/search` with
-   songs filter → parse `videoRenderer`/`musicResponsiveListItemRenderer`
-   → print top 10 results for a query.
-2. Resolve: NewPipe Extractor `YoutubeStreamLinkHandlerFactory` +
-   `YoutubeStreamExtractor` for a result's video ID → get audio-only stream
-   URL (choose best audio-only format).
-3. Play: desktop — pipe the URL into a raw `vlcj` player and hear audio.
-4. Metadata sanity: `/youtubei/v1/next` with the videoId → parse related
-   tracks (this powers radio/queue later).
-5. Fallback probe (desktop): same resolution via `yt-dlp -f bestaudio -g`
-   subprocess; record when it succeeds vs NewPipe Extractor.
+### Stage S4 — Settings + themes + EQ wiring (the "keys without UI" gap)
+- **Objective:** every user-facing setting that exists as a key gets a
+  reachable surface, or the key is removed.
+- Tasks: minimal Settings surface (location TBD — Library row or
+  overflow; must not fork navigation): theme mode (dark/light/system —
+  `SettingsKeys.THEME`, today unread), cache budget
+  (`CACHE_SIZE_MB`, Phase 14 promised "user-settable"), close-to-tray
+  (Phase 12 promised a setting), download storage view link (exists in
+  Library — keep). Android EQ (`AudioEffect`) — implement or formally
+  defer to v2 with a user decision (candidate 22 excluded it).
+  Jump-list Play/Pause verb hook (one-line `Main.kt` arg — the
+  documented follow-up).
+- **Acceptance:** each key readable/writable from UI with tests on the
+  persistence round-trip; EQ decision recorded.
+- **Tests:** ViewModel round-trip tests; theme-persistence test.
 
-**Capture:** save raw JSON responses into `tests/fixtures/` (search, next).
-**Record:** `docs/research/01-extraction-spike.md` — exact client context
-used, what worked, failure modes seen, fixture file list.
+### Stage S5 — Testing + hardening (protect what works)
+- **Objective:** highest-value missing coverage; no test-count theater.
+- Tasks: probe/rot-drill assertions stay meaningful (update fixtures
+  if parsers drift); add resolve-chain regression tests for any wave
+  change; Robolectric back-stack/rotation tests already exist — extend
+  only if S3 finds holes; fix the dark `error/errorContainer` 3.92:1
+  contrast defect (KNOWN_LIMITATIONS, deliberate) with user-visible
+  before/after; dependency audit (pinned versions still current?
+  upgrade one at a time); `THIRD_PARTY.md` + licenses review.
+- **Acceptance:** CI green; contrast gate ≥4.5:1 both schemes or a
+  re-recorded exception; dependency review logged.
+- **Tests:** the stage IS tests + the fixes they force.
 
-**Acceptance criteria:**
-1. Probe prints 10 real search results for "Bohemian Rhapsody".
-2. Audio audibly plays from a resolved URL on a real machine.
-3. `curl -I` on a resolved URL returns 200 with `audio/*` content type.
-4. Related tracks parse for 3 different video IDs.
-5. Both extractor paths (NewPipe, yt-dlp) tested; results recorded.
-6. Fixtures committed.
+### Stage S6 — Release v0.1.0 (gated by S1–S5)
+- **Objective:** earn the tag.
+- Tasks: 30-minute soaks (Android unrestricted-battery + Desktop
+  libVLC) with zero-crash logs; clean-target installs of APK + AAB +
+  MSI; release-signing decisions (Play key? Authenticode? — user call;
+  until decided, artifacts stay test-grade and the release stays
+  DRAFT-private); finalize CHANGELOG (drop DRAFT markers), README,
+  KNOWN_LIMITATIONS, RISK_REGISTER; tag `v0.1.0`; publish GitHub
+  release. Rolling `test` pre-release continues unchanged.
+- **Acceptance (ALL required):** S1 live verdict green · S3 checklists
+  signed · soaks logged · three artifacts clean-installed · user
+  go-ahead. Then and only then: tag + publish.
 
-**Kill switch:** if no path to audible audio exists after the time-box,
-STOP. Write up findings. Decide with the user before anything else.
-
----
-
-### Phase 02 — Provider & Domain Core
-
-**Objective:** Turn the spike into the stable API every layer uses.
-
-**Build:**
-- `shared/core`: entities — `Track, Artist, Album, Playlist, SearchResults,
-  HomeSection, Lyrics(Synced/Unsynced/NotAvailable), StreamInfo,
-  PlayerState, RepeatMode, HistoryEntry`; `DhunResult<T>` sealed
-  (Network, Parse, Unavailable, RateLimited, AuthRequired, Unknown) with
-  `toUserMessage()`.
-- `shared/innertube`: the metadata client from the spike, hardened —
-  Ktor, timeouts, retry w/ exponential backoff on 429/5xx, `DhunResult`
-  mapping, response models + parsers for search (all filters),
-  search suggestions, next/related, YTM lyrics browse.
-- `shared/extraction`: `StreamResolver` interface;
-  `NewPipeStreamResolver` (both targets); `YtDlpStreamResolver`
-  (jvmMain, subprocess, feature-flagged, default off until needed);
-  `ResolvingStreamResolver` = primary with fallback + 403-aware re-resolve.
-- `shared/provider`: `MusicProvider` interface + `YouTubeMusicProvider`
-  implementation gluing innertube + extraction.
-- `shared/player`: `DhunPlayer` interface, `QueueManager` (pure logic:
-  add/remove/reorder/shuffle/repeat/next/prev), `PlayerState` machine.
-
-**Tests:** parsers vs committed fixtures; QueueManager full coverage;
-`ResolvingStreamResolver` 403→re-resolve logic (simulated).
-
-**Acceptance criteria:**
-1. `MusicProvider` complete — zero stubs, every method returns real data.
-2. Parser unit tests green in CI (no network).
-3. Queue logic tests green: 20+ assertions covering shuffle/repeat/edges
-   (empty queue, single track, remove playing track).
-4. No TODOs in `shared/`.
-
----
-
-### Phase 03 — Android App Skeleton + Real Playback
-
-**Objective:** DHUN plays a YouTube Music track on an Android phone with
-background playback and lock screen controls. The app is ugly. It works.
-
-**Build:**
-- `app-android`: single-activity Compose app, Koin wired, dark theme from
-  tokens (temporary minimal tokens).
-- `DhunPlaybackService`: Media3 `MediaSessionService` + ExoPlayer;
-  `AndroidDhunPlayer : DhunPlayer` bridging to Media3 (position polling
-  500ms, state flows).
-- `Media3StreamLoader`: resolves via `StreamResolver`, builds `MediaItem`,
-  **on 403 mid-stream: re-resolve, seek to previous position, resume**
-  (this is the single most important robustness feature — write it now).
-- Audio focus handling (loss→pause, transient→pause, gain→resume-if-was).
-- Test harness screen (clearly marked, deleted in Phase 06): search field,
-  result list, play/pause/next/prev, position bar.
-- Manifest: foregroundServiceType `mediaPlayback`, POST_NOTIFICATIONS
-  runtime request, `WAKE_LOCK`.
-
-**Verify on hardware:** play → lock phone → audio continues → lock screen
-controls work → notification works → app killed ≠ audio killed →
-notification swipe = stop.
-
-**Acceptance criteria:**
-1. Real audio on a real device from YouTube Music.
-2. Lock screen controls functional.
-3. Background playback survives app swipe-away.
-4. 403-recovery verified (test by expiring/resolving a stale URL).
-5. No-network → clean error state, no crash.
+### Explicitly NOT in S1–S6 (v2 backlog — see ROADMAP)
+Web/PWA · Android Auto · Cast · cross-device sync · optional cookie
+sign-in (#60) · EQ beyond S4 · widgets beyond Quick Play · security
+hardening program (#63) · store releases · v1.0 GA · any ADR-007
+implementation (contingency only).
 
 ---
 
-### Phase 04 — Desktop App Skeleton + Real Playback
+## 8. Philip Behavior Rules (code-first, single-agent)
 
-**Objective:** The same core plays a track on the desktop.
-
-**Build:**
-- `app-desktop`: Compose Desktop `Window` (1200×780, min 800×600), Koin.
-- `DesktopDhunPlayer : DhunPlayer` wrapping **vlcj**
-  (`MediaPlayerFactory` + `MediaPlayer`); position polling 500ms;
-  `AudioPlayerComponent` only (no video surface).
-- Reuse the same test-harness screen as Android (shared harness
-  composable in `shared` for now).
-- Window state (size/pos) persisted via `java.util.prefs` behind a
-  `SettingsStore` interface.
-
-**Verify on hardware:** search → play → hear audio → pause/resume →
-seek → next/prev → close window = app exits cleanly, no dangling VLC
-processes (`ps` check).
-
-**Acceptance criteria:**
-1. Real audio on desktop.
-2. All transport controls correct.
-3. VLC process lifecycle clean (no leaks on stop/exit).
-4. Same `DhunPlayer` API drives both platforms — prove it by running the
-   shared harness on both.
-
----
-
-### Phase 05 — Data Layer
-
-**Objective:** Library, favorites, playlists, history, settings — persisted.
-
-**Build:**
-- SQLDelight schema: `Track, Playlist, PlaylistTrack, Favorite, History,
-  Settings, RecentSearch` tables (keyed by YouTube video/playlist IDs;
-  `cachedAt` columns for future caching).
-- Drivers: Android `AndroidSqliteDriver`, JVM `JdbcSqliteDriver`.
-- Repositories behind interfaces: `TrackRepository, LibraryRepository,
-  PlaylistRepository, HistoryRepository, SettingsRepository,
-  SearchRepository` (recent searches). Flows out, suspend in.
-- Use cases: `ToggleFavorite, CreatePlaylist, AddToPlaylist,
-  RemoveFromPlaylist, RecordPlay, GetRecentlyPlayed, GetHistory,
-  UpdateSetting…`
-- Settings keys object (audio quality, theme, accent mode, lyrics prefs,
-  cache size, country code).
-- Wire "now playing" persistence: restore last queue + position on cold
-  start (both platforms).
-
-**Tests:** every repository against in-memory DB; every use case with
-fakes; queue-restore round-trip.
-
-**Acceptance criteria:**
-1. All repo tests green both targets.
-2. Favorite → observe → unfavorite round-trip verified in-app on both
-   platforms.
-3. Queue survives app restart on Android.
+1. **One agent at a time.** Never assume a parallel session will finish,
+   rebase, or review your work. Verify on GitHub, rebase onto current
+   `main` yourself, and leave the tree reviewable by a human.
+2. **Ship running code every work unit.** Docs are written *after* the
+   code they describe, from the code. A unit with beautiful docs and
+   nothing on hardware/CI is a failed unit.
+3. **Current code + current tests + accepted ADRs outrank all plans.**
+   If this prompt contradicts the repo, stop, investigate, and update
+   the prompt — never silently rewrite working code to match paper.
+4. Read MASTER_PROMPT.md, ROADMAP.md (CURRENT ACTIVE TASK first), and
+   the relevant verification log before starting work.
+5. Tests after implementation, before commit. No test that tests
+   nothing. Mutation-prove CI steps that must execute (precedent: PRs
+   #68/#71).
+6. Update ROADMAP.md status and KNOWN_LIMITATIONS.md every session.
+7. Commit small and meaningful. Never big-bang. Never merge until the
+   user says so; never force-push; never rewrite history.
+8. No stubs, no TODO-left-in-production, no "compiles = done."
+9. If reality invalidates a locked decision, stop, write the ADR, get
+   the user's OK, then proceed. Silent divergence is forbidden.
+10. When a step exceeds ~30 minutes without visible progress, split it
+    or report back. Silent grinding is forbidden.
+11. **Do not touch extraction/probe/rot-drill semantics** without
+    checking §2's contingency triggers — and never implement ADR-007
+    without the user's explicit go-ahead.
+12. Skippable is not allowed; pretending is less allowed.
 
 ---
 
-### Phase 06 — Design System (living, in code)
+## 9. Source-of-truth hierarchy (set by the 2026-09-16 re-baseline)
 
-**Objective:** The DHUN look, as real components — not a spec document.
+1. Current source code on `main`
+2. Current tests + CI verdicts (on GitHub, not local claims)
+3. Accepted ADRs (`docs/decisions/`, statuses as filed)
+4. This master prompt (v3)
+5. `.ai/ROADMAP.md` (live status + S1–S6 plan)
+6. Historical research (incl. open PR #54 — reference, not backlog)
+7. Old plans (v2 text in git history, PROMPT_SEQUENCE, PROBLEMS_AND_FIXES)
 
-**Build — `shared/design/`:**
-- Tokens: `DhunColors` (surfaces `#0A0A0A…#2A2A2A`, glass 60% `#99111111`,
-  border 10% white, text 4-step alpha, accent `#BB86FC` static fallback),
-  `DhunTypography` (Material-3-compatible scale), `DhunSpacing`,
-  `DhunShapes`, `DhunAnimations` (150/300/500ms + spring spec).
-- `GlassCard`: **real blur** — `Modifier.blur()`/`RenderEffect` where the
-  platform supports it (Android 12+/desktop skiko), graceful fallback to
-  scrim+translucency below, flagged in KNOWN_LIMITATIONS.md per platform.
-- `ArtworkImage` (Coil 3): crossfade, pulsing placeholder, error gradient.
-- `ArtworkColorExtractor`: palette from artwork bitmap →
-  `ArtworkColors(primary, onPrimary, container, backgroundTint)`.
-- Components: `TrackRow, TrackCard, ArtistCard, AlbumCard, PlaylistCard,
-  SectionHeader, DhunButton, DhunIconButton, LoadingShimmer, ErrorView,
-  EmptyView, Chip` — each with normal/pressed/disabled/loading states.
-- `ComponentCatalogScreen` (debug builds only) rendering every state.
-
-**Verify:** catalogue screen on Android + Desktop over a colorful artwork
-background; blur visibly real; extracted-colors test screen.
-
-**Acceptance criteria:**
-1. Glass blur visibly real over artwork (screenshot in
-   `docs/verification/06-design.md`).
-2. No raw hex/px values outside `shared/design/`.
-3. All states present in catalogue.
-4. Artwork color extraction returns sane palettes for 5 artworks.
+If documentation contradicts code: investigate first. Never implement
+documentation that contradicts verified current behavior.
 
 ---
 
-### Phase 07 — Home & Search
-
-**Objective:** The two screens that prove the app is real.
-
-**Build:**
-- Shared `HomeScreen` + `HomeViewModel`: time-of-day greeting, quick picks
-  (6 tracks, 3×2), sections from InnerTube home/browse parsing
-  ("Listen again" from history + YTM sections), shimmer skeletons,
-  error/empty/retry states, pull-to-refresh (Android).
-- Shared `SearchScreen` + `SearchViewModel`: debounced suggestions
-  (300ms), filter chips (songs/artists/albums/playlists), results with
-  per-type rows, infinite scroll via continuation, recent searches
-  (persisted, clearable), track overflow menu (play next / add to queue /
-  add to playlist / go to artist-album — all functional).
-- Track tap → plays with the full result set as queue context.
-
-**Verify on hardware, both platforms:** real data end-to-end.
-
-**Acceptance criteria:**
-1. Home renders real YTM content on Android + Desktop.
-2. Search: type → suggestions ≤300ms after pause → results per filter →
-   infinite scroll.
-3. Every overflow action works.
-4. Loading skeleton (not spinner), error, and empty states all observed.
-
----
-
-### Phase 08 — Player UI (the showstopper)
-
-**Objective:** MiniPlayer + FullPlayer at ViMusic quality.
-
-**Build:**
-- `MiniPlayer` (shared): 72dp glass bar above bottom nav (Android) /
-  docked bottom (desktop); artwork, title marquee, artist, play/pause,
-  next, 1dp accent progress line; tap/swipe-up opens FullPlayer
-  (animated); swipe-to-skip optional.
-- `FullPlayer` (shared): full-bleed **blurred artwork background + dark
-  scrim**, color crossfade on track change (500ms); large artwork w/
-  shadow, scale animation playing-vs-paused (spring); custom progress
-  bar (4dp→8dp on drag, thumb on touch only); prev/next (hold-to-seek),
-  animated play/pause morph; shuffle + repeat(cycle 3); volume slider
-  (desktop); bottom tabs: **Lyrics | Queue | Related** (Related wired to
-  `/next` parsing from Phase 02 — radio/queue works now).
-- Queue tab: reorder (drag), remove (swipe), tap-to-jump; current track
-  highlighted with equalizer animation.
-- Track-change choreography: artwork slide in skip direction + fade,
-  background color crossfade, title fade-update-fade.
-- Android: edge-to-edge insets correct; back from FullPlayer collapses
-  (never exits app).
-
-**Verify on hardware:** every acceptance item in
-`docs/verification/08-player.md` with screenshots.
-
-**Acceptance criteria:**
-1. Background is real blurred artwork (not a color).
-2. All 16 visual/interaction checks from the verification doc pass.
-3. Rapid skip-stress (10 fast nexts) — no state inconsistency, no crash.
-4. Both platforms.
-
----
-
-### Phase 09 — Artist, Album, Playlist Pages
-
-**Objective:** Browse the catalog properly.
-
-**Build:**
-- InnerTube browse parsers: artist (`MUSIC_PAGE_TYPE_ARTIST` browseIds),
-  album (`MPRE`…), playlist (`VL`…) — fixtures captured for tests.
-- `ArtistScreen`: parallax header, collapse-on-scroll with glass toolbar,
-  shuffle/radio (radio = `/next` radio playlist), top songs, albums,
-  singles, related artists, about.
-- `AlbumScreen`: artwork header, play/shuffle, ordered track list,
-  "more by artist".
-- `PlaylistScreen`: YTM playlists (play, add-to-library mirror) + local
-  playlists (rename, reorder via drag, remove tracks, delete).
-- Wire every navigation path from Home/Search/Player into these pages.
-
-**Acceptance criteria:**
-1. Artist page for 3 artists: all sections correct.
-2. Album track order correct for 3 albums.
-3. Local playlist CRUD + reorder verified.
-4. Parser tests against fixtures green.
-
----
-
-### Phase 10 — Library & History Screens
-
-**Objective:** The user's own space.
-
-**Build:**
-- Library: tabs Playlists / Favorites / History (+ Albums/Artists saved
-  when data layer supports — otherwise listed in KNOWN_LIMITATIONS).
-- Favorites list (tap plays favorites as queue, swipe to remove).
-- History grouped by day with relative times; long-press remove; clear
-  all with confirmation.
-- Play-played-context recording (search/home/artist/album/playlist/radio)
-  via `RecordPlay` use case from Phase 05, wired into player.
-
-**Acceptance criteria:**
-1. Favorites round-trip in UI.
-2. History grouping/timestamps correct; clear works.
-3. Empty states for all tabs.
-
----
-
-### Phase 11 — Lyrics
-
-**Objective:** Synced lyrics that scroll with the music.
-
-**Build:**
-- `shared/lyrics`: `LyricsSource` interface; `LrcLibSource`
-  (title+artist+duration match, synced LRC); `YouTubeLyricsSource`
-  (InnerTube browse lyrics); `LyricsRepository` = cache → YTM → LRCLIB →
-  NotAvailable; `LrcParser` ([mm:ss.xx] + enhanced word timing tolerated).
-- Lyrics tab in FullPlayer: active line large/bright/centered, others
-  dim/smaller; smooth auto-scroll; tap line = seek; on seek, jump to
-  line; unsynced = scrollable text; empty state.
-- Lyrics persisted cache (Phase 05 DB).
-
-**Acceptance criteria:**
-1. Synced lyrics track audio on 5 diverse tracks.
-2. Tap-to-seek correct within ±1s.
-3. LRCLIB fallback verified on tracks absent from YTM lyrics.
-4. Second open = instant (cache hit).
-5. Parser unit tests green.
-
----
-
-### Phase 12 — Desktop Native Integrations
-
-**Objective:** The desktop app feels native. With honest fallbacks.
-
-**Build (spike-ordered):**
-1. **SMTC spike (time-boxed 3 days):** Windows System Media Transport
-   Controls via JNA/WinRT — now-playing tile, artwork, media keys.
-   If stable → integrate. If not → fallback: tray-based controls +
-   focused-window media keys, **documented in KNOWN_LIMITATIONS.md**.
-2. System tray: icon (playing/paused variants), menu
-   (track title / play-pause / next / prev / open / quit).
-3. Mini-player window: ~~320×88 always-on-top second window; artwork,
-   title, transport, progress; draggable; click opens main window.~~
-   **REMOVED 2026-09-06 — ADR-004 (user decision): the Phase 08 docked
-   in-app MiniPlayer is the product mini-player; do not re-add a second
-   window.**
-4. Keyboard shortcuts: Space, ←/→ seek 5s, Ctrl+←/→ prev/next,
-   Ctrl+F search, Ctrl+Q quit. (Ctrl+M mini-player removed with the
-   mini-player window — ADR-004.)
-5. Close-to-tray setting (default on), remembered window state.
-6. Packaging: `jpackage` (.msi via `createDistributable`/
-   `packageMsi`) with app icon; test install on a clean Windows VM/user.
-
-**Acceptance criteria:**
-1. Media keys control playback (SMTC or documented fallback).
-2. Tray fully functional; close-to-tray ≠ quit; quit from tray exits
-   clean (no zombie processes).
-3. Mini-player mirrors state live.
-4. Installer installs and runs on a clean machine.
-
----
-
-### Phase 13 — Android Native Polish
-
-**Objective:** Android feels native and survives real-world use.
-
-**Build:**
-- Edge-to-edge audit with `WindowInsets` on every screen; gesture-nav
-  compatibility (no edge-swipe conflicts in player/queue).
-- App shortcuts (long-press): Search, Resume, Library.
-- Battery-optimization exemption prompt with rationale (standard for
-  media apps), documented in first-run.
-- Robolectric/UI tests: rotation state survival, back-stack behavior,
-  notification permission flow.
-- Tablet/large-screen layout: bottom nav → navigation rail at width
-  ≥ 840dp; two-pane player where space allows.
-
-**Acceptance criteria:**
-1. Rotation: no state loss, no crash.
-2. Back stack per spec (tabs exit, pages pop, player collapses).
-3. Shortcuts work.
-4. Background playback with battery optimization unrestricted: 30-min
-   soak, no kill, no leak (LeakCanary clean).
-
----
-
-### Phase 14 — Robustness, Rot-Drill, Release v0.1.0
-
-**Objective:** Earn the right to exist past first contact with reality.
-
-**Build:**
-- **Error taxonomy sweep:** every network/db/playback path returns typed
-  errors → user-facing messages (human, actionable); offline banner;
-  429 global backoff; 403-during-playback auto-recovery (from Phase 03,
-  now UX-visible).
-- **Audio cache (simple, bounded):** played audio segments cached LRU
-  (default 1GB, user-settable), replay of cached tracks works offline;
-  stream-URL cache with TTL + 403 invalidation.
-- **Rot drill CI:** `.github/workflows/rot-drill.yml` — daily cron runs
-  the Phase 01 probe suite (search → resolve → HTTP-200 check) against
-  live YouTube; failure opens an issue automatically.
-- **30-minute soak test** on Android + Desktop: normal use, zero crashes
-  (required to pass).
-- Release: version 0.1.0, signed debug-keystore APK + AAB, `jpackage`
-  installers, CHANGELOG.md, README finalized (build instructions that
-  actually work + the maintenance contract), THIRD_PARTY.md, RISK_REGISTER
-  reviewed, git tag `v0.1.0`, GitHub release with artifacts.
-
-**Acceptance criteria:**
-1. Rot drill green and scheduled.
-2. 30-min soak passed on both platforms (logged in
-   `docs/verification/14-release.md`).
-3. All three artifacts built and install/run on clean targets.
-4. KNOWN_LIMITATIONS.md current and honest (Web absence, SMTC status,
-   blur floor, anything else).
-
----
-
-## Deferred (v2 candidates — NOT designed, NOT stubbed)
-
-Web/PWA · Android Auto · Cast · equalizer · cross-device sync · account
-sign-in (optional cookies; unlock age/region restrictions + personal
-playlists — treat as experimental if ever built) · downloads beyond cache ·
-widgets · jump lists · themes beyond dark-first.
-
----
-
-## RISK_REGISTER.md — required content (created Phase 01, kept current)
+## 10. RISK_REGISTER — standing content (mirror; canonical file is `.ai/RISK_REGISTER.md`)
 
 | Risk | Likelihood | Trigger | Response |
 |---|---|---|---|
-| NewPipe Extractor breaks (PO/SABR change) | High, recurring | rot-drill red | Pin last-good; adopt upstream patch; ship patch release ≤72h |
-| Upstream fix slow (>14 days) | Medium | rot-drill red 14 days | Enable yt-dlp fallback path (desktop); document Android impact; user decision on pivot |
-| SMTC via JNA unstable | Medium | Phase 12 spike | Ship documented fallback (tray + media keys) |
-| Blur unavailable (old Android) | Certain <API31 | Phase 06 | Scrim+translucency fallback; note in limitations |
-| Ktor/Coil/Compose MP regression | Low | CI | Pin versions; upgrade deliberately, one at a time |
-
----
-
-## AI Behavior Rules (code-first)
-
-1. **Ship running code every phase.** Docs are written *after* the code
-   they describe, from the code. A phase with beautiful docs and nothing
-   on hardware is a failed phase — that is exactly how the last attempt
-   died.
-2. Read MASTER_PROMPT.md, PROBLEMS_AND_FIXES.md, ROADMAP.md, and the
-   previous phase's verification log before starting a phase.
-3. Verify on real hardware. Record evidence (screenshots/logs) in
-   `docs/verification/`.
-4. Tests after implementation, before commit. No test that tests nothing.
-5. Update ROADMAP.md status and KNOWN_LIMITATIONS.md every phase.
-6. Commit small and meaningful. Never "big bang" commits.
-7. No stubs, no TODO-left-in-production, no "compiles = done."
-8. If reality invalidates a locked decision, stop, write the ADR, get the
-   user's OK, then proceed. Silent divergence is forbidden.
-9. When a step exceeds ~30 minutes of wall-clock effort without visible
-   progress, split it or report back. Silent grinding is forbidden.
-10. Skippable is not allowed; pretending is less allowed.
-
----
-
-## Phase Dependency Map
-
-```
-01 ─ 02 ─ 03 ─┬─ 06 ─ 07 ─ 08 ─ 09 ─ 10 ─ 11 ─┐
-              └─ 04 ────────────────┬─────────┼─ 14
-                    05 ────────────┘  12 · 13 ┘
-```
-(01→02→{03,04,05 in either order}→06→07→08→09→10→11 and {12,13} any time
-after their platform base — 14 last.)
+| Own-client chain gated or broken (visitorData/sts/identity rot) | High, recurring | rot drill red / residential failures | Client bump → wave maintenance → patch release ≤72h; T2 → consider ADR-007 |
+| Rot drill not running (OPEN since 2026-09-07) | **Happening now** | S1 | Restore schedule; human dispatch + Actions-settings check |
+| NewPipe upstream recovery missed | Medium | drill watch line | Re-enter as implementation option per ADR-001 |
+| Upstream fix slow (>14 days, all engines) | Medium | drill red 14 days | Kill-switch: stop-and-decide with the user |
+| SMTC via JNA unstable | Medium | S3 hardware | Ship documented fallback (tray + media keys) |
+| Blur unavailable (Android <31) | Certain | shipped | Dark fallback (PR #70); pre-blurred bitmap is a v2 idea |
+| Ktor/Coil/Compose MP regression | Low | CI | Pin versions; upgrade one at a time |
+| GPL compliance drift | Low | S5 review | THIRD_PARTY.md per release; no incompatible deps |
