@@ -1,5 +1,44 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-16 (UTC)** · session **`arena/01a0aa7a-dhun`** — **PR #70: Android <12 backdrop guard unified across FullPlayer and NowPlayingBackdrop** · base = **`e93d5f4`** = **PR #69 MERGED**.
+
+**Current state & active scope:**
+1. Unified platform blur guard across `NowPlayingBackdrop.kt` and `FullPlayer.kt` (`PlayerBackdrop` + `LyricsCard`).
+2. On Android below API 31 (where Compose's `Modifier.blur` is a RenderEffect no-op), unblurred sharp album art is suppressed, ensuring screens fall back cleanly to the dark background and ambient scrim as designed in ADR-002 / `docs/verification/08-player.md`.
+3. Pinned policy with unit tests in `NowPlayingBackdropPolicyTest` and `PlayerSheetLayoutTest`.
+
+**Files currently under work:**
+- `shared/src/commonMain/kotlin/dev/dhun/design/BlurSupport.kt`
+- `shared/src/commonMain/kotlin/dev/dhun/design/components/NowPlayingBackdrop.kt`
+- `shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt`
+- `shared/src/jvmTest/kotlin/dev/dhun/design/NowPlayingBackdropPolicyTest.kt`
+- `shared/src/jvmTest/kotlin/dev/dhun/ui/player/PlayerSheetLayoutTest.kt`
+- `CHANGELOG.md`
+- `.ai/KNOWN_LIMITATIONS.md`
+- this file.
+
+**Last actual error:** "none" on `main` / `arena/01a0aa7a-dhun`.
+
+**Verification status:**
+- **Local:** `python3 -m unittest discover -s scripts -p 'test_*.py'` = 27 OK.
+- **CI-verified:** PR #70 head commit `8167272` verified 100% green:
+  - `build-and-test` (CI run 35106060769) pass in 5m16s (all 10 steps passed including `:shared:jvmTest`, `:app-android:testDebugUnitTest`, `:app-android:assembleDebug`, probe compile, desktop compile).
+  - `build` (Build APK run 35106060727) pass in 2m41s.
+  - `apk` & `msi` (test-release run 35106060559) pass in 2m35s & 6m34s.
+- **Artifact checksums:**
+  - `dhun-test.apk` SHA-256: `fb3459c12e961095702c3c951154a0fc1971d52d375de9cab9d204d2be63d2cb`
+  - `dhun-test.msi` SHA-256: `9b8ac8d6f02c439d8970e4da39bf8290c89c1c23ec9b041590e4c1fafe00723d`
+- **Merged:** Base `e93d5f4` merged to `main`.
+- **Released:** Rolling `test` pre-release updated.
+- **Hardware-verified:** None claimed; on-device visual appearance on physical Android 8–11 devices remains an open hardware gate.
+
+**Exact next technical step & blockers:** Await user review and explicit merge instruction for PR #70 (`gh pr merge 70 --merge`). Do NOT merge until instructed. Blockers: none.
+
+---
+
+<details>
+<summary><b>Prior snapshot (`arena/01a0aa5e-dhun` — PR #69 mouse-rail fling + named CI step; MERGED as `e93d5f4`)</b></summary>
+
 Updated **2026-09-16 (UTC)** · session **`arena/01a0aa5e-dhun`** — **PR #68 follow-ups: mouse-rail fling + named Android unit-test CI step** (shared `commonMain` + `.github/workflows/ci.yml`) · base = **`e8f8634`** = **PR #68 MERGED**.
 
 **What this branch changes:** the two follow-ups #68 listed and did not ship — no extraction, playback-engine, PO-token or ADR-007 change.

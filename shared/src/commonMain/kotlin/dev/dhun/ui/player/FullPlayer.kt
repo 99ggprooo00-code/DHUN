@@ -118,6 +118,7 @@ import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.fittedPlayerArtworkSize
 import dev.dhun.design.fullPlayerLayoutMode
 import dev.dhun.design.playerWideControlsWidth
+import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.design.usesCompactPlayerControls
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.player.SkipDirection
@@ -1439,6 +1440,14 @@ private fun LyricsCardOverlay(
 }
 
 /**
+ * Decision whether to render the full-screen blurred backdrop layer.
+ * A null/blank URL or a platform that cannot really blur returns false so the
+ * screen falls back to the clean dark surface rather than a sharp stretched cover.
+ */
+internal fun shouldRenderPlayerBackdrop(artworkUrl: String?, supportsBlur: Boolean): Boolean =
+    !artworkUrl.isNullOrBlank() && supportsBlur
+
+/**
  * Blurred-artwork bleed (ADR-002 P4). [ArtworkBackdrop] mounts this inside
  * `key(BlurredArtworkCache.keyFor(...))`, so every track change starts one
  * fresh layer and nothing else recomposes it — the blur radius animates in
@@ -1452,6 +1461,8 @@ private fun PlayerBackdrop(
     artworkUrl: String?,
     cacheKey: String,
 ) {
+    if (!shouldRenderPlayerBackdrop(artworkUrl, supportsRealtimeBlur)) return
+
     var prepared by remember {
         mutableStateOf(cacheKey.isNotBlank() && BlurredArtworkCache.isPrepared(cacheKey))
     }
@@ -1512,16 +1523,20 @@ private fun LyricsCard(
     ) {
         // Blurred artwork inside the card — keyed like the backdrop so the
         // blur is prepared once per track, never per frame.
+        // On platforms without realtime blur (Android < API 31), skip the
+        // unblurred artwork so text stays legible over the clean scrim.
         key(cacheKey) {
-            ArtworkImage(
-                imageUrl = artworkUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(DhunSpacing.glassBlur * 2),
-                shape = RectangleShape,
-                contentScale = ContentScale.Crop,
-            )
+            if (shouldRenderPlayerBackdrop(artworkUrl, supportsRealtimeBlur)) {
+                ArtworkImage(
+                    imageUrl = artworkUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(DhunSpacing.glassBlur * 2),
+                    shape = RectangleShape,
+                    contentScale = ContentScale.Crop,
+                )
+            }
         }
         // Readability scrim behind the lyric lines — adaptive: near-black in
         // dark, a light wash in light so the dark lyric text keeps contrast.

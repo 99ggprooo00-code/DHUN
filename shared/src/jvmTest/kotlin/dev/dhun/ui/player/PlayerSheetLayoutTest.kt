@@ -614,6 +614,16 @@ class PlayerSheetLayoutTest {
         assertTrue(lowerBand.first() > 0f, "the darkening must start above the very bottom edge")
     }
 
+    @Test
+    fun playerBackdropPolicySuppressesSharpArtworkWhenBlurIsUnsupported() {
+        // Platforms without RenderEffect (Android < API 31) fall back to the clean dark surface.
+        assertTrue(shouldRenderPlayerBackdrop("https://example.com/art.jpg", supportsBlur = true))
+        assertFalse(shouldRenderPlayerBackdrop("https://example.com/art.jpg", supportsBlur = false))
+        assertFalse(shouldRenderPlayerBackdrop(null, supportsBlur = true))
+        assertFalse(shouldRenderPlayerBackdrop("", supportsBlur = true))
+        assertFalse(shouldRenderPlayerBackdrop("   ", supportsBlur = true))
+    }
+
     /* -------- queue rows ------------------------------------------------- */
 
     @Test

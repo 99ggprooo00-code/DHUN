@@ -77,4 +77,15 @@ class NowPlayingBackdropPolicyTest {
         assertTrue(NowPlayingBackdropPolicy.BLUR_SCALE >= 3, "a background must be heavily blurred")
         assertTrue(NowPlayingBackdropPolicy.OVERSCAN > 1f, "the blur rim must never be visible")
     }
+
+    @Test
+    fun backdropIsSuppressedWhenBlurIsNotSupportedOrUrlIsBlank() {
+        // Android <12 (API <31) lacks RenderEffect blur, so sharp artwork is suppressed.
+        val validUrl = "https://lh3.googleusercontent.com/abc=w60-h60"
+        assertTrue(NowPlayingBackdropPolicy.shouldRenderBackdrop(validUrl, supportsBlur = true))
+        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop(validUrl, supportsBlur = false))
+        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop(null, supportsBlur = true))
+        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop("", supportsBlur = true))
+        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop("   ", supportsBlur = true))
+    }
 }
