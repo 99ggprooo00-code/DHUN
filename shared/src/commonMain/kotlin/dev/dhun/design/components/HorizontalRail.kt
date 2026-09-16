@@ -289,7 +289,7 @@ object RailScrollbarGeometry {
      * Narrowest thumb, as a fraction of the track. A rail with a hundred items
      * would otherwise get a 3px sliver that is impossible to grab.
      */
-    const val MIN_THUMB_FRACTION = 0.05f
+    const val MIN_THUMB_FRACTION = 0.18f
 
     /**
      * Thumb geometry, or `null` when the rail does not overflow (nothing to
