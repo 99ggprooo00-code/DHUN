@@ -29,6 +29,13 @@ jobs:
       - name: "Unit tests — shared domain (queue, parsers, resolvers)"
         run: ./gradlew :shared:jvmTest --no-daemon
 
+      # Named explicitly so a red Android suite cannot hide behind the
+      # assembleDebug coupling (app-android/build.gradle.kts). That
+      # dependsOn stays: packaging jobs (test-release / Build APK) still
+      # invoke only assembleDebug, and must keep failing on a red test.
+      - name: "Unit tests — Android (Robolectric)"
+        run: ./gradlew :app-android:testDebugUnitTest --no-daemon
+
       - name: Android debug build
         run: ./gradlew :app-android:assembleDebug --no-daemon
 
