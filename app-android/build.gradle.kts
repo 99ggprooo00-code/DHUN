@@ -112,17 +112,15 @@ dependencies {
 }
 
 // ---------------------------------------------------------------------------
-// CI EXECUTION COUPLING — remove this block once a workflow runs
-// `:app-android:testDebugUnitTest` explicitly.
+// PACKAGING EXECUTION COUPLING — keep this block.
 //
-// WHY: every existing CI Android path (ci.yml "Android debug build" and
-// test-release.yml "Build debug APK") invokes ONLY :app-android:assembleDebug.
-// Before this module had tests that was harmless; with a test suite it means
-// broken/failing unit tests would ship silently, because assemble is a
-// compile gate, not a test gate. The session that added the scaffold could
-// not edit .github/workflows (frozen scope), so the minimal app-android-only
-// way to make CI actually EXECUTE the suite on every PR and release build is
-// this dependency. It adds no task to the APK itself.
+// ci.yml now names `:app-android:testDebugUnitTest` as its own step (session
+// arena/01a0aa5e-dhun), so a red Android suite fails a step called "Unit
+// tests — Android" instead of masquerading as a compile error. test-release.yml
+// and build-apk.yml still invoke ONLY assembleDebug; without this dependsOn a
+// red suite would still produce a downloadable APK. The extra CI cost is
+// UP-TO-DATE: the named test step runs first, assembleDebug then finds the
+// suite already executed in the same workspace.
 // ---------------------------------------------------------------------------
 // HOW (lazy wiring): AGP creates assembleDebug AFTER the script body is
 // evaluated — an eager tasks.named("assembleDebug") throws

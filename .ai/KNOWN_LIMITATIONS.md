@@ -2,6 +2,27 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 (later) — mouse-rail fling + named Android unit-test CI step (`arena/01a0aa5e-dhun`)
+
+Follow-ups listed by PR #68, not a new product surface. What is **not**
+established:
+
+- **Fling feel is unproven on hardware.** The decay is `exponentialDecay`
+  (density-free, commonMain) rather than the framework's spline fling, which
+  still belongs to touch. A Windows mouse user is the gate; CI cannot see a
+  frame. A cancelled drag does not coast, by construction.
+- **The assembleDebug ↔ testDebugUnitTest coupling is still there on
+  purpose.** `ci.yml` now *names* `:app-android:testDebugUnitTest`, which was
+  the actual gap. `test-release.yml` and `build-apk.yml` still invoke only
+  assembleDebug, so removing the `dependsOn` would let a red suite produce a
+  downloadable APK. The extra CI cost should be UP-TO-DATE after the named
+  step; if it ever re-runs the whole Robolectric suite, that is waste, not a
+  silent skip.
+- **Android <12 pre-blurred backdrop is still a decision, not a patch.** Same
+  as #68: `Modifier.blur` is a no-op below API 31, so those devices keep the
+  old background.
+- **Still no local build.** No JDK; Maven/Gradle/dl.google.com egress-blocked.
+
 ## 2026-09-16 — Phase 16 UI/platform slice: CI is green and mutation-proven, but nothing here was seen on a device (`arena/01a0a9c4-dhun`, PR #68)
 
 Three user-reported defects fixed (now-playing blurred backdrop on
@@ -27,9 +48,9 @@ checks:
   extent, so `lazyRailMetrics` reconstructs it from the mean measured item size
   plus the layout's spacing and content padding: exact for the uniform card
   rails this ships on, approximate for a mixed-content rail.
-- **No fling after a mouse drag.** A mouse-dragged rail stops when the pointer
-  stops; touch keeps the framework's own fling. Deliberate, and recorded so it
-  is not rediscovered as a bug.
+- **No fling after a mouse drag.** Superseded by `arena/01a0aa5e-dhun` (see
+  the 2026-09-16 later entry): mouse release now decays leftover velocity.
+  Touch still uses the framework fling. Hardware feel remains unproven.
 - **Corrected environment fact (this contradicts what PR #68's first summary
   said, and refines the "CI proves compile + unit only" line below):**
   `:app-android:assembleDebug` **executes** the app-android unit suite, it does
@@ -41,9 +62,10 @@ checks:
   0.18f→0.05f) red-flagged `HorizontalRailTest.thumbFractionIsFlooredSoItStays
   Grabable(:49)` the same way, so the green `:shared:jvmTest` runs are known to
   execute the new tests rather than merely compile them. Both mutations are
-  reverted on the branch. Still true and still a gap: no workflow names
-  `:app-android:testDebugUnitTest`, so that coupling is implicit — if AGP stops
-  wiring it, the suite silently stops running.
+  reverted on the branch. **The named-step gap is closed on
+  `arena/01a0aa5e-dhun`:** `ci.yml` now runs `:app-android:testDebugUnitTest`
+  as its own step. The assembleDebug coupling remains for packaging jobs
+  (see the 2026-09-16 later entry).
 - **Still no local build.** No JDK, and Maven/Gradle/dl.google.com remain
   egress-blocked (`curl` → `000`); `gh` reaches api.github.com, which is how the
   framework sources and the check-run annotations above were read. CI is the only

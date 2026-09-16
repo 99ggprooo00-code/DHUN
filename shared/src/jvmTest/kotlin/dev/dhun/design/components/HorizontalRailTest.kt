@@ -91,4 +91,49 @@ class HorizontalRailTest {
         assertEquals(0f, RailScrollbarGeometry.scrollDeltaFor(50f, 4000f, 0f), 0.0001f)
         assertEquals(0f, RailScrollbarGeometry.scrollDeltaFor(Float.NaN, 4000f, 900f), 0.0001f)
     }
+
+    @Test
+    fun aSlowMouseReleaseDoesNotFling() {
+        // Below the platform minimum the rail must stop dead — a click-drag
+        // that already ended on the pointer-up frame is not a fling.
+        val min = MouseRailFling.MIN_FLING_VELOCITY_PX_PER_SEC
+        assertTrue(!MouseRailFling.shouldFling(velocityPxPerSec = min - 10f, minimumFlingVelocity = min))
+        assertTrue(!MouseRailFling.shouldFling(velocityPxPerSec = -(min - 10f), minimumFlingVelocity = min))
+        assertTrue(!MouseRailFling.shouldFling(velocityPxPerSec = 0f, minimumFlingVelocity = min))
+    }
+
+    @Test
+    fun aFastMouseReleaseDoesFlingInEitherDirection() {
+        assertTrue(MouseRailFling.shouldFling(velocityPxPerSec = 800f, minimumFlingVelocity = 50f))
+        assertTrue(MouseRailFling.shouldFling(velocityPxPerSec = -800f, minimumFlingVelocity = 50f))
+        // Exactly at the floor still counts — otherwise a just-fast-enough
+        // flick dies on a rounding edge.
+        assertTrue(MouseRailFling.shouldFling(velocityPxPerSec = 50f, minimumFlingVelocity = 50f))
+    }
+
+    @Test
+    fun garbageVelocitiesNeverFling() {
+        assertTrue(!MouseRailFling.shouldFling(Float.NaN, 50f))
+        assertTrue(!MouseRailFling.shouldFling(800f, Float.NaN))
+        assertTrue(!MouseRailFling.shouldFling(Float.POSITIVE_INFINITY, 50f))
+        assertTrue(!MouseRailFling.shouldFling(800f, -1f))
+    }
+
+    @Test
+    fun contentCoastsTheWayThePointerWasMoving() {
+        // Pointer right → content left, matching every drag delta in
+        // dhunMouseDragScroll (`dispatchRawDelta(-dx)`).
+        assertEquals(-800f, MouseRailFling.contentVelocityFromPointer(800f), 0.0001f)
+        assertEquals(800f, MouseRailFling.contentVelocityFromPointer(-800f), 0.0001f)
+        assertEquals(0f, MouseRailFling.contentVelocityFromPointer(0f), 0.0001f)
+    }
+
+    @Test
+    fun decayStopsWhenTheRailCannotSwallowTheFrame() {
+        assertTrue(MouseRailFling.shouldStopDecay(requestedDelta = 24f, consumedDelta = 0f))
+        assertTrue(MouseRailFling.shouldStopDecay(requestedDelta = -24f, consumedDelta = -0.1f))
+        assertTrue(!MouseRailFling.shouldStopDecay(requestedDelta = 24f, consumedDelta = 24f))
+        assertTrue(!MouseRailFling.shouldStopDecay(requestedDelta = 24f, consumedDelta = 23.8f))
+        assertTrue(MouseRailFling.shouldStopDecay(Float.NaN, 24f))
+    }
 }

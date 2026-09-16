@@ -1,5 +1,26 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-16 (UTC)** · session **`arena/01a0aa5e-dhun`** — **PR #68 follow-ups: mouse-rail fling + named Android unit-test CI step** (shared `commonMain` + `.github/workflows/ci.yml`) · base = **`e8f8634`** = **PR #68 MERGED**.
+
+**What this branch changes:** the two follow-ups #68 listed and did not ship — no extraction, playback-engine, PO-token or ADR-007 change.
+
+1. **Mouse-rail fling.** `#68` made hold-and-slide work, then stopped dead on pointer-up (Compose 1.8.2 `PointerInputScope` is not a `CoroutineScope`, so a `launch` inside the gesture would not compile). `dhunMouseDragScroll` now takes a `rememberCoroutineScope` via `Modifier.composed`, tracks pointer velocity, and on a completed mouse drag above `viewConfiguration.minimumFlingVelocity` decays the remaining velocity (`MouseRailFling` + `exponentialDecay`). Sign matches the drag path (`dispatchRawDelta(-dx)`). Touch/pen still use the framework fling; a cancelled drag does not coast; hitting the end of the rail cancels the decay. Wheel stays vertical. Trackpad native path untouched.
+2. **Named Android unit-test CI step.** `ci.yml` now runs `./gradlew :app-android:testDebugUnitTest` as **"Unit tests — Android (Robolectric)"** *before* `assembleDebug`. A red suite fails a step with that name instead of masquerading as a compile error. The `assembleDebug dependsOn testDebugUnitTest` coupling in `app-android/build.gradle.kts` **stays** so `test-release.yml` / `build-apk.yml` (which still invoke only assembleDebug) cannot publish a red suite. `scripts/test_ci_workflow.py` pins the named step and its order.
+
+**Files:** `shared/…/design/components/HorizontalRail.kt` · `shared/…/jvmTest/…/HorizontalRailTest.kt` · `.github/workflows/ci.yml` · `app-android/build.gradle.kts` (comment only) · `scripts/test_ci_workflow.py` (new) · `CHANGELOG.md` · `.ai/KNOWN_LIMITATIONS.md` · this file.
+
+**Last error / CI:** first CI on PR #69 red — `HorizontalRail.kt:217 Unresolved reference 'minimumFlingVelocity'` (runs `35102094935` / `35102094887`). Floor pinned to `MouseRailFling.MIN_FLING_VELOCITY_PX_PER_SEC = 50f`. Re-push `388892e` **green**: `build-and-test` `35102704452` (8m21s), `build` `35102704449`, `apk`/`msi` `35102704481`. Local Gradle still impossible. `python3 -m unittest discover -s scripts -p 'test_*.py'` = **27 OK**. Do not merge until asked. Hardware fling feel unclaimed.
+
+**Exact next step:** push this branch → open **one** session PR → require `build-and-test` + `apk` + `msi` green on the head. Then the user's hardware gate for #68 (backdrop / BACK / rails) **plus** a mouse flick on a rail. Do **not** merge until asked. ADR-007 (#54) and #53 (do-not-merge ROADMAP wipe) are unchanged.
+
+**Explicitly NOT claimed:** on-device feel of the fling, Windows trackpad vs mouse, Android <12 pre-blurred backdrop (still a decision, not this slice), audible playback, rot-drill schedule. `docs/verification/` has no line for this follow-up.
+
+---
+
+<details>
+<summary><b>Prior snapshot (`arena/01a0a9c4-dhun` — PR #68 backdrop / tab BACK / rails; MERGED as `e8f8634`)</b></summary>
+
+
 Updated **2026-09-16 (UTC)** · session **`arena/01a0a9c4-dhun`** — **PR #68: blurred now-playing background on Home/Search/Library + Android tab BACK + Windows horizontal rails** (shared `commonMain`; Android *and* Windows/Desktop, one implementation) · base = **`c1d9066`** = **PR #67 MERGED**.
 
 **What this branch changes:** three user-reported UI/platform defects, fixed in one slice and nothing else — no extraction, playback-engine or PO-token change.
@@ -15,6 +36,8 @@ Updated **2026-09-16 (UTC)** · session **`arena/01a0a9c4-dhun`** — **PR #68: 
 **Exact next step:** (1) PR #68 review + the merge decision; (2) **the user's gate**: open the test APK on Android and the MSI on Windows — walk Home → Search → BACK and Home → Library → BACK, watch the backdrop change with the track, and drag a rail sideways with the mouse; (3) if the backdrop reads too dark or too loud on a real panel, the two dials are `NowPlayingBackdropPolicy.DIM_ALPHA` (0.55) and `scrimStops()`; the blur is `DhunSpacing.glassBlur * BLUR_SCALE` (16dp × 4); (4) follow-ups worth opening, none in this slice: a rail *fling* after a mouse drag (currently it stops dead), `:app-android:testDebugUnitTest` as an explicit CI step so the coupling to `assembleDebug` stops being implicit, and a decision on whether Android <12 should get a pre-blurred bitmap backdrop instead of the default background.
 
 **Explicitly NOT claimed:** on-device evidence of any kind — the physical Back button/gesture, the visual weight of the backdrop, and trackpad hardware behaviour were not exercised here, and no screenshot or recording is attached. `docs/verification/` has no line for this phase, so nothing here asserts one. Pre-Android-12 devices deliberately keep the **old** background (`Modifier.blur` is a `RenderEffect` and is a silent no-op below API 31; a sharp full-screen cover was the worse outcome). Rail scrollbar geometry is reconstructed from the mean measured item size — exact for the uniform card rails it is used on, approximate for a mixed one.
+
+</details>
 
 ---
 
