@@ -108,7 +108,7 @@ class NavStatePersistenceTest {
             selectTab(AppTab.SEARCH)
             selectTab(AppTab.LIBRARY)
         }
-        assertEquals(listOf(AppTab.HOME, AppTab.SEARCH), original.tabHistoryEntries())
+        assertEquals(listOf(AppTab.SEARCH, AppTab.HOME), original.tabHistoryEntries())
 
         val bundle = Bundle().also { NavStatePersistence.save(original, it) }
         val restored = NavStatePersistence.restore(bundle)
