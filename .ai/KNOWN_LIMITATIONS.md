@@ -11,10 +11,15 @@ locally runnable but **never executed by CI**, because the desktop gate was
 as a named step after the compile step, and `scripts/test_ci_workflow.py` pins
 both the step and its order. What is **not** established:
 
-- **The green must still be proven meaningful by mutation** (see ROADMAP): a
-  deliberately broken desktop expectation has to go red on the new step and be
-  reverted. Until that run exists, "CI runs the tests" is a claim about YAML,
-  not about execution.
+- **Execution is proven by a genuine red, not a mutation.** The first CI run
+  failed `:app-desktop:jvmTest` with three real assertion failures (test names
+  + file:line in the annotations), so no separate mutation run is needed — a
+  step that merely compiled could not produce those. Caveat: that red consumed
+  all 10 check-run annotations (the per-run cap), so further failures could be
+  hiding behind it; the re-run is the confirmation.
+- **Validator contract tightened to ASCII `[A-Za-z0-9_-]`** (was Unicode-aware
+  `isLetterOrDigit()`, which admitted `ä`). No real-world change: track ids
+  are YouTube video ids.
 - **Still no local build.** No JDK; Maven/Gradle/dl.google.com egress-blocked.
   CI is the only compiler, exactly as before.
 
