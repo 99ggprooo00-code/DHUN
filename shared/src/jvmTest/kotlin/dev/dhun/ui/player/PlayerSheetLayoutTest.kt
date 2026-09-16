@@ -20,7 +20,8 @@ import kotlin.test.assertTrue
  * 1. the sharp artwork is sized by [fittedPlayerArtworkSize] and drawn `Fit`,
  *    so nothing is ever cropped;
  * 2. the Queue sheet gets a height that is never starved by a density-blind
- *    inset ([queuePanelMetrics] + [chromeHeightDp]);
+ *    inset ([queuePanelMetrics] + [chromeHeightDp]), while its transition
+ *    shares one reversible distance with the player stage;
  * 3. the blurred backdrop stays clear in the middle (so the artwork glows)
  *    and darkens towards the bottom (so titles/progress/transport read).
  */
@@ -108,6 +109,61 @@ class PlayerSheetLayoutTest {
             metrics.height + metrics.bottomInset <= 823.dp,
             "sheet + chrome must never overflow the safe area",
         )
+    }
+
+    @Test
+    fun coordinatedSheetLeavesTheExistingFooterReachable() {
+        val metrics = queuePanelMetrics(availableHeight = 823.dp, chromeHeight = 330.dp)
+        val travel = relatedSheetTravelHeight(metrics)
+
+        assertEquals(metrics.height, travel)
+        assertClose(expected = 335.24f, actual = travel.value)
+        assertTrue(
+            travel + metrics.bottomInset <= 823.dp,
+            "the moving sheet plus the existing footer must stay inside the safe area",
+        )
+        assertClose(
+            expected = 157.76f,
+            actual = (823.dp - metrics.bottomInset - travel).value,
+            tolerance = 0.01f,
+        )
+    }
+
+    @Test
+    fun playerAndSheetUseOneReversibleMeasuredTravelDistance() {
+        val closed = relatedSheetMotion(progress = 0f, travelPx = 1_200f)
+        assertEquals(0f, closed.playerOffsetY)
+        assertEquals(1_200f, closed.sheetOffsetY)
+        assertEquals(0f, closed.progress)
+
+        val halfway = relatedSheetMotion(progress = 0.5f, travelPx = 1_200f)
+        assertEquals(-600f, halfway.playerOffsetY)
+        assertEquals(600f, halfway.sheetOffsetY)
+        assertEquals(0.5f, halfway.progress)
+
+        val open = relatedSheetMotion(progress = 1f, travelPx = 1_200f)
+        assertEquals(-1_200f, open.playerOffsetY)
+        assertEquals(0f, open.sheetOffsetY)
+        assertEquals(1f, open.progress)
+
+        // A reversed target uses the same geometry rather than a second offset
+        // or a one-way enter/exit animation.
+        val reversed = relatedSheetMotion(progress = 0.25f, travelPx = 1_200f)
+        assertEquals(-300f, reversed.playerOffsetY)
+        assertEquals(900f, reversed.sheetOffsetY)
+    }
+
+    @Test
+    fun invalidTransitionGeometryDegradesToAStableClosedState() {
+        val invalidProgress = relatedSheetMotion(progress = Float.NaN, travelPx = Float.POSITIVE_INFINITY)
+        assertEquals(0f, invalidProgress.playerOffsetY)
+        assertEquals(0f, invalidProgress.sheetOffsetY)
+        assertEquals(0f, invalidProgress.progress)
+
+        val clamped = relatedSheetMotion(progress = 2f, travelPx = -10f)
+        assertEquals(0f, clamped.playerOffsetY)
+        assertEquals(0f, clamped.sheetOffsetY)
+        assertEquals(1f, clamped.progress)
     }
 
     @Test

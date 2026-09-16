@@ -5,7 +5,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -146,9 +148,11 @@ import dev.dhun.presentation.player.SkipDirection
  * ([playerAmbientScrimStops]), never over the sharp cover.
  *
  * **Queue panel:** the queue glyph opens a glass bottom sheet
- * (Queue | Related) with a real height ([queuePanelMetrics]) that docks above
- * the chrome, so rows stay readable at 48dp artwork + title + artist +
- * duration, with the current track highlighted and an explicit close control.
+ * (Queue | Related) with a real height ([queuePanelMetrics]). Its measured
+ * occupied region drives one coordinated transition: the sheet rises while
+ * the player foreground translates upward by the same distance, so rows stay
+ * readable at 48dp artwork + title + artist + duration and the current track
+ * remains highlighted with an explicit close control.
  *
  * **Lyrics-dominant mode (ADR-002 P6):** the lyrics glyph (CC) recedes the
  * sharp artwork to a darkened blur and raises a rounded card carrying the
@@ -210,7 +214,9 @@ fun FullPlayer(
     // Immersive state:
     //  - selectedTab 0 = lyrics-dominant view (ADR-002 P6); 1/2 = plain tabs
     //    that live inside the queue panel;
-    //  - panelOpen = the Queue/Related sheet is docked above the chrome.
+    //  - panelOpen = the Queue/Related sheet is open. Its transition below is
+    //    shared by the sheet and the player foreground, so they never drift
+    //    into two independent animations.
     var selectedTab by rememberSaveable { mutableIntStateOf(1) } // Queue by default
     // Where the lyrics glyph returns when lyrics-dominant mode closes.
     var lastPlainTab by rememberSaveable { mutableIntStateOf(1) }
@@ -245,14 +251,29 @@ fun FullPlayer(
     }
     val panelTab = if (selectedTab == LYRICS_TAB_INDEX) lastPlainTab else selectedTab
 
-    // Chrome height feeds the queue sheet's bottom inset (same coordinate
-    // space — both live inside the safe-drawing box below).
+    // One target drives both pieces of the composition. The sheet is kept in
+    // the tree while the transition reverses so closing it can move downward
+    // at the same time as the player returns to its original position.
+    val relatedSheetTarget = panelOpen && !lyricsDominant
+    val relatedTransition = updateTransition(
+        targetState = relatedSheetTarget,
+        label = "relatedSheetTransition",
+    )
+    val relatedProgress by relatedTransition.animateFloat(
+        transitionSpec = { DhunAnimations.mediumTween<Float>() },
+        label = "relatedSheetProgress",
+    ) { open -> if (open) 1f else 0f }
+    val relatedSheetVisible = relatedSheetTarget || relatedProgress > 0f
+
+    // Chrome height feeds the related sheet geometry (same coordinate space —
+    // both live inside the safe-drawing box below).
     val chromeHeightPx = remember { mutableIntStateOf(0) }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(DhunColors.background)
+            .clipToBounds()
             // Swallow gestures so taps don't fall through to the library below.
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -283,11 +304,26 @@ fun FullPlayer(
             Modifier.fillMaxSize().safeDrawingPadding()
         }
         Box(modifier = foregroundModifier) {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds(),
+            ) {
                 // Capture constraints before entering Row/Column scopes, whose
                 // own scope markers deliberately hide BoxWithConstraints' axes.
                 val availableWidth = maxWidth
                 val availableHeight = maxHeight
+                val density = LocalDensity.current
+                val relatedMetrics = queuePanelMetrics(
+                    availableHeight = availableHeight,
+                    chromeHeight = chromeHeightDp(chromeHeightPx.intValue, density.density),
+                )
+                // The panel's own measured height is the travel distance;
+                // chrome remains a real footer below it rather than a gap.
+                val sheetTravelPx = with(density) {
+                    relatedSheetTravelHeight(relatedMetrics).toPx()
+                }
+                val relatedMotion = relatedSheetMotion(relatedProgress, sheetTravelPx)
                 val layoutMode = fullPlayerLayoutMode(availableWidth, availableHeight)
                 val compactControls = usesCompactPlayerControls(availableHeight)
 
@@ -306,7 +342,7 @@ fun FullPlayer(
                         isDesktop = isDesktop,
                         isFavorite = isFavorite,
                         accent = accent,
-                        panelOpen = panelOpen,
+                        panelOpen = relatedSheetVisible,
                         lyricsDominant = lyricsDominant,
                         compact = compact,
                         onOverflowTrack = onOverflowTrack,
@@ -316,119 +352,130 @@ fun FullPlayer(
                         onLyricsToggle = onLyricsToggle,
                         onShowErrorDetails = { showErrorDetails = true },
                         onHeightChanged = { chromeHeightPx.intValue = it },
-                        modifier = controlsModifier,
+                        // The player stage moves upward with the sheet. Apply
+                        // the exact inverse only to the existing chrome so its
+                        // footer/mini-player behavior remains reachable below
+                        // the sheet throughout the transition.
+                        modifier = controlsModifier.graphicsLayer {
+                            translationY = -relatedMotion.playerOffsetY
+                        },
                     )
                 }
 
-                when (layoutMode) {
-                    FullPlayerLayoutMode.Stacked -> {
-                        Column(
-                            modifier = Modifier
-                                .widthIn(max = DhunSpacing.playerContentMaxWidth)
-                                .fillMaxSize()
-                                .align(Alignment.TopCenter),
-                        ) {
-                            PlayerHeader(onCollapse = onCollapse)
-
-                            // Always emitted: this weighted stage is the source
-                            // of truth for the room between header and chrome.
-                            Box(
+                // The backdrop stays in place for continuity. The player stage
+                // (header, artwork and metadata) translates by the same measured
+                // travel distance that the sheet uses; the existing chrome is
+                // counter-translated below so it remains the footer.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { translationY = relatedMotion.playerOffsetY },
+                ) {
+                    when (layoutMode) {
+                        FullPlayerLayoutMode.Stacked -> {
+                            Column(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
+                                    .widthIn(max = DhunSpacing.playerContentMaxWidth)
+                                    .fillMaxSize()
+                                    .align(Alignment.TopCenter),
                             ) {
-                                PlayerArtworkStage(
-                                    track = current,
-                                    skipDirection = skipDirection,
-                                    isPlaying = isPlaying,
-                                    lyricsDominant = lyricsDominant,
-                                    busyLabel = playbackBusyLabel(state),
-                                    artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
-                                    cacheKey = artworkCacheKey,
-                                    viewModel = viewModel,
-                                    accent = accent,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(
-                                            horizontal = DhunSpacing.playerArtworkHorizontalInset,
-                                            vertical = DhunSpacing.playerArtworkVerticalInset,
-                                        ),
-                                )
-                            }
-                            Controls(compact = compactControls)
-                        }
-                    }
+                                PlayerHeader(onCollapse = onCollapse)
 
-                    FullPlayerLayoutMode.Wide -> {
-                        Row(modifier = Modifier.fillMaxSize()) {
-                            // The hero remains a distinct, reusable stage. The
-                            // overlay header reserves only its own space; it no
-                            // longer steals a whole artwork row from a landscape
-                            // player or a desktop window.
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                            ) {
-                                PlayerArtworkStage(
-                                    track = current,
-                                    skipDirection = skipDirection,
-                                    isPlaying = isPlaying,
-                                    lyricsDominant = lyricsDominant,
-                                    busyLabel = playbackBusyLabel(state),
-                                    artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
-                                    cacheKey = artworkCacheKey,
-                                    viewModel = viewModel,
-                                    accent = accent,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(
-                                            start = DhunSpacing.playerArtworkHorizontalInset,
-                                            top = DhunSpacing.playerArtworkHeaderInset,
-                                            end = DhunSpacing.playerArtworkHorizontalInset,
-                                            bottom = DhunSpacing.playerArtworkVerticalInset,
-                                        ),
-                                )
-                                PlayerHeader(
-                                    onCollapse = onCollapse,
+                                // Always emitted: this weighted stage is the source
+                                // of truth for the room between header and chrome.
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .align(Alignment.TopCenter),
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(DhunSpacing.playerWideLayoutGap))
-                            Box(
-                                modifier = Modifier
-                                    .width(playerWideControlsWidth(availableWidth))
-                                    .fillMaxHeight(),
-                                contentAlignment = Alignment.BottomCenter,
-                            ) {
+                                        .weight(1f),
+                                ) {
+                                    PlayerArtworkStage(
+                                        track = current,
+                                        skipDirection = skipDirection,
+                                        isPlaying = isPlaying,
+                                        lyricsDominant = lyricsDominant,
+                                        busyLabel = playbackBusyLabel(state),
+                                        artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
+                                        cacheKey = artworkCacheKey,
+                                        viewModel = viewModel,
+                                        accent = accent,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(
+                                                horizontal = DhunSpacing.playerArtworkHorizontalInset,
+                                                vertical = DhunSpacing.playerArtworkVerticalInset,
+                                            ),
+                                    )
+                                }
                                 Controls(compact = compactControls)
+                            }
+                        }
+
+                        FullPlayerLayoutMode.Wide -> {
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                // The hero remains a distinct, reusable stage. The
+                                // overlay header reserves only its own space; it no
+                                // longer steals a whole artwork row from a landscape
+                                // player or a desktop window.
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                ) {
+                                    PlayerArtworkStage(
+                                        track = current,
+                                        skipDirection = skipDirection,
+                                        isPlaying = isPlaying,
+                                        lyricsDominant = lyricsDominant,
+                                        busyLabel = playbackBusyLabel(state),
+                                        artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
+                                        cacheKey = artworkCacheKey,
+                                        viewModel = viewModel,
+                                        accent = accent,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(
+                                                start = DhunSpacing.playerArtworkHorizontalInset,
+                                                top = DhunSpacing.playerArtworkHeaderInset,
+                                                end = DhunSpacing.playerArtworkHorizontalInset,
+                                                bottom = DhunSpacing.playerArtworkVerticalInset,
+                                            ),
+                                    )
+                                    PlayerHeader(
+                                        onCollapse = onCollapse,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .align(Alignment.TopCenter),
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(DhunSpacing.playerWideLayoutGap))
+                                Box(
+                                    modifier = Modifier
+                                        .width(playerWideControlsWidth(availableWidth))
+                                        .fillMaxHeight(),
+                                    contentAlignment = Alignment.BottomCenter,
+                                ) {
+                                    Controls(compact = compactControls)
+                                }
                             }
                         }
                     }
                 }
 
                 // ---- queue / related sheet ------------------------------------
-                // Docks above the control cluster with a real, measured height. A
-                // bare height fraction minus a *pixel* value interpreted as dp is
-                // what used to starve the sheet on Android (density ~2.75 left no
-                // row height at all — the tap looked dead) and leave a thin,
-                // unreadable bar on desktop.
-                AnimatedVisibility(
-                    visible = panelOpen && !lyricsDominant,
-                    enter = slideInVertically(DhunAnimations.mediumTween()) { it } +
-                        fadeIn(DhunAnimations.mediumTween()),
-                    exit = slideOutVertically(DhunAnimations.fastTween()) { it } +
-                        fadeOut(DhunAnimations.fastTween()),
-                ) {
+                // The sheet and the player use the same progress and the same
+                // measured travel distance. At progress 0 the sheet is below
+                // the viewport; at progress 1 its top meets the translated
+                // player's bottom, with no arbitrary negative offset.
+                if (relatedSheetVisible) {
                     QueueSheet(
                         viewModel = viewModel,
                         selectedTab = panelTab,
                         onSelectTab = onPanelTabSelect,
                         onClose = onQueueToggle,
                         accent = accent,
-                        chromeHeightPx = chromeHeightPx.intValue,
+                        metrics = relatedMetrics,
+                        sheetProgress = relatedProgress,
+                        sheetTravelPx = sheetTravelPx,
                     )
                 }
             }
@@ -893,13 +940,13 @@ internal const val LYRICS_TAB_INDEX = 0
 private const val QUEUE_PANEL_HEIGHT_FRACTION = 0.68f
 
 /**
- * Geometry of the Queue/Related sheet: how tall it is, and how far it floats
- * above the bottom edge so the control cluster underneath stays reachable.
- *
- * [bottomInset] is the chrome height converted from **pixels** to dp — the
- * conversion is the whole point: passing raw pixels to `Dp()` inflated the
- * inset by the display density, which on a phone (~2.75×) consumed the entire
- * sheet and left it as an empty translucent bar.
+ * Geometry of the Queue/Related sheet. [bottomInset] is the existing player
+ * chrome height converted from **pixels** to dp — the conversion is the whole
+ * point: passing raw pixels to `Dp()` inflated the inset by the display density,
+ * which on a phone (~2.75×) consumed the entire sheet and left it as an empty
+ * translucent bar. The coordinated transition uses that measured budget to
+ * place the sheet above the existing footer instead of leaving an accidental
+ * gap.
  */
 internal data class QueuePanelMetrics(val height: Dp, val bottomInset: Dp)
 
@@ -923,6 +970,36 @@ internal fun queuePanelMetrics(
     val desired = room * fraction.coerceIn(0f, 1f)
     val floor = DhunSpacing.queuePanelMinHeight.coerceAtMost(room)
     return QueuePanelMetrics(desired.coerceIn(floor, room), chrome)
+}
+
+/**
+ * The sheet's actual travel height. The chrome budget remains below the sheet
+ * as the existing player footer, so the moving player stage meets this panel
+ * without turning the footer into a transparent gap.
+ */
+internal fun relatedSheetTravelHeight(metrics: QueuePanelMetrics): Dp =
+    metrics.height.coerceAtLeast(DhunSpacing.zero)
+
+/** Shared geometry for the two halves of the Related/Queue transition. */
+internal data class RelatedSheetMotion(
+    val playerOffsetY: Float,
+    val sheetOffsetY: Float,
+    val progress: Float,
+)
+
+/**
+ * Derives both translations from one normalized progress and one measured
+ * travel distance. This is intentionally pure so Android and Desktop share
+ * the same reversible motion contract.
+ */
+internal fun relatedSheetMotion(progress: Float, travelPx: Float): RelatedSheetMotion {
+    val safeProgress = if (progress.isFinite()) progress.coerceIn(0f, 1f) else 0f
+    val safeTravel = if (travelPx.isFinite() && travelPx > 0f) travelPx else 0f
+    return RelatedSheetMotion(
+        playerOffsetY = -safeTravel * safeProgress,
+        sheetOffsetY = safeTravel * (1f - safeProgress),
+        progress = safeProgress,
+    )
 }
 
 /**
@@ -1426,12 +1503,15 @@ private fun ImmersivePlayButton(
  *
  * Height and bottom inset come from [queuePanelMetrics] — a share of the room
  * actually left above the measured control cluster, floored at
- * [DhunSpacing.queuePanelMinHeight] — so the sheet is a real, readable panel
- * on a phone and on a desktop window instead of a thin translucent sliver. Its
- * width is capped to the player content budget so a wide window gets readable
- * rows rather than one stretched line.
- * It paints an opaque base under the glass (like every other sheet in the
- * app) because translucent-over-artwork left the rows illegible, and it
+ * [DhunSpacing.queuePanelMinHeight]. Together they define the lower region:
+ * the sheet occupies the panel height and the existing player chrome remains
+ * reachable as the footer below it. The translated player stage meets the
+ * sheet instead of leaving a transparent gap. Its width is capped to the
+ * player content budget so a wide window gets readable rows rather than one
+ * stretched line.
+ *
+ * The sheet paints an opaque base under the glass (like every other sheet in
+ * the app) because translucent-over-artwork left the rows illegible, and it
  * closes through two obvious affordances: the header ✕ and the queue glyph in
  * the bottom action row.
  */
@@ -1442,30 +1522,36 @@ private fun QueueSheet(
     onSelectTab: (Int) -> Unit,
     onClose: () -> Unit,
     accent: Color,
-    chromeHeightPx: Int,
+    metrics: QueuePanelMetrics,
+    sheetProgress: Float,
+    sheetTravelPx: Float,
 ) {
-    val density = LocalDensity.current
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val metrics = queuePanelMetrics(
-            availableHeight = maxHeight,
-            chromeHeight = chromeHeightDp(chromeHeightPx, density.density),
-        )
+    val motion = relatedSheetMotion(sheetProgress, sheetTravelPx)
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
         Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomCenter,
+            modifier = Modifier
+                // Same width budget as the player's own content column, so
+                // a wide desktop window gets a centred, readable sheet
+                // instead of rows stretched across the whole screen.
+                .widthIn(max = DhunSpacing.playerContentMaxWidth)
+                .fillMaxWidth()
+                // The existing player chrome remains a footer beneath the
+                // panel. The sheet rises from its top edge, not from an
+                // arbitrary screen offset.
+                .padding(bottom = metrics.bottomInset)
+                .height(metrics.height)
+                .graphicsLayer {
+                    translationY = motion.sheetOffsetY
+                    alpha = motion.progress
+                },
         ) {
             GlassBottomBar(
-                modifier = Modifier
-                    // Same width budget as the player's own content column, so
-                    // a wide desktop window gets a centred, readable sheet
-                    // instead of rows stretched across the whole screen.
-                    .widthIn(max = DhunSpacing.playerContentMaxWidth)
-                    .fillMaxWidth()
-                    .padding(bottom = metrics.bottomInset)
-                    .height(metrics.height),
-                // All four corners round: the sheet floats above the control
-                // cluster, it does not touch the bottom edge.
-                shape = DhunShapes.extraLarge,
+                modifier = Modifier.fillMaxSize(),
+                // This is now a bottom sheet: rounded top corners, flush lower edge.
+                shape = DhunShapes.bottomSheet,
                 opaqueBase = true,
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
