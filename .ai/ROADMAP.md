@@ -18,7 +18,7 @@ overload). Full branch diff vs `main` reviewed hunk-by-hunk.
 `AndroidEqualizerEngine.kt` · `EqualizerBandMapper.kt` ·
 `SettingsViewModel.kt` (doc path) · this file.
 
-**Last error:** CI red on `040dd71`/`bbc5c3c` (`:shared:jvmTest` step) —
+**Last error:** CI red on `92468e5` (`:shared:jvmTest` step) — my S5 const insert split a two-line `const val` declaration (anchor matched only its first line). Fixed by moving the const after the full declaration. Lesson: anchors must cover the ENTIRE statement, and every new hunk gets re-read before push. Earlier: CI red on `040dd71`/`bbc5c3c` —
 corrupted + missing shell edits (see above). Tool lesson recorded: NEVER
 batch multiple edits to the SAME file in one message (last-writer-wins
 clobber + fuzzy-splice corruption); one asserted python patch per file,

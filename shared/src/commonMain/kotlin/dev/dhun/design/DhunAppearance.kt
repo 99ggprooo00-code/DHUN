@@ -266,12 +266,14 @@ data class DhunTokens(
     val onAccentContainer: Color = Color(0xFFE8D5FF),
 
     // Semantic
-    val error: Color = Color(0xFFCF6679),
+    // S5: #D5798A (was #CF6679) — the old error on this container measured
+    // 3.92:1, below WCAG AA; the retune measures 4.66:1 with the same hue.
+    val error: Color = Color(0xFFD5798A),
     val onError: Color = Color(0xFF000000),
     val errorContainer: Color = Color(0xFF4D1A24),
     val success: Color = Color(0xFF4CAF50),
     val warning: Color = Color(0xFFFFB74D),
-    val borderError: Color = Color(0x40CF6679),
+    val borderError: Color = Color(0x40D5798A),
 
     // Overlays
     val overlayHover: Color = Color(0x0FFFFFFF),

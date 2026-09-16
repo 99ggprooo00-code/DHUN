@@ -50,14 +50,14 @@ enum class SearchFilter(internal val params: String?) {
 }
 
 internal const val INNERTUBE_USER_AGENT =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
 /**
  * Resolves served from the cached `sts` before the watch page is re-checked
  * (S5). See `InnerTubeClient.stsUsesSinceValidation`.
  */
 internal const val STS_REVALIDATE_EVERY: Int = 25
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
 internal fun HttpRequestBuilder.browserHeaders() {
     headers {

@@ -78,6 +78,9 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   `expect/actual`. `forceRefresh` still bypasses; a failed revalidation fails
   open to `null`, backs off a full budget, and keeps serving the stale cache
   meanwhile. (Resolves the PERF/MEDIUM second-look finding.)
+- **Dark error contrast fix**: `error` `#CF6679` → `#D5798A` (same hue),
+  lifting `error`-on-`errorContainer` from 3.92:1 to 4.66:1 (WCAG AA); the
+  contrast gate now asserts 4.5:1 in both schemes.
 ### Changed — Stage S2 architectural cleanup — 2026-09-16
 - **Dead harness UI deleted** (~680 lines): `HarnessScreen`,
   `HarnessViewModel`, `DesktopHarness*` had zero call sites (only an

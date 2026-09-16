@@ -718,14 +718,11 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
 Limits found while building it. Each is a measured or code-verified fact;
 **visual appearance on hardware is claimed nowhere.**
 
-- **Dark `error` on `errorContainer` is 3.92:1 — below WCAG AA (4.5:1) for
-  text.** Shipped values (`#CF6679` on `#4D1A24`), left byte-identical on
-  purpose: retuning them would break the "dark stays the default and
-  unchanged" guarantee, which is the whole basis of an additive theme system.
-  `DhunThemeContrastTest` therefore asserts 3:1 for that pair in dark and
-  4.5:1 in light (the new light pair, `#B00020` on `#F9DEDC`, measures
-  5.76:1). A future pass can retune the dark pair knowingly — it is a real
-  accessibility defect, recorded here rather than silently asserted away.
+- **~~Dark `error` on `errorContainer` is 3.92:1~~ RESOLVED 2026-09-16 (S5):**
+  retuned `#CF6679` → `#D5798A` (same hue, container unchanged) — now 4.66:1,
+  and `DhunThemeContrastTest` asserts 4.5:1 in both schemes. The
+  "byte-identical dark" migration guarantee is retired for this pair only,
+  with before/after values recorded here.
 - **`app-desktop` tray icons stay dark in light mode.**
   `native/TrayIcons.kt:19-21` reads `DhunColors.surface/border/accent` in an
   object initialiser — once, before any composition exists — so it captures

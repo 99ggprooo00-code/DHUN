@@ -98,12 +98,10 @@ class DhunThemeContrastTest {
     @Test
     fun semanticColorsAreLegibleInBothModes() {
         eachMode { mode, tokens ->
-            // Dark's error/errorContainer pair is the *shipped* value and is
-            // left untouched: retuning it would break "dark stays
-            // byte-identical". Measured 3.92:1 — below AA for text, so it is
-            // recorded in .ai/KNOWN_LIMITATIONS.md rather than silently
-            // asserted away here. Light meets AA.
-            val errorOnContainerMinimum = if (tokens.isLight) 4.5f else 3.0f
+            // S5: dark's error was retuned #CF6679 → #D5798A (same hue, 3.92:1
+            // → 4.66:1 on the unchanged container), retiring the deliberate
+            // exception — both schemes now meet AA on this pair.
+            val errorOnContainerMinimum = 4.5f
             assertAtLeast(
                 contrast(tokens.error, tokens.errorContainer), errorOnContainerMinimum,
                 "$mode error on errorContainer",
