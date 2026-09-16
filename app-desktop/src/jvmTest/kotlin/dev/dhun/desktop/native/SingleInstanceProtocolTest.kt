@@ -72,8 +72,6 @@ class SingleInstanceProtocolTest {
         } finally {
             h.close()
         }
-        // Silence unused-field warnings by construction: token parity check.
-        assertEquals("test-token-1", token)
     }
 
     @Test

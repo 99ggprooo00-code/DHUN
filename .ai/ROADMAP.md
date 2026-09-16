@@ -1,33 +1,34 @@
 # CURRENT ACTIVE TASK
 
 Updated **2026-09-16 (UTC)** · session **`arena/01a0ab12-dhun`** —
-**PR #72 MERGED** (`main@5023b38`; pre-merge CI fully green) ·
-**Stage S4 slice 1 (Settings page) in progress** · user authorized
-autonomous merge — only S1 dispatch (agent 403), S3 hardware, and
-release/signing decisions escalate with step-by-step guides.
+**PR #73 OPEN** (S4 slices 1–3: Settings page + jump-list verb + Android EQ)
+· user authorized autonomous merge — only S1 dispatch (agent 403), S3
+hardware, and release/signing decisions escalate with step-by-step guides.
 
-**What this commit adds (S4.1):** `DetailRoute.SettingsPage` (stack
-singleton) + `SettingsScreen` (appearance/cache/resume/tray/EQ) +
-`SettingsViewModel` + `SettingsKeys.ACCENT` +
-`applyPersistedAppearance` + startup restore on both platforms +
-`"settings"` saved-state codec; desktop shell gets `player.equalizer`.
-PR #53/#54 left for the user (close #53 unmerged; keep #54 as
-contingency reference — user's click).
+**What this commit adds (S4 repairs):** re-applies S4 changes lost to
+batched-edit clobbering/fuzzy-splice corruption — shell `settingsVm`
+creation, shell call-site duplication removal, second master + detail call
+args, `TabContent` signature, `NavStatePersistence` decode arm, Library header (was
+spliced into `LikedSongsFolderCard`), protocol-test cruft removal — plus two
+genuine fixes found in review (EQ rebind flag, `Double.coerceIn` Float
+overload). Full branch diff vs `main` reviewed hunk-by-hunk.
 
-**Files (this commit):** `AppNavState.kt` · `SettingsKeys.kt` ·
-`DhunAppearance.kt` · `AppearanceControls.kt` (kdoc) ·
-`presentation/settings/` (new) · `ui/settings/` (new) ·
-`DhunAppShell.kt` · `LibraryScreen.kt` · `NavStatePersistence.kt` (+test) ·
-`MainActivity.kt` · `Main.kt` · `AppNavStateTest.kt` ·
-`SettingsViewModelTest.kt` (new) · `CHANGELOG.md` · this file.
+**Files (this commit):** `DhunAppShell.kt` · `NavStatePersistence.kt` ·
+`LibraryScreen.kt` · `SingleInstanceProtocolTest.kt` ·
+`AndroidEqualizerEngine.kt` · `EqualizerBandMapper.kt` ·
+`SettingsViewModel.kt` (doc path) · this file.
 
-**Last error:** none — CI is the compiler (no JDK in sandbox).
+**Last error:** CI red on `040dd71`/`bbc5c3c` (`:shared:jvmTest` step) —
+corrupted + missing shell edits (see above). Tool lesson recorded: NEVER
+batch multiple edits to the SAME file in one message (last-writer-wins
+clobber + fuzzy-splice corruption); one asserted python patch per file,
+grep-verify every marker, read the full diff before pushing.
 
-**Exact next step:** commit + open PR for S4.1 → while CI runs, build
-S4 slice 2 (jump-list command protocol + `main(args)`) and slice 3
-(Android AudioEffect EQ engine + Koin session) on the same branch →
-merge when green. **Stage S1 needs the user** (Actions *Run workflow*
-click — agents get 403), **Stage S3 needs the user** (devices).
+**Exact next step:** push → require `build-and-test` + `apk` + `msi` +
+`build` green on PR #73 → merge (authorized) → post-merge `main` CI +
+`test` release check → S4 done → start **S5** (stream-perf: sts TTL guard).
+**Stage S1 needs the user** (Actions *Run workflow* click — agents get
+403), **Stage S3 needs the user** (devices).
 
 **Explicitly NOT claimed:** on-device behavior of the nav fixes or
 the cancel fix; UI restyling (deferred past v0.1.0 by user decision —

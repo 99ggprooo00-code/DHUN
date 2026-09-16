@@ -174,6 +174,16 @@ fun DhunAppShell(
             downloadManager = downloadManager,
         )
     }
+    // S4: settings model lives at shell scope (one instance, shared by both
+    // panes) so a change made in the detail pane is visible if the window is
+    // resized down to the single-pane path, and vice versa.
+    val settingsVm = remember(dataLayer, scope) {
+        SettingsViewModel(
+            GetSettingUseCase(dataLayer.settings),
+            UpdateSettingUseCase(dataLayer.settings),
+            scope,
+        )
+    }
 
     // Phase 10: RecordPlay contexts — every queue handoff labels the history row.
     val onPlayTrack: (Track, List<Track>, Int) -> Unit = { _, queue, index ->
@@ -344,13 +354,6 @@ fun DhunAppShell(
                             detailRoute = detailRoute,
                             homeViewModel = homeViewModel,
                             searchViewModel = searchViewModel,
-        nly a non-empty route is
-                        // rendered here; the normal empty state stays on the tab.
-                        ShellMasterPane(
-                            tab = nav.selectedTab,
-                            detailRoute = detailRoute,
-                            homeViewModel = homeViewModel,
-                            searchViewModel = searchViewModel,
                             libraryViewModel = libraryVm,
                             provider = provider,
                             dataLayer = dataLayer,
@@ -429,6 +432,10 @@ fun DhunAppShell(
                                     libraryVm.selectTab(LibraryTab.PLAYLISTS)
                                     nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = true)
                                 },
+                                settingsVm = settingsVm,
+                                isDesktop = isDesktop,
+                                equalizerSession = equalizerSession,
+                                onOpenSettings = { nav.push(DetailRoute.SettingsPage) },
                             )
                         },
                         detail = {
@@ -442,6 +449,9 @@ fun DhunAppShell(
                                 onPlayAlbum = onPlayAlbum,
                                 onPlayPlaylist = onPlayPlaylist,
                                 onTrackOverflow = { overflowTrack = it },
+                                settingsVm = settingsVm,
+                                isDesktop = isDesktop,
+                                equalizerSession = equalizerSession,
                             )
                         },
                         miniPlayer = if (!nav.playerExpanded) {
@@ -905,6 +915,7 @@ private fun TabContent(
     onOpenOffline: () -> Unit = {},
     sleepTimerLabel: String? = null,
     onCycleSleepTimer: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     when (tab) {
         AppTab.HOME -> {

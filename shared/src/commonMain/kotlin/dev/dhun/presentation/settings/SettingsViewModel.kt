@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
  *
  * Settings whose keys exist but have no behaviour behind them yet
  * (`AUDIO_QUALITY`, `COUNTRY_CODE`, `LYRICS_ENABLED`, `ACCENT_MODE`,
- * `EXPLICIT_CONTENT` — see KNOWN_LIMITATIONS.md) are deliberately *not*
+ * `EXPLICIT_CONTENT` — see `.ai/KNOWN_LIMITATIONS.md`) are deliberately *not*
  * exposed: a toggle that changes nothing is worse than no toggle.
  */
 class SettingsViewModel(

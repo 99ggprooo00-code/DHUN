@@ -57,6 +57,10 @@ class AndroidEqualizerEngine(
         }.onFailure { t ->
             Log.w(TAG, "equalizer apply failed — releasing, will rebind on next apply", t)
             releaseLocked()
+            // Force a rebind attempt on the next apply (bind() itself records
+            // the session even on failure, so a device that throws every time
+            // still degrades to silent no-op rather than retry spam).
+            boundSession = -1
         }
     }
 

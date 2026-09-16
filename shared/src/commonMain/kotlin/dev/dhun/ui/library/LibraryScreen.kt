@@ -107,21 +107,29 @@ fun LibraryScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Header — brand wordmark + sans headline (M3 readable type)
-        Column(
+        // Header — brand wordmark + sans headline (M3 readable type), with the
+        // S4 Settings entry pinned to the trailing edge.
+        Row(
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "DHUN",
-                style = DhunTypographyTokens.brand,
-                color = DhunColors.accent,
-            )
-            Text(
-                text = "Your library",
-                style = MaterialTheme.typography.headlineMedium,
-                color = DhunColors.textPrimary,
-            )
+            Column {
+                Text(
+                    text = "DHUN",
+                    style = DhunTypographyTokens.brand,
+                    color = DhunColors.accent,
+                )
+                Text(
+                    text = "Your library",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = DhunColors.textPrimary,
+                )
+            }
+            DhunTextButton(onClick = onOpenSettings) {
+                Text("Settings")
+            }
         }
 
         LibraryTabRow(
@@ -398,15 +406,6 @@ private fun LikedSongsFolderCard(
                 Text(
                     text = "$trackCount song${if (trackCount == 1) "" else "s"} • Auto-playlist",
                     style = MaterialTheme.typography.bodySmall,
-                    color = DhunColors.textSecondary,
-                )
-            }
-
-            if (trackCount > 0) {
-                DhunIconButton(
-                    onClick = onPlay,
-                    modifier = Modifier.size(DhunSpacing.touchTarget),
-                    contentDescription = "Ptypography.bodySmall,
                     color = DhunColors.textSecondary,
                 )
             }

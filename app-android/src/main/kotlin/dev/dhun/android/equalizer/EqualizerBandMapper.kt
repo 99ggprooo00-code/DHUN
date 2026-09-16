@@ -49,9 +49,10 @@ object EqualizerBandMapper {
             val hz = (mhz / 1000.0).coerceAtLeast(1.0)
             val curve = curveGainDb(hz, centers, gains)
             val preamp = state.preampDb.takeUnless { it.isNaN() } ?: 0f
+            // toDouble()s: Double.coerceIn has no mixed Float overload.
             val total = (curve + preamp).coerceIn(
-                EqualizerBands.MIN_GAIN_DB,
-                EqualizerBands.MAX_GAIN_DB,
+                EqualizerBands.MIN_GAIN_DB.toDouble(),
+                EqualizerBands.MAX_GAIN_DB.toDouble(),
             )
             (total * 100).roundToInt().coerceIn(lo, hi).toShort()
         }

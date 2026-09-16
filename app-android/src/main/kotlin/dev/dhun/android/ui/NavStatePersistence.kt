@@ -79,6 +79,7 @@ object NavStatePersistence {
             "playlist" -> parts.getOrNull(2)?.takeIf { it.isNotBlank() }?.let { id ->
                 DetailRoute.PlaylistPage(id, parts.getOrNull(1) == "true")
             }
+            "settings" -> DetailRoute.SettingsPage
             else -> null
         }
     }
