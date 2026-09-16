@@ -10,7 +10,6 @@ import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellati
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -35,7 +34,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,7 +49,6 @@ import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
@@ -178,15 +175,20 @@ fun Modifier.dhunMouseDragScroll(
             val down = awaitFirstDown(requireUnconsumed = false)
             if (down.type != PointerType.Mouse) return@awaitEachGesture
             val slopChange = awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
-                // Content follows the pointer, exactly like the touch path.
                 change.consume()
-                launch { state.scrollBy(-overSlop) }
+                // Content follows the pointer, exactly like the touch path.
+                // dispatchRawDelta, not scrollBy: it is synchronous, so the
+                // rail tracks the cursor on the same frame, and neither
+                // PointerInputScope nor AwaitPointerEventScope is a
+                // CoroutineScope in Compose 1.8 (a `launch` here would bind to
+                // the deprecated scope-less global and not compile).
+                state.dispatchRawDelta(-overSlop)
             } ?: return@awaitEachGesture
             horizontalDrag(slopChange.id) { change ->
                 val dragged = change.positionChange().x
                 if (dragged != 0f) {
                     change.consume()
-                    launch { state.scrollBy(-dragged) }
+                    state.dispatchRawDelta(-dragged)
                 }
             }
         }
@@ -205,7 +207,6 @@ private fun DhunRailScrollbar(
     metrics: RailMetrics,
     modifier: Modifier = Modifier,
 ) {
-    val scope = rememberCoroutineScope()
     var dragging by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -251,15 +252,14 @@ private fun DhunRailScrollbar(
                 .hoverable(interactionSource)
                 .draggable(
                     state = rememberDraggableState { delta ->
-                        scope.launch {
-                            scrollable.scrollBy(
-                                RailScrollbarGeometry.scrollDeltaFor(
-                                    thumbDragPx = delta,
-                                    contentExtentPx = metrics.contentExtentPx,
-                                    trackWidthPx = trackWidthPx,
-                                ),
-                            )
-                        }
+                        // Same synchronous path as the rail drag above.
+                        scrollable.dispatchRawDelta(
+                            RailScrollbarGeometry.scrollDeltaFor(
+                                thumbDragPx = delta,
+                                contentExtentPx = metrics.contentExtentPx,
+                                trackWidthPx = trackWidthPx,
+                            ),
+                        )
                     },
                     orientation = Orientation.Horizontal,
                     onDragStarted = { dragging = true },
