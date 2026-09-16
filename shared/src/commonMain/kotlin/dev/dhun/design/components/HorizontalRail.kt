@@ -1,6 +1,9 @@
 package dev.dhun.design.components
 
+import androidx.compose.animation.core.AnimationState
+import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableState
@@ -34,21 +37,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -163,32 +172,54 @@ fun DhunHorizontalRail(
  * framework's own drag + fling, so Android behaviour is untouched by
  * construction. The gesture waits for touch slop before consuming anything, so
  * a click on a card inside the rail stays a click — only a real sideways drag
- * cancels it.
+ * cancels it. On pointer-up the remaining velocity is decayed as a fling
+ * (PR #68 stopped dead; that was the remaining Windows-mouse gap).
  */
 fun Modifier.dhunMouseDragScroll(
     state: ScrollableState,
     enabled: Boolean = true,
 ): Modifier {
     if (!enabled) return this
-    return pointerInput(state) {
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            if (down.type != PointerType.Mouse) return@awaitEachGesture
-            val slopChange = awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
-                change.consume()
-                // Content follows the pointer, exactly like the touch path.
-                // dispatchRawDelta, not scrollBy: it is synchronous, so the
-                // rail tracks the cursor on the same frame, and neither
-                // PointerInputScope nor AwaitPointerEventScope is a
-                // CoroutineScope in Compose 1.8 (a `launch` here would bind to
-                // the deprecated scope-less global and not compile).
-                state.dispatchRawDelta(-overSlop)
-            } ?: return@awaitEachGesture
-            horizontalDrag(slopChange.id) { change ->
-                val dragged = change.positionChange().x
-                if (dragged != 0f) {
+    // composed, not pointerInput at the top: PointerInputScope is Density in
+    // CMP 1.8.2, not a CoroutineScope, so a `launch` inside the gesture would
+    // bind to the deprecated global (the compile break that #68 hit). The
+    // fling needs a real scope; rememberCoroutineScope is cancelled when this
+    // modifier leaves the tree.
+    return composed {
+        val scope = rememberCoroutineScope()
+        pointerInput(state) {
+            var flingJob: Job? = null
+            awaitEachGesture {
+                flingJob?.cancel()
+                flingJob = null
+                val down = awaitFirstDown(requireUnconsumed = false)
+                if (down.type != PointerType.Mouse) return@awaitEachGesture
+                val tracker = VelocityTracker()
+                tracker.addPosition(down.uptimeMillis, down.position)
+                val slopChange = awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
                     change.consume()
-                    state.dispatchRawDelta(-dragged)
+                    tracker.addPosition(change.uptimeMillis, change.position)
+                    // Content follows the pointer, exactly like the touch path.
+                    // dispatchRawDelta, not scrollBy: it is synchronous, so the
+                    // rail tracks the cursor on the same frame.
+                    state.dispatchRawDelta(-overSlop)
+                } ?: return@awaitEachGesture
+                val completed = horizontalDrag(slopChange.id) { change ->
+                    val dragged = change.positionChange().x
+                    if (dragged != 0f) {
+                        change.consume()
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        state.dispatchRawDelta(-dragged)
+                    }
+                }
+                if (!completed) return@awaitEachGesture
+                val pointerVelocityX = tracker.calculateVelocity().x
+                if (!MouseRailFling.shouldFling(pointerVelocityX, viewConfiguration.minimumFlingVelocity)) {
+                    return@awaitEachGesture
+                }
+                val contentVelocity = MouseRailFling.contentVelocityFromPointer(pointerVelocityX)
+                flingJob = scope.launch {
+                    MouseRailFling.decay(state, contentVelocity)
                 }
             }
         }
@@ -266,6 +297,50 @@ private fun DhunRailScrollbar(
                     onDragStopped = { dragging = false },
                 ),
         )
+    }
+}
+
+/**
+ * Mouse-drag fling for a horizontal rail. Pure bits live here so the
+ * jvmTest suite can pin the threshold and the "hit the end → stop"
+ * rule without driving Compose animation on CI.
+ *
+ * Pointer velocity is the *cursor*; content moves the other way (same sign
+ * flip `dhunMouseDragScroll` already applies to every drag delta). Decay is
+ * exponential (density-free) so this stays in commonMain — touch keeps the
+ * framework spline fling, which we do not replace.
+ */
+object MouseRailFling {
+
+    /** A requested decay frame that the rail could not swallow means we hit an edge. */
+    const val STOP_EPSILON_PX = 0.5f
+
+    fun shouldFling(velocityPxPerSec: Float, minimumFlingVelocity: Float): Boolean {
+        if (!velocityPxPerSec.isFinite() || !minimumFlingVelocity.isFinite()) return false
+        if (minimumFlingVelocity < 0f) return false
+        return abs(velocityPxPerSec) >= minimumFlingVelocity
+    }
+
+    fun contentVelocityFromPointer(pointerVelocityX: Float): Float = -pointerVelocityX
+
+    fun shouldStopDecay(requestedDelta: Float, consumedDelta: Float): Boolean {
+        if (!requestedDelta.isFinite() || !consumedDelta.isFinite()) return true
+        return abs(requestedDelta - consumedDelta) > STOP_EPSILON_PX
+    }
+
+    suspend fun decay(state: ScrollableState, contentVelocityPxPerSec: Float) {
+        if (!contentVelocityPxPerSec.isFinite() || contentVelocityPxPerSec == 0f) return
+        val spec = exponentialDecay<Float>(absVelocityThreshold = STOP_EPSILON_PX)
+        var lastValue = 0f
+        AnimationState(
+            initialValue = 0f,
+            initialVelocity = contentVelocityPxPerSec,
+        ).animateDecay(spec) {
+            val delta = value - lastValue
+            lastValue = value
+            val consumed = state.dispatchRawDelta(delta)
+            if (shouldStopDecay(delta, consumed)) cancelAnimation()
+        }
     }
 }
 
