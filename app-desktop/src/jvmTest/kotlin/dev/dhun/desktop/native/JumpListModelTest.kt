@@ -45,7 +45,8 @@ class JumpListModelTest {
     @Test
     fun `entries with invalid track ids are dropped, others survive`() {
         val tasks = JumpListModel.buildTasks(listOf(track("bad id"), track("ok")))
-        assertEquals(3, tasks.size)
+        // surviving recent + separator + 2 verbs
+        assertEquals(4, tasks.size)
         assertEquals("--dhun-play=ok", tasks[0].arguments)
     }
 
@@ -54,7 +55,7 @@ class JumpListModelTest {
         val many = (1..20).map { track("id$it") }
         val tasks = JumpListModel.buildTasks(many)
         // 5 recents + separator + 2 verbs
-        assertEquals(JumpListModel.MAX_RECENT + 2, tasks.size)
+        assertEquals(JumpListModel.MAX_RECENT + 3, tasks.size)
         assertEquals("--dhun-play=id1", tasks[0].arguments)
     }
 

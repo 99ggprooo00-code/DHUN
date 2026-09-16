@@ -1,5 +1,24 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-16 (UTC)** · session **`arena/01a0aa8e-dhun`** — **named `:app-desktop:jvmTest` CI step** (`.github/workflows/ci.yml` + `scripts/test_ci_workflow.py`) · base = **`ebad6ec`** = **PR #70 MERGED**.
+
+**What this branch changes:** the last silent-skip in `ci.yml` — no app, extraction, playback-engine or ADR change. The five `app-desktop/src/jvmTest` classes (jump-list/tray pure cores, candidate 27, PR #47) exist on `main` but CI only runs `:app-desktop:compileKotlinJvm`, which compiles `jvmMain` and never executes `jvmTest`: a red desktop test is currently *impossible*, and any future desktop test would be decorative. `ci.yml` now runs `./gradlew :app-desktop:jvmTest` as **"Unit tests — Desktop (JVM)"** *after* "Desktop compiles", so a compile break and a test failure fail different, honestly-named steps. `scripts/test_ci_workflow.py` pins the named step and its order; the stale NOTE in `app-desktop/build.gradle.kts` (comment-only) is corrected to match.
+
+**Files:** `.github/workflows/ci.yml` · `scripts/test_ci_workflow.py` · `app-desktop/build.gradle.kts` (comment only) · `app-desktop/…/native/JumpListModel.kt` (ASCII validator) · `app-desktop/…/native/JumpListModelTest.kt` (2 assertions) · `CHANGELOG.md` · `.ai/KNOWN_LIMITATIONS.md` · `.ai/DEBUG_LOG.md` · this file.
+
+**Last error / CI:** first CI on PR #71 red **on the new step itself** — `build-and-test` `35112656439` (8m26s): `:app-desktop:jvmTest` failed 3 assertions latent since PR #47 (`JumpListModelTest.kt:57` expected 7 was 8, `:48` expected 3 was 4, `JumpListArgsTest.kt:56` `ä` accepted). Root cause, not retried: two assertions forgot the separator entry (production matched its documented order both times), and `isValidTrackId` used Unicode-aware `isLetterOrDigit()` against its own `[A-Za-z0-9_-]` KDoc. Fixed here (assertions → 4 / `MAX_RECENT + 3`; explicit ASCII ranges). `apk`/`msi`/`build` passed on that head, and `main` CI on `ebad6ec` is fully green (`35112234744`/`701`/`707`), so the red is this slice's find, not the base. Local Gradle still impossible (no JDK; egress-blocked), so CI is the compiler. `python3 -m unittest discover -s scripts -p 'test_*.py'` = **29 OK** locally. No separate mutation run: a step that merely compiled could not produce failing test names with file:line — execution is proven by the genuine red (caveat: the red consumed all 10 annotation slots, so the re-run confirms nothing else hides behind the cap).
+
+**CI green on the fix head `6cfa9fc`:** `build-and-test` **pass** 4m35s (`35113967339`), `apk` pass 2m38s + `msi` pass 6m54s (`35113967288`), `build` pass 2m29s (`35113967485`); `aab`/`publish`/`release_draft` skipping by design. Nothing hid behind the annotation cap — the whole desktop suite passes, and the genuine red on the previous head stands as the execution proof.
+
+**Exact next step:** PR #71 review + merge decision (do **not** merge until asked). ADR-007 (#54) and #53 (do-not-merge ROADMAP wipe) are unchanged.
+
+**Explicitly NOT claimed:** anything about the desktop app itself — no behaviour changed, no Windows hardware involved, no jump-list/tray re-verification. Only that the existing tests now run where a red one can be seen.
+
+---
+
+<details>
+<summary><b>Prior snapshot (`arena/01a0aa7a-dhun` — PR #70 Android <12 backdrop guard; MERGED as `ebad6ec`)</b></summary>
+
 Updated **2026-09-16 (UTC)** · session **`arena/01a0aa7a-dhun`** — **PR #70: Android <12 backdrop guard unified across FullPlayer and NowPlayingBackdrop** · base = **`e93d5f4`** = **PR #69 MERGED**.
 
 **Current state & active scope:**
@@ -33,6 +52,8 @@ Updated **2026-09-16 (UTC)** · session **`arena/01a0aa7a-dhun`** — **PR #70: 
 - **Hardware-verified:** None claimed; on-device visual appearance on physical Android 8–11 devices remains an open hardware gate.
 
 **Exact next technical step & blockers:** Await user review and explicit merge instruction for PR #70 (`gh pr merge 70 --merge`). Do NOT merge until instructed. Blockers: none.
+
+</details>
 
 ---
 

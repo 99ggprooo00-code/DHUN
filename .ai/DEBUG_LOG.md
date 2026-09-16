@@ -1,5 +1,53 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-16 — the new desktop-test gate immediately finds 3 latent failures from PR #47 (`arena/01a0aa8e-dhun`)
+
+**Symptom.** First CI on PR #71 (`build-and-test` run `35112656439`, 8m26s)
+red on the brand-new step — and only there (`apk`/`msi`/`build` pass):
+
+```
+TaskExecutionException: Execution failed for task ':app-desktop:jvmTest'.
+AssertionError: expected:<7> but was:<8>  @ JumpListModelTest.more than MAX_RECENT recents are capped(JumpListModelTest.kt:57)
+AssertionError: expected:<3> but was:<4>  @ JumpListModelTest.entries with invalid track ids are dropped, others survive(JumpListModelTest.kt:48)
+AssertionError: Expected value to be false.  @ JumpListArgsTest.id validation allows only plain id characters(JumpListArgsTest.kt:56)
+```
+
+**Root cause — two independent defects, both latent since candidate 27 and
+both invisible because `:app-desktop:jvmTest` was never a CI step:**
+1. **Two test assertions forgot the separator.** `buildTasks` returns
+   recents + separator + 2 verbs (its KDoc order, and what the passing
+   sibling test `recents come first…` asserts: 2+1+2=5). The capped test
+   asserted `MAX_RECENT + 2` (= 7) while its own comment says "5 recents +
+   separator + 2 verbs" (= 8); the invalid-id test asserted 3 for one
+   surviving recent (1+1+2 = 4). Production matched the documented order in
+   both cases — the assertions were wrong from the day they were written
+   (`d33adc9`) and never executed anywhere.
+2. **`isValidTrackId` used Unicode-aware `isLetterOrDigit()`.** Its own KDoc
+   promises `[A-Za-z0-9_-]` ("plain id characters", YouTube video ids), and
+   the test asserts `ä` is rejected — but `Char.isLetterOrDigit()` admits
+   Unicode letters, so `ä` passed. The implementation violated its documented
+   contract; classic Kotlin trap.
+
+**Fix.** Test assertions corrected to 4 and `MAX_RECENT + 3`; the validator
+is now an explicit ASCII range check (`a-z`, `A-Z`, `0-9`, `-`, `_`) with a
+KDoc note recording *why* `isLetterOrDigit()` is wrong here. Zero real-world
+behaviour change: track ids are YouTube video ids (ASCII), so no legitimate
+jump entry is affected.
+
+**Verification.** Re-push; CI is the compiler. Two honest caveats: (a) this
+red run consumed all 10 check-run annotations (the per-run cap), so further
+failing tests could be hiding behind it — the re-run is the confirmation,
+not this diagnosis; (b) no separate mutation run is needed for the new step:
+a step that merely compiled could not produce failing test *names* with
+file:line, so execution is proven by this genuine red.
+
+**Lesson, filed where it will be read:** PR #47's own fix commit (`6275beb`)
+says "the pure-core tests referenced it too, but `:app-desktop:test` is not
+a CI step — exactly the gap the disclosed CI limit describes". A test suite
+that never executes does not merely fail to protect — it *rots*: the two
+separator assertions were born wrong and sat for a week looking like
+coverage. Unexecuted tests are documentation with a false uniform.
+
 ## 2026-09-16 — FullPlayer and LyricsCard lacked Android <12 blur fallback guard (`arena/01a0aa7a-dhun`)
 
 **Symptom.** On Android versions below API 31 (minSdk is 26, so Android 8.0–11),

@@ -24,6 +24,22 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — desktop unit tests now execute in CI — 2026-09-16
+- **`:app-desktop:jvmTest` is a named CI step.** The five jump-list/tray
+  test classes existed since candidate 27 but CI only ran
+  `:app-desktop:compileKotlinJvm`, which compiles `jvmMain` and never
+  executes `jvmTest` — a red desktop test was impossible. `ci.yml` now runs
+  the suite as its own "Unit tests — Desktop (JVM)" step after
+  "Desktop compiles", so a compile break and a test failure fail different
+  steps. `scripts/test_ci_workflow.py` pins the step and its order.
+- **The new gate immediately caught three latent failures** (first CI run,
+  `:app-desktop:jvmTest`): two `JumpListModelTest` assertions forgot the
+  separator entry the documented task order includes, and `isValidTrackId`
+  used Unicode-aware `isLetterOrDigit()`, admitting `ä` against its own
+  `[A-Za-z0-9_-]` contract. Separator assertions corrected; the validator is
+  now ASCII-only (no real-world change — track ids are YouTube video ids).
+  These tests had never executed anywhere since PR #47.
+
 ### Fixed — Android <12 backdrop guard across FullPlayer and NowPlayingBackdrop — 2026-09-16
 - **Sharp unblurred backdrop suppressed on Android <12.** `Modifier.blur` is a
   `RenderEffect` supported only on API 31+. While `NowPlayingBackdrop` already
