@@ -2,6 +2,36 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 — project re-baselined (`arena/01a0ab12-dhun`, base `d555959`)
+
+Docs-only session: `.ai/MASTER_PROMPT.md` → v3, `.ai/ROADMAP.md`
+rewritten around build history (Phases 01–16, all code-merged) and
+sequential completion Stages S1–S6 (single-agent era — the user runs
+one agent at a time from here on). What this changes about the entries
+below:
+
+- **Device playback reports are the user's, not CI's.** "Android works
+  well / Windows acceptable" (2026-09-16) is a user report on recent
+  `test` builds. No live drill verdict exists on the current chain
+  (last real one: `34011539225` @ `dd1ab31`, 2026-09-07, pre-#57), so
+  every pre-2026-09-16 "playback broken / gated" entry below is
+  **stale evidence, kept for history** — re-baselined by Stage S1, not
+  deleted.
+- **PO-token / InnerTubeX / ADR-007 research (open PR #54) is
+  contingency reference, not backlog.** Implementation is gated by
+  triggers T1/T2 (MASTER_PROMPT §2) + the user's explicit go-ahead.
+- **PR #53 is do-not-merge** (stale ROADMAP wipe); recommendation is
+  close-unmerged (user's call). Issue #60 (guest-first login) and #63
+  (security hardening) are v2 backlog, not S1–S6 work.
+- **No Settings screen exists.** `SettingsKeys` (theme, cache budget,
+  close-to-tray…) are keys without UI — recorded as the Stage S4 gap.
+- **Dead code identified, not yet removed:** the Phase 03/04 harness
+  screens (`HarnessScreen`, `DesktopHarness*`, ~680 lines, no call
+  sites — v2 Phase 06 ordered deletion) are Stage S2 work.
+- **Trajectory candidate numbers (15–30) are retired** — several
+  shipped already (EQ, widgets, jump lists, themes). Remaining ideas
+  are the unnumbered v2 backlog in ROADMAP §8.
+
 ## 2026-09-16 — desktop unit tests execute in CI (`arena/01a0aa8e-dhun`)
 
 Closes the gap candidate 27 recorded and every entry since repeated: the five

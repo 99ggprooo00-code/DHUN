@@ -24,6 +24,30 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — full project re-baseline (docs only) — 2026-09-16
+- **`.ai/MASTER_PROMPT.md` → v3.** Rewritten from the live repo
+  (`main@d555959`): revised extraction doctrine (own-client wave chain
+  acknowledged as the production primary, NewPipe as drill watch,
+  ADR-007 as contingency gated by triggers T1/T2), corrected stack
+  (Ktor CIO, platform logging, shared navigator on both platforms),
+  build history Phases 01–16 (all code-merged), and sequential
+  single-agent completion Stages S1–S6. v2's phase text is preserved
+  in git history — it must never be implemented from again.
+- **`.ai/ROADMAP.md` rewritten.** 122 KB of session snapshots
+  collapsed (full text in the file's git history); standing user
+  directives kept; new live status from code/CI/GitHub; v2 trajectory
+  numbers retired (several "candidates" already shipped); PR/issue
+  hygiene recorded (#53 close-unmerged, #54 contingency reference,
+  #14 needs a fresh S1 verdict, #60/#63 are v2 backlog).
+- **Reconciled:** `.ai/KNOWN_LIMITATIONS.md` (re-baseline entry;
+  pre-#57 "playback broken" entries marked stale-but-kept),
+  `.ai/RISK_REGISTER.md` (drill outage + own-client rot now head the
+  table; repaired risks retired, not deleted),
+  `docs/decisions/README.md` (missing ADR-006 entry added; ADR-007
+  PROPOSED pointer added).
+- **No behavior change.** No app, extraction, playback-engine or ADR
+  change in this session.
+
 ### Fixed — desktop unit tests now execute in CI — 2026-09-16
 - **`:app-desktop:jvmTest` is a named CI step.** The five jump-list/tray
   test classes existed since candidate 27 but CI only ran
