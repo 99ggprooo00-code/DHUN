@@ -2,6 +2,53 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 — Phase 16 UI/platform slice: CI is green and mutation-proven, but nothing here was seen on a device (`arena/01a0a9c4-dhun`, PR #68)
+
+Three user-reported defects fixed (now-playing blurred backdrop on
+Home/Search/Library, Android BACK out of Search/Library, Windows horizontal
+rails). What is **not** established, and should not be inferred from the green
+checks:
+
+- **No hardware evidence of any kind.** This sandbox has no Android
+  device/emulator and no Windows machine, so the physical Back button/gesture,
+  the visual weight of the backdrop, the feel of hold-and-slide and real trackpad
+  hardware were **not** exercised. No screenshot or recording is attached to the
+  PR, and `docs/verification/` has no line for this phase. The desktop *root
+  cause* is quoted from the pinned Compose Multiplatform 1.8.2 sources
+  (`Scrollable.kt` `CanDragCalculation`, `MouseWheelScrollable.kt`
+  `canConsumeDelta`, `ComposeSceneMediator.desktop.kt`, AWT `WmMouseWheel`) —
+  that is evidence about the framework, not about a user's laptop.
+- **Android <12 keeps the old background, by design.** `Modifier.blur` is a
+  `RenderEffect`: a silent no-op below API 31. Shipping the artwork there would
+  have meant a *sharp* full-screen album cover, so `supportsRealtimeBlur` gates
+  the backdrop and those devices fall back. minSdk is 26, so that is a real
+  population, not a corner. A pre-blurred bitmap tier is an open follow-up.
+- **Rail scrollbar geometry is estimated.** A lazy list exposes no total content
+  extent, so `lazyRailMetrics` reconstructs it from the mean measured item size
+  plus the layout's spacing and content padding: exact for the uniform card
+  rails this ships on, approximate for a mixed-content rail.
+- **No fling after a mouse drag.** A mouse-dragged rail stops when the pointer
+  stops; touch keeps the framework's own fling. Deliberate, and recorded so it
+  is not rediscovered as a bug.
+- **Corrected environment fact (this contradicts what PR #68's first summary
+  said, and refines the "CI proves compile + unit only" line below):**
+  `:app-android:assembleDebug` **executes** the app-android unit suite, it does
+  not merely compile it. Proven by mutation, not by reading the workflow: a
+  reversed expectation in `NavStatePersistenceTest` turned the `Android debug
+  build` step red with `AssertionError: expected:<[SEARCH, HOME]> but was:<[HOME,
+  SEARCH]> @ NavStatePersistenceTest.tab back history survives a round
+  trip…(:111)`. A second mutation (`RailScrollbarGeometry.MIN_THUMB_FRACTION`
+  0.18f→0.05f) red-flagged `HorizontalRailTest.thumbFractionIsFlooredSoItStays
+  Grabable(:49)` the same way, so the green `:shared:jvmTest` runs are known to
+  execute the new tests rather than merely compile them. Both mutations are
+  reverted on the branch. Still true and still a gap: no workflow names
+  `:app-android:testDebugUnitTest`, so that coupling is implicit — if AGP stops
+  wiring it, the suite silently stops running.
+- **Still no local build.** No JDK, and Maven/Gradle/dl.google.com remain
+  egress-blocked (`curl` → `000`); `gh` reaches api.github.com, which is how the
+  framework sources and the check-run annotations above were read. CI is the only
+  compiler, exactly as the entries below record.
+
 ## 2026-09-10 (later) — #57 wires the session fields; device proof still open (`arena/01a0897a-dhun`)
 
 Supersedes the "inert" bullets of the "auth-gating is **not** fixed" entry below (kept verbatim — true on `main@be51d7d`): PR #57 sources `visitorData` (YouTube-homepage ytcfg) and `signatureTimestamp` (watch page → base.js, emitted as a JSON **number**), both cached and fail-open, and `OwnClientStreamResolver.resolve()` races them through all 7 alt strategies; `playbackContext` moved top-level per the InnerTube schema. **Still** honestly open: whether YouTube's gate clears — no on-device audio demonstrated with these fields, CI proves compile + unit only. ADR-007 (PR #54) stays the fallback if the gate survives.
