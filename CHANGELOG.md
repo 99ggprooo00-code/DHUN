@@ -60,6 +60,16 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   start the track — no track-by-id resolve path exists yet (recorded in
   `.ai/KNOWN_LIMITATIONS.md`).
 
+### Added — Stage S4 settings surface, slice 3 — 2026-09-16
+- **Android equalizer engine** (`AudioEffect`): `PlaybackGraph` pins every
+  player to a generated audio session and publishes it; the Koin
+  `AndroidEqualizerEngine` attaches to DHUN's own session only (never the
+  global mix), mapping the shared 10-band curve onto the DSP's bands with
+  log-frequency interpolation (`EqualizerBandMapper`, JVM-tested) and the
+  preamp folded in. No-EQ devices degrade to silent bypass; the service
+  releases the native effect on destroy. The Settings EQ section is now live
+  on both platforms (audible proof needs S3 hardware).
+
 ### Changed — Stage S2 architectural cleanup — 2026-09-16
 - **Dead harness UI deleted** (~680 lines): `HarnessScreen`,
   `HarnessViewModel`, `DesktopHarness*` had zero call sites (only an

@@ -16,6 +16,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.MediaStyleNotificationHelper
 import dev.dhun.android.R
+import dev.dhun.android.equalizer.AndroidEqualizerEngine
 import dev.dhun.android.widgets.DhunWidgetUpdater
 import dev.dhun.data.DataLayer
 import dev.dhun.download.DownloadRepository
@@ -207,6 +208,10 @@ class DhunPlaybackService : MediaSessionService() {
             release()
         }
         mediaSession = null
+        // S4.3: release the native EQ effect (binder object survives the
+        // player otherwise). The Koin engine re-binds lazily on the next
+        // enabled apply; best-effort — audio shutdown must never throw.
+        runCatching { GlobalContext.get().get<AndroidEqualizerEngine>().release() }
         super.onDestroy()
     }
 

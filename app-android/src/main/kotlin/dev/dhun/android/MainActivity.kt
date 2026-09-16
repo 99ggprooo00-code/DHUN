@@ -229,6 +229,7 @@ class MainActivity : ComponentActivity() {
                                 isDesktop = false,
                                 connectivity = koin.get(),
                                 downloadManager = koin.get(),
+                                equalizerSession = koin.get(),
                             )
                         }
                         s.reason?.let { reason ->

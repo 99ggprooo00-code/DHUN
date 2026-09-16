@@ -21,6 +21,18 @@ close-to-tray). These keys exist in `SettingsKeys` but are deliberately
 Wiring any of these is a v0.2.0+ feature, not a settings-UI gap. `THEME`
 `"system"` likewise stays storable-but-unhonoured (falls back to dark).
 
+## 2026-09-16 — S4 slice 3: Android EQ notes
+
+- The engine attaches to DHUN's own audio session id only. Session 0 (the
+  global output mix) is refused by design: EQ must never affect — or be
+  affected by — another app's audio.
+- Devices whose DSP/HAL omits an equalizer degrade to silent bypass (one log
+  line per session id). No `MODIFY_AUDIO_SETTINGS` permission is needed for
+  own-session effects.
+- Audible EQ proof is S3-hardware-gated: no emulator reproduces a DSP
+  equalizer, so the binder calls are reviewed, not executed. The curve
+  mapping itself is JVM unit-tested (`EqualizerBandMapperTest`).
+
 ## 2026-09-16 — S4 slice 2: per-track jump entries surface, don't play
 
 `--dhun-play=<id>` converges on `RemoteCommand.Show`: `MusicProvider` has no

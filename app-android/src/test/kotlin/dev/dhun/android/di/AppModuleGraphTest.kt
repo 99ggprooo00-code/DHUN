@@ -2,6 +2,7 @@ package dev.dhun.android.di
 
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
+import dev.dhun.android.equalizer.AndroidEqualizerEngine
 import dev.dhun.android.download.DownloadServiceController
 import dev.dhun.android.download.ForegroundServiceDownloadManager
 import dev.dhun.android.playback.DhunAudioSegmentCache
@@ -23,6 +24,7 @@ import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.lyrics.YouTubeLyricsSource
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.search.SearchViewModel
+import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
 import org.junit.After
@@ -111,5 +113,10 @@ class AppModuleGraphTest {
         koin.get<CoroutineScope>()
         koin.get<HomeViewModel>()
         koin.get<SearchViewModel>()
+
+        // S4.3 equalizer: engine resolves without touching AudioEffect (lazy
+        // bind on first enabled apply), session wraps the same engine.
+        koin.get<AndroidEqualizerEngine>()
+        koin.get<EqualizerSession>()
     }
 }

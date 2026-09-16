@@ -23,6 +23,9 @@ import dev.dhun.extraction.OwnClientStreamResolver
 import dev.dhun.extraction.StreamResolver
 import dev.dhun.innertube.InnerTubeClient
 import dev.dhun.player.AudioCacheBudget
+import dev.dhun.android.equalizer.AndroidAudioSession
+import dev.dhun.android.equalizer.AndroidEqualizerEngine
+import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.lyrics.LrcLibSource
@@ -170,4 +173,11 @@ val appModule = module {
             scope = get(),
         )
     }
+
+    // S4.3: equalizer — the engine binds android.media.audiofx.Equalizer to
+    // DHUN's own audio session (published by PlaybackGraph); the session is
+    // the shared controller the Settings screen drives. Kept as two singles
+    // so the service can release the native effect on destroy.
+    single { AndroidEqualizerEngine(sessionId = { AndroidAudioSession.sessionId }) }
+    single { EqualizerSession(engine = get<AndroidEqualizerEngine>()) }
 }
