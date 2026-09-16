@@ -1,5 +1,31 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-16 (UTC)** · session **`arena/01a0aa7a-dhun`** — **Baseline post-PR #69: mouse-rail fling + named Android unit-test CI step MERGED** · base = **`e93d5f4`** = **PR #69 MERGED**.
+
+**Current state & active scope:** PR #69 merged into `main` (`e93d5f4`), completing Phase 16 UI polish and follow-ups:
+1. Now-playing blurred backdrop across Home, Search, and Library (`NowPlayingBackdrop.kt`).
+2. Android tab back navigation contract (`AppNavState.kt`, `MainActivity.kt`).
+3. Windows horizontal rail hold-and-slide dragging and smooth mouse fling decay (`HorizontalRail.kt`).
+4. Named Android unit-test step in `ci.yml` (`scripts/test_ci_workflow.py`).
+
+**Files currently under work:** Reconciling `.ai/ROADMAP.md` and establishing session `arena/01a0aa7a-dhun` baseline.
+
+**Last actual error:** "none" on `main` / `arena/01a0aa7a-dhun`. (CMP 1.8.2 `minimumFlingVelocity` compile issue during PR #69 was fixed in commit `388892e`; `rot-drill` push 0-job noise remains known non-blocking).
+
+**Verification status:**
+- **Local:** `python3 -m unittest discover -s scripts -p 'test_*.py'` = 27 OK.
+- **CI-verified:** PR #69 head green across `build-and-test` (`35103659597`), `Build APK` (`35103659541`), and `test-release` (`35103660450`).
+- **Merged:** PR #69 merged to `main` at `e93d5f4`.
+- **Released:** Rolling `test` pre-release updated.
+- **Hardware-verified:** None claimed; on-device feel of mouse fling, backdrop visual balance, tab back gestures, and audible playback remain open hardware gates.
+
+**Exact next technical step & blockers:** Await user direction on the next prioritized phase/task (e.g. Android <12 pre-blurred backdrop, ADR-007 extraction root-fix track, or next roadmap candidate), open session PR on `arena/01a0aa7a-dhun`, and execute autonomously. Blockers: none.
+
+---
+
+<details>
+<summary><b>Prior snapshot (`arena/01a0aa5e-dhun` — PR #69 mouse-rail fling + named CI step; MERGED as `e93d5f4`)</b></summary>
+
 Updated **2026-09-16 (UTC)** · session **`arena/01a0aa5e-dhun`** — **PR #68 follow-ups: mouse-rail fling + named Android unit-test CI step** (shared `commonMain` + `.github/workflows/ci.yml`) · base = **`e8f8634`** = **PR #68 MERGED**.
 
 **What this branch changes:** the two follow-ups #68 listed and did not ship — no extraction, playback-engine, PO-token or ADR-007 change.
