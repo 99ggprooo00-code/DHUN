@@ -1807,8 +1807,13 @@ still passes `isDesktop = true`, and there is no platform fork.
 Python gate is runnable: `python3 -m unittest discover -s scripts -p 'test_*.py'`
 → 24 OK.
 
-**Verification state:** CI on `c0b27fc` (run `35048954505`): shared `jvmTest`,
-Android `assembleDebug`, Desktop `compileKotlinJvm`, probe compile — see the PR.
+**Verification state:** the first CI run (`35048954505` on `c0b27fc`) was red on
+`:shared:compileTestKotlinJvm` only, and only for a test-side Kotlin detail:
+`songCount * DhunSpacing.xs` — `Int.times(Dp)` is a top-level extension this
+codebase does not import, where `Dp.times(Int)` is the member form the app uses
+(`DhunSpacing.glassBlur * 4`). `commonMain` compiled as-is; the assertion now
+reads `DhunSpacing.xs * songCount`. Re-run covers shared `jvmTest`, Android
+`assembleDebug`, Desktop `compileKotlinJvm` and the probe compile — see the PR.
 `rot-drill` 0-job no-trigger noise is not a gate. **Open, and not inferable from
 CI:** on-device / on-Windows eyeball of the animation curve, a rapid
 open↔close mash on a 60Hz and a 120Hz panel, and a dragged Desktop window mid
