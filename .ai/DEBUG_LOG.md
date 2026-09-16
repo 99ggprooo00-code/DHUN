@@ -1760,3 +1760,66 @@ cache for instant 0ms track transitions. Purged unplayed temp files on queue jum
 Fixed `QueueManager.setQueue` setting `currentIndexInItems` before `rebuildOrder()`
 and added `peekNext()` helper.
 
+## 2026-09-16 · Full Player / Related-sheet transition moved only the artwork (session `arena/01a0a7f3-dhun`, follow-up to PR #66)
+
+**Symptom (device report, Android; Desktop reproduced it):** tapping the queue
+glyph opened the Queue/Related panel while the *only* thing that moved was the
+cover. Title, artist, timeline, prev/play/next and the desktop volume slider
+stayed parked, the panel rose into the space above them, and opening looked like
+a glass wash fading in over a stationary player. Closing looked fine, which is
+how the asymmetry got shipped.
+
+**Root cause, three layers, all inside `shared/src/commonMain/…/ui/player/FullPlayer.kt`:**
+1. PR #66 translated the player Box by `playerOffsetY` and then handed
+   `PlayerControlCluster` the exact inverse (`translationY = -playerOffsetY`) to
+   "keep the chrome reachable as a footer". Two offsets on one subtree = the
+   chrome is stationary by construction.
+2. The sheet was placed at `padding(bottom = chromeHeight)` with
+   `height = 0.68 · (available − chromeHeight)`. Its top therefore met neither
+   the player's lower boundary nor the bottom edge — the "gap" was structural,
+   not an animation defect.
+3. `alpha = motion.progress` on the sheet made the first ~40% of the flight a
+   fade rather than a rise, and the travel was re-derived from live geometry on
+   every frame, so anything that re-measured mid-motion (chrome, window resize)
+   moved the target underneath a panel that had already been mounted.
+
+**Fix:** one progress, one travel, both halves derived from it. `relatedSheetTravel`
+(dp, from safe-area height + `chromeHeightDp`-corrected measured chrome) is the
+sheet's height *and* the travel; `relatedSheetMotion(progress, travelPx)` yields
+`playerOffsetY = -travel·progress` and `sheetOffsetY = travel·(1-progress)`, so
+`player bottom == sheet top` at every frame with the panel flush to the bottom of
+the safe area. `relatedSheetTransition` owns the mount window (target opened →
+progress lands on 0) and the mirrored `actionRowVisible`, so the queue / shuffle /
+repeat / lyrics strip is faded out — space preserved, so the chrome measure cannot
+change mid-motion — and returns exactly once. `rememberFrozenSheetTravel` captures
+the travel while at rest and holds it for the flight, including reversals. Half
+the rise is absorbed by the weighted artwork field (`relatedSheetLayoutRiseDp`) so
+the cover re-fits into a thumbnail rather than being cropped, and the header's
+swipe-down collapse stays inside the touch area. Fade removed; the panel slides,
+opaque, clipped by the player's own `clipToBounds`. No `AnimatedVisibility` enter
+on the sheet to fight the shared transition. Shared commonMain only — `Main.kt`
+still passes `isDesktop = true`, and there is no platform fork.
+
+**Environment trap (unchanged, still true):** this sandbox has no JDK and Maven
+/ Gradle / dl.google.com are egress-blocked (`curl` to them returns `000`), so
+`./gradlew :shared:jvmTest`, `:app-android:assembleDebug` and
+`:app-desktop:compileKotlinJvm` cannot run locally; CI is the compile gate. The
+Python gate is runnable: `python3 -m unittest discover -s scripts -p 'test_*.py'`
+→ 24 OK.
+
+**Verification state:** the first CI run (`35048954505` on `c0b27fc`) was red on
+`:shared:compileTestKotlinJvm` only, and only for a test-side Kotlin detail:
+`songCount * DhunSpacing.xs` — `Int.times(Dp)` is a top-level extension this
+codebase does not import, where `Dp.times(Int)` is the member form the app uses
+(`DhunSpacing.glassBlur * 4`). `commonMain` compiled as-is; the assertion now
+reads `DhunSpacing.xs * songCount`. Re-run covers shared `jvmTest`, Android
+`assembleDebug`, Desktop `compileKotlinJvm` and the probe compile: **green on `44d8a32`
+(run `35049622474`, 5m17s)** — `:shared:jvmTest` runs all 24 `PlayerSheetLayoutTest`
+cases on a real Kotlin/JVM + Compose build, `:app-android:assembleDebug` builds the APK
+off the same `commonMain`, and the Desktop module compiles against it.
+`python3 -m unittest discover -s scripts -p 'test_*.py'` = 24 OK locally.
+`rot-drill` 0-job no-trigger noise is not a gate. **Open, and not inferable from
+CI:** on-device / on-Windows eyeball of the animation curve, a rapid
+open↔close mash on a 60Hz and a 120Hz panel, and a dragged Desktop window mid
+transition. The seam, reversal, freeze, visibility-window and
+restored-layout contracts are pinned by `PlayerSheetLayoutTest` instead.

@@ -1,5 +1,25 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-16 (UTC)** · session **`arena/01a0a7f3-dhun`** — **Full Player ⇄ Related/Queue sheet: the follow-up PR #66 should have been** (shared `commonMain`; Android *and* Windows/Desktop, one implementation) · base = **`4eba3da`** = **PR #66 MERGED**.
+
+**What this branch changes:** the device report was "opening Related/Queue mainly moves the artwork thumbnail while the rest of the player remains stationary", and #66's code explains it — the chrome was handed the *inverse* of the player offset (`translationY = -playerOffsetY`), the sheet was inset `chromeHeight` above the bottom as a footer, and `alpha = progress` turned the rise into a fade. Now: **one** `updateTransition` progress and **one** travel distance drive everything — `relatedSheetTravel` (safe-area height − density-corrected measured chrome) is simultaneously the panel's height and the player's rise, so `playerOffsetY = -travel·progress` and `sheetOffsetY = travel·(1-progress)` keep the panel's top on the player's lower boundary at every frame; the travel is **frozen** from the pre-flight measurement for the whole flight (`rememberFrozenSheetTravel`), half of it is absorbed by the weighted artwork field so the cover re-fits into a thumbnail instead of being cropped and the header's swipe-down collapse stays reachable, and the queue/shuffle/repeat/lyrics row is faded out (space kept, so the chrome measure cannot move mid-motion) for the entire mount window. Closing is unchanged in feel and is literally the same function read backwards; rapid reversal continues from the current progress.
+
+**Files:** `shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt` · `shared/src/commonMain/kotlin/dev/dhun/design/DhunSpacing.kt` (new `queuePanelPlayerBandFloor`, `queuePanelMinHeight` doc) · `shared/src/jvmTest/kotlin/dev/dhun/ui/player/PlayerSheetLayoutTest.kt` · `CHANGELOG.md` · `.ai/DEBUG_LOG.md` · this file.
+
+**Last error / CI:** local Gradle remains impossible (no JDK; Maven/Gradle/dl.google.com egress-blocked → `curl` returns `000`), so CI is the compiler: `python3 -m unittest discover -s scripts -p 'test_*.py'` = **24 OK** locally. CI `35048954505` on `c0b27fc` went **red on `:shared:compileTestKotlinJvm` and nothing else** — `songCount * DhunSpacing.xs` in the new test: `Int.times(Dp)` is a top-level extension that is not imported in this codebase, while `Dp.times(Int)` is the member form the rest of the code uses (`DhunSpacing.glassBlur * 4`). `commonMain` compiled unchanged, so the fix is the operand order, not the geometry. **CI is green on the head** — `35049622474` on `44d8a32`: python gates, `:shared:jvmTest`
+(24 tests, all the transition geometry included), `:app-android:assembleDebug`, the probe
+compile and `:app-desktop:compileKotlinJvm` all `success` (`rot-drill` 0-job noise is not a
+gate and fails identically on `main`). `rot-drill` 0-job noise is not a gate (see the snapshot below).
+
+**Exact next step:** (1) PR #67 review + the merge decision; (2) **the user's gate**: open the test APK on Android and the MSI on Windows and watch the panel — the transition contract is pinned by `PlayerSheetLayoutTest`, but no CI run can see a frame; (3) if the reference wants a bigger/smaller panel, `QUEUE_PANEL_HEIGHT_FRACTION` (0.6) and `DhunSpacing.queuePanelPlayerBandFloor` (96dp) are the only two dials; (4) open follow-ups if the user asks for drag-to-dismiss on the sheet itself (not in this slice: the panel keeps ✕ + Back, the header keeps its swipe).
+
+**Explicitly NOT claimed:** on-device smoothness, 120Hz behaviour, or a Windows screen capture. `docs/verification/08-player.md` has no line for this transition yet, so nothing here asserts one.
+
+---
+
+<details>
+<summary><b>Prior snapshot (`arena/01a0897a-dhun` — PR #57 §7 sourcing fix; no longer the active task, kept verbatim)</b></summary>
+
 Updated **2026-09-10 (UTC)** · session **`arena/01a0897a-dhun`** — **PR #57: complete PR #55's §7 fix (visitorData + sts, sourced and raced)** · **`origin/main` = `06a35fb`** = **PR #59 MERGED** (docs: rot-drill red push-runs are 0-job noise; `main` green since #56, rolling `test` current). This branch rebased onto `06a35fb` — all 4 code/test commits replayed cleanly (docs-only base change, third rebase). Verified via `gh` + `git ls-remote`. Board: OPEN **#53** (⚠️ do-not-merge as-is, `+17/−513` ROADMAP hunk), **#54** (ADR-007 PROPOSED), **#57** (this PR).
 
 **What this PR is vs `main`:** the #56 repair + #58/#59 marks are the base. #57 adds the **sourcing** (`visitorDataOrNull()` from homepage ytcfg, `signatureTimestampOrNull()` from watch page → base.js, cached + fail-open), the **wiring** (`resolve()` races one `PlayerIdentity` through all 7 strategies), 16 new tests — plus two schema corrections: (1) `playbackContext` **top-level** (InnerTube/yt-dlp; #56's carried-session test updated, null-case test strengthened); (2) sts as **JSON number**. #58's ask for a **live** probe verdict stands as device-test acceptance (rot-drill measures `main`, so post-merge). ADR-007 (#54) stays the fallback if the gate survives; the user's §7 mandate governs this slice.
@@ -10,6 +30,7 @@ Updated **2026-09-10 (UTC)** · session **`arena/01a0897a-dhun`** — **PR #57: 
 
 **Exact next step:** (1) ✅ done — head `2bbfdf5` green on all gates; (2) **merge #57 — awaiting user approval**; (3) on-device re-test of `qSay_8xzijg` (**CI proves compile + unit only, never audible playback**); (4) if gated still, new per-identity verdict → report §11. NOT in slice: `web_remix` primary-path identity, Android outer resolve budget.
 
+</details>
 ---
 
 <details>

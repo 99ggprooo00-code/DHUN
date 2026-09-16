@@ -65,9 +65,19 @@ object DhunSpacing {
     /**
      * Shortest Queue/Related sheet that still shows a header and real rows.
      * The sheet asks for a share of the room above the control cluster but
-     * never drops below this while that room exists.
+     * never drops below this while that room exists. Because the sheet's height
+     * is also how far the Full Player rises for it, this floor is a promise
+     * about the panel *and* about the motion, so it is deliberately small
+     * enough to fit a short phone's remaining band.
      */
     val queuePanelMinHeight = 280.dp
+    /**
+     * Band of Full Player that must stay on screen while the Queue/Related
+     * sheet is up: enough of the cover, above the metadata and transport that
+     * rise with it, that the player still reads as the player rather than as a
+     * strip of cropped artwork. Caps the sheet's travel on short viewports.
+     */
+    val queuePanelPlayerBandFloor = 96.dp
     val playerVolumeMaxWidth = 240.dp
     val playerDiagnosticsMaxHeight = 320.dp
     val contentBottomInset = 112.dp  // room above frosted mini+nav dock
