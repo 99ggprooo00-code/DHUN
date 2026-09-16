@@ -21,6 +21,15 @@ close-to-tray). These keys exist in `SettingsKeys` but are deliberately
 Wiring any of these is a v0.2.0+ feature, not a settings-UI gap. `THEME`
 `"system"` likewise stays storable-but-unhonoured (falls back to dark).
 
+## 2026-09-16 — S4 slice 2: per-track jump entries surface, don't play
+
+`--dhun-play=<id>` converges on `RemoteCommand.Show`: `MusicProvider` has no
+track-by-id lookup (only search/feed/related/page), so resolving a bare video
+id into a playable `Track` would mean a search round-trip with fuzzy matching
+— a wrong-track play is worse than a surface. The Play/Pause verb (the one S4
+promised) genuinely toggles. A `provider.track(id)` API + jump-play would be a
+v0.2.0+ feature.
+
 ## 2026-09-16 — second-look code findings (same session, engine-room read)
 
 Read end to end: `InnerTubeClient`, `OwnClientStreamResolver`,

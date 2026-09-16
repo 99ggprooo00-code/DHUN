@@ -14,11 +14,12 @@ import java.io.File
  * and Open tasks. No `SetAppID`, no custom categories, no registry writes:
  * custom categories require registering the category under an AUMID we cannot
  * set from the paths this batch owns, and the task list works on the app's
- * default identity. Honest caveat, also recorded in the ROADMAP: a jump-list
- * click launches `DHUN.exe <args>` and today converges on the single-instance
- * launch-or-refocus path, so Recent/Open genuinely surface the running app,
- * while the Play/Pause verb needs the one-line arg hook in the desktop entry
- * point that a later batch can add using [JumpListArgs.parse].
+ * default identity. A jump-list click launches `DHUN.exe <args>` and converges
+ * on the single-instance path: Recent/Open surface the running app, and since
+ * S4.2 the Play/Pause verb toggles playback without surfacing
+ * ([JumpListArgs.requestForArgs] → `SingleInstance.RemoteCommand`, carried over
+ * the guard's `PLAYPAUSE` wire command). Per-track Recent entries surface the
+ * app but cannot start that track — no track-by-id resolve path exists yet.
  */
 
 /** One recently played track as the jump list sees it (no shared types). */
@@ -52,7 +53,30 @@ object JumpListArgs {
         data object Unknown : Command
     }
 
-    /** Parses one launch argument (the future `main()` hook is a `when` over this). */
+    /**
+     * Maps a parsed launch argument onto the single-instance request (S4.2 —
+     * this is the `main()` hook the Play/Pause verb was waiting for).
+     * PlayPause is the only verb with remote behaviour; Open/Unknown surface,
+     * and Play(id) surfaces too — there is no track-by-id resolve path, so a
+     * per-track jump entry opens the app rather than pretending to play (the
+     * honest degradation; see `.ai/KNOWN_LIMITATIONS.md`).
+     */
+    fun toRemoteCommand(command: Command): SingleInstance.RemoteCommand = when (command) {
+        Command.PlayPause -> SingleInstance.RemoteCommand.PlayPause
+        else -> SingleInstance.RemoteCommand.Show
+    }
+
+    /**
+     * The request this process carries: the first `--dhun-*` arg wins, and a
+     * launch without one is a plain launch (Show). Non-`--dhun-` args (JVM or
+     * launcher flags that leaked into the process argv) are ignored.
+     */
+    fun requestForArgs(args: Array<String>): SingleInstance.RemoteCommand =
+        args.firstOrNull { it.startsWith("--dhun-") }
+            ?.let { toRemoteCommand(parse(it)) }
+            ?: SingleInstance.RemoteCommand.Show
+
+    /** Parses one launch argument. */
     fun parse(arg: String): Command = when {
         arg == OPEN -> Command.Open
         arg == PLAY_PAUSE -> Command.PlayPause

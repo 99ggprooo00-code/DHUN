@@ -39,6 +39,7 @@ import dev.dhun.extraction.StreamResolver
 import dev.dhun.extraction.YtDlpStreamResolver
 import dev.dhun.innertube.InnerTubeClient
 import dev.dhun.desktop.native.DhunTray
+import dev.dhun.desktop.native.JumpListArgs
 import dev.dhun.desktop.native.SingleInstance
 import dev.dhun.desktop.player.DesktopDhunPlayer
 import dev.dhun.desktop.smct.Smct
@@ -180,7 +181,7 @@ private fun logStartupFailure(e: Throwable) {
     } catch (_: Throwable) { }
 }
 
-fun main() {
+fun main(args: Array<String>) {
     Thread.setDefaultUncaughtExceptionHandler { thread, ex ->
         System.err.println("DHUN uncaught on ${thread.name}: $ex")
         ex.printStackTrace()
@@ -193,25 +194,42 @@ fun main() {
     )
     // Phase 15a/27 single-instance guard — decided BEFORE the module probes,
     // Koin, the database and `application {}`, so a second launch never creates
-    // a window, a tray icon, an SMTC session or a second SQLite writer. It asks
-    // the already-running instance to surface its existing window and exits.
+    // a window, a tray icon, an SMTC session or a second SQLite writer. It sends
+    // this launch's request (`--dhun-play-pause` toggles playback; anything
+    // else surfaces the window) to the running instance and exits.
+    // S4.2: the args hook the jump-list Play/Pause verb was waiting for.
+    val launchRequest = JumpListArgs.requestForArgs(args)
     val surfaceRequest = AtomicReference<() -> Unit>()
     val surfacePending = AtomicBoolean(false)
+    val toggleRequest = AtomicReference<() -> Unit>()
+    val togglePending = AtomicBoolean(false)
     val instance = SingleInstance.start(
         // Invoked on the guard's own daemon thread — never the EDT. The
-        // callback installed below does the EDT marshaling.
-        onShow = {
-            val surface = surfaceRequest.get()
-            // The window may not be wired up yet (a third launch racing this
-            // one's startup): remember it and drain the flag once wired.
-            if (surface != null) surface() else surfacePending.set(true)
+        // callbacks installed below do the EDT marshaling.
+        onCommand = { command ->
+            when (command) {
+                SingleInstance.RemoteCommand.Show -> {
+                    val surface = surfaceRequest.get()
+                    // The window may not be wired up yet (a third launch racing this
+                    // one's startup): remember it and drain the flag once wired.
+                    if (surface != null) surface() else surfacePending.set(true)
+                }
+                SingleInstance.RemoteCommand.PlayPause -> {
+                    // Media-key semantics: toggle, never surface. Same race as
+                    // above — a PLAYPAUSE that lands before the player is wired
+                    // is drained once, right after wiring.
+                    val toggle = toggleRequest.get()
+                    if (toggle != null) toggle() else togglePending.set(true)
+                }
+            }
         },
+        request = launchRequest,
         log = ::logStartup,
     )
     val instanceLease: SingleInstance.Lease? = when (instance) {
         is SingleInstance.Startup.Primary -> instance.lease
         SingleInstance.Startup.SecondInstance -> {
-            logStartup("DHUN second instance: the running DHUN was asked to surface — exiting without opening a window")
+            logStartup("DHUN second instance: the running DHUN accepted $launchRequest — exiting without opening a window")
             System.exit(0)
             return
         }
@@ -373,6 +391,14 @@ fun main() {
             surfaceRequest.set { SwingUtilities.invokeLater { showMainWindow() } }
             if (surfacePending.getAndSet(false)) {
                 SwingUtilities.invokeLater { showMainWindow() }
+            }
+
+            // S4.2: the jump-list PlayPause path. The toggle hops onto appScope
+            // (the guard thread must never touch the player directly), then a
+            // PLAYPAUSE that arrived before wiring is drained exactly once.
+            toggleRequest.set { appScope.launch { playerViewModel.togglePlay() } }
+            if (togglePending.getAndSet(false)) {
+                appScope.launch { playerViewModel.togglePlay() }
             }
 
             fun saveGeometry() {

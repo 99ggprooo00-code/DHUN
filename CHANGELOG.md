@@ -44,6 +44,22 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   behaviour behind them — a dead toggle is worse than none
   (see `.ai/KNOWN_LIMITATIONS.md`).
 
+### Added — Stage S4 settings surface, slice 2 — 2026-09-16
+- **Jump-list Play/Pause verb (desktop)**: `main(args)` maps the first
+  `--dhun-*` arg onto a single-instance request; the guard protocol gains a
+  `PLAYPAUSE` wire command with media-key semantics (toggles playback in the
+  running instance, never surfaces). A `PLAYPAUSE` racing startup is drained
+  once after the player wires up; unknown verbs and foreign identity tokens
+  are refused without side effects.
+- **First guard protocol tests** (`SingleInstanceProtocolTest`): ephemeral
+  loopback lease covering PING/SHOW/PLAYPAUSE replies, callback dispatch,
+  token mismatch, and the parser; `JumpListArgsTest` covers the
+  args→request mapping. `start()` itself stays untested (binds the real
+  rendezvous port).
+- Per-track Recent entries (`--dhun-play=<id>`) surface the app but do not
+  start the track — no track-by-id resolve path exists yet (recorded in
+  `.ai/KNOWN_LIMITATIONS.md`).
+
 ### Changed — Stage S2 architectural cleanup — 2026-09-16
 - **Dead harness UI deleted** (~680 lines): `HarnessScreen`,
   `HarnessViewModel`, `DesktopHarness*` had zero call sites (only an
