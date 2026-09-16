@@ -996,7 +996,13 @@ internal fun relatedSheetMotion(progress: Float, travelPx: Float): RelatedSheetM
     val safeProgress = if (progress.isFinite()) progress.coerceIn(0f, 1f) else 0f
     val safeTravel = if (travelPx.isFinite() && travelPx > 0f) travelPx else 0f
     return RelatedSheetMotion(
-        playerOffsetY = -safeTravel * safeProgress,
+        // Normalize zero so equality-based geometry tests and any downstream
+        // interpolation never observe a signed negative zero.
+        playerOffsetY = if (safeTravel == 0f || safeProgress == 0f) {
+            0f
+        } else {
+            -safeTravel * safeProgress
+        },
         sheetOffsetY = safeTravel * (1f - safeProgress),
         progress = safeProgress,
     )
