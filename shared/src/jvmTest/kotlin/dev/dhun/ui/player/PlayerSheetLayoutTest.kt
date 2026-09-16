@@ -544,7 +544,7 @@ class PlayerSheetLayoutTest {
             // Even a live measurement that grows as rows land (the failure mode
             // behind a panel that re-measures under its own animation) cannot
             // move the distance once the flight has started.
-            val growingLiveMeasurement = travel + songCount * DhunSpacing.xs
+            val growingLiveMeasurement = travel + DhunSpacing.xs * songCount
             assertEquals(
                 travel,
                 relatedSheetTravelDp(inFlight = true, liveDp = growingLiveMeasurement, frozenDp = travel),

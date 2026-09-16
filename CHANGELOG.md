@@ -24,6 +24,54 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — the Full Player rises *with* the Related/Queue sheet — 2026-09-16
+- **One composition, not one moving picture.** PR #66 made the panel and the
+  player share a transition, but it left the control cluster
+  counter-translated (`-playerOffsetY`) and parked the sheet *above* the chrome
+  as a footer. The result on Android and Windows was the same: the cover slid up
+  while the title, artist, timeline, transport and desktop volume stayed where
+  they were, and the panel rose into the gap. The counter-translate is gone, the
+  footer inset is gone, and the sheet's height now *is* the transition's travel
+  distance: `playerOffsetY = -travel · progress`,
+  `sheetOffsetY = travel · (1 - progress)` from one `updateTransition` progress
+  (0 closed, 1 open), so the panel's top edge and the player's lower boundary are
+  the same y on every frame — no empty gap under the panel, nothing buried under
+  it, no `-500.dp` guess.
+- **Opening is the exact reversible counterpart of closing.** The panel no
+  longer fades in over a still player (`alpha = progress` is gone): it is
+  opaque, clipped by the player's own bounds, mounted on the first frame at its
+  real frozen height, and driven by the same numbers as the close. Reversing the
+  target mid-flight continues from the current progress instead of restarting,
+  because the sheet stays in the tree until the close lands on exactly zero.
+- **Travel is captured from responsive geometry and frozen for the flight.**
+  Safe-area height (Android status bar / cutout / gesture inset via
+  `safeDrawingPadding`, the raw window box on Desktop), the density-corrected
+  measured chrome, and the panel's own share of the room left over. Idle frames
+  keep re-tracking that measurement (rotation, a dragged window, a track change),
+  and the value in force when the target flips is what the whole motion runs
+  against. `DhunSpacing.queuePanelPlayerBandFloor` additionally caps the travel
+  so a short viewport shrinks the panel rather than pushing the player out.
+- **The cover becomes a thumbnail instead of being cropped.** Half the rise is
+  absorbed by the existing weighted artwork field
+  (`relatedSheetLayoutRiseDp`), so `fittedPlayerArtworkSize` re-fits the cover as
+  the field shortens; the header stays at the top of the safe area, which keeps
+  its swipe-down-to-collapse gesture reachable while the panel is up.
+- **The row the panel replaces gets out of the way.** Queue / shuffle / repeat /
+  lyrics are faded out for the entire mount window — with their measured space
+  preserved, because that measurement is what sizes the travel — and restored on
+  the frame the close lands, so nothing flickers back on mid-motion. Hidden
+  buttons also stop being hittable.
+- Shared `commonMain` only: no Android- or Windows-only fork, no second player,
+  no duplicated navigation destination, no screenshot UI. `PlayerViewModel`, the
+  Queue/Related state, tabs, Play Radio, loading/error/empty states, add-to-queue,
+  the ✕, Back, and the drag behaviour are all the existing ones.
+- Tests: `PlayerSheetLayoutTest` pins the seam at 0 / 0.5 / 1 (and between) for
+  small and large Android portrait, tablet, landscape, and wide, maximised and
+  resized Desktop windows; opening-vs-closing frame equality; rapid reversal
+  continuity; travel freeze/unfreeze; action-row visibility for the whole
+  transition; the untouched layout restored after closing; and geometry that
+  never depends on how many songs have arrived.
+
 ### Changed — one widget only: Quick Play survives, Now Playing deleted — 2026-09-15
 - **Now Playing is gone**, on device feedback after PR #61. It "added but
   couldn't load": its layout declared `minHeight="140dp"` for a 4×2 slot that
