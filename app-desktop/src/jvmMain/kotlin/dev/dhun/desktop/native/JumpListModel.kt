@@ -68,9 +68,13 @@ object JumpListArgs {
      * plain id characters so no shell metacharacter can ever ride through.
      * YouTube video ids are 11 chars of `[A-Za-z0-9_-]`; the check is looser
      * in length so a provider change degrades to "no jump entry", not a crash.
+     * ASCII-only on purpose: `Char.isLetterOrDigit()` is Unicode-aware and
+     * would admit letters like `ä` that no track id can contain.
      */
     fun isValidTrackId(id: String): Boolean =
-        id.isNotEmpty() && id.length <= 64 && id.all { it.isLetterOrDigit() || it == '-' || it == '_' }
+        id.isNotEmpty() && id.length <= 64 && id.all { c ->
+            c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9' || c == '-' || c == '_'
+        }
 }
 
 /** One line of the jump-list task block: a labeled task or a separator. */
