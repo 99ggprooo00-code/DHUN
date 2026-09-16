@@ -1,25 +1,32 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-16 (UTC)** · session **`arena/01a0aa7a-dhun`** — **Baseline post-PR #69: mouse-rail fling + named Android unit-test CI step MERGED** · base = **`e93d5f4`** = **PR #69 MERGED**.
+Updated **2026-09-16 (UTC)** · session **`arena/01a0aa7a-dhun`** — **PR #70: Android <12 backdrop guard unified across FullPlayer and NowPlayingBackdrop** · base = **`e93d5f4`** = **PR #69 MERGED**.
 
-**Current state & active scope:** PR #69 merged into `main` (`e93d5f4`), completing Phase 16 UI polish and follow-ups:
-1. Now-playing blurred backdrop across Home, Search, and Library (`NowPlayingBackdrop.kt`).
-2. Android tab back navigation contract (`AppNavState.kt`, `MainActivity.kt`).
-3. Windows horizontal rail hold-and-slide dragging and smooth mouse fling decay (`HorizontalRail.kt`).
-4. Named Android unit-test step in `ci.yml` (`scripts/test_ci_workflow.py`).
+**Current state & active scope:**
+1. Unified platform blur guard across `NowPlayingBackdrop.kt` and `FullPlayer.kt` (`PlayerBackdrop` + `LyricsCard`).
+2. On Android below API 31 (where Compose's `Modifier.blur` is a RenderEffect no-op), unblurred sharp album art is suppressed, ensuring screens fall back cleanly to the dark background and ambient scrim as designed in ADR-002 / `docs/verification/08-player.md`.
+3. Pinned policy with unit tests in `NowPlayingBackdropPolicyTest` and `PlayerSheetLayoutTest`.
 
-**Files currently under work:** Reconciling `.ai/ROADMAP.md` and establishing session `arena/01a0aa7a-dhun` baseline.
+**Files currently under work:**
+- `shared/src/commonMain/kotlin/dev/dhun/design/BlurSupport.kt`
+- `shared/src/commonMain/kotlin/dev/dhun/design/components/NowPlayingBackdrop.kt`
+- `shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt`
+- `shared/src/jvmTest/kotlin/dev/dhun/design/NowPlayingBackdropPolicyTest.kt`
+- `shared/src/jvmTest/kotlin/dev/dhun/ui/player/PlayerSheetLayoutTest.kt`
+- `CHANGELOG.md`
+- `.ai/KNOWN_LIMITATIONS.md`
+- this file.
 
-**Last actual error:** "none" on `main` / `arena/01a0aa7a-dhun`. (CMP 1.8.2 `minimumFlingVelocity` compile issue during PR #69 was fixed in commit `388892e`; `rot-drill` push 0-job noise remains known non-blocking).
+**Last actual error:** "none" on `main` / `arena/01a0aa7a-dhun`.
 
 **Verification status:**
 - **Local:** `python3 -m unittest discover -s scripts -p 'test_*.py'` = 27 OK.
-- **CI-verified:** PR #69 head green across `build-and-test` (`35103659597`), `Build APK` (`35103659541`), and `test-release` (`35103660450`).
-- **Merged:** PR #69 merged to `main` at `e93d5f4`.
+- **CI-verified:** PR #70 open, initial commit `f7871b3` green on `apk` & `build`.
+- **Merged:** Base `e93d5f4` merged to `main`.
 - **Released:** Rolling `test` pre-release updated.
-- **Hardware-verified:** None claimed; on-device feel of mouse fling, backdrop visual balance, tab back gestures, and audible playback remain open hardware gates.
+- **Hardware-verified:** None claimed; on-device visual appearance on physical Android 8–11 devices remains an open hardware gate.
 
-**Exact next technical step & blockers:** Await user direction on the next prioritized phase/task (e.g. Android <12 pre-blurred backdrop, ADR-007 extraction root-fix track, or next roadmap candidate), open session PR on `arena/01a0aa7a-dhun`, and execute autonomously. Blockers: none.
+**Exact next technical step & blockers:** Push implementation commit to PR #70, verify all CI gates green (`build-and-test`, `build`, `apk`, `msi`), and await user instruction before merging. Blockers: none.
 
 ---
 

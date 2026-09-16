@@ -2,6 +2,18 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 (session `arena/01a0aa7a-dhun`) — Android <12 backdrop guard unified across FullPlayer and NowPlayingBackdrop
+
+- **Android <12 devices consistently receive clean dark fallback without sharp bleed.**
+  `supportsRealtimeBlur` now guards both `FullPlayer` (`PlayerBackdrop` + `LyricsCard`)
+  and `NowPlayingBackdrop`. On Android below API 31 (where `Modifier.blur` is a RenderEffect
+  no-op), unblurred artwork is suppressed across all screens.
+- **Still no pre-blurred bitmap generation on API <31.** Android 8.0–11 devices display
+  the designed clean dark surface and ambient scrim rather than an offscreen pre-blurred
+  bitmap cache.
+- **Hardware verification OPEN.** Visual look on physical Android 8–11 devices remains an open
+  hardware check.
+
 ## 2026-09-16 (later) — mouse-rail fling + named Android unit-test CI step (`arena/01a0aa5e-dhun`)
 
 Follow-ups listed by PR #68, not a new product surface. What is **not**

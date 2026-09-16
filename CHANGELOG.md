@@ -24,6 +24,15 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — Android <12 backdrop guard across FullPlayer and NowPlayingBackdrop — 2026-09-16
+- **Sharp unblurred backdrop suppressed on Android <12.** `Modifier.blur` is a
+  `RenderEffect` supported only on API 31+. While `NowPlayingBackdrop` already
+  checked `supportsRealtimeBlur`, `FullPlayer`'s blurred bleed layer and `LyricsCard`
+  did not check platform capability, drawing sharp stretched artwork under the
+  controls on Android 8.0–11. Both components now use a unified policy guard
+  (`shouldRenderPlayerBackdrop` / `shouldRenderBackdrop`), consistently falling back
+  to the clean dark surface and ambient scrim when realtime blur is unsupported.
+
 ### Fixed — mouse-rail fling + named Android unit-test CI step — 2026-09-16
 - **Windows rails coast after a mouse flick.** Hold-and-slide (PR #68) stopped
   dead on pointer-up. Releasing with leftover velocity now decays into a fling

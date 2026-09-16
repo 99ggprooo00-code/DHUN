@@ -64,8 +64,8 @@ fun NowPlayingBackdrop(
     modifier: Modifier = Modifier,
     dimColor: Color = Color.Black.copy(alpha = NowPlayingBackdropPolicy.DIM_ALPHA),
 ) {
-    val url = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) }
-    if (url == null || !supportsRealtimeBlur) return
+    if (!NowPlayingBackdropPolicy.shouldRenderBackdrop(artworkUrl, supportsRealtimeBlur)) return
+    val url = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) } ?: return
 
     val context = LocalPlatformContext.current
     // `phase` restarts per URL; `loadedOnce` deliberately does not, so the
@@ -147,6 +147,13 @@ object NowPlayingBackdropPolicy {
 
     /** Artwork tier this backdrop asks for — the list tier, see [resolveUrl]. */
     val artworkSizePx: Int get() = ArtworkUrls.LIST_SIZE_PX
+
+    /**
+     * Whether a backdrop should be rendered given the thumbnail URL and
+     * platform blur capability.
+     */
+    fun shouldRenderBackdrop(thumbnailUrl: String?, supportsBlur: Boolean): Boolean =
+        resolveUrl(thumbnailUrl) != null && supportsBlur
 
     /**
      * Artwork to request, or `null` when the current song has nothing usable —
