@@ -38,6 +38,7 @@ import dev.dhun.player.equalizer.EqualizerPresets
 import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.player.equalizer.toUiModel
 import dev.dhun.presentation.settings.SettingsViewModel
+import kotlin.math.round
 
 /**
  * Settings page (S4) — the only screen that writes user preferences.
@@ -74,7 +75,12 @@ fun SettingsScreen(
                 modifier = Modifier.size(DhunSpacing.touchTarget),
                 contentDescription = "Back",
             ) {
-                DhunIconView(icon = DhunIcon.ArrowBack)
+                DhunIconView(
+                    icon = DhunIcon.ArrowBack,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
+                )
             }
             Spacer(modifier = Modifier.width(DhunSpacing.sm))
             Text(
@@ -267,11 +273,6 @@ private fun EqualizerSection(session: EqualizerSession) {
                 onChange = { session.setBandGain(band.index, it) },
             )
         }
-        // Keeps the initial snapshot referenced so its derivation cost is paid
-        // once even if the state flow replays identically (documents intent;
-        // the live model above is what renders).
-        @Suppress("UNUSED_EXPRESSION")
-        uiModel
     }
 }
 

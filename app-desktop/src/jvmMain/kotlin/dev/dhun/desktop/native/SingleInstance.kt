@@ -90,6 +90,12 @@ object SingleInstance {
     internal const val PROTOCOL = "DHUN1"
     internal const val CMD_PING = "PING"
     internal const val CMD_SHOW = "SHOW"
+    /**
+     * S4.2: toggle playback in the running instance (jump-list Play/Pause
+     * verb, `--dhun-play-pause`). Deliberately does NOT surface the window —
+     * it behaves like a media key, not a launch.
+     */
+    internal const val CMD_PLAY_PAUSE = "PLAYPAUSE"
     internal const val REPLY_OK = "DHUN1 OK"
     internal const val REPLY_ERR = "DHUN1 ERR"
 
@@ -203,15 +209,15 @@ object SingleInstance {
             null
         }
         if (server != null) {
-            val lease = Lease(server, token, onShow, log)
+            val lease = Lease(server, token, onCommand, log)
             lease.begin()
             log("single-instance: primary — listening on 127.0.0.1:$port for \"$key\" (id $token)")
             return Startup.Primary(lease)
         }
 
-        return when (val signal = signalRunningInstance(port, token)) {
+        return when (val signal = signalRunningInstance(port, token, request)) {
             SignalResult.Signalled -> {
-                log("single-instance: live DHUN on 127.0.0.1:$port was asked to surface — this process exits")
+                log("single-instance: live DHUN on 127.0.0.1:$port accepted $request — this process exits")
                 Startup.SecondInstance
             }
             is SignalResult.NotDhun -> {
@@ -305,8 +311,14 @@ object SingleInstance {
                     request.command == CMD_SHOW -> {
                         writeLine(output, REPLY_OK)
                         log("single-instance: another launch of THIS install asked to surface — reusing the tray \"Open DHUN\" focus path")
-                        runCatching { onShow() }
+                        runCatching { onCommand(RemoteCommand.Show) }
                             .onFailure { log("single-instance: surface callback failed (${it::class.java.simpleName}: ${it.message})") }
+                    }
+                    request.command == CMD_PLAY_PAUSE -> {
+                        writeLine(output, REPLY_OK)
+                        log("single-instance: another launch of THIS install asked to toggle playback (jump-list verb)")
+                        runCatching { onCommand(RemoteCommand.PlayPause) }
+                            .onFailure { log("single-instance: play-pause callback failed (${it::class.java.simpleName}: ${it.message})") }
                     }
                     else -> {
                         writeLine(output, REPLY_ERR)

@@ -827,6 +827,14 @@ private fun ShellDetailPane(
                 onDeleted = { nav.popDetail() },
             )
         }
+        is DetailRoute.SettingsPage -> {
+            SettingsScreen(
+                viewModel = settingsVm,
+                onBack = { nav.popDetail() },
+                isDesktop = isDesktop,
+                equalizerSession = equalizerSession,
+            )
+        }
     }
 }
 
