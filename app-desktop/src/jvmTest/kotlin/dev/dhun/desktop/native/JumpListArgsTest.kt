@@ -62,4 +62,51 @@ class JumpListArgsTest {
     fun `play formats the prefixed argument`() {
         assertEquals("--dhun-play=dQw4w9WgXcQ", JumpListArgs.play("dQw4w9WgXcQ"))
     }
+
+    @Test
+    fun `only play-pause maps to a remote toggle, everything else surfaces`() {
+        assertEquals(
+            SingleInstance.RemoteCommand.PlayPause,
+            JumpListArgs.toRemoteCommand(JumpListArgs.Command.PlayPause),
+        )
+        assertEquals(
+            SingleInstance.RemoteCommand.Show,
+            JumpListArgs.toRemoteCommand(JumpListArgs.Command.Open),
+        )
+        assertEquals(
+            SingleInstance.RemoteCommand.Show,
+            JumpListArgs.toRemoteCommand(JumpListArgs.Command.Unknown),
+        )
+        // Per-track entries surface: no track-by-id resolve path exists, so
+        // playing the id would be a lie (documented in JumpListArgs).
+        assertEquals(
+            SingleInstance.RemoteCommand.Show,
+            JumpListArgs.toRemoteCommand(JumpListArgs.Command.Play("dQw4w9WgXcQ")),
+        )
+    }
+
+    @Test
+    fun `requestForArgs takes the first dhun arg and ignores the rest`() {
+        assertEquals(
+            SingleInstance.RemoteCommand.PlayPause,
+            JumpListArgs.requestForArgs(arrayOf("--dhun-play-pause")),
+        )
+        assertEquals(
+            SingleInstance.RemoteCommand.Show,
+            JumpListArgs.requestForArgs(arrayOf()),
+        )
+        assertEquals(
+            SingleInstance.RemoteCommand.Show,
+            JumpListArgs.requestForArgs(arrayOf("-Dfoo=bar", "--unknown")),
+        )
+        // First --dhun-* arg wins, even when a later one differs.
+        assertEquals(
+            SingleInstance.RemoteCommand.Show,
+            JumpListArgs.requestForArgs(arrayOf("--dhun-open", "--dhun-play-pause")),
+        )
+        assertEquals(
+            SingleInstance.RemoteCommand.PlayPause,
+            JumpListArgs.requestForArgs(arrayOf("--dhun-play-pause", "--dhun-open")),
+        )
+    }
 }

@@ -51,6 +51,8 @@ import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
 import dev.dhun.download.DownloadManager
+import dev.dhun.domain.GetSettingUseCase
+import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
@@ -63,6 +65,7 @@ import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.design.components.NowPlayingBackdrop
 import dev.dhun.player.DhunPlayer
+import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.presentation.browse.AlbumViewModel
 import dev.dhun.presentation.browse.ArtistViewModel
 import dev.dhun.presentation.browse.PlaylistViewModel
@@ -71,6 +74,7 @@ import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
+import dev.dhun.presentation.settings.SettingsViewModel
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.browse.AlbumScreen
 import dev.dhun.ui.browse.ArtistScreen
@@ -82,6 +86,7 @@ import dev.dhun.ui.library.LibraryScreen
 import dev.dhun.ui.player.FullPlayer
 import dev.dhun.ui.player.MiniPlayer
 import dev.dhun.ui.search.SearchScreen
+import dev.dhun.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
 // A positive layer keeps the immersive player above the rail, split panes and
@@ -149,6 +154,7 @@ fun DhunAppShell(
     libraryViewModel: LibraryViewModel? = null,
     connectivity: ConnectivityMonitor = AlwaysOnlineConnectivityMonitor,
     downloadManager: DownloadManager? = null,
+    equalizerSession: EqualizerSession? = null,
 ) {
     val scope = rememberCoroutineScope()
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
@@ -166,6 +172,16 @@ fun DhunAppShell(
             scope = scope,
             setContext = { ctx -> playerViewModel.setPlayContext(ctx) },
             downloadManager = downloadManager,
+        )
+    }
+    // S4: settings model lives at shell scope (one instance, shared by both
+    // panes) so a change made in the detail pane is visible if the window is
+    // resized down to the single-pane path, and vice versa.
+    val settingsVm = remember(dataLayer, scope) {
+        SettingsViewModel(
+            GetSettingUseCase(dataLayer.settings),
+            UpdateSettingUseCase(dataLayer.settings),
+            scope,
         )
     }
 
@@ -361,6 +377,10 @@ fun DhunAppShell(
                                 libraryVm.selectTab(LibraryTab.PLAYLISTS)
                                 nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = false)
                             },
+                            settingsVm = settingsVm,
+                            isDesktop = isDesktop,
+                            equalizerSession = equalizerSession,
+                            onOpenSettings = { nav.push(DetailRoute.SettingsPage) },
                         )
                         if (useNavigationRail && !nav.playerExpanded) {
                             MiniPlayer(
@@ -412,6 +432,10 @@ fun DhunAppShell(
                                     libraryVm.selectTab(LibraryTab.PLAYLISTS)
                                     nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = true)
                                 },
+                                settingsVm = settingsVm,
+                                isDesktop = isDesktop,
+                                equalizerSession = equalizerSession,
+                                onOpenSettings = { nav.push(DetailRoute.SettingsPage) },
                             )
                         },
                         detail = {
@@ -425,6 +449,9 @@ fun DhunAppShell(
                                 onPlayAlbum = onPlayAlbum,
                                 onPlayPlaylist = onPlayPlaylist,
                                 onTrackOverflow = { overflowTrack = it },
+                                settingsVm = settingsVm,
+                                isDesktop = isDesktop,
+                                equalizerSession = equalizerSession,
                             )
                         },
                         miniPlayer = if (!nav.playerExpanded) {
@@ -678,6 +705,10 @@ private fun ShellMasterPane(
     onCycleSleepTimer: () -> Unit,
     onOpenLiked: () -> Unit,
     onOpenOffline: () -> Unit,
+    settingsVm: SettingsViewModel,
+    isDesktop: Boolean,
+    equalizerSession: EqualizerSession?,
+    onOpenSettings: () -> Unit,
 ) {
     val route: DetailRoute? = detailRoute
     when (route) {
@@ -694,6 +725,7 @@ private fun ShellMasterPane(
             onOpenOffline = onOpenOffline,
             sleepTimerLabel = sleepTimerLabel,
             onCycleSleepTimer = onCycleSleepTimer,
+            onOpenSettings = onOpenSettings,
         )
         is DetailRoute.ArtistPage -> {
             val vm = remember(route.id) { ArtistViewModel(provider, player, route.id) }
@@ -732,6 +764,14 @@ private fun ShellMasterPane(
                 onDeleted = { nav.popDetail() },
             )
         }
+        is DetailRoute.SettingsPage -> {
+            SettingsScreen(
+                viewModel = settingsVm,
+                onBack = { nav.closeTop() },
+                isDesktop = isDesktop,
+                equalizerSession = equalizerSession,
+            )
+        }
     }
 }
 
@@ -755,6 +795,9 @@ private fun ShellDetailPane(
     onPlayAlbum: (Track, List<Track>, Int) -> Unit,
     onPlayPlaylist: (Track, List<Track>, Int) -> Unit,
     onTrackOverflow: (Track) -> Unit,
+    settingsVm: SettingsViewModel,
+    isDesktop: Boolean,
+    equalizerSession: EqualizerSession?,
 ) {
     when (route) {
         is DetailRoute.ArtistPage -> {
@@ -792,6 +835,14 @@ private fun ShellDetailPane(
                 onTrackPlay = onPlayPlaylist,
                 onTrackOverflow = onTrackOverflow,
                 onDeleted = { nav.popDetail() },
+            )
+        }
+        is DetailRoute.SettingsPage -> {
+            SettingsScreen(
+                viewModel = settingsVm,
+                onBack = { nav.popDetail() },
+                isDesktop = isDesktop,
+                equalizerSession = equalizerSession,
             )
         }
     }
@@ -864,6 +915,7 @@ private fun TabContent(
     onOpenOffline: () -> Unit = {},
     sleepTimerLabel: String? = null,
     onCycleSleepTimer: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     when (tab) {
         AppTab.HOME -> {
@@ -898,6 +950,7 @@ private fun TabContent(
                 onPlaylistClick = { onNavigate(DetailRoute.PlaylistPage(it.id, isLocal = true)) },
                 onTrackOverflow = onTrackOverflow,
                 modifier = Modifier.fillMaxSize(),
+                onOpenSettings = onOpenSettings,
             )
         }
         AppTab.CATALOG -> {

@@ -213,6 +213,20 @@ object PlaybackGraph {
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
 
+        // S4.3: pin the player to a dedicated audio session and publish it for
+        // the equalizer engine — the EQ attaches to OUR session only, never
+        // the global mix. Set before any media item exists so every audio
+        // track the player ever creates belongs to this session. On failure
+        // (id generation is best-effort) playback is unaffected; EQ bypasses.
+        runCatching {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val sessionId = audioManager.generateAudioSessionId()
+            if (sessionId > 0) {
+                player.setAudioSessionId(sessionId)
+                dev.dhun.android.equalizer.AndroidAudioSession.sessionId = sessionId
+            }
+        }
+
         // Pure audio player: disable video and text track parsing/decoding/buffering entirely.
         player.trackSelectionParameters = player.trackSelectionParameters
             .buildUpon()

@@ -60,6 +60,8 @@ import dev.dhun.android.shortcuts.shortcutTrack
 import dev.dhun.android.ui.NavStatePersistence
 import dev.dhun.core.PlaybackState
 import dev.dhun.data.DataLayer
+import dev.dhun.data.SettingsKeys
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
 import dev.dhun.download.DownloadManager
@@ -83,6 +85,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.guava.await
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
 
@@ -130,6 +133,17 @@ class MainActivity : ComponentActivity() {
         handleShortcutIntent(intent)
         requestNotificationPermissionIfNeeded()
         connectWithFallback()
+        // S4: restore the persisted theme/accent before first composition so
+        // the launch frame already carries the user's appearance. Best-effort:
+        // a corrupt row falls back to dark+brand inside applyPersistedAppearance,
+        // and a dead Koin/DB must never block startup.
+        runCatching {
+            val settings = GlobalContext.get().get<DataLayer>().settings
+            val (themeId, accentId) = runBlocking {
+                settings.getString(SettingsKeys.THEME) to settings.getString(SettingsKeys.ACCENT)
+            }
+            DhunAppearance.applyPersistedAppearance(themeId, accentId)
+        }
         setContent {
             DhunTheme {
                 // Music-app back behavior: FullPlayer collapses first, then
@@ -215,6 +229,7 @@ class MainActivity : ComponentActivity() {
                                 isDesktop = false,
                                 connectivity = koin.get(),
                                 downloadManager = koin.get(),
+                                equalizerSession = koin.get(),
                             )
                         }
                         s.reason?.let { reason ->

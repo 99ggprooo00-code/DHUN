@@ -2,6 +2,58 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 — S5 continuation: stale palette regression baseline
+
+`DhunAppearanceTest` still expected the pre-S5 error and border hue after
+production tokens were retuned. Both expectations now match `#D5798A`;
+the baseline name/comments explicitly allow this intentional change.
+CI verification PASSED on PR #74 at `19c7b0d`: shared/Android/desktop tests,
+APK, MSI and build checks all green. The Android build also required
+calling `generateAudioSessionId()` on the context AudioManager instance,
+not statically. No local JDK or hardware verification is claimed. S1
+dispatch and S3 device checks remain user-blocked; S6 is not authorized
+by the autonomous merge approval.
+
+## 2026-09-16 — S4 slice 1: settings with keys but no behaviour
+
+Verified by grep (no app caller outside tests — only `UseCasesTest`
+touches the getters): the S4 Settings page exposes exactly the five
+settings that do something (theme, accent, cache budget, resume-on-launch,
+close-to-tray). These keys exist in `SettingsKeys` but are deliberately
+*not* surfaced, because persisting a value nothing reads would be a lie:
+
+- `AUDIO_QUALITY` ("low/medium/high") — `GetSettingUseCase.audioQuality()`
+  has no caller; `InnerTubeClient` is constructed with fixed defaults.
+- `COUNTRY_CODE` — same; InnerTube `gl` stays `"US"`.
+- `LYRICS_ENABLED` — no reader at all (lyrics always on).
+- `ACCENT_MODE` ("artwork"/"static") — no reader; dynamic artwork palettes
+  are unimplemented (the 6-way accent hue is the separate `ACCENT` key).
+- `EXPLICIT_CONTENT` — no reader; nothing filters explicit tracks.
+
+Wiring any of these is a v0.2.0+ feature, not a settings-UI gap. `THEME`
+`"system"` likewise stays storable-but-unhonoured (falls back to dark).
+
+## 2026-09-16 — S4 slice 3: Android EQ notes
+
+- The engine attaches to DHUN's own audio session id only. Session 0 (the
+  global output mix) is refused by design: EQ must never affect — or be
+  affected by — another app's audio.
+- Devices whose DSP/HAL omits an equalizer degrade to silent bypass (one log
+  line per session id). No `MODIFY_AUDIO_SETTINGS` permission is needed for
+  own-session effects.
+- Audible EQ proof is S3-hardware-gated: no emulator reproduces a DSP
+  equalizer, so the binder calls are reviewed, not executed. The curve
+  mapping itself is JVM unit-tested (`EqualizerBandMapperTest`).
+
+## 2026-09-16 — S4 slice 2: per-track jump entries surface, don't play
+
+`--dhun-play=<id>` converges on `RemoteCommand.Show`: `MusicProvider` has no
+track-by-id lookup (only search/feed/related/page), so resolving a bare video
+id into a playable `Track` would mean a search round-trip with fuzzy matching
+— a wrong-track play is worse than a surface. The Play/Pause verb (the one S4
+promised) genuinely toggles. A `provider.track(id)` API + jump-play would be a
+v0.2.0+ feature.
+
 ## 2026-09-16 — second-look code findings (same session, engine-room read)
 
 Read end to end: `InnerTubeClient`, `OwnClientStreamResolver`,
@@ -18,6 +70,10 @@ not inherited:
   on every cold resolve, part of the desktop startup budget. Fix:
   TTL-guard sts revalidation (reuse cached sts if validated within
   N hours; re-fetch watch page only on TTL expiry or AuthRequired).
+  **RESOLVED 2026-09-16 (S5):** count-based budget instead of wall-clock TTL
+  (`STS_REVALIDATE_EVERY = 25`; commonMain has no clock) — 1 watch GET per 26
+  resolves, forceRefresh bypasses, failed revalidation backs off + serves
+  stale. Covered in `AltPlayerIdentityTest`.
 - **[BUG-RISK/LOW-MEDIUM — S2 or S5 one-liner]
   `cancelCacheFill()` nulls the job WITHOUT cancelling it**
   (`DesktopDhunPlayer.kt`): only the AtomicBoolean is set, so a fill
@@ -674,14 +730,11 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
 Limits found while building it. Each is a measured or code-verified fact;
 **visual appearance on hardware is claimed nowhere.**
 
-- **Dark `error` on `errorContainer` is 3.92:1 — below WCAG AA (4.5:1) for
-  text.** Shipped values (`#CF6679` on `#4D1A24`), left byte-identical on
-  purpose: retuning them would break the "dark stays the default and
-  unchanged" guarantee, which is the whole basis of an additive theme system.
-  `DhunThemeContrastTest` therefore asserts 3:1 for that pair in dark and
-  4.5:1 in light (the new light pair, `#B00020` on `#F9DEDC`, measures
-  5.76:1). A future pass can retune the dark pair knowingly — it is a real
-  accessibility defect, recorded here rather than silently asserted away.
+- **~~Dark `error` on `errorContainer` is 3.92:1~~ RESOLVED 2026-09-16 (S5):**
+  retuned `#CF6679` → `#D5798A` (same hue, container unchanged) — now 4.66:1,
+  and `DhunThemeContrastTest` asserts 4.5:1 in both schemes. The
+  "byte-identical dark" migration guarantee is retired for this pair only,
+  with before/after values recorded here.
 - **`app-desktop` tray icons stay dark in light mode.**
   `native/TrayIcons.kt:19-21` reads `DhunColors.surface/border/accent` in an
   object initialiser — once, before any composition exists — so it captures

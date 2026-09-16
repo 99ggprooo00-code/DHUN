@@ -42,10 +42,10 @@ import dev.dhun.design.DhunThemeMode
  * "Violet, selected" to TalkBack without this file adding any.
  *
  * **Persistence is not this component's job.** It holds no state, so whoever
- * mounts it owns saving the choice. The store already exists
- * (`SettingsRepository` + `SettingsKeys.THEME`, whose documented values are
- * `"dark" | "light" | "system"` and match [DhunThemeMode.id] exactly); nothing
- * reads it yet, and an accent-hue key would have to be added in the data layer.
+ * mounts it owns saving the choice. The store is `SettingsRepository` +
+ * `SettingsKeys.THEME` / `SettingsKeys.ACCENT`; the S4 Settings screen persists
+ * through them and the platform entry points restore at startup via
+ * `DhunAppearance.applyPersistedAppearance`. The catalog mount stays ephemeral.
  * See [dev.dhun.design.DhunAppearance] for the full picture.
  */
 @Composable

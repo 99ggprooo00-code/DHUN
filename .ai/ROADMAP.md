@@ -1,31 +1,32 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-16 (UTC)** · session **`arena/01a0ab12-dhun`** —
-**Stage S2 cleanup on top of the nav package** · **PR #72 OPEN**
-(re-baseline + nav fixes; CI running at last check: `apk` + `build`
-pass, `build-and-test` + `msi` pending).
+Updated **2026-09-16 (UTC)** · session **`arena/01a0ab74-dhun`**.
 
-**What this commit adds (S2):** dead harness UI deleted (4 files +
-DI registration + graph-test lines); root session notes archived to
-`docs/history/`; `14-release.md` current-status notice;
-`cancelCacheFill()` now cancels the job (mirrors prebuffer).
-PR #53/#54 left for the user (close #53 unmerged; keep #54 as
-contingency reference — user's click).
+**GitHub evidence:** PR #73 CLOSED unmerged, superseded by **PR #74**,
+which preserves all commits through `ce5cb18`. At `19c7b0d`, all four
+checks PASS: `build-and-test` (35134174898), `apk` + `msi` (35134174968),
+`build` (35134174949). Main remains `5023b38` before merge.
 
-**Files (this commit):** 4 harness deletions · `AppModule.kt` ·
-`AppModuleGraphTest.kt` · `DesktopDhunPlayer.kt` · `docs/history/` ·
-`docs/verification/14-release.md` · `CHANGELOG.md` · this file.
+**Verified fixes:** `DhunAppearanceTest.kt` pins S5's `#D5798A` error
+and matching translucent border, with baseline name/comments updated.
+No other test assertion pins the old hue. `PlaybackGraph.kt` now uses
+an AudioManager instance for `generateAudioSessionId()`. CI compiled
+and tested shared, Android and desktop; no local JDK or hardware claims.
 
-**Last error:** none — CI is the compiler (no JDK; egress-blocked).
+**Last error:** none on `19c7b0d`. This documentation follow-up still
+requires its own CI check before merge.
 
-**Exact next step:** push → require `build-and-test` + `apk` + `msi`
-green on PR #72 → PR review + merge decision (do **not** merge until
-asked). Then: **Stage S1 needs the user** (Actions *Run workflow*
-click — agents get 403), **Stage S3 needs the user** (devices).
+**Exact next step:** push this evidence → require all four checks green
+on final PR #74 head → merge (user explicitly authorized) → verify
+post-merge main CI and rolling `test` release. S4/S5 code and audit work
+is CI-verified; merge/release publication pending. No new feature stage.
 
-**Explicitly NOT claimed:** on-device behavior of the nav fixes or
-the cancel fix; UI restyling (deferred past v0.1.0 by user decision —
-only S3-found functional UI bugs get fixed before the tag).
+**Remaining gates, in order:** S1 user Actions dispatch
+(`docs/runbooks/rot-drill.md`); S3 device evidence
+(`docs/runbooks/s3-hardware-checklist.md`); S6 signing, clean installs,
+soaks and explicit go-ahead. No hardware success or release readiness
+claimed. Work stays sequential; one asserted patch per file, marker
+verification, full diff review before every push.
 
 ---
 

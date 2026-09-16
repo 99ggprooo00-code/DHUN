@@ -24,6 +24,63 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Added — Stage S4 settings surface, slice 1 — 2026-09-16
+- **Settings page** (`DetailRoute.SettingsPage`, entry from the Library
+  header): theme (dark/light) + accent pickers that apply live via the
+  existing `DhunAppearanceControls`, audio-cache budget ladder, resume-on-launch
+  switch, desktop-only close-to-tray switch, and an equalizer section (enable,
+  18 presets, preamp + 10 band sliders) bound to `EqualizerSession` through
+  `toUiModel()`. Settings is a nav-stack singleton; the Android
+  saved-instance-state codec round-trips it as `"settings"`.
+- **Appearance persistence**: new `SettingsKeys.ACCENT` key (default
+  `"brand"`); both platforms restore theme+accent before first composition
+  via `DhunAppearance.applyPersistedAppearance()`; unknown/corrupt ids fall
+  back to dark+brand. `SettingsViewModel` stays in plain strings so
+  `presentation` keeps its separation from `design`.
+- Desktop passes `player.equalizer` into the shell, so the EQ section is
+  live there; Android's section appears with slice 3 (AudioEffect engine).
+- Deliberately **not** exposed: `AUDIO_QUALITY`, `COUNTRY_CODE`,
+  `LYRICS_ENABLED`, `ACCENT_MODE`, `EXPLICIT_CONTENT` have keys but no
+  behaviour behind them — a dead toggle is worse than none
+  (see `.ai/KNOWN_LIMITATIONS.md`).
+
+### Added — Stage S4 settings surface, slice 2 — 2026-09-16
+- **Jump-list Play/Pause verb (desktop)**: `main(args)` maps the first
+  `--dhun-*` arg onto a single-instance request; the guard protocol gains a
+  `PLAYPAUSE` wire command with media-key semantics (toggles playback in the
+  running instance, never surfaces). A `PLAYPAUSE` racing startup is drained
+  once after the player wires up; unknown verbs and foreign identity tokens
+  are refused without side effects.
+- **First guard protocol tests** (`SingleInstanceProtocolTest`): ephemeral
+  loopback lease covering PING/SHOW/PLAYPAUSE replies, callback dispatch,
+  token mismatch, and the parser; `JumpListArgsTest` covers the
+  args→request mapping. `start()` itself stays untested (binds the real
+  rendezvous port).
+- Per-track Recent entries (`--dhun-play=<id>`) surface the app but do not
+  start the track — no track-by-id resolve path exists yet (recorded in
+  `.ai/KNOWN_LIMITATIONS.md`).
+
+### Added — Stage S4 settings surface, slice 3 — 2026-09-16
+- **Android equalizer engine** (`AudioEffect`): `PlaybackGraph` pins every
+  player to a generated audio session and publishes it; the Koin
+  `AndroidEqualizerEngine` attaches to DHUN's own session only (never the
+  global mix), mapping the shared 10-band curve onto the DSP's bands with
+  log-frequency interpolation (`EqualizerBandMapper`, JVM-tested) and the
+  preamp folded in. No-EQ devices degrade to silent bypass; the service
+  releases the native effect on destroy. The Settings EQ section is now live
+  on both platforms (audible proof needs S3 hardware).
+
+### Fixed — Stage S5 stream-perf — 2026-09-16
+- **`sts` revalidation budget** (`InnerTubeClient`): the ~1 MB watch-page GET
+  that ran on *every* resolve now runs once per 26 resolves
+  (`STS_REVALIDATE_EVERY = 25` cached serves between re-checks) —
+  count-based, not wall-clock, because commonMain has no clock without a new
+  `expect/actual`. `forceRefresh` still bypasses; a failed revalidation fails
+  open to `null`, backs off a full budget, and keeps serving the stale cache
+  meanwhile. (Resolves the PERF/MEDIUM second-look finding.)
+- **Dark error contrast fix**: `error` `#CF6679` → `#D5798A` (same hue),
+  lifting `error`-on-`errorContainer` from 3.92:1 to 4.66:1 (WCAG AA); the
+  contrast gate now asserts 4.5:1 in both schemes.
 ### Changed — Stage S2 architectural cleanup — 2026-09-16
 - **Dead harness UI deleted** (~680 lines): `HarnessScreen`,
   `HarnessViewModel`, `DesktopHarness*` had zero call sites (only an

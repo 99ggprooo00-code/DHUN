@@ -88,6 +88,7 @@ fun LibraryScreen(
     onPlaylistClick: (LocalPlaylist) -> Unit,
     onTrackOverflow: (Track) -> Unit = {},
     modifier: Modifier = Modifier,
+    onOpenSettings: () -> Unit = {},
 ) {
     val selectedTab by viewModel.selectedTab.collectAsState()
     val viewingLikedSongs by viewModel.viewingLikedSongs.collectAsState()
@@ -106,21 +107,29 @@ fun LibraryScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Header — brand wordmark + sans headline (M3 readable type)
-        Column(
+        // Header — brand wordmark + sans headline (M3 readable type), with the
+        // S4 Settings entry pinned to the trailing edge.
+        Row(
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "DHUN",
-                style = DhunTypographyTokens.brand,
-                color = DhunColors.accent,
-            )
-            Text(
-                text = "Your library",
-                style = MaterialTheme.typography.headlineMedium,
-                color = DhunColors.textPrimary,
-            )
+            Column {
+                Text(
+                    text = "DHUN",
+                    style = DhunTypographyTokens.brand,
+                    color = DhunColors.accent,
+                )
+                Text(
+                    text = "Your library",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = DhunColors.textPrimary,
+                )
+            }
+            DhunTextButton(onClick = onOpenSettings) {
+                Text("Settings")
+            }
         }
 
         LibraryTabRow(

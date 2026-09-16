@@ -65,6 +65,7 @@ object NavStatePersistence {
         is DetailRoute.ArtistPage -> "artist:${route.id}"
         is DetailRoute.AlbumPage -> "album:${route.id}"
         is DetailRoute.PlaylistPage -> "playlist:${route.isLocal}:${route.id}"
+        is DetailRoute.SettingsPage -> "settings"
     }
 
     fun decodeRoute(value: String): DetailRoute? {
@@ -78,6 +79,7 @@ object NavStatePersistence {
             "playlist" -> parts.getOrNull(2)?.takeIf { it.isNotBlank() }?.let { id ->
                 DetailRoute.PlaylistPage(id, parts.getOrNull(1) == "true")
             }
+            "settings" -> DetailRoute.SettingsPage
             else -> null
         }
     }

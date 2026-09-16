@@ -14,6 +14,14 @@ object SettingsKeys {
     const val THEME = "theme"
     const val THEME_DEFAULT = "dark"
 
+    /**
+     * Accent hue id — one of [dev.dhun.design.DhunAccent.id]
+     * ("brand" default). Persisted by the S4 Settings screen; unknown ids
+     * fall back to the default at read time rather than crashing.
+     */
+    const val ACCENT = "accent"
+    const val ACCENT_DEFAULT = "brand"
+
     /** "artwork" (dynamic palette) | "static" */
     const val ACCENT_MODE = "accent_mode"
     const val ACCENT_MODE_DEFAULT = "artwork"
@@ -48,7 +56,7 @@ object SettingsKeys {
     const val WINDOW_GEOMETRY = "window_geometry"
 
     val all: List<String> = listOf(
-        AUDIO_QUALITY, THEME, ACCENT_MODE, LYRICS_ENABLED, CACHE_SIZE_MB, COUNTRY_CODE,
+        AUDIO_QUALITY, THEME, ACCENT, ACCENT_MODE, LYRICS_ENABLED, CACHE_SIZE_MB, COUNTRY_CODE,
         EXPLICIT_CONTENT, CLOSE_TO_TRAY, RESUME_ON_LAUNCH, WINDOW_GEOMETRY,
     )
 }

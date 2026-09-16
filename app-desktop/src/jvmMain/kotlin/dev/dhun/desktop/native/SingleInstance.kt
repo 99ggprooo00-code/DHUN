@@ -34,11 +34,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * switching / RDP) never see each other's instance:
  *
  *  - bind succeeds → this process is the **primary**. A daemon thread answers a
- *    tiny line protocol and, on `SHOW`, asks the caller's callback to surface
- *    the existing window.
+ *    tiny line protocol (`SHOW` → surface the window, `PLAYPAUSE` → toggle
+ *    playback without surfacing) and forwards each to the caller's callback.
  *  - bind fails → **verify before deferring**: connect and `PING` carrying this
  *    instance's identity token. Only a peer that answers `DHUN1 OK` to *that*
- *    token is treated as the live DHUN, in which case `SHOW` is sent and
+ *    token is treated as the live DHUN, in which case the request is sent and
  *    [Startup.SecondInstance] is returned so the caller can exit without
  *    creating *any* AWT, Compose, Koin or SQLite surface. A port held by an
  *    unrelated program — or by a *different* DHUN install/user whose derived
@@ -62,9 +62,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Loopback only (`InetAddress.getLoopbackAddress()`); nothing is reachable from
  * the network. The accept loop runs on a **daemon** thread so it can never hold
  * the JVM open, and every per-connection read/write is bounded by
- * [READ_TIMEOUT_MS] so a stuck peer cannot wedge it. A peer may only cause the
- * existing window to be brought to front — it receives no track, queue or
- * settings data. This file is deliberately AWT-free and Compose-free: EDT
+ * [READ_TIMEOUT_MS] so a stuck peer cannot wedge it. A peer may only surface the
+ * window or toggle playback — it receives no track, queue or settings data,
+ * and it cannot inject any (the protocol carries commands, not content).
+ * This file is deliberately AWT-free and Compose-free: EDT
  * marshaling belongs to the caller ([dev.dhun.desktop.Main]), which keeps the
  * protocol independent of the window layer.
  *
@@ -89,6 +90,12 @@ object SingleInstance {
     internal const val PROTOCOL = "DHUN1"
     internal const val CMD_PING = "PING"
     internal const val CMD_SHOW = "SHOW"
+    /**
+     * S4.2: toggle playback in the running instance (jump-list Play/Pause
+     * verb, `--dhun-play-pause`). Deliberately does NOT surface the window —
+     * it behaves like a media key, not a launch.
+     */
+    internal const val CMD_PLAY_PAUSE = "PLAYPAUSE"
     internal const val REPLY_OK = "DHUN1 OK"
     internal const val REPLY_ERR = "DHUN1 ERR"
 
@@ -147,14 +154,29 @@ object SingleInstance {
     }
 
     /**
+     * What a second launch asks the running instance to do (S4.2). [Show] is
+     * the plain-launch default; [PlayPause] is the jump-list verb.
+     */
+    sealed interface RemoteCommand {
+        data object Show : RemoteCommand
+        data object PlayPause : RemoteCommand
+    }
+
+    /**
      * Decides this process's role. Call it as early as possible in `main()` —
      * before any window, DI or database work — so [Startup.SecondInstance] can
      * exit cheaply.
      *
-     * @param onShow invoked on the guard's daemon thread when another launch asks
-     *   this instance to surface. The caller owns EDT marshaling.
+     * @param onCommand invoked on the guard's daemon thread when another launch
+     *   sends a command. The caller owns EDT marshaling.
+     * @param request what THIS process asks for if a live instance exists —
+     *   derived from the process args (`--dhun-play-pause` → [RemoteCommand.PlayPause]).
      */
-    fun start(onShow: () -> Unit, log: (String) -> Unit = ::println): Startup {
+    fun start(
+        onCommand: (RemoteCommand) -> Unit,
+        request: RemoteCommand = RemoteCommand.Show,
+        log: (String) -> Unit = ::println,
+    ): Startup {
         if (System.getProperty(FLAG, "true") == "false") {
             return Startup.Unguarded("$FLAG=false")
         }
@@ -187,15 +209,15 @@ object SingleInstance {
             null
         }
         if (server != null) {
-            val lease = Lease(server, token, onShow, log)
+            val lease = Lease(server, token, onCommand, log)
             lease.begin()
             log("single-instance: primary — listening on 127.0.0.1:$port for \"$key\" (id $token)")
             return Startup.Primary(lease)
         }
 
-        return when (val signal = signalRunningInstance(port, token)) {
+        return when (val signal = signalRunningInstance(port, token, request)) {
             SignalResult.Signalled -> {
-                log("single-instance: live DHUN on 127.0.0.1:$port was asked to surface — this process exits")
+                log("single-instance: live DHUN on 127.0.0.1:$port accepted $request — this process exits")
                 Startup.SecondInstance
             }
             is SignalResult.NotDhun -> {
@@ -216,7 +238,7 @@ object SingleInstance {
     class Lease internal constructor(
         private val server: ServerSocket,
         private val identityToken: String,
-        private val onShow: () -> Unit,
+        private val onCommand: (RemoteCommand) -> Unit,
         private val log: (String) -> Unit,
     ) {
         private val closed = AtomicBoolean(false)
@@ -289,8 +311,14 @@ object SingleInstance {
                     request.command == CMD_SHOW -> {
                         writeLine(output, REPLY_OK)
                         log("single-instance: another launch of THIS install asked to surface — reusing the tray \"Open DHUN\" focus path")
-                        runCatching { onShow() }
+                        runCatching { onCommand(RemoteCommand.Show) }
                             .onFailure { log("single-instance: surface callback failed (${it::class.java.simpleName}: ${it.message})") }
+                    }
+                    request.command == CMD_PLAY_PAUSE -> {
+                        writeLine(output, REPLY_OK)
+                        log("single-instance: another launch of THIS install asked to toggle playback (jump-list verb)")
+                        runCatching { onCommand(RemoteCommand.PlayPause) }
+                            .onFailure { log("single-instance: play-pause callback failed (${it::class.java.simpleName}: ${it.message})") }
                     }
                     else -> {
                         writeLine(output, REPLY_ERR)
@@ -318,12 +346,13 @@ object SingleInstance {
 
     /**
      * Asks whatever owns [port] whether it is a live DHUN **for this same
-     * install/user**, and if so tells it to surface. Two commands on one
-     * connection: `PING` proves identity *before* `SHOW` commits this process to
-     * exiting. Anything else — a foreign program, or a different DHUN instance
-     * that happens to share the port — means fail open.
+     * install/user**, and if so sends [request]. Two commands on one
+     * connection: `PING` proves identity *before* the request commits this
+     * process to exiting. Anything else — a foreign program, or a different
+     * DHUN instance that happens to share the port — means fail open.
      */
-    private fun signalRunningInstance(port: Int, token: String): SignalResult {
+    private fun signalRunningInstance(port: Int, token: String, request: RemoteCommand): SignalResult {
+        val wire = wireCommand(request)
         val socket = Socket()
         return try {
             socket.connect(InetSocketAddress(InetAddress.getLoopbackAddress(), port), CONNECT_TIMEOUT_MS)
@@ -333,8 +362,8 @@ object SingleInstance {
             when {
                 !exchange(input, output, CMD_PING, token) ->
                     SignalResult.NotDhun("no matching $PROTOCOL reply to PING")
-                !exchange(input, output, CMD_SHOW, token) ->
-                    SignalResult.NotDhun("no matching $PROTOCOL reply to SHOW")
+                !exchange(input, output, wire, token) ->
+                    SignalResult.NotDhun("no matching $PROTOCOL reply to $wire")
                 else -> SignalResult.Signalled
             }
         } catch (t: Throwable) {
@@ -342,6 +371,12 @@ object SingleInstance {
         } finally {
             runCatching { socket.close() }
         }
+    }
+
+    /** Maps a second-launch request onto its wire command. Total — no `else`. */
+    internal fun wireCommand(request: RemoteCommand): String = when (request) {
+        RemoteCommand.Show -> CMD_SHOW
+        RemoteCommand.PlayPause -> CMD_PLAY_PAUSE
     }
 
     internal fun exchange(input: InputStream, output: OutputStream, command: String, token: String): Boolean {

@@ -38,19 +38,16 @@ import androidx.compose.ui.graphics.Color
  *    process-wide holder, so desktop's startup-error window and main window
  *    share a theme. That is the intended behaviour for a toggle; it is stated
  *    here because it is a real constraint, not an omission.
- * 2. **Nothing persists it yet.** A persistence path *does* exist —
- *    `dev.dhun.data.SettingsRepository.getString/putString/observeString`
- *    (SQLDelight-backed) — and `SettingsKeys.THEME` already reserves
- *    `"dark" | "light" | "system"` with `"dark"` as the default, so
- *    [DhunThemeMode.id] deliberately uses exactly those strings. But **no app
- *    code reads that key today** (only `RepositoriesTest` touches it), there
- *    is no Settings screen to host the choice, and reading it at startup means
- *    touching the frozen platform entry points. `design` also must not depend
- *    on `data` — that would invert the layers. So: a restart returns to the
- *    dark default until a host wires `SettingsKeys.THEME` to
- *    [DhunAppearance.setAppearance].
+ * 2. **Persistence is host-owned, via [applyPersistedAppearance].** The store is
+ *    `dev.dhun.data.SettingsRepository.getString/putString` (SQLDelight-backed):
+ *    `SettingsKeys.THEME` and `SettingsKeys.ACCENT`. `design` must not depend
+ *    on `data` — that would invert the layers — so the platform entry points
+ *    read the two keys at startup and call [applyPersistedAppearance], and the
+ *    Settings screen persists every change. Unknown or corrupt ids fall back
+ *    to the defaults instead of crashing.
  * 3. **`TrayIcons` keeps the dark palette**: it reads tokens at object-init,
- *    before any composition exists. Fixing that means touching a frozen file.
+ *    before any composition exists. Fixing that means deferring the read until
+ *    first tray paint; cosmetic, deferred past v0.1.0 with the rest of UI polish.
  */
 
 /**
@@ -269,12 +266,14 @@ data class DhunTokens(
     val onAccentContainer: Color = Color(0xFFE8D5FF),
 
     // Semantic
-    val error: Color = Color(0xFFCF6679),
+    // S5: #D5798A (was #CF6679) — the old error on this container measured
+    // 3.92:1, below WCAG AA; the retune measures 4.66:1 with the same hue.
+    val error: Color = Color(0xFFD5798A),
     val onError: Color = Color(0xFF000000),
     val errorContainer: Color = Color(0xFF4D1A24),
     val success: Color = Color(0xFF4CAF50),
     val warning: Color = Color(0xFFFFB74D),
-    val borderError: Color = Color(0x40CF6679),
+    val borderError: Color = Color(0x40D5798A),
 
     // Overlays
     val overlayHover: Color = Color(0x0FFFFFFF),
@@ -468,4 +467,18 @@ object DhunAppearance {
 
     /** Back to the shipped default. Used by tests and any future "reset" action. */
     fun reset() = setAppearance(DhunThemeMode.default, DhunAccent.default)
+
+    /**
+     * Applies persisted ids read from `SettingsKeys.THEME` / `SettingsKeys.ACCENT`
+     * by the host (platform entry points own the read; `design` cannot depend
+     * on `data`). Unknown, corrupt, or absent ids — including `"system"`, which
+     * is storable but not honoured (see [DhunThemeMode]) — fall back to the
+     * defaults. Idempotent: re-applying the active ids is a no-op.
+     */
+    fun applyPersistedAppearance(themeId: String?, accentId: String?) {
+        setAppearance(
+            nextMode = DhunThemeMode.fromId(themeId) ?: DhunThemeMode.default,
+            nextAccent = DhunAccent.fromId(accentId) ?: DhunAccent.default,
+        )
+    }
 }

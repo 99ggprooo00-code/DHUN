@@ -16,8 +16,8 @@ import kotlin.test.assertTrue
 
 /**
  * Candidate 28 gates. The load-bearing ones are the first two: they pin the
- * **dark** palette hex-for-hex, because "dark stays the default so nothing
- * regresses" is the whole promise of an additive theme system. Everything
+ * **dark** palette hex-for-hex, including the intentional S5 error-contrast
+ * retune. Dark stays the default; unrelated tokens must not regress. Everything
  * after that is about the light scheme and accent selector being real.
  *
  * Note these run as plain JVM tests with no composer — which is exactly the
@@ -45,9 +45,9 @@ class DhunAppearanceTest {
     }
 
     @Test
-    fun darkPaletteIsByteIdenticalToTheShippedColors() {
-        // Every value below is the pre-candidate-28 hex. If this test goes red,
-        // a dark-mode screen changed appearance — which is out of scope.
+    fun darkPaletteMatchesBaselineIncludingS5ErrorContrastRetune() {
+        // Preserve the dark baseline except for the intentional S5 error retune.
+        // Error and its translucent border share the new accessible hue.
         assertEquals(Color(0xFF0A0A0A), DhunColors.background, "background")
         assertEquals(Color(0xFF121212), DhunColors.surface, "surface")
         assertEquals(Color(0xFF1A1A1A), DhunColors.surfaceVariant, "surfaceVariant")
@@ -74,12 +74,12 @@ class DhunAppearanceTest {
         assertEquals(Color(0xFF000000), DhunColors.onAccent, "onAccent")
         assertEquals(Color(0xFF3A2A5A), DhunColors.accentContainer, "accentContainer")
         assertEquals(Color(0xFFE8D5FF), DhunColors.onAccentContainer, "onAccentContainer")
-        assertEquals(Color(0xFFCF6679), DhunColors.error, "error")
+        assertEquals(Color(0xFFD5798A), DhunColors.error, "error")
         assertEquals(Color(0xFF000000), DhunColors.onError, "onError")
         assertEquals(Color(0xFF4D1A24), DhunColors.errorContainer, "errorContainer")
         assertEquals(Color(0xFF4CAF50), DhunColors.success, "success")
         assertEquals(Color(0xFFFFB74D), DhunColors.warning, "warning")
-        assertEquals(Color(0x40CF6679), DhunColors.borderError, "borderError")
+        assertEquals(Color(0x40D5798A), DhunColors.borderError, "borderError")
         assertEquals(Color(0x0FFFFFFF), DhunColors.overlayHover, "overlayHover")
         assertEquals(Color(0x14FFFFFF), DhunColors.overlayPressed, "overlayPressed")
         assertEquals(Color(0x1FFFFFFF), DhunColors.overlayFocus, "overlayFocus")
