@@ -32,7 +32,8 @@ sealed interface DetailRoute {
  * [detailStack] is the only navigation stack, and it means the same thing in
  * both shell layouts; what differs is *where* its top is rendered. Below the
  * rail breakpoint it replaces the tab content (see the shell's single-pane
- * branch); at [DhunShellLayout.TwoPane] it is the detail pane beside the list.
+ * branch); at [DhunShellLayout.TwoPane] a non-empty stack becomes the detail
+ * pane beside the list. An empty stack leaves the large-screen master full-width.
  * Nothing here encodes the layout — [DhunShellPolicy] owns that decision, so a
  * platform caller (or a restored Bundle) keeps working unchanged.
  */

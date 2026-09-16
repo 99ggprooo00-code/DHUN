@@ -42,6 +42,16 @@ class DhunShellLayoutTest {
     }
 
     @Test
+    fun theDetailPaneIsDemandDrivenInsteadOfAnAlwaysVisiblePlaceholder() {
+        // A large window is capable of splitting, but the landing state must
+        // keep Home/Search/Library at full width until a route is opened.
+        assertFalse(DhunShellPolicy.detailPaneVisible(DhunShellLayout.TwoPane, 0))
+        assertFalse(DhunShellPolicy.detailPaneVisible(DhunShellLayout.TwoPane, -1))
+        assertTrue(DhunShellPolicy.detailPaneVisible(DhunShellLayout.TwoPane, 1))
+        assertFalse(DhunShellPolicy.detailPaneVisible(DhunShellLayout.SinglePane, 1))
+    }
+
+    @Test
     fun policyAndEnumAgreeOnTheLayout() {
         listOf(320.dp, 839.5.dp, 840.dp, 1920.dp).forEach { width ->
             assertEquals(
