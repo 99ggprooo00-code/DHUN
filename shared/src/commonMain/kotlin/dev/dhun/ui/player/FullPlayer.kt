@@ -273,7 +273,16 @@ fun FullPlayer(
         // familiar artwork-above-chrome hierarchy; a short/wide viewport moves
         // the exact same control cluster beside the hero, so landscape never
         // reduces the cover to the sliver left above a vertical control stack.
-        Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+        // Android needs the safe drawing inset for gesture/status bars. The
+        // desktop window has no system-bar inset to reserve; using the exact
+        // window bounds there keeps Windows' immersive player genuinely
+        // full-window instead of shrinking it to an apparent half-screen.
+        val foregroundModifier = if (isDesktop) {
+            Modifier.fillMaxSize()
+        } else {
+            Modifier.fillMaxSize().safeDrawingPadding()
+        }
+        Box(modifier = foregroundModifier) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 // Capture constraints before entering Row/Column scopes, whose
                 // own scope markers deliberately hide BoxWithConstraints' axes.

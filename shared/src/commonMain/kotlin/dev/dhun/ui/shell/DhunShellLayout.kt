@@ -16,7 +16,8 @@ import dev.dhun.design.DhunSpacing
  * The decision layer is separated from the render layer because a two-pane
  * layout that cannot be tested is a layout that will silently regress: the
  * phone path and the tablet path used to share one `when (detailStack …)`
- * block, which is precisely why large screens never got a second pane.
+ * block, which is precisely why large screens never got a second pane. The
+ * detail pane is demand-driven: an empty stack keeps the master full-width.
  */
 enum class DhunShellLayout {
     /** Handsets and narrow windows: the detail stack replaces the tab content. */
@@ -131,6 +132,15 @@ object DhunShellPolicy {
 
     /** Layout the shell should render for a measured width. */
     fun layoutAt(availableWidth: Dp): DhunShellLayout = DhunShellLayout.of(availableWidth)
+
+    /**
+     * Whether the shell should reserve a second column right now. Large
+     * screens are capable of two panes, but an empty detail stack is the normal
+     * landing state and must not turn the home/search/library content into a
+     * half-width view with an idle placeholder beside it.
+     */
+    fun detailPaneVisible(layout: DhunShellLayout, detailDepth: Int): Boolean =
+        layout.showsDetailPane && detailDepth > 0
 
     /**
      * Pane split. The layout is decided on the shell's measured width

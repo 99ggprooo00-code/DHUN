@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.zIndex
 import dev.dhun.core.AlwaysOnlineConnectivityMonitor
 import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.core.Track
@@ -82,6 +83,10 @@ import dev.dhun.ui.player.MiniPlayer
 import dev.dhun.ui.search.SearchScreen
 import kotlinx.coroutines.launch
 
+// A positive layer keeps the immersive player above the rail, split panes and
+// the desktop navigation dock while its enter/exit transition is running.
+private const val FULL_PLAYER_LAYER_Z_INDEX = 10f
+
 enum class AppTab(val title: String, val icon: DhunIcon) {
     HOME("Home", DhunIcon.Home),
     SEARCH("Search", DhunIcon.Search),
@@ -113,10 +118,10 @@ enum class AppTab(val title: String, val icon: DhunIcon) {
  *   apart from moving the same `when` into [ShellMasterPane].
  * - **[DhunShellLayout.TwoPane]** (≥ 840dp, Phase 13's "navigation rail at
  *   width ≥ 840dp; two-pane player where space allows") — the rail, a master
- *   column (list + MiniPlayer docked to its bottom), and a detail column that
- *   shows the top of [AppNavState.detailStack] beside the list instead of
- *   replacing it. The stack survives a tab switch, and Back pops it page by
- *   page before the player sheet, so a tablet never loses a page it can see.
+ *   column (list + MiniPlayer docked to its bottom), and a detail column beside
+ *   it only while [AppNavState.detailStack] has a route. With no route the
+ *   master uses the full content width; the stack survives a tab switch, and
+ *   Back pops it page by page before the player sheet.
  *
  * Nav & overlay state live in [nav] (hoisted to the platform shell so its
  * BackHandler can coordinate: player collapses → detail pops → app default).
@@ -181,8 +186,9 @@ fun DhunAppShell(
         // ONE decision drives both large-screen affordances: [DhunShellLayout.of]
         // reuses the rail breakpoint token, so the rail and the intent to split
         // can never drift apart. Below it the shell is exactly what shipped to
-        // phones; at and above it the detail stack becomes a real pane — subject
-        // to [DhunShellPolicy.panes] finding actual room in the inset content area.
+        // phones. At and above it, a detail route opts into a real second pane;
+        // an empty stack keeps the master full-width instead of reserving a
+        // permanent "Nothing open" half-screen placeholder.
         val layout = DhunShellPolicy.layoutAt(maxWidth)
         val useNavigationRail = layout == DhunShellLayout.TwoPane
         // Phase 14 error taxonomy: offline banner. Rendered in the Scaffold
@@ -263,15 +269,26 @@ fun DhunAppShell(
             },
         ) { innerPadding ->
             // The split is computed from what the Scaffold actually handed back,
-            // minus the rail — see [DhunShellPolicy.panes].
+            // minus the rail — see [DhunShellPolicy.panes]. It is deliberately
+            // requested only for an open route: an empty detail stack is the
+            // normal landing state, not a reason to surrender half the window.
             val direction = LocalLayoutDirection.current
             val horizontalInsets = innerPadding.calculateLeftPadding(direction) +
                 innerPadding.calculateRightPadding(direction)
-            val panes = DhunShellPolicy.panes(
-                shellWidth = maxWidth,
-                contentWidth = maxWidth - horizontalInsets,
-                hasRail = useNavigationRail,
+            val detailRoute = nav.detailStack.lastOrNull()
+            val showDetailPane = DhunShellPolicy.detailPaneVisible(
+                layout = layout,
+                detailDepth = nav.detailStack.size,
             )
+            val panes = if (showDetailPane) {
+                DhunShellPolicy.panes(
+                    shellWidth = maxWidth,
+                    contentWidth = maxWidth - horizontalInsets,
+                    hasRail = useNavigationRail,
+                )
+            } else {
+                null
+            }
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -280,21 +297,23 @@ fun DhunAppShell(
                 if (useNavigationRail) {
                     AppNavigationRail(nav = nav, layout = layout)
                 }
-                if (panes == null) {
-                    // Phone / narrow window: unchanged, including the floating
-                    // MiniPlayer above where the bottom bar would have been.
+                if (panes == null || detailRoute == null) {
+                    // Phone / narrow window, or a large screen with no route:
+                    // unchanged content wiring, with the master using all of the
+                    // available space. The floating MiniPlayer is only needed
+                    // here because the rail layout has no bottom navigation dock.
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
                     ) {
-                        // `panes == null` is the single-pane case: either below the
-                        // breakpoint, or (rare) at it with insets so large that two real
-                        // columns do not fit. Either way the top of the stack covers the
-                        // tab, exactly as it does on a phone.
+                        // `panes == null` is either the phone path, a large
+                        // screen with no detail route, or a constrained window that
+                        // cannot fit two usable columns. Only a non-empty route is
+                        // rendered here; the normal empty state stays on the tab.
                         ShellMasterPane(
                             tab = nav.selectedTab,
-                            detailRoute = nav.detailStack.lastOrNull(),
+                            detailRoute = detailRoute,
                             homeViewModel = homeViewModel,
                             searchViewModel = searchViewModel,
                             libraryViewModel = libraryVm,
@@ -332,15 +351,15 @@ fun DhunAppShell(
                         }
                     }
                 } else {
-                    // Large screen: a master column (tab list + docked
-                    // MiniPlayer) and a detail column. The stack survives tab
-                    // switches here — it is not covering anything any more.
+                    // Large screen with an open route: a master column (tab list
+                    // + docked MiniPlayer) and a detail column. The stack survives
+                    // tab switches here — it is not covering anything any more.
                     ShellTwoPane(
                         panes = panes,
                         master = {
                             ShellMasterPane(
                                 tab = nav.selectedTab,
-                                detailRoute = null,
+                                detailRoute = detailRoute,
                                 homeViewModel = homeViewModel,
                                 searchViewModel = searchViewModel,
                                 libraryViewModel = libraryVm,
@@ -370,7 +389,7 @@ fun DhunAppShell(
                         },
                         detail = {
                             ShellDetailPane(
-                                route = nav.detailStack.lastOrNull(),
+                                route = detailRoute,
                                 provider = provider,
                                 dataLayer = dataLayer,
                                 player = player,
@@ -401,32 +420,43 @@ fun DhunAppShell(
         }
 
         // ---------------- FullPlayer overlay (covers nav + content) --------------
-        AnimatedVisibility(
-            visible = nav.playerExpanded && currentTrack != null,
-            enter = slideInVertically(DhunAnimations.mediumTween()) { it } +
-                fadeIn(DhunAnimations.mediumTween()),
-            exit = slideOutVertically(DhunAnimations.mediumTween()) { it } +
-                fadeOut(DhunAnimations.fastTween()),
-            modifier = Modifier.fillMaxSize(),
+        // Keep this as an explicit top layer rather than relying on sibling draw
+        // order. On Compose Desktop the rail/detail split can otherwise remain
+        // visually above a transitioning sheet during the first frame, which
+        // makes the Windows player look like it opened in only one pane.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(FULL_PLAYER_LAYER_Z_INDEX),
         ) {
-            FullPlayer(
-                viewModel = playerViewModel,
-                isDesktop = isDesktop,
-                onCollapse = { nav.playerExpanded = false },
-                onOverflowTrack = { overflowTrack = it },
-                favoriteIds = favoriteIds,
-                onToggleFavorite = { homeViewModel.toggleFavorite(it) },
-                onOpenArtist = { track ->
-                    nav.playerExpanded = false
-                    nav.detailStack.clear()
-                    openArtist(track)
-                },
-                onOpenAlbum = { track ->
-                    nav.playerExpanded = false
-                    nav.detailStack.clear()
-                    openAlbum(track)
-                },
-            )
+            AnimatedVisibility(
+                visible = nav.playerExpanded && currentTrack != null,
+                enter = slideInVertically(DhunAnimations.mediumTween()) { it } +
+                    fadeIn(DhunAnimations.mediumTween()),
+                exit = slideOutVertically(DhunAnimations.mediumTween()) { it } +
+                    fadeOut(DhunAnimations.fastTween()),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                FullPlayer(
+                    modifier = Modifier.fillMaxSize(),
+                    viewModel = playerViewModel,
+                    isDesktop = isDesktop,
+                    onCollapse = { nav.playerExpanded = false },
+                    onOverflowTrack = { overflowTrack = it },
+                    favoriteIds = favoriteIds,
+                    onToggleFavorite = { homeViewModel.toggleFavorite(it) },
+                    onOpenArtist = { track ->
+                        nav.playerExpanded = false
+                        nav.detailStack.clear()
+                        openArtist(track)
+                    },
+                    onOpenAlbum = { track ->
+                        nav.playerExpanded = false
+                        nav.detailStack.clear()
+                        openAlbum(track)
+                    },
+                )
+            }
         }
 
         // ---------------- dialogs (topmost) ---------------------------------------
@@ -679,13 +709,13 @@ private fun ShellMasterPane(
  * [AppNavState.popDetail] is the right affordance here (one page, not
  * [AppNavState.closeTop], which would also try to collapse the player).
  *
- * An empty stack is **not** an error state — on a tablet the pane is reserved
- * permanently so the layout does not jump every time a page opens or closes;
- * it shows an idle prompt instead of a blank rectangle.
+ * This composable is only mounted while the stack is non-empty. The shell
+ * removes the pane entirely when the last route closes, so an empty stack
+ * returns the tab to full width instead of showing an idle prompt.
  */
 @Composable
 private fun ShellDetailPane(
-    route: DetailRoute?,
+    route: DetailRoute,
     provider: MusicProvider,
     dataLayer: DataLayer,
     player: DhunPlayer,
@@ -696,7 +726,6 @@ private fun ShellDetailPane(
     onTrackOverflow: (Track) -> Unit,
 ) {
     when (route) {
-        null -> DetailPanePlaceholder()
         is DetailRoute.ArtistPage -> {
             val vm = remember(route.id) { ArtistViewModel(provider, player, route.id) }
             DisposableEffect(vm) { onDispose { vm.close() } }
@@ -732,40 +761,6 @@ private fun ShellDetailPane(
                 onTrackPlay = onPlayPlaylist,
                 onTrackOverflow = onTrackOverflow,
                 onDeleted = { nav.popDetail() },
-            )
-        }
-    }
-}
-
-@Composable
-private fun DetailPanePlaceholder() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(DhunSpacing.xxl),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(DhunSpacing.skeletonTextWidth * 2),
-        ) {
-            DhunIconView(
-                icon = DhunIcon.Album,
-                contentDescription = null,
-                modifier = Modifier.size(DhunSpacing.artworkThumb),
-                tint = DhunColors.textDisabled,
-            )
-            Text(
-                text = "Nothing open",
-                color = DhunColors.textSecondary,
-                fontSize = DhunTypographyTokens.titleMedium.fontSize,
-                modifier = Modifier.padding(top = DhunSpacing.md),
-            )
-            Text(
-                text = "Pick a song, artist, album or playlist on the left and it opens here.",
-                color = DhunColors.textTertiary,
-                fontSize = DhunTypographyTokens.bodySmall.fontSize,
-                modifier = Modifier.padding(top = DhunSpacing.xs),
             )
         }
     }
