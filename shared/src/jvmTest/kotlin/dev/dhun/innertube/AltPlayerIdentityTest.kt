@@ -239,10 +239,11 @@ class AltPlayerIdentityTest {
         try {
             val client = InnerTubeClient(http)
             assertEquals("19912", client.signatureTimestampOrNull("vid123"))
-            // Second resolve re-checks the watch page (player builds rotate)
-            // but does not re-download unchanged player JS.
+            // S5: the second resolve serves the cached sts without touching
+            // the network at all (player builds rotate every few weeks, not
+            // per track) — the old contract re-fetched the ~1 MB watch page.
             assertEquals("19912", client.signatureTimestampOrNull("vid123"))
-            assertEquals(2, watchFetches)
+            assertEquals(1, watchFetches)
             assertEquals(1, jsFetches)
         } finally {
             http.close()
@@ -255,6 +256,109 @@ class AltPlayerIdentityTest {
         val http = HttpClient(engine) { install(HttpTimeout) }
         try {
             assertNull(InnerTubeClient(http).signatureTimestampOrNull("vid123"))
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun signatureTimestampRevalidatesAfterTheCachedBudgetRunsOut() = runBlocking {
+        var watchFetches = 0
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/watch" -> {
+                    watchFetches++
+                    respond(watchHtml, headers = headersOf(HttpHeaders.ContentType, "text/html"))
+                }
+                "/s/player/5c9f3a2b/player_ias.vflset/en_US/base.js" -> {
+                    respond(playerJs, headers = headersOf(HttpHeaders.ContentType, "application/javascript"))
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val client = InnerTubeClient(http)
+            // Call 1 validates; the next STS_REVALIDATE_EVERY calls serve cache.
+            repeat(1 + STS_REVALIDATE_EVERY) {
+                assertEquals("19912", client.signatureTimestampOrNull("vid123"))
+            }
+            assertEquals(1, watchFetches)
+            // The budget is spent: this call re-checks the watch page (same
+            // player build → same sts, no JS re-download).
+            assertEquals("19912", client.signatureTimestampOrNull("vid123"))
+            assertEquals(2, watchFetches)
+            // ...and the budget renews.
+            repeat(STS_REVALIDATE_EVERY) {
+                assertEquals("19912", client.signatureTimestampOrNull("vid123"))
+            }
+            assertEquals(2, watchFetches)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun signatureTimestampForceRefreshBypassesTheCache() = runBlocking {
+        var watchFetches = 0
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/watch" -> {
+                    watchFetches++
+                    respond(watchHtml, headers = headersOf(HttpHeaders.ContentType, "text/html"))
+                }
+                "/s/player/5c9f3a2b/player_ias.vflset/en_US/base.js" -> {
+                    respond(playerJs, headers = headersOf(HttpHeaders.ContentType, "application/javascript"))
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val client = InnerTubeClient(http)
+            assertEquals("19912", client.signatureTimestampOrNull("vid123"))
+            assertEquals("19912", client.signatureTimestampOrNull("vid123", forceRefresh = true))
+            assertEquals(2, watchFetches)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun signatureTimestampFailedRevalidationBacksOffAndKeepsServingCache() = runBlocking {
+        var watchFetches = 0
+        var failWatch = false
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/watch" -> {
+                    watchFetches++
+                    if (failWatch) error("watch page down")
+                    respond(watchHtml, headers = headersOf(HttpHeaders.ContentType, "text/html"))
+                }
+                "/s/player/5c9f3a2b/player_ias.vflset/en_US/base.js" -> {
+                    respond(playerJs, headers = headersOf(HttpHeaders.ContentType, "application/javascript"))
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val client = InnerTubeClient(http)
+            assertEquals("19912", client.signatureTimestampOrNull("vid123"))
+            // Spend the cached budget, then break the watch page.
+            repeat(STS_REVALIDATE_EVERY) {
+                assertEquals("19912", client.signatureTimestampOrNull("vid123"))
+            }
+            failWatch = true
+            // Revalidation fails open to null (the resolve goes out without
+            // playbackContext) — and backs off instead of hammering.
+            assertNull(client.signatureTimestampOrNull("vid123"))
+            assertEquals(2, watchFetches)
+            // The stale cache keeps serving a full fresh budget.
+            repeat(STS_REVALIDATE_EVERY) {
+                assertEquals("19912", client.signatureTimestampOrNull("vid123"))
+            }
+            assertEquals(2, watchFetches)
         } finally {
             http.close()
         }

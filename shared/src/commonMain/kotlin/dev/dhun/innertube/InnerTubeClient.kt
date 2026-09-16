@@ -50,6 +50,12 @@ enum class SearchFilter(internal val params: String?) {
 }
 
 internal const val INNERTUBE_USER_AGENT =
+
+/**
+ * Resolves served from the cached `sts` before the watch page is re-checked
+ * (S5). See `InnerTubeClient.stsUsesSinceValidation`.
+ */
+internal const val STS_REVALIDATE_EVERY: Int = 25
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
@@ -85,6 +91,17 @@ class InnerTubeClient(
     /** Player-JS URL to the `signatureTimestamp` extracted from it. */
     @Volatile
     private var cachedSts: Pair<String, String>? = null
+
+    /**
+     * Resolves served from [cachedSts] since its last validation (S5). Player
+     * builds — and their `sts` — rotate every few weeks, not per track, so
+     * re-checking the ~1 MB watch page on every resolve wastes a round trip
+     * per track. Count-based rather than wall-clock TTL: commonMain has no
+     * clock without a new expect/actual, and at [STS_REVALIDATE_EVERY] even a
+     * 100-track marathon revalidates 4 times while a stale sts can only ever
+     * cost one failed resolve before the caller's recovery path kicks in.
+     */
+    private var stsUsesSinceValidation: Int = 0
 
     suspend fun clientVersion(forceRefresh: Boolean = false): String {
         cachedClientVersion?.takeIf { !forceRefresh }?.let { return it }
@@ -307,13 +324,22 @@ class InnerTubeClient(
      * Player `signatureTimestamp` (`sts`) for [videoId], extracted from the
      * watch page's player JS URL and then the JS itself — the yt-dlp shape:
      * watch page → `/s/player/…/base.js` → `signatureTimestamp:<digits>`.
-     * Cached per player-JS URL (player builds — and their `sts` — rotate
-     * every few weeks, not per track).
+     * Cached per player-JS URL and revalidated every [STS_REVALIDATE_EVERY]
+     * resolves (player builds — and their `sts` — rotate every few weeks,
+     * not per track).
      *
      * Fail-open by design: any fetch/parse failure returns `null` and the
-     * request goes out without `playbackContext` — never worse.
+     * request goes out without `playbackContext` — never worse. A failed
+     * revalidation backs off (the counter resets) instead of hammering the
+     * watch page on every subsequent resolve; the stale cache keeps serving
+     * meanwhile.
      */
     suspend fun signatureTimestampOrNull(videoId: String, forceRefresh: Boolean = false): String? {
+        val cached = cachedSts
+        if (!forceRefresh && cached != null && stsUsesSinceValidation < STS_REVALIDATE_EVERY) {
+            stsUsesSinceValidation++
+            return cached.second
+        }
         val jsUrl = try {
             val watchHtml = httpClient.get("$WWW_BASE/watch?v=$videoId") {
                 headers {
@@ -321,13 +347,20 @@ class InnerTubeClient(
                     append(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9")
                 }
             }.bodyAsText()
-            parsePlayerJsUrl(watchHtml) ?: return null
+            parsePlayerJsUrl(watchHtml) ?: run {
+                stsUsesSinceValidation = 0 // unparseable page: back off, keep cache
+                return null
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
+            stsUsesSinceValidation = 0 // back off; keep serving the stale cache
             return null
         }
-        if (!forceRefresh && cachedSts?.first == jsUrl) return cachedSts?.second
+        if (!forceRefresh && cachedSts?.first == jsUrl) {
+            stsUsesSinceValidation = 0
+            return cachedSts?.second
+        }
         val js = try {
             httpClient.get(jsUrl) {
                 headers {
@@ -338,9 +371,13 @@ class InnerTubeClient(
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
+            stsUsesSinceValidation = 0 // back off; keep serving the stale cache
             return null
         }
-        return parseSignatureTimestampFromPlayerJs(js)?.also { cachedSts = jsUrl to it }
+        return parseSignatureTimestampFromPlayerJs(js)?.also {
+            cachedSts = jsUrl to it
+            stsUsesSinceValidation = 0
+        }
     }
 
     /* ---------------- internals ------------------------------------------ */
