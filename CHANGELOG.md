@@ -24,6 +24,19 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — mouse-rail fling + named Android unit-test CI step — 2026-09-16
+- **Windows rails coast after a mouse flick.** Hold-and-slide (PR #68) stopped
+  dead on pointer-up. Releasing with leftover velocity now decays into a fling
+  in the same direction the drag was already moving; a slow release, a cancelled
+  drag, and the end of the rail still stop. Touch keeps the framework fling;
+  the mouse wheel stays a vertical control; trackpad two-finger pans are
+  untouched.
+- **CI names `:app-android:testDebugUnitTest`.** A red Android suite used to
+  abort the step called "Android debug build" because `assembleDebug` depended
+  on the tests. `ci.yml` now runs the suite as its own "Unit tests — Android
+  (Robolectric)" step before assemble. Packaging jobs still go through
+  assembleDebug, so that coupling is kept — a red suite cannot ship an APK.
+
 ### Fixed — Home/Search/Library backdrop, Android tab BACK, Windows rails — 2026-09-16
 - **The app now sits on the song you are playing.** Home, Search and Library get
   an edge-to-edge background built from the **currently playing** track's
