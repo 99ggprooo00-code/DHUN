@@ -88,6 +88,7 @@ fun LibraryScreen(
     onPlaylistClick: (LocalPlaylist) -> Unit,
     onTrackOverflow: (Track) -> Unit = {},
     modifier: Modifier = Modifier,
+    onOpenSettings: () -> Unit = {},
 ) {
     val selectedTab by viewModel.selectedTab.collectAsState()
     val viewingLikedSongs by viewModel.viewingLikedSongs.collectAsState()
@@ -397,6 +398,15 @@ private fun LikedSongsFolderCard(
                 Text(
                     text = "$trackCount song${if (trackCount == 1) "" else "s"} • Auto-playlist",
                     style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                )
+            }
+
+            if (trackCount > 0) {
+                DhunIconButton(
+                    onClick = onPlay,
+                    modifier = Modifier.size(DhunSpacing.touchTarget),
+                    contentDescription = "Ptypography.bodySmall,
                     color = DhunColors.textSecondary,
                 )
             }

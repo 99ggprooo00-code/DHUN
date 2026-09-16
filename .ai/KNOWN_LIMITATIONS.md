@@ -2,6 +2,25 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-16 — S4 slice 1: settings with keys but no behaviour
+
+Verified by grep (no app caller outside tests — only `UseCasesTest`
+touches the getters): the S4 Settings page exposes exactly the five
+settings that do something (theme, accent, cache budget, resume-on-launch,
+close-to-tray). These keys exist in `SettingsKeys` but are deliberately
+*not* surfaced, because persisting a value nothing reads would be a lie:
+
+- `AUDIO_QUALITY` ("low/medium/high") — `GetSettingUseCase.audioQuality()`
+  has no caller; `InnerTubeClient` is constructed with fixed defaults.
+- `COUNTRY_CODE` — same; InnerTube `gl` stays `"US"`.
+- `LYRICS_ENABLED` — no reader at all (lyrics always on).
+- `ACCENT_MODE` ("artwork"/"static") — no reader; dynamic artwork palettes
+  are unimplemented (the 6-way accent hue is the separate `ACCENT` key).
+- `EXPLICIT_CONTENT` — no reader; nothing filters explicit tracks.
+
+Wiring any of these is a v0.2.0+ feature, not a settings-UI gap. `THEME`
+`"system"` likewise stays storable-but-unhonoured (falls back to dark).
+
 ## 2026-09-16 — second-look code findings (same session, engine-room read)
 
 Read end to end: `InnerTubeClient`, `OwnClientStreamResolver`,

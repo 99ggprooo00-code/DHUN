@@ -26,6 +26,7 @@ import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.DhunUserDirs
 import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunTheme
+import dev.dhun.design.DhunAppearance
 import dev.dhun.download.DownloadManager
 import dev.dhun.download.FileDownloadManager
 import dev.dhun.download.JvmDownloadStorage
@@ -305,6 +306,17 @@ fun main() {
             val persistence: NowPlayingPersistence = koin.get()
             val settings = dataLayer.settings
 
+            // S4: persisted theme/accent (SettingsKeys.THEME/ACCENT) — applied
+            // before the main window opens so the first frame is already themed.
+            runBlocking {
+                runCatching {
+                    DhunAppearance.applyPersistedAppearance(
+                        settings.getString(SettingsKeys.THEME),
+                        settings.getString(SettingsKeys.ACCENT),
+                    )
+                }
+            }
+
             // Phase 12: persisted window geometry + close-to-tray (Phase 05 DB).
             val initialGeometry: WindowGeometry? = runBlocking {
                 runCatching { settings.getString(SettingsKeys.WINDOW_GEOMETRY) }
@@ -572,6 +584,7 @@ fun main() {
                         modifier = Modifier.fillMaxSize(),
                         connectivity = koin.get(),
                         downloadManager = koin.get(),
+                        equalizerSession = player.equalizer,
                     )
                 }
             }

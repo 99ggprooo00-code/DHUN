@@ -273,6 +273,21 @@ class AppNavStateTest {
     }
 
     @Test
+    fun pushingSettingsTwiceKeepsASingleton() {
+        // Unlike browse pages (see pushingTheSameRouteTwice…), Settings has
+        // no id to distinguish instances — re-tapping the entry moves the one
+        // page to the top instead of stacking identical pages.
+        val nav = AppNavState()
+        nav.push(DetailRoute.ArtistPage("UCx"))
+        nav.push(DetailRoute.SettingsPage)
+        nav.push(DetailRoute.SettingsPage)
+        assertEquals(
+            listOf(DetailRoute.ArtistPage("UCx"), DetailRoute.SettingsPage),
+            nav.detailStack.toList(),
+        )
+    }
+
+    @Test
     fun pushCollapsesThePlayerSoThePageIsVisible() {
         // Pushes issued from above the player (overflow "Go to artist/album",
         // add-to-playlist "open playlist") used to land invisibly under the

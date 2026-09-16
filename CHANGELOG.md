@@ -24,6 +24,26 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Added — Stage S4 settings surface, slice 1 — 2026-09-16
+- **Settings page** (`DetailRoute.SettingsPage`, entry from the Library
+  header): theme (dark/light) + accent pickers that apply live via the
+  existing `DhunAppearanceControls`, audio-cache budget ladder, resume-on-launch
+  switch, desktop-only close-to-tray switch, and an equalizer section (enable,
+  18 presets, preamp + 10 band sliders) bound to `EqualizerSession` through
+  `toUiModel()`. Settings is a nav-stack singleton; the Android
+  saved-instance-state codec round-trips it as `"settings"`.
+- **Appearance persistence**: new `SettingsKeys.ACCENT` key (default
+  `"brand"`); both platforms restore theme+accent before first composition
+  via `DhunAppearance.applyPersistedAppearance()`; unknown/corrupt ids fall
+  back to dark+brand. `SettingsViewModel` stays in plain strings so
+  `presentation` keeps its separation from `design`.
+- Desktop passes `player.equalizer` into the shell, so the EQ section is
+  live there; Android's section appears with slice 3 (AudioEffect engine).
+- Deliberately **not** exposed: `AUDIO_QUALITY`, `COUNTRY_CODE`,
+  `LYRICS_ENABLED`, `ACCENT_MODE`, `EXPLICIT_CONTENT` have keys but no
+  behaviour behind them — a dead toggle is worse than none
+  (see `.ai/KNOWN_LIMITATIONS.md`).
+
 ### Changed — Stage S2 architectural cleanup — 2026-09-16
 - **Dead harness UI deleted** (~680 lines): `HarnessScreen`,
   `HarnessViewModel`, `DesktopHarness*` had zero call sites (only an

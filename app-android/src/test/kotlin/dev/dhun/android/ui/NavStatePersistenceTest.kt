@@ -183,4 +183,12 @@ class NavStatePersistenceTest {
         assertEquals(DetailRoute.PlaylistPage("15", isLocal = true), NavStatePersistence.decodeRoute(local))
         assertEquals(DetailRoute.PlaylistPage("VL_x", isLocal = false), NavStatePersistence.decodeRoute(remote))
     }
+
+    @Test
+    fun `settings route round-trips as an id-less entry`() {
+        // S4: SettingsPage carries no id, so it encodes to a bare tag and
+        // decodes even if a future version appends fields (split limit).
+        assertEquals("settings", NavStatePersistence.encodeRoute(DetailRoute.SettingsPage))
+        assertEquals(DetailRoute.SettingsPage, NavStatePersistence.decodeRoute("settings"))
+    }
 }

@@ -1,26 +1,32 @@
 # CURRENT ACTIVE TASK
 
 Updated **2026-09-16 (UTC)** · session **`arena/01a0ab12-dhun`** —
-**Stage S2 cleanup on top of the nav package** · **PR #72 OPEN**
-(re-baseline + nav fixes; CI running at last check: `apk` + `build`
-pass, `build-and-test` + `msi` pending).
+**PR #72 MERGED** (`main@5023b38`; pre-merge CI fully green) ·
+**Stage S4 slice 1 (Settings page) in progress** · user authorized
+autonomous merge — only S1 dispatch (agent 403), S3 hardware, and
+release/signing decisions escalate with step-by-step guides.
 
-**What this commit adds (S2):** dead harness UI deleted (4 files +
-DI registration + graph-test lines); root session notes archived to
-`docs/history/`; `14-release.md` current-status notice;
-`cancelCacheFill()` now cancels the job (mirrors prebuffer).
+**What this commit adds (S4.1):** `DetailRoute.SettingsPage` (stack
+singleton) + `SettingsScreen` (appearance/cache/resume/tray/EQ) +
+`SettingsViewModel` + `SettingsKeys.ACCENT` +
+`applyPersistedAppearance` + startup restore on both platforms +
+`"settings"` saved-state codec; desktop shell gets `player.equalizer`.
 PR #53/#54 left for the user (close #53 unmerged; keep #54 as
 contingency reference — user's click).
 
-**Files (this commit):** 4 harness deletions · `AppModule.kt` ·
-`AppModuleGraphTest.kt` · `DesktopDhunPlayer.kt` · `docs/history/` ·
-`docs/verification/14-release.md` · `CHANGELOG.md` · this file.
+**Files (this commit):** `AppNavState.kt` · `SettingsKeys.kt` ·
+`DhunAppearance.kt` · `AppearanceControls.kt` (kdoc) ·
+`presentation/settings/` (new) · `ui/settings/` (new) ·
+`DhunAppShell.kt` · `LibraryScreen.kt` · `NavStatePersistence.kt` (+test) ·
+`MainActivity.kt` · `Main.kt` · `AppNavStateTest.kt` ·
+`SettingsViewModelTest.kt` (new) · `CHANGELOG.md` · this file.
 
-**Last error:** none — CI is the compiler (no JDK; egress-blocked).
+**Last error:** none — CI is the compiler (no JDK in sandbox).
 
-**Exact next step:** push → require `build-and-test` + `apk` + `msi`
-green on PR #72 → PR review + merge decision (do **not** merge until
-asked). Then: **Stage S1 needs the user** (Actions *Run workflow*
+**Exact next step:** commit + open PR for S4.1 → while CI runs, build
+S4 slice 2 (jump-list command protocol + `main(args)`) and slice 3
+(Android AudioEffect EQ engine + Koin session) on the same branch →
+merge when green. **Stage S1 needs the user** (Actions *Run workflow*
 click — agents get 403), **Stage S3 needs the user** (devices).
 
 **Explicitly NOT claimed:** on-device behavior of the nav fixes or

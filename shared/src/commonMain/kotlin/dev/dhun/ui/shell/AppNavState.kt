@@ -18,6 +18,12 @@ sealed interface DetailRoute {
 
     /** Playlist page — YTM (id VL…) or local ([isLocal] = true, SQLDelight id). */
     data class PlaylistPage(val id: String, val isLocal: Boolean = false) : DetailRoute
+
+    /**
+     * Settings page (S4). Id-less singleton: at most one lives on the stack —
+     * [AppNavState.push] replaces an existing one rather than stacking dupes.
+     */
+    data object SettingsPage : DetailRoute
 }
 
 /**
@@ -165,6 +171,9 @@ class AppNavState {
      */
     fun push(route: DetailRoute) {
         playerExpanded = false
+        // Settings is a singleton: re-tapping the entry replaces the existing
+        // page instead of stacking identical pages.
+        if (route is DetailRoute.SettingsPage) detailStack.removeAll { it is DetailRoute.SettingsPage }
         detailStack += route
     }
 
