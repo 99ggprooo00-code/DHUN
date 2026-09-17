@@ -1,61 +1,66 @@
-# Runbook: rot-drill (live extraction health check)
+# Runbook: rot-drill / extraction-health (live extraction health check)
 
-**Why this needs a human:** the `rot-drill` workflow only runs on a
+**Why this needs a human:** the drill workflow only runs on a
 daily schedule or a manual dispatch. Agent sessions get `HTTP 403` on
 `workflow_dispatch` (re-verified 2026-09-17), and the daily schedule
 does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-17 ~05:50 UTC): rename (attempt 3) ALSO FAILED — awaiting support
+## State (2026-09-17 ~16:00 UTC): attempt 4 SUCCESS — extraction-health.yml healthy
 
-Rename to `rot-drill-daily.yml` (PR #84) created new workflow id
-360227450 (old id 348098190 now shows `state: deleted`), but the
-fresh entry ALSO shows name stuck at the file path (not
-`rot-drill`) and fired phantom 0-job push run 35186690348 on the
-merge push. The bug reproduces on a fresh id even at a new
-filename — the repository's workflow-registration layer is
-failing to read the `name:` field server-side.
+- **Attempt 4 (PR #88, merged `3c593fb` ~15:40 UTC):** new file
+  `.github/workflows/extraction-health.yml` with `name: extraction-health`
+  registered as id **360655315**, `state: active`, name correctly
+  `extraction-health` (NOT file path). No phantom 0-job push run on merge,
+  unlike wedged id 360227450 which fired 35241808266 (0s failure) on same merge.
+  This bypassed the corrupted registration tied to `rot-drill.yml` /
+  `rot-drill-daily.yml` paths.
 
-**ALL workflow file changes STOPPED per plan step 5.** GitHub
-support ticket **#4765894** submitted by user (~03:15 UTC,
-auto-receipt ~06:50 UTC) to Support Actions
-(diagnostic page confirmed "stale/corrupted registration" / no
-self-service fix). Awaiting support response; the new id
-360227450 is the target for them to re-sync. Ticket text was
-provided in the 2026-09-17 agent chat (not committed to repo per
-request). Until support resets the entry, the UI path below does
-not exist and the schedule will continue to miss windows.
+- **Old wedged entries still present before cleanup:**
+  - 360227450 `.github/workflows/rot-drill-daily.yml` (active, wedged: name=file path)
+  - 348098190 now `state: deleted` (orphaned)
+  - 347425736 `dev-release` (orphaned, file deleted)
+
+- **Current healthy drill:** `extraction-health` (id 360655315). The old
+  `rot-drill-daily.yml` will be deleted in next PR to orphan 360227450.
+
+- **Support ticket #4765894** (filed ~03:15 UTC, auto-receipt ~06:50 UTC)
+  originally targeted 348098190, then 360227450. With attempt 4 success,
+  ask support to close as "resolved by new file path" or leave open for
+  them to clean orphaned ids.
+
+**Post-merge CI on `3c593fb`:** Build APK success 2m46s, CI success 5m23s,
+test-release success 6m33s, rolling `test` republished 15:46:15Z apk /
+15:47:22Z msi (all four assets). Phantom noise 35241808266 from old entry.
 
 ## Dispatch
 
-**Path A — Actions UI (the repo owner's path; needs re-registration
-first):**
+**Path A — Actions UI (the repo owner's path):**
 
-1. Open `https://github.com/99ggprooo00-code/DHUN/actions/workflows/rot-drill-daily.yml`
-   (repo → **Actions** → **rot-drill** in the left sidebar — the
-   workflow's declared name remains `rot-drill`; the sidebar label
-   should reflect that name once registration is healthy).
+1. Open `https://github.com/99ggprooo00-code/DHUN/actions/workflows/extraction-health.yml`
+   (repo → **Actions** → **extraction-health** in the left sidebar — the
+   workflow's declared name is `extraction-health`; sidebar label should
+   reflect that name when registration is healthy).
 2. Click **Run workflow** (right side, above the runs list); leave
-   **Branch: main** selected (there are no input fields); click the
-   green **Run workflow** button in the dropdown.
-3. A new run appears at the top within ~30 s. Click it, then watch the
-   **probe** job (≈5–12 min; it installs `yt-dlp` and runs the offline +
-   live playback probes).
+   **Branch: main** selected; click green **Run workflow**.
+3. A new run appears at top within ~30 s. Click it, watch **probe** job
+   (≈5–12 min; installs yt-dlp and runs offline + live probes).
+
+**Legacy path (old wedged file):**
+`https://github.com/99ggprooo00-code/DHUN/actions/workflows/rot-drill-daily.yml`
+— shows name as file path when wedged, fires 0-job push noise. Ignore;
+use extraction-health instead. This file is deleted in cleanup PR.
 
 **Path B — owner-account API dispatch (one-liner; agent tokens get
 403):**
 
 ```bash
-gh workflow run rot-drill-daily.yml --ref main --repo 99ggprooo00-code/DHUN
+gh workflow run extraction-health.yml --ref main --repo 99ggprooo00-code/DHUN
 # or by declared name:
-# gh workflow run rot-drill --ref main --repo 99ggprooo00-code/DHUN
-# or, with a workflow-scoped PAT (replace <id> with the new
-# workflow id seen in `gh workflow list` after the rename):
-# curl -X POST -H "Authorization: Bearer <PAT>" \
-#   -H "Accept: application/vnd.github+json" \
-#   https://api.github.com/repos/99ggprooo00-code/DHUN/actions/workflows/<id>/dispatches \
-#   -d '{"ref":"main"}'    # success = HTTP 204, empty body
+# gh workflow run extraction-health --ref main --repo 99ggprooo00-code/DHUN
+# or with workflow id:
+# gh workflow run 360655315 --ref main --repo 99ggprooo00-code/DHUN
 ```
 
 ## Reading the verdict
@@ -63,102 +68,56 @@ gh workflow run rot-drill-daily.yml --ref main --repo 99ggprooo00-code/DHUN
 - **Green run** = extraction healthy on this commit. Nothing else to do;
   if a `[rot-drill]` issue was open, the workflow comments and closes it
   automatically.
-- **Red run** = open the run → **probe** job → expand **Run playback
-  probes (offline + live)**:
-  - `LOGIN_REQUIRED` / *"Sign in to confirm you're not a bot"* =
-    YouTube is gating the GitHub runner's datacenter IP. This does **not**
-    prove user breakage: verify playback on a residential connection
-    (your phone on mobile data, see `s3-hardware-checklist.md`) before
-    treating it as rot.
-  - Anything else (parse errors, 400s, `sts` failures across all client
-    profiles) = probable extractor rot. The workflow opens (or comments
-    on) an issue titled `[rot-drill] Live extraction probe failed` with
-    the last 12 KB of log; the full `rot-drill.log` is on the run under
-    **Artifacts** (`rot-drill-<run_id>`, 14-day retention). Paste the
-    issue number back to the agent — that is the S1 handoff.
-- **Gray / skipped `probe` job** = the run never started (concurrency
-  cancel or runner outage). Re-dispatch; if it repeats, report it like
-  any CI outage, not like rot.
-- **Red run with ZERO jobs** (run shows `failure` but the jobs list is
-  empty, `total_count: 0`) = trigger noise, not a verdict — see below.
+- **Red run** = open run → **probe** job → expand **Run playback probes**:
+  - `LOGIN_REQUIRED` / "Sign in to confirm you're not a bot" = YouTube
+    gating GitHub runner datacenter IP. Not proof of user breakage: verify
+    residential playback (phone on mobile data, see s3-hardware-checklist.md)
+    before treating as rot.
+  - Anything else = probable extractor rot. Workflow opens/comments on
+    issue `[rot-drill] Live extraction probe failed` with last 12 KB log;
+    full log artifact `rot-drill-<run_id>`, 14-day retention.
+- **Gray / skipped probe job** = run never started (concurrency cancel).
+  Re-dispatch.
+- **Red run with ZERO jobs** (failure but jobs list empty, total_count:0)
+  = trigger noise, not verdict — see below.
 
-## Observed anomalies (reconciled 2026-09-16 — read before dispatching)
-
-Verified against the full 189-run Actions history (GitHub API, session
-`arena/01a0ac91-dhun`); UI-absence evidence added 2026-09-17:
+## Observed anomalies (history)
 
 - **The workflow is absent from the Actions UI entirely (2026-09-17,
-  user report):** no list entry and no Run-workflow button, while the
-  REST registry reports `state: active` (id 348098190) and
-  `gh workflow list` shows the registry name as the file path — the
-  same registration decay that killed the schedule also dropped the
-  UI entry.
+  user report for rot-drill):** no list entry and no Run-workflow button,
+  while REST reports `state: active` (id 348098190) and
+  `gh workflow list` shows registry name as file path — same decay that killed schedule.
 
   **Fix attempts:**
-  1. **Comment-only edit (PR #77 = `3ff3a55`, merged 2026-09-17
-     01:03 UTC) — FAILED.** The registry entry 348098190 was
-     untouched: name still the file path, `updated_at` frozen at
-     2026-09-16T23:57:41Z, phantom 0-job push run 35171317970
-     fired on the merge push, Run-workflow button still absent
-     (user-confirmed). The wedge ignores file-content changes.
-  2. **Delete + verbatim re-add (PR #78 = `df6a0be`, then PR #79
-     = `56324f5`, merged 2026-09-17 ~02:21 UTC) — FAILED.** The
-     delete briefly dropped entry 348098190 from `gh workflow
-     list` for ~90 s, but when the file was re-added (verbatim
-     from `3ff3a55` plus one updated comment block — triggers/
-     jobs UNCHANGED, verified by direct diff), GitHub reattached
-     the **same** wedged registry id 348098190 (keyed by file
-     path, not content). Name stayed as the file path (not
-     `rot-drill`), phantom 0-job push run 35174080320 fired on
-     the PR B merge push, and the Actions UI entry did not
-     return. File-level fixes cannot evict this entry. Agent
-     `workflow disable`/`enable` is also 403.
-  3. **GitHub support ticket SUBMITTED by user (~03:15 UTC,
-     2026-09-17).** GitHub's diagnostic page confirmed the
-     "stale/corrupted workflow registration" diagnosis and that
-     no self-service fix exists. Ticket text was provided in the
-     agent chat session (not committed to repo per user
-     request). Request originally targeted id 348098190; after
-     PR #84 the new wedged id 360227450 (path
-     `.github/workflows/rot-drill-daily.yml`) is the active
-     target for re-sync. Both ids are failing to read the
-     `name:` field and fire phantom push runs.
-  3b. **Plan B executed — rename to new file path (~04:30 UTC,
-     PR #84, merged ~05:40 UTC) — FAILED.** File renamed to
-     `rot-drill-daily.yml`; new id 360227450 created but ALSO
-     wedged (path-as-name, phantom push run 35186690348).
-     All workflow file changes STOPPED; awaiting support.
-- **0-job push runs are noise, not verdicts.** Every push since
-  2026-09-07 05:56 UTC created a `rot-drill` run with `event: push`,
-  **0 jobs**, `conclusion: failure`, `failure_reason: null` — although
-  the workflow file has **no `push:` trigger in any version** (verified
-  at SHAs from 2026-09-01 through `c5b1793`). Such runs carry no probe
-  output, open or comment on no issue, and must never be cited as
-  extraction evidence (e.g. 35135427771 on the 2026-09-16 merge push).
-- **The schedule has been silent since 2026-09-07 04:28 UTC** (run
-  34083253658). It fired every day 09-02 → 09-07 (4 green, 2 red — both
-  red pre-#57 chain); **≥10** missed 04:17 UTC windows (09-08 → 09-17,
-  including the 09-17 04:17 window) have passed without a scheduled
-  run despite daily pushes to `main`. Workflow registry `state:
-  active` on the wedged entry (id **348098190**); file unchanged since
-  `da9d779` (09-07 06:17). Working diagnosis: GitHub-side
-  trigger-registration anomaly around that edit (the registry name
-  still shows the file path, not `rot-drill`).
-- **Before and after dispatching, check the schedule too:** once the
-  UI entry is restored, confirm the workflow is enabled on that page.
-  If the next 04:17 UTC window is missed after the manual run, the
-  schedule needs restoring: force re-registration (trivial commit to
-  `main` + one manual run — user-approved 2026-09-17) or a GitHub
-  support ticket citing workflow id 348098190, last scheduled run
-  34083253658, and the missed windows.
-- **Agent dispatch is 403** (`gh workflow run` → `HTTP 403: Resource
-  not accessible by integration`), re-verified 2026-09-17. The *Run
-  workflow* click stays an operator task — and per handoff v2
-  (2026-09-17) the user can only click UI buttons (merge, Run
-  workflow), so Path B above is for a future operator with a PAT, not
-  the current user. An agent token also cannot comment on issue #14
-  (issue-comment writes 403), but the workflow itself updates the
-  issue on the next live run.
+  1. Comment-only edit (PR #77 = `3ff3a55`, merged 2026-09-17 01:03 UTC) — FAILED.
+     Registry entry 348098190 untouched: name still file path, updated_at frozen,
+     phantom 0-job push run 35171317970, button absent.
+  2. Delete + verbatim re-add (PR #78 = `df6a0be`, then PR #79 = `56324f5`,
+     merged ~02:21 UTC) — FAILED. Delete dropped entry ~90 s, but re-add
+     reattached SAME id 348098190 by file path. Name stayed file path,
+     phantom push 35174080320.
+  3. Support ticket SUBMITTED (~03:15 UTC). Diagnostic page confirmed
+     "stale/corrupted workflow registration". Request originally targeted
+     348098190; after PR #84 new wedged id 360227450 (path rot-drill-daily.yml)
+     is active target. Both failing to read name: field and firing phantom pushes.
+  3b. Rename to new file path (PR #84, merged ~05:40 UTC) — FAILED. New id
+      360227450 created but ALSO wedged (path-as-name, phantom 35186690348).
+  4. **New distinct file extraction-health.yml (PR #88, merged `3c593fb`
+     ~15:40 UTC) — SUCCESS.** Id 360655315, name correctly extraction-health,
+     no phantom push on merge. Bypassed path-specific corruption.
+
+- **0-job push runs are noise, not verdicts.** Every push since 2026-09-07
+  05:56 UTC created a rot-drill run with event: push, 0 jobs, conclusion: failure,
+  failure_reason: null — although file has no push: trigger in any version.
+  Such runs carry no probe output and must never be cited as extraction evidence.
+
+- **Schedule silent since 2026-09-07 04:28 UTC** (run 34083253658). Fired daily
+  09-02 → 09-07 (4 green, 2 red — both pre-#57 chain); ≥10 missed windows
+  09-08 → 09-17 passed without scheduled run despite daily pushes.
+
+- **Agent dispatch is 403** (gh workflow run → HTTP 403), re-verified 2026-09-17.
+  Run-workflow click stays operator task. Agent token also cannot comment on
+  issue #14 (403), but workflow itself updates issue on next live run.
 
 ## Recording the evidence
 
@@ -166,8 +125,8 @@ For a release candidate, append one line to
 `docs/verification/14-release.md` ("Live evidence log" → "Rot-drill"
 section):
 
-```text
-- rot-drill <run_id> (<YYYY-MM-DD HH:MM UTC>, main@<sha>): GREEN — <one-line note>
+```
+- extraction-health <run_id> (<YYYY-MM-DD HH:MM UTC>, main@<sha>): GREEN — <note>
 ```
 
 That line is the S1 exit criterion: no tag without it.
