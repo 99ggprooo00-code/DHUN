@@ -1,32 +1,21 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Status note (2026-09-17 ~06:55 UTC, Stage S1):** the body below is a
-> point-in-time log whose merge chain ends at PR #32 (`862f0ac`,
-> 2026-09-07). It is kept verbatim as history. Current state:
-> `main@a27af74` (post-rename; post-merge
-> CI green across Build APK / CI / test-release; rolling `test`
-> republished at exactly `56324f5`, all four assets); Phases 01–16
-> code-merged with hardware gates open; S4/S5 code merged (PR
-> #74); completion tracked as Stages S1–S6 in `.ai/ROADMAP.md`. No
-> v0.1.0 tag/release exists. The rot-drill schedule has been
-> silent since 2026-09-07 04:28 UTC (≥10 missed 04:17 windows)
-> and the workflow is **absent from the Actions UI entirely**
-> while registry-active on the wedged entry (id 348098190).
-> **Both file-level re-registration attempts FAILED:** (1)
-> comment-only edit PR #77 — entry untouched; (2) delete + verbatim
-> re-add PRs #78/#79 — GitHub reattached SAME id 348098190.
-> Attempt 3 (rename to `rot-drill-daily.yml`, PR #84) created new
-> id 360227450 (old id now state:deleted) but ALSO wedged (name
-> stuck at file path; phantom push run 35186690348). The repo's
-> workflow registration is failing server-side even for fresh
-> ids; awaiting GitHub Support on ticket **#4765894** (filed ~03:15
-> UTC, auto-receipt received ~06:50 UTC).
-> All workflow file changes STOPPED. The
-> push-triggered "red rot-drill" runs are 0-job noise (the file
-> never had a `push:` trigger), not verdicts — see
-> `.ai/KNOWN_LIMITATIONS.md` + `docs/runbooks/rot-drill.md`. The
-> verdict line below lands after support resets the entry and a
-> live probe run exists.
+> **Status note (2026-09-17 ~16:00 UTC, Stage S1 attempt 4 SUCCESS):**
+> body below is point-in-time log ending PR #32 (`862f0ac`, 2026-09-07),
+> kept verbatim as history. Current state: `main@3c593fb` (PR #88 merged
+> ~15:40 UTC, attempt 4 `extraction-health.yml`); Build APK 2m46s PASS,
+> CI 5m23s PASS, test-release 6m33s PASS, rolling `test` republished
+> 15:46:15Z apk / 15:47:22Z msi all four assets verified via release API.
+> **New healthy workflow id 360655315 `extraction-health` active with
+> correct name `extraction-health` (not file path), no phantom 0-job push
+> on merge** — bypassed corrupted registration that wedged 348098190
+> (deleted) and 360227450 (active wedged, fired phantom 35241808266 on
+> same merge). Old `rot-drill-daily.yml` to be deleted next PR to orphan
+> 360227450. Support ticket #4765894 filed ~03:15 UTC still pending but
+> workaround succeeded. Dispatch still 403 for agent — user must click
+> **Run workflow** on `extraction-health` in Actions UI; schedule 04:17 UTC
+> will fire next window. No v0.1.0 tag/release yet. S1 exit criterion is
+> live GREEN run of `extraction-health` (replacing rot-drill).
 
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
 RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**
