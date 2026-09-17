@@ -7,18 +7,20 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-17 ~02:45 UTC): both file-level fix attempts FAILED — GitHub support needed
+## State (2026-09-17 ~03:20 UTC): ticket SUBMITTED; awaiting GitHub Support response
 
 The Actions UI shows no `rot-drill` entry at all (no list entry, no
 Run-workflow button), while the REST registry still reports it
 `state: active` (workflow id **348098190**, name stuck at the file
 path). Both file-level re-registration attempts failed (see "Fix
 attempts" below). Per the user-approved plan, file changes to
-`rot-drill.yml` are STOPPED. The repo owner must submit the GitHub
-support ticket at
-the 2026-09-17 agent chat session (ticket text not stored in repo per user preference) (Subject
-+ Body copy-paste to https://support.github.com/contact?tags=rr-actions)
-asking GitHub to force a clean re-registration of entry 348098190.
+`rot-drill.yml` are STOPPED. **GitHub support ticket SUBMITTED by
+the user (~03:15 UTC)** to GitHub Support Actions (GitHub's own
+diagnostic page confirmed the "stale/corrupted workflow
+registration" diagnosis and stated no self-service fix exists).
+Ticket text was provided in the 2026-09-17 agent chat (not
+committed to repo per user request). Awaiting support response;
+until then phantom 0-job push runs continue and should be ignored.
 Until support resets the entry, the UI path below does not exist
 and the schedule will continue to miss windows.
 
@@ -103,15 +105,15 @@ Verified against the full 189-run Actions history (GitHub API, session
      the PR B merge push, and the Actions UI entry did not
      return. File-level fixes cannot evict this entry. Agent
      `workflow disable`/`enable` is also 403.
-  3. **GitHub support ticket (current step, 2026-09-17).** Copy-
-     paste ready draft at
-     the 2026-09-17 agent chat session (ticket text not stored in repo per user preference).
-     Submit Subject + Body verbatim to
-     https://support.github.com/contact?tags=rr-actions.
-     Request: force re-registration or delete + clean re-creation
-     of workflow 348098190. If support also cannot fix it, plan B
-     is a replacement workflow file under a new name (separate
-     decision post-response).
+  3. **GitHub support ticket SUBMITTED by user (~03:15 UTC,
+     2026-09-17).** GitHub's diagnostic page confirmed the
+     "stale/corrupted workflow registration" diagnosis and that
+     no self-service fix exists. Ticket text was provided in the
+     agent chat session (not committed to repo per user
+     request). Request: force re-registration or delete + clean
+     re-creation of workflow 348098190. Awaiting response; if
+     support cannot fix it, plan B is a replacement workflow
+     file under a new name (separate decision post-response).
 - **0-job push runs are noise, not verdicts.** Every push since
   2026-09-07 05:56 UTC created a `rot-drill` run with `event: push`,
   **0 jobs**, `conclusion: failure`, `failure_reason: null` — although

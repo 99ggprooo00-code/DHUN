@@ -897,3 +897,22 @@ Limits found while building it. Each is a measured or code-verified fact;
   only triggers on `pull_request` and that event does not fire for a given PR,
   its jobs need a human — which is exactly how `apk`/`msi` were obtained for
   PR #49 (run `34315184472`).
+
+## 2026-09-17 (~03:20 UTC) — support ticket submitted (`arena/01a0ad18-dhun`)
+
+- **GitHub Support ticket submitted by the user (~03:15 UTC)** for
+  workflow 348098190 after both file-level fix attempts failed.
+  GitHub's own diagnostic page confirmed the diagnosis: "stale or
+  corrupted workflow registration... no self-service endpoint for
+  forcing a clean re-registration". Ticket text is recorded in the
+  2026-09-17 agent chat session (not committed to the repo per
+  user request — PR #81 removed the earlier draft file).
+- **Awaiting support response.** Until then: expect the phantom
+  0-job push run to continue firing on every `main` push (the
+  most recent: 35176591866 on the PR #81 merge); ignore those
+  runs — they carry no probe output. No further edits to
+  `.github/workflows/rot-drill.yml`.
+- **Phantom-merge-run count as of `78b16ad`:** 6 phantom runs in
+  this session alone (35170942908, 35171317970 from PRs #76/#77;
+  35174080320 from #79; 35175253985 from #80; 35176591866 from
+  #81; plus one on PR A's branch push before delete).
