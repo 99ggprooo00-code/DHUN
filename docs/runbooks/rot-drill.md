@@ -13,14 +13,13 @@ The Actions UI shows no `rot-drill` entry at all (no list entry, no
 Run-workflow button), while the REST registry still reports it
 `state: active` (workflow id **348098190**, name stuck at the file
 path). Both file-level re-registration attempts failed (see "Fix
-attempts" below). Per the user-approved plan, file changes to
-`rot-drill.yml` are STOPPED. **GitHub support ticket SUBMITTED by
-the user (~03:15 UTC)** to GitHub Support Actions (GitHub's own
-diagnostic page confirmed the "stale/corrupted workflow
-registration" diagnosis and stated no self-service fix exists).
-Ticket text was provided in the 2026-09-17 agent chat (not
-committed to repo per user request). Awaiting support response;
-until then phantom 0-job push runs continue and should be ignored.
+attempts" below). **GitHub support ticket SUBMITTED by user (~03:15 UTC)** to GitHub
+Support Actions (diagnostic page confirmed "stale/corrupted
+registration" / no self-service fix). After ticket submission the
+agent is executing plan B (rename to new path) while awaiting
+support — if rename succeeds the ticket can be closed; if rename
+wedges we wait for support. Ticket text provided in the 2026-09-17
+agent chat (not committed to repo per request).
 Until support resets the entry, the UI path below does not exist
 and the schedule will continue to miss windows.
 
@@ -29,8 +28,10 @@ and the schedule will continue to miss windows.
 **Path A — Actions UI (the repo owner's path; needs re-registration
 first):**
 
-1. Open `https://github.com/99ggprooo00-code/DHUN/actions/workflows/rot-drill.yml`
-   (repo → **Actions** → **rot-drill** in the left sidebar).
+1. Open `https://github.com/99ggprooo00-code/DHUN/actions/workflows/rot-drill-daily.yml`
+   (repo → **Actions** → **rot-drill** in the left sidebar — the
+   workflow's declared name remains `rot-drill`; the sidebar label
+   should reflect that name once registration is healthy).
 2. Click **Run workflow** (right side, above the runs list); leave
    **Branch: main** selected (there are no input fields); click the
    green **Run workflow** button in the dropdown.
@@ -42,11 +43,14 @@ first):**
 403):**
 
 ```bash
-gh workflow run rot-drill.yml --ref main --repo 99ggprooo00-code/DHUN
-# or, with a workflow-scoped PAT:
+gh workflow run rot-drill-daily.yml --ref main --repo 99ggprooo00-code/DHUN
+# or by declared name:
+# gh workflow run rot-drill --ref main --repo 99ggprooo00-code/DHUN
+# or, with a workflow-scoped PAT (replace <id> with the new
+# workflow id seen in `gh workflow list` after the rename):
 # curl -X POST -H "Authorization: Bearer <PAT>" \
 #   -H "Accept: application/vnd.github+json" \
-#   https://api.github.com/repos/99ggprooo00-code/DHUN/actions/workflows/348098190/dispatches \
+#   https://api.github.com/repos/99ggprooo00-code/DHUN/actions/workflows/<id>/dispatches \
 #   -d '{"ref":"main"}'    # success = HTTP 204, empty body
 ```
 
@@ -114,6 +118,12 @@ Verified against the full 189-run Actions history (GitHub API, session
      re-creation of workflow 348098190. Awaiting response; if
      support cannot fix it, plan B is a replacement workflow
      file under a new name (separate decision post-response).
+  3b. **Plan B executed — rename to new file path (~04:30 UTC,
+     this PR).** File renamed from `rot-drill.yml` to
+     `rot-drill-daily.yml`. Because the wedge was keyed to the
+     exact path, the new path must register as a fresh workflow
+     id. If it also wedges, await support; if it succeeds,
+     close the support ticket and proceed to live probe.
 - **0-job push runs are noise, not verdicts.** Every push since
   2026-09-07 05:56 UTC created a `rot-drill` run with `event: push`,
   **0 jobs**, `conclusion: failure`, `failure_reason: null` — although

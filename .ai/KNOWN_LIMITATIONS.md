@@ -24,8 +24,15 @@ Updated every phase. Nothing hidden.
   Actions UI entry did not return. File-level fixes cannot evict
   this entry. Agent tokens cannot disable/enable workflows
   (`gh workflow enable`/`disable` returns 403) either.
-- **File changes to `.github/workflows/rot-drill.yml` STOPPED per
-  plan.** Next step: the repo owner submits a GitHub support
+- **Attempt 3 (rename) THIS PR:** file renamed from
+  `.github/workflows/rot-drill.yml` to `.github/workflows/rot-drill-daily.yml`
+  to force a genuinely fresh registration (wedge keyed by file path;
+  attempt 2's same-path re-add proved that). Triggers/jobs/concurrency
+  group unchanged. Old id 348098190 remains orphaned to deleted path.
+  If rename also wedges, stop file changes and await support. Next
+  step: support ticket already filed by the user; awaiting response.
+
+  **Previous note (historical):** the repo owner submitted a GitHub support
   ticket (copy-paste ready draft in
   the 2026-09-17 agent chat session (ticket text not stored in repo per user preference) —
   Subject + Body verbatim, to

@@ -1,9 +1,9 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Status note (2026-09-17 ~03:20 UTC, Stage S1):** the body below is a
+> **Status note (2026-09-17 ~04:30 UTC, Stage S1):** the body below is a
 > point-in-time log whose merge chain ends at PR #32 (`862f0ac`,
 > 2026-09-07). It is kept verbatim as history. Current state:
-> `main@78b16ad` (PR #79 merged 2026-09-17 ~02:21 UTC; post-merge
+> `main@563f78a` (post-branch-hygiene; post-merge
 > CI green across Build APK / CI / test-release; rolling `test`
 > republished at exactly `56324f5`, all four assets); Phases 01–16
 > code-merged with hardware gates open; S4/S5 code merged (PR
@@ -15,13 +15,13 @@
 > **Both file-level re-registration attempts FAILED:** (1)
 > comment-only edit PR #77 — entry untouched; (2) delete + verbatim
 > re-add PRs #78/#79 — GitHub reattached the SAME wedged id 348098190
-> when the file reappeared (keyed by file path), phantom push run
-> 35174080320 fired. File changes to `rot-drill.yml` are stopped.
-> **GitHub support ticket SUBMITTED by the user (~03:15 UTC)** to GitHub
-> Support Actions; GitHub's diagnostic page confirmed the
-> "stale/corrupted workflow registration" diagnosis. Awaiting
-> support response. Ticket text is in the 2026-09-17 agent chat
-> session (not committed to repo per user request). The
+> when the file reappeared (keyed by file path). Support ticket
+> submitted by user (~03:15 UTC). **THIS PR renames the file to**
+> **`rot-drill-daily.yml`** (attempt 3) to force a fresh
+> registration at a new path; triggers/jobs/concurrency group
+> unchanged. Phantom push runs on the OLD orphaned entry (id
+> 348098190) will continue briefly until that entry ages out;
+> ignore them. The
 > push-triggered "red rot-drill" runs are 0-job noise (the file
 > never had a `push:` trigger), not verdicts — see
 > `.ai/KNOWN_LIMITATIONS.md` + `docs/runbooks/rot-drill.md`. The
