@@ -64,27 +64,65 @@ nothing direct-to-main:**
    push runs): stop file changes; submit the GitHub support ticket
    (draft in handoff v3 / runbook); record the outcome in docs.
 
-**Last error:** re-registration attempt 1 (comment-only edit,
-PR #77) failed to touch registry entry 348098190. No local tests
-were run (no JDK — CI is the compiler); no hardware claims.
+**Last error:** re-registration attempts 1 AND 2 failed to evict
+registry entry 348098190. No local tests were run (no JDK — CI is
+the compiler); no hardware claims.
 
-**PR A "delete" (PR #78) MERGED 2026-09-17 ~02:35 UTC** — merge SHA
+**PR A "delete" (PR #78) MERGED 2026-09-17 ~02:12 UTC** — merge SHA
 `df6a0be`. Same-turn verification:
-- ✅ Entry 348098190 is GONE from `gh workflow list` (wedged entry
-  successfully dropped by the delete).
-- ✅ NO phantom 0-job push run fired on the delete merge (last
-  phantom on the old entry is still 35171317970 from PR #77).
-- ✅ Post-merge CI green across all four remaining workflows
-  (Build APK, CI, dev-release, test-release).
+- ✅ Entry 348098190 briefly dropped from `gh workflow list` for
+  ~90 seconds after the delete.
+- ✅ NO phantom 0-job push run fired on the delete merge itself
+  (the file was absent at that moment).
+- ✅ Post-merge CI green; rolling `test` republished.
 
-**Exact next step (in order, this PR = PR B "restore"):**
-1. THIS PR (PR B): restore `rot-drill.yml` verbatim from `3ff3a55`
-   (+ one comment block documenting the delete/re-add; diff vs
-   `3ff3a55` verified comment-only) → CI green → merge → same-turn
-   verify NEW workflow id, name `rot-drill`, state active, NO
-   phantom 0-job push run on this merge.
-2. Wait for user Run-workflow click (button must be back in UI) →
-   live verdict (probe ≈5–12 min) → PR C.
+**PR B "restore" (PR #79) MERGED 2026-09-17 ~02:21 UTC** — merge
+SHA `56324f5`. **SAME-TURN VERIFICATION: ATTEMPT 2 FAILED.**
+- ❌ Workflow id is STILL **348098190** — GitHub reattached the
+  same wedged entry when the file reappeared (keyed by file path,
+  not by content), instead of creating a fresh id.
+- ❌ Registry name is STILL the file path
+  `.github/workflows/rot-drill.yml` (not `rot-drill`). `updated_at`
+  moved to `2026-09-17T02:21:08Z` but the name never flipped.
+- ❌ Phantom 0-job push run **35174080320** fired on the PR B
+  merge push (0s, failure, 0 jobs) — the decayed push trigger
+  came back with the old entry.
+- ❌ Actions UI entry / Run-workflow button still absent
+  (inferred from registry state; user to confirm).
+- ✅ Post-merge CI green across the other four workflows (Build
+  APK, CI, dev-release, test-release); rolling `test` republished
+  at `56324f5` (all four assets uploaded).
+
+**Conclusion: file-level fixes cannot evict entry 348098190.** It
+is keyed by file path and survives delete+re-add. Agent tokens
+also cannot `workflow disable/enable` (403) or delete the
+registry entry by API.
+
+**THIS PR (PR C / "ticket" PR):**
+- Adds `docs/support/2026-09-17-rot-drill-workflow-348098190.md` —
+  ready-to-submit GitHub Support ticket (copy Subject + Body
+  verbatim to https://support.github.com/contact → Actions).
+- Updates ROADMAP (this section), KNOWN_LIMITATIONS, runbook
+  ("Observed anomalies" fix-attempt 2 failure), and
+  `docs/verification/14-release.md` status note.
+- **NO further changes to `.github/workflows/rot-drill.yml`** per
+  handoff v3 step 5 ("stop file changes").
+
+**Exact next step (user action):**
+1. Review + merge this PR (routine green-CI merge).
+2. **Submit the GitHub support ticket** from
+   `docs/support/2026-09-17-rot-drill-workflow-348098190.md` (copy
+   Subject + Body into the support form). Paste the ticket URL /
+   case number back to the agent.
+3. After support resets the registration, the agent (next session)
+   verifies (a) new workflow id with name `rot-drill`, (b) Actions
+   UI entry + Run-workflow button back, (c) no phantom push runs,
+   (d) user clicks Run workflow → live probe verdict → final
+   verdict line in `docs/verification/14-release.md` → S1 done → S2.
+4. If support cannot fix it either, the workflow stays disabled in
+   practice and we escalate to plan B (a separate scheduled
+   workflow file with a different name) — a decision for after the
+   ticket response.
 
 S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`) and S6
 (soaks, clean installs, signing decisions, tag, explicit go-ahead)
