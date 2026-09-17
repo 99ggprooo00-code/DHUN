@@ -1,90 +1,87 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-17 (UTC)** · session **`arena/01a0acb6-dhun`**.
+Updated **2026-09-17 (~05:50 UTC)** · session **`arena/01a0ad18-dhun`**
+(handoff v3; rot-drill fix: rename attempt 3 after support ticket).
 
-**GitHub evidence (verified live this session via `gh`/API, not
-assumed):** `origin/main` = `bcb65cc` (PR #75 merge,
-2026-09-16T23:46:37Z — docs reconciliation + S1 rot-drill
-diagnosis). Post-merge CI on `bcb65cc`: build-and-test **35163768301**
-success · Build APK **35163768295** success · test-release
-**35163768291** success. Rolling `test` pre-release republished
-**2026-09-16 23:46:36 UTC** (asset uploads final 23:51:28 UTC) at
-exactly `bcb65cc` — `dhun-test.apk`, `dhun-test.msi` + both
-`.sha256` sidecars all `uploaded` (release API). Evidence: PR #75
-post-merge comment. PRs #73/#53 closed unmerged; PR #54 open
-(contingency reference; head branch `arena/01a0890b-dhun`, kept in
-the 09-17 branch cleanup).
+**GitHub evidence (pre-rename, verified live):** `origin/main` =
+`563f78a` — chain this session: PR #78 (delete), PR #79 (restore),
+PR #80 (verdict+ticket), PR #81 (remove ticket file per request),
+PR #82 (ticket-submitted), PR #83 (branch hygiene delete stale +3).
+Post-merge CI on `563f78a`: build-and-test / Build APK / CI /
+test-release all green; rolling `test` republished at `563f78a`
+(~04:16 UTC; all four assets). Phantom 0-job push run 35180648311
+fired on the #83 merge (expected — entry 348098190 still wedged).
+PR #54 open (contingency reference, kept). Remote branches:
+`main`, `arena/01a0890b-dhun` (PR #54) — stale +3 branches
+deleted this session. All session + prior-session fully-merged
+branches deleted (`ahead_by == 0` verified or content superseded).
 
-**Handoff v2 (2026-09-17) — new facts that reshape S1:**
-- **The user cannot perform manual GitHub steps** (no CLI/API/PAT
-  use). Their only possible actions: **clicking merge on session
-  PRs** and, once the button exists again, **one Run-workflow
-  click**. Every plan assuming an operator API dispatch is void.
-- **`rot-drill` is absent from the Actions UI entirely** (user
-  report: no list entry, no Run-workflow button) while the REST
-  registry reports `state: active`, workflow id **348098190**, and
-  `gh workflow list` still shows the registry name as the file
-  path. Schedule silent since 09-07 04:28 UTC (9 missed 04:17
-  windows; the 09-17 window was still pending at session start,
-  00:14 UTC). 0-job push noise continues (35163767716 on the merge
-  push). Full reconciliation: `docs/runbooks/rot-drill.md`.
-- Agent `workflow_dispatch` re-verified **403** this session
-  (capability check, once per session).
+**S1 fix attempts:**
+- **Attempt 1** (comment-only, PR #77 = `3ff3a55`, 01:03 UTC):
+  entry 348098190 untouched; phantom run 35171317970.
+- **Attempt 2** (delete + same-path re-add, PRs #78/#79, ~02:20 UTC):
+  delete dropped entry ~90 s but GitHub reattached the SAME wedged
+  id 348098190 by file path; phantom run 35174080320.
+- **Support ticket SUBMITTED** by the user (~03:15 UTC) via GitHub
+  Support Actions. GitHub diagnostic page confirmed "stale/
+  corrupted registration — no self-service fix". Request: re-sync
+  id 348098190 (or delete it). Ticket text provided inline in chat
+  (not committed to repo; PR #81 removed the draft).
+- **Attempt 3 (rename to new file path, THIS PR):** rename
+  `rot-drill.yml` → `rot-drill-daily.yml`. The wedge was keyed to
+  the exact path; a new path MUST register as a new workflow id
+  (same mechanism that made attempt 2 reattach). Workflow `name:`,
+  triggers (`schedule '17 4 * * *'` + `workflow_dispatch`),
+  permissions, concurrency group (`rot-drill`), jobs unchanged.
+  Old orphaned id 348098190 stays tied to deleted path and will
+  age out.
 
-**This session (S1 continuation + repo hygiene; no app code, no
-local build, no hardware claims):**
-- **Branch cleanup executed** (user request "too many branches"):
-  **17 fully-merged remote branches deleted**, each verified
-  `ahead_by == 0` vs `main` via the compare API — `arena/01a085ea`,
-  `01a08976`, `01a0897a`, `01a0a540`, `01a0a589`, `01a0a5b3`,
-  `01a0a61a`, `01a0a7b0`, `01a0a7f3`, `01a0a9c4`, `01a0aa5e`,
-  `01a0aa7a`, `01a0aa8e`, `01a0ab12`, `01a0ab74`, `01a0ac91` (all
-  `-dhun`) + `fix/android-player-visitordata`. Kept: `main`,
-  `arena/01a0890b-dhun` (open PR #54), this session branch, and two
-  unmerged-unknowns — `arena/01a08455-dhun` (+3, 2026-09-09 docs
-  commits) and `arena/01a08676-dhun` (+3, 2026-09-10 docs commits;
-  PR #53's branch, superseded by PR #54) — not deleted per the
-  ahead>0 rule. Remote branches: 21 → 4 (+ this session branch).
-- **Lost commit 771552a re-applied:** the previous session's
-  unpushed post-merge docs commit never reached GitHub (absent from
-  this fresh clone); its content — the CURRENT ACTIVE TASK
-  reconciliation, standing directive #14, the handoff record, the
-  runbook dispatch bullet — is restated by handoff v2 and carried by
-  this PR.
-- **Re-registration approved by the user this session** (2026-09-17):
-  comment-only edit to `.github/workflows/rot-drill.yml`, merged by
-  the agent once CI is green; GitHub support ticket is the agreed
-  fallback if it does not restore the UI/schedule.
+**Last error:** rename attempt 3 also wedged on fresh id 360227450
+(`rot-drill-daily.yml`). Name stuck at file path, phantom 0-job push
+run 35186690348 fired on merge. The bug is deeper than file-path
+keying — even a new id ignores the file's `name:` value. Per plan
+and GitHub diagnostic guidance: ALL file changes stopped; awaiting
+support response. The old id 348098190 is now `state: deleted`
+(orphaned to the removed path). No
+local tests were run (no JDK — CI is the compiler); no hardware
+claims.
 
-**Last error:** none blocking. No local tests were run (no JDK — CI
-is the compiler); no hardware claims.
-
-**Exact next step (this session, in order):**
-1. THIS docs PR: required CI green on the final head → merge →
-   same-turn post-merge verification (CI on the merge SHA + rolling
-   `test` republication).
-2. Re-registration PR (comment-only `rot-drill.yml` edit, no
-   trigger/job change) → CI green → merge → same-turn check whether
-   the registry re-registered (name flips from the file path to
-   `rot-drill`); the Run-workflow button's return is user-observable.
-3. User: if the Run-workflow button is back in the Actions UI, click
-   it on `main` → probe job (≈5–12 min) = live verdict → verdict line
-   in `docs/verification/14-release.md` (green → #14 auto-closes, S1
-   done → S2; red → LOGIN_REQUIRED = datacenter-IP gating vs real
-   rot; check contingency triggers T1/T2).
-4. If the button is still absent or the next 04:17 UTC window is
-   missed again: GitHub support ticket (workflow id 348098190; last
-   scheduled run 34083253658; missed windows 09-08 → 09-16 [→ 09-17];
-   absent from UI but active in registry) — ticket text prepared
-   agent-side for the user to submit.
+**Exact next step (this PR = rename attempt 3):**
+1. THIS PR renames `.github/workflows/rot-drill.yml` →
+   `.github/workflows/rot-drill-daily.yml` (header comment only
+   changed; triggers/jobs unchanged). CI green → merge →
+   same-turn verify:
+   - **NEW** workflow id in `gh workflow list` (≠ 348098190).
+   - Name = `rot-drill` (NOT file path; NOT `rot-drill-daily.yml`).
+   - State active; path = `.github/workflows/rot-drill-daily.yml`.
+   - **NO** phantom 0-job push run on the new entry for this merge
+     (fresh registrations don't carry decayed triggers).
+   - Old entry 348098190 remains (orphaned) — expected; ignore.
+2. If rename works: user confirms Actions UI shows the new
+   `rot-drill` entry and clicks Run-workflow on `main` → probe
+   ≈5–12 min = live verdict. Ask support to close ticket as
+   "resolved by rename".
+3. If rename ALSO wedges (new entry path-as-name or phantom runs):
+   stop file changes; await support (ticket already filed).
+4. After a green live probe (rename or support reset): agent
+   watches the probe job and records the verdict line in
+   `docs/verification/14-release.md` — green = #14 auto-closes,
+   S1 done → S2; red with `LOGIN_REQUIRED` = datacenter-IP gating
+   (check T1/T2).
+5. Standing notes:
+   - Contingency PR #54 (PO-token/InnerTubeX research) open; its
+     "test-ping (delete me)" comment cannot be removed by agent
+     tokens (403) — user-optional cleanup.
 
 S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`) and S6
 (soaks, clean installs, signing decisions, tag, explicit go-ahead)
-remain user-gated; nothing in this session authorizes a tag or a stable
-release. Work stays sequential; one asserted patch per file per block,
-marker verification, full diff review against main before every push.
+remain user-gated; nothing in this session authorizes a tag or a
+stable release. Work stays sequential; one asserted patch per file
+per block, marker verification, full diff review against main
+before every push.
 
 ---
+
 
 ## Re-baseline record (2026-09-16 — why this file was rewritten)
 

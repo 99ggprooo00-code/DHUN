@@ -1,23 +1,31 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Status note (2026-09-17, Stage S1):** the body below is a
+> **Status note (2026-09-17 ~05:50 UTC, Stage S1):** the body below is a
 > point-in-time log whose merge chain ends at PR #32 (`862f0ac`,
 > 2026-09-07). It is kept verbatim as history. Current state:
-> `main@bcb65cc` (PR #75 merged 2026-09-16T23:46:37Z; post-merge CI
-> 35163768301 / 35163768295 / 35163768291 green; rolling `test`
-> republished 23:46:36 UTC at exactly `bcb65cc`, all four assets);
-> Phases 01–16 code-merged with hardware gates open; S4/S5 code merged
-> (PR #74); completion tracked as Stages S1–S6 in `.ai/ROADMAP.md`. No
-> v0.1.0 tag/release exists. The rot-drill schedule has been silent
-> since 2026-09-07 04:28 UTC and the workflow is now **absent from the
-> Actions UI entirely** while registry-active (id 348098190; user
-> report 2026-09-17) — the live-verdict path is re-registration → UI
-> button → the user's Run-workflow click (support-ticket fallback).
-> The push-triggered "red rot-drill" runs are 0-job noise (the file
+> `main@a27af74` (post-rename; post-merge
+> CI green across Build APK / CI / test-release; rolling `test`
+> republished at exactly `56324f5`, all four assets); Phases 01–16
+> code-merged with hardware gates open; S4/S5 code merged (PR
+> #74); completion tracked as Stages S1–S6 in `.ai/ROADMAP.md`. No
+> v0.1.0 tag/release exists. The rot-drill schedule has been
+> silent since 2026-09-07 04:28 UTC (≥10 missed 04:17 windows)
+> and the workflow is **absent from the Actions UI entirely**
+> while registry-active on the wedged entry (id 348098190).
+> **Both file-level re-registration attempts FAILED:** (1)
+> comment-only edit PR #77 — entry untouched; (2) delete + verbatim
+> re-add PRs #78/#79 — GitHub reattached SAME id 348098190.
+> Attempt 3 (rename to `rot-drill-daily.yml`, PR #84) created new
+> id 360227450 (old id now state:deleted) but ALSO wedged (name
+> stuck at file path; phantom push run 35186690348). The repo's
+> workflow registration is failing server-side even for fresh
+> ids; awaiting GitHub Support on the ticket filed ~03:15 UTC.
+> All workflow file changes STOPPED. The
+> push-triggered "red rot-drill" runs are 0-job noise (the file
 > never had a `push:` trigger), not verdicts — see
-> `.ai/KNOWN_LIMITATIONS.md` + `docs/runbooks/rot-drill.md`. The next
-> verdict line lands below in "Live evidence log → Rot-drill" once a
-> live run exists.
+> `.ai/KNOWN_LIMITATIONS.md` + `docs/runbooks/rot-drill.md`. The
+> verdict line below lands after support resets the entry and a
+> live probe run exists.
 
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
 RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**

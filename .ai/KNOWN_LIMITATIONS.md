@@ -2,6 +2,65 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-17 (~02:30 UTC) — S1 delete+re-add fix after attempt-1 failure (`arena/01a0ad18-dhun`, handoff v3)
+
+- **Re-registration attempt 1 (comment-only edit, PR #77 = `3ff3a55`)
+  FAILED.** The comment-only change to `rot-drill.yml` did not
+  re-register the wedged workflow: registry entry **348098190** still
+  shows name as the file path (not `rot-drill`), `updated_at` frozen
+  at 2026-09-16T23:57:41Z, phantom 0-job push run 35171317970 fired
+  on the PR #77 merge, and the Actions UI still has no `rot-drill`
+  entry / Run-workflow button (user-confirmed 2026-09-17). The entry
+  ignores file-content changes.
+- **Fix plan executed: delete-then-restore** (PR A = delete (#78),
+  PR B = verbatim re-add (#79)). **ATTEMPT 2 FAILED.** PR A briefly
+  dropped entry 348098190 from `gh workflow list` (~90 s), but when
+  PR B re-added the file (verbatim from `3ff3a55` plus one updated
+  comment block; triggers/jobs unchanged, verified by direct
+  diff), GitHub reattached the SAME wedged registry id 348098190
+  keyed by file path — it did NOT create a fresh id. Name stayed
+  as `.github/workflows/rot-drill.yml` (not `rot-drill`), phantom
+  0-job push run 35174080320 fired on the PR B merge push, and the
+  Actions UI entry did not return. File-level fixes cannot evict
+  this entry. Agent tokens cannot disable/enable workflows
+  (`gh workflow enable`/`disable` returns 403) either.
+- **Attempt 3 (rename to `rot-drill-daily.yml`, PR #84, merged
+  ~05:40 UTC) — ALSO FAILED.** New workflow id 360227450 was created
+  (old id 348098190 now shows `state: deleted`), but the new entry
+  also has name stuck at the file path `.github/workflows/
+  rot-drill-daily.yml` (not `rot-drill`) and phantom 0-job push run
+  35186690348 fired on the merge push. The bug reproduces on a
+  fresh id even at a new filename — the repository's workflow-
+  registration layer is failing to read the `name:` field for any
+  new workflow at present.
+- **ALL file changes to workflows STOPPED per plan (step 5).**
+  GitHub Support ticket filed by user (~03:15 UTC); awaiting
+  response. New id 360227450 is the target for support to re-sync.
+
+  **Previous note (historical):** the repo owner submitted a GitHub
+  support ticket (text provided in the 2026-09-17 agent chat
+  session, not committed to repo per request) to
+  https://support.github.com/contact?tags=rr-actions asking
+  GitHub support to force a clean re-registration (reset the
+  entry or delete it so the next push recreates it fresh).
+- **Re-registration summary for the ticket:** workflow id
+  348098190; last healthy scheduled run 34083253658 (2026-09-07
+  04:28 UTC); ≥10 missed windows 09-08 → 09-17; absent from UI
+  while `state: active`; registry name = file path, not `name:`
+  value; phantom 0-job push runs on every push since 09-07 05:56
+  UTC despite no `push:` trigger ever declared; decay began around
+  edit `da9d779` (2026-09-07 06:17 UTC); two fix attempts
+  (comment-only, delete+re-add) both failed.
+- **Merge-last directive #14 in effect:** merging ends the session's
+  GitHub connection, so PR B (restore) must have its branch
+  complete, diff-verified, and pushed BEFORE merging; same-turn
+  post-merge checks happen in the same turn as the merge.
+- **Still agent-403 (re-verified handoff v3):** `workflow_dispatch`,
+  workflow disable/enable, issue comments. Agent CAN push, open PRs,
+  merge routine green PRs, and delete fully-merged branches. User
+  can click Merge on PRs and one Run-workflow button click once the
+  UI returns.
+
 ## 2026-09-17 — S1 continuation: UI absence, revised dispatch path, branch cleanup (`arena/01a0acb6-dhun`)
 
 - **Rot-drill is absent from the Actions UI entirely** (user report
@@ -25,11 +84,12 @@ Updated every phase. Nothing hidden.
 - **Branch cleanup (user request, executed 2026-09-17):** 17
   fully-merged remote branches deleted (each verified `ahead_by == 0`
   vs `main` via the compare API); kept `main`, `arena/01a0890b-dhun`
-  (open PR #54), the session branch, and unmerged-unknowns
-  `arena/01a08455-dhun` (+3, 2026-09-09 docs commits) and
-  `arena/01a08676-dhun` (+3, 2026-09-10 docs commits; PR #53's
-  branch) — superseded by the re-baseline/PR #54 but kept per the
-  ahead>0 rule. Remote branches 21 → 4.
+  (open PR #54) and the session branch. Stale unmerged branches
+  `arena/01a08455-dhun` (+3) and `arena/01a08676-dhun` (+3) were
+  deleted 2026-09-17 ~03:35 UTC — their ahead commits (09-09/09-10
+  docs snapshots + an early extraction-auth research draft) were
+  fully superseded by the 09-16 re-baseline and PR #54; no open
+  PRs referenced them. Remote branches 21 → 2 (main + PR #54).
 - **Lost commit 771552a:** the previous session's unpushed post-merge
   docs commit never reached GitHub (this fresh clone has no trace);
   its content is restated in handoff v2 and re-applied by this
@@ -849,3 +909,22 @@ Limits found while building it. Each is a measured or code-verified fact;
   only triggers on `pull_request` and that event does not fire for a given PR,
   its jobs need a human — which is exactly how `apk`/`msi` were obtained for
   PR #49 (run `34315184472`).
+
+## 2026-09-17 (~03:20 UTC) — support ticket submitted (`arena/01a0ad18-dhun`)
+
+- **GitHub Support ticket submitted by the user (~03:15 UTC)** for
+  workflow 348098190 after both file-level fix attempts failed.
+  GitHub's own diagnostic page confirmed the diagnosis: "stale or
+  corrupted workflow registration... no self-service endpoint for
+  forcing a clean re-registration". Ticket text is recorded in the
+  2026-09-17 agent chat session (not committed to the repo per
+  user request — PR #81 removed the earlier draft file).
+- **Awaiting support response.** Until then: expect the phantom
+  0-job push run to continue firing on every `main` push (the
+  most recent: 35176591866 on the PR #81 merge); ignore those
+  runs — they carry no probe output. No further edits to
+  `.github/workflows/rot-drill.yml`.
+- **Phantom-merge-run count as of `78b16ad`:** 6 phantom runs in
+  this session alone (35170942908, 35171317970 from PRs #76/#77;
+  35174080320 from #79; 35175253985 from #80; 35176591866 from
+  #81; plus one on PR A's branch push before delete).
