@@ -2,6 +2,43 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-17 — S1 continuation: UI absence, revised dispatch path, branch cleanup (`arena/01a0acb6-dhun`)
+
+- **Rot-drill is absent from the Actions UI entirely** (user report
+  2026-09-17: no list entry, no Run-workflow button) while the REST
+  registry reports `state: active`, workflow id 348098190, and
+  `gh workflow list` shows the registry name as the file path
+  `.github/workflows/rot-drill.yml`. Schedule still silent since
+  09-07 04:28 UTC (9 missed 04:17 windows; the 09-17 window was
+  pending at session start). 0-job push noise continues (35163767716
+  on the `bcb65cc` merge push). Live-verdict path revised:
+  re-registration (comment-only workflow edit) → UI button → user's
+  Run-workflow click; GitHub support ticket as the fallback.
+- **The user cannot perform manual GitHub steps** (handoff v2,
+  2026-09-17): no CLI/API/PAT actions — only merge clicks on session
+  PRs and one Run-workflow click once the button exists. All prior
+  plans assuming an operator API dispatch are void.
+- **Agent dispatch 403 re-verified** this session (same integration
+  token). Agent-side merge DOES work — this app merged PRs #72/#74/#75
+  (`mergedBy` verified via the API) — as do branch deletions
+  (`git push origin --delete`).
+- **Branch cleanup (user request, executed 2026-09-17):** 17
+  fully-merged remote branches deleted (each verified `ahead_by == 0`
+  vs `main` via the compare API); kept `main`, `arena/01a0890b-dhun`
+  (open PR #54), the session branch, and unmerged-unknowns
+  `arena/01a08455-dhun` (+3, 2026-09-09 docs commits) and
+  `arena/01a08676-dhun` (+3, 2026-09-10 docs commits; PR #53's
+  branch) — superseded by the re-baseline/PR #54 but kept per the
+  ahead>0 rule. Remote branches 21 → 4.
+- **Lost commit 771552a:** the previous session's unpushed post-merge
+  docs commit never reached GitHub (this fresh clone has no trace);
+  its content is restated in handoff v2 and re-applied by this
+  session's first PR.
+- **Capability check (once, this session):** no JDK/Gradle/Android SDK
+  → CI is the compiler; `gh` + GitHub API reachable (incl. branch
+  delete + PR merge); the local clone is shallow (depth 1) — GitHub
+  API remains the history source of truth.
+
 ## 2026-09-16 (late) — S1 rot-drill diagnosis + post-merge reconciliation (`arena/01a0ac91-dhun`)
 
 Evidence-first reconciliation after the PR #74 merge; no code changed,

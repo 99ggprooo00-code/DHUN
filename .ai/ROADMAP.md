@@ -1,62 +1,82 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-16 (UTC, after the #74 merge)** · session **`arena/01a0ac91-dhun`**.
+Updated **2026-09-17 (UTC)** · session **`arena/01a0acb6-dhun`**.
 
-**GitHub evidence (verified live this session via `gh`/API, not assumed):**
-`origin/main` = `c5b1793` (PR #74 merge, 2026-09-16T18:36:09Z; PR #73
-closed unmerged, superseded by #74). Post-merge CI on `c5b1793`:
-build-and-test **35135429018** success · Build APK **35135429102**
-success · test-release **35135429240** success. Rolling `test`
-pre-release republished **2026-09-16 18:41:19 UTC** at exactly
-`c5b1793` — `dhun-test.apk`, `dhun-test.msi` + both `.sha256` sidecars
-all `uploaded` (release API). PR #74's final comments carry the
-pre-merge (final head `ade145b`, four checks green) and post-merge
-evidence.
+**GitHub evidence (verified live this session via `gh`/API, not
+assumed):** `origin/main` = `bcb65cc` (PR #75 merge,
+2026-09-16T23:46:37Z — docs reconciliation + S1 rot-drill
+diagnosis). Post-merge CI on `bcb65cc`: build-and-test **35163768301**
+success · Build APK **35163768295** success · test-release
+**35163768291** success. Rolling `test` pre-release republished
+**2026-09-16 23:46:36 UTC** (asset uploads final 23:51:28 UTC) at
+exactly `bcb65cc` — `dhun-test.apk`, `dhun-test.msi` + both
+`.sha256` sidecars all `uploaded` (release API). Evidence: PR #75
+post-merge comment. PRs #73/#53 closed unmerged; PR #54 open
+(contingency reference; head branch `arena/01a0890b-dhun`, kept in
+the 09-17 branch cleanup).
 
-**This session (S1 — diagnosis + hygiene + docs; no code, no local
-build, no hardware claims):**
-- Reconciled the full 189-run rot-drill history from the GitHub API:
-  the schedule fired daily 09-02 → 09-07 (4 green, 2 red — both red
-  pre-#57); it has been **silent since 2026-09-07 04:28 UTC** (9 missed
-  04:17 UTC windows, repo active daily, workflow `state: active`, id
-  **348098190**); **0-job push runs** occur on every push since
-  09-07 05:56 (`event: push`, 0 jobs, `failure`, `failure_reason: null`)
-  although **no version of the file ever had a `push:` trigger**
-  (verified at 6 SHAs, 09-01 → `c5b1793`). Working diagnosis:
-  GitHub-side trigger-registration anomaly around the 09-07 06:17 file
-  edit (`da9d779`) — the registry name still shows the file path, not
-  `rot-drill`. Details: KNOWN_LIMITATIONS + `docs/runbooks/rot-drill.md`.
-- Capability check (once, per standing rule): no JDK/Gradle/Android SDK
-  → CI is the compiler; `gh` + GitHub API reachable; the local clone is
-  **shallow (depth 1)** — GitHub API is the history source of truth.
-- `gh workflow run rot-drill.yml --ref main` → **HTTP 403**
-  re-confirmed: the live dispatch stays an operator task.
-- Closed stale PR #53 per the recorded §3 decision (superseded by the
-  re-baseline; the research track continues in open PR #54).
-- Issue #14 could **not** be commented on from this token (issue-comment
-  writes return 403; PR comments work) — its reconciliation is recorded
-  here, in KNOWN_LIMITATIONS and the runbook instead; the rot-drill
-  workflow (`issues: write`) updates #14 on the next live run. Note: a
-  test comment on PR #54 ("test-ping (delete me)") could not be deleted
-  by this token (delete 403) — safe to remove manually.
+**Handoff v2 (2026-09-17) — new facts that reshape S1:**
+- **The user cannot perform manual GitHub steps** (no CLI/API/PAT
+  use). Their only possible actions: **clicking merge on session
+  PRs** and, once the button exists again, **one Run-workflow
+  click**. Every plan assuming an operator API dispatch is void.
+- **`rot-drill` is absent from the Actions UI entirely** (user
+  report: no list entry, no Run-workflow button) while the REST
+  registry reports `state: active`, workflow id **348098190**, and
+  `gh workflow list` still shows the registry name as the file
+  path. Schedule silent since 09-07 04:28 UTC (9 missed 04:17
+  windows; the 09-17 window was still pending at session start,
+  00:14 UTC). 0-job push noise continues (35163767716 on the merge
+  push). Full reconciliation: `docs/runbooks/rot-drill.md`.
+- Agent `workflow_dispatch` re-verified **403** this session
+  (capability check, once per session).
 
-**Last error:** none blocking. No local tests were run; no hardware
-claims.
+**This session (S1 continuation + repo hygiene; no app code, no
+local build, no hardware claims):**
+- **Branch cleanup executed** (user request "too many branches"):
+  **17 fully-merged remote branches deleted**, each verified
+  `ahead_by == 0` vs `main` via the compare API — `arena/01a085ea`,
+  `01a08976`, `01a0897a`, `01a0a540`, `01a0a589`, `01a0a5b3`,
+  `01a0a61a`, `01a0a7b0`, `01a0a7f3`, `01a0a9c4`, `01a0aa5e`,
+  `01a0aa7a`, `01a0aa8e`, `01a0ab12`, `01a0ab74`, `01a0ac91` (all
+  `-dhun`) + `fix/android-player-visitordata`. Kept: `main`,
+  `arena/01a0890b-dhun` (open PR #54), this session branch, and two
+  unmerged-unknowns — `arena/01a08455-dhun` (+3, 2026-09-09 docs
+  commits) and `arena/01a08676-dhun` (+3, 2026-09-10 docs commits;
+  PR #53's branch, superseded by PR #54) — not deleted per the
+  ahead>0 rule. Remote branches: 21 → 4 (+ this session branch).
+- **Lost commit 771552a re-applied:** the previous session's
+  unpushed post-merge docs commit never reached GitHub (absent from
+  this fresh clone); its content — the CURRENT ACTIVE TASK
+  reconciliation, standing directive #14, the handoff record, the
+  runbook dispatch bullet — is restated by handoff v2 and carried by
+  this PR.
+- **Re-registration approved by the user this session** (2026-09-17):
+  comment-only edit to `.github/workflows/rot-drill.yml`, merged by
+  the agent once CI is green; GitHub support ticket is the agreed
+  fallback if it does not restore the UI/schedule.
 
-**Exact next step (BLOCKED on operator — exact guide in
-`docs/runbooks/rot-drill.md`, "Observed anomalies" section):**
-1. Operator: Actions → `rot-drill` → **Run workflow** on `main`
-   (current head `c5b1793…`) → watch the probe job → live verdict (the
-   S1 exit criterion).
-2. Operator: same page — confirm the workflow is enabled and note the
-   schedule state. If the next 04:17 UTC window is missed after the
-   manual run, restore the schedule: trivial commit to `main` + one
-   manual run (workflow change → needs user OK per S1), or a GitHub
-   support ticket (workflow id 348098190, last scheduled run
-   34083253658, missed windows 09-08 → 09-16).
-3. Record the verdict line in `docs/verification/14-release.md`
-   (green → #14 auto-close path proven; red → new evidence, check
-   contingency triggers T1/T2), then proceed to Stage S2.
+**Last error:** none blocking. No local tests were run (no JDK — CI
+is the compiler); no hardware claims.
+
+**Exact next step (this session, in order):**
+1. THIS docs PR: required CI green on the final head → merge →
+   same-turn post-merge verification (CI on the merge SHA + rolling
+   `test` republication).
+2. Re-registration PR (comment-only `rot-drill.yml` edit, no
+   trigger/job change) → CI green → merge → same-turn check whether
+   the registry re-registered (name flips from the file path to
+   `rot-drill`); the Run-workflow button's return is user-observable.
+3. User: if the Run-workflow button is back in the Actions UI, click
+   it on `main` → probe job (≈5–12 min) = live verdict → verdict line
+   in `docs/verification/14-release.md` (green → #14 auto-closes, S1
+   done → S2; red → LOGIN_REQUIRED = datacenter-IP gating vs real
+   rot; check contingency triggers T1/T2).
+4. If the button is still absent or the next 04:17 UTC window is
+   missed again: GitHub support ticket (workflow id 348098190; last
+   scheduled run 34083253658; missed windows 09-08 → 09-16 [→ 09-17];
+   absent from UI but active in registry) — ticket text prepared
+   agent-side for the user to submit.
 
 S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`) and S6
 (soaks, clean installs, signing decisions, tag, explicit go-ahead)
@@ -124,6 +144,12 @@ Rules (permanent, from the user):
      status changed (a commit can't truthfully mark *itself* as pushed
      and green — the ROADMAP always lags the push by one small commit).
   Only then open/merge the PR. **Never merge until the user says so.**
+  **Merge-last (2026-09-17, directive #14):** merging ends the
+  session's GitHub connection — do everything (code + docs) BEFORE the
+  merge; same-turn post-merge verification OK, post-merge turns are
+  not. A PR must be complete (code + docs + verdicts) before its
+  merge; post-merge CI / rolling-`test` checks happen in the same turn
+  as the merge, never pre-claimed.
 
 ---
 
@@ -148,6 +174,7 @@ instructions be stored permanently in `.ai/`).
 | 11 | **Tool discipline:** one asserted patch per file per block; grep-verify every edit; read the full diff against current main before every push. | Session behavior |
 | 12 | **Blocked work:** when blocked on hardware, unavailable GitHub actions, or release/signing decisions, give an exact step-by-step guide and continue only genuinely unblocked work permitted by the stage gates; never invent features or mark blocked gates complete. | rot-drill.md / s3-hardware-checklist.md |
 | 13 | **Sandbox capability rule:** check capabilities ONCE per session (JDK, `gh`, egress). If no JDK: CI is the compiler — inspect failed step names via `gh run view --json jobs` and diagnose through code review; never claim local tests ran; never infer an exact failure from a step name alone. | KNOWN_LIMITATIONS |
+| 14 | **Merge-last (2026-09-17, user):** merging ends the session's GitHub connection — do everything (code + docs) BEFORE the merge; same-turn post-merge verification OK, post-merge turns are not. | Rules block above + session behavior |
 
 **Handoff record (2026-09-16, session `arena/01a0ac91-dhun`):** PR #73
 closed unmerged, superseded by PR #74, merged as `c5b1793` (S4/S5
@@ -161,6 +188,24 @@ fully diagnosed (see CURRENT ACTIVE TASK + KNOWN_LIMITATIONS). S3 needs
 real-device evidence; S6 needs explicit user go-ahead. No v0.1.0 tag,
 no stable release, no signing decision was made or is authorized.
 
+**Handoff record (2026-09-17, session `arena/01a0ac91-dhun` →
+`arena/01a0acb6-dhun`, "handoff v2"):** PR #75 merged as `bcb65cc`;
+post-merge CI (35163768301 / 35163768295 / 35163768291) and rolling
+`test` publication (2026-09-16T23:46:36Z at exactly `bcb65cc`, all
+four assets) verified in the PR's post-merge comment. The closed
+session left one unpushed local commit (771552a — post-merge ROADMAP
+reconciliation); it never reached GitHub and is re-applied by the
+successor's first PR. New user facts: the user cannot perform manual
+GitHub steps (only merge clicks + one Run-workflow click once the
+button returns); rot-drill is absent from the Actions UI while
+registry-active (id 348098190) — the live-verdict path is
+re-registration → UI button → user click, with a GitHub support ticket
+as fallback. Branch cleanup requested and executed (17 fully-merged
+branches deleted; unmerged-unknowns kept and reported). The
+re-registration workflow edit was approved 2026-09-17 (agent merges on
+green CI). S3/S6 gates unchanged; no v0.1.0 tag, no stable release, no
+signing.
+
 ---
 
 ## 2. True progress (exactly what is proven, nothing more)
@@ -169,11 +214,11 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 🟨 code merged + CI green, **hardware verification open** ·
 ⬜ not started · 🔴 blocked/open problem.
 
-**`main@c5b1793` (2026-09-16, after PR #74 merge): post-merge CI green**
-(build-and-test 35135429018, Build APK 35135429102, test-release
-35135429240 — all success on the merge SHA). Rolling `test` pre-release
-republished 2026-09-16 18:41:19 UTC at exactly `c5b1793` (apk + msi +
-both `.sha256` sidecars).
+**`main@bcb65cc` (2026-09-16, after PR #75 merge): post-merge CI green**
+(build-and-test 35163768301, Build APK 35163768295, test-release
+35163768291 — all success on the merge SHA). Rolling `test` pre-release
+republished 2026-09-16 23:46:36 UTC at exactly `bcb65cc` (apk + msi +
+both `.sha256` sidecars; asset uploads final 23:51:28 UTC).
 
 ### 2a. Build history — Phases 01–16 (ALL code-merged; do not re-implement)
 
@@ -203,7 +248,7 @@ All are 🟨/⬜ — closing them is Stage S3.
 
 | Stage | Objective | Status | Gate |
 |---|---|---|---|
-| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | ⬜ diagnosis done 09-16 (schedule dead since 09-07, 0-job noise identified); live verdict awaits operator dispatch | ≥1 scheduled/dispatched drill verdict on current `main` + artifact |
+| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | ⬜ diagnosis done 09-16; UI absence + user-capability facts 09-17; live-verdict path = re-registration → UI button → user's Run-workflow click (support-ticket fallback) | ≥1 scheduled/dispatched drill verdict on current `main` + artifact |
 | **S2** | Architectural cleanup (dead harness UI, PR #53/#54 hygiene, docs index, stale root notes) | ⬜ | CI green; zero dead screens; PRs resolved |
 | **S3** | Hardware verification round 1 (core loop both platforms, signed checklists) | ⬜ | `docs/verification/` checklists signed with build SHAs |
 | **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | 🟨 code merged + CI green (PR #74); S4 hardware boxes ride in S3 | Every shipped key reachable or removed; EQ decision recorded |
@@ -212,10 +257,12 @@ All are 🟨/⬜ — closing them is Stage S3.
 
 Full tasking per stage: `MASTER_PROMPT.md` §7. Execution order is
 fixed: S1 → S2 → S3 → S4 → S5 → S6. S3 needs the user (devices); S1
-needs the user (Actions click — agents get 403, re-verified 2026-09-16).
-Note: S4/S5 CODE was executed out of stage order with user authorization
-and merged in PR #74 (2026-09-16); the S4 hardware boxes ride in S3.
-Remaining work order is unchanged: S1 → S2 → S3 → S6.
+needs the user (one Run-workflow click once re-registration restores
+the UI button — agents get 403, re-verified 2026-09-17; the user
+cannot API-dispatch). Note: S4/S5 CODE was executed out of stage order
+with user authorization and merged in PR #74 (2026-09-16); the S4
+hardware boxes ride in S3. Remaining work order is unchanged:
+S1 → S2 → S3 → S6.
 
 ---
 
@@ -227,7 +274,8 @@ Remaining work order is unchanged: S1 → S2 → S3 → S6.
 | PR #54 `docs: PO-token/InnerTubeX research + ADR proposal` (+326/−1, ADR-007 PROPOSED) | OPEN, research-only | **Keep as contingency reference** (merge docs-only with ADR-007 staying PROPOSED, or leave open — user's call). NEVER implement without trigger T1/T2 + explicit go-ahead. (A labeled agent test comment "test-ping (delete me)" from 2026-09-16 could not be deleted by the agent token — safe to remove manually.) |
 | PR #73 `S4: settings surface (slice 1: page + persistence + desktop EQ)` | CLOSED unmerged 2026-09-16 | Superseded by PR #74, which preserves all commits through `ce5cb18`. |
 | PR #74 `S4/S5: settings, EQ and hardening with palette and Android build fixes` | **MERGED as `c5b1793`** (2026-09-16T18:36:09Z) | Four checks green on final head `ade145b`; post-merge CI + rolling `test` publication verified (see CURRENT ACTIVE TASK). |
-| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; last LIVE verdicts `34011539225` (09-06) + `34083253658` (09-07), both RED, pre-#57 chain | Keep open; S1 re-baselines it with a fresh verdict on `main@c5b1793`. Schedule silent since 09-07 04:28 (9 missed windows); every later push run is **0-job noise** (0 jobs, `failure_reason: null`, file never had a `push:` trigger) — not verdicts. Agent token cannot comment on issues (403, 2026-09-16); the rot-drill workflow (`issues: write`) updates #14 on the next live run. |
+| PR #75 `docs: reconcile post-#74 state; S1 rot-drill diagnosis + standing directives` | **MERGED as `bcb65cc`** (2026-09-16T23:46:37Z) | Docs-only; post-merge CI (35163768301 / 35163768295 / 35163768291) + rolling `test` (23:46:36 UTC at exactly `bcb65cc`) verified in its final comment. Carried the rot-drill runbook rewrite ("Observed anomalies"). |
+| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; last LIVE verdicts `34011539225` (09-06) + `34083253658` (09-07), both RED, pre-#57 chain | Keep open; S1 re-baselines it with a fresh verdict on current `main`. Schedule silent since 09-07 04:28 (9 missed windows) and the workflow is **absent from the Actions UI** while registry-active (id 348098190, 2026-09-17) — re-registration fix in flight; every push run is **0-job noise** (0 jobs, `failure_reason: null`, file never had a `push:` trigger) — not verdicts. Agent token cannot comment on issues (403, re-verified 2026-09-17); the rot-drill workflow (`issues: write`) updates #14 on the next live run. |
 | Issue #60 `Guest-First + Optional YTM Login` | OPEN (future plan, self-declared not-current) | v2 backlog (§8). Guest-first is already the architecture — no action now |
 | Issue #63 `Security hardening…` | OPEN (enhancement) | v2 backlog (§8). No action in S1–S6 except S5's dep/license review (done in PR #74) |
 
@@ -287,9 +335,14 @@ Remaining work order is unchanged: S1 → S2 → S3 → S6.
 1. ~~Merge this re-baseline (user review).~~ **DONE** — merged as PR #72
    (main `5023b38`, 2026-09-16T17:08:09Z).
 2. **S1** — **IN PROGRESS**: PR #53 closed (2026-09-16); full rot-drill
-   diagnosis recorded (§3 + KNOWN_LIMITATIONS + runbook). Remaining:
-   user's Actions *Run workflow* click on `main@c5b1793` + Settings
-   check (+ user OK if the schedule fix touches the workflow file).
+   diagnosis recorded (§3 + KNOWN_LIMITATIONS + runbook); branch
+   cleanup done + dispatch path revised 2026-09-17 (user cannot
+   API-dispatch; workflow absent from the Actions UI). Remaining:
+   re-registration PR (comment-only workflow edit, user-approved
+   2026-09-17, agent merges on green CI) → UI button returns → user's
+   *Run workflow* click on current `main` → live verdict → verdict
+   line in `docs/verification/14-release.md` → #14 reconciliation.
+   Fallback: GitHub support ticket (workflow id 348098190).
 3. **S2** (agent: dead-code + PR/docs hygiene).
 4. **S3** (user drives devices; agent records + fixes fallout) — includes
    the S4 hardware boxes (settings, EQ, jump-list verb, close-to-tray).
