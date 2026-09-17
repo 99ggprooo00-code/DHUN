@@ -1,82 +1,81 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-17 (UTC)** · session **`arena/01a0acb6-dhun`**.
+Updated **2026-09-17 (~02:30 UTC)** · session **`arena/01a0ad18-dhun`**
+(handoff v3 from closed session `arena/01a0acb6-dhun`).
 
-**GitHub evidence (verified live this session via `gh`/API, not
-assumed):** `origin/main` = `bcb65cc` (PR #75 merge,
-2026-09-16T23:46:37Z — docs reconciliation + S1 rot-drill
-diagnosis). Post-merge CI on `bcb65cc`: build-and-test **35163768301**
-success · Build APK **35163768295** success · test-release
-**35163768291** success. Rolling `test` pre-release republished
-**2026-09-16 23:46:36 UTC** (asset uploads final 23:51:28 UTC) at
-exactly `bcb65cc` — `dhun-test.apk`, `dhun-test.msi` + both
-`.sha256` sidecars all `uploaded` (release API). Evidence: PR #75
-post-merge comment. PRs #73/#53 closed unmerged; PR #54 open
-(contingency reference; head branch `arena/01a0890b-dhun`, kept in
-the 09-17 branch cleanup).
+**GitHub evidence (verified live at session start):** `origin/main` =
+`3ff3a55` — PR #77 (comment-only re-registration edit to
+`rot-drill.yml`) merged 2026-09-17 01:03:30 UTC on top of PR #76.
+Post-merge CI on `3ff3a55`: green across all four workflows
+(rolling `test` assets republished; evidence: PR #77 post-merge
+comment). PR #54 open (contingency reference, kept); PRs #76/#77
+merged. Remote branches: `main`, `arena/01a0890b-dhun` (PR #54),
+`arena/01a08455-dhun` (+3), `arena/01a08676-dhun` (+3), plus two
+fully-merged leftovers (`arena/01a0acb6-dhun`, `arena/01a0acb6-dhun-rereg`,
+both `ahead_by == 0`) flagged for cleanup.
 
-**Handoff v2 (2026-09-17) — new facts that reshape S1:**
-- **The user cannot perform manual GitHub steps** (no CLI/API/PAT
-  use). Their only possible actions: **clicking merge on session
-  PRs** and, once the button exists again, **one Run-workflow
-  click**. Every plan assuming an operator API dispatch is void.
-- **`rot-drill` is absent from the Actions UI entirely** (user
-  report: no list entry, no Run-workflow button) while the REST
-  registry reports `state: active`, workflow id **348098190**, and
-  `gh workflow list` still shows the registry name as the file
-  path. Schedule silent since 09-07 04:28 UTC (9 missed 04:17
-  windows; the 09-17 window was still pending at session start,
-  00:14 UTC). 0-job push noise continues (35163767716 on the merge
-  push). Full reconciliation: `docs/runbooks/rot-drill.md`.
-- Agent `workflow_dispatch` re-verified **403** this session
-  (capability check, once per session).
+**S1 re-registration ATTEMPT 1 FAILED (handoff v3 evidence):**
+- The 2026-09-17 comment-only edit (PR #77 = `3ff3a55`) did **not**
+  re-register the workflow. Registry entry **348098190** is
+  unchanged: `gh workflow list` still shows the name as the file
+  path `.github/workflows/rot-drill.yml` (not `rot-drill`), and
+  `updated_at` is frozen at `2026-09-16T23:57:41Z` (before PR #77).
+- Phantom 0-job push run **35171317970** fired on the PR #77 merge
+  push — the wedge ignores file content changes.
+- Agent `workflow_dispatch` **403** and workflow disable/enable
+  **403** re-confirmed (same integration token).
+- User confirmed (2026-09-17) the Actions UI still has **no**
+  `rot-drill` sidebar entry and **no** Run-workflow button.
+- The 09-17 04:17 UTC window is the 10th consecutive miss since
+  09-07 and counts as ticket evidence if the next fix fails.
 
-**This session (S1 continuation + repo hygiene; no app code, no
-local build, no hardware claims):**
-- **Branch cleanup executed** (user request "too many branches"):
-  **17 fully-merged remote branches deleted**, each verified
-  `ahead_by == 0` vs `main` via the compare API — `arena/01a085ea`,
-  `01a08976`, `01a0897a`, `01a0a540`, `01a0a589`, `01a0a5b3`,
-  `01a0a61a`, `01a0a7b0`, `01a0a7f3`, `01a0a9c4`, `01a0aa5e`,
-  `01a0aa7a`, `01a0aa8e`, `01a0ab12`, `01a0ab74`, `01a0ac91` (all
-  `-dhun`) + `fix/android-player-visitordata`. Kept: `main`,
-  `arena/01a0890b-dhun` (open PR #54), this session branch, and two
-  unmerged-unknowns — `arena/01a08455-dhun` (+3, 2026-09-09 docs
-  commits) and `arena/01a08676-dhun` (+3, 2026-09-10 docs commits;
-  PR #53's branch, superseded by PR #54) — not deleted per the
-  ahead>0 rule. Remote branches: 21 → 4 (+ this session branch).
-- **Lost commit 771552a re-applied:** the previous session's
-  unpushed post-merge docs commit never reached GitHub (absent from
-  this fresh clone); its content — the CURRENT ACTIVE TASK
-  reconciliation, standing directive #14, the handoff record, the
-  runbook dispatch bullet — is restated by handoff v2 and carried by
-  this PR.
-- **Re-registration approved by the user this session** (2026-09-17):
-  comment-only edit to `.github/workflows/rot-drill.yml`, merged by
-  the agent once CI is green; GitHub support ticket is the agreed
-  fallback if it does not restore the UI/schedule.
+**User directive (handoff v3):** "one by one — fix rot-drill first,
+then the other (support ticket)". User cannot do manual GitHub
+steps (no CLI/API/PAT) — only merge clicks and one Run-workflow
+click once the button returns. Agents merge routine PRs on green CI.
 
-**Last error:** none blocking. No local tests were run (no JDK — CI
-is the compiler); no hardware claims.
+**Fix plan (delete + re-add), sequential, everything rides in PRs,
+nothing direct-to-main:**
+1. **PR A — delete:** `git rm` the wedged workflow file; carry the
+   docs updates that never landed (this CURRENT ACTIVE TASK
+   rewrite, new KNOWN_LIMITATIONS 2026-09-17 bullet, runbook
+   "Observed anomalies" fix-attempt wording). CI green → merge →
+   same-turn verify: is entry 348098190 gone from `gh workflow list`?
+   Did that merge push still create a phantom run?
+2. **PR B — restore:** branch from post-PR-A `main`; restore the
+   file VERBATIM from `3ff3a55` (+ one comment line documenting the
+   delete/re-add). Verify `git diff 3ff3a55 --
+   .github/workflows/rot-drill.yml` shows only the comment line. CI
+   green → merge → same-turn verify: NEW workflow id, name
+   `rot-drill`, state active, and **no** phantom 0-job push run on
+   that merge push (a fresh entry has no phantom push trigger).
+3. **User:** confirm the Run-workflow button is back in the Actions
+   UI → click it on `main` → probe job ≈5–12 min = live verdict
+   (agent watches `gh run list --workflow <new-id> --event
+   workflow_dispatch`).
+4. **PR C — verdict:** one line in
+   `docs/verification/14-release.md` ("Live evidence log" →
+   "Rot-drill"), ROADMAP S1 status, KNOWN_LIMITATIONS, runbook
+   outcome. Green → #14 auto-closes, S1 done → S2; red →
+   `LOGIN_REQUIRED` = datacenter-IP gating vs real rot; check
+   triggers T1/T2 (neither fires on one datacenter red). CI green →
+   merge → same-turn verify.
+5. If the fresh entry is ALSO wedged (name = path again, or phantom
+   push runs): stop file changes; submit the GitHub support ticket
+   (draft in handoff v3 / runbook); record the outcome in docs.
 
-**Exact next step (this session, in order):**
-1. THIS docs PR: required CI green on the final head → merge →
-   same-turn post-merge verification (CI on the merge SHA + rolling
-   `test` republication).
-2. Re-registration PR (comment-only `rot-drill.yml` edit, no
-   trigger/job change) → CI green → merge → same-turn check whether
-   the registry re-registered (name flips from the file path to
-   `rot-drill`); the Run-workflow button's return is user-observable.
-3. User: if the Run-workflow button is back in the Actions UI, click
-   it on `main` → probe job (≈5–12 min) = live verdict → verdict line
-   in `docs/verification/14-release.md` (green → #14 auto-closes, S1
-   done → S2; red → LOGIN_REQUIRED = datacenter-IP gating vs real
-   rot; check contingency triggers T1/T2).
-4. If the button is still absent or the next 04:17 UTC window is
-   missed again: GitHub support ticket (workflow id 348098190; last
-   scheduled run 34083253658; missed windows 09-08 → 09-16 [→ 09-17];
-   absent from UI but active in registry) — ticket text prepared
-   agent-side for the user to submit.
+**Last error:** re-registration attempt 1 (comment-only edit,
+PR #77) failed to touch registry entry 348098190. No local tests
+were run (no JDK — CI is the compiler); no hardware claims.
+
+**Exact next step (in order, this PR = PR A "delete"):**
+1. THIS PR (PR A): delete `rot-drill.yml` + docs updates → CI green
+   → merge → same-turn verify entry 348098190 is removed and check
+   for phantom push run on the merge.
+2. PR B (restore) on a new branch, verbatim file + one comment line
+   → CI green → merge → same-turn verify new workflow id, name
+   `rot-drill`, no phantom push run.
+3. Wait for user Run-workflow click → live verdict → PR C.
 
 S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`) and S6
 (soaks, clean installs, signing decisions, tag, explicit go-ahead)

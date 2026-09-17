@@ -7,15 +7,23 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-17): the workflow is MISSING from the Actions UI
+## State (2026-09-17 ~02:30 UTC): delete+re-add re-registration in progress
 
 The Actions UI shows no `rot-drill` entry at all (no list entry, no
 Run-workflow button), while the REST registry still reports it
 `state: active` (workflow id **348098190**, name stuck at the file
-path). Until the re-registration fix (comment-only edit to the
-workflow file, user-approved 2026-09-17) restores the UI entry, the
-UI path below does not exist — use the API path (any account with
-owner rights + a `workflow`-scoped PAT) or wait for re-registration.
+path). **Re-registration attempt 1 (comment-only edit, PR #77 =
+`3ff3a55`) FAILED** — the registry entry was untouched (name still
+file path, `updated_at` frozen 2026-09-16T23:57:41Z, phantom push
+run 35171317970 still fired). Attempt 2 (delete-then-restore,
+PR A = delete, PR B = verbatim re-add + one comment line;
+user-approved 2026-09-17) is in progress — after PR B merges, a
+fresh workflow id should exist with the correct name, UI entry, and
+no phantom push trigger. Fallback if attempt 2 also wedges: GitHub
+support ticket (see "Fix attempts" below). Until the fresh entry is
+confirmed, the UI path below does not exist — use the API path (any
+account with owner rights + a `workflow`-scoped PAT) or wait for
+re-registration.
 
 ## Dispatch
 
@@ -77,11 +85,31 @@ Verified against the full 189-run Actions history (GitHub API, session
   REST registry reports `state: active` (id 348098190) and
   `gh workflow list` shows the registry name as the file path — the
   same registration decay that killed the schedule also dropped the
-  UI entry. Planned fix: comment-only edit to this workflow file on
-  `main` to force re-registration (user-approved 2026-09-17);
-  fallback = GitHub support ticket (workflow id 348098190, last
-  scheduled run 34083253658, missed windows 09-08 → 09-16, absent
-  from UI but active in registry).
+  UI entry.
+
+  **Fix attempts:**
+  1. **Comment-only edit (PR #77 = `3ff3a55`, merged 2026-09-17
+     01:03 UTC) — FAILED.** The registry entry 348098190 was
+     untouched: name still the file path, `updated_at` frozen at
+     2026-09-16T23:57:41Z, phantom 0-job push run 35171317970
+     fired on the merge push, Run-workflow button still absent
+     (user-confirmed). The wedge ignores file-content changes.
+  2. **Delete + verbatim re-add (PR A delete / PR B restore,
+     ~02:30 UTC 2026-09-17, user-approved) — IN PROGRESS.**
+     Force GitHub to drop the wedged entry and create a fresh
+     workflow id on re-add. Goal: name = `rot-drill`, Actions UI
+     entry returns, phantom push runs stop, daily 04:17 UTC
+     schedule re-arms. Agent `workflow disable`/`enable` is 403,
+     so file-level delete+re-add is the only agent-accessible
+     re-registration vector.
+  3. **Fallback (if re-add also wedges):** GitHub support ticket —
+     repo `99ggprooo00-code/DHUN`, workflow id 348098190, last
+     scheduled run 34083253658 (2026-09-07 04:28 UTC), ≥10 missed
+     windows 09-08 → 09-17, phantom 0-job push runs on every push
+     since 09-07 05:56 UTC despite no `push:` trigger, decay began
+     around edit `da9d779` (2026-09-07 06:17 UTC). Request: force
+     re-registration or delete + clean re-creation of workflow
+     348098190.
 - **0-job push runs are noise, not verdicts.** Every push since
   2026-09-07 05:56 UTC created a `rot-drill` run with `event: push`,
   **0 jobs**, `conclusion: failure`, `failure_reason: null` — although
@@ -91,12 +119,13 @@ Verified against the full 189-run Actions history (GitHub API, session
   extraction evidence (e.g. 35135427771 on the 2026-09-16 merge push).
 - **The schedule has been silent since 2026-09-07 04:28 UTC** (run
   34083253658). It fired every day 09-02 → 09-07 (4 green, 2 red — both
-  red pre-#57 chain); 9 further 04:17 UTC windows (09-08 → 09-16) never
-  fired despite daily pushes to `main`. Workflow registry `state:
-  active` (id **348098190**); file unchanged since `da9d779` (09-07
-  06:17). Working diagnosis: GitHub-side trigger-registration anomaly
-  around that edit (the registry name still shows the file path, not
-  `rot-drill`).
+  red pre-#57 chain); **≥10** missed 04:17 UTC windows (09-08 → 09-17,
+  including the 09-17 04:17 window) have passed without a scheduled
+  run despite daily pushes to `main`. Workflow registry `state:
+  active` on the wedged entry (id **348098190**); file unchanged since
+  `da9d779` (09-07 06:17). Working diagnosis: GitHub-side
+  trigger-registration anomaly around that edit (the registry name
+  still shows the file path, not `rot-drill`).
 - **Before and after dispatching, check the schedule too:** once the
   UI entry is restored, confirm the workflow is enabled on that page.
   If the next 04:17 UTC window is missed after the manual run, the
