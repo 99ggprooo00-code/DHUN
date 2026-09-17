@@ -34,8 +34,9 @@ Updated every phase. Nothing hidden.
   registration layer is failing to read the `name:` field for any
   new workflow at present.
 - **ALL file changes to workflows STOPPED per plan (step 5).**
-  GitHub Support ticket filed by user (~03:15 UTC); awaiting
-  response. New id 360227450 is the target for support to re-sync.
+  GitHub Support ticket **#4765894** filed by user (~03:15 UTC;
+  auto-receipt ~06:50 UTC); awaiting human response. New id
+  360227450 is the target for support to re-sync.
 
   **Previous note (historical):** the repo owner submitted a GitHub
   support ticket (text provided in the 2026-09-17 agent chat

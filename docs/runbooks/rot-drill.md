@@ -18,7 +18,8 @@ filename — the repository's workflow-registration layer is
 failing to read the `name:` field server-side.
 
 **ALL workflow file changes STOPPED per plan step 5.** GitHub
-support ticket submitted by user (~03:15 UTC) to Support Actions
+support ticket **#4765894** submitted by user (~03:15 UTC,
+auto-receipt ~06:50 UTC) to Support Actions
 (diagnostic page confirmed "stale/corrupted registration" / no
 self-service fix). Awaiting support response; the new id
 360227450 is the target for them to re-sync. Ticket text was

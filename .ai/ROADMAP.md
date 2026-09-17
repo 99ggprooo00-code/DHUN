@@ -1,6 +1,6 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-17 (~05:50 UTC)** · session **`arena/01a0ad18-dhun`**
+Updated **2026-09-17 (~06:55 UTC)** · session **`arena/01a0ad18-dhun`**
 (handoff v3; rot-drill fix: rename attempt 3 after support ticket).
 
 **GitHub evidence (pre-rename, verified live):** `origin/main` =
@@ -22,11 +22,14 @@ branches deleted (`ahead_by == 0` verified or content superseded).
 - **Attempt 2** (delete + same-path re-add, PRs #78/#79, ~02:20 UTC):
   delete dropped entry ~90 s but GitHub reattached the SAME wedged
   id 348098190 by file path; phantom run 35174080320.
-- **Support ticket SUBMITTED** by the user (~03:15 UTC) via GitHub
-  Support Actions. GitHub diagnostic page confirmed "stale/
-  corrupted registration — no self-service fix". Request: re-sync
-  id 348098190 (or delete it). Ticket text provided inline in chat
-  (not committed to repo; PR #81 removed the draft).
+- **Support ticket #4765894 SUBMITTED** by the user (~03:15 UTC;
+  auto-receipt ~06:50 UTC) via GitHub Support Actions. GitHub
+  diagnostic page confirmed "stale/corrupted registration — no
+  self-service fix". Originally targeted id 348098190; after PR
+  #84 the new wedged id 360227450 (path
+  `.github/workflows/rot-drill-daily.yml`) is the active target.
+  Ticket text provided inline in chat (not committed to repo; PR
+  #81 removed the draft).
 - **Attempt 3 (rename to new file path, THIS PR):** rename
   `rot-drill.yml` → `rot-drill-daily.yml`. The wedge was keyed to
   the exact path; a new path MUST register as a new workflow id
@@ -41,7 +44,7 @@ branches deleted (`ahead_by == 0` verified or content superseded).
 run 35186690348 fired on merge. The bug is deeper than file-path
 keying — even a new id ignores the file's `name:` value. Per plan
 and GitHub diagnostic guidance: ALL file changes stopped; awaiting
-support response. The old id 348098190 is now `state: deleted`
+human response on ticket #4765894. The old id 348098190 is now `state: deleted`
 (orphaned to the removed path). No
 local tests were run (no JDK — CI is the compiler); no hardware
 claims.
