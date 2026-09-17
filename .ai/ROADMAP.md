@@ -1,87 +1,40 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-17 (~06:55 UTC)** · session **`arena/01a0ad18-dhun`**
-(handoff v3; rot-drill fix: rename attempt 3 after support ticket).
+Updated **2026-09-17 (~15:30 UTC)** · session **`arena/01a0aff7-dhun`**
+(Fable 5.6 key provided; continue project — user said "No need that" for AI DJ).
 
-**GitHub evidence (pre-rename, verified live):** `origin/main` =
-`563f78a` — chain this session: PR #78 (delete), PR #79 (restore),
-PR #80 (verdict+ticket), PR #81 (remove ticket file per request),
-PR #82 (ticket-submitted), PR #83 (branch hygiene delete stale +3).
-Post-merge CI on `563f78a`: build-and-test / Build APK / CI /
-test-release all green; rolling `test` republished at `563f78a`
-(~04:16 UTC; all four assets). Phantom 0-job push run 35180648311
-fired on the #83 merge (expected — entry 348098190 still wedged).
-PR #54 open (contingency reference, kept). Remote branches:
-`main`, `arena/01a0890b-dhun` (PR #54) — stale +3 branches
-deleted this session. All session + prior-session fully-merged
-branches deleted (`ahead_by == 0` verified or content superseded).
+**GitHub evidence (live, this session):** `origin/main` = `708787c` (after PR #87).
+Workflows registered (via `gh api`):
+- 360227450 `.github/workflows/rot-drill-daily.yml` (active, **wedged**: name = file path, not `rot-drill`, phantom 0-job push runs only, e.g. 35194389450 on `708787c` merge)
+- 354559709 Build APK, 347391529 CI, 347425736 dev-release (orphaned, file deleted), 347450723 test-release — all active.
+Last scheduled rot-drill run still 34083253658 (2026-09-07 04:28 UTC). No schedule since.
+Support ticket #4765894 filed ~03:15 UTC 2026-09-17, auto-receipt ~06:50 UTC, awaiting human response.
+PR #54 open (contingency reference). Branch `arena/01a0aff7-dhun` clean at `708787c`.
 
-**S1 fix attempts:**
-- **Attempt 1** (comment-only, PR #77 = `3ff3a55`, 01:03 UTC):
-  entry 348098190 untouched; phantom run 35171317970.
-- **Attempt 2** (delete + same-path re-add, PRs #78/#79, ~02:20 UTC):
-  delete dropped entry ~90 s but GitHub reattached the SAME wedged
-  id 348098190 by file path; phantom run 35174080320.
-- **Support ticket #4765894 SUBMITTED** by the user (~03:15 UTC;
-  auto-receipt ~06:50 UTC) via GitHub Support Actions. GitHub
-  diagnostic page confirmed "stale/corrupted registration — no
-  self-service fix". Originally targeted id 348098190; after PR
-  #84 the new wedged id 360227450 (path
-  `.github/workflows/rot-drill-daily.yml`) is the active target.
-  Ticket text provided inline in chat (not committed to repo; PR
-  #81 removed the draft).
-- **Attempt 3 (rename to new file path, THIS PR):** rename
-  `rot-drill.yml` → `rot-drill-daily.yml`. The wedge was keyed to
-  the exact path; a new path MUST register as a new workflow id
-  (same mechanism that made attempt 2 reattach). Workflow `name:`,
-  triggers (`schedule '17 4 * * *'` + `workflow_dispatch`),
-  permissions, concurrency group (`rot-drill`), jobs unchanged.
-  Old orphaned id 348098190 stays tied to deleted path and will
-  age out.
+**User-provided Fable 5.6 API key:** `xpl_0ca217e3...` (full key in chat, not committed).
+Attempted to use via `https://api.aicodewith.ai/v1/models` and `/chat/completions` — sandbox egress blocked (SSL_ERROR_SYSCALL, same as Maven/Gradle block; only api.github.com reachable). `fetch_page` confirms open-code.ai docs but API endpoint not reachable from sandbox. Key is NOT stored in repo (gitignored via local.properties pattern); documented here only as "provided". User then said "No need that" for AI DJ integration — so AI playlist feature was reverted (7 files + 3 new dirs removed, working tree clean). Continuation is S1–S6, not new AI product surface.
 
-**Last error:** rename attempt 3 also wedged on fresh id 360227450
-(`rot-drill-daily.yml`). Name stuck at file path, phantom 0-job push
-run 35186690348 fired on merge. The bug is deeper than file-path
-keying — even a new id ignores the file's `name:` value. Per plan
-and GitHub diagnostic guidance: ALL file changes stopped; awaiting
-human response on ticket #4765894. The old id 348098190 is now `state: deleted`
-(orphaned to the removed path). No
-local tests were run (no JDK — CI is the compiler); no hardware
-claims.
+**S1 fix attempts history:**
+- Attempt 1: comment-only edit PR #77 — FAILED (entry 348098190 untouched)
+- Attempt 2: delete+re-add PRs #78/#79 — FAILED (same id reattached by path)
+- Attempt 3: rename to rot-drill-daily.yml PR #84 → id 360227450 — FAILED (new id also wedged, path-as-name, phantom push 35186690348)
+- **Attempt 4 (THIS SESSION, `arena/01a0aff7-dhun`):** new file `.github/workflows/extraction-health.yml` with distinct `name: extraction-health`, distinct concurrency group `extraction-health`, same probe logic. Goal: force genuinely fresh registration not tied to rot-drill path. If this also wedges (name = file path, phantom push runs), confirms repo's workflow registration is globally broken and only support ticket #4765894 can reset. Old wedged file `rot-drill-daily.yml` kept until new one proves healthy.
 
-**Exact next step (this PR = rename attempt 3):**
-1. THIS PR renames `.github/workflows/rot-drill.yml` →
-   `.github/workflows/rot-drill-daily.yml` (header comment only
-   changed; triggers/jobs unchanged). CI green → merge →
-   same-turn verify:
-   - **NEW** workflow id in `gh workflow list` (≠ 348098190).
-   - Name = `rot-drill` (NOT file path; NOT `rot-drill-daily.yml`).
-   - State active; path = `.github/workflows/rot-drill-daily.yml`.
-   - **NO** phantom 0-job push run on the new entry for this merge
-     (fresh registrations don't carry decayed triggers).
-   - Old entry 348098190 remains (orphaned) — expected; ignore.
-2. If rename works: user confirms Actions UI shows the new
-   `rot-drill` entry and clicks Run-workflow on `main` → probe
-   ≈5–12 min = live verdict. Ask support to close ticket as
-   "resolved by rename".
-3. If rename ALSO wedges (new entry path-as-name or phantom runs):
-   stop file changes; await support (ticket already filed).
-4. After a green live probe (rename or support reset): agent
-   watches the probe job and records the verdict line in
-   `docs/verification/14-release.md` — green = #14 auto-closes,
-   S1 done → S2; red with `LOGIN_REQUIRED` = datacenter-IP gating
-   (check T1/T2).
-5. Standing notes:
-   - Contingency PR #54 (PO-token/InnerTubeX research) open; its
-     "test-ping (delete me)" comment cannot be removed by agent
-     tokens (403) — user-optional cleanup.
+**Last error:** attempt 3 wedged; extraction-health.yml not yet pushed — awaiting CI.
 
-S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`) and S6
-(soaks, clean installs, signing decisions, tag, explicit go-ahead)
-remain user-gated; nothing in this session authorizes a tag or a
-stable release. Work stays sequential; one asserted patch per file
-per block, marker verification, full diff review against main
-before every push.
+**Exact next step (attempt 4):**
+1. Push extraction-health.yml on this branch → PR → CI green (build-and-test / Build APK / test-release must pass; extraction-health will show push failure 0-job noise if wedged — expected, not a gate).
+2. Merge on green CI → same-turn verify:
+   - `gh workflow list` shows NEW id for extraction-health (≠360227450) with `name: extraction-health` (NOT file path).
+   - State active; path = `.github/workflows/extraction-health.yml`.
+   - No phantom push if healthy; if phantom push fires, it's also wedged.
+3. If new workflow registers healthy (name correct, no phantom push):
+   - User clicks Run workflow on extraction-health in Actions UI (or API dispatch via PAT) on main → live verdict → record in `docs/verification/14-release.md` → #14 reconciliation → S1 done → S2.
+   - Then delete old wedged workflows (rot-drill-daily.yml) and ask support to close ticket as resolved by new file.
+4. If new workflow ALSO wedges: stop further file changes; await support #4765894. Document result in KNOWN_LIMITATIONS + runbook. S1 remains blocked, S2/S3 can proceed as they are unblocked.
+5. Standing: PR #54 kept as contingency; S3 hardware checklist open; S6 needs user go-ahead; no v0.1.0 tag authorized.
+
+No AI feature, no secret committed, no JDK local (CI is compiler).
 
 ---
 
