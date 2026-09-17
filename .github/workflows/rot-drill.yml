@@ -3,6 +3,15 @@ name: rot-drill
 # Daily extraction health check against live YouTube. This is intentionally
 # separate from pull-request CI: it exercises the networked Phase 01 probe
 # from a fresh runner and detects extractor rot within 24 hours.
+#
+# 2026-09-17 re-registration: comment-only edit (no trigger or job change)
+# to force GitHub to re-read this file. Since the 2026-09-07 edit the
+# workflow's registry entry has decayed: the Actions UI lost the workflow
+# entirely (no list entry, no Run-workflow button), the registry name shows
+# the file path instead of "rot-drill", the 04:17 UTC schedule stopped
+# firing (9 missed windows, 09-08..09-16), and phantom 0-job push runs
+# appear on every push although no version of this file ever declared a
+# push trigger. Details: docs/runbooks/rot-drill.md "Observed anomalies".
 on:
   schedule:
     - cron: '17 4 * * *'
