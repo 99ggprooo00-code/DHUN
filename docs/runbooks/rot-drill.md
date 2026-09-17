@@ -1,21 +1,47 @@
 # Runbook: rot-drill (live extraction health check)
 
-**Why this needs a human:** the `rot-drill` workflow only runs on a daily
-schedule or a manual *Run workflow* click. Agent sessions get `HTTP 403`
-on `workflow_dispatch`, and the daily schedule does not prove *this*
-commit — so confirming stream health for a release is a 3-minute operator
-task. Do it once per release candidate, on `main`, after merge.
+**Why this needs a human:** the `rot-drill` workflow only runs on a
+daily schedule or a manual dispatch. Agent sessions get `HTTP 403` on
+`workflow_dispatch` (re-verified 2026-09-17), and the daily schedule
+does not prove *this* commit — so confirming stream health for a
+release is an operator task. Do it once per release candidate, on
+`main`, after merge.
 
-## Dispatch (exact clicks)
+## State (2026-09-17): the workflow is MISSING from the Actions UI
+
+The Actions UI shows no `rot-drill` entry at all (no list entry, no
+Run-workflow button), while the REST registry still reports it
+`state: active` (workflow id **348098190**, name stuck at the file
+path). Until the re-registration fix (comment-only edit to the
+workflow file, user-approved 2026-09-17) restores the UI entry, the
+UI path below does not exist — use the API path (any account with
+owner rights + a `workflow`-scoped PAT) or wait for re-registration.
+
+## Dispatch
+
+**Path A — Actions UI (the repo owner's path; needs re-registration
+first):**
 
 1. Open `https://github.com/99ggprooo00-code/DHUN/actions/workflows/rot-drill.yml`
    (repo → **Actions** → **rot-drill** in the left sidebar).
-2. Click **Run workflow** (right side, above the runs list).
-3. Leave **Branch: main** selected. There are no input fields.
-4. Click the green **Run workflow** button in the dropdown.
-5. A new run appears at the top within ~30 s. Click it, then watch the
+2. Click **Run workflow** (right side, above the runs list); leave
+   **Branch: main** selected (there are no input fields); click the
+   green **Run workflow** button in the dropdown.
+3. A new run appears at the top within ~30 s. Click it, then watch the
    **probe** job (≈5–12 min; it installs `yt-dlp` and runs the offline +
    live playback probes).
+
+**Path B — owner-account API dispatch (one-liner; agent tokens get
+403):**
+
+```bash
+gh workflow run rot-drill.yml --ref main --repo 99ggprooo00-code/DHUN
+# or, with a workflow-scoped PAT:
+# curl -X POST -H "Authorization: Bearer <PAT>" \
+#   -H "Accept: application/vnd.github+json" \
+#   https://api.github.com/repos/99ggprooo00-code/DHUN/actions/workflows/348098190/dispatches \
+#   -d '{"ref":"main"}'    # success = HTTP 204, empty body
+```
 
 ## Reading the verdict
 
@@ -44,8 +70,18 @@ task. Do it once per release candidate, on `main`, after merge.
 ## Observed anomalies (reconciled 2026-09-16 — read before dispatching)
 
 Verified against the full 189-run Actions history (GitHub API, session
-`arena/01a0ac91-dhun`):
+`arena/01a0ac91-dhun`); UI-absence evidence added 2026-09-17:
 
+- **The workflow is absent from the Actions UI entirely (2026-09-17,
+  user report):** no list entry and no Run-workflow button, while the
+  REST registry reports `state: active` (id 348098190) and
+  `gh workflow list` shows the registry name as the file path — the
+  same registration decay that killed the schedule also dropped the
+  UI entry. Planned fix: comment-only edit to this workflow file on
+  `main` to force re-registration (user-approved 2026-09-17);
+  fallback = GitHub support ticket (workflow id 348098190, last
+  scheduled run 34083253658, missed windows 09-08 → 09-16, absent
+  from UI but active in registry).
 - **0-job push runs are noise, not verdicts.** Every push since
   2026-09-07 05:56 UTC created a `rot-drill` run with `event: push`,
   **0 jobs**, `conclusion: failure`, `failure_reason: null` — although
@@ -61,23 +97,27 @@ Verified against the full 189-run Actions history (GitHub API, session
   06:17). Working diagnosis: GitHub-side trigger-registration anomaly
   around that edit (the registry name still shows the file path, not
   `rot-drill`).
-- **Before and after dispatching, check the schedule too:** on the same
-  Actions page confirm the workflow is enabled. If the next 04:17 UTC
-  window is missed after your manual run, the schedule needs
-  restoring: force re-registration (trivial commit to `main` + one
-  manual run — a workflow change, needs the user's OK per S1) or a
-  GitHub support ticket citing workflow id 348098190, last scheduled
-  run 34083253658, and the missed windows.
+- **Before and after dispatching, check the schedule too:** once the
+  UI entry is restored, confirm the workflow is enabled on that page.
+  If the next 04:17 UTC window is missed after the manual run, the
+  schedule needs restoring: force re-registration (trivial commit to
+  `main` + one manual run — user-approved 2026-09-17) or a GitHub
+  support ticket citing workflow id 348098190, last scheduled run
+  34083253658, and the missed windows.
 - **Agent dispatch is 403** (`gh workflow run` → `HTTP 403: Resource
-  not accessible by integration`), re-verified 2026-09-16. The *Run
-  workflow* click stays an operator task; an agent token also cannot
-  comment on issue #14 (issue-comment writes 403), but the workflow
-  itself updates the issue on the next live run.
+  not accessible by integration`), re-verified 2026-09-17. The *Run
+  workflow* click stays an operator task — and per handoff v2
+  (2026-09-17) the user can only click UI buttons (merge, Run
+  workflow), so Path B above is for a future operator with a PAT, not
+  the current user. An agent token also cannot comment on issue #14
+  (issue-comment writes 403), but the workflow itself updates the
+  issue on the next live run.
 
 ## Recording the evidence
 
 For a release candidate, append one line to
-`docs/verification/14-release.md` (Current status section):
+`docs/verification/14-release.md` ("Live evidence log" → "Rot-drill"
+section):
 
 ```text
 - rot-drill <run_id> (<YYYY-MM-DD HH:MM UTC>, main@<sha>): GREEN — <one-line note>
