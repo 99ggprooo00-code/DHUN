@@ -7,21 +7,24 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-17 ~03:20 UTC): ticket SUBMITTED; awaiting GitHub Support response
+## State (2026-09-17 ~05:50 UTC): rename (attempt 3) ALSO FAILED — awaiting support
 
-The Actions UI shows no `rot-drill` entry at all (no list entry, no
-Run-workflow button), while the REST registry still reports it
-`state: active` (workflow id **348098190**, name stuck at the file
-path). Both file-level re-registration attempts failed (see "Fix
-attempts" below). **GitHub support ticket SUBMITTED by user (~03:15 UTC)** to GitHub
-Support Actions (diagnostic page confirmed "stale/corrupted
-registration" / no self-service fix). After ticket submission the
-agent is executing plan B (rename to new path) while awaiting
-support — if rename succeeds the ticket can be closed; if rename
-wedges we wait for support. Ticket text provided in the 2026-09-17
-agent chat (not committed to repo per request).
-Until support resets the entry, the UI path below does not exist
-and the schedule will continue to miss windows.
+Rename to `rot-drill-daily.yml` (PR #84) created new workflow id
+360227450 (old id 348098190 now shows `state: deleted`), but the
+fresh entry ALSO shows name stuck at the file path (not
+`rot-drill`) and fired phantom 0-job push run 35186690348 on the
+merge push. The bug reproduces on a fresh id even at a new
+filename — the repository's workflow-registration layer is
+failing to read the `name:` field server-side.
+
+**ALL workflow file changes STOPPED per plan step 5.** GitHub
+support ticket submitted by user (~03:15 UTC) to Support Actions
+(diagnostic page confirmed "stale/corrupted registration" / no
+self-service fix). Awaiting support response; the new id
+360227450 is the target for them to re-sync. Ticket text was
+provided in the 2026-09-17 agent chat (not committed to repo per
+request). Until support resets the entry, the UI path below does
+not exist and the schedule will continue to miss windows.
 
 ## Dispatch
 
@@ -114,16 +117,16 @@ Verified against the full 189-run Actions history (GitHub API, session
      "stale/corrupted workflow registration" diagnosis and that
      no self-service fix exists. Ticket text was provided in the
      agent chat session (not committed to repo per user
-     request). Request: force re-registration or delete + clean
-     re-creation of workflow 348098190. Awaiting response; if
-     support cannot fix it, plan B is a replacement workflow
-     file under a new name (separate decision post-response).
+     request). Request originally targeted id 348098190; after
+     PR #84 the new wedged id 360227450 (path
+     `.github/workflows/rot-drill-daily.yml`) is the active
+     target for re-sync. Both ids are failing to read the
+     `name:` field and fire phantom push runs.
   3b. **Plan B executed — rename to new file path (~04:30 UTC,
-     this PR).** File renamed from `rot-drill.yml` to
-     `rot-drill-daily.yml`. Because the wedge was keyed to the
-     exact path, the new path must register as a fresh workflow
-     id. If it also wedges, await support; if it succeeds,
-     close the support ticket and proceed to live probe.
+     PR #84, merged ~05:40 UTC) — FAILED.** File renamed to
+     `rot-drill-daily.yml`; new id 360227450 created but ALSO
+     wedged (path-as-name, phantom push run 35186690348).
+     All workflow file changes STOPPED; awaiting support.
 - **0-job push runs are noise, not verdicts.** Every push since
   2026-09-07 05:56 UTC created a `rot-drill` run with `event: push`,
   **0 jobs**, `conclusion: failure`, `failure_reason: null` — although

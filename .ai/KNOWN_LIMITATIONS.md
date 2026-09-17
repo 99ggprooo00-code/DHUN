@@ -24,20 +24,24 @@ Updated every phase. Nothing hidden.
   Actions UI entry did not return. File-level fixes cannot evict
   this entry. Agent tokens cannot disable/enable workflows
   (`gh workflow enable`/`disable` returns 403) either.
-- **Attempt 3 (rename) THIS PR:** file renamed from
-  `.github/workflows/rot-drill.yml` to `.github/workflows/rot-drill-daily.yml`
-  to force a genuinely fresh registration (wedge keyed by file path;
-  attempt 2's same-path re-add proved that). Triggers/jobs/concurrency
-  group unchanged. Old id 348098190 remains orphaned to deleted path.
-  If rename also wedges, stop file changes and await support. Next
-  step: support ticket already filed by the user; awaiting response.
+- **Attempt 3 (rename to `rot-drill-daily.yml`, PR #84, merged
+  ~05:40 UTC) — ALSO FAILED.** New workflow id 360227450 was created
+  (old id 348098190 now shows `state: deleted`), but the new entry
+  also has name stuck at the file path `.github/workflows/
+  rot-drill-daily.yml` (not `rot-drill`) and phantom 0-job push run
+  35186690348 fired on the merge push. The bug reproduces on a
+  fresh id even at a new filename — the repository's workflow-
+  registration layer is failing to read the `name:` field for any
+  new workflow at present.
+- **ALL file changes to workflows STOPPED per plan (step 5).**
+  GitHub Support ticket filed by user (~03:15 UTC); awaiting
+  response. New id 360227450 is the target for support to re-sync.
 
-  **Previous note (historical):** the repo owner submitted a GitHub support
-  ticket (copy-paste ready draft in
-  the 2026-09-17 agent chat session (ticket text not stored in repo per user preference) —
-  Subject + Body verbatim, to
-  https://support.github.com/contact?tags=rr-actions). Ticket
-  requests GitHub support force a clean re-registration (reset the
+  **Previous note (historical):** the repo owner submitted a GitHub
+  support ticket (text provided in the 2026-09-17 agent chat
+  session, not committed to repo per request) to
+  https://support.github.com/contact?tags=rr-actions asking
+  GitHub support to force a clean re-registration (reset the
   entry or delete it so the next push recreates it fresh).
 - **Re-registration summary for the ticket:** workflow id
   348098190; last healthy scheduled run 34083253658 (2026-09-07

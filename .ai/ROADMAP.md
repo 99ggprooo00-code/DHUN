@@ -1,6 +1,6 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-17 (~04:30 UTC)** · session **`arena/01a0ad18-dhun`**
+Updated **2026-09-17 (~05:50 UTC)** · session **`arena/01a0ad18-dhun`**
 (handoff v3; rot-drill fix: rename attempt 3 after support ticket).
 
 **GitHub evidence (pre-rename, verified live):** `origin/main` =
@@ -36,8 +36,13 @@ branches deleted (`ahead_by == 0` verified or content superseded).
   Old orphaned id 348098190 stays tied to deleted path and will
   age out.
 
-**Last error:** attempts 1 and 2 failed to evict entry 348098190;
-executing rename (attempt 3) while support ticket is filed. No
+**Last error:** rename attempt 3 also wedged on fresh id 360227450
+(`rot-drill-daily.yml`). Name stuck at file path, phantom 0-job push
+run 35186690348 fired on merge. The bug is deeper than file-path
+keying — even a new id ignores the file's `name:` value. Per plan
+and GitHub diagnostic guidance: ALL file changes stopped; awaiting
+support response. The old id 348098190 is now `state: deleted`
+(orphaned to the removed path). No
 local tests were run (no JDK — CI is the compiler); no hardware
 claims.
 
