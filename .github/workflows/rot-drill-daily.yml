@@ -4,21 +4,27 @@ name: rot-drill
 # separate from pull-request CI: it exercises the networked Phase 01 probe
 # from a fresh runner and detects extractor rot within 24 hours.
 #
-# 2026-09-17 re-registration (attempt 2 — delete + verbatim re-add):
-# Attempt 1 (comment-only edit, PR #77 = 3ff3a55) FAILED to touch the
-# wedged registry entry (id 348098190; name stuck at the file path,
-# updated_at frozen, phantom 0-job push runs on every push). PR A
-# (#78) deleted this file to force GitHub to drop that entry; this PR
-# restores the file verbatim from 3ff3a55 so a fresh workflow id is
-# created. Triggers and jobs are UNCHANGED.
+# 2026-09-17 re-registration attempt 3 — rename to rot-drill-daily.yml:
+# Attempt 1 (comment-only, PR #77 = 3ff3a55) — FAILED; entry 348098190
+# untouched. Attempt 2 (delete + same-path re-add, PRs #78/#79) —
+# FAILED; GitHub reattached the SAME wedged id 348098190 by file path.
+# GitHub Support ticket filed by user (~03:15 UTC); diagnostic page
+# confirmed 'stale/corrupted registration, no self-service fix'.
 #
-# Original decay context: since the 2026-09-07 edit (da9d779) the
-# workflow's registry entry decayed — the Actions UI lost the
-# workflow, the registry name showed the file path, the 04:17 UTC
-# schedule stopped firing (≥10 missed windows 09-08..09-17), and
-# phantom 0-job push runs appeared on every push although no version
-# of this file ever declared a push trigger. Details:
-# docs/runbooks/rot-drill.md "Observed anomalies".
+# Attempt 3 = rename to a new file path (.github/workflows/
+# rot-drill-daily.yml) to force a genuinely fresh registry id. The
+# wedge was keyed to the exact path '.github/workflows/rot-drill.yml';
+# moving to a new path must register as a new workflow. Triggers,
+# permissions, concurrency group ('rot-drill'), jobs, and the
+# workflow's declared name ('rot-drill') are UNCHANGED.
+#
+# Decay history: since the 2026-09-07 edit (da9d779) the old entry
+# (id 348098190) decayed — Actions UI lost the entry, registry name
+# stuck at the file path, daily 04:17 UTC schedule stopped (≥10
+# missed windows 09-08..09-17), phantom 0-job push runs fired on
+# every push despite no push: trigger. The old id 348098190 remains
+# orphaned to the deleted path and will age out.
+# Details: docs/runbooks/rot-drill.md "Observed anomalies".
 on:
   schedule:
     - cron: '17 4 * * *'

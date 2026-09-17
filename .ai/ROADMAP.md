@@ -1,85 +1,82 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-17 (~03:20 UTC)** · session **`arena/01a0ad18-dhun`**
-(handoff v3; rot-drill fix + support ticket filed).
+Updated **2026-09-17 (~04:30 UTC)** · session **`arena/01a0ad18-dhun`**
+(handoff v3; rot-drill fix: rename attempt 3 after support ticket).
 
-**GitHub evidence (verified live):** `origin/main` =
-`78b16ad` — chain this session: PR #78 (delete, `df6a0be`), PR
-#79 (restore, `56324f5`), PR #80 (verdict+ticket draft, `c8b6b83`),
-PR #81 (remove ticket file from repo per user request).
-Post-merge CI on `78b16ad`: build-and-test / Build APK / CI /
-test-release all green; rolling `test` republished at exactly
-`78b16ad` (all four assets uploaded). The phantom 0-job push run
-35176591866 fired on the #81 merge (expected — entry 348098190 is
-still wedged). PR #54 open (contingency reference, kept). Remote
-branches: `main`, `arena/01a0890b-dhun` (PR #54),
-`arena/01a08455-dhun` (+3), `arena/01a08676-dhun` (+3) — kept per
-`ahead_by > 0` rule (their 3 ahead commits each are 09-09/09-10
-docs snapshots superseded by the 09-16 re-baseline but no
-instruction to override the rule). All session branches
-(`arena/01a0ad18-dhun-delete`, `-restore`, `-ticket`,
-`-remove-ticket-file`, plus the prior-session leftovers
-`arena/01a0acb6-dhun` / `-rereg`) have been deleted
-(`ahead_by == 0` verified).
+**GitHub evidence (pre-rename, verified live):** `origin/main` =
+`563f78a` — chain this session: PR #78 (delete), PR #79 (restore),
+PR #80 (verdict+ticket), PR #81 (remove ticket file per request),
+PR #82 (ticket-submitted), PR #83 (branch hygiene delete stale +3).
+Post-merge CI on `563f78a`: build-and-test / Build APK / CI /
+test-release all green; rolling `test` republished at `563f78a`
+(~04:16 UTC; all four assets). Phantom 0-job push run 35180648311
+fired on the #83 merge (expected — entry 348098190 still wedged).
+PR #54 open (contingency reference, kept). Remote branches:
+`main`, `arena/01a0890b-dhun` (PR #54) — stale +3 branches
+deleted this session. All session + prior-session fully-merged
+branches deleted (`ahead_by == 0` verified or content superseded).
 
-**S1 fix attempts — both failed; support ticket submitted by user:**
-- **Attempt 1 (comment-only, PR #77 = `3ff3a55`, 2026-09-17 01:03 UTC):**
+**S1 fix attempts:**
+- **Attempt 1** (comment-only, PR #77 = `3ff3a55`, 01:03 UTC):
   entry 348098190 untouched; phantom run 35171317970.
-- **Attempt 2 (delete + verbatim re-add, PR #78/#79,
-  ~02:20 UTC):** delete briefly dropped the entry for ~90 s, but
-  GitHub reattached the same id 348098190 when the file
-  reappeared (keyed by file path); phantom run 35174080320.
-- **Support ticket SUBMITTED by the user (2026-09-17 ~03:15 UTC)**
-  via GitHub Support's Actions contact page. GitHub's diagnostic
-  page confirmed the diagnosis ("stale or corrupted workflow
-  registration", "no self-service endpoint for forcing a clean
-  re-registration"). Request: server-side re-sync of workflow id
-  348098190 (or deletion so the next push re-creates it fresh).
-  Ticket text was provided inline in the agent chat session and
-  is NOT stored in the repo (PR #81 removed the earlier committed
-  draft per user request).
+- **Attempt 2** (delete + same-path re-add, PRs #78/#79, ~02:20 UTC):
+  delete dropped entry ~90 s but GitHub reattached the SAME wedged
+  id 348098190 by file path; phantom run 35174080320.
+- **Support ticket SUBMITTED** by the user (~03:15 UTC) via GitHub
+  Support Actions. GitHub diagnostic page confirmed "stale/
+  corrupted registration — no self-service fix". Request: re-sync
+  id 348098190 (or delete it). Ticket text provided inline in chat
+  (not committed to repo; PR #81 removed the draft).
+- **Attempt 3 (rename to new file path, THIS PR):** rename
+  `rot-drill.yml` → `rot-drill-daily.yml`. The wedge was keyed to
+  the exact path; a new path MUST register as a new workflow id
+  (same mechanism that made attempt 2 reattach). Workflow `name:`,
+  triggers (`schedule '17 4 * * *'` + `workflow_dispatch`),
+  permissions, concurrency group (`rot-drill`), jobs unchanged.
+  Old orphaned id 348098190 stays tied to deleted path and will
+  age out.
 
-**Last error:** file-level re-registration cannot evict entry
-348098190; awaiting GitHub Support response. No local tests were
-run (no JDK — CI is the compiler); no hardware claims.
+**Last error:** attempts 1 and 2 failed to evict entry 348098190;
+executing rename (attempt 3) while support ticket is filed. No
+local tests were run (no JDK — CI is the compiler); no hardware
+claims.
 
-**Next steps (sequential):**
-1. **Await GitHub Support response** on workflow 348098190. While
-   waiting, every push to `main` will continue to fire a phantom
-   0-job push run on the wedged entry — ignore those, they are
-   not verdicts. Avoid further edits to
-   `.github/workflows/rot-drill.yml` (file changes are stopped per
-   plan step 5).
-2. After support resets/removes the entry:
-   - Verify `gh workflow list` shows a workflow named `rot-drill`
-     (not the file path) with a new id.
-   - User confirms the Actions UI shows the entry and clicks **Run
-     workflow** on `main`.
-   - Agent watches the probe job (≈5–12 min) and records the
-     verdict in `docs/verification/14-release.md` — green = #14
-     auto-closes, S1 done → S2; red with `LOGIN_REQUIRED` =
-     datacenter-IP gating (check T1/T2 — neither fires on a single
-     datacenter red).
-3. If support cannot fix it, escalate to plan B (a replacement
-   workflow file under a different filename, e.g.
-   `rot-drill-v2.yml`) — separate decision at that time.
-4. Contingency PR #54 (PO-token/InnerTubeX research) remains open;
-   its "test-ping (delete me)" comment cannot be removed by agent
-   tokens (403), that's a user-optional cleanup.
-5. Stale unmerged branches `arena/01a08455-dhun` and
-   `arena/01a08676-dhun` DELETED this session (2026-09-17 ~03:35
-   UTC): their ahead-commits were 09-09/09-10 docs snapshots fully
-   superseded by the 09-16 re-baseline (ROADMAP/KNOWN_LIMITATIONS
-   rewrites) and PR #54's research file; no open PRs referenced
-   them.
+**Exact next step (this PR = rename attempt 3):**
+1. THIS PR renames `.github/workflows/rot-drill.yml` →
+   `.github/workflows/rot-drill-daily.yml` (header comment only
+   changed; triggers/jobs unchanged). CI green → merge →
+   same-turn verify:
+   - **NEW** workflow id in `gh workflow list` (≠ 348098190).
+   - Name = `rot-drill` (NOT file path; NOT `rot-drill-daily.yml`).
+   - State active; path = `.github/workflows/rot-drill-daily.yml`.
+   - **NO** phantom 0-job push run on the new entry for this merge
+     (fresh registrations don't carry decayed triggers).
+   - Old entry 348098190 remains (orphaned) — expected; ignore.
+2. If rename works: user confirms Actions UI shows the new
+   `rot-drill` entry and clicks Run-workflow on `main` → probe
+   ≈5–12 min = live verdict. Ask support to close ticket as
+   "resolved by rename".
+3. If rename ALSO wedges (new entry path-as-name or phantom runs):
+   stop file changes; await support (ticket already filed).
+4. After a green live probe (rename or support reset): agent
+   watches the probe job and records the verdict line in
+   `docs/verification/14-release.md` — green = #14 auto-closes,
+   S1 done → S2; red with `LOGIN_REQUIRED` = datacenter-IP gating
+   (check T1/T2).
+5. Standing notes:
+   - Contingency PR #54 (PO-token/InnerTubeX research) open; its
+     "test-ping (delete me)" comment cannot be removed by agent
+     tokens (403) — user-optional cleanup.
 
 S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`) and S6
 (soaks, clean installs, signing decisions, tag, explicit go-ahead)
-remain user-gated; nothing in this session authorizes a tag or a stable
-release. Work stays sequential; one asserted patch per file per block,
-marker verification, full diff review against main before every push.
+remain user-gated; nothing in this session authorizes a tag or a
+stable release. Work stays sequential; one asserted patch per file
+per block, marker verification, full diff review against main
+before every push.
 
 ---
+
 
 ## Re-baseline record (2026-09-16 — why this file was rewritten)
 
