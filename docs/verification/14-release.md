@@ -18,7 +18,7 @@
 > when the file reappeared (keyed by file path), phantom push run
 > 35174080320 fired. File changes to `rot-drill.yml` are stopped.
 > **Next step: GitHub support ticket** (copy-paste draft at
-> `docs/support/2026-09-17-rot-drill-workflow-348098190.md`). The
+> the 2026-09-17 agent chat session (ticket text not stored in repo per user preference)). The
 > push-triggered "red rot-drill" runs are 0-job noise (the file
 > never had a `push:` trigger), not verdicts — see
 > `.ai/KNOWN_LIMITATIONS.md` + `docs/runbooks/rot-drill.md`. The
