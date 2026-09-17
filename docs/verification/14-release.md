@@ -1,6 +1,6 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Status note (2026-09-17 ~05:50 UTC, Stage S1):** the body below is a
+> **Status note (2026-09-17 ~06:55 UTC, Stage S1):** the body below is a
 > point-in-time log whose merge chain ends at PR #32 (`862f0ac`,
 > 2026-09-07). It is kept verbatim as history. Current state:
 > `main@a27af74` (post-rename; post-merge
@@ -19,7 +19,8 @@
 > id 360227450 (old id now state:deleted) but ALSO wedged (name
 > stuck at file path; phantom push run 35186690348). The repo's
 > workflow registration is failing server-side even for fresh
-> ids; awaiting GitHub Support on the ticket filed ~03:15 UTC.
+> ids; awaiting GitHub Support on ticket **#4765894** (filed ~03:15
+> UTC, auto-receipt received ~06:50 UTC).
 > All workflow file changes STOPPED. The
 > push-triggered "red rot-drill" runs are 0-job noise (the file
 > never had a `push:` trigger), not verdicts — see
