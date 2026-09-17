@@ -1,0 +1,138 @@
+name: rot-drill
+
+# Daily extraction health check against live YouTube. This is intentionally
+# separate from pull-request CI: it exercises the networked Phase 01 probe
+# from a fresh runner and detects extractor rot within 24 hours.
+#
+# 2026-09-17 re-registration (attempt 2 — delete + verbatim re-add):
+# Attempt 1 (comment-only edit, PR #77 = 3ff3a55) FAILED to touch the
+# wedged registry entry (id 348098190; name stuck at the file path,
+# updated_at frozen, phantom 0-job push runs on every push). PR A
+# (#78) deleted this file to force GitHub to drop that entry; this PR
+# restores the file verbatim from 3ff3a55 so a fresh workflow id is
+# created. Triggers and jobs are UNCHANGED.
+#
+# Original decay context: since the 2026-09-07 edit (da9d779) the
+# workflow's registry entry decayed — the Actions UI lost the
+# workflow, the registry name showed the file path, the 04:17 UTC
+# schedule stopped firing (≥10 missed windows 09-08..09-17), and
+# phantom 0-job push runs appeared on every push although no version
+# of this file ever declared a push trigger. Details:
+# docs/runbooks/rot-drill.md "Observed anomalies".
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: rot-drill
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Record environment and install extractors
+        run: |
+          {
+            echo "=== ROT-DRILL ENVIRONMENT ==="
+            echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "Runner: $(uname -s) $(uname -r) $(uname -m)"
+            echo "Java: $(java -version 2>&1 | head -n 1)"
+            echo "Python: $(python3 --version 2>&1)"
+          } 2>&1 | tee rot-drill.log
+          python -m pip install --upgrade pip yt-dlp 2>&1 | tee -a rot-drill.log
+          echo "Installed yt-dlp: $(yt-dlp --version 2>&1 || echo 'failed')" | tee -a rot-drill.log
+
+      - name: Run playback probes (offline + live)
+        id: probe
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          echo "=== 1. DETERMINISTIC OFFLINE PROBE (ADR-006) ===" | tee -a rot-drill.log
+          ./gradlew :tools:playback-probe:offlineProbe --no-daemon --console=plain 2>&1 | tee -a rot-drill.log
+          echo "=== 2. LIVE EXTRACTION AND STREAM PROBE ===" | tee -a rot-drill.log
+          ./gradlew :tools:playback-probe:run --no-daemon --console=plain 2>&1 | tee -a rot-drill.log
+
+      - name: Upload probe log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rot-drill-${{ github.run_id }}
+          path: rot-drill.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Open or update a rot-drill issue
+        if: steps.probe.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="rot-drill-${GITHUB_RUN_ID}"
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          cat <<EOF > issue_body.md
+rot-drill failed on ${GITHUB_SHA}
+
+Run: ${run_url}
+Trigger: ${GITHUB_EVENT_NAME}
+
+The attached \`${artifact}\` artifact contains the full engine-version + Gradle/probe log.
+
+### Last probe output:
+\`\`\`
+EOF
+
+          tail -c 12000 rot-drill.log >> issue_body.md
+
+          cat <<EOF >> issue_body.md
+\`\`\`
+
+> *Note: If errors indicate bot-gating / IP challenge (\`LOGIN_REQUIRED\` / \`Sign in to confirm you’re not a bot\`), GitHub runner datacenter IPs may be gated by YouTube while residential IPs remain unaffected. Verify residential playback independently.*
+EOF
+
+          open_issue=$(gh issue list --state open --limit 1 --search 'rot-drill in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$open_issue" ]; then
+            gh issue comment "$open_issue" -F issue_body.md
+          else
+            gh issue create \
+              --title "[rot-drill] Live extraction probe failed" \
+              -F issue_body.md
+          fi
+
+      - name: Close a recovered rot-drill issue
+        if: steps.probe.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          open_issue=$(gh issue list --state open --limit 1 --search 'rot-drill in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$open_issue" ]; then
+            gh issue comment "$open_issue" --body "rot-drill recovered on ${GITHUB_SHA}. Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            gh issue close "$open_issue" --comment "Closed automatically after a green live probe."
+          fi
+
+      - name: Fail the workflow after alerting
+        if: steps.probe.outcome == 'failure'
+        run: exit 1

@@ -68,14 +68,23 @@ nothing direct-to-main:**
 PR #77) failed to touch registry entry 348098190. No local tests
 were run (no JDK — CI is the compiler); no hardware claims.
 
-**Exact next step (in order, this PR = PR A "delete"):**
-1. THIS PR (PR A): delete `rot-drill.yml` + docs updates → CI green
-   → merge → same-turn verify entry 348098190 is removed and check
-   for phantom push run on the merge.
-2. PR B (restore) on a new branch, verbatim file + one comment line
-   → CI green → merge → same-turn verify new workflow id, name
-   `rot-drill`, no phantom push run.
-3. Wait for user Run-workflow click → live verdict → PR C.
+**PR A "delete" (PR #78) MERGED 2026-09-17 ~02:35 UTC** — merge SHA
+`df6a0be`. Same-turn verification:
+- ✅ Entry 348098190 is GONE from `gh workflow list` (wedged entry
+  successfully dropped by the delete).
+- ✅ NO phantom 0-job push run fired on the delete merge (last
+  phantom on the old entry is still 35171317970 from PR #77).
+- ✅ Post-merge CI green across all four remaining workflows
+  (Build APK, CI, dev-release, test-release).
+
+**Exact next step (in order, this PR = PR B "restore"):**
+1. THIS PR (PR B): restore `rot-drill.yml` verbatim from `3ff3a55`
+   (+ one comment block documenting the delete/re-add; diff vs
+   `3ff3a55` verified comment-only) → CI green → merge → same-turn
+   verify NEW workflow id, name `rot-drill`, state active, NO
+   phantom 0-job push run on this merge.
+2. Wait for user Run-workflow click (button must be back in UI) →
+   live verdict (probe ≈5–12 min) → PR C.
 
 S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`) and S6
 (soaks, clean installs, signing decisions, tag, explicit go-ahead)
