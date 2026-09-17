@@ -1,25 +1,29 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Status note (2026-09-17 ~02:30 UTC, Stage S1):** the body below is a
+> **Status note (2026-09-17 ~02:45 UTC, Stage S1):** the body below is a
 > point-in-time log whose merge chain ends at PR #32 (`862f0ac`,
 > 2026-09-07). It is kept verbatim as history. Current state:
-> `main@3ff3a55` (PR #77 merged 2026-09-17 01:03 UTC; post-merge CI
-> green across all four workflows; rolling `test` republished at
-> exactly `3ff3a55`); Phases 01–16 code-merged with hardware gates
-> open; S4/S5 code merged (PR #74); completion tracked as Stages
-> S1–S6 in `.ai/ROADMAP.md`. No v0.1.0 tag/release exists. The
-> rot-drill schedule has been silent since 2026-09-07 04:28 UTC
-> (≥10 missed 04:17 windows) and the workflow is **absent from the
-> Actions UI entirely** while registry-active on the wedged entry
-> (id 348098190). Re-registration attempt 1 (comment-only edit, PR
-> #77) FAILED (entry 348098190 untouched). Attempt 2 (delete +
-> verbatim re-add, PR A / PR B) in progress at time of writing;
-> support ticket is fallback. The push-triggered "red rot-drill"
-> runs are 0-job noise (the file never had a `push:` trigger), not
-> verdicts — see `.ai/KNOWN_LIMITATIONS.md` +
-> `docs/runbooks/rot-drill.md`. The next verdict line lands below
-> in "Live evidence log → Rot-drill" once a live run exists on the
-> fresh workflow id.
+> `main@56324f5` (PR #79 merged 2026-09-17 ~02:21 UTC; post-merge
+> CI green across Build APK / CI / test-release; rolling `test`
+> republished at exactly `56324f5`, all four assets); Phases 01–16
+> code-merged with hardware gates open; S4/S5 code merged (PR
+> #74); completion tracked as Stages S1–S6 in `.ai/ROADMAP.md`. No
+> v0.1.0 tag/release exists. The rot-drill schedule has been
+> silent since 2026-09-07 04:28 UTC (≥10 missed 04:17 windows)
+> and the workflow is **absent from the Actions UI entirely**
+> while registry-active on the wedged entry (id 348098190).
+> **Both file-level re-registration attempts FAILED:** (1)
+> comment-only edit PR #77 — entry untouched; (2) delete + verbatim
+> re-add PRs #78/#79 — GitHub reattached the SAME wedged id 348098190
+> when the file reappeared (keyed by file path), phantom push run
+> 35174080320 fired. File changes to `rot-drill.yml` are stopped.
+> **Next step: GitHub support ticket** (copy-paste draft at
+> `docs/support/2026-09-17-rot-drill-workflow-348098190.md`). The
+> push-triggered "red rot-drill" runs are 0-job noise (the file
+> never had a `push:` trigger), not verdicts — see
+> `.ai/KNOWN_LIMITATIONS.md` + `docs/runbooks/rot-drill.md`. The
+> verdict line below lands after support resets the entry and a
+> live probe run exists.
 
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
 RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**

@@ -12,23 +12,34 @@ Updated every phase. Nothing hidden.
   on the PR #77 merge, and the Actions UI still has no `rot-drill`
   entry / Run-workflow button (user-confirmed 2026-09-17). The entry
   ignores file-content changes.
-- **Fix plan approved by user: delete-then-restore** (PR A = delete,
-  PR B = verbatim re-add + one comment line). The goal is to force
-  GitHub to drop entry 348098190 and create a fresh workflow id on
-  re-add, which should (a) restore the name to `rot-drill`, (b)
-  restore the Actions UI entry and Run-workflow button, (c) stop
-  phantom 0-job push runs (a fresh entry does not carry the decayed
-  push trigger), and (d) re-arm the daily 04:17 UTC schedule. Agent
-  tokens cannot disable/enable workflows (`gh workflow enable`/
-  `disable` returns 403), so a file-level delete+re-add is the only
-  agent-accessible re-registration vector.
-- **Fallback (if PR B's fresh entry also wedges):** stop file
-  changes and file a GitHub support ticket (draft in
-  `docs/runbooks/rot-drill.md`; workflow id 348098190; last
-  scheduled run 34083253658; 10 missed windows 09-08 → 09-17;
-  absent from UI but `state: active`; phantom 0-job push runs on
-  every push despite no `push:` trigger; decay began around the
-  2026-09-07 06:17 edit `da9d779`).
+- **Fix plan executed: delete-then-restore** (PR A = delete (#78),
+  PR B = verbatim re-add (#79)). **ATTEMPT 2 FAILED.** PR A briefly
+  dropped entry 348098190 from `gh workflow list` (~90 s), but when
+  PR B re-added the file (verbatim from `3ff3a55` plus one updated
+  comment block; triggers/jobs unchanged, verified by direct
+  diff), GitHub reattached the SAME wedged registry id 348098190
+  keyed by file path — it did NOT create a fresh id. Name stayed
+  as `.github/workflows/rot-drill.yml` (not `rot-drill`), phantom
+  0-job push run 35174080320 fired on the PR B merge push, and the
+  Actions UI entry did not return. File-level fixes cannot evict
+  this entry. Agent tokens cannot disable/enable workflows
+  (`gh workflow enable`/`disable` returns 403) either.
+- **File changes to `.github/workflows/rot-drill.yml` STOPPED per
+  plan.** Next step: the repo owner submits a GitHub support
+  ticket (copy-paste ready draft in
+  `docs/support/2026-09-17-rot-drill-workflow-348098190.md` —
+  Subject + Body verbatim, to
+  https://support.github.com/contact?tags=rr-actions). Ticket
+  requests GitHub support force a clean re-registration (reset the
+  entry or delete it so the next push recreates it fresh).
+- **Re-registration summary for the ticket:** workflow id
+  348098190; last healthy scheduled run 34083253658 (2026-09-07
+  04:28 UTC); ≥10 missed windows 09-08 → 09-17; absent from UI
+  while `state: active`; registry name = file path, not `name:`
+  value; phantom 0-job push runs on every push since 09-07 05:56
+  UTC despite no `push:` trigger ever declared; decay began around
+  edit `da9d779` (2026-09-07 06:17 UTC); two fix attempts
+  (comment-only, delete+re-add) both failed.
 - **Merge-last directive #14 in effect:** merging ends the session's
   GitHub connection, so PR B (restore) must have its branch
   complete, diff-verified, and pushed BEFORE merging; same-turn

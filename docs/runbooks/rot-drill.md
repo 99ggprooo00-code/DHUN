@@ -7,23 +7,20 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-17 ~02:30 UTC): delete+re-add re-registration in progress
+## State (2026-09-17 ~02:45 UTC): both file-level fix attempts FAILED — GitHub support needed
 
 The Actions UI shows no `rot-drill` entry at all (no list entry, no
 Run-workflow button), while the REST registry still reports it
 `state: active` (workflow id **348098190**, name stuck at the file
-path). **Re-registration attempt 1 (comment-only edit, PR #77 =
-`3ff3a55`) FAILED** — the registry entry was untouched (name still
-file path, `updated_at` frozen 2026-09-16T23:57:41Z, phantom push
-run 35171317970 still fired). Attempt 2 (delete-then-restore,
-PR A = delete, PR B = verbatim re-add + one comment line;
-user-approved 2026-09-17) is in progress — after PR B merges, a
-fresh workflow id should exist with the correct name, UI entry, and
-no phantom push trigger. Fallback if attempt 2 also wedges: GitHub
-support ticket (see "Fix attempts" below). Until the fresh entry is
-confirmed, the UI path below does not exist — use the API path (any
-account with owner rights + a `workflow`-scoped PAT) or wait for
-re-registration.
+path). Both file-level re-registration attempts failed (see "Fix
+attempts" below). Per the user-approved plan, file changes to
+`rot-drill.yml` are STOPPED. The repo owner must submit the GitHub
+support ticket at
+`docs/support/2026-09-17-rot-drill-workflow-348098190.md` (Subject
++ Body copy-paste to https://support.github.com/contact?tags=rr-actions)
+asking GitHub to force a clean re-registration of entry 348098190.
+Until support resets the entry, the UI path below does not exist
+and the schedule will continue to miss windows.
 
 ## Dispatch
 
@@ -94,22 +91,27 @@ Verified against the full 189-run Actions history (GitHub API, session
      2026-09-16T23:57:41Z, phantom 0-job push run 35171317970
      fired on the merge push, Run-workflow button still absent
      (user-confirmed). The wedge ignores file-content changes.
-  2. **Delete + verbatim re-add (PR A delete / PR B restore,
-     ~02:30 UTC 2026-09-17, user-approved) — IN PROGRESS.**
-     Force GitHub to drop the wedged entry and create a fresh
-     workflow id on re-add. Goal: name = `rot-drill`, Actions UI
-     entry returns, phantom push runs stop, daily 04:17 UTC
-     schedule re-arms. Agent `workflow disable`/`enable` is 403,
-     so file-level delete+re-add is the only agent-accessible
-     re-registration vector.
-  3. **Fallback (if re-add also wedges):** GitHub support ticket —
-     repo `99ggprooo00-code/DHUN`, workflow id 348098190, last
-     scheduled run 34083253658 (2026-09-07 04:28 UTC), ≥10 missed
-     windows 09-08 → 09-17, phantom 0-job push runs on every push
-     since 09-07 05:56 UTC despite no `push:` trigger, decay began
-     around edit `da9d779` (2026-09-07 06:17 UTC). Request: force
-     re-registration or delete + clean re-creation of workflow
-     348098190.
+  2. **Delete + verbatim re-add (PR #78 = `df6a0be`, then PR #79
+     = `56324f5`, merged 2026-09-17 ~02:21 UTC) — FAILED.** The
+     delete briefly dropped entry 348098190 from `gh workflow
+     list` for ~90 s, but when the file was re-added (verbatim
+     from `3ff3a55` plus one updated comment block — triggers/
+     jobs UNCHANGED, verified by direct diff), GitHub reattached
+     the **same** wedged registry id 348098190 (keyed by file
+     path, not content). Name stayed as the file path (not
+     `rot-drill`), phantom 0-job push run 35174080320 fired on
+     the PR B merge push, and the Actions UI entry did not
+     return. File-level fixes cannot evict this entry. Agent
+     `workflow disable`/`enable` is also 403.
+  3. **GitHub support ticket (current step, 2026-09-17).** Copy-
+     paste ready draft at
+     `docs/support/2026-09-17-rot-drill-workflow-348098190.md`.
+     Submit Subject + Body verbatim to
+     https://support.github.com/contact?tags=rr-actions.
+     Request: force re-registration or delete + clean re-creation
+     of workflow 348098190. If support also cannot fix it, plan B
+     is a replacement workflow file under a new name (separate
+     decision post-response).
 - **0-job push runs are noise, not verdicts.** Every push since
   2026-09-07 05:56 UTC created a `rot-drill` run with `event: push`,
   **0 jobs**, `conclusion: failure`, `failure_reason: null` — although
