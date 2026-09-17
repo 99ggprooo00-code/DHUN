@@ -66,9 +66,12 @@ run (no JDK — CI is the compiler); no hardware claims.
 4. Contingency PR #54 (PO-token/InnerTubeX research) remains open;
    its "test-ping (delete me)" comment cannot be removed by agent
    tokens (403), that's a user-optional cleanup.
-5. Stale unmerged branches `arena/01a08455-dhun` (+3) and
-   `arena/01a08676-dhun` (+3) remain until an explicit directive
-   to override the `ahead_by > 0` rule.
+5. Stale unmerged branches `arena/01a08455-dhun` and
+   `arena/01a08676-dhun` DELETED this session (2026-09-17 ~03:35
+   UTC): their ahead-commits were 09-09/09-10 docs snapshots fully
+   superseded by the 09-16 re-baseline (ROADMAP/KNOWN_LIMITATIONS
+   rewrites) and PR #54's research file; no open PRs referenced
+   them.
 
 S3 device evidence (`docs/runbooks/s3-hardware-checklist.md`) and S6
 (soaks, clean installs, signing decisions, tag, explicit go-ahead)

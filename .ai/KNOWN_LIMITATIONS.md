@@ -73,11 +73,12 @@ Updated every phase. Nothing hidden.
 - **Branch cleanup (user request, executed 2026-09-17):** 17
   fully-merged remote branches deleted (each verified `ahead_by == 0`
   vs `main` via the compare API); kept `main`, `arena/01a0890b-dhun`
-  (open PR #54), the session branch, and unmerged-unknowns
-  `arena/01a08455-dhun` (+3, 2026-09-09 docs commits) and
-  `arena/01a08676-dhun` (+3, 2026-09-10 docs commits; PR #53's
-  branch) — superseded by the re-baseline/PR #54 but kept per the
-  ahead>0 rule. Remote branches 21 → 4.
+  (open PR #54) and the session branch. Stale unmerged branches
+  `arena/01a08455-dhun` (+3) and `arena/01a08676-dhun` (+3) were
+  deleted 2026-09-17 ~03:35 UTC — their ahead commits (09-09/09-10
+  docs snapshots + an early extraction-auth research draft) were
+  fully superseded by the 09-16 re-baseline and PR #54; no open
+  PRs referenced them. Remote branches 21 → 2 (main + PR #54).
 - **Lost commit 771552a:** the previous session's unpushed post-merge
   docs commit never reached GitHub (this fresh clone has no trace);
   its content is restated in handoff v2 and re-applied by this
