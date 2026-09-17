@@ -99,7 +99,7 @@ also cannot `workflow disable/enable` (403) or delete the
 registry entry by API.
 
 **THIS PR (PR C / "ticket" PR):**
-- Adds `docs/support/2026-09-17-rot-drill-workflow-348098190.md` —
+- Adds the 2026-09-17 agent chat session (ticket text not stored in repo per user preference) —
   ready-to-submit GitHub Support ticket (copy Subject + Body
   verbatim to https://support.github.com/contact → Actions).
 - Updates ROADMAP (this section), KNOWN_LIMITATIONS, runbook
@@ -111,7 +111,7 @@ registry entry by API.
 **Exact next step (user action):**
 1. Review + merge this PR (routine green-CI merge).
 2. **Submit the GitHub support ticket** from
-   `docs/support/2026-09-17-rot-drill-workflow-348098190.md` (copy
+   the 2026-09-17 agent chat session (ticket text not stored in repo per user preference) (copy
    Subject + Body into the support form). Paste the ticket URL /
    case number back to the agent.
 3. After support resets the registration, the agent (next session)

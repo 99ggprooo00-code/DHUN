@@ -27,7 +27,7 @@ Updated every phase. Nothing hidden.
 - **File changes to `.github/workflows/rot-drill.yml` STOPPED per
   plan.** Next step: the repo owner submits a GitHub support
   ticket (copy-paste ready draft in
-  `docs/support/2026-09-17-rot-drill-workflow-348098190.md` —
+  the 2026-09-17 agent chat session (ticket text not stored in repo per user preference) —
   Subject + Body verbatim, to
   https://support.github.com/contact?tags=rr-actions). Ticket
   requests GitHub support force a clean re-registration (reset the

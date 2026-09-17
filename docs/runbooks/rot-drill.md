@@ -16,7 +16,7 @@ path). Both file-level re-registration attempts failed (see "Fix
 attempts" below). Per the user-approved plan, file changes to
 `rot-drill.yml` are STOPPED. The repo owner must submit the GitHub
 support ticket at
-`docs/support/2026-09-17-rot-drill-workflow-348098190.md` (Subject
+the 2026-09-17 agent chat session (ticket text not stored in repo per user preference) (Subject
 + Body copy-paste to https://support.github.com/contact?tags=rr-actions)
 asking GitHub to force a clean re-registration of entry 348098190.
 Until support resets the entry, the UI path below does not exist
@@ -105,7 +105,7 @@ Verified against the full 189-run Actions history (GitHub API, session
      `workflow disable`/`enable` is also 403.
   3. **GitHub support ticket (current step, 2026-09-17).** Copy-
      paste ready draft at
-     `docs/support/2026-09-17-rot-drill-workflow-348098190.md`.
+     the 2026-09-17 agent chat session (ticket text not stored in repo per user preference).
      Submit Subject + Body verbatim to
      https://support.github.com/contact?tags=rr-actions.
      Request: force re-registration or delete + clean re-creation
