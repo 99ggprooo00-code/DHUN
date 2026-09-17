@@ -1,23 +1,24 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-17 (~16:00 UTC)** · session **`arena/01a0aff7-dhun`** · main `3c593fb`
+Updated **2026-09-17 (~16:15 UTC)** · session **`arena/01a0aff7-dhun`** · main `ef9844d`
 (Fable 5.6 key provided; AI DJ rejected — "No need that").
 
-**GitHub evidence (live, this session, post-PR #88 merge):**
-- `origin/main` = `3c593fb` (PR #88 merged ~15:40 UTC)
-- Workflows: **360655315 `extraction-health` `.github/workflows/extraction-health.yml` active, name=extraction-health (HEALTHY)**
-- Old wedged: 360227450 `rot-drill-daily.yml` active but name=file path (wedged), phantom 0-job push run 35241808266 on 3c593fb merge (expected noise)
-- Build APK run 35241809437 success 2m46s, CI 35241809608 success 5m23s, test-release 35241809594 success 6m33s, rolling test republished 15:46:15Z apk / 15:47:22Z msi all four assets
-- Support ticket #4765894 still pending but workaround succeeded — new file bypassed corruption
-- Branch `arena/01a0aff7-dhun` now at 3c593fb + cleanup docs (this commit)
+**GitHub evidence (live, post-PR #89 merge ef9844d):**
+- `origin/main` = `ef9844d` (PR #89 merged ~16:00 UTC) — cleanup of wedged file
+- Workflows: **360655315 `extraction-health` `.github/workflows/extraction-health.yml` active, name=extraction-health (HEALTHY)** — ONLY 5 workflows now: CI, Build APK, test-release, dev-release (orphaned), extraction-health. Old wedged 360227450 `rot-drill-daily.yml` GONE from `gh workflow list` (orphaned by delete).
+- Main CI on ef9844d: Build APK 35243865335 success, CI 35243865297 success, test-release 35243865257 success (all ~16:00-16:13 UTC). **No phantom 0-job push run on this merge** — proves extraction-health healthy (previous merge 3c593fb had phantom 35241808266 from old wedged file, now gone).
+- Rolling test republished 16:06:13Z apk 17948508 / 16:13:42Z msi 112852992 all four assets (verified via release API).
+- Support ticket #4765894 still pending but workaround succeeded — new file bypassed corruption, old file orphaned.
+- Branch `arena/01a0aff7-dhun` at ef9844d (fast-forwarded to main), clean.
 
-**Attempt 4 SUCCESS:** extraction-health.yml registered with correct name, no phantom push. This proves previous wedge was path-specific corruption (rot-drill* paths), not global repo breakage. Old file `rot-drill-daily.yml` can now be deleted to orphan 360227450.
+**Attempt 4 + cleanup SUCCESS:**
+- extraction-health.yml registered with correct name, no phantom push on either merge (3c593fb had no phantom from new file, only old file; ef9844d has zero phantom).
+- Old wedged rot-drill-daily.yml deleted, its id 360227450 no longer active — orphaned.
 
 **Exact next steps:**
-1. **User action required:** go to Actions → `extraction-health` → Run workflow on main (agent 403). Record live verdict in `docs/verification/14-release.md` + `DEBUG_LOG` → S1 close → update issue #14.
-2. **Cleanup PR (this session):** delete `.github/workflows/rot-drill-daily.yml` (orphans 360227450), push + PR + CI green + merge → verify `gh workflow list` no longer shows rot-drill-daily active, only extraction-health healthy.
-3. **S2 unblock:** after S1 live GREEN, proceed to architectural cleanup (dead harness UI, PR #53/#54 hygiene, docs index).
-4. **Fable key:** sandbox egress blocked (SSL_ERROR_SYSCALL, only api.github.com reachable). Key NOT committed. User rejected AI DJ surface — code reverted, working tree clean. Continuation is S1–S6 per MASTER_PROMPT, not new AI product.
+1. **User action required (S1 exit):** Actions → `extraction-health` → Run workflow on main (agent 403). Record live verdict in `docs/verification/14-release.md` + `DEBUG_LOG` → S1 close → update issue #14 → S2 unblock.
+2. **S2:** architectural cleanup (dead harness UI, PR #54 hygiene, docs index) after S1 GREEN.
+3. **Fable key:** sandbox egress blocked (SSL_ERROR_SYSCALL, only api.github.com reachable). Key NOT committed. AI DJ surface reverted per user "No need that". Continuation is S1–S6.
 
 No secret committed, no JDK local (CI is compiler), no AI surface shipped.
 
