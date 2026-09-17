@@ -2,6 +2,43 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-17 (~02:30 UTC) — S1 delete+re-add fix after attempt-1 failure (`arena/01a0ad18-dhun`, handoff v3)
+
+- **Re-registration attempt 1 (comment-only edit, PR #77 = `3ff3a55`)
+  FAILED.** The comment-only change to `rot-drill.yml` did not
+  re-register the wedged workflow: registry entry **348098190** still
+  shows name as the file path (not `rot-drill`), `updated_at` frozen
+  at 2026-09-16T23:57:41Z, phantom 0-job push run 35171317970 fired
+  on the PR #77 merge, and the Actions UI still has no `rot-drill`
+  entry / Run-workflow button (user-confirmed 2026-09-17). The entry
+  ignores file-content changes.
+- **Fix plan approved by user: delete-then-restore** (PR A = delete,
+  PR B = verbatim re-add + one comment line). The goal is to force
+  GitHub to drop entry 348098190 and create a fresh workflow id on
+  re-add, which should (a) restore the name to `rot-drill`, (b)
+  restore the Actions UI entry and Run-workflow button, (c) stop
+  phantom 0-job push runs (a fresh entry does not carry the decayed
+  push trigger), and (d) re-arm the daily 04:17 UTC schedule. Agent
+  tokens cannot disable/enable workflows (`gh workflow enable`/
+  `disable` returns 403), so a file-level delete+re-add is the only
+  agent-accessible re-registration vector.
+- **Fallback (if PR B's fresh entry also wedges):** stop file
+  changes and file a GitHub support ticket (draft in
+  `docs/runbooks/rot-drill.md`; workflow id 348098190; last
+  scheduled run 34083253658; 10 missed windows 09-08 → 09-17;
+  absent from UI but `state: active`; phantom 0-job push runs on
+  every push despite no `push:` trigger; decay began around the
+  2026-09-07 06:17 edit `da9d779`).
+- **Merge-last directive #14 in effect:** merging ends the session's
+  GitHub connection, so PR B (restore) must have its branch
+  complete, diff-verified, and pushed BEFORE merging; same-turn
+  post-merge checks happen in the same turn as the merge.
+- **Still agent-403 (re-verified handoff v3):** `workflow_dispatch`,
+  workflow disable/enable, issue comments. Agent CAN push, open PRs,
+  merge routine green PRs, and delete fully-merged branches. User
+  can click Merge on PRs and one Run-workflow button click once the
+  UI returns.
+
 ## 2026-09-17 — S1 continuation: UI absence, revised dispatch path, branch cleanup (`arena/01a0acb6-dhun`)
 
 - **Rot-drill is absent from the Actions UI entirely** (user report
