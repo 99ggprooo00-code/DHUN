@@ -10,7 +10,9 @@
 
 **Verification boundary.** No application code or extraction semantics changed in this handoff. The sandbox has no JDK/Android SDK/adb, so no local Gradle test ran; the only local check for this docs reconciliation is `git diff --check`. Hardware playback, live Home pagination, visuals, and soaks remain unverified.
 
-**Next action.** The reconciled docs are pushed as `a97138b` in PR #91; finish its CI verification, then obtain and record the live `extraction-health` result before doing S2 cleanup. PR #91 must not be merged without explicit user instruction.
+**Verification.** PR #91 head `4df37ca` is CI-verified: CI runs **35296973696** and **35296970878**, Build APK **35296973755**, and test-release **35296973590** all pass. The PR remains open and unmerged.
+
+**Next action.** Obtain and record the live `extraction-health` result before doing S2 cleanup. PR #91 must not be merged without explicit user instruction.
 
 ## 2026-09-16 — the new desktop-test gate immediately finds 3 latent failures from PR #47 (`arena/01a0aa8e-dhun`)
 
