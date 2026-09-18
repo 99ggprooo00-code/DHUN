@@ -10,7 +10,7 @@
 
 **Verification boundary.** No application code or extraction semantics changed in this handoff. The sandbox has no JDK/Android SDK/adb, so no local Gradle test ran; the only local check for this docs reconciliation is `git diff --check`. Hardware playback, live Home pagination, visuals, and soaks remain unverified.
 
-**Next action.** Push the reconciled docs on `arena/01a0b224-dhun`, open the single session PR, then obtain and record the live `extraction-health` result before doing S2 cleanup.
+**Next action.** The reconciled docs are pushed as `a97138b` in PR #91; finish its CI verification, then obtain and record the live `extraction-health` result before doing S2 cleanup. PR #91 must not be merged without explicit user instruction.
 
 ## 2026-09-16 — the new desktop-test gate immediately finds 3 latent failures from PR #47 (`arena/01a0aa8e-dhun`)
 

@@ -1,22 +1,22 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-18 01:48 UTC** · session **`arena/01a0b224-dhun`** · `main`/`origin/main` `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`.
+Updated **2026-09-18 01:50 UTC** · session **`arena/01a0b224-dhun`** · `main`/`origin/main` `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`.
 
 **Phase/status:** Stage **S1 — restore the maintenance contract**. Application-code work is paused; S2 cleanup and extraction changes remain blocked until a fresh live `extraction-health` verdict is produced on current `main`.
 
-**Exact files/task currently being worked on:** docs-only S1 handoff across `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`, `docs/runbooks/rot-drill.md`, and `docs/verification/14-release.md`; all five files reconcile the live `main@33e94b0` state and the missing `extraction-health` verdict. No application files are being changed.
+**Exact files/task currently being worked on:** the five-file docs-only S1 handoff is committed as `a97138b` and pushed on `arena/01a0b224-dhun`; PR **#91** is open while its CI checks run. No application files are being changed.
 
 **GitHub state verified live (2026-09-18 01:32 UTC):**
-- Local tree was clean at boot; local `arena/01a0b224-dhun` and `origin/main` both point to `33e94b0`. The assigned session branch is **not present on origin**, so there is no session PR. The only open PR is #54, research-only contingency material; it is not an implementation dependency.
+- `origin/main` remains `33e94b0`; `origin/arena/01a0b224-dhun` is now `a97138b`. PR **#91** is the single session PR and is open; PR #54 remains the separate research-only contingency PR.
 - Main checks at `33e94b0`: CI **35246193151** PASS, Build APK **35246193174** PASS, and test-release **35246193097** PASS. The rolling `test` tag and release target `33e94b0`; APK/MSI plus both `.sha256` assets are present (APK 17,948,508 B; MSI 112,852,992 B).
 - Workflow **`extraction-health`**, id **360655315**, is active and correctly registered from `.github/workflows/extraction-health.yml`. It has **no run yet**. The former wedged `rot-drill-daily.yml` entry is gone from the registry; the orphaned `dev-release` registry entry remains unrelated.
 - Issue #14 remains OPEN. The latest actual live extraction failure is run **34083253658** (scheduled 2026-09-07, `main@d1e0408`): metadata/search/related passed, the production chain and yt-dlp reported bot-gated `AuthRequired`, NewPipe remained a non-fatal parse watch, and the probe verdict was FAIL; no newer live verdict exists. Zero-job push failures are not extraction evidence.
 
 **Last actual error:** no local build/test error (no local JDK); the last actual live error is the stale run **34083253658** above. The current S1 blocker is **absence of a fresh verdict**, not a new code failure.
 
-**Evidence state:** main changes are pushed, merged through PR #90, CI-verified, and released to rolling `test`; this session's five-file docs handoff is complete locally but has no commit, push, PR, or CI result yet. No hardware verification is claimed.
+**Evidence state:** main changes are pushed, merged through PR #90, CI-verified, and released to rolling `test`; this session's docs handoff is committed/pushed as `a97138b` and tracked by PR #91. PR checks are currently pending/in progress; no hardware verification is claimed.
 
-**Exact next technical step and blocker:** run the documentation checks, commit all five reconciled files, push `arena/01a0b224-dhun`, open one PR, and request the live `extraction-health` run on `main`. The agent cannot dispatch workflows (`HTTP 403`); the user must click **Actions → extraction-health → Run workflow** or let the next scheduled window run. S1 cannot close, and S2 cannot begin, until that run produces an artifact and a recorded GREEN/RED verdict.
+**Exact next technical step and blocker:** finish CI verification on PR #91, fix only any CI failure if one appears, then request the live `extraction-health` run on `main`. The agent cannot dispatch workflows (`HTTP 403`); the user must click **Actions → extraction-health → Run workflow** or let the next scheduled window run. S1 cannot close, and S2 cannot begin, until that run produces an artifact and a recorded GREEN/RED verdict. Do not merge PR #91 without explicit instruction.
 
 ---
 
@@ -218,6 +218,7 @@ S1 → S2 → S3 → S6.
 |---|---|---|
 | PR #53 `docs: reconcile extraction playback research handoff` (+182/−513, would wipe this file from a stale base) | **CLOSED unmerged 2026-09-16** (session `arena/01a0ac91-dhun`, per this decision) | Superseded by the re-baseline; the research track continues in open PR #54. Nothing in it survived. |
 | PR #54 `docs: PO-token/InnerTubeX research + ADR proposal` (+326/−1, ADR-007 PROPOSED) | OPEN, research-only | **Keep as contingency reference** (merge docs-only with ADR-007 staying PROPOSED, or leave open — user's call). NEVER implement without trigger T1/T2 + explicit go-ahead. (A labeled agent test comment "test-ping (delete me)" from 2026-09-16 could not be deleted by the agent token — safe to remove manually.) |
+| PR #91 `docs(s1): reconcile extraction-health handoff at main 33e94b0` | OPEN, session branch `arena/01a0b224-dhun`, head `a97138b` | Docs-only S1 handoff; CI pending/in progress. Do not merge until checks are green and the user explicitly instructs merge. |
 | PR #88 `S1 attempt 4 — new workflow extraction-health.yml` | **MERGED as `3c593fb`** (2026-09-17T15:40Z) | Attempt 4 SUCCESS — id 360655315 healthy, name=extraction-health, no phantom push. Old wedged 360227450 fired 35241808266 phantom on same merge. |
 | Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; latest actual scheduled verdict `34083253658` (2026-09-07, `main@d1e0408`) is RED; no `extraction-health` run exists yet on current `main@33e94b0` | Keep open; S1 re-baselines it with the first fresh extraction-health artifact. The healthy workflow replaces the deleted/wedged `rot-drill-daily` registration. Agent cannot dispatch or write issue comments (403); the workflow itself updates #14 on the next live run. |
 | Issue #60 `Guest-First + Optional YTM Login` | OPEN (future plan, self-declared not-current) | v2 backlog (§8). Guest-first is already architecture — no action now |
