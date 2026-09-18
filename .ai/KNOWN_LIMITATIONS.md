@@ -3,6 +3,14 @@
 Updated every phase. Nothing hidden.
 
 
+## 2026-09-18 — Current diagnostic run confirms a tab-only Home shell
+
+- Owner run **35321898985** (job **105526042204**, `workflow_dispatch`) tested current head `257251c84b934a6e93a4f44ffb1de39548c74b6a`, completed `failure`, and uploaded artifact **10537362749**. Version/search, first Home page, related, and offline passed.
+- The expanded diagnostic reports `tabs[tabRenderer]`, `tabRenderers[endpoint,icon,selected,tabIdentifier,title,trackingParams]`, but `tabContents[-]` and `tabSections[-]`; there are no browse items, actions, commands, or continuation items. This is a navigation shell, not a parseable Home page payload.
+- The resolver correctly remains `ENVIRONMENT_BLOCKED`; NewPipe remains a separate short-JSON watch. The overall `FAIL` is correctly caused by the shared Home continuation parser. Do not silently accept this as an exhausted page or invent a second request from the opaque endpoint.
+- The shape-diagnostic patch has therefore completed its purpose. No further parser implementation is justified without a raw/sanitized response containing a real section/cursor contract. Android and Windows/Desktop production paths remain unaffected.
+
+
 ## 2026-09-18 — Current-head live probe confirms Home RED and classifier boundary
 
 - Owner run **35316993036** (job **105510712498**, `workflow_dispatch`) tested `arena/01a0b224-dhun@ad1b403`, completed `failure`, and included the new `Classify probe result` step. Version/search, first Home page, related, and deterministic offline playback passed.

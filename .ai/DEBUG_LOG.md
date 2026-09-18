@@ -1,6 +1,37 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-18 — Current diagnostic run shows a tab-only Home shell; no parser payload (`arena/01a0b224-dhun`)
+
+**Run identity.** Owner-dispatched `extraction-health` run **35321898985**
+(run #7, attempt 1), job **105526042204**, checked out current branch head
+`257251c84b934a6e93a4f44ffb1de39548c74b6a`. It completed 07:59:20Z with
+failure and uploaded artifact `rot-drill-35321898985` (id **10537362749**).
+Raw job logs/artifact download still return `EOF` in this sandbox.
+
+**Probe result.** Version/search, first Home page, related tracks, and
+zero-network offline playback passed. `home-more` failed with the expanded
+shape-only evidence:
+
+```
+PROBE|home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action; shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];contentsItems[-];rootItems[-];browse[tabs];browseItems[-];tabs[tabRenderer];tabRenderers[endpoint,icon,selected,tabIdentifier,title,trackingParams];tabContents[-];tabSections[-];actions[-];commands[-];items[-])
+```
+
+The response contains a `tabRenderer` navigation shell with an `endpoint`, but
+no tab `content`, no section list, no browse items, no actions, and no
+continuation items. There is therefore no confirmed track/cursor payload for a
+safe parser branch to consume. The resolver correctly emitted
+`ENVIRONMENT_BLOCKED`; NewPipe remained the separate short-JSON watch. The
+overall verdict correctly stayed `FAIL` because the shared Home continuation
+response is not parseable as a Home page.
+
+**Decision.** `f36cc76`'s diagnostic objective is complete. Do not turn this
+tab-only shell into an empty successful page or invent an endpoint follow-up:
+that would silently hide a continuation contract failure. Keep S1 RED until a
+raw/sanitized response or a later approved run provides a real section/cursor
+shape; Android and Windows/Desktop production paths remain untouched.
+
+
 ## 2026-09-18 — Current-head extraction-health run proves classifier; Home remains RED (`arena/01a0b224-dhun`)
 
 **Run identity.** Owner-triggered `extraction-health` run **35316993036**
