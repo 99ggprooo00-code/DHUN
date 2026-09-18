@@ -1,5 +1,356 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+
+## 2026-09-18 — Home continuation transport aligned with independent client (`c71d1bb`)
+
+**Comparison.** The diagnostic `ytmusicapi` client on the same GitHub runner returned
+`continuationContents.sectionListContinuation` for the Home token while DHUN
+returned only the tab-navigation shell. Source comparison isolated the request
+contract rather than a parser gap: the independent client sends `alt=json`, an
+empty `context.user`, `browseId` in the JSON body, the opaque token as both
+`ctoken` and `continuation` query parameters, and the anonymous visitor header
+from the Music homepage. DHUN had been missing the `alt=json` form and visitor
+header and had also put the continuation in the body.
+
+**Change.** Commit `56bd9b1` matched the body/query/URL contract and kept the
+Home `browseId`; commit `c71d1bb` forwards the cached Music-home
+`X-Goog-Visitor-Id` and adds a MockEngine assertion. `HomeFeedParser.kt` is
+unchanged. No opaque tab endpoint is followed and no tab-only response is
+accepted as success.
+
+**Validation.** Extraction-health run **35325690972** tested `c71d1bb` and
+classified the overall result as `ENVIRONMENT_BLOCKED`; the classifier step
+passed, the rot-drill issue step was skipped, and the final non-PASS gate was
+the only failing step. This moves the result past the previous Home-driven
+`FAIL`; the remaining resolver bot gate is separate and no live audio bytes
+were validated. Raw job logs still return `EOF` in this sandbox, and no local
+Gradle test could run because no JDK is installed.
+
+
+## 2026-09-18 — Current diagnostic run shows a tab-only Home shell; no parser payload (`arena/01a0b224-dhun`)
+
+**Run identity.** Owner-dispatched `extraction-health` run **35321898985**
+(run #7, attempt 1), job **105526042204**, checked out current branch head
+`257251c84b934a6e93a4f44ffb1de39548c74b6a`. It completed 07:59:20Z with
+failure and uploaded artifact `rot-drill-35321898985` (id **10537362749**).
+Raw job logs/artifact download still return `EOF` in this sandbox.
+
+**Probe result.** Version/search, first Home page, related tracks, and
+zero-network offline playback passed. `home-more` failed with the expanded
+shape-only evidence:
+
+```
+PROBE|home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action; shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];contentsItems[-];rootItems[-];browse[tabs];browseItems[-];tabs[tabRenderer];tabRenderers[endpoint,icon,selected,tabIdentifier,title,trackingParams];tabContents[-];tabSections[-];actions[-];commands[-];items[-])
+```
+
+The response contains a `tabRenderer` navigation shell with an `endpoint`, but
+no tab `content`, no section list, no browse items, no actions, and no
+continuation items. There is therefore no confirmed track/cursor payload for a
+safe parser branch to consume. The resolver correctly emitted
+`ENVIRONMENT_BLOCKED`; NewPipe remained the separate short-JSON watch. The
+overall verdict correctly stayed `FAIL` because the shared Home continuation
+response is not parseable as a Home page.
+
+**Decision.** `f36cc76`'s diagnostic objective is complete. Do not turn this
+tab-only shell into an empty successful page or invent an endpoint follow-up:
+that would silently hide a continuation contract failure. Keep S1 RED until a
+raw/sanitized response or a later approved run provides a real section/cursor
+shape; Android and Windows/Desktop production paths remain untouched.
+
+
+## 2026-09-18 — Current-head extraction-health run proves classifier; Home remains RED (`arena/01a0b224-dhun`)
+
+**Run identity.** Owner-triggered `extraction-health` run **35316993036**
+(run #6, attempt 1), job **105510712498**, checked out
+`arena/01a0b224-dhun@ad1b403f35b3373a20fa0f83ca1c21f1d510baaa`. It completed
+06:57:27Z with failure and uploaded artifact `rot-drill-35316993036` (id
+**10535238461**). Raw job logs and artifact download still return `EOF` in this
+sandbox.
+
+**Probe result.** Version/search, first Home page, related tracks, and
+zero-network offline playback passed. `home-more` failed independently:
+
+```
+PROBE|home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action; shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];contentsItems[-];rootItems[-];browse[tabs];browseItems[-];actions[-];commands[-];items[-])
+```
+
+The resolver emitted `ENVIRONMENT_BLOCKED`, and own-client/yt-dlp watch lines
+also emitted `ENVIRONMENT_BLOCKED`, proving the new classification boundary is
+working. NewPipe remained a separate `BROKEN|Parse(detail=JSON response is too
+short)` watch. The overall verdict correctly stayed `FAIL` because a shared
+Home parser failure is still present; the workflow remained non-zero.
+
+**Narrow next patch.** Because the live body is unavailable, commit **`f36cc76`**
+adds only safe nested key diagnostics for browse tabs, tab renderers, tab
+contents, and tab sections. Push CI **35317377585**, Build APK **35317382758**,
+and test-release **35317382644** pass. PR CI **35317382642** separately timed
+out in `LibraryViewModelTest.kt:82` before the changed parser/probe steps; the
+full push CI passed and no Android/Desktop production source was reopened.
+The next owner run must test `f36cc76` to reveal the confirmed nested keys
+before any parser branch is added.
+
+
+## 2026-09-18 — Owner reran stale candidate job; final head still untested (`arena/01a0b224-dhun`)
+
+**Run identity.** The supplied job link is workflow run **35310771629**, attempt
+**5**, job **105507779324**, not a new run for the final branch head. GitHub
+reports `head_sha=dbb3c0872dac2e7d010883b4e5ff7482561bc62a` (the older candidate),
+started 06:42:21Z and completed 06:44:39Z. Its refreshed artifact is
+`rot-drill-35310771629` (id **10535400903**). The artifact and raw job-log
+endpoints still return `EOF` in this sandbox.
+
+**Observed result.** The rerun reproduced the earlier old-head result: version,
+search, first Home page, related tracks, and deterministic offline playback
+passed; `home-more` failed with the same shape-only parse diagnostic; own-client
+and yt-dlp were separately YouTube bot-gated; NewPipe returned its short-JSON
+watch result. The job's steps show the old workflow revision and do not include
+the newer `Classify probe result` step, so its `PROBE|verdict|FAIL` is not a
+classification result from the final probe code.
+
+**Decision.** This is useful confirmation of the stale candidate's behavior but
+is not live validation of current code (`6dd98fb` plus docs-only heads). Android
+and Windows/Desktop production paths remain unaffected. S1 stays RED and S2
+stays blocked; the owner must dispatch `extraction-health` from the current
+`arena/01a0b224-dhun` branch head.
+
+
+## 2026-09-18 — Final probe/classifier head is CI-green; Android/Desktop unchanged (`arena/01a0b224-dhun`)
+
+**Compiler repair.** CI **35313043505** had failed before tests because `Main.kt`
+contained an invalid trailing comma in a Kotlin `when` branch at lines 201–202.
+Commit **6dd98fb** removed that comma. No Android or Windows/Desktop production
+extraction code was involved in the failure or the repair.
+
+**GitHub verification.** Code head `6dd98fb` passed push CI **35313596684**, PR CI
+**35313601849**, Build APK **35313601854**, and test-release **35313601903**.
+The docs-only sync commit **`ad129be`** is now the final pushed PR head; its
+push CI **35314651766**, PR CI **35314654589**, Build APK **35314654604**, and
+test-release **35314654669** also pass. The checks cover shared domain tests,
+Android Robolectric/debug build, probe compilation and `ProbeStatusTest`,
+extraction-health classification, Desktop JVM compile/tests, and packaging. PR
+#91 is OPEN, unmerged, and `CLEAN`.
+
+**Remaining gate.** No owner-triggered live run has tested final pushed head `ad129be`. The latest
+live candidate run **35310771629** tested older `dbb3c08`: metadata/search, first
+Home page, related, and offline passed; `home-more` failed; own-client/yt-dlp
+were separately bot-gated; NewPipe reported its separate short-JSON watch. S1
+therefore remains RED and S2 remains blocked. The owner must dispatch
+`extraction-health` on `arena/01a0b224-dhun@ad129be`; this agent still receives
+HTTP 403 for workflow dispatch. No credentials, cookies, PO tokens, BotGuard,
+attestation, ADR-007, resolver replacement, or platform rewrite was added.
+
+
+## 2026-09-18 — Extraction-health status classification and production-path comparison (`arena/01a0b224-dhun`)
+
+**Architecture result.** Android and Desktop production both reach the shared
+`InnerTubeClient`, `parseHomeFeedPage`, and `OwnClientStreamResolver`. Desktop
+adds the shared JVM `YtDlpStreamResolver` fallback; Android deliberately does
+not. The probe directly constructs those same shared classes and uses the same
+Desktop own-client → yt-dlp chain. It does not use platform DI, offline/cache
+orchestration, Media3, libVLC, or NewPipe in production. No duplicate extractor
+was found, so no resolver rewrite or synthetic CI extractor was introduced.
+
+**Probe changes.** Home first-page and continuation failures now set the live
+probe to `FAIL` because they exercise the production parser; they are no longer
+merely informational. Resolver failures are classified without changing
+`DhunError`: explicit `AuthRequired` bot evidence (`LOGIN_REQUIRED`, “Sign in to
+confirm you're not a bot”, etc.) emits `ENVIRONMENT_BLOCKED`; ordinary
+network/rate-limit/auth/unavailable results emit `UNAVAILABLE`; parser/unknown
+resolver failures remain `FAIL`. All non-PASS statuses still exit non-zero so
+an unverified live stream cannot become a green health check. NewPipe remains a
+separate non-fatal watch.
+
+**Workflow changes.** `extraction-health.yml` now preserves both offline and live
+exit codes, parses the probe verdict, writes a job summary, warns explicitly on
+runner limitation, opens a rot-drill issue only for `FAIL`, and keeps the check
+non-zero for `ENVIRONMENT_BLOCKED`/`UNAVAILABLE`. A blocked runner is therefore
+not filed as a DHUN parser/resolver regression, but it is also not declared a
+production pass.
+
+**Verification boundary.** `ProbeStatusTest` and the changed probe/workflow have
+not run locally because this sandbox has no JDK; CI remains the compiler. The
+existing Home parser candidate still requires an owner-triggered live run at its
+current head and `home-more` must pass before S1 can close. No credentials,
+cookies, PO tokens, BotGuard, attestation, or ADR-007 were added.
+
+
+## 2026-09-18 — Candidate run 35310771629 keeps Home RED; nested browse follow-up added (`arena/01a0b224-dhun`)
+
+**Owner-triggered validation.** The repository owner dispatched
+`extraction-health` **35310771629** on `arena/01a0b224-dhun@dbb3c0872dac2e7d010883b4e5ff7482561bc62a` (`workflow_dispatch`). Probe job **105492165940** completed the live steps, uploaded artifact `rot-drill-35310771629` (id **10533178016**, 4,432 bytes), updated issue #14 in comment **5725612380**, and failed at the intentional alert step. The artifact/log blob again returns `EOF` in this sandbox; no raw response body or opaque token is recorded.
+
+**Probe result.** Version/search (20 songs), first Home page (2 sections plus continuation), related (50), and deterministic offline playback passed. `home-more` remained RED:
+
+```
+PROBE|home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action; shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];contentsItems[-];rootItems[-];actions[-];commands[-];items[-])
+```
+
+The failure is separate from playback: own-client and yt-dlp remained `AuthRequired` / `LOGIN_REQUIRED` bot-gated, so no audio bytes were validated; NewPipe remained `Parse(detail=JSON response is too short)`. Keep all three findings separate and do not add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007.
+
+**Narrow follow-up.** The new diagnostic identifies the known top-level `contents` → `singleColumnBrowseResultsRenderer` envelope, while the existing parser only accepted its selected-tab section path. Commit **8dc88a1** adds `homeBrowsePage`, which accepts a scoped `sectionListRenderer` or direct `contents` section array under the known single-/two-column browse renderer; it does not recursively flatten arbitrary response objects. Fixture `nested-browse-contents.json` and a regression test cover that contract.
+
+**Verification boundary.** Push CI **35311036178**, PR CI **35311039453**, Build APK **35311039470**, and test-release **35311039459** pass on `8dc88a1`; PR #91 is `CLEAN`, open, and unmerged. No local Kotlin/Gradle test ran because the sandbox has no JDK. This is not live acceptance: the next owner-triggered run must test current head `8dc88a1`. S1 remains RED and S2 remains blocked.
+
+
+## 2026-09-18 — S1 live handoff is RED with two independent signals (`arena/01a0b224-dhun`)
+
+**Authoritative run.** The repository owner dispatched workflow
+`extraction-health` **35306224822** on `main@33e94b06125b8ce1eefe9aab0a2faca116ca53fe`
+(`workflow_dispatch`, created 04:14:42Z, completed 04:17:00Z). The probe job
+**105478849067** failed at the intentional alert step after emitting
+`PROBE|verdict|FAIL|extraction-pipeline-broken`. Artifact
+`rot-drill-35306224822` exists (artifact id **10532130174**, 4,357 bytes), and
+workflow output was posted to issue #14. The signed artifact blob could not be
+downloaded in this sandbox (`EOF`); the issue comment tail and artifact metadata
+are the preserved evidence. No cookies, credentials, PO tokens, or signed URLs
+are recorded here.
+
+**Observed probe outcomes.** Java 17, yt-dlp **2026.08.19**, and
+NewPipeExtractor **0.26.5** were used. Version and search passed (20 songs),
+the first Home page passed (2 sections plus a continuation token), and related
+tracks passed (50). The deterministic offline file probe passed with zero
+network calls. The Home continuation check independently failed:
+
+```
+home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action)
+WATCH|newpipe-stream|BROKEN|Parse(detail=JSON response is too short)
+```
+
+The production resolver then failed with `AuthRequired`; own-client and yt-dlp
+watch paths both reported YouTube `LOGIN_REQUIRED` / “Sign in to confirm you're
+not a bot”, so stream bytes were not validated. The NewPipe watch line is
+non-fatal in the workflow, but it remains a separate parse signal.
+
+**Classification boundary.** The own-client/yt-dlp result is strong evidence of
+GitHub-hosted runner bot-gating, not permission failure and not permission to
+add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007. It must be
+re-tested from an approved residential/device network. The `home-more` parse
+failure is not dismissed as bot-gating: `parseHomeFeedPage` currently accepts
+only direct section-list shapes or recognized append/reload action groups, and
+the live response reached none of those branches. The raw continuation body is
+not available because the artifact blob download returned `EOF`; the issue
+comment has only the probe tail. That is enough to identify a live parser
+contract mismatch, not enough to name the response shape or safely patch it.
+
+**NewPipe boundary.** `NewPipeStreamResolver` uses NewPipeExtractor v0.26.5's
+`NPStreamInfo.getInfo` through the tokenless `SimpleDownloader`; its
+`ParsingException` is deliberately mapped to `DhunError.Parse`. The short-JSON
+message therefore proves the NewPipe parser received an unexpectedly short
+response, but without the body it cannot distinguish upstream schema drift from
+a challenge/error page. It remains a diagnostic watch and is not a reason to
+rewrite the production resolver chain.
+
+**Decision.** S1 is **RED / unresolved**; S2 must not begin. Do not merge PR #91.
+The next technical action is a sanitized capture or fixture of the actual Home
+continuation response, followed by a narrow parser regression/fix if that
+shape is confirmed. Keep the runner bot-gating evidence and the Home parser
+failure as separate findings. No application source changed in this evidence
+reconciliation; no local Kotlin/Gradle test ran because the sandbox has no JDK.
+
+
+
+## 2026-09-18 — Home continuation parser candidate added after S1 RED (`arena/01a0b224-dhun`)
+
+**Why this is a candidate, not a live-fix claim.** Run **35306224822** exposed
+`home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action)`,
+but the uploaded blob could not be downloaded (`EOF`), so the exact response body
+is unavailable. Existing parser coverage handled `sectionListContinuation` and
+carousel/immersive append actions, but not the other standard YouTube Music
+continuation family: `musicShelfContinuation` / `musicPlaylistShelfContinuation`
+wrappers or action items carrying `musicShelfRenderer` / playlist shelf renderers.
+That is the narrow contract gap addressed here; a future probe must confirm it
+matches the live response rather than treating inference as evidence.
+
+**Change.** `HomeFeedParser` normalizes shelf-specific continuation wrappers,
+recognizes shelf renderers in append/reload action groups, and `parseHomeSections`
+now reads vertical/playlist shelf rows plus direct shelf/header titles. An
+unmatched response now reports only top-level/continuation/action/command/item
+**keys**—never cursor values or tracking data—so a future live run can identify
+its shape without logging opaque continuation material. Two synthetic fixtures and
+parser tests cover the direct shelf continuation and append-action variants.
+
+**Verification boundary.** JSON fixture validation and the Python helper suite
+are the only local checks; Kotlin/Gradle remains unrun because no JDK exists.
+CI is the compiler. The candidate is not live-validated, does not change the
+resolver chain, and does not weaken byte checks. S1 stays RED until CI plus a
+sanitized owner-triggered probe/fixture confirms the shape. Bot-gating remains a
+separate residential/device investigation; no cookies, credentials, PO tokens,
+BotGuard, attestation, or ADR-007.
+
+**First CI feedback and correction.** CI run **35307551559** reached the shared JVM tests and
+caught two candidate-test defects: the new shelf wrapper exposed the cursor one level deeper
+than `homeListContinuation` inspected, and the old `wrong-shelf-continuation` fixture was now
+an intentionally supported `musicShelfContinuation`. The fix scopes cursor extraction to the
+normalized shelf object and changes that negative fixture to an unsupported grid continuation.
+This was a genuine test failure, not a live verdict; APK/build packaging checks on the same
+head passed, but later steps were skipped by the shared-test failure. The correction is now
+CI-green at parser evidence head **005b526**: PR CI **35307916827**, push CI **35307913766**,
+Build APK **35307916736**, and test-release **35307916668** all passed, including the shared
+JVM parser suite. This proves compilation/tests for the candidate only; it does not prove the
+live Home response uses either covered shape.
+
+
+## 2026-09-18 — Candidate-branch run 35308796439 keeps Home RED (`arena/01a0b224-dhun`)
+
+**Owner-triggered validation.** Workflow `extraction-health` run **35308796439**
+used candidate branch `arena/01a0b224-dhun` at `c546d7b797157bfd5d2eb6954c45ceefe54bb686`.
+The probe job **105486452033** completed the live steps and uploaded artifact
+`rot-drill-35308796439` (id **10532443661**, 4,402 bytes), then failed at the
+intentional alert step. The artifact blob again returned `EOF` from this
+sandbox; issue #14 preserves the tail. No cookies, credentials, PO tokens, or
+signed URLs are recorded.
+
+**What the candidate run proved.** Version/search passed, Home first page passed
+(2 sections and a token), related passed (50), and the offline probe passed.
+The first shelf-continuation candidate did **not** clear `home-more`:
+
+```
+PROBE|home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action; shape=top[contents,responseContext,trackingParams];continuation[-];actions[-];commands[-];items[-])
+```
+
+The shape-only diagnostic is useful: the continuation response has a top-level
+`contents` field, not `continuationContents` or an action array. The candidate
+parser did not yet inspect the direct nested contents contract. Own-client/yt-dlp
+still returned `AuthRequired` bot-gating, NewPipe still returned
+`Parse(detail=JSON response is too short)`, and no audio bytes were validated.
+
+**Follow-up.** The next narrow patch accepts a shelf object directly under
+`contents` when it yields rows/cursor, and expands shape-only diagnostics to
+report the direct contents/item keys. This is still a source/test hypothesis
+until CI and another owner-triggered candidate run confirm it. S1 remains RED;
+S2 remains blocked; no auth/attestation workaround is permitted.
+
+
+## 2026-09-18 — Direct-contents follow-up is PR-green; one push check flaked (`arena/01a0b224-dhun`)
+
+The follow-up parser candidate is `526e3904ec1d59c04a8a7ac595157dbf913841e6`.
+PR CI **35309128614**, Build APK **35309128640**, and test-release
+**35309128612** passed, including the shared JVM parser suite. The independent
+push CI **35309124090** failed at the unrelated
+`LibraryViewModelTest.eventually` 15-second timeout; its annotations contain no
+Home/parser failure. This is a CI flake on the same SHA, not evidence against
+the parser patch, but the branch was temporarily `UNSTABLE` until a later push
+check. Push CI **35309533562** on docs-only successor `98843af` passed, and PR
+#91 is now `CLEAN`; no parser failure was found. No local Kotlin test was run.
+
+The direct-contents patch is still not live-validated. The next owner-triggered
+probe must use current head `98843af32e8326c8329a5c33d2c06ddfc30a9485`; S1 remains
+RED and S2 remains blocked.
+
+## 2026-09-18 — S1 boot reconciliation: registration is healthy, live verdict is still absent (`arena/01a0b224-dhun`)
+
+**Current gap.** The repository is at `main@33e94b0` after PR #90. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** all pass, and the rolling `test` release points at that SHA. The replacement workflow `extraction-health` (id **360655315**) is active with the declared name, but `gh run list --workflow extraction-health.yml` returns no runs.
+
+**Last actual extraction error.** The latest real scheduled probe is **34083253658** (`main@d1e0408`, 2026-09-07), not a push-trigger artifact: metadata/search/related passed, the production own-client chain and yt-dlp were bot-gated with `AuthRequired`, NewPipe reported its known parse watch, and `PROBE|verdict|FAIL|extraction-pipeline-broken` was emitted. The many zero-job push failures are trigger noise and are not cited as extraction verdicts.
+
+**Root cause/blocker.** The file-registration repair succeeded, but this agent's GitHub integration token still receives HTTP 403 for `workflow_dispatch` (and cannot write issue comments). A human must click **Actions → extraction-health → Run workflow** on `main`, or the 04:17 UTC schedule must fire. Until an artifact and live verdict exist, S1 cannot close and S2 must not start.
+
+**Verification boundary.** No application code or extraction semantics changed in this handoff. The sandbox has no JDK/Android SDK/adb, so no local Gradle test ran; the only local check for this docs reconciliation is `git diff --check`. Hardware playback, live Home pagination, visuals, and soaks remain unverified.
+
+**Verification.** PR #91 last verified head `f2dffea` is CI-verified: CI runs **35297881950** and **35297879208**, Build APK **35297881997**, and test-release **35297882070** all pass. The PR remains open and unmerged.
+
+**Next action.** Obtain and record the live `extraction-health` result before doing S2 cleanup. PR #91 must not be merged without explicit user instruction.
+
 ## 2026-09-16 — the new desktop-test gate immediately finds 3 latent failures from PR #47 (`arena/01a0aa8e-dhun`)
 
 **Symptom.** First CI on PR #71 (`build-and-test` run `35112656439`, 8m26s)

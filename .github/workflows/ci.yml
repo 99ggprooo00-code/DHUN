@@ -42,6 +42,9 @@ jobs:
       - name: Probe compiles
         run: ./gradlew :tools:playback-probe:compileKotlin --no-daemon
 
+      - name: "Unit tests — extraction-health classification"
+        run: ./gradlew :tools:playback-probe:test --no-daemon
+
       # Desktop was previously only compiled by the MSI job on pushes to main;
       # PRs touching app-desktop (Phase 12/14) must fail here, not after merge.
       - name: Desktop compiles

@@ -144,17 +144,30 @@ internal fun parseHomeSections(root: JsonObject): List<HomeSection> {
     val shelves = mutableListOf<JsonObject>()
     root.collectObjects("musicCarouselShelfRenderer", shelves)
     root.collectObjects("musicImmersiveCarouselShelfRenderer", shelves)
+    // Home continuations can use the vertical shelf renderers instead of a
+    // carousel renderer. They carry the same row shapes and their own cursor.
+    root.collectObjects("musicShelfRenderer", shelves)
+    root.collectObjects("musicPlaylistShelfRenderer", shelves)
 
     val sections = mutableListOf<HomeSection>()
 
     for (shelf in shelves) {
-        val header = shelf.obj("header")?.obj("musicCarouselShelfBasicHeaderRenderer")
-            ?: shelf.obj("header")?.obj("musicImmersiveCarouselShelfBasicHeaderRenderer")
+        val header = shelf.obj("header")?.let { h ->
+            h.obj("musicCarouselShelfBasicHeaderRenderer")
+                ?: h.obj("musicImmersiveCarouselShelfBasicHeaderRenderer")
+                ?: h.obj("musicShelfBasicHeaderRenderer")
+                ?: h.obj("musicPlaylistShelfBasicHeaderRenderer")
+                ?: h.obj("musicResponsiveHeaderRenderer")
+        }
         val title = header?.firstRunText("title", "runs")
             ?: header?.allRunsText("title", "runs")
+            ?: shelf.firstRunText("title", "runs")
+            ?: shelf.allRunsText("title", "runs")
             ?: ""
         val strapline = header?.firstRunText("strapline", "runs")
             ?: header?.allRunsText("strapline", "runs")
+            ?: shelf.firstRunText("strapline", "runs")
+            ?: shelf.allRunsText("strapline", "runs")
 
         val contents = shelf.arr("contents") ?: continue
         val items = mutableListOf<HomeItem>()

@@ -24,22 +24,30 @@ class InnerTubeRequestTest {
     private fun obj(json: String) = Json.parseToJsonElement(json) as JsonObject
 
     @Test
-    fun firstBrowseUsesTheDiscoveredVersionInBothHeaderAndBody() = runBlocking {
+    fun homeContinuationUsesTheBrowseQueryWireContract() = runBlocking {
         var posts = 0
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
-                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.20260906.01.00"}""")
+                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.20260906.01.00","VISITOR_DATA":"visitor-fixture"}""")
                 "/youtubei/v1/browse" -> {
                     posts++
                     val body = obj((request.body as TextContent).text)
                     assertEquals("1.20260906.01.00", request.headers["X-YouTube-Client-Version"])
+                    assertEquals("visitor-fixture", request.headers["X-Goog-Visitor-Id"])
                     assertEquals("1.20260906.01.00", body.obj("context").obj("client").str("clientVersion"))
                     assertEquals("WEB_REMIX", body.obj("context").obj("client").str("clientName"))
                     if (posts == 1) {
                         assertEquals("FEmusic_home", body.str("browseId"))
+                        assertEquals("json", request.url.parameters["alt"])
+                        assertNull(request.url.parameters["ctoken"])
+                        assertNull(request.url.parameters["continuation"])
                         respond("""{"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[],"continuations":[{"nextContinuationData":{"continuation":"next-page"}}]}}}}]}}}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
                     } else {
-                        assertEquals("next-page", body.str("continuation"))
+                        assertEquals("FEmusic_home", body.str("browseId"))
+                        assertNull(body["continuation"])
+                        assertEquals("next-page", request.url.parameters["ctoken"])
+                        assertEquals("next-page", request.url.parameters["continuation"])
+                        assertTrue(body.obj("context").obj("user") != null)
                         respond("""{"continuationContents":{"sectionListContinuation":{"contents":[]}}}""")
                     }
                 }

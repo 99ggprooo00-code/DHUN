@@ -42,6 +42,34 @@ class HomeFeedParserTest {
     }
 
     @Test
+    fun parsesMusicShelfContinuationAndItsNextToken() {
+        val result = parseHomeFeedPage(fixture("music-shelf-continuation"))
+        assertEquals("b", result.sections.single().tracks.single().id)
+        assertEquals("page-three", result.continuationToken)
+    }
+
+    @Test
+    fun acceptsMusicShelfRendererInAppendActions() {
+        val result = parseHomeFeedPage(fixture("music-shelf-action"))
+        assertEquals("b", result.sections.single().tracks.single().id)
+        assertEquals("page-three", result.continuationToken)
+    }
+
+    @Test
+    fun acceptsAContinuationShelfDirectlyUnderContents() {
+        val result = parseHomeFeedPage(fixture("direct-shelf-contents"))
+        assertEquals("b", result.sections.single().tracks.single().id)
+        assertEquals("page-three", result.continuationToken)
+    }
+
+    @Test
+    fun acceptsSectionEntriesNestedDirectlyInABrowseRenderer() {
+        val result = parseHomeFeedPage(fixture("nested-browse-contents"))
+        assertEquals("c", result.sections.single().tracks.single().id)
+        assertEquals("page-four", result.continuationToken)
+    }
+
+    @Test
     fun parsesAppendActionsInAllSupportedResponseFields() {
         val actions = fixture("append-action").arr("onResponseReceivedActions")!!
         for (field in listOf("onResponseReceivedActions", "onResponseReceivedEndpoints", "onResponseReceivedCommands")) {
@@ -67,7 +95,10 @@ class HomeFeedParserTest {
 
     @Test
     fun unexpectedContinuationShapeIsAnErrorNotSilentExhaustion() {
-        assertFailsWith<DhunException> { parseHomeFeedPage(fixture("wrong-shelf-continuation")) }
+        val error = assertFailsWith<DhunException> {
+            parseHomeFeedPage(fixture("wrong-shelf-continuation"))
+        }
+        assertTrue(error.error.toString().contains("shape=top"))
     }
 
     @Test

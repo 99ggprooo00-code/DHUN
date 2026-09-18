@@ -2,6 +2,81 @@
 
 Updated every phase. Nothing hidden.
 
+
+## 2026-09-18 — Home continuation request contract repaired; resolver remains runner-gated
+
+- The independent `ytmusicapi` comparison on run **35325125151** supplied the wire-level difference: its Home continuation uses `alt=json`, `context.user`, `browseId` in the body, `ctoken` plus `continuation` in the query, and an anonymous `X-Goog-Visitor-Id`. DHUN now matches that contract in `InnerTubeClient`; the Home parser was not changed.
+- Push run **35325690972** on `c71d1bb` reached `ENVIRONMENT_BLOCKED` instead of the prior Home-driven `FAIL`. The classifier step passed, the rot-drill issue step was skipped, and only the intentional non-PASS gate failed. This is the accepted separation: Home no longer blocks the probe, while resolver playback remains unverified.
+- No live audio bytes are accepted from this runner. Raw GitHub job logs still return `EOF` here, and the sandbox has no JDK for a local Gradle run. S1 therefore remains open and S2 remains blocked pending approved residential/device playback evidence.
+- The tab-only response remains an invalid Home payload if encountered; do not add a parser fallback, treat it as exhausted, or follow its opaque tab endpoint.
+
+
+## 2026-09-18 — Current diagnostic run confirms a tab-only Home shell
+
+- Owner run **35321898985** (job **105526042204**, `workflow_dispatch`) tested current head `257251c84b934a6e93a4f44ffb1de39548c74b6a`, completed `failure`, and uploaded artifact **10537362749**. Version/search, first Home page, related, and offline passed.
+- The expanded diagnostic reports `tabs[tabRenderer]`, `tabRenderers[endpoint,icon,selected,tabIdentifier,title,trackingParams]`, but `tabContents[-]` and `tabSections[-]`; there are no browse items, actions, commands, or continuation items. This is a navigation shell, not a parseable Home page payload.
+- The resolver correctly remains `ENVIRONMENT_BLOCKED`; NewPipe remains a separate short-JSON watch. The overall `FAIL` is correctly caused by the shared Home continuation parser. Do not silently accept this as an exhausted page or invent a second request from the opaque endpoint.
+- The shape-diagnostic patch has therefore completed its purpose. No further parser implementation is justified without a raw/sanitized response containing a real section/cursor contract. Android and Windows/Desktop production paths remain unaffected.
+
+
+## 2026-09-18 — Current-head live probe confirms Home RED and classifier boundary
+
+- Owner run **35316993036** (job **105510712498**, `workflow_dispatch`) tested `arena/01a0b224-dhun@ad1b403`, completed `failure`, and included the new `Classify probe result` step. Version/search, first Home page, related, and deterministic offline playback passed.
+- `home-more` still failed as a shared parser error. The safe shape summary now reaches `contents[singleColumnBrowseResultsRenderer]` with `browse[tabs]` and no `browseItems`; the response values are unavailable because GitHub artifact/raw-log downloads return `EOF` in this sandbox.
+- The resolver correctly emitted `ENVIRONMENT_BLOCKED`, and both own-client/yt-dlp watch lines were `ENVIRONMENT_BLOCKED`. NewPipe remained its separate `BROKEN` short-JSON diagnostic. The overall verdict correctly remained `FAIL` because Home parsing failed; the workflow stayed non-zero and opened/updated the rot-drill issue.
+- Commit `f36cc76` adds only nested tab/section key diagnostics (`tabs`, tab renderers, tab contents, tab sections) for the next owner run. Push CI **35317377585**, Build APK **35317382758**, and test-release **35317382644** pass on that head. PR CI **35317382642** independently timed out in `LibraryViewModelTest` before changed parser/probe steps; this is a flaky test signal, not an Android/Desktop extraction regression.
+
+
+## 2026-09-18 — Supplied live link reran an older candidate, not the final head
+
+- Workflow run **35310771629**, attempt **5**, job **105507779324** checked out `dbb3c0872dac2e7d010883b4e5ff7482561bc62a`, not the current branch head. It reproduced the older `home-more` parse failure, separate YouTube runner bot-gating, and NewPipe short-JSON diagnostic while metadata/search/first Home/related/offline passed.
+- Because this job used the old workflow revision, its steps did not include the new probe-classification step. Its `PROBE|verdict|FAIL` must not be read as evidence against the final `ENVIRONMENT_BLOCKED`/`UNAVAILABLE` classifier.
+- The refreshed artifact is `rot-drill-35310771629` (id **10535400903**), but artifact/raw-log downloads still return `EOF` in this sandbox. The rerun is evidence for the stale candidate only; S1 remains open until the owner dispatches the current branch head.
+
+
+## 2026-09-18 — Final probe/classifier head is CI-green; live gate remains
+
+- The malformed Kotlin `when` expression in `Main.kt` was fixed in commit `6dd98fb`. Push CI **35314651766**, PR CI **35314654589**, Build APK **35314654604**, and test-release **35314654669** all pass on the final pushed head, including shared, Android, playback-probe, extraction-health classifier, Desktop JVM, and packaging checks.
+- Android and Windows/Desktop production extraction fixes are preserved and are not the remaining issue. No Android, Desktop resolver, player, cache, or platform orchestration path was reopened or replaced by the probe classification work.
+- The final head has no known compiler/test failure, but this does not constitute live extraction acceptance. The latest owner-triggered run **35310771629** tested an older candidate and still failed `home-more`; its own-client/yt-dlp bot-gating and NewPipe short-JSON result remain separate diagnostics.
+- S1 remains open and S2 remains blocked until the repository owner runs `extraction-health` on `arena/01a0b224-dhun@ad129be` and the candidate produces a live `home-more` pass. The agent's workflow-dispatch token remains HTTP 403. No local Kotlin/Gradle test ran because the sandbox has no JDK.
+
+
+## 2026-09-18 — Extraction-health now distinguishes code failure from runner limitation
+
+- The architecture review found no duplicate extraction implementation in CI. `playback-probe` directly calls the shared `InnerTubeClient`, Home parser, `OwnClientStreamResolver`, and the same own-client → yt-dlp chain used by Desktop. It intentionally does not reproduce Android Media3, Desktop libVLC, platform DI, or platform cache/download orchestration. Android remains own-client-only; NewPipe remains probe-only.
+- The probe now emits `PASS`, `FAIL`, `ENVIRONMENT_BLOCKED`, or `UNAVAILABLE`. Home feed/continuation failures are `FAIL` because they exercise the shared production parser. Resolver `AuthRequired` is `ENVIRONMENT_BLOCKED` only when explicit YouTube gate evidence is present (`LOGIN_REQUIRED`, “Sign in to confirm you're not a bot”, etc.); generic auth/upstream/network failures remain non-PASS `UNAVAILABLE`, and parser failures remain `FAIL`.
+- `extraction-health.yml` preserves offline and live exit codes, summarizes the classification, opens a rot-drill issue only for `FAIL`, and keeps every non-PASS result non-zero. `ENVIRONMENT_BLOCKED` is an honest external limitation, not a green production verdict and not evidence for adding credentials or bypasses.
+- Regression tests cover the status classifier. No local Kotlin/Gradle test has run because the sandbox has no JDK; CI and the owner-triggered live probe remain required. S1 is still open until the current Home parser candidate passes `home-more` in a live run.
+
+
+## 2026-09-18 (~05:28 UTC) — Candidate run 35310771629 keeps Home RED; nested-browse follow-up is CI-green
+
+- **Owner-triggered candidate evidence:** `extraction-health` run **35310771629** tested `arena/01a0b224-dhun@dbb3c0872dac2e7d010883b4e5ff7482561bc62a`, completed `failure`, and emitted `PROBE|verdict|FAIL|extraction-pipeline-broken`. Probe job **105492165940** uploaded artifact `rot-drill-35310771629` (id **10533178016**, 4,432 bytes); issue #14 comment **5725612380** preserves the sanitized tail. Artifact/log downloads return `EOF` in this sandbox.
+- **What passed:** version, search (20 songs), first Home page (2 sections + continuation), related (50 tracks), and deterministic offline playback. **Home still failed:** `home-more` reported `shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];...`.
+- **Separate resolver findings:** own-client and yt-dlp returned `AuthRequired` / `LOGIN_REQUIRED` bot-gating, no audio bytes were validated, and NewPipe returned `Parse(detail=JSON response is too short)`. Keep these separate from the Home parser result; do not add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007.
+- **Follow-up:** commit `8dc88a1` adds scoped support for direct section entries under the known single-/two-column browse renderers, with synthetic fixture `nested-browse-contents.json`. Push CI **35311036178**, PR CI **35311039453**, Build APK **35311039470**, and test-release **35311039459** all pass. This is not live acceptance until another owner-triggered probe passes `home-more`.
+- **Gate:** S1 remains RED/open; S2 is blocked and PR #91 remains open/unmerged. The sandbox has no JDK, so local Kotlin/Gradle tests remain unrun.
+
+## 2026-09-18 (~04:17 UTC) — S1 live run 35306224822 is RED / mixed (`arena/01a0b224-dhun`)
+
+- **Authoritative current gate:** `extraction-health` run **35306224822** was owner-dispatched on `main@33e94b06125b8ce1eefe9aab0a2faca116ca53fe`, completed with conclusion `failure`, and emitted `PROBE|verdict|FAIL|extraction-pipeline-broken`. Artifact `rot-drill-35306224822` (id **10532130174**, 4,357 bytes) exists; the issue #14 comment preserves the log tail. The signed artifact download returned `EOF` in this sandbox, so no raw payload is claimed.
+- **What passed:** Java 17 / tool setup, version, search (20 songs), first Home page (2 sections + token), related (50 tracks), and deterministic offline playback with zero network calls.
+- **Separate live failures:** Home continuation (`home-more`) returned `Parse(detail=Home response contained no section list or Home continuation action)`; own-client and yt-dlp watch paths returned YouTube `AuthRequired` / `LOGIN_REQUIRED` bot-gating, so no live audio bytes were validated; NewPipe returned the separate non-fatal `Parse(detail=JSON response is too short)` watch result.
+- **Interpretation:** `AuthRequired` is runner-network evidence that requires approved residential/device verification. It is not permission to add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007. The Home parse failure is independently unresolved: source review shows the parser recognized no supported continuation shape, but the raw response is not captured, so no speculative parser patch is justified yet. NewPipe v0.26.5 reaches `NPStreamInfo.getInfo` through the tokenless `SimpleDownloader`; its `ParsingException` is surfaced as `DhunError.Parse`, but without the response body the short-JSON symptom cannot yet be separated into upstream schema drift versus a challenge/error response. It remains a diagnostic watch, not a production-path change target.
+- **Gate:** S1 remains RED/open; S2 is blocked and PR #91 remains open/unmerged. Owner run **35308796439** still failed `home-more` with a top-level `contents` response. Follow-up `526e390` is PR-green with synthetic coverage; independent push CI **35309124090** flaked on an unrelated `LibraryViewModelTest` timeout, then push CI **35309533562** passed on docs-only successor `98843af` and PR #91 returned to `CLEAN`. The follow-up is still not live-validated. No cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007 were added. The sandbox has no JDK, so local Kotlin/Gradle tests remain unrun.
+
+
+## 2026-09-18 (~01:32 UTC) — S1 handoff reconciled against `main@33e94b0` (`arena/01a0b224-dhun`)
+
+- **Current GitHub baseline:** `origin/main`, local `main`, and the rolling `test` tag all resolve to `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** are green; the `test` release contains APK/MSI and both checksum sidecars.
+- **S1 is not closed.** Workflow `extraction-health` (id **360655315**) is active and correctly named; owner-dispatched run **35306224822** is the current RED/mixed result. The deleted `rot-drill-daily.yml` entry is no longer the active path. The agent cannot dispatch workflows (`HTTP 403`); no second run is needed until the mixed findings are reconciled.
+- **Current live extraction evidence:** run **35306224822** on `main@33e94b0` failed the production probe with bot-gated `AuthRequired` outcomes, a separate Home continuation parse failure, and the non-fatal NewPipe short-JSON parse; metadata/search/related and offline passed. This supersedes the stale scheduled run **34083253658** as the current verdict.
+- **No new application behavior is claimed in this handoff.** No extraction identities, token/cookie paths, probe semantics, ADRs, or hardware status were changed. ADR-007 remains proposed and contingency-only.
+- **Environment:** this sandbox has no `java`, `javac`, `ANDROID_HOME`, or `adb`; no local Gradle/Kotlin/Android test was run. CI remains the compiler and hardware gates remain open.
+- **Current handoff:** PR #91's parser evidence head `005b526` is CI-verified: CI **35307916827**, push CI **35307913766**, Build APK **35307916736**, and test-release **35307916668** all pass. The PR remains unmerged; this follow-up status commit is docs-only; do not merge without explicit user instruction.
+- **Next gate:** reconcile run **35306224822** in `docs/verification/14-release.md` and the debug log, capture the Home continuation shape, and obtain approved residential/device playback evidence. S2 cleanup is blocked until the mixed RED is resolved.
+
 ## 2026-09-17 (~16:00 UTC) — S1 attempt 4 SUCCESS — extraction-health.yml clean registration (`arena/01a0aff7-dhun`, main 3c593fb)
 
 - **Attempt 4 (new file `extraction-health.yml`, PR #88, merged `3c593fb` ~15:40 UTC) — SUCCESS.**

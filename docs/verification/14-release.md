@@ -1,21 +1,17 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Status note (2026-09-17 ~16:00 UTC, Stage S1 attempt 4 SUCCESS):**
-> body below is point-in-time log ending PR #32 (`862f0ac`, 2026-09-07),
-> kept verbatim as history. Current state: `main@3c593fb` (PR #88 merged
-> ~15:40 UTC, attempt 4 `extraction-health.yml`); Build APK 2m46s PASS,
-> CI 5m23s PASS, test-release 6m33s PASS, rolling `test` republished
-> 15:46:15Z apk / 15:47:22Z msi all four assets verified via release API.
-> **New healthy workflow id 360655315 `extraction-health` active with
-> correct name `extraction-health` (not file path), no phantom 0-job push
-> on merge** — bypassed corrupted registration that wedged 348098190
-> (deleted) and 360227450 (active wedged, fired phantom 35241808266 on
-> same merge). Old `rot-drill-daily.yml` to be deleted next PR to orphan
-> 360227450. Support ticket #4765894 filed ~03:15 UTC still pending but
-> workaround succeeded. Dispatch still 403 for agent — user must click
-> **Run workflow** on `extraction-health` in Actions UI; schedule 04:17 UTC
-> will fire next window. No v0.1.0 tag/release yet. S1 exit criterion is
-> live GREEN run of `extraction-health` (replacing rot-drill).
+> **Current status (2026-09-18, Stage S1 remains open):** The release baseline remains `main@33e94b0` after PR #90. PR #91 is OPEN and unmerged at docs head **`89187f0`** (production repair **`c71d1bb`**); Android and Windows/Desktop production fixes remain intact and are not the remaining issue.
+> Candidate run **35325690972** tested `c71d1bb`. Its classifier step passed, the rot-drill issue step was skipped, and the overall result was `ENVIRONMENT_BLOCKED`; only the intentional non-PASS gate failed. The previous Home-driven `FAIL` is no longer present after the request-contract repair. The resolver remains YouTube-runner-gated, so no live audio bytes were validated.
+> The narrow production change matches the independent anonymous client's observed request: `alt=json`, empty `context.user`, Home `browseId` in the JSON body, opaque continuation in `ctoken`/`continuation` query parameters, and cached anonymous `X-Goog-Visitor-Id`. `HomeFeedParser.kt` was not changed. A tab-only shell remains a genuine parse failure; no empty-page success or opaque-endpoint follow-up is permitted.
+> All non-PASS statuses remain non-zero, and only `FAIL` opens a rot-drill issue. S2, hardware, and stable-release acceptance remain blocked pending approved residential/device playback evidence. The user has separately authorized the documented code merge; that merge does not claim live playback acceptance. No same-run dispatch loop is requested; raw GitHub logs return `EOF` in this sandbox and local Gradle cannot run without a JDK.
+
+## Pre-merge verification — 2026-09-18
+
+- Candidate: PR **#91**, `arena/01a0b224-dhun@79d052b`, based on `main@33e94b0`.
+- Code verification: CI **35326114136** passed all shared, Android, Desktop, probe-compilation, classifier, and packaging checks. Build APK **35326114122** passed. Test-release APK/MSI jobs in **35326114116** passed; publication was correctly skipped for the unmerged PR.
+- Live-check boundary: extraction-health **35326110278** completed non-zero because the resolver remained `ENVIRONMENT_BLOCKED`. Its classifier passed and the rot-drill issue step was skipped; this is not evidence of a new DHUN/Home failure, but it is also not live playback acceptance.
+- Merge disposition: the user explicitly authorized merging after this record. Merging records the request-contract repair and CI verification only; it does **not** close S1, certify live audio, or unblock S2.
+
 
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
 RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**
@@ -76,7 +72,7 @@ suppressed until retry; backups are still recommended. No v0.1.0.
 |---|---|---|
 | Typed error taxonomy and actionable user messages | 🟨 Typed `DhunResult`/`DhunError` + `toUserMessage` paths, per-request retry, 429 global backoff gate (`2932d57`, with unit tests), and offline banner (`fed1d54`) are merged with recovery UX; baseline CI `34018809911` is green. Local reason-preserving diagnostics changes await CI; offline/429/403 hardware checks and db-path review remain | `shared/.../core/RateLimitGate.kt`, `shared/.../core/ConnectivityMonitor.kt`, `DhunAppShell.kt`, hosts' Koin modules |
 | Bounded audio cache and offline replay | 🟨 Android + Desktop code | Android: Media3 `SimpleCache` LRU via `DhunAudioSegmentCache` + `CacheDataSource` (stable video-id keys). Desktop: `AudioFileCache` whole-track LRU files under `<data dir>/cache/audio`, background fill during first play, local-file playback on hit (no resolve → offline). Both use `SettingsKeys.CACHE_SIZE_MB` default 1024 MB (`AudioCacheBudget`). URL TTL cache still `DhunStreamCache`. Unit tests: `AudioFileCacheTest` (9: hit/LRU victim/over-budget/short-read/cancel/unsafe id/partial sweep/shrink+clear). Hardware offline-replay check OPEN on both |
-| Daily live rot-drill | 🔴 Latest verified run **34011539225**, scheduled on `dd1ab31`, failed; metadata PASS; own-client / production aggregate Unavailable; yt-dlp WATCH separately AuthRequired | Schedule, issue #14 alert and artifact `rot-drill-34011539225` proven. No newer live verdict, green byte check or recovery auto-close |
+| Daily live extraction-health | 🟨 Candidate run **35325690972** tested `c71d1bb`: the request-contract repair removed the prior Home-driven `FAIL`; the final classification was `ENVIRONMENT_BLOCKED`, with the resolver still bot-gated. | S1 remains open pending approved residential/device playback evidence. Keep `ENVIRONMENT_BLOCKED`/`UNAVAILABLE` separate; do not begin S2. |
 | Android 30-minute soak | ⬜ Open | Requires a physical device with unrestricted battery mode, lock-screen playback, and zero-crash/leak evidence |
 | Desktop 30-minute soak | ⬜ Open | Requires a desktop with libVLC and tray/SMTC-capable runtime |
 | Release v0.1.0 artifacts | ⬜ Open | Rolling `test` APK/MSI is not the signed/stable v0.1.0 release; clean-target installation and release evidence are required |
@@ -100,7 +96,15 @@ for upstream recovery.
 
 ## Live evidence log
 
-### Rot-drill
+### Rot-drill / extraction-health
+
+- [x] **Current candidate live run — run 35321898985 (2026-09-18, `workflow_dispatch`, `arena/01a0b224-dhun@257251c`, job 105526042204): RED / correctly classified result.** Version/search, first Home page, related, and deterministic offline playback passed. `home-more` failed with `tabs[tabRenderer]`, `tabRenderers[endpoint,icon,selected,tabIdentifier,title,trackingParams]`, and empty `tabContents`/`tabSections`; no browse items/actions/commands/continuations were present. Own-client/yt-dlp and their watch lines were `ENVIRONMENT_BLOCKED`; NewPipe remained the separate short-JSON watch. The overall verdict was correctly `FAIL` because the Home response had no section/cursor payload. Artifact `rot-drill-35321898985` id **10537362749** exists; blob download returned `EOF` in the sandbox.
+- [ ] **Raw Home response / real section-cursor contract pending:** the shape-diagnostic objective is complete in code head `f36cc76`. Do not add an empty-page success or opaque-endpoint follow-up. A raw/sanitized response or later approved run with a real section/cursor payload is required before another parser branch is justified. Android and Windows/Desktop production paths are not being reopened.
+- [x] **Stale-candidate rerun — run 35310771629 attempt 5, job 105507779324:** GitHub reran older head `dbb3c08`, not the final branch head. Metadata/search, first Home page, related, and offline passed; `home-more` failed again; resolver bot-gating and NewPipe short-JSON remained separate. The old workflow revision had no classifier step, so this does not validate the final probe status changes. Refreshed artifact id **10535400903**; artifact download returned `EOF` in the sandbox.
+- [x] **Current S1 live verdict — run 35306224822 (2026-09-18, `workflow_dispatch`, `main@33e94b0`, job 105478849067): RED / mixed.** Artifact `rot-drill-35306224822` (id **10532130174**, 4,357 B) exists and issue #14 received the workflow comment. Version/search passed (20 songs), Home first page passed (2 sections + continuation token), related passed (50 tracks), and the deterministic offline probe passed with zero network calls. `home-more` independently failed with `Parse(detail=Home response contained no section list or Home continuation action)`. Own-client and yt-dlp returned `AuthRequired` / `LOGIN_REQUIRED` bot-gating, so stream bytes were skipped; NewPipe returned `Parse(detail=JSON response is too short)`. The artifact blob download returned `EOF` in the sandbox, so the raw Home body is not available. Keep bot-gating and parser findings separate; no cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007.
+- [x] **Candidate-branch probe — run 35308796439 (2026-09-18, `arena/01a0b224-dhun@c546d7b`):** offline/metadata/search/related passed, but `home-more` remained RED with shape-only detail `top[contents,responseContext,trackingParams]`; own-client/yt-dlp remained bot-gated, NewPipe remained short-JSON parse, and no audio bytes were validated. Artifact `rot-drill-35308796439` id **10532443661** exists; blob download returned `EOF` in the sandbox.
+- [x] **Home continuation request-contract follow-up — run `35325690972` on `c71d1bb`:** the independent anonymous client supplied the real `continuationContents.sectionListContinuation` contract, so DHUN was repaired at the request layer (`alt=json`, body/query token placement, and anonymous visitor header). `HomeFeedParser.kt` remained unchanged; the candidate no longer produced a Home-driven `FAIL` and was classified `ENVIRONMENT_BLOCKED` solely because resolver playback remains runner-gated. The earlier tab-only shell remains invalid if encountered; no parser fallback or opaque-endpoint follow-up is accepted.
+
 
 - [x] **Failure path exercised for real — run 33961533965 (2026-09-05,
       workflow_dispatch on `a554594`, job 101295458477): FAILED as
@@ -157,8 +161,10 @@ for upstream recovery.
       stream FAIL / Unavailable. Do not relabel the aggregate as AuthRequired.
       Run: https://github.com/99ggprooo00-code/DHUN/actions/runs/34011539225
 - [x] Failure path creates/updates one issue and uploads the log artifact.
-- [ ] Manual/scheduled run completes with `PROBE|verdict|PASS`, including
-      validated audio bytes. No newer live run for `0920148` was verified.
+- [ ] A later live run completes with `PROBE|verdict|PASS`, including
+      validated audio bytes, after the current mixed RED is reconciled.
+- [ ] Approved residential/device verification distinguishes runner bot-gating
+      from user-network playback.
 - [ ] Recovery path comments on and closes issue #14 (still OPEN).
 
 **CI vs user-network evidence:** a red Actions run establishes failure on
@@ -414,7 +420,7 @@ recorded here.
 
 ### v0.1.0 release gate
 
-- [ ] Rot-drill is scheduled and has a green live run (scheduled run still red at `34011539225`; re-investigate after next green).
+- [ ] `extraction-health` has a current green live run on the release candidate (run **35306224822** is the current mixed RED; the Home parser and runner-network findings remain open).
 - [ ] Android APK and AAB build and install on a clean target.
 - [ ] Windows MSI installs and launches on a clean Windows VM/user — **published baseline `0920148` launches on the user’s machine; install-over failed and clean-target hygiene is still OPEN**.
 - [ ] Android and Desktop soak evidence is attached above (both still OPEN; use an identified candidate that first passes real playback).

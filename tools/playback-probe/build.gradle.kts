@@ -17,6 +17,7 @@ dependencies {
     // Stream extraction engine (GPL-3.0). NOTE: its POM scopes ALL deps to
     // runtime-only — anything needed at compile time must be declared here.
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    testImplementation(kotlin("test"))
 }
 
 application {
@@ -55,10 +56,10 @@ tasks.register<Copy>("resolveRuntime") {
     into(layout.buildDirectory.dir("runtime-libs"))
 }
 
-// CI runs `:tools:playback-probe:compileKotlin` as its last step. Until the
-// repo owner adds a dedicated desktop step to ci.yml (the agent token cannot
-// edit workflows), chain the Phase 04 desktop compile onto it so the desktop
-// module is compile-checked on every PR. Local builds are unaffected.
+// CI compiles and tests this module explicitly. Until the repository keeps a
+// separate desktop compile dependency in the main build job, retain the
+// GITHUB_ACTIONS-only dependency so the probe compile also checks the Desktop
+// JVM source set. Local builds are unaffected.
 if (System.getenv("GITHUB_ACTIONS") == "true") {
     tasks.named("compileKotlin") {
         dependsOn(":app-desktop:compileKotlinJvm")

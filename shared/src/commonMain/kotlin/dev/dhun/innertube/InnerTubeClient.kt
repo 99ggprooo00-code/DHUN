@@ -20,6 +20,7 @@ import io.ktor.client.plugins.timeout
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -88,6 +89,9 @@ class InnerTubeClient(
     @Volatile
     private var cachedVisitorData: String? = null
 
+    @Volatile
+    private var cachedMusicVisitorData: String? = null
+
     /** Player-JS URL to the `signatureTimestamp` extracted from it. */
     @Volatile
     private var cachedSts: Pair<String, String>? = null
@@ -115,6 +119,7 @@ class InnerTubeClient(
         val version = Regex("\"INNERTUBE_CLIENT_VERSION\":\"([0-9.]+)\"")
             .find(html)?.groupValues?.get(1)
             ?: throw DhunException(DhunError.Parse("client version missing from homepage HTML"))
+        cachedMusicVisitorData = parseVisitorDataFromHomepage(html)
         cachedClientVersion = version
         return version
     }
@@ -169,14 +174,21 @@ class InnerTubeClient(
             parseHomeFeedPage(postJson("browse", body))
         }
 
-    /** Next page of home shelves (InnerTube `/browse` continuation). */
+    /**
+     * Next page of Home shelves (InnerTube `/browse` continuation).
+     *
+     * YouTube Music's current browse wire contract keeps the Home browse id in
+     * the JSON body and carries the opaque continuation in the query parameters
+     * (`ctoken` and `continuation`). Sending the token only as a JSON field can
+     * return a tab-navigation shell instead of the continuation contents.
+     */
     suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> =
         resultify {
             val body = buildJsonObject {
                 put("context", context())
-                put("continuation", continuationToken)
+                put("browseId", "FEmusic_home")
             }
-            parseHomeFeedPage(postJson("browse", body))
+            parseHomeFeedPage(postJson("browse", body, continuationToken))
         }
 
     /* ---------------- browse pages (Phase 09) ---------------------------- */
@@ -454,10 +466,16 @@ class InnerTubeClient(
             put("hl", "en")
             put("gl", country)
         }
+        putJsonObject("user") {}
     }
 
-    private suspend fun postJson(endpoint: String, body: JsonObject): JsonObject {
+    private suspend fun postJson(
+        endpoint: String,
+        body: JsonObject,
+        continuationToken: String? = null,
+    ): JsonObject {
         val version = clientVersion()
+        val visitorData = cachedMusicVisitorData
         // context() may have been built BEFORE the first version discovery.
         // Keep body and X-YouTube-Client-Version aligned on the very first request.
         val requestBody = bodyWithClientVersion(body, version)
@@ -466,11 +484,16 @@ class InnerTubeClient(
             globalRateGate.await() // Phase 14: 429 global backoff — all calls wait out a tripped gate
             if (attempt > 0) delay(backoffMillis(attempt, lastError))
             try {
-                val response = httpClient.post("$MUSIC_BASE/youtubei/v1/$endpoint?prettyPrint=false") {
+                val response = httpClient.post("$MUSIC_BASE/youtubei/v1/$endpoint?alt=json") {
+                    continuationToken?.let { token ->
+                        parameter("ctoken", token)
+                        parameter("continuation", token)
+                    }
                     browserHeaders()
                     headers {
                         append("X-YouTube-Client-Name", CLIENT_NAME_WEB_REMIX)
                         append("X-YouTube-Client-Version", version)
+                        visitorData?.let { append("X-Goog-Visitor-Id", it) }
                         append(HttpHeaders.ContentType, "application/json")
                     }
                     timeout { requestTimeoutMillis = 20_000 }
