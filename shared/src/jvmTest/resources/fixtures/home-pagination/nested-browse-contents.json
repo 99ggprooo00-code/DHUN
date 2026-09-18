@@ -1,0 +1,61 @@
+{
+  "contents": {
+    "singleColumnBrowseResultsRenderer": {
+      "contents": [
+        {
+          "musicShelfRenderer": {
+            "title": {
+              "runs": [
+                {
+                  "text": "More recommendations"
+                }
+              ]
+            },
+            "contents": [
+              {
+                "musicResponsiveListItemRenderer": {
+                  "playlistItemData": {
+                    "videoId": "c"
+                  },
+                  "flexColumns": [
+                    {
+                      "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {
+                          "runs": [
+                            {
+                              "text": "Track c"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {
+                          "runs": [
+                            {
+                              "text": "Artist"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "continuationItemRenderer": {
+            "continuationEndpoint": {
+              "continuationCommand": {
+                "token": "page-four"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

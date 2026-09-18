@@ -63,6 +63,13 @@ class HomeFeedParserTest {
     }
 
     @Test
+    fun acceptsSectionEntriesNestedDirectlyInABrowseRenderer() {
+        val result = parseHomeFeedPage(fixture("nested-browse-contents"))
+        assertEquals("c", result.sections.single().tracks.single().id)
+        assertEquals("page-four", result.continuationToken)
+    }
+
+    @Test
     fun parsesAppendActionsInAllSupportedResponseFields() {
         val actions = fixture("append-action").arr("onResponseReceivedActions")!!
         for (field in listOf("onResponseReceivedActions", "onResponseReceivedEndpoints", "onResponseReceivedCommands")) {

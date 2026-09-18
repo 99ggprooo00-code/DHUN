@@ -79,12 +79,38 @@ internal fun parseHomeFeedPage(root: JsonObject): HomeFeedPage {
     contents.obj("sectionListRenderer")?.let { return homePage(it) }
     val browse = contents.obj("singleColumnBrowseResultsRenderer")
         ?: contents.obj("twoColumnBrowseResultsRenderer")
-    val tabs = browse.arr("tabs").orEmpty().mapNotNull { (it as? JsonObject).obj("tabRenderer") }
-    val selected = tabs.firstOrNull { it.str("selected") == "true" } ?: tabs.firstOrNull()
-    selected.obj("content").obj("sectionListRenderer")?.let { return homePage(it) }
+    browse?.let { homeBrowsePage(it)?.let { return it } }
     root.obj("sectionListRenderer")?.let { return homePage(it) }
 
     return homeActionPage(root)
+}
+
+/**
+ * Parse the two browse envelopes seen around Home pages. Full Browse replies
+ * put the section list under a selected tab; some Home continuation replies
+ * put the section entries directly under the browse renderer instead. Keep
+ * both paths scoped to the known browse wrapper rather than recursively
+ * flattening unrelated response objects.
+ */
+private fun homeBrowsePage(browse: JsonObject): HomeFeedPage? {
+    val tabs = browse.arr("tabs").orEmpty()
+        .mapNotNull { (it as? JsonObject).obj("tabRenderer") }
+    val selected = tabs.firstOrNull { it.str("selected") == "true" } ?: tabs.firstOrNull()
+    selected.obj("content").obj("sectionListRenderer")?.let { return homePage(it) }
+
+    browse.obj("sectionListRenderer")?.let { return homePage(it) }
+    browse.arr("contents")?.let { items ->
+        return homePage(JsonObject(mapOf("contents" to items)))
+    }
+
+    // A second wrapper occasionally appears between the browse renderer and
+    // its section list. Accept only the same known section/list keys.
+    val nested = browse.obj("contents")
+    nested.obj("sectionListRenderer")?.let { return homePage(it) }
+    nested.arr("contents")?.let { items ->
+        return homePage(JsonObject(mapOf("contents" to items)))
+    }
+    return null
 }
 
 private data class HomeAppend(val target: String?, val items: JsonArray)
@@ -122,11 +148,19 @@ private fun homeShapeSummary(root: JsonObject): String {
     val contents = root.obj("contents")
     val contentsItems = contents?.arr("contents").orEmpty().mapNotNull { it as? JsonObject }
     val rootItems = root.arr("contents").orEmpty().mapNotNull { it as? JsonObject }
+    val browseContainers = listOfNotNull(
+        contents?.obj("singleColumnBrowseResultsRenderer"),
+        contents?.obj("twoColumnBrowseResultsRenderer"),
+    )
+    val browseItems = browseContainers.flatMap { it.arr("contents").orEmpty() }
+        .mapNotNull { it as? JsonObject }
     return "shape=top[${keys(listOf(root))}]" +
         ";continuation[${keys(listOfNotNull(root.obj("continuationContents")))}]" +
         ";contents[${keys(listOfNotNull(contents))}]" +
         ";contentsItems[${keys(contentsItems)}]" +
         ";rootItems[${keys(rootItems)}]" +
+        ";browse[${keys(browseContainers)}]" +
+        ";browseItems[${keys(browseItems)}]" +
         ";actions[${keys(actionEntries)}]" +
         ";commands[${keys(commands)}]" +
         ";items[${keys(continuationItems)}]"
