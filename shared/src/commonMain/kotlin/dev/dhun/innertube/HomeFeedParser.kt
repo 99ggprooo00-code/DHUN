@@ -21,21 +21,61 @@ internal fun parseHomeFeedPage(root: JsonObject): HomeFeedPage {
     // wrapper key is different. Normalize them before parsing; otherwise a
     // valid Home page falls through to the action error below.
     continuationContents.obj("musicShelfContinuation")?.let {
-        return homeShelfContinuationPage("musicShelfRenderer", it)
+        return homeShelfPage("musicShelfRenderer", it)
     }
     continuationContents.obj("musicPlaylistShelfContinuation")?.let {
-        return homeShelfContinuationPage("musicPlaylistShelfRenderer", it)
+        return homeShelfPage("musicPlaylistShelfRenderer", it)
     }
     continuationContents.obj("musicCarouselShelfContinuation")?.let {
-        return homeShelfContinuationPage("musicCarouselShelfRenderer", it)
+        return homeShelfPage("musicCarouselShelfRenderer", it)
     }
     continuationContents.obj("musicImmersiveCarouselShelfContinuation")?.let {
-        return homeShelfContinuationPage("musicImmersiveCarouselShelfRenderer", it)
+        return homeShelfPage("musicImmersiveCarouselShelfRenderer", it)
     }
 
     // A full page may also contain unrelated sidebar/shelf update commands.
     // Prefer its actual section list before looking at incremental actions.
     val contents = root.obj("contents")
+    contents.obj("musicShelfContinuation")?.let {
+        return homeShelfPage("musicShelfRenderer", it)
+    }
+    contents.obj("musicPlaylistShelfContinuation")?.let {
+        return homeShelfPage("musicPlaylistShelfRenderer", it)
+    }
+    contents.obj("musicCarouselShelfContinuation")?.let {
+        return homeShelfPage("musicCarouselShelfRenderer", it)
+    }
+    contents.obj("musicImmersiveCarouselShelfContinuation")?.let {
+        return homeShelfPage("musicImmersiveCarouselShelfRenderer", it)
+    }
+    contents.obj("musicShelfRenderer")?.let {
+        return homeShelfPage("musicShelfRenderer", it)
+    }
+    contents.obj("musicPlaylistShelfRenderer")?.let {
+        return homeShelfPage("musicPlaylistShelfRenderer", it)
+    }
+    contents.obj("musicCarouselShelfRenderer")?.let {
+        return homeShelfPage("musicCarouselShelfRenderer", it)
+    }
+    contents.obj("musicImmersiveCarouselShelfRenderer")?.let {
+        return homeShelfPage("musicImmersiveCarouselShelfRenderer", it)
+    }
+    // Some continuation replies place the shelf object directly under
+    // `contents`, without a renderer/continuation wrapper. Treat it as a
+    // shelf only when it actually yields rows or its own cursor; otherwise
+    // continue to the strict action-shape validation below.
+    contents?.let { directContents ->
+        if (directContents.arr("contents") != null) {
+            homeShelfPage("musicShelfRenderer", directContents)
+                .takeIf { it.sections.isNotEmpty() || it.continuationToken != null }
+                ?.let { return it }
+        }
+    }
+    root.arr("contents")?.let { items ->
+        homeShelfPage("musicShelfRenderer", JsonObject(mapOf("contents" to items)))
+            .takeIf { it.sections.isNotEmpty() || it.continuationToken != null }
+            ?.let { return it }
+    }
     contents.obj("sectionListRenderer")?.let { return homePage(it) }
     val browse = contents.obj("singleColumnBrowseResultsRenderer")
         ?: contents.obj("twoColumnBrowseResultsRenderer")
@@ -79,8 +119,14 @@ private fun homeShapeSummary(root: JsonObject): String {
     }
     val continuationItems = commands.flatMap { it.arr("continuationItems").orEmpty() }
         .mapNotNull { it as? JsonObject }
+    val contents = root.obj("contents")
+    val contentsItems = contents?.arr("contents").orEmpty().mapNotNull { it as? JsonObject }
+    val rootItems = root.arr("contents").orEmpty().mapNotNull { it as? JsonObject }
     return "shape=top[${keys(listOf(root))}]" +
         ";continuation[${keys(listOfNotNull(root.obj("continuationContents")))}]" +
+        ";contents[${keys(listOfNotNull(contents))}]" +
+        ";contentsItems[${keys(contentsItems)}]" +
+        ";rootItems[${keys(rootItems)}]" +
         ";actions[${keys(actionEntries)}]" +
         ";commands[${keys(commands)}]" +
         ";items[${keys(continuationItems)}]"
@@ -129,10 +175,10 @@ private fun homeActionPage(root: JsonObject): HomeFeedPage {
     )
 }
 
-private fun homeShelfContinuationPage(rendererName: String, continuation: JsonObject): HomeFeedPage =
+private fun homeShelfPage(rendererName: String, shelf: JsonObject): HomeFeedPage =
     HomeFeedPage(
-        sections = parseHomeSections(JsonObject(mapOf(rendererName to continuation))),
-        continuationToken = homeListContinuation(continuation),
+        sections = parseHomeSections(JsonObject(mapOf(rendererName to shelf))),
+        continuationToken = homeListContinuation(shelf),
     )
 
 private fun homePage(list: JsonObject): HomeFeedPage = HomeFeedPage(

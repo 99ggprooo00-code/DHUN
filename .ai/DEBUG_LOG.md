@@ -97,6 +97,37 @@ Build APK **35307916736**, and test-release **35307916668** all passed, includin
 JVM parser suite. This proves compilation/tests for the candidate only; it does not prove the
 live Home response uses either covered shape.
 
+
+## 2026-09-18 — Candidate-branch run 35308796439 keeps Home RED (`arena/01a0b224-dhun`)
+
+**Owner-triggered validation.** Workflow `extraction-health` run **35308796439**
+used candidate branch `arena/01a0b224-dhun` at `c546d7b797157bfd5d2eb6954c45ceefe54bb686`.
+The probe job **105486452033** completed the live steps and uploaded artifact
+`rot-drill-35308796439` (id **10532443661**, 4,402 bytes), then failed at the
+intentional alert step. The artifact blob again returned `EOF` from this
+sandbox; issue #14 preserves the tail. No cookies, credentials, PO tokens, or
+signed URLs are recorded.
+
+**What the candidate run proved.** Version/search passed, Home first page passed
+(2 sections and a token), related passed (50), and the offline probe passed.
+The first shelf-continuation candidate did **not** clear `home-more`:
+
+```
+PROBE|home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action; shape=top[contents,responseContext,trackingParams];continuation[-];actions[-];commands[-];items[-])
+```
+
+The shape-only diagnostic is useful: the continuation response has a top-level
+`contents` field, not `continuationContents` or an action array. The candidate
+parser did not yet inspect the direct nested contents contract. Own-client/yt-dlp
+still returned `AuthRequired` bot-gating, NewPipe still returned
+`Parse(detail=JSON response is too short)`, and no audio bytes were validated.
+
+**Follow-up.** The next narrow patch accepts a shelf object directly under
+`contents` when it yields rows/cursor, and expands shape-only diagnostics to
+report the direct contents/item keys. This is still a source/test hypothesis
+until CI and another owner-triggered candidate run confirm it. S1 remains RED;
+S2 remains blocked; no auth/attestation workaround is permitted.
+
 ## 2026-09-18 — S1 boot reconciliation: registration is healthy, live verdict is still absent (`arena/01a0b224-dhun`)
 
 **Current gap.** The repository is at `main@33e94b0` after PR #90. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** all pass, and the rolling `test` release points at that SHA. The replacement workflow `extraction-health` (id **360655315**) is active with the declared name, but `gh run list --workflow extraction-health.yml` returns no runs.

@@ -56,6 +56,13 @@ class HomeFeedParserTest {
     }
 
     @Test
+    fun acceptsAContinuationShelfDirectlyUnderContents() {
+        val result = parseHomeFeedPage(fixture("direct-shelf-contents"))
+        assertEquals("b", result.sections.single().tracks.single().id)
+        assertEquals("page-three", result.continuationToken)
+    }
+
+    @Test
     fun parsesAppendActionsInAllSupportedResponseFields() {
         val actions = fixture("append-action").arr("onResponseReceivedActions")!!
         for (field in listOf("onResponseReceivedActions", "onResponseReceivedEndpoints", "onResponseReceivedCommands")) {
