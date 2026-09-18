@@ -3,7 +3,14 @@
 > **Current status (2026-09-18, Stage S1 remains open):** The release baseline remains `main@33e94b0` after PR #90. PR #91 is OPEN and unmerged at docs head **`89187f0`** (production repair **`c71d1bb`**); Android and Windows/Desktop production fixes remain intact and are not the remaining issue.
 > Candidate run **35325690972** tested `c71d1bb`. Its classifier step passed, the rot-drill issue step was skipped, and the overall result was `ENVIRONMENT_BLOCKED`; only the intentional non-PASS gate failed. The previous Home-driven `FAIL` is no longer present after the request-contract repair. The resolver remains YouTube-runner-gated, so no live audio bytes were validated.
 > The narrow production change matches the independent anonymous client's observed request: `alt=json`, empty `context.user`, Home `browseId` in the JSON body, opaque continuation in `ctoken`/`continuation` query parameters, and cached anonymous `X-Goog-Visitor-Id`. `HomeFeedParser.kt` was not changed. A tab-only shell remains a genuine parse failure; no empty-page success or opaque-endpoint follow-up is permitted.
-> All non-PASS statuses remain non-zero, and only `FAIL` opens a rot-drill issue. S2, hardware, stable-release, and merge acceptance remain blocked pending approved residential/device playback evidence. No same-run dispatch loop is requested; raw GitHub logs return `EOF` in this sandbox and local Gradle cannot run without a JDK.
+> All non-PASS statuses remain non-zero, and only `FAIL` opens a rot-drill issue. S2, hardware, and stable-release acceptance remain blocked pending approved residential/device playback evidence. The user has separately authorized the documented code merge; that merge does not claim live playback acceptance. No same-run dispatch loop is requested; raw GitHub logs return `EOF` in this sandbox and local Gradle cannot run without a JDK.
+
+## Pre-merge verification — 2026-09-18
+
+- Candidate: PR **#91**, `arena/01a0b224-dhun@79d052b`, based on `main@33e94b0`.
+- Code verification: CI **35326114136** passed all shared, Android, Desktop, probe-compilation, classifier, and packaging checks. Build APK **35326114122** passed. Test-release APK/MSI jobs in **35326114116** passed; publication was correctly skipped for the unmerged PR.
+- Live-check boundary: extraction-health **35326110278** completed non-zero because the resolver remained `ENVIRONMENT_BLOCKED`. Its classifier passed and the rot-drill issue step was skipped; this is not evidence of a new DHUN/Home failure, but it is also not live playback acceptance.
+- Merge disposition: the user explicitly authorized merging after this record. Merging records the request-contract repair and CI verification only; it does **not** close S1, certify live audio, or unblock S2.
 
 
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
