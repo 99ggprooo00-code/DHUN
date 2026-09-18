@@ -1,5 +1,33 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-18** · session **`arena/01a0b342-dhun`** · main `33e94b0`
+(PR #90 merged). **Continuation is still S1–S6.**
+
+**Last session was OUT-OF-PLAN — read before resuming.**
+The user asked to host the project at
+`https://99ggprooo00-code.github.io/DHUN/` and chose a runnable web build, so
+one was built (`web/` + `tools/web-bridge`, branch only, **not merged**).
+That contradicts `MASTER_PROMPT.md` §3 ("**Web: cut**") and §7 ("Explicitly
+NOT in S1–S6 … **Web/PWA**"), and `PROBLEMS_AND_FIXES.md` P7 calls any future
+web effort "a separate, explicit project decision". §8 rule 9 (stop → ADR →
+user OK) was not followed. Full record in `KNOWN_LIMITATIONS.md`
+(2026-09-18). **No decision has been made to adopt web; do not treat the
+branch as approved scope.** It advanced nothing in S1–S6.
+
+**Exact next steps (unchanged from before, still the real queue):**
+1. **User action required (S1 exit):** Actions → `extraction-health` → Run
+   workflow on main (agent 403). Record live verdict in
+   `docs/verification/14-release.md` + `DEBUG_LOG` → S1 close → issue #14 →
+   S2 unblock.
+2. **S2:** architectural cleanup (dead harness UI, PR #54 hygiene, docs index)
+   after S1 GREEN.
+3. **Decide the web branch:** adopt (needs MASTER_PROMPT §3/§7 amendment + an
+   ADR, per §8 rules 3 and 9) or drop it. Until then it stays unmerged.
+
+---
+
+# PREVIOUS ACTIVE TASK (superseded 2026-09-18)
+
 Updated **2026-09-17 (~16:15 UTC)** · session **`arena/01a0aff7-dhun`** · main `ef9844d`
 (Fable 5.6 key provided; AI DJ rejected — "No need that").
 
