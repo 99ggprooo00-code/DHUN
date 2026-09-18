@@ -128,6 +128,22 @@ report the direct contents/item keys. This is still a source/test hypothesis
 until CI and another owner-triggered candidate run confirm it. S1 remains RED;
 S2 remains blocked; no auth/attestation workaround is permitted.
 
+
+## 2026-09-18 — Direct-contents follow-up is PR-green; one push check flaked (`arena/01a0b224-dhun`)
+
+The follow-up parser candidate is `526e3904ec1d59c04a8a7ac595157dbf913841e6`.
+PR CI **35309128614**, Build APK **35309128640**, and test-release
+**35309128612** passed, including the shared JVM parser suite. The independent
+push CI **35309124090** failed at the unrelated
+`LibraryViewModelTest.eventually` 15-second timeout; its annotations contain no
+Home/parser failure. This is a CI flake on the same SHA, not evidence against
+the parser patch, but the branch is temporarily `UNSTABLE` until a later push
+check is green. No local Kotlin test was run.
+
+The direct-contents patch is still not live-validated. The next owner-triggered
+probe must use the current branch head after CI settles; S1 remains RED and S2
+remains blocked.
+
 ## 2026-09-18 — S1 boot reconciliation: registration is healthy, live verdict is still absent (`arena/01a0b224-dhun`)
 
 **Current gap.** The repository is at `main@33e94b0` after PR #90. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** all pass, and the rolling `test` release points at that SHA. The replacement workflow `extraction-health` (id **360655315**) is active with the declared name, but `gh run list --workflow extraction-health.yml` returns no runs.
