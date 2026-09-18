@@ -9,7 +9,7 @@ Updated **2026-09-18** · session **`arena/01a0b224-dhun`** · `main`/`origin/ma
 **GitHub state verified live:**
 - `origin/main` remains `33e94b0`; PR **#91** is OPEN, unmerged, and `CLEAN` at final pushed head **`ad129be`** (code head `6dd98fb` plus a docs-only sync).
 - Push CI **35314651766**, PR CI **35314654589**, Build APK **35314654604**, and test-release **35314654669** all pass on final pushed head `ad129be`. The passing CI includes shared domain, Android Robolectric/debug build, playback-probe compile/classifier tests, extraction-health classification, Desktop compile/JVM tests, and packaging checks.
-- The latest owner-triggered live run remains **35310771629** on older candidate `dbb3c08`; it passed metadata/search, first Home page, related, and offline checks, but `home-more` failed. Own-client/yt-dlp were separately bot-gated and NewPipe reported its separate short-JSON diagnostic.
+- The latest owner rerun is attempt **5** of workflow **35310771629**, job **105507779324**, still on older candidate `dbb3c08`; it passed metadata/search, first Home page, related, and offline checks, but `home-more` failed again. Own-client/yt-dlp were separately bot-gated and NewPipe reported its separate short-JSON diagnostic. It did not test the final branch head or the new classifier.
 
 **Last actual code error:** the malformed Kotlin `when` expression at `Main.kt:201–202` caused CI **35313043505** to fail; commit `6dd98fb` fixed it and the replacement CI is green. No current compiler/test error is known. No local Kotlin/Gradle test ran because the sandbox has no JDK; CI remains the compiler.
 

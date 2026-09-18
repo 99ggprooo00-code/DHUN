@@ -3,6 +3,13 @@
 Updated every phase. Nothing hidden.
 
 
+## 2026-09-18 — Supplied live link reran an older candidate, not the final head
+
+- Workflow run **35310771629**, attempt **5**, job **105507779324** checked out `dbb3c0872dac2e7d010883b4e5ff7482561bc62a`, not the current branch head. It reproduced the older `home-more` parse failure, separate YouTube runner bot-gating, and NewPipe short-JSON diagnostic while metadata/search/first Home/related/offline passed.
+- Because this job used the old workflow revision, its steps did not include the new probe-classification step. Its `PROBE|verdict|FAIL` must not be read as evidence against the final `ENVIRONMENT_BLOCKED`/`UNAVAILABLE` classifier.
+- The refreshed artifact is `rot-drill-35310771629` (id **10535400903**), but artifact/raw-log downloads still return `EOF` in this sandbox. The rerun is evidence for the stale candidate only; S1 remains open until the owner dispatches the current branch head.
+
+
 ## 2026-09-18 — Final probe/classifier head is CI-green; live gate remains
 
 - The malformed Kotlin `when` expression in `Main.kt` was fixed in commit `6dd98fb`. Push CI **35314651766**, PR CI **35314654589**, Build APK **35314654604**, and test-release **35314654669** all pass on the final pushed head, including shared, Android, playback-probe, extraction-health classifier, Desktop JVM, and packaging checks.

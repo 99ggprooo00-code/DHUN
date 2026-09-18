@@ -1,6 +1,30 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-18 — Owner reran stale candidate job; final head still untested (`arena/01a0b224-dhun`)
+
+**Run identity.** The supplied job link is workflow run **35310771629**, attempt
+**5**, job **105507779324**, not a new run for the final branch head. GitHub
+reports `head_sha=dbb3c0872dac2e7d010883b4e5ff7482561bc62a` (the older candidate),
+started 06:42:21Z and completed 06:44:39Z. Its refreshed artifact is
+`rot-drill-35310771629` (id **10535400903**). The artifact and raw job-log
+endpoints still return `EOF` in this sandbox.
+
+**Observed result.** The rerun reproduced the earlier old-head result: version,
+search, first Home page, related tracks, and deterministic offline playback
+passed; `home-more` failed with the same shape-only parse diagnostic; own-client
+and yt-dlp were separately YouTube bot-gated; NewPipe returned its short-JSON
+watch result. The job's steps show the old workflow revision and do not include
+the newer `Classify probe result` step, so its `PROBE|verdict|FAIL` is not a
+classification result from the final probe code.
+
+**Decision.** This is useful confirmation of the stale candidate's behavior but
+is not live validation of current code (`6dd98fb` plus docs-only heads). Android
+and Windows/Desktop production paths remain unaffected. S1 stays RED and S2
+stays blocked; the owner must dispatch `extraction-health` from the current
+`arena/01a0b224-dhun` branch head.
+
+
 ## 2026-09-18 — Final probe/classifier head is CI-green; Android/Desktop unchanged (`arena/01a0b224-dhun`)
 
 **Compiler repair.** CI **35313043505** had failed before tests because `Main.kt`
