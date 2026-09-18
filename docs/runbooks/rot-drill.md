@@ -7,15 +7,15 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-18): final probe head CI-green; S1 remains open
+## State (2026-09-18): current live classifier verified; Home parser remains RED
 
 - **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). Its baseline CI/test-release evidence remains green; the rolling `test` release is separate from this unmerged candidate.
-- **Current candidate:** PR **#91**, branch `arena/01a0b224-dhun`, final pushed head **`ad129be`** (code head `6dd98fb` plus a docs-only sync), is OPEN, unmerged, and `CLEAN`. Push CI **35314651766**, PR CI **35314654589**, Build APK **35314654604**, and test-release **35314654669** pass on the final pushed head. Android and Windows/Desktop production paths are preserved; this probe work did not replace them.
+- **Current candidate:** PR **#91**, branch `arena/01a0b224-dhun`, code/diagnostic head **`f36cc76`**, is OPEN and unmerged. Push CI **35317377585**, Build APK **35317382758**, and test-release **35317382644** pass. PR CI **35317382642** timed out in unrelated `LibraryViewModelTest.kt:82` before the changed parser/probe steps; the full push CI on the same head passed those steps. Android and Windows/Desktop production paths remain preserved and were not replaced.
 - **Healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`.
-- **Latest live candidate evidence:** rerun attempt **5** of owner run **35310771629**, job **105507779324**, still tested older head `dbb3c08` and completed `failure`; version/search, first Home page, related, and offline passed, while `home-more` failed with the top-level `contents`/`singleColumnBrowseResultsRenderer` shape. Own-client/yt-dlp returned runner bot-gating and NewPipe returned its separate short-JSON parse watch. Refreshed artifact `rot-drill-35310771629` id **10535400903** and issue #14 preserve the available evidence; blob download returned `EOF` in the sandbox. This rerun did not test the final branch head or the new classifier.
-- **Probe/workflow update:** current code emits `PASS`, `FAIL`, `ENVIRONMENT_BLOCKED`, or `UNAVAILABLE`. Home continuation failure is a real `FAIL`; explicit YouTube bot-gating is `ENVIRONMENT_BLOCKED`; all non-PASS statuses remain non-zero. The workflow opens a rot-drill issue only for `FAIL`, but does not turn an environment-blocked run into a green production claim.
-- **Current parser candidate:** the direct/nested-browse parser and fixture changes are CI-verified as part of `6dd98fb`, but are not live-accepted. `home-more` must pass on the final head before S1 closes.
-- **Exact next step:** repository owner triggers `extraction-health` on `arena/01a0b224-dhun` at final pushed head `ad129be` (code changes are `6dd98fb`), then records the live `home-more` and verdict classification. The agent still receives HTTP 403 for `workflow_dispatch`.
+- **Latest live candidate evidence:** owner run **35316993036**, job **105510712498**, tested prior head `ad1b403` and completed `failure`. Version/search, first Home page, related, and offline passed; `home-more` failed with `contents[singleColumnBrowseResultsRenderer]` → `browse[tabs]` and no `browseItems`. The resolver and both own-client/yt-dlp watches correctly reported `ENVIRONMENT_BLOCKED`; NewPipe reported its separate short-JSON watch. Artifact `rot-drill-35316993036` id **10535238461** exists; blob download returned `EOF` in the sandbox.
+- **Probe/workflow interpretation:** Home continuation failure is a real `FAIL`; explicit YouTube bot-gating is `ENVIRONMENT_BLOCKED`; all non-PASS statuses remain non-zero. The overall run was correctly `FAIL` because Home parsing failed, while the resolver gate was not misreported as a DHUN resolver defect.
+- **Current parser diagnostic:** commit `f36cc76` adds only shape-key diagnostics for nested browse tabs (`tabs`, tab renderers, tab contents, tab sections). It needs a new live run before any parser branch is added.
+- **Exact next step:** repository owner triggers `extraction-health` on current branch head `arena/01a0b224-dhun` (code head `f36cc76`), then records the expanded nested-tab keys. The agent still receives HTTP 403 for `workflow_dispatch`.
 - **Gate:** S1 remains RED/open; S2 is blocked and PR #91 remains open/unmerged.
 
 ## Dispatch
@@ -56,7 +56,7 @@ gh workflow run extraction-health.yml --ref arena/01a0b224-dhun --repo 99ggprooo
 - **`PROBE|verdict|UNAVAILABLE`** = external live service/network did not provide a health result. It is not a DHUN parser verdict, but it is also not a pass.
 - **`PROBE|verdict|FAIL`** = a production-path/probe check failed. Home feed or continuation parser errors are always in this category. The workflow opens/comments on issue `[rot-drill] Live extraction probe failed` with the last 12 KB and retains the full 14-day artifact.
 - A separate `WATCH|newpipe-stream|BROKEN|Parse(JSON response is too short)` line is diagnostic only. NewPipe is not in either production resolver chain and must not be folded into Home or own-client/yt-dlp conclusions.
-- Run **35310771629** still failed `home-more` with `contents[singleColumnBrowseResultsRenderer]`; the final pushed candidate at `ad129be` (code changes are `6dd98fb`) includes the scoped parser follow-up but is not accepted until another candidate run passes. The raw artifact blob is unavailable in this sandbox, so keep diagnostics key-only.
+- Run **35316993036** on older head `ad1b403` still failed `home-more` with `contents[singleColumnBrowseResultsRenderer]` → `browse[tabs]`; code head `f36cc76` adds nested tab-key diagnostics but is not live-accepted until a new candidate run passes. The raw artifact blob is unavailable in this sandbox, so keep diagnostics key-only.
 - **Gray / skipped probe job** = run never started (concurrency cancel). Re-dispatch.
 - **Red run with ZERO jobs** (failure but jobs list empty, total_count:0) = trigger noise, not verdict — see below.
 

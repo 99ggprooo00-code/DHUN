@@ -3,6 +3,14 @@
 Updated every phase. Nothing hidden.
 
 
+## 2026-09-18 — Current-head live probe confirms Home RED and classifier boundary
+
+- Owner run **35316993036** (job **105510712498**, `workflow_dispatch`) tested `arena/01a0b224-dhun@ad1b403`, completed `failure`, and included the new `Classify probe result` step. Version/search, first Home page, related, and deterministic offline playback passed.
+- `home-more` still failed as a shared parser error. The safe shape summary now reaches `contents[singleColumnBrowseResultsRenderer]` with `browse[tabs]` and no `browseItems`; the response values are unavailable because GitHub artifact/raw-log downloads return `EOF` in this sandbox.
+- The resolver correctly emitted `ENVIRONMENT_BLOCKED`, and both own-client/yt-dlp watch lines were `ENVIRONMENT_BLOCKED`. NewPipe remained its separate `BROKEN` short-JSON diagnostic. The overall verdict correctly remained `FAIL` because Home parsing failed; the workflow stayed non-zero and opened/updated the rot-drill issue.
+- Commit `f36cc76` adds only nested tab/section key diagnostics (`tabs`, tab renderers, tab contents, tab sections) for the next owner run. Push CI **35317377585**, Build APK **35317382758**, and test-release **35317382644** pass on that head. PR CI **35317382642** independently timed out in `LibraryViewModelTest` before changed parser/probe steps; this is a flaky test signal, not an Android/Desktop extraction regression.
+
+
 ## 2026-09-18 — Supplied live link reran an older candidate, not the final head
 
 - Workflow run **35310771629**, attempt **5**, job **105507779324** checked out `dbb3c0872dac2e7d010883b4e5ff7482561bc62a`, not the current branch head. It reproduced the older `home-more` parse failure, separate YouTube runner bot-gating, and NewPipe short-JSON diagnostic while metadata/search/first Home/related/offline passed.

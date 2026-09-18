@@ -1,6 +1,38 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-18 — Current-head extraction-health run proves classifier; Home remains RED (`arena/01a0b224-dhun`)
+
+**Run identity.** Owner-triggered `extraction-health` run **35316993036**
+(run #6, attempt 1), job **105510712498**, checked out
+`arena/01a0b224-dhun@ad1b403f35b3373a20fa0f83ca1c21f1d510baaa`. It completed
+06:57:27Z with failure and uploaded artifact `rot-drill-35316993036` (id
+**10535238461**). Raw job logs and artifact download still return `EOF` in this
+sandbox.
+
+**Probe result.** Version/search, first Home page, related tracks, and
+zero-network offline playback passed. `home-more` failed independently:
+
+```
+PROBE|home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action; shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];contentsItems[-];rootItems[-];browse[tabs];browseItems[-];actions[-];commands[-];items[-])
+```
+
+The resolver emitted `ENVIRONMENT_BLOCKED`, and own-client/yt-dlp watch lines
+also emitted `ENVIRONMENT_BLOCKED`, proving the new classification boundary is
+working. NewPipe remained a separate `BROKEN|Parse(detail=JSON response is too
+short)` watch. The overall verdict correctly stayed `FAIL` because a shared
+Home parser failure is still present; the workflow remained non-zero.
+
+**Narrow next patch.** Because the live body is unavailable, commit **`f36cc76`**
+adds only safe nested key diagnostics for browse tabs, tab renderers, tab
+contents, and tab sections. Push CI **35317377585**, Build APK **35317382758**,
+and test-release **35317382644** pass. PR CI **35317382642** separately timed
+out in `LibraryViewModelTest.kt:82` before the changed parser/probe steps; the
+full push CI passed and no Android/Desktop production source was reopened.
+The next owner run must test `f36cc76` to reveal the confirmed nested keys
+before any parser branch is added.
+
+
 ## 2026-09-18 — Owner reran stale candidate job; final head still untested (`arena/01a0b224-dhun`)
 
 **Run identity.** The supplied job link is workflow run **35310771629**, attempt
