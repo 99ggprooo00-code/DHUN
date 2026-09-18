@@ -198,7 +198,7 @@ fun main(): Unit = runBlocking<Unit> {
                     pass = false
                     println("PROBE|resolve|FAIL|via ${chain.name}: ${resolveResult.error}")
                 }
-                ProbeStatus.PASS -> error("resolver failure classified as PASS"),
+                ProbeStatus.PASS -> error("resolver failure classified as PASS")
             }
         }
     }
