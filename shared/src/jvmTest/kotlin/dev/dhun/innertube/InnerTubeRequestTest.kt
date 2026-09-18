@@ -28,11 +28,12 @@ class InnerTubeRequestTest {
         var posts = 0
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
-                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.20260906.01.00"}""")
+                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.20260906.01.00","VISITOR_DATA":"visitor-fixture"}""")
                 "/youtubei/v1/browse" -> {
                     posts++
                     val body = obj((request.body as TextContent).text)
                     assertEquals("1.20260906.01.00", request.headers["X-YouTube-Client-Version"])
+                    assertEquals("visitor-fixture", request.headers["X-Goog-Visitor-Id"])
                     assertEquals("1.20260906.01.00", body.obj("context").obj("client").str("clientVersion"))
                     assertEquals("WEB_REMIX", body.obj("context").obj("client").str("clientName"))
                     if (posts == 1) {
