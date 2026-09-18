@@ -79,6 +79,72 @@ jobs:
             exit 1
           fi
 
+      # Compare the same anonymous Home request with the maintained Python
+      # client. This is diagnostic-only: it never changes DHUN's verdict and
+      # lets us distinguish a shared request-contract bug from a runner-side
+      # YouTube response shape without guessing at parser branches.
+      - name: Compare independent Home continuation client
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          python -m pip install --quiet ytmusicapi 2>&1 | tee -a rot-drill.log
+          python3 - <<'PY' 2>&1 | tee -a rot-drill.log
+          import hashlib
+          from ytmusicapi import YTMusic
+
+          def summarize(raw):
+              contents = raw.get("contents") or {}
+              browse = (
+                  contents.get("singleColumnBrowseResultsRenderer")
+                  or contents.get("twoColumnBrowseResultsRenderer")
+                  or {}
+              )
+              tabs = browse.get("tabs") or []
+              renderers = [
+                  tab.get("tabRenderer") or tab.get("musicTabRenderer")
+                  for tab in tabs if isinstance(tab, dict)
+              ]
+              renderers = [renderer for renderer in renderers if isinstance(renderer, dict)]
+              tab_contents = [renderer.get("content") for renderer in renderers if isinstance(renderer.get("content"), dict)]
+              sections = [content.get("sectionListRenderer") for content in tab_contents if isinstance(content, dict) and isinstance(content.get("sectionListRenderer"), dict)]
+              continuation = raw.get("continuationContents") or {}
+              return (
+                  f"root={','.join(sorted(raw.keys())) or '-'} "
+                  f"browse={','.join(sorted(browse.keys())) or '-'} "
+                  f"tabs={len(tabs)} "
+                  f"tabRenderers={','.join(sorted({key for renderer in renderers for key in renderer.keys()})) or '-'} "
+                  f"tabContents={len(tab_contents)} tabSections={len(sections)} "
+                  f"continuation={','.join(sorted(continuation.keys())) or '-'}"
+              )
+
+          try:
+              client = YTMusic()
+              body = {"browseId": "FEmusic_home"}
+              first = client._send_request("browse", body.copy())
+              section = (
+                  first.get("contents", {})
+                  .get("singleColumnBrowseResultsRenderer", {})
+                  .get("tabs", [{}])[0]
+                  .get("tabRenderer", {})
+                  .get("content", {})
+                  .get("sectionListRenderer", {})
+              )
+              entries = section.get("continuations") or []
+              token = ((entries[0].get("nextContinuationData") or {}).get("continuation") if entries else None)
+              print(f"YTAPI|home-first|{summarize(first)} token={'present' if token else 'missing'}")
+              if token:
+                  token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
+                  query = "&ctoken=" + token + "&continuation=" + token
+                  more = client._send_request("browse", body.copy(), query)
+                  print(f"YTAPI|home-more|{summarize(more)} tokenSha256={token_hash}")
+              else:
+                  print("YTAPI|home-more|SKIP|first page has no continuation")
+          except Exception as exc:
+              print(f"YTAPI|error|{type(exc).__name__}: {str(exc)[:240]}")
+          PY
+
       - name: Upload probe log
         if: always()
         uses: actions/upload-artifact@v4
