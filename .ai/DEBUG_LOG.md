@@ -56,6 +56,35 @@ failure as separate findings. No application source changed in this evidence
 reconciliation; no local Kotlin/Gradle test ran because the sandbox has no JDK.
 
 
+
+## 2026-09-18 — Home continuation parser candidate added after S1 RED (`arena/01a0b224-dhun`)
+
+**Why this is a candidate, not a live-fix claim.** Run **35306224822** exposed
+`home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action)`,
+but the uploaded blob could not be downloaded (`EOF`), so the exact response body
+is unavailable. Existing parser coverage handled `sectionListContinuation` and
+carousel/immersive append actions, but not the other standard YouTube Music
+continuation family: `musicShelfContinuation` / `musicPlaylistShelfContinuation`
+wrappers or action items carrying `musicShelfRenderer` / playlist shelf renderers.
+That is the narrow contract gap addressed here; a future probe must confirm it
+matches the live response rather than treating inference as evidence.
+
+**Change.** `HomeFeedParser` normalizes shelf-specific continuation wrappers,
+recognizes shelf renderers in append/reload action groups, and `parseHomeSections`
+now reads vertical/playlist shelf rows plus direct shelf/header titles. An
+unmatched response now reports only top-level/continuation/action/command/item
+**keys**—never cursor values or tracking data—so a future live run can identify
+its shape without logging opaque continuation material. Two synthetic fixtures and
+parser tests cover the direct shelf continuation and append-action variants.
+
+**Verification boundary.** JSON fixture validation and the Python helper suite
+are the only local checks; Kotlin/Gradle remains unrun because no JDK exists.
+CI is the compiler. The candidate is not live-validated, does not change the
+resolver chain, and does not weaken byte checks. S1 stays RED until CI plus a
+sanitized owner-triggered probe/fixture confirms the shape. Bot-gating remains a
+separate residential/device investigation; no cookies, credentials, PO tokens,
+BotGuard, attestation, or ADR-007.
+
 ## 2026-09-18 — S1 boot reconciliation: registration is healthy, live verdict is still absent (`arena/01a0b224-dhun`)
 
 **Current gap.** The repository is at `main@33e94b0` after PR #90. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** all pass, and the rolling `test` release points at that SHA. The replacement workflow `extraction-health` (id **360655315**) is active with the declared name, but `gh run list --workflow extraction-health.yml` returns no runs.

@@ -12,7 +12,26 @@ import kotlinx.serialization.json.JsonObject
  * response action preserves that ownership.
  */
 internal fun parseHomeFeedPage(root: JsonObject): HomeFeedPage {
-    root.obj("continuationContents").obj("sectionListContinuation")?.let { return homePage(it) }
+    val continuationContents = root.obj("continuationContents")
+    continuationContents.obj("sectionListContinuation")?.let { return homePage(it) }
+
+    // YouTube Music sometimes returns a shelf-specific continuation instead
+    // of the generic section-list continuation. These objects have the same
+    // contents/continuations contract as their renderer counterparts, but the
+    // wrapper key is different. Normalize them before parsing; otherwise a
+    // valid Home page falls through to the action error below.
+    continuationContents.obj("musicShelfContinuation")?.let {
+        return homePage(JsonObject(mapOf("musicShelfRenderer" to it)))
+    }
+    continuationContents.obj("musicPlaylistShelfContinuation")?.let {
+        return homePage(JsonObject(mapOf("musicPlaylistShelfRenderer" to it)))
+    }
+    continuationContents.obj("musicCarouselShelfContinuation")?.let {
+        return homePage(JsonObject(mapOf("musicCarouselShelfRenderer" to it)))
+    }
+    continuationContents.obj("musicImmersiveCarouselShelfContinuation")?.let {
+        return homePage(JsonObject(mapOf("musicImmersiveCarouselShelfRenderer" to it)))
+    }
 
     // A full page may also contain unrelated sidebar/shelf update commands.
     // Prefer its actual section list before looking at incremental actions.
@@ -29,6 +48,43 @@ internal fun parseHomeFeedPage(root: JsonObject): HomeFeedPage {
 }
 
 private data class HomeAppend(val target: String?, val items: JsonArray)
+
+private fun isHomeSectionRenderer(renderer: JsonObject?): Boolean =
+    renderer.obj("musicCarouselShelfRenderer") != null ||
+        renderer.obj("musicImmersiveCarouselShelfRenderer") != null ||
+        renderer.obj("musicShelfRenderer") != null ||
+        renderer.obj("musicPlaylistShelfRenderer") != null
+
+/**
+ * Shape-only diagnostics for a response that did not match the Home contract.
+ * Keys are safe to report; values are intentionally never included because
+ * continuation responses contain opaque cursors and tracking data.
+ */
+private fun homeShapeSummary(root: JsonObject): String {
+    fun keys(objects: List<JsonObject>): String = objects
+        .flatMap { it.keys }
+        .distinct()
+        .sorted()
+        .joinToString(",")
+        .ifEmpty { "-" }
+
+    val actionEntries = listOf("onResponseReceivedActions", "onResponseReceivedEndpoints", "onResponseReceivedCommands")
+        .flatMap { root.arr(it).orEmpty() }
+        .mapNotNull { it as? JsonObject }
+    val commands = actionEntries.flatMap { action ->
+        listOfNotNull(
+            action.obj("appendContinuationItemsAction"),
+            action.obj("reloadContinuationItemsCommand"),
+        )
+    }
+    val continuationItems = commands.flatMap { it.arr("continuationItems").orEmpty() }
+        .mapNotNull { it as? JsonObject }
+    return "shape=top[${keys(listOf(root))}]" +
+        ";continuation[${keys(listOfNotNull(root.obj("continuationContents")))}]" +
+        ";actions[${keys(actionEntries)}]" +
+        ";commands[${keys(commands)}]" +
+        ";items[${keys(continuationItems)}]"
+}
 
 private fun homeActionPage(root: JsonObject): HomeFeedPage {
     val appends = listOf("onResponseReceivedActions", "onResponseReceivedEndpoints", "onResponseReceivedCommands")
@@ -49,9 +105,7 @@ private fun homeActionPage(root: JsonObject): HomeFeedPage {
         appends.filter { it.target == null }.map { listOf(it) }
     val feedGroups = groups.filter { group ->
         group.any { append -> append.items.any { item ->
-            val renderer = item as? JsonObject
-            renderer.obj("musicCarouselShelfRenderer") != null ||
-                renderer.obj("musicImmersiveCarouselShelfRenderer") != null
+            isHomeSectionRenderer(item as? JsonObject)
         } }
     }
     val candidates = feedGroups.ifEmpty {
@@ -64,7 +118,9 @@ private fun homeActionPage(root: JsonObject): HomeFeedPage {
     }
     if (candidates.size != 1) {
         val reason = if (candidates.isEmpty()) "no section list or Home continuation action" else "ambiguous Home continuation targets"
-        throw DhunException(DhunError.Parse("Home response contained $reason"))
+        throw DhunException(
+            DhunError.Parse("Home response contained $reason; ${homeShapeSummary(root)}"),
+        )
     }
     val pages = candidates.single().map { append -> homePage(JsonObject(mapOf("contents" to append.items))) }
     return HomeFeedPage(
