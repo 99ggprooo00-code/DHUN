@@ -1,6 +1,32 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-18 — Home continuation transport aligned with independent client (`c71d1bb`)
+
+**Comparison.** The diagnostic `ytmusicapi` client on the same GitHub runner returned
+`continuationContents.sectionListContinuation` for the Home token while DHUN
+returned only the tab-navigation shell. Source comparison isolated the request
+contract rather than a parser gap: the independent client sends `alt=json`, an
+empty `context.user`, `browseId` in the JSON body, the opaque token as both
+`ctoken` and `continuation` query parameters, and the anonymous visitor header
+from the Music homepage. DHUN had been missing the `alt=json` form and visitor
+header and had also put the continuation in the body.
+
+**Change.** Commit `56bd9b1` matched the body/query/URL contract and kept the
+Home `browseId`; commit `c71d1bb` forwards the cached Music-home
+`X-Goog-Visitor-Id` and adds a MockEngine assertion. `HomeFeedParser.kt` is
+unchanged. No opaque tab endpoint is followed and no tab-only response is
+accepted as success.
+
+**Validation.** Extraction-health run **35325690972** tested `c71d1bb` and
+classified the overall result as `ENVIRONMENT_BLOCKED`; the classifier step
+passed, the rot-drill issue step was skipped, and the final non-PASS gate was
+the only failing step. This moves the result past the previous Home-driven
+`FAIL`; the remaining resolver bot gate is separate and no live audio bytes
+were validated. Raw job logs still return `EOF` in this sandbox, and no local
+Gradle test could run because no JDK is installed.
+
+
 ## 2026-09-18 — Current diagnostic run shows a tab-only Home shell; no parser payload (`arena/01a0b224-dhun`)
 
 **Run identity.** Owner-dispatched `extraction-health` run **35321898985**

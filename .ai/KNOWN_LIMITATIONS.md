@@ -3,6 +3,14 @@
 Updated every phase. Nothing hidden.
 
 
+## 2026-09-18 — Home continuation request contract repaired; resolver remains runner-gated
+
+- The independent `ytmusicapi` comparison on run **35325125151** supplied the wire-level difference: its Home continuation uses `alt=json`, `context.user`, `browseId` in the body, `ctoken` plus `continuation` in the query, and an anonymous `X-Goog-Visitor-Id`. DHUN now matches that contract in `InnerTubeClient`; the Home parser was not changed.
+- Push run **35325690972** on `c71d1bb` reached `ENVIRONMENT_BLOCKED` instead of the prior Home-driven `FAIL`. The classifier step passed, the rot-drill issue step was skipped, and only the intentional non-PASS gate failed. This is the accepted separation: Home no longer blocks the probe, while resolver playback remains unverified.
+- No live audio bytes are accepted from this runner. Raw GitHub job logs still return `EOF` here, and the sandbox has no JDK for a local Gradle run. S1 therefore remains open and S2 remains blocked pending approved residential/device playback evidence.
+- The tab-only response remains an invalid Home payload if encountered; do not add a parser fallback, treat it as exhausted, or follow its opaque tab endpoint.
+
+
 ## 2026-09-18 — Current diagnostic run confirms a tab-only Home shell
 
 - Owner run **35321898985** (job **105526042204**, `workflow_dispatch`) tested current head `257251c84b934a6e93a4f44ffb1de39548c74b6a`, completed `failure`, and uploaded artifact **10537362749**. Version/search, first Home page, related, and offline passed.

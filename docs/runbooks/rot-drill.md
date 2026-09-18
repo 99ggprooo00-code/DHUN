@@ -7,18 +7,22 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-18): current Home shell is unparseable; S1 remains RED
+## State (2026-09-18): Home transport repaired; resolver gate remains
 
-- **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). Its baseline CI/test-release evidence remains green; the rolling `test` release is separate from this unmerged candidate.
-- **Current candidate:** PR **#91**, branch `arena/01a0b224-dhun`, docs head **`257251c`** with code/diagnostic head **`f36cc76`**, is OPEN and unmerged. Push CI **35317927713**, PR CI **35317931749**, and Build APK **35317931750** pass. The docs-head test-release cancelled after a hosted Windows MSI timeout; preceding code-head test-release **35317382644** passed. Android and Windows/Desktop production paths remain preserved and were not replaced.
+- **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). Its baseline CI/test-release evidence remains separate from this unmerged candidate.
+- **Current candidate:** PR **#91**, branch `arena/01a0b224-dhun`, head **`c71d1bb`**, is OPEN and unmerged. Android and Windows/Desktop production paths remain preserved and were not replaced.
 - **Healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`.
-- **Latest live candidate evidence:** owner run **35321898985**, job **105526042204**, tested current head `257251c` and completed `failure`. Version/search, first Home page, related, and offline passed. `home-more` failed with `tabs[tabRenderer]`, `tabRenderers[endpoint,icon,selected,tabIdentifier,title,trackingParams]`, but `tabContents[-]` and `tabSections[-]`; no browse items/actions/commands/continuations were present. The resolver and both own-client/yt-dlp watches correctly reported `ENVIRONMENT_BLOCKED`; NewPipe reported its separate short-JSON watch. Artifact `rot-drill-35321898985` id **10537362749** exists; blob download returned `EOF` in the sandbox.
-- **Probe/workflow interpretation:** Home continuation failure is a real `FAIL`; explicit YouTube bot-gating is `ENVIRONMENT_BLOCKED`; all non-PASS statuses remain non-zero. The overall run was correctly `FAIL` because the response is a tab navigation shell without a Home data payload.
-- **Parser boundary:** `f36cc76`'s shape diagnostics are complete. Do not accept the shell as an exhausted page or invent a follow-up from its opaque endpoint. A raw/sanitized response containing a real section/cursor contract is required before another parser branch is justified.
-- **Exact next step:** preserve the RED evidence and obtain that raw/sanitized continuation body or a later approved run with a real section/cursor payload. The agent still receives HTTP 403 for `workflow_dispatch`.
-- **Gate:** S1 remains RED/open; S2 is blocked and PR #91 remains open/unmerged.
+- **Latest candidate evidence:** push run **35325690972** tested `c71d1bb`. Its classifier step passed, the rot-drill issue step was skipped, and the final result was `ENVIRONMENT_BLOCKED`; only the intentional non-PASS gate failed. This means the prior Home-driven `FAIL` no longer controls the result. The resolver remains blocked by the GitHub runner's YouTube bot gate, so no live audio bytes were validated.
+- **Request contract:** `InnerTubeClient` now matches the independent `ytmusicapi` comparison: `alt=json`, empty `context.user`, `browseId` in the body, `ctoken` and `continuation` in the query, and cached anonymous `X-Goog-Visitor-Id`. `HomeFeedParser.kt` remains unchanged.
+- **Parser boundary:** a tab-only shell is still a genuine parse failure if encountered. Do not accept it as an exhausted page, follow its opaque endpoint, or add a speculative parser branch. The independent client supplied a real `continuationContents.sectionListContinuation` contract, so no parser change was needed.
+- **Gate:** S1 remains open/RED pending approved residential/device playback evidence; S2 is blocked and PR #91 remains open/unmerged. Raw GitHub logs return `EOF` in this sandbox, the agent cannot dispatch the workflow (HTTP 403), and no local Gradle test ran because no JDK is installed.
 
 ## Dispatch
+
+The procedures below are retained for a materially new candidate or an approved
+residential/device validation. Do not repeat the same owner-triggered run merely
+to loop on the current result; this investigation already has the distinct
+request-contract comparison and run **35325690972**.
 
 **Path A — Actions UI (the repo owner's path):**
 
@@ -56,7 +60,7 @@ gh workflow run extraction-health.yml --ref arena/01a0b224-dhun --repo 99ggprooo
 - **`PROBE|verdict|UNAVAILABLE`** = external live service/network did not provide a health result. It is not a DHUN parser verdict, but it is also not a pass.
 - **`PROBE|verdict|FAIL`** = a production-path/probe check failed. Home feed or continuation parser errors are always in this category. The workflow opens/comments on issue `[rot-drill] Live extraction probe failed` with the last 12 KB and retains the full 14-day artifact.
 - A separate `WATCH|newpipe-stream|BROKEN|Parse(JSON response is too short)` line is diagnostic only. NewPipe is not in either production resolver chain and must not be folded into Home or own-client/yt-dlp conclusions.
-- Run **35321898985** on current docs head `257251c` still failed `home-more`: `tabRenderer` had only navigation keys, while `tabContents`/`tabSections` were empty. Code head `f36cc76` has completed the safe shape diagnostics; no parser branch is accepted without a real section/cursor payload. The raw artifact blob is unavailable in this sandbox, so keep diagnostics key-only.
+- Historical run **35321898985** exposed the tab-only shell; candidate run **35325690972** then classified `ENVIRONMENT_BLOCKED` after the request-contract repair. The independent client supplied a real `continuationContents.sectionListContinuation` contract, so no parser branch was needed. A tab-only shell remains invalid, and raw logs for the latest job still return `EOF` in this sandbox.
 - **Gray / skipped probe job** = run never started (concurrency cancel). Re-dispatch.
 - **Red run with ZERO jobs** (failure but jobs list empty, total_count:0) = trigger noise, not verdict — see below.
 
