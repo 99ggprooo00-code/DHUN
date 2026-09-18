@@ -7,32 +7,15 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-17 ~16:00 UTC): attempt 4 SUCCESS — extraction-health.yml healthy
+## State (2026-09-18): probe classification added; S1 remains open
 
-- **Attempt 4 (PR #88, merged `3c593fb` ~15:40 UTC):** new file
-  `.github/workflows/extraction-health.yml` with `name: extraction-health`
-  registered as id **360655315**, `state: active`, name correctly
-  `extraction-health` (NOT file path). No phantom 0-job push run on merge,
-  unlike wedged id 360227450 which fired 35241808266 (0s failure) on same merge.
-  This bypassed the corrupted registration tied to `rot-drill.yml` /
-  `rot-drill-daily.yml` paths.
-
-- **Old wedged entries still present before cleanup:**
-  - 360227450 `.github/workflows/rot-drill-daily.yml` (active, wedged: name=file path)
-  - 348098190 now `state: deleted` (orphaned)
-  - 347425736 `dev-release` (orphaned, file deleted)
-
-- **Current healthy drill:** `extraction-health` (id 360655315). The old
-  `rot-drill-daily.yml` will be deleted in next PR to orphan 360227450.
-
-- **Support ticket #4765894** (filed ~03:15 UTC, auto-receipt ~06:50 UTC)
-  originally targeted 348098190, then 360227450. With attempt 4 success,
-  ask support to close as "resolved by new file path" or leave open for
-  them to clean orphaned ids.
-
-**Post-merge CI on `3c593fb`:** Build APK success 2m46s, CI success 5m23s,
-test-release success 6m33s, rolling `test` republished 15:46:15Z apk /
-15:47:22Z msi (all four assets). Phantom noise 35241808266 from old entry.
+- **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** pass; the rolling `test` release targets this SHA and has APK/MSI plus both checksum sidecars.
+- **Current healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`.
+- **Latest live candidate evidence:** owner run **35310771629** (`workflow_dispatch`, `arena/01a0b224-dhun@dbb3c08`) completed `failure`; version/search, first Home page, related, and offline passed, while `home-more` failed with the top-level `contents`/`singleColumnBrowseResultsRenderer` shape. Own-client/yt-dlp returned runner bot-gating and NewPipe returned its separate short-JSON parse watch. Artifact `rot-drill-35310771629` id **10533178016** and issue #14 comment **5725612380** preserve the available evidence; blob download returned `EOF` in the sandbox.
+- **Probe/workflow update:** current code emits `PASS`, `FAIL`, `ENVIRONMENT_BLOCKED`, or `UNAVAILABLE`. Home continuation failure is now a real `FAIL`; explicit YouTube bot-gating is `ENVIRONMENT_BLOCKED`; all non-PASS statuses remain non-zero. The workflow opens a rot-drill issue only for `FAIL`, but does not turn an environment-blocked run into a green production claim.
+- **Current parser candidate:** commit **8dc88a1** adds scoped support for direct section entries under known single-/two-column browse renderers and fixture coverage. Push CI **35311036178**, PR CI **35311039453**, Build APK **35311039470**, and test-release **35311039459** pass. This is not live acceptance.
+- **Exact next step:** owner-trigger `extraction-health` again on the final pushed head after CI; inspect `home-more` and the new verdict classification. The agent still receives HTTP 403 for `workflow_dispatch`.
+- **Gate:** S1 remains RED/open; S2 is blocked and PR #91 remains open/unmerged.
 
 ## Dispatch
 
@@ -42,44 +25,39 @@ test-release success 6m33s, rolling `test` republished 15:46:15Z apk /
    (repo → **Actions** → **extraction-health** in the left sidebar — the
    workflow's declared name is `extraction-health`; sidebar label should
    reflect that name when registration is healthy).
-2. Click **Run workflow** (right side, above the runs list); leave
-   **Branch: main** selected; click green **Run workflow**.
+2. Click **Run workflow** (right side, above the runs list). For the current
+   PR candidate validation select **`arena/01a0b224-dhun`** (not `main`),
+   then click the green **Run workflow** button.
 3. A new run appears at top within ~30 s. Click it, watch **probe** job
    (≈5–12 min; installs yt-dlp and runs offline + live probes).
 
-**Legacy path (old wedged file):**
-`https://github.com/99ggprooo00-code/DHUN/actions/workflows/rot-drill-daily.yml`
-— shows name as file path when wedged, fires 0-job push noise. Ignore;
-use extraction-health instead. This file is deleted in cleanup PR.
+**Legacy path (retired):** the former `rot-drill-daily.yml` file is deleted
+and its wedged registry entry is orphaned. Ignore any historical URL or
+zero-job artifact from that path; use `extraction-health` instead.
 
 **Path B — owner-account API dispatch (one-liner; agent tokens get
 403):**
 
 ```bash
-gh workflow run extraction-health.yml --ref main --repo 99ggprooo00-code/DHUN
-# or by declared name:
-# gh workflow run extraction-health --ref main --repo 99ggprooo00-code/DHUN
-# or with workflow id:
-# gh workflow run 360655315 --ref main --repo 99ggprooo00-code/DHUN
+# Current PR candidate validation:
+gh workflow run extraction-health.yml --ref arena/01a0b224-dhun --repo 99ggprooo00-code/DHUN
+# After the candidate is merged, release-baseline validation uses main:
+# gh workflow run extraction-health.yml --ref main --repo 99ggprooo00-code/DHUN
+# or by declared name / workflow id with the same --ref:
+# gh workflow run extraction-health --ref arena/01a0b224-dhun --repo 99ggprooo00-code/DHUN
+# gh workflow run 360655315 --ref arena/01a0b224-dhun --repo 99ggprooo00-code/DHUN
 ```
 
 ## Reading the verdict
 
-- **Green run** = extraction healthy on this commit. Nothing else to do;
-  if a `[rot-drill]` issue was open, the workflow comments and closes it
-  automatically.
-- **Red run** = open run → **probe** job → expand **Run playback probes**:
-  - `LOGIN_REQUIRED` / "Sign in to confirm you're not a bot" = YouTube
-    gating GitHub runner datacenter IP. Not proof of user breakage: verify
-    residential playback (phone on mobile data, see s3-hardware-checklist.md)
-    before treating as rot.
-  - Anything else = probable extractor rot. Workflow opens/comments on
-    issue `[rot-drill] Live extraction probe failed` with last 12 KB log;
-    full log artifact `rot-drill-<run_id>`, 14-day retention.
-- **Gray / skipped probe job** = run never started (concurrency cancel).
-  Re-dispatch.
-- **Red run with ZERO jobs** (failure but jobs list empty, total_count:0)
-  = trigger noise, not verdict — see below.
+- **`PROBE|verdict|PASS`** and a successful workflow = all required live and offline checks passed on that runner. Only this is a health pass; the parser candidate still needs this evidence before S1 closes.
+- **`PROBE|verdict|ENVIRONMENT_BLOCKED`** = explicit YouTube runner bot-gating/authentication evidence. The workflow remains non-zero and does not close a rot issue, because live stream health was not established. Verify residential/device playback; do not introduce cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007.
+- **`PROBE|verdict|UNAVAILABLE`** = external live service/network did not provide a health result. It is not a DHUN parser verdict, but it is also not a pass.
+- **`PROBE|verdict|FAIL`** = a production-path/probe check failed. Home feed or continuation parser errors are always in this category. The workflow opens/comments on issue `[rot-drill] Live extraction probe failed` with the last 12 KB and retains the full 14-day artifact.
+- A separate `WATCH|newpipe-stream|BROKEN|Parse(JSON response is too short)` line is diagnostic only. NewPipe is not in either production resolver chain and must not be folded into Home or own-client/yt-dlp conclusions.
+- Run **35310771629** still failed `home-more` with `contents[singleColumnBrowseResultsRenderer]`; the scoped `8dc88a1` follow-up is not accepted until another candidate run passes. The raw artifact blob is unavailable in this sandbox, so keep diagnostics key-only.
+- **Gray / skipped probe job** = run never started (concurrency cancel). Re-dispatch.
+- **Red run with ZERO jobs** (failure but jobs list empty, total_count:0) = trigger noise, not verdict — see below.
 
 ## Observed anomalies (history)
 
@@ -127,6 +105,9 @@ section):
 
 ```
 - extraction-health <run_id> (<YYYY-MM-DD HH:MM UTC>, main@<sha>): GREEN — <note>
+- extraction-health 35306224822 (2026-09-18 04:17 UTC, main@33e94b0): RED / mixed — Home continuation parse failure plus runner bot-gating; artifact rot-drill-35306224822; S1 remains open.
 ```
 
-That line is the S1 exit criterion: no tag without it.
+A recorded RED is evidence, not the S1 exit criterion. S1 exit requires the
+mixed findings to be reconciled and a later accepted verdict; no tag without
+that evidence.

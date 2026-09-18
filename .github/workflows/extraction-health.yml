@@ -57,10 +57,20 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          set +e
+
           echo "=== 1. DETERMINISTIC OFFLINE PROBE (ADR-006) ===" | tee -a rot-drill.log
           ./gradlew :tools:playback-probe:offlineProbe --no-daemon --console=plain 2>&1 | tee -a rot-drill.log
+          offline_status=${PIPESTATUS[0]}
+
           echo "=== 2. LIVE EXTRACTION AND STREAM PROBE ===" | tee -a rot-drill.log
           ./gradlew :tools:playback-probe:run --no-daemon --console=plain 2>&1 | tee -a rot-drill.log
+          live_status=${PIPESTATUS[0]}
+
+          echo "PROBE|workflow-status|offline=$offline_status|live=$live_status" | tee -a rot-drill.log
+          if [ "$offline_status" -ne 0 ] || [ "$live_status" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Upload probe log
         if: always()
@@ -71,8 +81,60 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Classify probe result
+        if: always()
+        id: classify
+        shell: bash
+        run: |
+          set -u
+          offline=$(grep -E '^PROBE\|offline-verdict\|' rot-drill.log | tail -n 1 | cut -d'|' -f 3 || true)
+          live=$(grep -E '^PROBE\|verdict\|' rot-drill.log | tail -n 1 | cut -d'|' -f 3 || true)
+          workflow_status=$(grep -E '^PROBE\|workflow-status\|' rot-drill.log | tail -n 1 || true)
+          offline_cmd="${workflow_status#*offline=}"
+          offline_cmd="${offline_cmd%%|*}"
+          live_cmd="${workflow_status#*live=}"
+          live_cmd="${live_cmd%%|*}"
+
+          if [ "$offline" != "PASS" ] || [ "${offline_cmd:-}" != "0" ]; then
+            classification="FAIL"
+            reason="the deterministic offline check or its workflow command failed"
+          elif [ "$live" = "ENVIRONMENT_BLOCKED" ]; then
+            classification="ENVIRONMENT_BLOCKED"
+            reason="YouTube returned explicit bot-gating/authentication evidence to the GitHub runner"
+          elif [ "$live" = "UNAVAILABLE" ]; then
+            classification="UNAVAILABLE"
+            reason="the external live extraction service was unavailable"
+          elif [ "$live" = "PASS" ] && [ "${live_cmd:-}" = "0" ]; then
+            classification="PASS"
+            reason="all required probe stages passed"
+          else
+            classification="FAIL"
+            reason="the live probe did not produce a passing or classified verdict"
+          fi
+
+          echo "classification=$classification" >> "$GITHUB_OUTPUT"
+          echo "offline=$offline" >> "$GITHUB_OUTPUT"
+          echo "live=$live" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Extraction-health classification"
+            echo "- Classification: **$classification**"
+            echo "- Offline verdict: \`$offline\`"
+            echo "- Live verdict: \`${live:-MISSING}\`"
+            echo "- Reason: $reason"
+            if [ "$classification" = "ENVIRONMENT_BLOCKED" ]; then
+              echo
+              echo "> This is an external GitHub/YouTube runner limitation, not evidence that DHUN's shared resolver is broken. The check remains non-zero because live stream health was not established."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report external live-probe limitation
+        if: steps.classify.outputs.classification == 'ENVIRONMENT_BLOCKED' || steps.classify.outputs.classification == 'UNAVAILABLE'
+        shell: bash
+        run: |
+          echo "::warning title=Extraction health is not a production pass::${{ steps.classify.outputs.classification }} — inspect the probe log and verify playback outside the GitHub runner."
+
       - name: Open or update a rot-drill issue
-        if: steps.probe.outcome == 'failure'
+        if: steps.probe.outcome == 'failure' && steps.classify.outputs.classification == 'FAIL'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -111,7 +173,7 @@ jobs:
           fi
 
       - name: Close a recovered rot-drill issue
-        if: steps.probe.outcome == 'success'
+        if: steps.probe.outcome == 'success' && steps.classify.outputs.classification == 'PASS'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -123,6 +185,22 @@ jobs:
             gh issue close "$open_issue" --comment "Closed automatically after a green live probe."
           fi
 
-      - name: Fail the workflow after alerting
+      - name: Keep the check non-zero when live health is unverified
         if: steps.probe.outcome == 'failure'
-        run: exit 1
+        shell: bash
+        run: |
+          classification="${{ steps.classify.outputs.classification }}"
+          case "$classification" in
+            ENVIRONMENT_BLOCKED)
+              echo "Extraction health is ENVIRONMENT_BLOCKED: live stream health was not established on this runner."
+              exit 2
+              ;;
+            UNAVAILABLE)
+              echo "Extraction health is UNAVAILABLE: the external live service did not provide a health result."
+              exit 3
+              ;;
+            *)
+              echo "Extraction health detected a DHUN/probe failure."
+              exit 1
+              ;;
+          esac

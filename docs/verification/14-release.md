@@ -1,21 +1,10 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Status note (2026-09-17 ~16:00 UTC, Stage S1 attempt 4 SUCCESS):**
-> body below is point-in-time log ending PR #32 (`862f0ac`, 2026-09-07),
-> kept verbatim as history. Current state: `main@3c593fb` (PR #88 merged
-> ~15:40 UTC, attempt 4 `extraction-health.yml`); Build APK 2m46s PASS,
-> CI 5m23s PASS, test-release 6m33s PASS, rolling `test` republished
-> 15:46:15Z apk / 15:47:22Z msi all four assets verified via release API.
-> **New healthy workflow id 360655315 `extraction-health` active with
-> correct name `extraction-health` (not file path), no phantom 0-job push
-> on merge** — bypassed corrupted registration that wedged 348098190
-> (deleted) and 360227450 (active wedged, fired phantom 35241808266 on
-> same merge). Old `rot-drill-daily.yml` to be deleted next PR to orphan
-> 360227450. Support ticket #4765894 filed ~03:15 UTC still pending but
-> workaround succeeded. Dispatch still 403 for agent — user must click
-> **Run workflow** on `extraction-health` in Actions UI; schedule 04:17 UTC
-> will fire next window. No v0.1.0 tag/release yet. S1 exit criterion is
-> live GREEN run of `extraction-health` (replacing rot-drill).
+> **Current status (2026-09-18 ~05:28 UTC, Stage S1 RED):** The release baseline remains `main@33e94b0` after PR #90. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** pass; the rolling `test` release contains APK/MSI and both checksum sidecars.
+> Owner-dispatched candidate run **35310771629** tested PR #91's branch at `dbb3c08` and completed **failure**. Version/search, first Home page, related, and deterministic offline checks passed; `home-more` remained **RED** with `shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];...`. Own-client/yt-dlp remained runner-bot-gated with `AuthRequired`; NewPipe reported `Parse(detail=JSON response is too short)`. No live audio bytes were validated.
+> The direct/nested-browse parser follow-up is now `8dc88a1` and passed push CI **35311036178**, PR CI **35311039453**, Build APK **35311039470**, and test-release **35311039459**. It adds scoped synthetic coverage for direct section entries under a known browse renderer, but is **not** live-accepted. PR #91 remains open/unmerged and S1 remains RED. Artifact `rot-drill-35310771629` (id **10533178016**, 4,432 B) exists; blob download returned `EOF` in the sandbox and issue #14 comment **5725612380** preserves the tail.
+> Keep parser, bot-gating, and NewPipe findings separate. The probe/workflow now emits `PASS`, `FAIL`, `ENVIRONMENT_BLOCKED`, or `UNAVAILABLE`; all non-PASS statuses remain non-zero, and only `FAIL` opens a rot-drill issue. Do not add credentials, cookies, PO tokens, BotGuard, attestation, or ADR-007. The next gate is another owner-triggered run on the final pushed head; no S2, hardware, stable-release, or merge acceptance is claimed.
+
 
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
 RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**
@@ -76,7 +65,7 @@ suppressed until retry; backups are still recommended. No v0.1.0.
 |---|---|---|
 | Typed error taxonomy and actionable user messages | 🟨 Typed `DhunResult`/`DhunError` + `toUserMessage` paths, per-request retry, 429 global backoff gate (`2932d57`, with unit tests), and offline banner (`fed1d54`) are merged with recovery UX; baseline CI `34018809911` is green. Local reason-preserving diagnostics changes await CI; offline/429/403 hardware checks and db-path review remain | `shared/.../core/RateLimitGate.kt`, `shared/.../core/ConnectivityMonitor.kt`, `DhunAppShell.kt`, hosts' Koin modules |
 | Bounded audio cache and offline replay | 🟨 Android + Desktop code | Android: Media3 `SimpleCache` LRU via `DhunAudioSegmentCache` + `CacheDataSource` (stable video-id keys). Desktop: `AudioFileCache` whole-track LRU files under `<data dir>/cache/audio`, background fill during first play, local-file playback on hit (no resolve → offline). Both use `SettingsKeys.CACHE_SIZE_MB` default 1024 MB (`AudioCacheBudget`). URL TTL cache still `DhunStreamCache`. Unit tests: `AudioFileCacheTest` (9: hit/LRU victim/over-budget/short-read/cancel/unsafe id/partial sweep/shrink+clear). Hardware offline-replay check OPEN on both |
-| Daily live rot-drill | 🔴 Latest verified run **34011539225**, scheduled on `dd1ab31`, failed; metadata PASS; own-client / production aggregate Unavailable; yt-dlp WATCH separately AuthRequired | Schedule, issue #14 alert and artifact `rot-drill-34011539225` proven. No newer live verdict, green byte check or recovery auto-close |
+| Daily live extraction-health | 🔴 Run **35306224822** on `main@33e94b0` is the current authoritative RED: offline/metadata/search/related passed; `home-more` has a separate continuation parse failure; own-client/yt-dlp are runner bot-gated; NewPipe is a short-JSON parse watch | S1 remains open. Capture the Home continuation shape, fix/regression-test only if confirmed, and verify playback from an approved residential/device network. Do not begin S2. |
 | Android 30-minute soak | ⬜ Open | Requires a physical device with unrestricted battery mode, lock-screen playback, and zero-crash/leak evidence |
 | Desktop 30-minute soak | ⬜ Open | Requires a desktop with libVLC and tray/SMTC-capable runtime |
 | Release v0.1.0 artifacts | ⬜ Open | Rolling `test` APK/MSI is not the signed/stable v0.1.0 release; clean-target installation and release evidence are required |
@@ -100,7 +89,12 @@ for upstream recovery.
 
 ## Live evidence log
 
-### Rot-drill
+### Rot-drill / extraction-health
+
+- [x] **Current S1 live verdict — run 35306224822 (2026-09-18, `workflow_dispatch`, `main@33e94b0`, job 105478849067): RED / mixed.** Artifact `rot-drill-35306224822` (id **10532130174**, 4,357 B) exists and issue #14 received the workflow comment. Version/search passed (20 songs), Home first page passed (2 sections + continuation token), related passed (50 tracks), and the deterministic offline probe passed with zero network calls. `home-more` independently failed with `Parse(detail=Home response contained no section list or Home continuation action)`. Own-client and yt-dlp returned `AuthRequired` / `LOGIN_REQUIRED` bot-gating, so stream bytes were skipped; NewPipe returned `Parse(detail=JSON response is too short)`. The artifact blob download returned `EOF` in the sandbox, so the raw Home body is not available. Keep bot-gating and parser findings separate; no cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007.
+- [x] **Candidate-branch probe — run 35308796439 (2026-09-18, `arena/01a0b224-dhun@c546d7b`):** offline/metadata/search/related passed, but `home-more` remained RED with shape-only detail `top[contents,responseContext,trackingParams]`; own-client/yt-dlp remained bot-gated, NewPipe remained short-JSON parse, and no audio bytes were validated. Artifact `rot-drill-35308796439` id **10532443661** exists; blob download returned `EOF` in the sandbox.
+- [ ] **Home parser follow-up pending live validation:** the first candidate did not cover the direct top-level `contents` shape. The follow-up accepts direct shelf contents only when it yields rows/cursor and expands safe nested-key diagnostics. Do not mark `home-more` green until its CI and a new candidate-branch probe pass.
+
 
 - [x] **Failure path exercised for real — run 33961533965 (2026-09-05,
       workflow_dispatch on `a554594`, job 101295458477): FAILED as
@@ -157,8 +151,10 @@ for upstream recovery.
       stream FAIL / Unavailable. Do not relabel the aggregate as AuthRequired.
       Run: https://github.com/99ggprooo00-code/DHUN/actions/runs/34011539225
 - [x] Failure path creates/updates one issue and uploads the log artifact.
-- [ ] Manual/scheduled run completes with `PROBE|verdict|PASS`, including
-      validated audio bytes. No newer live run for `0920148` was verified.
+- [ ] A later live run completes with `PROBE|verdict|PASS`, including
+      validated audio bytes, after the current mixed RED is reconciled.
+- [ ] Approved residential/device verification distinguishes runner bot-gating
+      from user-network playback.
 - [ ] Recovery path comments on and closes issue #14 (still OPEN).
 
 **CI vs user-network evidence:** a red Actions run establishes failure on
@@ -414,7 +410,7 @@ recorded here.
 
 ### v0.1.0 release gate
 
-- [ ] Rot-drill is scheduled and has a green live run (scheduled run still red at `34011539225`; re-investigate after next green).
+- [ ] `extraction-health` has a current green live run on the release candidate (run **35306224822** is the current mixed RED; the Home parser and runner-network findings remain open).
 - [ ] Android APK and AAB build and install on a clean target.
 - [ ] Windows MSI installs and launches on a clean Windows VM/user — **published baseline `0920148` launches on the user’s machine; install-over failed and clean-target hygiene is still OPEN**.
 - [ ] Android and Desktop soak evidence is attached above (both still OPEN; use an identified candidate that first passes real playback).

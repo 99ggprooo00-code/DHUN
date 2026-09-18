@@ -31,11 +31,19 @@ import java.net.URL
  *   6. WATCH    — Per-engine diagnostic watch (own-client, yt-dlp, NewPipeExtractor)
  *
  * Exit 0 = entire pipeline healthy (including live stream & offline load).
- * Exit 1 = one or more critical steps failed.
+ * Exit 1 = a production check failed OR the live service was unavailable/
+ *           runner-blocked; the final PROBE|verdict status distinguishes them.
+ *
+ * Home/continuation failures are always FAIL because they exercise the shared
+ * production parser. AuthRequired with explicit YouTube bot-gate evidence is
+ * ENVIRONMENT_BLOCKED, not a parser/resolver failure; it remains non-zero so
+ * CI cannot report an unverified live stream as healthy.
  */
 fun main(): Unit = runBlocking<Unit> {
     val client = InnerTubeClient()
     var pass = true
+    var environmentBlocked = false
+    var unavailable = false
 
     println("=== DHUN Playback & Extraction Probe ===")
 
@@ -132,17 +140,26 @@ fun main(): Unit = runBlocking<Unit> {
                             "PROBE|home-more|PASS|sections=${next.value.sections.size} " +
                                 "continuation=${next.value.continuationToken != null}"
                         )
-                        is DhunResult.Failure -> println("PROBE|home-more|FAIL|${next.error}")
+                        is DhunResult.Failure -> {
+                            // A continuation failure is a production parser/
+                            // metadata failure, not a stream-engine signal.
+                            pass = false
+                            println("PROBE|home-more|FAIL|${next.error}")
+                        }
                     }
                 } else {
                     println("PROBE|home-more|SKIP|first page exhausted (no continuation token)")
                 }
             }
-            is DhunResult.Failure -> println("PROBE|home-feed|FAIL|${r.error}")
+            is DhunResult.Failure -> {
+                pass = false
+                println("PROBE|home-feed|FAIL|${r.error}")
+            }
         }
     } catch (e: CancellationException) {
         throw e
     } catch (t: Throwable) {
+        pass = false
         println("PROBE|home-feed|FAIL|${t.javaClass.simpleName}: ${t.message?.take(200)}")
     }
 
@@ -168,8 +185,21 @@ fun main(): Unit = runBlocking<Unit> {
             println("PROBE|resolve|PASS|via ${chain.name} (\"${topTrack.title}\" by ${topTrack.artistName})")
         }
         is DhunResult.Failure -> {
-            pass = false
-            println("PROBE|resolve|FAIL|via ${chain.name}: ${resolveResult.error}")
+            when (classifyResolverFailure(resolveResult.error)) {
+                ProbeStatus.ENVIRONMENT_BLOCKED -> {
+                    environmentBlocked = true
+                    println("PROBE|resolve|ENVIRONMENT_BLOCKED|via ${chain.name}: ${resolveResult.error}")
+                }
+                ProbeStatus.UNAVAILABLE -> {
+                    unavailable = true
+                    println("PROBE|resolve|UNAVAILABLE|via ${chain.name}: ${resolveResult.error}")
+                }
+                ProbeStatus.FAIL -> {
+                    pass = false
+                    println("PROBE|resolve|FAIL|via ${chain.name}: ${resolveResult.error}")
+                }
+                ProbeStatus.PASS -> error("resolver failure classified as PASS"),
+            }
         }
     }
 
@@ -232,8 +262,16 @@ fun main(): Unit = runBlocking<Unit> {
             when (val r = resolver.resolve(topTrack.id)) {
                 is DhunResult.Success ->
                     println("WATCH|$label|OK|${r.value.bitrateKbps ?: "?"} kbps ${r.value.mimeType}")
-                is DhunResult.Failure ->
-                    println("WATCH|$label|BROKEN|${r.error}")
+                is DhunResult.Failure -> {
+                    val status = classifyResolverFailure(r.error)
+                    val labelStatus = when (status) {
+                        ProbeStatus.ENVIRONMENT_BLOCKED -> "ENVIRONMENT_BLOCKED"
+                        ProbeStatus.UNAVAILABLE -> "UNAVAILABLE"
+                        ProbeStatus.FAIL -> "BROKEN"
+                        ProbeStatus.PASS -> "OK"
+                    }
+                    println("WATCH|$label|$labelStatus|${r.error}")
+                }
             }
         } catch (e: CancellationException) {
             throw e
@@ -256,11 +294,24 @@ fun main(): Unit = runBlocking<Unit> {
     }
 
     // ---- STEP 7: FINAL VERDICT ----------------------------------------------
-    val verdict = if (pass) "PASS" else "FAIL"
-    val statusText = if (pass) "extraction-pipeline-healthy" else "extraction-pipeline-broken"
+    // A blocked/unavailable live stream remains non-zero: extraction-health
+    // must not turn an unverified stream into a green check. The explicit
+    // status lets the workflow distinguish a runner gate from a DHUN failure.
+    val verdict = when {
+        !pass -> ProbeStatus.FAIL
+        environmentBlocked -> ProbeStatus.ENVIRONMENT_BLOCKED
+        unavailable -> ProbeStatus.UNAVAILABLE
+        else -> ProbeStatus.PASS
+    }
+    val statusText = when (verdict) {
+        ProbeStatus.PASS -> "extraction-pipeline-healthy"
+        ProbeStatus.ENVIRONMENT_BLOCKED -> "youtube-runner-bot-gated"
+        ProbeStatus.UNAVAILABLE -> "external-extraction-service-unavailable"
+        ProbeStatus.FAIL -> "extraction-pipeline-broken"
+    }
     println("PROBE|verdict|$verdict|$statusText")
 
-    kotlin.system.exitProcess(if (pass) 0 else 1)
+    kotlin.system.exitProcess(if (verdict == ProbeStatus.PASS) 0 else 1)
 }
 
 private fun tracksReport(tracks: List<dev.dhun.core.Track>) {
