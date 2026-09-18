@@ -20,6 +20,7 @@ import io.ktor.client.plugins.timeout
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -169,14 +170,21 @@ class InnerTubeClient(
             parseHomeFeedPage(postJson("browse", body))
         }
 
-    /** Next page of home shelves (InnerTube `/browse` continuation). */
+    /**
+     * Next page of Home shelves (InnerTube `/browse` continuation).
+     *
+     * YouTube Music's current browse wire contract keeps the Home browse id in
+     * the JSON body and carries the opaque continuation in both query parameters
+     * (`ctoken` and `continuation`). Sending the token only as a JSON field can
+     * return a tab-navigation shell instead of the continuation contents.
+     */
     suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> =
         resultify {
             val body = buildJsonObject {
                 put("context", context())
-                put("continuation", continuationToken)
+                put("browseId", "FEmusic_home")
             }
-            parseHomeFeedPage(postJson("browse", body))
+            parseHomeFeedPage(postJson("browse", body, continuationToken))
         }
 
     /* ---------------- browse pages (Phase 09) ---------------------------- */
@@ -456,7 +464,11 @@ class InnerTubeClient(
         }
     }
 
-    private suspend fun postJson(endpoint: String, body: JsonObject): JsonObject {
+    private suspend fun postJson(
+        endpoint: String,
+        body: JsonObject,
+        continuationToken: String? = null,
+    ): JsonObject {
         val version = clientVersion()
         // context() may have been built BEFORE the first version discovery.
         // Keep body and X-YouTube-Client-Version aligned on the very first request.
@@ -467,6 +479,10 @@ class InnerTubeClient(
             if (attempt > 0) delay(backoffMillis(attempt, lastError))
             try {
                 val response = httpClient.post("$MUSIC_BASE/youtubei/v1/$endpoint?prettyPrint=false") {
+                    continuationToken?.let { token ->
+                        parameter("ctoken", token)
+                        parameter("continuation", token)
+                    }
                     browserHeaders()
                     headers {
                         append("X-YouTube-Client-Name", CLIENT_NAME_WEB_REMIX)

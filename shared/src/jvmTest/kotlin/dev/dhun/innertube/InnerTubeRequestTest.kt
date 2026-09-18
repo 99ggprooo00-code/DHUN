@@ -24,7 +24,7 @@ class InnerTubeRequestTest {
     private fun obj(json: String) = Json.parseToJsonElement(json) as JsonObject
 
     @Test
-    fun firstBrowseUsesTheDiscoveredVersionInBothHeaderAndBody() = runBlocking {
+    fun homeContinuationUsesTheBrowseQueryWireContract() = runBlocking {
         var posts = 0
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
@@ -37,9 +37,14 @@ class InnerTubeRequestTest {
                     assertEquals("WEB_REMIX", body.obj("context").obj("client").str("clientName"))
                     if (posts == 1) {
                         assertEquals("FEmusic_home", body.str("browseId"))
+                        assertNull(request.url.parameters["ctoken"])
+                        assertNull(request.url.parameters["continuation"])
                         respond("""{"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[],"continuations":[{"nextContinuationData":{"continuation":"next-page"}}]}}}}]}}}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
                     } else {
-                        assertEquals("next-page", body.str("continuation"))
+                        assertEquals("FEmusic_home", body.str("browseId"))
+                        assertNull(body["continuation"])
+                        assertEquals("next-page", request.url.parameters["ctoken"])
+                        assertEquals("next-page", request.url.parameters["continuation"])
                         respond("""{"continuationContents":{"sectionListContinuation":{"contents":[]}}}""")
                     }
                 }
