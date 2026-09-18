@@ -10,6 +10,13 @@ name: extraction-health
 # can reset it.
 
 on:
+  # Also run on pushes to the active validation branch. This provides an
+  # auditable owner-free trigger when workflow_dispatch is unavailable to the
+  # integration token; the branch-specific scope avoids turning every PR push
+  # into a live YouTube probe.
+  push:
+    branches:
+      - arena/01a0b224-dhun
   schedule:
     - cron: '17 4 * * *'
   workflow_dispatch:
