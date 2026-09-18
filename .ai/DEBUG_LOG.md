@@ -40,6 +40,14 @@ not available because the artifact blob download returned `EOF`; the issue
 comment has only the probe tail. That is enough to identify a live parser
 contract mismatch, not enough to name the response shape or safely patch it.
 
+**NewPipe boundary.** `NewPipeStreamResolver` uses NewPipeExtractor v0.26.5's
+`NPStreamInfo.getInfo` through the tokenless `SimpleDownloader`; its
+`ParsingException` is deliberately mapped to `DhunError.Parse`. The short-JSON
+message therefore proves the NewPipe parser received an unexpectedly short
+response, but without the body it cannot distinguish upstream schema drift from
+a challenge/error page. It remains a diagnostic watch and is not a reason to
+rewrite the production resolver chain.
+
 **Decision.** S1 is **RED / unresolved**; S2 must not begin. Do not merge PR #91.
 The next technical action is a sanitized capture or fixture of the actual Home
 continuation response, followed by a narrow parser regression/fix if that
