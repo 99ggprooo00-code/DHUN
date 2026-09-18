@@ -137,12 +137,13 @@ PR CI **35309128614**, Build APK **35309128640**, and test-release
 push CI **35309124090** failed at the unrelated
 `LibraryViewModelTest.eventually` 15-second timeout; its annotations contain no
 Home/parser failure. This is a CI flake on the same SHA, not evidence against
-the parser patch, but the branch is temporarily `UNSTABLE` until a later push
-check is green. No local Kotlin test was run.
+the parser patch, but the branch was temporarily `UNSTABLE` until a later push
+check. Push CI **35309533562** on docs-only successor `98843af` passed, and PR
+#91 is now `CLEAN`; no parser failure was found. No local Kotlin test was run.
 
 The direct-contents patch is still not live-validated. The next owner-triggered
-probe must use the current branch head after CI settles; S1 remains RED and S2
-remains blocked.
+probe must use current head `98843af32e8326c8329a5c33d2c06ddfc30a9485`; S1 remains
+RED and S2 remains blocked.
 
 ## 2026-09-18 — S1 boot reconciliation: registration is healthy, live verdict is still absent (`arena/01a0b224-dhun`)
 
