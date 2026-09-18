@@ -1,6 +1,29 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-18 — Final probe/classifier head is CI-green; Android/Desktop unchanged (`arena/01a0b224-dhun`)
+
+**Compiler repair.** CI **35313043505** had failed before tests because `Main.kt`
+contained an invalid trailing comma in a Kotlin `when` branch at lines 201–202.
+Commit **6dd98fb** removed that comma. No Android or Windows/Desktop production
+extraction code was involved in the failure or the repair.
+
+**GitHub verification.** On exact head `6dd98fb`, push CI **35313596684**, PR CI
+**35313601849**, Build APK **35313601854**, and test-release **35313601903** pass.
+The checks cover shared domain tests, Android Robolectric/debug build, probe
+compilation and `ProbeStatusTest`, extraction-health classification, Desktop JVM
+compile/tests, and packaging. PR #91 is OPEN, unmerged, and `CLEAN`.
+
+**Remaining gate.** No owner-triggered live run has tested `6dd98fb`. The latest
+live candidate run **35310771629** tested older `dbb3c08`: metadata/search, first
+Home page, related, and offline passed; `home-more` failed; own-client/yt-dlp
+were separately bot-gated; NewPipe reported its separate short-JSON watch. S1
+therefore remains RED and S2 remains blocked. The owner must dispatch
+`extraction-health` on `arena/01a0b224-dhun@6dd98fb`; this agent still receives
+HTTP 403 for workflow dispatch. No credentials, cookies, PO tokens, BotGuard,
+attestation, ADR-007, resolver replacement, or platform rewrite was added.
+
+
 ## 2026-09-18 — Extraction-health status classification and production-path comparison (`arena/01a0b224-dhun`)
 
 **Architecture result.** Android and Desktop production both reach the shared

@@ -7,14 +7,15 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-18): probe classification added; S1 remains open
+## State (2026-09-18): final probe head CI-green; S1 remains open
 
-- **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** pass; the rolling `test` release targets this SHA and has APK/MSI plus both checksum sidecars.
-- **Current healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`.
-- **Latest live candidate evidence:** owner run **35310771629** (`workflow_dispatch`, `arena/01a0b224-dhun@dbb3c08`) completed `failure`; version/search, first Home page, related, and offline passed, while `home-more` failed with the top-level `contents`/`singleColumnBrowseResultsRenderer` shape. Own-client/yt-dlp returned runner bot-gating and NewPipe returned its separate short-JSON parse watch. Artifact `rot-drill-35310771629` id **10533178016** and issue #14 comment **5725612380** preserve the available evidence; blob download returned `EOF` in the sandbox.
-- **Probe/workflow update:** current code emits `PASS`, `FAIL`, `ENVIRONMENT_BLOCKED`, or `UNAVAILABLE`. Home continuation failure is now a real `FAIL`; explicit YouTube bot-gating is `ENVIRONMENT_BLOCKED`; all non-PASS statuses remain non-zero. The workflow opens a rot-drill issue only for `FAIL`, but does not turn an environment-blocked run into a green production claim.
-- **Current parser candidate:** commit **8dc88a1** adds scoped support for direct section entries under known single-/two-column browse renderers and fixture coverage. Push CI **35311036178**, PR CI **35311039453**, Build APK **35311039470**, and test-release **35311039459** pass. This is not live acceptance.
-- **Exact next step:** owner-trigger `extraction-health` again on the final pushed head after CI; inspect `home-more` and the new verdict classification. The agent still receives HTTP 403 for `workflow_dispatch`.
+- **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). Its baseline CI/test-release evidence remains green; the rolling `test` release is separate from this unmerged candidate.
+- **Current candidate:** PR **#91**, branch `arena/01a0b224-dhun`, head **`6dd98fb`**, is OPEN, unmerged, and `CLEAN`. Push CI **35313596684**, PR CI **35313601849**, Build APK **35313601854**, and test-release **35313601903** pass on that exact head. Android and Windows/Desktop production paths are preserved; this probe work did not replace them.
+- **Healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`.
+- **Latest live candidate evidence:** owner run **35310771629** tested older head `dbb3c08` and completed `failure`; version/search, first Home page, related, and offline passed, while `home-more` failed with the top-level `contents`/`singleColumnBrowseResultsRenderer` shape. Own-client/yt-dlp returned runner bot-gating and NewPipe returned its separate short-JSON parse watch. Artifact `rot-drill-35310771629` id **10533178016** and issue #14 comment **5725612380** preserve the available evidence; blob download returned `EOF` in the sandbox.
+- **Probe/workflow update:** current code emits `PASS`, `FAIL`, `ENVIRONMENT_BLOCKED`, or `UNAVAILABLE`. Home continuation failure is a real `FAIL`; explicit YouTube bot-gating is `ENVIRONMENT_BLOCKED`; all non-PASS statuses remain non-zero. The workflow opens a rot-drill issue only for `FAIL`, but does not turn an environment-blocked run into a green production claim.
+- **Current parser candidate:** the direct/nested-browse parser and fixture changes are CI-verified as part of `6dd98fb`, but are not live-accepted. `home-more` must pass on the final head before S1 closes.
+- **Exact next step:** repository owner triggers `extraction-health` on `arena/01a0b224-dhun` (final head `6dd98fb`), then records the live `home-more` and verdict classification. The agent still receives HTTP 403 for `workflow_dispatch`.
 - **Gate:** S1 remains RED/open; S2 is blocked and PR #91 remains open/unmerged.
 
 ## Dispatch
@@ -55,7 +56,7 @@ gh workflow run extraction-health.yml --ref arena/01a0b224-dhun --repo 99ggprooo
 - **`PROBE|verdict|UNAVAILABLE`** = external live service/network did not provide a health result. It is not a DHUN parser verdict, but it is also not a pass.
 - **`PROBE|verdict|FAIL`** = a production-path/probe check failed. Home feed or continuation parser errors are always in this category. The workflow opens/comments on issue `[rot-drill] Live extraction probe failed` with the last 12 KB and retains the full 14-day artifact.
 - A separate `WATCH|newpipe-stream|BROKEN|Parse(JSON response is too short)` line is diagnostic only. NewPipe is not in either production resolver chain and must not be folded into Home or own-client/yt-dlp conclusions.
-- Run **35310771629** still failed `home-more` with `contents[singleColumnBrowseResultsRenderer]`; the scoped `8dc88a1` follow-up is not accepted until another candidate run passes. The raw artifact blob is unavailable in this sandbox, so keep diagnostics key-only.
+- Run **35310771629** still failed `home-more` with `contents[singleColumnBrowseResultsRenderer]`; the final candidate at `6dd98fb` includes the scoped parser follow-up but is not accepted until another candidate run passes. The raw artifact blob is unavailable in this sandbox, so keep diagnostics key-only.
 - **Gray / skipped probe job** = run never started (concurrency cancel). Re-dispatch.
 - **Red run with ZERO jobs** (failure but jobs list empty, total_count:0) = trigger noise, not verdict — see below.
 

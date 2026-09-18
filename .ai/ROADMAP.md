@@ -2,20 +2,18 @@
 
 Updated **2026-09-18** · session **`arena/01a0b224-dhun`** · `main`/`origin/main` `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`.
 
-**Phase/status:** Stage **S1 — restore the maintenance contract** remains **RED** and S2 remains blocked. The architecture comparison is complete: the probe reuses the shared production client/parser/resolvers; it does not reproduce platform orchestration or players. The Home parser candidate remains unaccepted until a live `home-more` pass.
+**Phase/status:** Stage **S1 — restore the maintenance contract** remains **RED** and S2 remains blocked. Android and Windows/Desktop production extraction work is already preserved and is **not** the remaining issue; those paths were not reopened or replaced. The shared Home parser candidate and probe classification changes are CI-green, but the Home parser is not accepted until a live `home-more` pass on the final head.
 
-**Exact files/task currently being worked on:** `tools/playback-probe/Main.kt` now treats Home/continuation failures as real `FAIL` results and emits explicit `PASS`, `FAIL`, `ENVIRONMENT_BLOCKED`, or `UNAVAILABLE` resolver statuses. New `ProbeStatus.kt` plus `ProbeStatusTest.kt` classify explicit YouTube `LOGIN_REQUIRED`/bot-gate evidence without changing `DhunError`. `.github/workflows/extraction-health.yml` preserves offline/live exit codes, summarizes the classification, opens issues only for `FAIL`, and keeps non-PASS checks non-zero. Existing `HomeFeedParser.kt`/fixture changes remain narrow and untouched by this status work.
+**Current code state:** `tools/playback-probe/Main.kt` treats Home/continuation failures as real `FAIL` results and emits explicit `PASS`, `FAIL`, `ENVIRONMENT_BLOCKED`, or `UNAVAILABLE` resolver statuses. `ProbeStatus.kt` plus `ProbeStatusTest.kt` classify explicit YouTube `LOGIN_REQUIRED`/bot-gate evidence without changing `DhunError`. `.github/workflows/extraction-health.yml` preserves offline/live exit codes, summarizes the classification, opens issues only for `FAIL`, and keeps non-PASS checks non-zero. The final syntax repair removed the invalid trailing comma in the probe `when` expression; no Android/Desktop production source was changed.
 
 **GitHub state verified live:**
-- `origin/main` remains `33e94b0`; PR **#91** is OPEN, unmerged, and `CLEAN` at the previously verified `445749a`/`8dc88a1` evidence head before these unpushed changes.
-- Parser candidate `8dc88a1` passed push CI **35311036178**, PR CI **35311039453**, Build APK **35311039470**, and test-release **35311039459**. The new probe/workflow changes are not yet CI-verified.
-- Owner run **35310771629** (`workflow_dispatch`) uploaded artifact `rot-drill-35310771629` (id **10533178016**), and issue #14 comment **5725612380** preserves the tail. Artifact/log blob downloads return `EOF` in this sandbox.
+- `origin/main` remains `33e94b0`; PR **#91** is OPEN, unmerged, and `CLEAN` at final head **`6dd98fb`**.
+- Push CI **35313596684**, PR CI **35313601849**, Build APK **35313601854**, and test-release **35313601903** all pass on `6dd98fb`. The passing CI includes shared domain, Android Robolectric/debug build, playback-probe compile/classifier tests, extraction-health classification, Desktop compile/JVM tests, and packaging checks.
+- The latest owner-triggered live run remains **35310771629** on older candidate `dbb3c08`; it passed metadata/search, first Home page, related, and offline checks, but `home-more` failed. Own-client/yt-dlp were separately bot-gated and NewPipe reported its separate short-JSON diagnostic.
 
-**Last actual error:** run **35310771629** passed version/search, Home first page, related, and offline checks. `home-more` failed with `shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];...`; own-client/yt-dlp remained `AuthRequired`, and NewPipe remained `Parse(detail=JSON response is too short)`. Those findings remain separate.
+**Last actual code error:** the malformed Kotlin `when` expression at `Main.kt:201–202` caused CI **35313043505** to fail; commit `6dd98fb` fixed it and the replacement CI is green. No current compiler/test error is known. No local Kotlin/Gradle test ran because the sandbox has no JDK; CI remains the compiler.
 
-**Evidence state:** PR #91 remains open/unmerged. No cookies, sign-in, PO tokens, BotGuard, attestation, ADR-007, resolver-chain replacement, or platform playback changes were added. No local Kotlin/Gradle test has run because the sandbox has no JDK; CI remains the compiler.
-
-**Exact next technical step and blocker:** run the new probe/workflow tests through CI, push only after the final diff is reviewed, then have the owner trigger `extraction-health` on that final head. Inspect `home-more` and the new verdict classification; keep S1 RED until live evidence passes. The agent token still cannot dispatch this workflow (HTTP 403). Do not start S2 or merge PR #91.
+**Exact next technical step and blocker:** have the repository owner trigger `extraction-health` on `arena/01a0b224-dhun@6dd98fb`, then inspect `home-more` and the final `PROBE|verdict|...` classification. Keep S1 RED until live evidence passes; do not start S2 or merge PR #91. The agent token still cannot dispatch this workflow (HTTP 403). No credentials, cookies, PO tokens, BotGuard, attestation, ADR-007, resolver-chain replacement, or Android/Desktop rewrite is permitted or needed.
 
 ---
 
