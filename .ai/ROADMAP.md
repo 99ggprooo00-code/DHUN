@@ -21,8 +21,16 @@ branch as approved scope.** It advanced nothing in S1–S6.
    S2 unblock.
 2. **S2:** architectural cleanup (dead harness UI, PR #54 hygiene, docs index)
    after S1 GREEN.
-3. **Decide the web branch:** adopt (needs MASTER_PROMPT §3/§7 amendment + an
-   ADR, per §8 rules 3 and 9) or drop it. Until then it stays unmerged.
+3. **Web branch: DISMISSED by the owner (2026-09-18).** The owner reviewed it
+   and dropped it — "dismiss everything in this session". It is **not
+   adopted** and it is **not reverted either**: it sits on
+   `arena/01a0b342-dhun`, unmerged, with `main` untouched. Do not build on it,
+   do not merge it, and do not treat it as approved scope. If web is ever
+   wanted, restart from MASTER_PROMPT §7 (owner asks → amend §3/§7 → ADR →
+   owner OK → code). See `docs/runbooks/post-release-process.md` §10.
+4. **Steady-state process documented:** `docs/runbooks/post-release-process.md`
+   — how DHUN is worked on after v0.1.0 ships (recurring calendar, red-drill
+   response, release checklist, owner-vs-agent boundary, backlog governance).
 
 ---
 
