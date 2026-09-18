@@ -7,17 +7,15 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-18 ~04:17 UTC): owner run completed RED; S1 remains open
+## State (2026-09-18 ~05:28 UTC): owner candidate run RED; S1 remains open
 
 - **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** pass; the rolling `test` release targets this SHA and has APK/MSI plus both checksum sidecars.
-- **Current healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`. Owner-dispatched run **35306224822** completed `failure` and uploaded artifact `rot-drill-35306224822` (id **10532130174**, 4,357 B).
-- **Current result:** offline/metadata/search/related passed, but `home-more` failed with `Parse(detail=Home response contained no section list or Home continuation action)`. Own-client and yt-dlp returned `AuthRequired` / `LOGIN_REQUIRED` bot-gating; no audio bytes were validated. NewPipe separately returned `Parse(detail=JSON response is too short)`. This is a mixed RED, not an S1 pass.
-- **Required classification:** treat the resolver `AuthRequired` as GitHub-runner network evidence requiring approved residential/device verification. Investigate the Home continuation parse failure independently; do not add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007. The raw artifact download returned `EOF` in the sandbox; issue #14's workflow comment and artifact metadata remain the recorded evidence.
-- **Parser candidate:** PR #91 now supports shelf-specific continuation wrappers/renderers and logs only response keys when no supported Home shape is found. CI is green at evidence head `005b526` (shared JVM parser suite included), but this is not live acceptance; a candidate-branch probe or sanitized payload is still required before classifying `home-more` as fixed.
-- **Latest candidate probe:** run **35308796439** on `arena/01a0b224-dhun@c546d7b` still returned `home-more` `Parse` with top-level `contents` and no action/continuation wrapper. A direct-contents follow-up is pending CI and another owner-triggered run; keep S1 RED.
-- **Follow-up CI:** head `526e390` is PR-green; push CI **35309124090** hit an unrelated `LibraryViewModelTest` timeout, then push CI **35309533562** passed on docs-only successor `98843af`. PR #91 is `CLEAN`; do not reinterpret the timeout as extraction or parser evidence.
-- **Dispatch limitation:** the agent still receives HTTP 403 for `workflow_dispatch` and cannot write issue comments. The owner-triggered run is authoritative; no second run is needed until the Home response shape and network classification are addressed.
-- **Support ticket #4765894** may be closed as resolved by the distinct workflow path; it is not a prerequisite for the mixed-RED investigation.
+- **Current healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`.
+- **Latest candidate result:** owner run **35310771629** (`workflow_dispatch`, `arena/01a0b224-dhun@dbb3c08`) completed `failure`; artifact `rot-drill-35310771629` id **10533178016** (4,432 B) exists and issue #14 comment **5725612380** preserves the tail. Version/search, first Home page, related, and offline passed, but `home-more` failed with a top-level `contents` response under `singleColumnBrowseResultsRenderer`.
+- **Required classification:** own-client/yt-dlp `AuthRequired` is GitHub-runner network evidence requiring approved residential/device verification; it is not permission to add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007. NewPipe's short-JSON parse is a separate watch. The Home parser failure is independent. Artifact/log blob download returned `EOF` in the sandbox.
+- **Current parser candidate:** commit **8dc88a1** adds scoped support for direct section entries under known single-/two-column browse renderers and fixture coverage. Push CI **35311036178**, PR CI **35311039453**, Build APK **35311039470**, and test-release **35311039459** pass. This is not live acceptance.
+- **Exact next step:** owner-trigger `extraction-health` again on `arena/01a0b224-dhun@8dc88a187a81e779f7dd9625ce90734b69e08216`; inspect `home-more` before changing classification. The agent still receives HTTP 403 for `workflow_dispatch`.
+- **Gate:** S1 remains RED/open; S2 is blocked and PR #91 remains open/unmerged.
 
 ## Dispatch
 
@@ -27,8 +25,9 @@ release is an operator task. Do it once per release candidate, on
    (repo → **Actions** → **extraction-health** in the left sidebar — the
    workflow's declared name is `extraction-health`; sidebar label should
    reflect that name when registration is healthy).
-2. Click **Run workflow** (right side, above the runs list); leave
-   **Branch: main** selected; click green **Run workflow**.
+2. Click **Run workflow** (right side, above the runs list). For the current
+   PR candidate validation select **`arena/01a0b224-dhun`** (not `main`),
+   then click the green **Run workflow** button.
 3. A new run appears at top within ~30 s. Click it, watch **probe** job
    (≈5–12 min; installs yt-dlp and runs offline + live probes).
 
@@ -40,11 +39,13 @@ zero-job artifact from that path; use `extraction-health` instead.
 403):**
 
 ```bash
-gh workflow run extraction-health.yml --ref main --repo 99ggprooo00-code/DHUN
-# or by declared name:
-# gh workflow run extraction-health --ref main --repo 99ggprooo00-code/DHUN
-# or with workflow id:
-# gh workflow run 360655315 --ref main --repo 99ggprooo00-code/DHUN
+# Current PR candidate validation:
+gh workflow run extraction-health.yml --ref arena/01a0b224-dhun --repo 99ggprooo00-code/DHUN
+# After the candidate is merged, release-baseline validation uses main:
+# gh workflow run extraction-health.yml --ref main --repo 99ggprooo00-code/DHUN
+# or by declared name / workflow id with the same --ref:
+# gh workflow run extraction-health --ref arena/01a0b224-dhun --repo 99ggprooo00-code/DHUN
+# gh workflow run 360655315 --ref arena/01a0b224-dhun --repo 99ggprooo00-code/DHUN
 ```
 
 ## Reading the verdict
@@ -59,9 +60,10 @@ gh workflow run extraction-health.yml --ref main --repo 99ggprooo00-code/DHUN
     before treating as rot. Do not introduce cookies, sign-in, PO tokens,
     BotGuard, attestation, or ADR-007 to make this runner green.
   - A separate parser error must not be folded into the bot-gating result.
-    For run **35306224822**, `home-more` failed with
-    `Parse(detail=Home response contained no section list or Home continuation action)`;
-    capture the raw/sanitized continuation shape before changing the parser.
+    Run **35310771629** on the candidate still failed `home-more` with
+    `contents[singleColumnBrowseResultsRenderer]`; the scoped `8dc88a1`
+    follow-up is not accepted until another candidate run passes. The raw
+    artifact blob is unavailable in this sandbox, so keep diagnostics key-only.
   - Anything else = probable extractor rot. Workflow opens/comments on
     issue `[rot-drill] Live extraction probe failed` with last 12 KB log;
     full log artifact `rot-drill-<run_id>`, 14-day retention. A blob-download

@@ -1,5 +1,24 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+
+## 2026-09-18 — Candidate run 35310771629 keeps Home RED; nested browse follow-up added (`arena/01a0b224-dhun`)
+
+**Owner-triggered validation.** The repository owner dispatched
+`extraction-health` **35310771629** on `arena/01a0b224-dhun@dbb3c0872dac2e7d010883b4e5ff7482561bc62a` (`workflow_dispatch`). Probe job **105492165940** completed the live steps, uploaded artifact `rot-drill-35310771629` (id **10533178016**, 4,432 bytes), updated issue #14 in comment **5725612380**, and failed at the intentional alert step. The artifact/log blob again returns `EOF` in this sandbox; no raw response body or opaque token is recorded.
+
+**Probe result.** Version/search (20 songs), first Home page (2 sections plus continuation), related (50), and deterministic offline playback passed. `home-more` remained RED:
+
+```
+PROBE|home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action; shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];contentsItems[-];rootItems[-];actions[-];commands[-];items[-])
+```
+
+The failure is separate from playback: own-client and yt-dlp remained `AuthRequired` / `LOGIN_REQUIRED` bot-gated, so no audio bytes were validated; NewPipe remained `Parse(detail=JSON response is too short)`. Keep all three findings separate and do not add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007.
+
+**Narrow follow-up.** The new diagnostic identifies the known top-level `contents` → `singleColumnBrowseResultsRenderer` envelope, while the existing parser only accepted its selected-tab section path. Commit **8dc88a1** adds `homeBrowsePage`, which accepts a scoped `sectionListRenderer` or direct `contents` section array under the known single-/two-column browse renderer; it does not recursively flatten arbitrary response objects. Fixture `nested-browse-contents.json` and a regression test cover that contract.
+
+**Verification boundary.** Push CI **35311036178**, PR CI **35311039453**, Build APK **35311039470**, and test-release **35311039459** pass on `8dc88a1`; PR #91 is `CLEAN`, open, and unmerged. No local Kotlin/Gradle test ran because the sandbox has no JDK. This is not live acceptance: the next owner-triggered run must test current head `8dc88a1`. S1 remains RED and S2 remains blocked.
+
+
 ## 2026-09-18 — S1 live handoff is RED with two independent signals (`arena/01a0b224-dhun`)
 
 **Authoritative run.** The repository owner dispatched workflow

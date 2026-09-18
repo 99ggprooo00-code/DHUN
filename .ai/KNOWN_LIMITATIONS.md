@@ -2,6 +2,15 @@
 
 Updated every phase. Nothing hidden.
 
+
+## 2026-09-18 (~05:28 UTC) — Candidate run 35310771629 keeps Home RED; nested-browse follow-up is CI-green
+
+- **Owner-triggered candidate evidence:** `extraction-health` run **35310771629** tested `arena/01a0b224-dhun@dbb3c0872dac2e7d010883b4e5ff7482561bc62a`, completed `failure`, and emitted `PROBE|verdict|FAIL|extraction-pipeline-broken`. Probe job **105492165940** uploaded artifact `rot-drill-35310771629` (id **10533178016**, 4,432 bytes); issue #14 comment **5725612380** preserves the sanitized tail. Artifact/log downloads return `EOF` in this sandbox.
+- **What passed:** version, search (20 songs), first Home page (2 sections + continuation), related (50 tracks), and deterministic offline playback. **Home still failed:** `home-more` reported `shape=top[contents,responseContext,trackingParams];continuation[-];contents[singleColumnBrowseResultsRenderer];...`.
+- **Separate resolver findings:** own-client and yt-dlp returned `AuthRequired` / `LOGIN_REQUIRED` bot-gating, no audio bytes were validated, and NewPipe returned `Parse(detail=JSON response is too short)`. Keep these separate from the Home parser result; do not add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007.
+- **Follow-up:** commit `8dc88a1` adds scoped support for direct section entries under the known single-/two-column browse renderers, with synthetic fixture `nested-browse-contents.json`. Push CI **35311036178**, PR CI **35311039453**, Build APK **35311039470**, and test-release **35311039459** all pass. This is not live acceptance until another owner-triggered probe passes `home-more`.
+- **Gate:** S1 remains RED/open; S2 is blocked and PR #91 remains open/unmerged. The sandbox has no JDK, so local Kotlin/Gradle tests remain unrun.
+
 ## 2026-09-18 (~04:17 UTC) — S1 live run 35306224822 is RED / mixed (`arena/01a0b224-dhun`)
 
 - **Authoritative current gate:** `extraction-health` run **35306224822** was owner-dispatched on `main@33e94b06125b8ce1eefe9aab0a2faca116ca53fe`, completed with conclusion `failure`, and emitted `PROBE|verdict|FAIL|extraction-pipeline-broken`. Artifact `rot-drill-35306224822` (id **10532130174**, 4,357 bytes) exists; the issue #14 comment preserves the log tail. The signed artifact download returned `EOF` in this sandbox, so no raw payload is claimed.
