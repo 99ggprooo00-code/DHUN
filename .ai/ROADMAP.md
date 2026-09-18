@@ -1,6 +1,6 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-18** · session **`arena/01a0b224-dhun`** · branch head **`c71d1bb`** · `main`/`origin/main` `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`.
+Updated **2026-09-18** · session **`arena/01a0b224-dhun`** · docs head **`89187f0`** (production repair **`c71d1bb`**) · `main`/`origin/main` `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`.
 
 **Phase/status:** Stage **S1 — restore the maintenance contract** remains **RED** and S2 remains blocked because the live resolver is still runner-gated. The Home continuation request repair is now accepted by the probe boundary: the latest extraction-health run classified the overall result as `ENVIRONMENT_BLOCKED`, not the prior Home-driven `FAIL`. Android and Windows/Desktop production extraction work is preserved and was not reopened or replaced.
 

@@ -10,7 +10,7 @@ release is an operator task. Do it once per release candidate, on
 ## State (2026-09-18): Home transport repaired; resolver gate remains
 
 - **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). Its baseline CI/test-release evidence remains separate from this unmerged candidate.
-- **Current candidate:** PR **#91**, branch `arena/01a0b224-dhun`, head **`c71d1bb`**, is OPEN and unmerged. Android and Windows/Desktop production paths remain preserved and were not replaced.
+- **Current candidate:** PR **#91**, branch `arena/01a0b224-dhun`, docs head **`89187f0`** (production repair **`c71d1bb`**), is OPEN and unmerged. Android and Windows/Desktop production paths remain preserved and were not replaced.
 - **Healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`.
 - **Latest candidate evidence:** push run **35325690972** tested `c71d1bb`. Its classifier step passed, the rot-drill issue step was skipped, and the final result was `ENVIRONMENT_BLOCKED`; only the intentional non-PASS gate failed. This means the prior Home-driven `FAIL` no longer controls the result. The resolver remains blocked by the GitHub runner's YouTube bot gate, so no live audio bytes were validated.
 - **Request contract:** `InnerTubeClient` now matches the independent `ytmusicapi` comparison: `alt=json`, empty `context.user`, `browseId` in the body, `ctoken` and `continuation` in the query, and cached anonymous `X-Goog-Visitor-Id`. `HomeFeedParser.kt` remains unchanged.
