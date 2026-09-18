@@ -1,26 +1,22 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-17 (~16:15 UTC)** · session **`arena/01a0aff7-dhun`** · main `ef9844d`
-(Fable 5.6 key provided; AI DJ rejected — "No need that").
+Updated **2026-09-18 01:48 UTC** · session **`arena/01a0b224-dhun`** · `main`/`origin/main` `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`.
 
-**GitHub evidence (live, post-PR #89 merge ef9844d):**
-- `origin/main` = `ef9844d` (PR #89 merged ~16:00 UTC) — cleanup of wedged file
-- Workflows: **360655315 `extraction-health` `.github/workflows/extraction-health.yml` active, name=extraction-health (HEALTHY)** — ONLY 5 workflows now: CI, Build APK, test-release, dev-release (orphaned), extraction-health. Old wedged 360227450 `rot-drill-daily.yml` GONE from `gh workflow list` (orphaned by delete).
-- Main CI on ef9844d: Build APK 35243865335 success, CI 35243865297 success, test-release 35243865257 success (all ~16:00-16:13 UTC). **No phantom 0-job push run on this merge** — proves extraction-health healthy (previous merge 3c593fb had phantom 35241808266 from old wedged file, now gone).
-- Rolling test republished 16:06:13Z apk 17948508 / 16:13:42Z msi 112852992 all four assets (verified via release API).
-- Support ticket #4765894 still pending but workaround succeeded — new file bypassed corruption, old file orphaned.
-- Branch `arena/01a0aff7-dhun` at ef9844d (fast-forwarded to main), clean.
+**Phase/status:** Stage **S1 — restore the maintenance contract**. Application-code work is paused; S2 cleanup and extraction changes remain blocked until a fresh live `extraction-health` verdict is produced on current `main`.
 
-**Attempt 4 + cleanup SUCCESS:**
-- extraction-health.yml registered with correct name, no phantom push on either merge (3c593fb had no phantom from new file, only old file; ef9844d has zero phantom).
-- Old wedged rot-drill-daily.yml deleted, its id 360227450 no longer active — orphaned.
+**Exact files/task currently being worked on:** docs-only S1 handoff across `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`, `docs/runbooks/rot-drill.md`, and `docs/verification/14-release.md`; all five files reconcile the live `main@33e94b0` state and the missing `extraction-health` verdict. No application files are being changed.
 
-**Exact next steps:**
-1. **User action required (S1 exit):** Actions → `extraction-health` → Run workflow on main (agent 403). Record live verdict in `docs/verification/14-release.md` + `DEBUG_LOG` → S1 close → update issue #14 → S2 unblock.
-2. **S2:** architectural cleanup (dead harness UI, PR #54 hygiene, docs index) after S1 GREEN.
-3. **Fable key:** sandbox egress blocked (SSL_ERROR_SYSCALL, only api.github.com reachable). Key NOT committed. AI DJ surface reverted per user "No need that". Continuation is S1–S6.
+**GitHub state verified live (2026-09-18 01:32 UTC):**
+- Local tree was clean at boot; local `arena/01a0b224-dhun` and `origin/main` both point to `33e94b0`. The assigned session branch is **not present on origin**, so there is no session PR. The only open PR is #54, research-only contingency material; it is not an implementation dependency.
+- Main checks at `33e94b0`: CI **35246193151** PASS, Build APK **35246193174** PASS, and test-release **35246193097** PASS. The rolling `test` tag and release target `33e94b0`; APK/MSI plus both `.sha256` assets are present (APK 17,948,508 B; MSI 112,852,992 B).
+- Workflow **`extraction-health`**, id **360655315**, is active and correctly registered from `.github/workflows/extraction-health.yml`. It has **no run yet**. The former wedged `rot-drill-daily.yml` entry is gone from the registry; the orphaned `dev-release` registry entry remains unrelated.
+- Issue #14 remains OPEN. The latest actual live extraction failure is run **34083253658** (scheduled 2026-09-07, `main@d1e0408`): metadata/search/related passed, the production chain and yt-dlp reported bot-gated `AuthRequired`, NewPipe remained a non-fatal parse watch, and the probe verdict was FAIL; no newer live verdict exists. Zero-job push failures are not extraction evidence.
 
-No secret committed, no JDK local (CI is compiler), no AI surface shipped.
+**Last actual error:** no local build/test error (no local JDK); the last actual live error is the stale run **34083253658** above. The current S1 blocker is **absence of a fresh verdict**, not a new code failure.
+
+**Evidence state:** main changes are pushed, merged through PR #90, CI-verified, and released to rolling `test`; this session's five-file docs handoff is complete locally but has no commit, push, PR, or CI result yet. No hardware verification is claimed.
+
+**Exact next technical step and blocker:** run the documentation checks, commit all five reconciled files, push `arena/01a0b224-dhun`, open one PR, and request the live `extraction-health` run on `main`. The agent cannot dispatch workflows (`HTTP 403`); the user must click **Actions → extraction-health → Run workflow** or let the next scheduled window run. S1 cannot close, and S2 cannot begin, until that run produces an artifact and a recorded GREEN/RED verdict.
 
 ---
 
@@ -162,12 +158,13 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 🟨 code merged + CI green, **hardware verification open** ·
 ⬜ not started · 🔴 blocked/open problem.
 
-**`main@3c593fb` (2026-09-17, after PR #88 merge): post-merge CI green**
-(build-and-test 35241809608, Build APK 35241809437, test-release
-35241809594 — all success on the merge SHA). Rolling `test` pre-release
-republished 2026-09-17 15:46:15 UTC at exactly `3c593fb` (apk + msi +
-both `.sha256` sidecars; asset uploads final 15:47:22 UTC). New healthy
-workflow 360655315 extraction-health active.
+**`main@33e94b0` (2026-09-17, after PR #90 merge): post-merge CI and rolling release green**
+(Build APK **35246193174**, CI **35246193151**, and test-release
+**35246193097** — all success on the merge SHA). Rolling `test` currently
+targets exactly `33e94b0` and has `dhun-test.apk`, `dhun-test.msi`, and both
+`.sha256` sidecars; release assets are 17,948,508 B and 112,852,992 B.
+Workflow **360655315 `extraction-health`** is active and correctly named,
+but has produced **no run yet**; S1 therefore remains open.
 
 ### 2a. Build history — Phases 01–16 (ALL code-merged; do not re-implement)
 
@@ -197,7 +194,7 @@ All are 🟨/⬜ — closing them is Stage S3.
 
 | Stage | Objective | Status | Gate |
 |---|---|---|---|
-| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | 🟨 attempt 4 SUCCESS — extraction-health id 360655315 healthy (name=extraction-health, no phantom push on 3c593fb merge); old wedged 360227450 still fires noise; needs user's Run workflow click + live GREEN | ≥1 scheduled/dispatched drill verdict on current `main` + artifact |
+| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | 🟨 registration repair merged (PRs #88–#90); extraction-health id 360655315 is active and correctly named, but it has **no live run yet**. The old wedged `rot-drill-daily.yml` file is deleted; the agent still receives HTTP 403 for dispatch. | ≥1 scheduled/dispatched extraction-health verdict on current `main` + artifact; then record it in `14-release.md` and reconcile #14 |
 | **S2** | Architectural cleanup (dead harness UI, PR #53/#54 hygiene, docs index, stale root notes) | ⬜ | CI green; zero dead screens; PRs resolved |
 | **S3** | Hardware verification round 1 (core loop both platforms, signed checklists) | ⬜ | `docs/verification/` checklists signed with build SHAs |
 | **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | 🟨 code merged + CI green (PR #74); S4 hardware boxes ride in S3 | Every shipped key reachable or removed; EQ decision recorded |
@@ -215,14 +212,14 @@ S1 → S2 → S3 → S6.
 
 ---
 
-## 3. Board hygiene (PRs + issues — verified via `gh` 2026-09-17)
+## 3. Board hygiene (PRs + issues — verified via `gh` 2026-09-18)
 
 | Item | State | Decision |
 |---|---|---|
 | PR #53 `docs: reconcile extraction playback research handoff` (+182/−513, would wipe this file from a stale base) | **CLOSED unmerged 2026-09-16** (session `arena/01a0ac91-dhun`, per this decision) | Superseded by the re-baseline; the research track continues in open PR #54. Nothing in it survived. |
 | PR #54 `docs: PO-token/InnerTubeX research + ADR proposal` (+326/−1, ADR-007 PROPOSED) | OPEN, research-only | **Keep as contingency reference** (merge docs-only with ADR-007 staying PROPOSED, or leave open — user's call). NEVER implement without trigger T1/T2 + explicit go-ahead. (A labeled agent test comment "test-ping (delete me)" from 2026-09-16 could not be deleted by the agent token — safe to remove manually.) |
 | PR #88 `S1 attempt 4 — new workflow extraction-health.yml` | **MERGED as `3c593fb`** (2026-09-17T15:40Z) | Attempt 4 SUCCESS — id 360655315 healthy, name=extraction-health, no phantom push. Old wedged 360227450 fired 35241808266 phantom on same merge. |
-| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; last LIVE verdicts `34011539225` (09-06) + `34083253658` (09-07), both RED, pre-#57 chain; schedule silent since 09-07 04:28; new healthy workflow 360655315 awaits live GREEN | Keep open; S1 re-baselines it with fresh verdict on current `main`. New workflow `extraction-health` replaces `rot-drill-daily`. Agent cannot comment on issues (403); workflow itself updates #14 on next live run. |
+| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; latest actual scheduled verdict `34083253658` (2026-09-07, `main@d1e0408`) is RED; no `extraction-health` run exists yet on current `main@33e94b0` | Keep open; S1 re-baselines it with the first fresh extraction-health artifact. The healthy workflow replaces the deleted/wedged `rot-drill-daily` registration. Agent cannot dispatch or write issue comments (403); the workflow itself updates #14 on the next live run. |
 | Issue #60 `Guest-First + Optional YTM Login` | OPEN (future plan, self-declared not-current) | v2 backlog (§8). Guest-first is already architecture — no action now |
 | Issue #63 `Security hardening…` | OPEN (enhancement) | v2 backlog (§8). No action in S1–S6 except S5's dep/license review (done in PR #74) |
 
@@ -281,13 +278,9 @@ S1 → S2 → S3 → S6.
 
 1. ~~Merge this re-baseline (user review).~~ **DONE** — merged as PR #72
    (main `5023b38`, 2026-09-16T17:08:09Z).
-2. **S1** — **SUCCESS (attempt 4) — awaiting live GREEN:** PR #53 closed (2026-09-16); full rot-drill
-   diagnosis recorded; branch cleanup done + dispatch path revised 2026-09-17;
-   re-registration via new file `extraction-health.yml` (PR #88, id 360655315 healthy)
-   merged as `3c593fb`; old wedged 360227450 to be deleted in next PR.
-   Remaining: user's Run workflow click on extraction-health → live verdict
-   → verdict line in 14-release.md → #14 reconciliation → S1 done.
-   Fallback support ticket #4765894 now optional (workaround succeeded).
+2. **S1** — **registration repair merged; live verdict still open:** PR #53 closed (2026-09-16); full rot-drill diagnosis recorded; re-registration via new file `extraction-health.yml` (PR #88, id 360655315) succeeded and cleanup of `rot-drill-daily.yml` merged in PRs #89/#90, with current `main@33e94b0` CI/release green.
+   Remaining: user's Run workflow click on extraction-health (or the next scheduled window) → live verdict/artifact → verdict line in `14-release.md` + `DEBUG_LOG` → #14 reconciliation → S1 done.
+   Agent dispatch remains HTTP 403; support ticket #4765894 is optional after the distinct-file workaround.
 3. **S2** (agent: dead-code + PR/docs hygiene) — unblocked after S1 GREEN.
 4. **S3** (user drives devices; agent records + fixes fallout) — includes
    the S4 hardware boxes (settings, EQ, jump-list verb, close-to-tray).

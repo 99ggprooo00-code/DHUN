@@ -1,21 +1,8 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Status note (2026-09-17 ~16:00 UTC, Stage S1 attempt 4 SUCCESS):**
-> body below is point-in-time log ending PR #32 (`862f0ac`, 2026-09-07),
-> kept verbatim as history. Current state: `main@3c593fb` (PR #88 merged
-> ~15:40 UTC, attempt 4 `extraction-health.yml`); Build APK 2m46s PASS,
-> CI 5m23s PASS, test-release 6m33s PASS, rolling `test` republished
-> 15:46:15Z apk / 15:47:22Z msi all four assets verified via release API.
-> **New healthy workflow id 360655315 `extraction-health` active with
-> correct name `extraction-health` (not file path), no phantom 0-job push
-> on merge** — bypassed corrupted registration that wedged 348098190
-> (deleted) and 360227450 (active wedged, fired phantom 35241808266 on
-> same merge). Old `rot-drill-daily.yml` to be deleted next PR to orphan
-> 360227450. Support ticket #4765894 filed ~03:15 UTC still pending but
-> workaround succeeded. Dispatch still 403 for agent — user must click
-> **Run workflow** on `extraction-health` in Actions UI; schedule 04:17 UTC
-> will fire next window. No v0.1.0 tag/release yet. S1 exit criterion is
-> live GREEN run of `extraction-health` (replacing rot-drill).
+> **Current status (2026-09-18 ~01:32 UTC, Stage S1 live verdict pending):** The historical body below is retained, but the current release baseline is `main@33e94b0` after PR #90. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** pass; the rolling `test` release contains APK/MSI and both checksum sidecars.
+> Workflow **360655315 `extraction-health`** is active and correctly named, but has produced **no run yet**. The former `rot-drill-daily.yml` file is deleted and its wedged registry entry is orphaned. The latest actual scheduled failure is **34083253658** (`main@d1e0408`, 2026-09-07), where metadata passed but production/yt-dlp playback was bot-gated; this does not prove the current SHA.
+> Agent dispatch remains HTTP 403. The user must click **Run workflow** on `extraction-health` with Branch `main`, or the next `04:17 UTC` schedule must fire. S1 exit requires the first current artifact and a recorded live verdict. No v0.1.0 tag/release or hardware acceptance is claimed.
 
 Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
 RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**
@@ -76,7 +63,7 @@ suppressed until retry; backups are still recommended. No v0.1.0.
 |---|---|---|
 | Typed error taxonomy and actionable user messages | 🟨 Typed `DhunResult`/`DhunError` + `toUserMessage` paths, per-request retry, 429 global backoff gate (`2932d57`, with unit tests), and offline banner (`fed1d54`) are merged with recovery UX; baseline CI `34018809911` is green. Local reason-preserving diagnostics changes await CI; offline/429/403 hardware checks and db-path review remain | `shared/.../core/RateLimitGate.kt`, `shared/.../core/ConnectivityMonitor.kt`, `DhunAppShell.kt`, hosts' Koin modules |
 | Bounded audio cache and offline replay | 🟨 Android + Desktop code | Android: Media3 `SimpleCache` LRU via `DhunAudioSegmentCache` + `CacheDataSource` (stable video-id keys). Desktop: `AudioFileCache` whole-track LRU files under `<data dir>/cache/audio`, background fill during first play, local-file playback on hit (no resolve → offline). Both use `SettingsKeys.CACHE_SIZE_MB` default 1024 MB (`AudioCacheBudget`). URL TTL cache still `DhunStreamCache`. Unit tests: `AudioFileCacheTest` (9: hit/LRU victim/over-budget/short-read/cancel/unsafe id/partial sweep/shrink+clear). Hardware offline-replay check OPEN on both |
-| Daily live rot-drill | 🔴 Latest verified run **34011539225**, scheduled on `dd1ab31`, failed; metadata PASS; own-client / production aggregate Unavailable; yt-dlp WATCH separately AuthRequired | Schedule, issue #14 alert and artifact `rot-drill-34011539225` proven. No newer live verdict, green byte check or recovery auto-close |
+| Daily live extraction-health | 🔴 No current run yet on `main@33e94b0`; workflow id **360655315** is active and correctly registered. Latest historical scheduled verdict is **34083253658** (`main@d1e0408`), RED with bot-gated production/yt-dlp playback and metadata/search/related PASS | User dispatch or scheduled run still required; record the first artifact and GREEN/RED verdict here before closing S1. |
 | Android 30-minute soak | ⬜ Open | Requires a physical device with unrestricted battery mode, lock-screen playback, and zero-crash/leak evidence |
 | Desktop 30-minute soak | ⬜ Open | Requires a desktop with libVLC and tray/SMTC-capable runtime |
 | Release v0.1.0 artifacts | ⬜ Open | Rolling `test` APK/MSI is not the signed/stable v0.1.0 release; clean-target installation and release evidence are required |
@@ -100,7 +87,10 @@ for upstream recovery.
 
 ## Live evidence log
 
-### Rot-drill
+### Rot-drill / extraction-health
+
+- [ ] **Current S1 verdict pending — workflow `extraction-health` id 360655315:** no run exists yet for `main@33e94b0` as of 2026-09-18 01:32 UTC. The first scheduled or manually dispatched run must be recorded below with its artifact, verdict, and issue #14 outcome.
+
 
 - [x] **Failure path exercised for real — run 33961533965 (2026-09-05,
       workflow_dispatch on `a554594`, job 101295458477): FAILED as
@@ -414,7 +404,7 @@ recorded here.
 
 ### v0.1.0 release gate
 
-- [ ] Rot-drill is scheduled and has a green live run (scheduled run still red at `34011539225`; re-investigate after next green).
+- [ ] `extraction-health` has a current green live run on the release candidate (no run exists yet; latest historical red is `34083253658`).
 - [ ] Android APK and AAB build and install on a clean target.
 - [ ] Windows MSI installs and launches on a clean Windows VM/user — **published baseline `0920148` launches on the user’s machine; install-over failed and clean-target hygiene is still OPEN**.
 - [ ] Android and Desktop soak evidence is attached above (both still OPEN; use an identified candidate that first passes real playback).

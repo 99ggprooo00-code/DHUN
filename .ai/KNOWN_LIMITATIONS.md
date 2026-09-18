@@ -2,6 +2,15 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-18 (~01:32 UTC) — S1 handoff reconciled against `main@33e94b0` (`arena/01a0b224-dhun`)
+
+- **Current GitHub baseline:** `origin/main`, local `main`, and the rolling `test` tag all resolve to `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** are green; the `test` release contains APK/MSI and both checksum sidecars.
+- **S1 is not closed.** Workflow `extraction-health` (id **360655315**) is active and correctly named, but GitHub reports no run yet. The deleted `rot-drill-daily.yml` entry is no longer the active path. The agent cannot dispatch workflows (`HTTP 403`), so a user click or scheduled run is required.
+- **Last actual live extraction evidence:** scheduled run **34083253658** on `main@d1e0408` (2026-09-07) failed the production probe with bot-gated `AuthRequired` outcomes while metadata/search/related passed; NewPipe remained a non-fatal parse watch. This is stale evidence, not a verdict on `main@33e94b0`.
+- **No new application behavior is claimed in this handoff.** No extraction identities, token/cookie paths, probe semantics, ADRs, or hardware status were changed. ADR-007 remains proposed and contingency-only.
+- **Environment:** this sandbox has no `java`, `javac`, `ANDROID_HOME`, or `adb`; no local Gradle/Kotlin/Android test was run. CI remains the compiler and hardware gates remain open.
+- **Next gate:** record the first `extraction-health` run and artifact in `docs/verification/14-release.md`, update the debug log and issue state through the workflow, then reassess S1. S2 cleanup is blocked until that evidence exists.
+
 ## 2026-09-17 (~16:00 UTC) — S1 attempt 4 SUCCESS — extraction-health.yml clean registration (`arena/01a0aff7-dhun`, main 3c593fb)
 
 - **Attempt 4 (new file `extraction-health.yml`, PR #88, merged `3c593fb` ~15:40 UTC) — SUCCESS.**

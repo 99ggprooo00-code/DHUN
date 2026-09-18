@@ -1,5 +1,17 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-18 — S1 boot reconciliation: registration is healthy, live verdict is still absent (`arena/01a0b224-dhun`)
+
+**Current gap.** The repository is at `main@33e94b0` after PR #90. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** all pass, and the rolling `test` release points at that SHA. The replacement workflow `extraction-health` (id **360655315**) is active with the declared name, but `gh run list --workflow extraction-health.yml` returns no runs.
+
+**Last actual extraction error.** The latest real scheduled probe is **34083253658** (`main@d1e0408`, 2026-09-07), not a push-trigger artifact: metadata/search/related passed, the production own-client chain and yt-dlp were bot-gated with `AuthRequired`, NewPipe reported its known parse watch, and `PROBE|verdict|FAIL|extraction-pipeline-broken` was emitted. The many zero-job push failures are trigger noise and are not cited as extraction verdicts.
+
+**Root cause/blocker.** The file-registration repair succeeded, but this agent's GitHub integration token still receives HTTP 403 for `workflow_dispatch` (and cannot write issue comments). A human must click **Actions → extraction-health → Run workflow** on `main`, or the 04:17 UTC schedule must fire. Until an artifact and live verdict exist, S1 cannot close and S2 must not start.
+
+**Verification boundary.** No application code or extraction semantics changed in this handoff. The sandbox has no JDK/Android SDK/adb, so no local Gradle test ran; the only local check for this docs reconciliation is `git diff --check`. Hardware playback, live Home pagination, visuals, and soaks remain unverified.
+
+**Next action.** Push the reconciled docs on `arena/01a0b224-dhun`, open the single session PR, then obtain and record the live `extraction-health` result before doing S2 cleanup.
+
 ## 2026-09-16 — the new desktop-test gate immediately finds 3 latent failures from PR #47 (`arena/01a0aa8e-dhun`)
 
 **Symptom.** First CI on PR #71 (`build-and-test` run `35112656439`, 8m26s)

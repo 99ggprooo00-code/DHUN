@@ -7,32 +7,14 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-17 ~16:00 UTC): attempt 4 SUCCESS — extraction-health.yml healthy
+## State (2026-09-18 ~01:32 UTC): registration repair merged; live verdict pending
 
-- **Attempt 4 (PR #88, merged `3c593fb` ~15:40 UTC):** new file
-  `.github/workflows/extraction-health.yml` with `name: extraction-health`
-  registered as id **360655315**, `state: active`, name correctly
-  `extraction-health` (NOT file path). No phantom 0-job push run on merge,
-  unlike wedged id 360227450 which fired 35241808266 (0s failure) on same merge.
-  This bypassed the corrupted registration tied to `rot-drill.yml` /
-  `rot-drill-daily.yml` paths.
-
-- **Old wedged entries still present before cleanup:**
-  - 360227450 `.github/workflows/rot-drill-daily.yml` (active, wedged: name=file path)
-  - 348098190 now `state: deleted` (orphaned)
-  - 347425736 `dev-release` (orphaned, file deleted)
-
-- **Current healthy drill:** `extraction-health` (id 360655315). The old
-  `rot-drill-daily.yml` will be deleted in next PR to orphan 360227450.
-
-- **Support ticket #4765894** (filed ~03:15 UTC, auto-receipt ~06:50 UTC)
-  originally targeted 348098190, then 360227450. With attempt 4 success,
-  ask support to close as "resolved by new file path" or leave open for
-  them to clean orphaned ids.
-
-**Post-merge CI on `3c593fb`:** Build APK success 2m46s, CI success 5m23s,
-test-release success 6m33s, rolling `test` republished 15:46:15Z apk /
-15:47:22Z msi (all four assets). Phantom noise 35241808266 from old entry.
+- **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** pass; the rolling `test` release targets this SHA and has APK/MSI plus both checksum sidecars.
+- **Current healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`. It has **no run yet**, so S1 is still open.
+- **Retired path:** `rot-drill-daily.yml` was deleted in PR #89 and the old wedged registry entry is orphaned. Do not treat any zero-job push artifact from that path as a probe verdict. The orphaned `dev-release` registry entry is unrelated.
+- **Latest actual live failure:** scheduled run **34083253658** on `main@d1e0408` (2026-09-07) failed with production/yt-dlp `AuthRequired` bot-gating evidence while metadata/search/related passed. No newer live verdict exists.
+- **Dispatch limitation:** the agent still receives HTTP 403 for `workflow_dispatch` and cannot write issue comments. The repository owner must click **Run workflow** on `extraction-health` with **Branch: main**, or the daily `04:17 UTC` schedule must produce the first current verdict.
+- **Support ticket #4765894** may be closed as resolved by the distinct workflow path; it is not a prerequisite for the live run.
 
 ## Dispatch
 
@@ -47,10 +29,9 @@ test-release success 6m33s, rolling `test` republished 15:46:15Z apk /
 3. A new run appears at top within ~30 s. Click it, watch **probe** job
    (≈5–12 min; installs yt-dlp and runs offline + live probes).
 
-**Legacy path (old wedged file):**
-`https://github.com/99ggprooo00-code/DHUN/actions/workflows/rot-drill-daily.yml`
-— shows name as file path when wedged, fires 0-job push noise. Ignore;
-use extraction-health instead. This file is deleted in cleanup PR.
+**Legacy path (retired):** the former `rot-drill-daily.yml` file is deleted
+and its wedged registry entry is orphaned. Ignore any historical URL or
+zero-job artifact from that path; use `extraction-health` instead.
 
 **Path B — owner-account API dispatch (one-liner; agent tokens get
 403):**
