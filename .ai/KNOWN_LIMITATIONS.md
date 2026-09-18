@@ -9,7 +9,7 @@ Updated every phase. Nothing hidden.
 - **Last actual live extraction evidence:** scheduled run **34083253658** on `main@d1e0408` (2026-09-07) failed the production probe with bot-gated `AuthRequired` outcomes while metadata/search/related passed; NewPipe remained a non-fatal parse watch. This is stale evidence, not a verdict on `main@33e94b0`.
 - **No new application behavior is claimed in this handoff.** No extraction identities, token/cookie paths, probe semantics, ADRs, or hardware status were changed. ADR-007 remains proposed and contingency-only.
 - **Environment:** this sandbox has no `java`, `javac`, `ANDROID_HOME`, or `adb`; no local Gradle/Kotlin/Android test was run. CI remains the compiler and hardware gates remain open.
-- **Current handoff:** the five-file reconciliation is pushed as PR #91 last verified head `2c90f12`; CI **35297455122**, push CI **35297451401**, Build APK **35297455168**, and test-release **35297455052** all pass. The PR remains unmerged; do not merge without explicit user instruction.
+- **Current handoff:** the five-file reconciliation is pushed as PR #91 last verified head `f2dffea`; CI **35297881950**, push CI **35297879208**, Build APK **35297881997**, and test-release **35297882070** all pass. The PR remains unmerged; do not merge without explicit user instruction.
 - **Next gate:** record the first `extraction-health` run and artifact in `docs/verification/14-release.md`, update the debug log and issue state through the workflow, then reassess S1. S2 cleanup is blocked until that evidence exists.
 
 ## 2026-09-17 (~16:00 UTC) — S1 attempt 4 SUCCESS — extraction-health.yml clean registration (`arena/01a0aff7-dhun`, main 3c593fb)

@@ -10,7 +10,7 @@
 
 **Verification boundary.** No application code or extraction semantics changed in this handoff. The sandbox has no JDK/Android SDK/adb, so no local Gradle test ran; the only local check for this docs reconciliation is `git diff --check`. Hardware playback, live Home pagination, visuals, and soaks remain unverified.
 
-**Verification.** PR #91 last verified head `2c90f12` is CI-verified: CI runs **35297455122** and **35297451401**, Build APK **35297455168**, and test-release **35297455052** all pass. The PR remains open and unmerged.
+**Verification.** PR #91 last verified head `f2dffea` is CI-verified: CI runs **35297881950** and **35297879208**, Build APK **35297881997**, and test-release **35297882070** all pass. The PR remains open and unmerged.
 
 **Next action.** Obtain and record the live `extraction-health` result before doing S2 cleanup. PR #91 must not be merged without explicit user instruction.
 
