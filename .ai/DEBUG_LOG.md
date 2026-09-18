@@ -85,6 +85,14 @@ sanitized owner-triggered probe/fixture confirms the shape. Bot-gating remains a
 separate residential/device investigation; no cookies, credentials, PO tokens,
 BotGuard, attestation, or ADR-007.
 
+**First CI feedback and correction.** CI run **35307551559** reached the shared JVM tests and
+caught two candidate-test defects: the new shelf wrapper exposed the cursor one level deeper
+than `homeListContinuation` inspected, and the old `wrong-shelf-continuation` fixture was now
+an intentionally supported `musicShelfContinuation`. The fix scopes cursor extraction to the
+normalized shelf object and changes that negative fixture to an unsupported grid continuation.
+This was a genuine test failure, not a live verdict; APK/build packaging checks on the same
+head passed, but later steps were skipped by the shared-test failure.
+
 ## 2026-09-18 — S1 boot reconciliation: registration is healthy, live verdict is still absent (`arena/01a0b224-dhun`)
 
 **Current gap.** The repository is at `main@33e94b0` after PR #90. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** all pass, and the rolling `test` release points at that SHA. The replacement workflow `extraction-health` (id **360655315**) is active with the declared name, but `gh run list --workflow extraction-health.yml` returns no runs.

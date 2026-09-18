@@ -21,16 +21,16 @@ internal fun parseHomeFeedPage(root: JsonObject): HomeFeedPage {
     // wrapper key is different. Normalize them before parsing; otherwise a
     // valid Home page falls through to the action error below.
     continuationContents.obj("musicShelfContinuation")?.let {
-        return homePage(JsonObject(mapOf("musicShelfRenderer" to it)))
+        return homeShelfContinuationPage("musicShelfRenderer", it)
     }
     continuationContents.obj("musicPlaylistShelfContinuation")?.let {
-        return homePage(JsonObject(mapOf("musicPlaylistShelfRenderer" to it)))
+        return homeShelfContinuationPage("musicPlaylistShelfRenderer", it)
     }
     continuationContents.obj("musicCarouselShelfContinuation")?.let {
-        return homePage(JsonObject(mapOf("musicCarouselShelfRenderer" to it)))
+        return homeShelfContinuationPage("musicCarouselShelfRenderer", it)
     }
     continuationContents.obj("musicImmersiveCarouselShelfContinuation")?.let {
-        return homePage(JsonObject(mapOf("musicImmersiveCarouselShelfRenderer" to it)))
+        return homeShelfContinuationPage("musicImmersiveCarouselShelfRenderer", it)
     }
 
     // A full page may also contain unrelated sidebar/shelf update commands.
@@ -128,6 +128,12 @@ private fun homeActionPage(root: JsonObject): HomeFeedPage {
         continuationToken = pages.last().continuationToken,
     )
 }
+
+private fun homeShelfContinuationPage(rendererName: String, continuation: JsonObject): HomeFeedPage =
+    HomeFeedPage(
+        sections = parseHomeSections(JsonObject(mapOf(rendererName to continuation))),
+        continuationToken = homeListContinuation(continuation),
+    )
 
 private fun homePage(list: JsonObject): HomeFeedPage = HomeFeedPage(
     sections = parseHomeSections(list),
