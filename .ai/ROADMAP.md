@@ -7,13 +7,13 @@ Updated **2026-09-18** · session **`arena/01a0b224-dhun`** · `main`/`origin/ma
 **Current code state:** `tools/playback-probe/Main.kt` treats Home/continuation failures as real `FAIL` results and emits explicit `PASS`, `FAIL`, `ENVIRONMENT_BLOCKED`, or `UNAVAILABLE` resolver statuses. `ProbeStatus.kt` plus `ProbeStatusTest.kt` classify explicit YouTube `LOGIN_REQUIRED`/bot-gate evidence without changing `DhunError`. `.github/workflows/extraction-health.yml` preserves offline/live exit codes, summarizes the classification, opens issues only for `FAIL`, and keeps non-PASS checks non-zero. The final syntax repair removed the invalid trailing comma in the probe `when` expression; no Android/Desktop production source was changed.
 
 **GitHub state verified live:**
-- `origin/main` remains `33e94b0`; PR **#91** is OPEN, unmerged, and `CLEAN` at final head **`6dd98fb`**.
-- Push CI **35313596684**, PR CI **35313601849**, Build APK **35313601854**, and test-release **35313601903** all pass on `6dd98fb`. The passing CI includes shared domain, Android Robolectric/debug build, playback-probe compile/classifier tests, extraction-health classification, Desktop compile/JVM tests, and packaging checks.
+- `origin/main` remains `33e94b0`; PR **#91** is OPEN, unmerged, and `CLEAN` at final pushed head **`ad129be`** (code head `6dd98fb` plus a docs-only sync).
+- Push CI **35314651766**, PR CI **35314654589**, Build APK **35314654604**, and test-release **35314654669** all pass on final pushed head `ad129be`. The passing CI includes shared domain, Android Robolectric/debug build, playback-probe compile/classifier tests, extraction-health classification, Desktop compile/JVM tests, and packaging checks.
 - The latest owner-triggered live run remains **35310771629** on older candidate `dbb3c08`; it passed metadata/search, first Home page, related, and offline checks, but `home-more` failed. Own-client/yt-dlp were separately bot-gated and NewPipe reported its separate short-JSON diagnostic.
 
 **Last actual code error:** the malformed Kotlin `when` expression at `Main.kt:201–202` caused CI **35313043505** to fail; commit `6dd98fb` fixed it and the replacement CI is green. No current compiler/test error is known. No local Kotlin/Gradle test ran because the sandbox has no JDK; CI remains the compiler.
 
-**Exact next technical step and blocker:** have the repository owner trigger `extraction-health` on `arena/01a0b224-dhun@6dd98fb`, then inspect `home-more` and the final `PROBE|verdict|...` classification. Keep S1 RED until live evidence passes; do not start S2 or merge PR #91. The agent token still cannot dispatch this workflow (HTTP 403). No credentials, cookies, PO tokens, BotGuard, attestation, ADR-007, resolver-chain replacement, or Android/Desktop rewrite is permitted or needed.
+**Exact next technical step and blocker:** have the repository owner trigger `extraction-health` on `arena/01a0b224-dhun@ad129be`, then inspect `home-more` and the final `PROBE|verdict|...` classification. Keep S1 RED until live evidence passes; do not start S2 or merge PR #91. The agent token still cannot dispatch this workflow (HTTP 403). No credentials, cookies, PO tokens, BotGuard, attestation, ADR-007, resolver-chain replacement, or Android/Desktop rewrite is permitted or needed.
 
 ---
 

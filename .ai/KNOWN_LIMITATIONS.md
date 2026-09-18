@@ -5,10 +5,10 @@ Updated every phase. Nothing hidden.
 
 ## 2026-09-18 — Final probe/classifier head is CI-green; live gate remains
 
-- The malformed Kotlin `when` expression in `Main.kt` was fixed in commit `6dd98fb`. Push CI **35313596684**, PR CI **35313601849**, Build APK **35313601854**, and test-release **35313601903** all pass on that exact head, including shared, Android, playback-probe, extraction-health classifier, Desktop JVM, and packaging checks.
+- The malformed Kotlin `when` expression in `Main.kt` was fixed in commit `6dd98fb`. Push CI **35314651766**, PR CI **35314654589**, Build APK **35314654604**, and test-release **35314654669** all pass on the final pushed head, including shared, Android, playback-probe, extraction-health classifier, Desktop JVM, and packaging checks.
 - Android and Windows/Desktop production extraction fixes are preserved and are not the remaining issue. No Android, Desktop resolver, player, cache, or platform orchestration path was reopened or replaced by the probe classification work.
 - The final head has no known compiler/test failure, but this does not constitute live extraction acceptance. The latest owner-triggered run **35310771629** tested an older candidate and still failed `home-more`; its own-client/yt-dlp bot-gating and NewPipe short-JSON result remain separate diagnostics.
-- S1 remains open and S2 remains blocked until the repository owner runs `extraction-health` on `arena/01a0b224-dhun@6dd98fb` and the candidate produces a live `home-more` pass. The agent's workflow-dispatch token remains HTTP 403. No local Kotlin/Gradle test ran because the sandbox has no JDK.
+- S1 remains open and S2 remains blocked until the repository owner runs `extraction-health` on `arena/01a0b224-dhun@ad129be` and the candidate produces a live `home-more` pass. The agent's workflow-dispatch token remains HTTP 403. No local Kotlin/Gradle test ran because the sandbox has no JDK.
 
 
 ## 2026-09-18 — Extraction-health now distinguishes code failure from runner limitation

@@ -8,18 +8,21 @@ contained an invalid trailing comma in a Kotlin `when` branch at lines 201–202
 Commit **6dd98fb** removed that comma. No Android or Windows/Desktop production
 extraction code was involved in the failure or the repair.
 
-**GitHub verification.** On exact head `6dd98fb`, push CI **35313596684**, PR CI
-**35313601849**, Build APK **35313601854**, and test-release **35313601903** pass.
-The checks cover shared domain tests, Android Robolectric/debug build, probe
-compilation and `ProbeStatusTest`, extraction-health classification, Desktop JVM
-compile/tests, and packaging. PR #91 is OPEN, unmerged, and `CLEAN`.
+**GitHub verification.** Code head `6dd98fb` passed push CI **35313596684**, PR CI
+**35313601849**, Build APK **35313601854**, and test-release **35313601903**.
+The docs-only sync commit **`ad129be`** is now the final pushed PR head; its
+push CI **35314651766**, PR CI **35314654589**, Build APK **35314654604**, and
+test-release **35314654669** also pass. The checks cover shared domain tests,
+Android Robolectric/debug build, probe compilation and `ProbeStatusTest`,
+extraction-health classification, Desktop JVM compile/tests, and packaging. PR
+#91 is OPEN, unmerged, and `CLEAN`.
 
-**Remaining gate.** No owner-triggered live run has tested `6dd98fb`. The latest
+**Remaining gate.** No owner-triggered live run has tested final pushed head `ad129be`. The latest
 live candidate run **35310771629** tested older `dbb3c08`: metadata/search, first
 Home page, related, and offline passed; `home-more` failed; own-client/yt-dlp
 were separately bot-gated; NewPipe reported its separate short-JSON watch. S1
 therefore remains RED and S2 remains blocked. The owner must dispatch
-`extraction-health` on `arena/01a0b224-dhun@6dd98fb`; this agent still receives
+`extraction-health` on `arena/01a0b224-dhun@ad129be`; this agent still receives
 HTTP 403 for workflow dispatch. No credentials, cookies, PO tokens, BotGuard,
 attestation, ADR-007, resolver replacement, or platform rewrite was added.
 
