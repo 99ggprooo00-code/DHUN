@@ -1,5 +1,53 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-18 — S1 live handoff is RED with two independent signals (`arena/01a0b224-dhun`)
+
+**Authoritative run.** The repository owner dispatched workflow
+`extraction-health` **35306224822** on `main@33e94b06125b8ce1eefe9aab0a2faca116ca53fe`
+(`workflow_dispatch`, created 04:14:42Z, completed 04:17:00Z). The probe job
+**105478849067** failed at the intentional alert step after emitting
+`PROBE|verdict|FAIL|extraction-pipeline-broken`. Artifact
+`rot-drill-35306224822` exists (artifact id **10532130174**, 4,357 bytes), and
+workflow output was posted to issue #14. The signed artifact blob could not be
+downloaded in this sandbox (`EOF`); the issue comment tail and artifact metadata
+are the preserved evidence. No cookies, credentials, PO tokens, or signed URLs
+are recorded here.
+
+**Observed probe outcomes.** Java 17, yt-dlp **2026.08.19**, and
+NewPipeExtractor **0.26.5** were used. Version and search passed (20 songs),
+the first Home page passed (2 sections plus a continuation token), and related
+tracks passed (50). The deterministic offline file probe passed with zero
+network calls. The Home continuation check independently failed:
+
+```
+home-more|FAIL|Parse(detail=Home response contained no section list or Home continuation action)
+WATCH|newpipe-stream|BROKEN|Parse(detail=JSON response is too short)
+```
+
+The production resolver then failed with `AuthRequired`; own-client and yt-dlp
+watch paths both reported YouTube `LOGIN_REQUIRED` / “Sign in to confirm you're
+not a bot”, so stream bytes were not validated. The NewPipe watch line is
+non-fatal in the workflow, but it remains a separate parse signal.
+
+**Classification boundary.** The own-client/yt-dlp result is strong evidence of
+GitHub-hosted runner bot-gating, not permission failure and not permission to
+add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007. It must be
+re-tested from an approved residential/device network. The `home-more` parse
+failure is not dismissed as bot-gating: `parseHomeFeedPage` currently accepts
+only direct section-list shapes or recognized append/reload action groups, and
+the live response reached none of those branches. The raw continuation body is
+not available because the artifact blob download returned `EOF`; the issue
+comment has only the probe tail. That is enough to identify a live parser
+contract mismatch, not enough to name the response shape or safely patch it.
+
+**Decision.** S1 is **RED / unresolved**; S2 must not begin. Do not merge PR #91.
+The next technical action is a sanitized capture or fixture of the actual Home
+continuation response, followed by a narrow parser regression/fix if that
+shape is confirmed. Keep the runner bot-gating evidence and the Home parser
+failure as separate findings. No application source changed in this evidence
+reconciliation; no local Kotlin/Gradle test ran because the sandbox has no JDK.
+
+
 ## 2026-09-18 — S1 boot reconciliation: registration is healthy, live verdict is still absent (`arena/01a0b224-dhun`)
 
 **Current gap.** The repository is at `main@33e94b0` after PR #90. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** all pass, and the rolling `test` release points at that SHA. The replacement workflow `extraction-health` (id **360655315**) is active with the declared name, but `gh run list --workflow extraction-health.yml` returns no runs.

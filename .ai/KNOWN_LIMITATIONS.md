@@ -2,14 +2,23 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-18 (~04:17 UTC) — S1 live run 35306224822 is RED / mixed (`arena/01a0b224-dhun`)
+
+- **Authoritative current gate:** `extraction-health` run **35306224822** was owner-dispatched on `main@33e94b06125b8ce1eefe9aab0a2faca116ca53fe`, completed with conclusion `failure`, and emitted `PROBE|verdict|FAIL|extraction-pipeline-broken`. Artifact `rot-drill-35306224822` (id **10532130174**, 4,357 bytes) exists; the issue #14 comment preserves the log tail. The signed artifact download returned `EOF` in this sandbox, so no raw payload is claimed.
+- **What passed:** Java 17 / tool setup, version, search (20 songs), first Home page (2 sections + token), related (50 tracks), and deterministic offline playback with zero network calls.
+- **Separate live failures:** Home continuation (`home-more`) returned `Parse(detail=Home response contained no section list or Home continuation action)`; own-client and yt-dlp watch paths returned YouTube `AuthRequired` / `LOGIN_REQUIRED` bot-gating, so no live audio bytes were validated; NewPipe returned the separate non-fatal `Parse(detail=JSON response is too short)` watch result.
+- **Interpretation:** `AuthRequired` is runner-network evidence that requires approved residential/device verification. It is not permission to add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007. The Home parse failure is independently unresolved: source review shows the parser recognized no supported continuation shape, but the raw response is not captured, so no speculative parser patch is justified yet.
+- **Gate:** S1 remains RED/open; S2 is blocked and PR #91 remains open/unmerged. Capture a sanitized Home continuation response or fixture, then make a narrow parser fix/regression only if the live shape confirms one. No application code or local Kotlin/Gradle test was added for this run; this sandbox has no JDK.
+
+
 ## 2026-09-18 (~01:32 UTC) — S1 handoff reconciled against `main@33e94b0` (`arena/01a0b224-dhun`)
 
 - **Current GitHub baseline:** `origin/main`, local `main`, and the rolling `test` tag all resolve to `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`. Main CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** are green; the `test` release contains APK/MSI and both checksum sidecars.
-- **S1 is not closed.** Workflow `extraction-health` (id **360655315**) is active and correctly named, but GitHub reports no run yet. The deleted `rot-drill-daily.yml` entry is no longer the active path. The agent cannot dispatch workflows (`HTTP 403`), so a user click or scheduled run is required.
-- **Last actual live extraction evidence:** scheduled run **34083253658** on `main@d1e0408` (2026-09-07) failed the production probe with bot-gated `AuthRequired` outcomes while metadata/search/related passed; NewPipe remained a non-fatal parse watch. This is stale evidence, not a verdict on `main@33e94b0`.
+- **S1 is not closed.** Workflow `extraction-health` (id **360655315**) is active and correctly named; owner-dispatched run **35306224822** is the current RED/mixed result. The deleted `rot-drill-daily.yml` entry is no longer the active path. The agent cannot dispatch workflows (`HTTP 403`); no second run is needed until the mixed findings are reconciled.
+- **Current live extraction evidence:** run **35306224822** on `main@33e94b0` failed the production probe with bot-gated `AuthRequired` outcomes, a separate Home continuation parse failure, and the non-fatal NewPipe short-JSON parse; metadata/search/related and offline passed. This supersedes the stale scheduled run **34083253658** as the current verdict.
 - **No new application behavior is claimed in this handoff.** No extraction identities, token/cookie paths, probe semantics, ADRs, or hardware status were changed. ADR-007 remains proposed and contingency-only.
 - **Environment:** this sandbox has no `java`, `javac`, `ANDROID_HOME`, or `adb`; no local Gradle/Kotlin/Android test was run. CI remains the compiler and hardware gates remain open.
-- **Current handoff:** the five-file reconciliation is pushed as PR #91 last verified head `f2dffea`; CI **35297881950**, push CI **35297879208**, Build APK **35297881997**, and test-release **35297882070** all pass. The PR remains unmerged; do not merge without explicit user instruction.
+- **Current handoff:** the five-file reconciliation is pushed as PR #91 last verified head `257a395`; CI **35298335178**, push CI **35298332023**, Build APK **35298335216**, and test-release **35298335174** all pass. The PR remains unmerged; do not merge without explicit user instruction.
 - **Next gate:** record the first `extraction-health` run and artifact in `docs/verification/14-release.md`, update the debug log and issue state through the workflow, then reassess S1. S2 cleanup is blocked until that evidence exists.
 
 ## 2026-09-17 (~16:00 UTC) — S1 attempt 4 SUCCESS — extraction-health.yml clean registration (`arena/01a0aff7-dhun`, main 3c593fb)

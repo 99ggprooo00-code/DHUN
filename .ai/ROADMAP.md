@@ -1,22 +1,22 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-18 02:10 UTC** · session **`arena/01a0b224-dhun`** · `main`/`origin/main` `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`.
+Updated **2026-09-18 04:17 UTC** · session **`arena/01a0b224-dhun`** · `main`/`origin/main` `33e94b06125b8ce1eefe9aab0a2faca116ca53fe`.
 
-**Phase/status:** Stage **S1 — restore the maintenance contract**. Application-code work is paused; S2 cleanup and extraction changes remain blocked until a fresh live `extraction-health` verdict is produced on current `main`.
+**Phase/status:** Stage **S1 — restore the maintenance contract**. The live gate ran as workflow **35306224822** on current `main` and returned **RED**. S1 remains open and S2 is blocked. The evidence is mixed: offline/metadata/search/related passed, Home continuation parsing failed, and stream resolution was bot-gated with `AuthRequired`. No application-code change is being made until the Home response shape is captured and classified.
 
-**Exact files/task currently being worked on:** the five-file docs-only S1 handoff is at PR **#91**, last verified head `f2dffea`, with CI verified green in runs **35297881950**, **35297881997**, **35297882070**, and **35297879208**. No application files are being changed; the next task is the live `extraction-health` gate on `main`.
+**Exact files/task currently being worked on:** the five-file S1 evidence handoff plus read-only investigation of `shared/src/commonMain/kotlin/dev/dhun/innertube/HomeFeedParser.kt`, `tools/playback-probe/src/main/kotlin/dev/dhun/tools/playbackprobe/Main.kt`, and `shared/src/jvmTest/kotlin/dev/dhun/innertube/HomeFeedParserTest.kt`. PR **#91** remains open and CI-green; no application files have been changed for this red run.
 
-**GitHub state verified live (2026-09-18 01:32 UTC):**
-- `origin/main` remains `33e94b0`; `origin/arena/01a0b224-dhun` is now `f2dffea`. PR **#91** is the single session PR and is open; PR #54 remains the separate research-only contingency PR.
+**GitHub state verified live (2026-09-18 04:17 UTC):
+- `origin/main` remains `33e94b0`; `origin/arena/01a0b224-dhun` is now `257a395` (full `257a3952c4debd67361d289b2bd2cbe6120ba1b3`). PR **#91** is the single session PR and is open; PR #54 remains the separate research-only contingency PR.
 - Main checks at `33e94b0`: CI **35246193151** PASS, Build APK **35246193174** PASS, and test-release **35246193097** PASS. The rolling `test` tag and release target `33e94b0`; APK/MSI plus both `.sha256` assets are present (APK 17,948,508 B; MSI 112,852,992 B).
-- Workflow **`extraction-health`**, id **360655315**, is active and correctly registered from `.github/workflows/extraction-health.yml`. It has **no run yet**. The former wedged `rot-drill-daily.yml` entry is gone from the registry; the orphaned `dev-release` registry entry remains unrelated.
-- Issue #14 remains OPEN. The latest actual live extraction failure is run **34083253658** (scheduled 2026-09-07, `main@d1e0408`): metadata/search/related passed, the production chain and yt-dlp reported bot-gated `AuthRequired`, NewPipe remained a non-fatal parse watch, and the probe verdict was FAIL; no newer live verdict exists. Zero-job push failures are not extraction evidence.
+- Workflow **`extraction-health`**, id **360655315**, is active and correctly registered from `.github/workflows/extraction-health.yml`. Manual run **35306224822** on `main@33e94b0` completed **failure** at 04:17 UTC and uploaded artifact `rot-drill-35306224822` (4,357 B). The former wedged `rot-drill-daily.yml` entry is gone from the registry; the orphaned `dev-release` registry entry remains unrelated.
+- Issue #14 remains OPEN. The latest actual live verdict is run **35306224822** (`workflow_dispatch`, `main@33e94b0`): offline probe PASS, metadata/search/related PASS, `home-more` failed with `Parse(detail=Home response contained no section list or Home continuation action)`, own-client and yt-dlp reported bot-gated `AuthRequired`, NewPipe remained a non-fatal parse watch, and `PROBE|verdict|FAIL|extraction-pipeline-broken`. Zero-job push failures are not extraction evidence.
 
-**Last actual error:** no local build/test error (no local JDK); the last actual live error is the stale run **34083253658** above. The current S1 blocker is **absence of a fresh verdict**, not a new code failure.
+**Last actual error:** live run **35306224822** is RED. The `AuthRequired` results are consistent with GitHub-runner bot-gating, but the separate `home-more` parser failure is not dismissed as network evidence; its raw continuation shape is not yet captured. The S1 blocker is classification/recording of this mixed verdict, not a local compiler error.
 
-**Evidence state:** main changes are pushed, merged through PR #90, CI-verified, and released to rolling `test`; PR #91 head `f2dffea` is pushed and CI-verified: CI **35297881950** (and push run **35297879208**), Build APK **35297881997**, test-release **35297882070** all pass. PR #91 is not merged; no hardware verification is claimed.
+**Evidence state:** main changes are pushed, merged through PR #90, CI-verified, and released to rolling `test`; PR #91 is open and CI-green. The current live gate is RED in run **35306224822** with artifact `rot-drill-35306224822`; no hardware verification is claimed and PR #91 is not merged.
 
-**Exact next technical step and blocker:** request the live `extraction-health` run on `main` and record its artifact/verdict. The agent cannot dispatch workflows (`HTTP 403`); the user must click **Actions → extraction-health → Run workflow** or let the next scheduled window run. S1 cannot close, and S2 cannot begin, until that run produces an artifact and a recorded GREEN/RED verdict. Do not merge PR #91 without explicit instruction.
+**Exact next technical step and blocker:** preserve run **35306224822** as S1 evidence; capture the actual Home continuation response or a sanitized fixture, determine why the live response bypasses the supported parser shapes, and add a regression/fix only if the parser contract is confirmed. Treat `AuthRequired` as runner-network evidence; do not add cookies, PO tokens, or ADR-007. Do not start S2 or merge PR #91 until the mixed RED result is reconciled.
 
 ---
 
@@ -164,7 +164,7 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 targets exactly `33e94b0` and has `dhun-test.apk`, `dhun-test.msi`, and both
 `.sha256` sidecars; release assets are 17,948,508 B and 112,852,992 B.
 Workflow **360655315 `extraction-health`** is active and correctly named,
-but has produced **no run yet**; S1 therefore remains open.
+and owner-dispatched run **35306224822** completed RED/mixed on `main@33e94b0`; S1 therefore remains open.
 
 ### 2a. Build history — Phases 01–16 (ALL code-merged; do not re-implement)
 
@@ -194,7 +194,7 @@ All are 🟨/⬜ — closing them is Stage S3.
 
 | Stage | Objective | Status | Gate |
 |---|---|---|---|
-| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | 🟨 registration repair merged (PRs #88–#90); extraction-health id 360655315 is active and correctly named, but it has **no live run yet**. The old wedged `rot-drill-daily.yml` file is deleted; the agent still receives HTTP 403 for dispatch. | ≥1 scheduled/dispatched extraction-health verdict on current `main` + artifact; then record it in `14-release.md` and reconcile #14 |
+| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | 🔴 workflow **35306224822** ran on `main@33e94b0` and produced artifact `rot-drill-35306224822`; offline/metadata/search/related passed, Home continuation returned a parser failure, and own-client/yt-dlp were bot-gated. Mixed RED requires Home-shape investigation; no tokens/ADR-007. | Reconcile the mixed RED evidence, verify residential playback separately, then record S1 outcome before S2 |
 | **S2** | Architectural cleanup (dead harness UI, PR #53/#54 hygiene, docs index, stale root notes) | ⬜ | CI green; zero dead screens; PRs resolved |
 | **S3** | Hardware verification round 1 (core loop both platforms, signed checklists) | ⬜ | `docs/verification/` checklists signed with build SHAs |
 | **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | 🟨 code merged + CI green (PR #74); S4 hardware boxes ride in S3 | Every shipped key reachable or removed; EQ decision recorded |
@@ -218,9 +218,9 @@ S1 → S2 → S3 → S6.
 |---|---|---|
 | PR #53 `docs: reconcile extraction playback research handoff` (+182/−513, would wipe this file from a stale base) | **CLOSED unmerged 2026-09-16** (session `arena/01a0ac91-dhun`, per this decision) | Superseded by the re-baseline; the research track continues in open PR #54. Nothing in it survived. |
 | PR #54 `docs: PO-token/InnerTubeX research + ADR proposal` (+326/−1, ADR-007 PROPOSED) | OPEN, research-only | **Keep as contingency reference** (merge docs-only with ADR-007 staying PROPOSED, or leave open — user's call). NEVER implement without trigger T1/T2 + explicit go-ahead. (A labeled agent test comment "test-ping (delete me)" from 2026-09-16 could not be deleted by the agent token — safe to remove manually.) |
-| PR #91 `docs(s1): reconcile extraction-health handoff at main 33e94b0` | OPEN, session branch `arena/01a0b224-dhun`, last verified head `f2dffea` | Docs-only S1 handoff; CI green in runs 35297881950 / 35297879208, Build APK 35297881997, test-release 35297882070. Do not merge without explicit user instruction. |
+| PR #91 `docs(s1): reconcile extraction-health handoff at main 33e94b0` | OPEN, session branch `arena/01a0b224-dhun`, last verified head `257a395` | Docs-only S1 handoff; CI green in runs 35298335178 / 35298332023, Build APK 35298335216, test-release 35298335174. Do not merge without explicit user instruction. |
 | PR #88 `S1 attempt 4 — new workflow extraction-health.yml` | **MERGED as `3c593fb`** (2026-09-17T15:40Z) | Attempt 4 SUCCESS — id 360655315 healthy, name=extraction-health, no phantom push. Old wedged 360227450 fired 35241808266 phantom on same merge. |
-| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; latest actual scheduled verdict `34083253658` (2026-09-07, `main@d1e0408`) is RED; no `extraction-health` run exists yet on current `main@33e94b0` | Keep open; S1 re-baselines it with the first fresh extraction-health artifact. The healthy workflow replaces the deleted/wedged `rot-drill-daily` registration. Agent cannot dispatch or write issue comments (403); the workflow itself updates #14 on the next live run. |
+| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; workflow **35306224822** on `main@33e94b0` is the current RED verdict with artifact `rot-drill-35306224822`; it contains both runner bot-gating and a separate `home-more` parser failure | Keep open; reconcile the mixed evidence, do not treat `AuthRequired` as parser rot, and do not dismiss the Home continuation failure without the raw shape. Agent cannot write issue comments (403). |
 | Issue #60 `Guest-First + Optional YTM Login` | OPEN (future plan, self-declared not-current) | v2 backlog (§8). Guest-first is already architecture — no action now |
 | Issue #63 `Security hardening…` | OPEN (enhancement) | v2 backlog (§8). No action in S1–S6 except S5's dep/license review (done in PR #74) |
 
@@ -279,9 +279,7 @@ S1 → S2 → S3 → S6.
 
 1. ~~Merge this re-baseline (user review).~~ **DONE** — merged as PR #72
    (main `5023b38`, 2026-09-16T17:08:09Z).
-2. **S1** — **registration repair merged; live verdict still open:** PR #53 closed (2026-09-16); full rot-drill diagnosis recorded; re-registration via new file `extraction-health.yml` (PR #88, id 360655315) succeeded and cleanup of `rot-drill-daily.yml` merged in PRs #89/#90, with current `main@33e94b0` CI/release green.
-   Remaining: user's Run workflow click on extraction-health (or the next scheduled window) → live verdict/artifact → verdict line in `14-release.md` + `DEBUG_LOG` → #14 reconciliation → S1 done.
-   Agent dispatch remains HTTP 403; support ticket #4765894 is optional after the distinct-file workaround.
+2. **S1** — **registration repair succeeded; live verdict RED and mixed:** workflow **35306224822** ran on current `main@33e94b0` and uploaded `rot-drill-35306224822`. Offline verification passed, stream resolution was bot-gated, and Home continuation produced a separate parse failure. Remaining: capture/reconcile the Home response shape, record the runner-network classification, and complete residential/device verification before S2. Agent dispatch remains HTTP 403; support ticket #4765894 is optional after the distinct-file workaround.
 3. **S2** (agent: dead-code + PR/docs hygiene) — unblocked after S1 GREEN.
 4. **S3** (user drives devices; agent records + fixes fallout) — includes
    the S4 hardware boxes (settings, EQ, jump-list verb, close-to-tray).

@@ -7,14 +7,14 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-18 ~01:32 UTC): registration repair merged; live verdict pending
+## State (2026-09-18 ~04:17 UTC): owner run completed RED; S1 remains open
 
 - **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). CI **35246193151**, Build APK **35246193174**, and test-release **35246193097** pass; the rolling `test` release targets this SHA and has APK/MSI plus both checksum sidecars.
-- **Current healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`. It has **no run yet**, so S1 is still open.
-- **Retired path:** `rot-drill-daily.yml` was deleted in PR #89 and the old wedged registry entry is orphaned. Do not treat any zero-job push artifact from that path as a probe verdict. The orphaned `dev-release` registry entry is unrelated.
-- **Latest actual live failure:** scheduled run **34083253658** on `main@d1e0408` (2026-09-07) failed with production/yt-dlp `AuthRequired` bot-gating evidence while metadata/search/related passed. No newer live verdict exists.
-- **Dispatch limitation:** the agent still receives HTTP 403 for `workflow_dispatch` and cannot write issue comments. The repository owner must click **Run workflow** on `extraction-health` with **Branch: main**, or the daily `04:17 UTC` schedule must produce the first current verdict.
-- **Support ticket #4765894** may be closed as resolved by the distinct workflow path; it is not a prerequisite for the live run.
+- **Current healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`. Owner-dispatched run **35306224822** completed `failure` and uploaded artifact `rot-drill-35306224822` (id **10532130174**, 4,357 B).
+- **Current result:** offline/metadata/search/related passed, but `home-more` failed with `Parse(detail=Home response contained no section list or Home continuation action)`. Own-client and yt-dlp returned `AuthRequired` / `LOGIN_REQUIRED` bot-gating; no audio bytes were validated. NewPipe separately returned `Parse(detail=JSON response is too short)`. This is a mixed RED, not an S1 pass.
+- **Required classification:** treat the resolver `AuthRequired` as GitHub-runner network evidence requiring approved residential/device verification. Investigate the Home continuation parse failure independently; do not add cookies, sign-in, PO tokens, BotGuard, attestation, or ADR-007. The raw artifact download returned `EOF` in the sandbox; issue #14's workflow comment and artifact metadata remain the recorded evidence.
+- **Dispatch limitation:** the agent still receives HTTP 403 for `workflow_dispatch` and cannot write issue comments. The owner-triggered run is authoritative; no second run is needed until the Home response shape and network classification are addressed.
+- **Support ticket #4765894** may be closed as resolved by the distinct workflow path; it is not a prerequisite for the mixed-RED investigation.
 
 ## Dispatch
 
@@ -53,10 +53,17 @@ gh workflow run extraction-health.yml --ref main --repo 99ggprooo00-code/DHUN
   - `LOGIN_REQUIRED` / "Sign in to confirm you're not a bot" = YouTube
     gating GitHub runner datacenter IP. Not proof of user breakage: verify
     residential playback (phone on mobile data, see s3-hardware-checklist.md)
-    before treating as rot.
+    before treating as rot. Do not introduce cookies, sign-in, PO tokens,
+    BotGuard, attestation, or ADR-007 to make this runner green.
+  - A separate parser error must not be folded into the bot-gating result.
+    For run **35306224822**, `home-more` failed with
+    `Parse(detail=Home response contained no section list or Home continuation action)`;
+    capture the raw/sanitized continuation shape before changing the parser.
   - Anything else = probable extractor rot. Workflow opens/comments on
     issue `[rot-drill] Live extraction probe failed` with last 12 KB log;
-    full log artifact `rot-drill-<run_id>`, 14-day retention.
+    full log artifact `rot-drill-<run_id>`, 14-day retention. A blob-download
+    failure in an agent sandbox does not mean the artifact is absent when the
+    artifact API and issue comment confirm it exists.
 - **Gray / skipped probe job** = run never started (concurrency cancel).
   Re-dispatch.
 - **Red run with ZERO jobs** (failure but jobs list empty, total_count:0)
@@ -108,6 +115,9 @@ section):
 
 ```
 - extraction-health <run_id> (<YYYY-MM-DD HH:MM UTC>, main@<sha>): GREEN — <note>
+- extraction-health 35306224822 (2026-09-18 04:17 UTC, main@33e94b0): RED / mixed — Home continuation parse failure plus runner bot-gating; artifact rot-drill-35306224822; S1 remains open.
 ```
 
-That line is the S1 exit criterion: no tag without it.
+A recorded RED is evidence, not the S1 exit criterion. S1 exit requires the
+mixed findings to be reconciled and a later accepted verdict; no tag without
+that evidence.
