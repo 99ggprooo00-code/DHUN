@@ -154,6 +154,13 @@ private fun homeShapeSummary(root: JsonObject): String {
     )
     val browseItems = browseContainers.flatMap { it.arr("contents").orEmpty() }
         .mapNotNull { it as? JsonObject }
+    val browseTabs = browseContainers.flatMap { it.arr("tabs").orEmpty() }
+        .mapNotNull { it as? JsonObject }
+    val tabRenderers = browseTabs.flatMap { tab ->
+        listOfNotNull(tab.obj("tabRenderer"), tab.obj("musicTabRenderer"))
+    }
+    val tabContents = tabRenderers.mapNotNull { it.obj("content") }
+    val tabSections = tabContents.mapNotNull { it.obj("sectionListRenderer") }
     return "shape=top[${keys(listOf(root))}]" +
         ";continuation[${keys(listOfNotNull(root.obj("continuationContents")))}]" +
         ";contents[${keys(listOfNotNull(contents))}]" +
@@ -161,6 +168,10 @@ private fun homeShapeSummary(root: JsonObject): String {
         ";rootItems[${keys(rootItems)}]" +
         ";browse[${keys(browseContainers)}]" +
         ";browseItems[${keys(browseItems)}]" +
+        ";tabs[${keys(browseTabs)}]" +
+        ";tabRenderers[${keys(tabRenderers)}]" +
+        ";tabContents[${keys(tabContents)}]" +
+        ";tabSections[${keys(tabSections)}]" +
         ";actions[${keys(actionEntries)}]" +
         ";commands[${keys(commands)}]" +
         ";items[${keys(continuationItems)}]"
