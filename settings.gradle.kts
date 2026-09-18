@@ -27,6 +27,9 @@ include(":shared")
 include(":app-android")
 include(":app-desktop") // Phase 04 desktop (Compose Desktop + vlcj); CI compiles it
 include(":tools:playback-probe")
+// DHUN Web client's server component: reuses :shared's extraction to serve the
+// static client hosted on GitHub Pages. See web/README.md.
+include(":tools:web-bridge")
 
 // ---------------------------------------------------------------------------
 // CI diagnostics without log access.

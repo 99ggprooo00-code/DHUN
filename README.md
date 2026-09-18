@@ -53,6 +53,22 @@ signed with the committed **public test keystore**
 the exact sign/verify/install commands and what that key is — and is not —
 for).
 
+## Web client
+
+A browser client lives in `web/`, deployed to GitHub Pages at
+<https://99ggprooo00-code.github.io/DHUN/>. It is static-only (no bundler, no
+framework) and takes its colours, type scale, radii and spacing straight from
+`shared/src/commonMain/kotlin/dev/dhun/design/`, so it reads as the same
+product rather than a marketing site.
+
+Playback requires a **DHUN Bridge** (`tools/web-bridge`), which reuses
+`:shared`'s extraction unchanged. A browser cannot resolve or read YouTube
+streams on its own — `StreamInfo` documents that googlevideo binds a signed
+URL to the requesting User-Agent, and Pages has no runtime to run InnerTube
+extraction. With no bridge connected the client falls back to demo mode on
+generated audio, so the player is still usable and testable. Details:
+[web/README.md](web/README.md).
+
 ## Test builds policy
 
 ONE rolling test **pre-release** exists — tag `test`, assets
@@ -298,3 +314,6 @@ also pins provenance.
   - `.ai/KNOWN_LIMITATIONS.md` — honest gaps, updated every phase
   - `.ai/DEBUG_LOG.md` — incidents: stack → root cause → fix
   - `.ai/README.md` — boot protocol + permanent maintenance contract
+
+- `web/` — GitHub Pages browser client (static; see `web/README.md`)
+- `tools/web-bridge/` — the server that client talks to; reuses `:shared`

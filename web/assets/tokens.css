@@ -1,0 +1,163 @@
+/* ===========================================================================
+   DHUN Web — design tokens
+
+   Machine-derived from shared/src/commonMain/kotlin/dev/dhun/design/
+   DhunAppearance.kt (`data class DhunTokens`), DhunTypography.kt,
+   DhunShapes.kt and DhunSpacing.kt. Every value below is the dark palette
+   (DhunThemeMode.DARK + DhunAccent.BRAND) that the Android and desktop apps
+   ship with, so the web client reads as the same product.
+
+   ARGB 0xAARRGGBB -> CSS rgba(r, g, b, AA/255). The alpha fractions are the
+   exact Kotlin values, not eyeballed approximations:
+     0x5E -> .369   0x70 -> .439   0x8A -> .541   0xB8 -> .722
+     0xC8 -> .784   0x1F -> .122   0x38 -> .220   0x80 -> .502
+     0xCC -> .800   0x1A -> .102   0x33 -> .200   0x99 -> .600
+     0x61 -> .380   0x4D -> .302   0x0F -> .059   0x14 -> .078
+   =========================================================================== */
+
+:root {
+  /* --- Surfaces (warm near-black stack so artwork pops) ----------------- */
+  --dhun-background: #0a0a0a;
+  --dhun-surface: #121212;
+  --dhun-surface-variant: #1a1a1a;
+  --dhun-surface-elevated: #242424;
+  --dhun-surface-highest: #2a2a2a;
+  --dhun-surface-card: #1e1e1e;
+
+  /* --- Material 3 tonal surface ladder --------------------------------- */
+  --dhun-container-lowest: #0a0a0a;
+  --dhun-container-low: #121212;
+  --dhun-container: #242424;
+  --dhun-container-high: #2a2a2a;
+  --dhun-container-highest: #303030;
+
+  /* --- Glass-morphism (M3 translucent atmosphere, not Liquid Glass) ----- */
+  --dhun-glass-highlight: rgba(32, 32, 42, 0.369);
+  --dhun-glass: rgba(22, 22, 30, 0.439);
+  --dhun-glass-deep: rgba(14, 14, 20, 0.541);
+  --dhun-glass-strong: rgba(18, 18, 24, 0.722);
+  --dhun-glass-bar-top: rgba(28, 28, 38, 0.784);
+  --dhun-glass-sheen: rgba(255, 255, 255, 0.122);
+  --dhun-glass-edge: rgba(255, 255, 255, 0.22);
+
+  /* --- Scrims ---------------------------------------------------------- */
+  --dhun-scrim: rgba(0, 0, 0, 0.502);
+  --dhun-scrim-strong: rgba(0, 0, 0, 0.8);
+
+  /* --- Borders (hairline glass edge) ----------------------------------- */
+  --dhun-border: rgba(255, 255, 255, 0.102);
+  --dhun-border-strong: rgba(255, 255, 255, 0.2);
+
+  /* --- Text: 5-step alpha ladder --------------------------------------- */
+  --dhun-text-primary: #ffffff;
+  --dhun-text-secondary: rgba(255, 255, 255, 0.8);
+  --dhun-text-tertiary: rgba(255, 255, 255, 0.6);
+  --dhun-text-disabled: rgba(255, 255, 255, 0.38);
+  --dhun-text-hint: rgba(255, 255, 255, 0.302);
+
+  /* --- Accent (BRAND) -------------------------------------------------- */
+  --dhun-accent: #bb86fc;
+  --dhun-on-accent: #000000;
+  --dhun-accent-container: #3a2a5a;
+  --dhun-on-accent-container: #e8d5ff;
+
+  /* --- Semantic -------------------------------------------------------- */
+  /* error #D5798A was retuned from #CF6679 to clear WCAG AA (4.66:1). */
+  --dhun-error: #d5798a;
+  --dhun-on-error: #000000;
+  --dhun-error-container: #4d1a24;
+  --dhun-success: #4caf50;
+  --dhun-warning: #ffb74d;
+  --dhun-border-error: rgba(213, 121, 138, 0.251);
+
+  /* --- Overlays (state layers) ----------------------------------------- */
+  --dhun-overlay-hover: rgba(255, 255, 255, 0.059);
+  --dhun-overlay-pressed: rgba(255, 255, 255, 0.078);
+  --dhun-overlay-focus: rgba(255, 255, 255, 0.122);
+
+  /* --- Artwork placeholders + shimmer ---------------------------------- */
+  --dhun-placeholder-start: #1a1a1a;
+  --dhun-placeholder-end: #2a2a2a;
+  --dhun-placeholder-pulse: #333333;
+  --dhun-shimmer-base: #1e1e1e;
+  --dhun-shimmer-highlight: #2e2e2e;
+
+  /* --- Tertiary role (teal, dark scheme) -------------------------------- */
+  --dhun-tertiary: #80cbc4;
+
+  /* =======================================================================
+     Typography — DhunTypography.kt. Family is FontFamily.SansSerif in the
+     app (Roboto on Android, system UI sans on desktop), so the web client
+     uses the platform system stack rather than shipping a webfont.
+     ======================================================================= */
+  --dhun-font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+
+  --dhun-type-hero-size: 30px;
+  --dhun-type-hero-line: 36px;
+  --dhun-type-player-title-size: 22px;
+  --dhun-type-player-title-line: 28px;
+  --dhun-type-title-large-size: 22px;
+  --dhun-type-title-large-line: 28px;
+  --dhun-type-title-medium-size: 16px;
+  --dhun-type-title-medium-line: 24px;
+  --dhun-type-body-large-size: 16px;
+  --dhun-type-body-large-line: 24px;
+  --dhun-type-body-relaxed-size: 14px;
+  --dhun-type-body-relaxed-line: 22px;
+  --dhun-type-body-medium-size: 14px;
+  --dhun-type-body-medium-line: 20px;
+  --dhun-type-body-small-size: 12px;
+  --dhun-type-body-small-line: 16px;
+  --dhun-type-compact-size: 13px;
+  --dhun-type-compact-line: 18px;
+  --dhun-type-track-title-size: 15px;
+  --dhun-type-track-title-line: 20px;
+  --dhun-type-label-medium-size: 12px;
+  --dhun-type-label-medium-line: 16px;
+  --dhun-type-label-small-size: 11px;
+  --dhun-type-label-small-line: 16px;
+  /* Wordmark style: 12/16, W700, 3sp tracking. */
+  --dhun-type-wordmark-size: 12px;
+  --dhun-type-wordmark-line: 16px;
+
+  /* =======================================================================
+     Shapes — DhunShapes.kt (RoundedCornerShape radii)
+     ======================================================================= */
+  --dhun-radius-extra-small: 4px;
+  --dhun-radius-small: 8px;
+  --dhun-radius-medium: 12px;
+  --dhun-radius-large: 16px; /* card, artwork, glass, navIndicator */
+  --dhun-radius-extra-large: 28px; /* cardLarge, artworkHero, bottomSheet top */
+  --dhun-radius-extra-extra-large: 32px;
+  --dhun-radius-full: 9999px; /* chip, button, artworkCircle */
+
+  /* =======================================================================
+     Spacing — DhunSpacing.kt
+     ======================================================================= */
+  --dhun-space-xs: 4px;
+  --dhun-space-xs-plus: 6px;
+  --dhun-space-sm: 8px;
+  --dhun-space-sm-plus: 10px;
+  --dhun-space-md: 12px;
+  --dhun-space-md-plus: 14px;
+  --dhun-space-lg: 16px;
+  --dhun-space-xl: 20px; /* screenPadding */
+  --dhun-space-xxl: 24px;
+  --dhun-space-medium-large: 28px;
+  --dhun-space-xxxl: 32px; /* sectionSpacing */
+  --dhun-space-huge: 48px;
+
+  --dhun-card-padding: 12px;
+  --dhun-item-spacing: 8px;
+  --dhun-touch-target: 48px;
+  --dhun-compact-target: 44px;
+  --dhun-transport-target: 52px;
+  --dhun-artwork-mini: 56px;
+  --dhun-navbar-content: 64px;
+
+  /* --- Web-client-only layout metrics (no app counterpart) -------------- */
+  --dhun-sidebar-width: 248px;
+  --dhun-queue-width: 320px;
+  --dhun-miniplayer-height: 76px;
+}

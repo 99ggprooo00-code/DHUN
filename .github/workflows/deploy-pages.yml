@@ -1,0 +1,73 @@
+name: Deploy DHUN Web to Pages
+
+# Publishes the static web client in `web/` to
+# https://99ggprooo00-code.github.io/DHUN/
+#
+# Build type is "GitHub Actions", so this must be enabled once by a repo admin:
+#   Settings -> Pages -> Build and deployment -> Source: GitHub Actions
+# (The Pages API needs admin, which the agent token does not have.)
+#
+# The client is static-only: no bundler, no framework, no server. The one
+# build step is generating demo audio, which is deliberately not committed
+# (see web/tools/make-demo-audio.py). Real playback needs a DHUN Bridge
+# running somewhere reachable — see web/README.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; newer pushes cancel an in-flight one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate demo audio
+        # Synthesised, not committed: keeps ~2 MB of WAV out of Git while
+        # still letting demo mode exercise the player with zero network.
+        run: python3 web/tools/make-demo-audio.py
+
+      - name: Verify generated audio
+        run: |
+          python3 - <<'PY'
+          import os, wave
+          for n in (1, 2, 3):
+              p = f"web/assets/demo/demo-{n}.wav"
+              with wave.open(p) as w:
+                  assert w.getnframes() > 0, p
+                  print(f"{p}: {w.getnframes() / w.getframerate():.1f}s")
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

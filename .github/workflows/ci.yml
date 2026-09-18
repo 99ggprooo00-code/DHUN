@@ -42,6 +42,20 @@ jobs:
       - name: Probe compiles
         run: ./gradlew :tools:playback-probe:compileKotlin --no-daemon
 
+      # The DHUN Web client's server component (tools/web-bridge) reuses
+      # :shared's extraction. Like every other module it must fail here rather
+      # than only on someone's machine.
+      - name: Web bridge compiles
+        run: ./gradlew :tools:web-bridge:compileKotlin --no-daemon
+
+      # Drives the real web/assets/dhun.js inside jsdom against the real
+      # index.html. Bridge-dependent cases self-skip (no bridge in CI).
+      - name: "Web client — jsdom tests"
+        run: |
+          npm install --no-save jsdom
+          python3 web/tools/make-demo-audio.py
+          node --test web/tests/client.test.mjs
+
       # Desktop was previously only compiled by the MSI job on pushes to main;
       # PRs touching app-desktop (Phase 12/14) must fail here, not after merge.
       - name: Desktop compiles
