@@ -91,7 +91,11 @@ than `homeListContinuation` inspected, and the old `wrong-shelf-continuation` fi
 an intentionally supported `musicShelfContinuation`. The fix scopes cursor extraction to the
 normalized shelf object and changes that negative fixture to an unsupported grid continuation.
 This was a genuine test failure, not a live verdict; APK/build packaging checks on the same
-head passed, but later steps were skipped by the shared-test failure.
+head passed, but later steps were skipped by the shared-test failure. The correction is now
+CI-green at parser evidence head **005b526**: PR CI **35307916827**, push CI **35307913766**,
+Build APK **35307916736**, and test-release **35307916668** all passed, including the shared
+JVM parser suite. This proves compilation/tests for the candidate only; it does not prove the
+live Home response uses either covered shape.
 
 ## 2026-09-18 — S1 boot reconciliation: registration is healthy, live verdict is still absent (`arena/01a0b224-dhun`)
 
