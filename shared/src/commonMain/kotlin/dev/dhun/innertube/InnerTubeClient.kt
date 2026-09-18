@@ -174,15 +174,16 @@ class InnerTubeClient(
      * Next page of Home shelves (InnerTube `/browse` continuation).
      *
      * YouTube Music's current browse wire contract keeps the Home browse id in
-     * the JSON body and carries the opaque continuation in both query parameters
-     * (`ctoken` and `continuation`). Sending the token only as a JSON field can
-     * return a tab-navigation shell instead of the continuation contents.
+     * the JSON body and carries the opaque continuation in both the body and
+     * query parameters (`ctoken` and `continuation`). Sending only the JSON
+     * continuation can return a tab-navigation shell instead of the contents.
      */
     suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> =
         resultify {
             val body = buildJsonObject {
                 put("context", context())
                 put("browseId", "FEmusic_home")
+                put("continuation", continuationToken)
             }
             parseHomeFeedPage(postJson("browse", body, continuationToken))
         }

@@ -42,7 +42,7 @@ class InnerTubeRequestTest {
                         respond("""{"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[],"continuations":[{"nextContinuationData":{"continuation":"next-page"}}]}}}}]}}}""", headers = headersOf(HttpHeaders.ContentType, "application/json"))
                     } else {
                         assertEquals("FEmusic_home", body.str("browseId"))
-                        assertNull(body["continuation"])
+                        assertEquals("next-page", body.str("continuation"))
                         assertEquals("next-page", request.url.parameters["ctoken"])
                         assertEquals("next-page", request.url.parameters["continuation"])
                         respond("""{"continuationContents":{"sectionListContinuation":{"contents":[]}}}""")
