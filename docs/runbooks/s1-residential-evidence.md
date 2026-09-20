@@ -18,20 +18,25 @@ contingency-trigger T1 evidence — equally valuable, not a wasted run).
 
 ## Build under test
 
-The rolling `test` release is retargeted on **every** push to `main`, so it is
-always the newest build. As of **2026-09-20 (session `arena/01a0bf52-dhun`)**
-it is published from `fabeb5f` (PR #93 merge) at 2026-09-20T13:34:04Z —
-earlier candidates were `39b8748` (07:15:29Z) and `6f7fa48`.
+The rolling `test` release is **replaced on every push to `main`**, so the page
+always shows the newest build — use whatever is there today. You do not need to
+match it against this guide: the page's publish timestamp being recent *is* the
+proof you are on the current build. (For reference, this paragraph was written
+when `test` was published 2026-09-20T15:19:07Z from `7304abb` — that pair is
+already superseded by any later merge, and downloading the newest release is
+still correct.)
 
 - Release page: `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`
-- Android: `dhun-test.apk` = **17,948,508 bytes** · Windows: `dhun-test.msi` =
-  **112,861,184 bytes** (each with a `.sha256` sidecar next to it)
+- Android: `dhun-test.apk` (last measured **17,948,508 bytes**) · Windows:
+  `dhun-test.msi` (last measured **112,861,184 bytes**); each has a `.sha256`
+  sidecar next to it. Sizes change only when a build actually changes —
+  docs-only merges leave them identical.
 
 **How to say which build you tested:** the release page does *not* print a
-commit SHA — it shows the release's publish time and the asset sizes. So in the
-evidence bundle report the **date+time shown beside the `test` release title**
-and the **file size your device downloaded**; that pins the build exactly.
-Copying the `.sha256` sidecar value is the gold standard if it is convenient.
+commit SHA. So report the **date+time shown beside the `test` release title**,
+the **file size your device downloaded**, and — if handy — the **`.sha256`
+sidecar contents** (gold standard). The agent maps that back to a commit via
+the release's `target_commitish`.
 
 Do **Path A** (phone) or **Path B** (PC) — or both. Path C is an advanced
 alternative that also satisfies S1.
