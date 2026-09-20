@@ -8,6 +8,30 @@ chat (or an issue #14 comment — the agent token cannot write issue
 comments) and are recorded in `.ai/ROADMAP.md` + `KNOWN_LIMITATIONS.md` +
 `docs/verification/14-release.md` by the next session.
 
+## ✅ RESULT — S1 closed GREEN, 2026-09-20 (keep this guide for re-runs)
+
+This procedure ran successfully. Recorded outcome:
+
+| Field | Value |
+|---|---|
+| Build tested | rolling `test` published **2026-09-20T16:46:20Z** (22:16 IST) → `main@d99060e` |
+| Files | `dhun-test.apk` **17,948,508 B** (reported "17 MB") · `dhun-test.msi` **112,861,184 B** (reported "108 MB") |
+| Platforms | Android **and** Windows — install and uninstall both easy |
+| Network | Home **WiFi**, no VPN |
+| Result | **4 songs played — audible, position advancing, zero failures** |
+| Background (Android) | **Audio continued with the screen locked** |
+| Error text | None — no failure occurred, so no `Playback details` capture exists |
+
+**Verdict:** the production own-client chain resolves and plays real audio for a
+real user on a residential network, on both platforms. Since the probed SHA
+(`6f7fa48`) and the tested SHA (`d99060e`) differ by **documentation only**, the
+runner's `ENVIRONMENT_BLOCKED` is datacenter gating — contingency trigger **T1 is
+disproven**, ADR-007 stays PROPOSED.
+
+**Re-run this guide when:** extraction code changes (resolver/waves/InnerTube
+client), before the `v0.1.0` tag, or if anyone reports silence/stalls. Docs-only
+merges do not invalidate the result above.
+
 ## Why this evidence is needed
 
 GitHub runners use datacenter IPs that YouTube bot-gates, so the drill

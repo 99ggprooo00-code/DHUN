@@ -1,6 +1,46 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-20 — S1 closed: separating "runner-blocked" from "broken" with a diff, not a hunch (`arena/01a0c11b-dhun`)
+
+**The problem this entry solves.** For two weeks the only extraction signal
+available was a GitHub runner saying `ENVIRONMENT_BLOCKED`. That verdict is
+ambiguous on its own: it is equally consistent with (a) YouTube bot-gating
+datacenter IPs and (b) DHUN's own-client chain having rotted. Choosing wrongly
+in direction (b) would have triggered ADR-007 work (PO tokens / attestation) —
+weeks of high-risk code for a problem that may not exist.
+
+**The disambiguation.** The user played 4 songs successfully from the rolling
+`test` build on home WiFi. The question is then whether that build contains the
+code the drill judged. Method:
+
+```
+gh api repos/99ggprooo00-code/DHUN/compare/6f7fa48...d99060e --jq '.files[].filename'
+```
+
+`6f7fa48` = the SHA of scheduled runs 35421383687 / 35489268023
+(`ENVIRONMENT_BLOCKED`). `d99060e` = `target_commitish` of the `test` release
+the user downloaded. Result: **9 files, every one documentation**
+(`.ai/*`, `CHANGELOG.md`, `docs/runbooks/*`, `docs/verification/14-release.md`,
+`tools/playback-probe/README.md`); filtering the compare for source extensions
+returns **0**. Same extraction code, two networks, two outcomes → the variable
+is the network, so (a) is proven and (b) is excluded.
+
+**Build-identity proof (the user cannot read a SHA off the release page).**
+Three independent facts were matched against the release API instead:
+publish time 2026-09-20T16:46:20Z = 22:16 IST ≈ the reported "10 pm, ~6 hrs
+ago"; APK 17,948,508 B = 17.1 MiB ≈ "17 MB"; MSI 112,861,184 B = 107.6 MiB ≈
+"108 MB". This is exactly the identity protocol `s1-residential-evidence.md`
+prescribes, and it worked as designed on first use.
+
+**Trap recorded for future sessions.** Do not read a green residential result
+as "playback is verified". It verifies *resolution and audio output on a real
+network*. Soaks, media-session controls, offline, and the Windows native
+surface were not exercised and stay open in S3. Conversely, do not read the
+next `ENVIRONMENT_BLOCKED` runner result as a regression — it is now the
+expected runner behaviour with a documented cause.
+
+
 ## 2026-09-20 — Scheduled runs confirm post-merge boundary; annotation readout method (`arena/01a0bd98-dhun`)
 
 **Run identity.** Scheduled `extraction-health` runs **35421383687**

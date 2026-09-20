@@ -1,9 +1,60 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Current status (2026-09-20, session 3 post-merge, Stage S1 remains open):** The release baseline is `main@7304abb` after PR #94 (docs-only evidence-path reconcile) merged 2026-09-20T15:14:02Z on top of PR #93's `fabeb5f` (post-merge push CI on `7304abb`: CI **35518928489** / Build APK **35518928490** / test-release **35518928487** all green; rolling `test` retargeted at exactly `7304abb`, published 2026-09-20T15:19:07Z, asset sizes unchanged — docs-only). Earlier baseline in this ledger: `main@fabeb5f` after PR #93 on PR #92's `39b8748` and PR #91's `6f7fa48` (post-merge push CI on `fabeb5f`: CI **35513643996** / Build APK **35513643853** / test-release **35513643918** all green; rolling `test` retargeted at exactly `fabeb5f`, published 2026-09-20T13:34:04Z, asset sizes unchanged — docs-only: `dhun-test.apk` 17,948,508 B, `dhun-test.msi` 112,861,184 B + both `.sha256` sidecars). The Home continuation request-contract repair is on `main`; Android and Windows/Desktop production fixes remain intact and are not the remaining issue.
-> Scheduled `extraction-health` runs **35421383687** (2026-09-19) and **35489268023** (2026-09-20) both tested `main@6f7fa48` (both fired before the #92 merge) and both classified **`ENVIRONMENT_BLOCKED`** (warning-annotation evidence, re-read directly via the annotations API; artifact/log blobs still `EOF` in the sandbox). Probes + classifier pass, the rot-drill issue step is correctly skipped, and only the intentional non-PASS gate fails (exit 2). No Home-driven `FAIL` remains; the resolver is YouTube-runner-gated, so no live audio bytes were validated. `main` advanced three times since — `39b8748` (PR #92), `fabeb5f` (PR #93) then `7304abb` (PR #94), all docs-only, post-merge CI green (35496174865/35496174870/35496174877 and 35513643996/35513643853/35513643918). The first scheduled run on `main@7304abb` is due 2026-09-21 04:17 UTC.
-> The merged production change matches the independent anonymous client's observed request: `alt=json`, empty `context.user`, Home `browseId` in the JSON body, opaque continuation in `ctoken`/`continuation` query parameters, and cached anonymous `X-Goog-Visitor-Id`. `HomeFeedParser.kt` was not changed. A tab-only shell remains a genuine parse failure; no empty-page success or opaque-endpoint follow-up is permitted.
-> All non-PASS statuses remain non-zero, and only `FAIL` opens a rot-drill issue. S2, hardware, and stable-release acceptance remain blocked pending approved residential/device playback evidence (user guide filed 2026-09-20 at `docs/runbooks/s1-residential-evidence.md`). No dispatch loop is needed — the schedule fires daily. Raw GitHub logs return `EOF` in this sandbox and local Gradle cannot run without a JDK.
+> **Current status (2026-09-20, session 5 — STAGE S1 CLOSED GREEN).** The release
+> baseline is **`main@d99060e`** (PR #96, merged 2026-09-20T16:40Z; post-merge push
+> CI **35523474108** / Build APK **35523474088** / test-release **35523474032** all
+> green on that SHA). Rolling `test` targets exactly `d99060e`, published
+> **2026-09-20T16:46:20Z**, four assets: `dhun-test.apk` **17,948,508 B**,
+> `dhun-test.msi` **112,861,184 B**, `.sha256` sidecars 80 B / 81 B — sizes unchanged
+> since `6f7fa48` because every merge since has been documentation-only. Earlier
+> baselines in this ledger: `7304abb` (PR #94), `fabeb5f` (PR #93), `39b8748`
+> (PR #92), `6f7fa48` (PR #91).
+>
+> **S1 acceptance is MET — the first live user playback evidence in this ledger.**
+> On 2026-09-20 the user downloaded this exact rolling build over **home WiFi (no
+> VPN)** and exercised it on **both** platforms: install and uninstall easy on
+> Android and Windows; searched a song; **4 songs played with audible sound and
+> advancing position; zero failures**; on Android **audio continued with the screen
+> locked**. No `Playback details` text exists because nothing failed. Build identity
+> was confirmed against the release API rather than a SHA on the page (the page shows
+> none): reported "≈6 h ago, 10 pm" = published 16:46:20Z = **22:16 IST**; reported
+> "17 MB"/"108 MB" = **17,948,508 B** (17.1 MiB) / **112,861,184 B** (107.6 MiB).
+>
+> **Interpretation of the drill, now settled.** Scheduled runs **35421383687**
+> (09-19) and **35489268023** (09-20) classified **`ENVIRONMENT_BLOCKED`** on
+> `main@6f7fa48`. `gh api compare/6f7fa48...d99060e` returns **9 changed files, all
+> documentation, 0 source files** — so the runner block and the user's audible
+> playback are the *same extraction code* on two different networks. The block is
+> datacenter IP gating, not extraction rot; contingency trigger **T1 is disproven**
+> and ADR-007 stays PROPOSED/unimplemented. The next scheduled run on `d99060e`
+> (2026-09-21 04:17 UTC) is expected to remain `ENVIRONMENT_BLOCKED` — a known-correct
+> runner result.
+>
+> **Release-gate accounting.** Gate 1 (S1 live verdict) is **satisfied**; re-confirm
+> only if extraction code changes before the tag — docs-only merges do not invalidate
+> it. Gates 2–7 remain open: S3 device checklists, 30-minute soaks, clean-target
+> installs of APK + AAB + MSI, signing decisions, final CHANGELOG/README review, and
+> the user's go-ahead. Four ~2-minute tracks are **not** a soak, and the following
+> were not exercised: media-notification/lock-screen **controls**, rotation/process
+> death, downloads + offline, lyrics, Settings/theme persistence, Android EQ, and the
+> Windows native column (single-instance, tray, close-to-tray, jump lists, media
+> keys/SMTC). Windows is confirmed to install and play only.
+>
+> The Home continuation request-contract repair is on `main`; Android and
+> Windows/Desktop production paths are unchanged. All non-PASS drill statuses remain
+> non-zero and only `FAIL` opens a rot-drill issue. Raw GitHub log/artifact blobs
+> still return `EOF` in the agent sandbox (annotations API is the readout), and local
+> Gradle cannot run without a JDK.
+
+## S1 evidence log (residential / on-device)
+
+```text
+- S1 2026-09-20: Android (user device) + Windows on main@d99060e — PASS — rolling `test`
+  published 2026-09-20T16:46:20Z, APK 17,948,508 B / MSI 112,861,184 B, home WiFi no VPN;
+  install+uninstall easy both platforms; 4 songs searched and played, audible, position
+  advancing, no failures; Android audio continued with screen locked; no error text to
+  capture. Scope not covered: soaks, media controls, offline, lyrics, EQ, Windows native.
+```
 
 ## Pre-merge verification — 2026-09-18
 
@@ -72,7 +123,7 @@ suppressed until retry; backups are still recommended. No v0.1.0.
 |---|---|---|
 | Typed error taxonomy and actionable user messages | 🟨 Typed `DhunResult`/`DhunError` + `toUserMessage` paths, per-request retry, 429 global backoff gate (`2932d57`, with unit tests), and offline banner (`fed1d54`) are merged with recovery UX; baseline CI `34018809911` is green. Local reason-preserving diagnostics changes await CI; offline/429/403 hardware checks and db-path review remain | `shared/.../core/RateLimitGate.kt`, `shared/.../core/ConnectivityMonitor.kt`, `DhunAppShell.kt`, hosts' Koin modules |
 | Bounded audio cache and offline replay | 🟨 Android + Desktop code | Android: Media3 `SimpleCache` LRU via `DhunAudioSegmentCache` + `CacheDataSource` (stable video-id keys). Desktop: `AudioFileCache` whole-track LRU files under `<data dir>/cache/audio`, background fill during first play, local-file playback on hit (no resolve → offline). Both use `SettingsKeys.CACHE_SIZE_MB` default 1024 MB (`AudioCacheBudget`). URL TTL cache still `DhunStreamCache`. Unit tests: `AudioFileCacheTest` (9: hit/LRU victim/over-budget/short-read/cancel/unsafe id/partial sweep/shrink+clear). Hardware offline-replay check OPEN on both |
-| Daily live extraction-health | 🟨 Schedule restored and firing daily: runs **35421383687** (09-19) + **35489268023** (09-20) on `main@6f7fa48` both classified `ENVIRONMENT_BLOCKED` — probe + classifier steps all green, only the intentional non-PASS gate failed (exit 2). The request-contract repair (`6f7fa48`) removed the prior Home-driven `FAIL`; the resolver remains bot-gated on the runner's datacenter IP. | S1 remains open pending approved residential/device playback evidence. Keep `ENVIRONMENT_BLOCKED`/`UNAVAILABLE` separate from `FAIL`; do not begin S2. First run on `main@7304abb`: 2026-09-21 04:17 UTC. |
+| Daily live extraction-health | ✅ **S1 GREEN (2026-09-20).** Schedule restored and firing daily: runs **35421383687** (09-19) + **35489268023** (09-20) on `main@6f7fa48` both classified `ENVIRONMENT_BLOCKED` — probe + classifier steps green, only the intentional non-PASS gate failed (exit 2). The runner's datacenter IP is bot-gated; **residential evidence on `main@d99060e` (docs-only diff from `6f7fa48`) played 4 songs audibly on Android + Windows**, so the block is network-shaped, not rot. | Gate 1 satisfied. Keep `ENVIRONMENT_BLOCKED`/`UNAVAILABLE` separate from `FAIL`; expect the runner to stay blocked. Re-run the residential guide if extraction code changes before the tag. First run on `main@d99060e`: 2026-09-21 04:17 UTC. |
 | Android 30-minute soak | ⬜ Open | Requires a physical device with unrestricted battery mode, lock-screen playback, and zero-crash/leak evidence |
 | Desktop 30-minute soak | ⬜ Open | Requires a desktop with libVLC and tray/SMTC-capable runtime |
 | Release v0.1.0 artifacts | ⬜ Open | Rolling `test` APK/MSI is not the signed/stable v0.1.0 release; clean-target installation and release evidence are required |

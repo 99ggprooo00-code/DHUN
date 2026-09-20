@@ -1,38 +1,22 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-20 (session 4)** · session **`arena/01a0bfa8-dhun`** · `main`/`origin/main` `7304abb8d08439a073d50c38e78f7b0e1dfe0381` (PR #94 merged 2026-09-20T15:14:02Z; below it PR #93 `fabeb5f`, PR #92 `39b8748`, PR #91 `6f7fa48`).
+Updated **2026-09-20 (session 5)** · session **`arena/01a0c11b-dhun`** · `main`/`origin/main` `d99060ecff08096359dde4fe590899d5088227b6` (PR #96 merged 2026-09-20T16:40Z; below it PR #94 `7304abb`, PR #93 `fabeb5f`, PR #92 `39b8748`, PR #91 `6f7fa48`).
 
-**Session 4 (handover of PR #95):** the previous session left PR **#95** (`arena/01a0bf52-dhun@c6d2264`, docs-only re-pin of the ledger to `7304abb`) open with all required checks green (CI 35519414719 · Build APK 35519414710 · test-release 35519414705, `mergeStateStatus: CLEAN`) but unmerged — its session connection ended before the merge. This session is fixed to `arena/01a0bfa8-dhun`, so #95's single commit was **cherry-picked here verbatim** (no re-authoring) plus one correction: `docs/verification/14-release.md` line 3 said "Earlier baseline in this ledger: `main@7304abb` after PR #93" — a typo for `fabeb5f`. #95 is closed in favour of this PR (same content, one branch, one merge). Nothing else changed: no code, workflow, probe or resolver file touched.
+**Phase/status: Stage S1 is GREEN — closed 2026-09-20 by user-supplied residential evidence. S2 is unblocked.** The one item S1 could never produce from CI — an honest playback result from a non-datacenter network — arrived this session. The user downloaded the rolling `test` release over home WiFi (no VPN), installed on **both** Android and Windows, searched, and played **four songs**: audio audible, position advancing, **no failure in any of the four**, and on Android **playback continued with the screen locked**. Install and uninstall were reported easy on both platforms. No "Playback details" text was needed because nothing failed.
 
-**Post-merge verification of #94 (same turn, recorded in the PR's evidence comment https://github.com/99ggprooo00-code/DHUN/pull/94#issuecomment-5750695526):** CI **35518928489** (3m47s), Build APK **35518928490** (2m51s) and test-release **35518928487** all `success` on exactly `7304abb`; rolling `test` retargeted at `7304abb`, published 2026-09-20T15:19:07Z, four assets with unchanged sizes (17,948,508 B APK / 112,861,184 B MSI + 80 B / 81 B sidecars) — as expected for a docs-only merge. The next scheduled drill run (2026-09-21 04:17 UTC) is therefore the first on `main@7304abb`. Nothing here changes probe, resolver or workflow semantics: **S1's only remaining item is still the user's residential/device playback result.**
+**Build identity verified live against the release API (not taken on trust):** the user reported "published ~6 hrs ago (10 pm)", APK ~17 MB, MSI ~108 MB, network WiFi. The `test` release published **2026-09-20T16:46:20Z** = **22:16 IST** (the user's "10 pm"), `target_commitish` **`d99060e`** = current `main`, assets `dhun-test.apk` **17,948,508 B** (17.1 MiB → "17 MB") and `dhun-test.msi` **112,861,184 B** (107.6 MiB → "108 MB"), sidecars 80 B / 81 B. Publish time + both byte sizes + network type all match the reported bundle, so the tested build is **`main@d99060e`** — exactly the self-correcting identity protocol `docs/runbooks/s1-residential-evidence.md` specifies.
 
-**Phase/status:** Stage **S1 — restore the maintenance contract** remains **RED/open** and S2 remains blocked: the drill fires daily and classifies honestly, but no live audio bytes have been validated anywhere — the runner verdict is `ENVIRONMENT_BLOCKED` and residential/device playback evidence is still missing. The **only** S1 exit item is that human-supplied result. PRs #91 (repair), #92 and #93 (docs reconciles) are merged; Android and Windows/Desktop production extraction work was not reopened or replaced.
+**Why this closes S1 and does NOT fire trigger T1 — the decisive check:** `gh api compare/6f7fa48...d99060e` returns **9 changed files, all documentation** (`.ai/*`, `CHANGELOG.md`, `docs/runbooks/*`, `docs/verification/14-release.md`, `tools/playback-probe/README.md`); **zero** `.kt`/`.kts`/`.yml`/`.toml`/`.properties`/`.xml`/`.wxs`/`.py` files differ. `6f7fa48` is the SHA the scheduled drill classified `ENVIRONMENT_BLOCKED` on 09-19 and 09-20. Therefore the runner block and the user's four audible tracks are **the same extraction code on two different networks**, which is the textbook definition of a datacenter-IP artifact. T1 requires "reproducible `AuthRequired`/gating failures on residential networks" — residential playback succeeded, so **T1 is affirmatively disproven, not merely unmet**. ADR-007 stays PROPOSED and unimplemented; no extraction, probe, resolver or wave change is authorized.
 
-**This session (docs-only correctness pass on the S1 evidence path):** five current-state
-documents contradicted verified code/CI and were repaired — `tools/playback-probe/README.md`
-(cited the deleted `rot-drill.yml`; output protocol omitted the `ENVIRONMENT_BLOCKED` /
-`UNAVAILABLE` verdicts, `PROBE|home-*`, `SEARCH|`, `RELATED|`, offline FAIL shapes and the
-exit-code contract → now line-for-line with `Main.kt`/`OfflineMain.kt`),
-`docs/runbooks/rot-drill.md` (State block claimed PR #91 was open at `main@33e94b0` and told
-the operator to dispatch on the merged PR branch → retargeted at `main`),
-`docs/runbooks/s1-residential-evidence.md` (asked the user to read a commit SHA that the
-release page does not display → build identity now pinned by publish time + exact byte
-sizes + `.sha256`, and the error-text step now names the real affordances:
-"Show playback details" / FullPlayer **Details** → selectable **Playback details**),
-`docs/verification/14-release.md` (baseline + gate line refreshed to `fabeb5f`),
-`.ai/MASTER_PROMPT.md` (§5 tree and S1 task list still named `rot-drill.yml`). No workflow,
-probe, resolver, or packaging file was touched.
+**What S1 green does and does not claim.** It claims: the production own-client chain resolves and plays real audio for a real user on a residential network, on both platforms, and the drill's `ENVIRONMENT_BLOCKED` verdict is now *interpreted* (runner-network gating), not merely *observed*. It does not claim: soaks (longest reported run ~2 min/track over four songs, not 30 min), lock-screen *control buttons* (background audio continued; notification controls untested), Windows background/tray/SMTC/jump-list behaviour, downloads/offline, lyrics, or EQ. Those are S3/S6 boxes and remain open.
 
-**GitHub state verified live (this session, not inherited):**
-- Base this session verified and merged onto: `fabeb5f` (PR #93, merged 13:29:15Z) — `main` is now `7304abb` (PR #94, this reconcile). Post-merge CI green on `fabeb5f`: CI **35513643996** (5m38s), Build APK **35513643853** (2m41s), test-release **35513643918** (4m49s). Rolling `test` release retargeted at exactly `fabeb5f`, published 2026-09-20T13:34:04Z, four assets: `dhun-test.apk` 17,948,508 B, `dhun-test.msi` 112,861,184 B, `.sha256` sidecars 80 B / 81 B — sizes unchanged across `6f7fa48`/`39b8748`/`fabeb5f`, as expected for docs-only merges. The release page shows **no commit SHA** (the SHA lives in `target_commitish`), which is why the user guide now pins a build by publish time + byte size instead.
-- Scheduled drill, re-read **directly** this session: run **35489268023** (started 2026-09-20T04:29:25Z on `main@6f7fa48`), job **106021243260** — steps 1–10 `success` (the probe step runs under `continue-on-error`; the classifier reads `PROBE|workflow-status` + `PROBE|verdict` from the log, so a non-zero `:tools:playback-probe:run` does *not* show as a red step), issue steps 11/12 `skipped` (correct: they fire only on `FAIL`), step 13 `Keep the check non-zero when live health is unverified` = the only failure, exit code **2**. Annotation: `Extraction health is not a production pass — ENVIRONMENT_BLOCKED — inspect the probe log and verify playback outside the GitHub runner`. Run **35421383687** (2026-09-19T04:28:36Z) tested the same SHA with the same classification.
-- Next scheduled run on `main@7304abb`: cron `17 4 * * *` → **2026-09-21 04:17 UTC** (observed starts land 04:28–04:30 UTC). The next session records that classification.
-- Open items unchanged: PR **#54** only (docs-only contingency reference, conflicting — user said take no action 2026-09-20); issues **#14** (last updated 2026-09-18 — correctly untouched by the scheduled runs, issue step skips unless `FAIL`), **#60**, **#63**.
-- **Awaiting the user's OK (deliberately NOT applied — workflow change):** (1) `extraction-health.yml` still has `push: branches: [arena/01a0b224-dhun]`, the merged PR #91 branch — retire it or repoint at `main`; (2) CI hygiene: `ubuntu-latest` migrates to Ubuntu 26 from **2026-10-19** (runner-images #14748) and Node.js 20 is deprecated for the pinned actions (`actions/checkout@v4`, `actions/setup-python@v5`, `actions/upload-artifact@v4` — annotation seen on job 106021243260). Both are S2-era decisions.
+**Drill status unchanged and still honest:** scheduled runs **35421383687** (09-19) + **35489268023** (09-20) on `main@6f7fa48` → `ENVIRONMENT_BLOCKED`, exit 2 on the intentional gate, issue steps correctly skipped. The first scheduled run on `main@d99060e` is due **2026-09-21 04:17 UTC** (starts land 04:28–04:30). It is expected to stay `ENVIRONMENT_BLOCKED` — that is now a **known-correct** runner result, no longer an open question, because residential truth has been established independently.
 
-**Last actual result:** no code changed this session — docs-only correctness pass on the S1 evidence path (this file + `MASTER_PROMPT` §5/§7 + probe README + `rot-drill.md` + `s1-residential-evidence.md` + `14-release.md`). Same standing limits: no JDK (CI is the compiler), no artifact/log blob downloads (`EOF`; the annotations API `check-runs/<job_id>/annotations` and the job-steps API are the readout — recipe now documented in `docs/runbooks/rot-drill.md`), agent workflow dispatch not re-probed (no dispatch needed while the schedule fires).
+**This session (docs-only; records the S1 verdict):** `.ai/ROADMAP.md` (this block + S1 row → GREEN + execution order + risk/board lines), `.ai/MASTER_PROMPT.md` (§2 doctrine status + §7 S1 acceptance met), `.ai/KNOWN_LIMITATIONS.md` (verdict entry + what is still unproven), `.ai/RISK_REGISTER.md` (drill-silent risk retired; own-client rot risk re-scoped), `.ai/DEBUG_LOG.md` (the compare-based reasoning), `docs/verification/14-release.md` (S1 evidence line + release gate item 1 satisfied), `docs/runbooks/s1-residential-evidence.md` (result recorded; guide kept for re-runs), `docs/runbooks/s3-hardware-checklist.md` (partial credit ticked with scope limits), `CHANGELOG.md`. **No code, workflow, probe, resolver or packaging file touched.**
 
-**Exact next step and boundary:** PR #94 shipped and merged (`7304abb`, CI green on the head and post-merge); this follow-up (a docs-only ledger re-pin + a self-correcting build-identity step in the user guide) merges on green CI like its predecessors. S1 then waits solely on the user's residential/device playback result — `docs/runbooks/s1-residential-evidence.md` no longer hard-pins a SHA, it tells the user to take whatever the rolling `test` release shows and report publish time + byte size + optional `.sha256`. Next session: record the 2026-09-21 04:17 UTC scheduled classification (first run on `main@7304abb`, or on the newer `main` if further docs PRs land) and only then propose an S1 outcome — audible playback is the green path; `LOGIN_REQUIRED`-style text from a residential network is T1 evidence, not S1 closure. Do not start S2, do not dispatch live runs in a loop, do not touch extraction/probe semantics (triggers T1/T2 unmet), and never implement ADR-007 without the user's explicit go-ahead.
+**Deliberately NOT done (and why):** `extraction-health.yml` still carries `push: branches: [arena/01a0b224-dhun]` (a merged branch, so the trigger is inert). Editing it re-registers the workflow, and this repo's registration layer has wedged twice already (ids 348098190 and 360227450 both fired phantom 0-job runs; GitHub Support ticket #4765894). Risking the one working daily drill for a cosmetic trigger cleanup on the same day S1 closes is a bad trade — it stays an S2 task, to be done with the user watching the next scheduled run. Same for the CI-hygiene items (`ubuntu-latest` → Ubuntu 26 from 2026-10-19; Node 20 deprecation on `checkout@v4` / `setup-python@v5` / `upload-artifact@v4`).
+
+**Exact next step:** **S2 — architectural cleanup.** Re-audit found most of the originally-listed S2 work already absent: there is no `HarnessScreen` or `DesktopHarness*` anywhere in `*.kt` (only a private test class in `SingleInstanceProtocolTest.kt` and three code comments — all legitimate), no root `agent-*-status.md` / `phase15-android-polish-status.md`, and `docs/decisions/README.md` indexes ADR-001…006 plus the PROPOSED ADR-007. So S2 reduces to: (1) the `extraction-health.yml` trigger retirement + CI hygiene above (needs a live-drill watch, not a blind edit), (2) PR #54 disposition (user said take no action 2026-09-20 — keep open as contingency reference), (3) `docs/verification/14-release.md`'s stale "merge chain ends at PR #32" body section. Then **S3**, which now needs the user's devices for the boxes four songs did not cover: 30-min soaks, notification/lock-screen *controls*, downloads + airplane-mode offline, lyrics, Settings/theme persistence, Android EQ, and the whole Windows native column (single-instance, tray, close-to-tray, jump-list Play/Pause, media keys/SMTC).
 
 ---
 
@@ -174,21 +158,32 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 🟨 code merged + CI green, **hardware verification open** ·
 ⬜ not started · 🔴 blocked/open problem.
 
-**`main@7304abb` (2026-09-20, PR #94 evidence-path reconcile on top of #93/#92/#91): post-merge CI and rolling release green**
-(CI **35518928489**, Build APK **35518928490**, and test-release
-**35518928487** — all success on the merge SHA; PR #93's own post-merge CI
-35513643996/35513643853/35513643918 was green in turn). Rolling `test` currently
-targets exactly `7304abb` (published 2026-09-20T15:19:07Z) and has
-`dhun-test.apk`, `dhun-test.msi`, and both `.sha256` sidecars; release
-assets are 17,948,508 B and 112,861,184 B (same sizes as the `6f7fa48`
-and `39b8748` builds — docs-only changes). Workflow **360655315
+**`main@d99060e` (2026-09-20, PR #96): post-merge CI and rolling release green**
+(CI **35523474108**, Build APK **35523474088**, test-release **35523474032** —
+all success on the merge SHA; PR #94's `7304abb` CI 35518928489/35518928490/
+35518928487 was green in turn). Rolling `test` targets exactly `d99060e`
+(published **2026-09-20T16:46:20Z**) with `dhun-test.apk` **17,948,508 B**,
+`dhun-test.msi` **112,861,184 B** and both `.sha256` sidecars (sizes unchanged
+since `6f7fa48` — every merge since has been docs-only). Workflow **360655315
 `extraction-health`** is active and correctly named; scheduled runs
 **35421383687** (2026-09-19) + **35489268023** (2026-09-20) both classified
-`ENVIRONMENT_BLOCKED` on `main@6f7fa48` (annotation-verified this session via
+`ENVIRONMENT_BLOCKED` on `main@6f7fa48` (annotation-verified via
 `check-runs/<job_id>/annotations` + the job-steps API: steps 1–10 success,
 issue steps skipped, only the intentional gate step failed with exit 2); the
-first scheduled run on `main@7304abb` is due 2026-09-21 04:17 UTC. S1
-therefore remains open pending residential/device playback evidence.
+first scheduled run on `main@d99060e` is due 2026-09-21 04:17 UTC.
+
+**S1 is closed GREEN (2026-09-20).** The missing half arrived as user evidence
+on this exact build: Android + Windows installs from the rolling `test`
+release over home WiFi (no VPN), **4 songs played — audible, position
+advancing, no failures**, Android audio continued with the screen locked;
+build identity confirmed against the release API by publish time (22:16 IST =
+16:46:20Z) and both byte sizes. Because `compare/6f7fa48...d99060e` contains
+**9 documentation files and 0 code files**, the runner's `ENVIRONMENT_BLOCKED`
+and the user's successful playback are the *same extraction code* on two
+networks — datacenter gating, not product rot. Trigger **T1 is disproven**;
+ADR-007 stays PROPOSED. What is still unproven and belongs to S3/S6: 30-minute
+soaks, notification/lock-screen *controls*, downloads + offline, lyrics,
+Settings/theme persistence, Android EQ, and the Windows native column.
 
 ### 2a. Build history — Phases 01–16 (ALL code-merged; do not re-implement)
 
@@ -218,8 +213,8 @@ All are 🟨/⬜ — closing them is Stage S3.
 
 | Stage | Objective | Status | Gate |
 |---|---|---|---|
-| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | 🔴 drill fires daily on schedule; PRs #91 (repair, `6f7fa48`) + #92/#93/#94 (reconciles, `39b8748`/`fabeb5f`/`7304abb`) merged; scheduled runs **35421383687**/**35489268023** on `6f7fa48` classify `ENVIRONMENT_BLOCKED` (Home no longer `FAIL`, resolver runner-gated, no audio bytes validated); first run on `main@7304abb` due 2026-09-21 04:17 UTC. Evidence-path docs (probe README, `rot-drill.md`, this file's guide pointer) reconciled to code 2026-09-20. | Obtain residential/device playback evidence (guide: `docs/runbooks/s1-residential-evidence.md` — self-correcting build identity: newest `test` release + publish time + byte sizes), then record S1 outcome before S2 |
-| **S2** | Architectural cleanup (dead harness UI, PR #53/#54 hygiene, docs index, stale root notes) | ⬜ | CI green; zero dead screens; PRs resolved |
+| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | ✅ **GREEN 2026-09-20.** Drill fires daily (runs **35421383687**/**35489268023** on `6f7fa48` → `ENVIRONMENT_BLOCKED`, honest runner-gating). **Residential evidence supplied by the user on `main@d99060e`** (rolling `test` published 2026-09-20T16:46:20Z = 22:16 IST; APK 17,948,508 B ≈ "17 MB", MSI 112,861,184 B ≈ "108 MB"; home WiFi, no VPN): installed on Android **and** Windows, searched, **4 songs played — audible, position advancing, zero failures**, Android audio continued on the locked screen. `compare/6f7fa48...d99060e` = **9 files, all docs, 0 code** → runner block and residential success are the *same code*, so the block is a datacenter-IP artifact and **T1 is disproven**. | **MET:** ≥1 scheduled verdict on current `main` **+** a playback result outside the runner. |
+| **S2** | Architectural cleanup (workflow-trigger retirement + CI hygiene, PR #54 disposition, stale `14-release.md` body) | 🟨 **unblocked; mostly already clean.** Re-audited 2026-09-20: no `HarnessScreen`/`DesktopHarness*` in any `*.kt` (only a private `Harness` test class + 3 comments — legitimate), no root `agent-*-status.md`, `docs/decisions/README.md` complete (ADR-001…006 + PROPOSED 007). Remaining: inert `push: [arena/01a0b224-dhun]` trigger in `extraction-health.yml` (edit re-registers the workflow — registration wedged twice, ticket #4765894, so do it with a live drill watch), `ubuntu-latest`→Ubuntu 26 (2026-10-19) + Node-20 action deprecations, PR #54 (user: no action), stale "merge chain ends at PR #32" section. | CI green; zero dead screens; PRs resolved; drill still firing after any workflow edit |
 | **S3** | Hardware verification round 1 (core loop both platforms, signed checklists) | ⬜ | `docs/verification/` checklists signed with build SHAs |
 | **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | 🟨 code merged + CI green (PR #74); S4 hardware boxes ride in S3 | Every shipped key reachable or removed; EQ decision recorded |
 | **S5** | Testing + hardening (contrast fix, dep audit, THIRD_PARTY review) | ✅ merged (PR #74): CI green; contrast 4.66:1 asserted both schemes (`DhunThemeContrastTest`); dep audit all-HOLD with post-tag upgrade order (`.ai/DEPENDENCY_AUDIT.md`); THIRD_PARTY reviewed | CI green; contrast ≥4.5:1 or re-recorded exception; review logged |
@@ -245,8 +240,9 @@ S1 → S2 → S3 → S6.
 | PR #91 `docs(s1): reconcile extraction-health handoff at main 33e94b0` | **MERGED as `6f7fa48`** (2026-09-18T14:06Z) | Home continuation request-contract repair + S1 docs; post-merge CI 35354234754 / Build APK 35354234582 / test-release 35354234760 green; rolling `test` retargeted at `6f7fa48`. Merge claimed the repair + CI only — not live playback acceptance. |
 | PRs #92 / #93 `docs(s1): reconcile …` | **MERGED** — `39b8748` (2026-09-20T07:10:47Z) and `fabeb5f` (2026-09-20T13:29:15Z) | Both docs-only: post-merge CI green on each merge SHA (35496174865/35496174870/35496174877 and 35513643996/35513643853/35513643918); rolling `test` republished at each SHA with unchanged asset sizes. Neither claims live playback acceptance. |
 | PR #94 `docs(s1): reconcile evidence-path docs with code at main fabeb5f` | **MERGED as `7304abb`** (2026-09-20T15:14:02Z); post-merge CI 35518928489 / Build APK 35518928490 / test-release 35518928487 green on that SHA and rolling `test` retargeted at `7304abb` (15:19:07Z) | Docs-only correctness pass: probe README output protocol + drill file reference, `rot-drill.md` state/dispatch/readout recipe, S1 user-guide build identity + error-capture affordances, `14-release.md` baseline, MASTER_PROMPT §5/§7 drill references. Still no code, workflow or probe-semantics change; the merge claims docs correctness only — not live playback acceptance. |
+| PR #96 `docs(s1): cherry-pick #95 ledger re-pin` | **MERGED as `d99060e`** (2026-09-20T16:40Z); post-merge CI **35523474108** / Build APK **35523474088** / test-release **35523474032** green, rolling `test` retargeted at `d99060e` (published 16:46:20Z) | Docs-only. **This is the build the user tested for S1** — the release the user downloaded ("~6 hrs ago, 10 pm", 17 MB / 108 MB) resolves to exactly this SHA. |
 | PR #88 `S1 attempt 4 — new workflow extraction-health.yml` | **MERGED as `3c593fb`** (2026-09-17T15:40Z) | Attempt 4 SUCCESS — id 360655315 healthy, name=extraction-health, no phantom push. Old wedged 360227450 fired 35241808266 phantom on same merge. |
-| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; scheduled runs **35421383687**/**35489268023** on `main@6f7fa48` classify `ENVIRONMENT_BLOCKED` (runner bot-gating, no audio bytes validated); the workflow correctly did not update the issue (issue step fires on `FAIL` only; last update 2026-09-18) | Keep open; the mixed-RED era (35306224822) is superseded — Home no longer fails, resolver gating is runner-network evidence awaiting residential/device verification. Agent cannot write issue comments (403). |
+| Issue #14 `[rot-drill] Live extraction probe failed` | OPEN; scheduled runs **35421383687**/**35489268023** on `main@6f7fa48` classify `ENVIRONMENT_BLOCKED` (runner bot-gating, no audio bytes validated); the workflow correctly did not update the issue (issue step fires on `FAIL` only; last update 2026-09-18) | **Now closable by the user** — the 2026-09-20 residential evidence on `main@d99060e` (4 songs audible on Android + Windows, docs-only diff from the probed `6f7fa48`) shows the probe failure is runner-network gating, not extraction rot. The agent token cannot comment on or close issues (403), so the user closes it with the S1-green note; see the handoff in this session's summary. |
 | Issue #60 `Guest-First + Optional YTM Login` | OPEN (future plan, self-declared not-current) | v2 backlog (§8). Guest-first is already architecture — no action now |
 | Issue #63 `Security hardening…` | OPEN (enhancement) | v2 backlog (§8). No action in S1–S6 except S5's dep/license review (done in PR #74) |
 
@@ -287,7 +283,7 @@ S1 → S2 → S3 → S6.
 
 ## 6. Release gate (v0.1.0 — ALL required, no exceptions)
 
-1. S1: live drill verdict green on the release candidate build (now extraction-health, id 360655315).
+1. ~~S1: live drill verdict green on the release candidate build (now extraction-health, id 360655315).~~ **SATISFIED 2026-09-20** — daily drill honest (`ENVIRONMENT_BLOCKED` = runner gating) **plus** residential playback proven on `main@d99060e` (Android + Windows, 4 songs, audible, zero failures). Re-confirm on the final release candidate if extraction code changes before the tag; docs-only merges do not invalidate it.
 2. S3: Android + Desktop core-loop checklists signed (build SHAs).
 3. S6 soaks: 30-min Android (unrestricted battery) + 30-min Desktop,
    zero crashes, logs committed.
@@ -305,8 +301,8 @@ S1 → S2 → S3 → S6.
 
 1. ~~Merge this re-baseline (user review).~~ **DONE** — merged as PR #72
    (main `5023b38`, 2026-09-16T17:08:09Z).
-2. **S1** — **drill fires daily; verdict `ENVIRONMENT_BLOCKED`, not `FAIL`:** PR #91 merged (`6f7fa48`), reconciles #92 (`39b8748`) + #93 (`fabeb5f`) merged on top; scheduled runs **35421383687** (09-19) + **35489268023** (09-20) classify `ENVIRONMENT_BLOCKED` (Home request-contract repair holds; resolver runner-gated; no audio bytes validated). Remaining: residential/device playback evidence (`docs/runbooks/s1-residential-evidence.md`, newest rolling `test` release, identity by publish time + byte size), then record the S1 outcome before S2. First run on `main@7304abb`: 2026-09-21 04:17 UTC. No dispatch loop needed — the schedule fires daily. Support ticket #4765894 is dormant after the distinct-file workaround.
-3. **S2** (agent: dead-code + PR/docs hygiene) — unblocked after S1 GREEN.
+2. ~~**S1** — restore the drill + fresh live verdict.~~ **DONE / GREEN 2026-09-20.** The drill fires daily and classifies honestly (`ENVIRONMENT_BLOCKED` on the runner), and the user supplied the residential half on `main@d99060e`: Android + Windows installs, 4 songs, audible, advancing, no failures, Android lock-screen audio continued. The `6f7fa48...d99060e` compare is docs-only (0 code files), so runner-block and residential-success are the same code — T1 disproven, ADR-007 stays PROPOSED. Next scheduled run (2026-09-21 04:17 UTC, first on `d99060e`) is expected to stay `ENVIRONMENT_BLOCKED`; that is now a known-correct runner result, not an open question.
+3. **S2** (agent: workflow-trigger retirement + CI hygiene + `14-release.md` body; PR #54 stays open per the user) — **unblocked now.** Most original S2 items were already clean (verified 2026-09-20). The workflow edit must be made with a live drill watch, never blind.
 4. **S3** (user drives devices; agent records + fixes fallout) — includes
    the S4 hardware boxes (settings, EQ, jump-list verb, close-to-tray).
 5. ~~**S4** (agent: settings/themes/EQ/jump-list verb).~~ CODE MERGED in
