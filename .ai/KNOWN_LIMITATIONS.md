@@ -3,6 +3,14 @@
 Updated every phase. Nothing hidden.
 
 
+## 2026-09-20 — Post-#91 reconcile at `main@6f7fa48`; scheduled runs confirm `ENVIRONMENT_BLOCKED` (`arena/01a0bd98-dhun`)
+
+- **PR #91 is merged** (`6f7fa48`, 2026-09-18T14:06Z) with post-merge CI green on the merge SHA: CI **35354234754**, Build APK **35354234582**, test-release **35354234760**. The rolling `test` release targets exactly `6f7fa48` (APK 17,948,508 B, MSI 112,861,184 B, both `.sha256` sidecars). The merge claims the request-contract repair + CI only — not live playback acceptance.
+- **The schedule fires daily again.** `extraction-health` runs **35421383687** (2026-09-19) and **35489268023** (2026-09-20) both ran on `main@6f7fa48` and both classified **`ENVIRONMENT_BLOCKED`**, read from the `Extraction health is not a production pass` warning annotation (exit code 2 on the final gate; artifact/log blob downloads still `EOF` here). Probes + classifier pass, the rot-drill issue step is correctly skipped, only the intentional non-PASS gate fails — the accepted boundary holds on current `main`.
+- **S1 stays open for one reason only:** no live audio bytes have been validated anywhere. The runner verdict is honestly `ENVIRONMENT_BLOCKED`, and residential/device playback evidence is user-gated (step-by-step guide supplied + filed at `docs/runbooks/s1-residential-evidence.md` 2026-09-20). Triggers T1/T2 are not met — no extraction/probe change is authorized, and ADR-007 stays PROPOSED contingency-only.
+- **Standing sandbox limits re-verified this session:** no JDK (CI is the compiler); `gh` + GitHub API reachable; artifact/log blob downloads `EOF` (annotations API is the readout). Agent workflow dispatch was not re-probed — no dispatch is needed while the schedule fires.
+
+
 ## 2026-09-18 — Home continuation request contract repaired; resolver remains runner-gated
 
 - The independent `ytmusicapi` comparison on run **35325125151** supplied the wire-level difference: its Home continuation uses `alt=json`, `context.user`, `browseId` in the body, `ctoken` plus `continuation` in the query, and an anonymous `X-Goog-Visitor-Id`. DHUN now matches that contract in `InnerTubeClient`; the Home parser was not changed.

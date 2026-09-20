@@ -1,9 +1,9 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Current status (2026-09-18, Stage S1 remains open):** The release baseline remains `main@33e94b0` after PR #90. PR #91 is OPEN and unmerged at docs head **`89187f0`** (production repair **`c71d1bb`**); Android and Windows/Desktop production fixes remain intact and are not the remaining issue.
-> Candidate run **35325690972** tested `c71d1bb`. Its classifier step passed, the rot-drill issue step was skipped, and the overall result was `ENVIRONMENT_BLOCKED`; only the intentional non-PASS gate failed. The previous Home-driven `FAIL` is no longer present after the request-contract repair. The resolver remains YouTube-runner-gated, so no live audio bytes were validated.
-> The narrow production change matches the independent anonymous client's observed request: `alt=json`, empty `context.user`, Home `browseId` in the JSON body, opaque continuation in `ctoken`/`continuation` query parameters, and cached anonymous `X-Goog-Visitor-Id`. `HomeFeedParser.kt` was not changed. A tab-only shell remains a genuine parse failure; no empty-page success or opaque-endpoint follow-up is permitted.
-> All non-PASS statuses remain non-zero, and only `FAIL` opens a rot-drill issue. S2, hardware, and stable-release acceptance remain blocked pending approved residential/device playback evidence. The user has separately authorized the documented code merge; that merge does not claim live playback acceptance. No same-run dispatch loop is requested; raw GitHub logs return `EOF` in this sandbox and local Gradle cannot run without a JDK.
+> **Current status (2026-09-20, Stage S1 remains open):** The release baseline is `main@6f7fa48` after PR #91 merged (2026-09-18T14:06Z; post-merge CI 35354234754 / Build APK 35354234582 / test-release 35354234760 green; rolling `test` retargeted at `6f7fa48`). The Home continuation request-contract repair is on `main`; Android and Windows/Desktop production fixes remain intact and are not the remaining issue.
+> Scheduled `extraction-health` runs **35421383687** (2026-09-19) and **35489268023** (2026-09-20) both tested `main@6f7fa48` and both classified **`ENVIRONMENT_BLOCKED`** (warning-annotation evidence; artifact/log blobs still `EOF` here). Probes + classifier pass, the rot-drill issue step is correctly skipped, and only the intentional non-PASS gate fails (exit 2). No Home-driven `FAIL` remains; the resolver is YouTube-runner-gated, so no live audio bytes were validated.
+> The merged production change matches the independent anonymous client's observed request: `alt=json`, empty `context.user`, Home `browseId` in the JSON body, opaque continuation in `ctoken`/`continuation` query parameters, and cached anonymous `X-Goog-Visitor-Id`. `HomeFeedParser.kt` was not changed. A tab-only shell remains a genuine parse failure; no empty-page success or opaque-endpoint follow-up is permitted.
+> All non-PASS statuses remain non-zero, and only `FAIL` opens a rot-drill issue. S2, hardware, and stable-release acceptance remain blocked pending approved residential/device playback evidence (user guide filed 2026-09-20 at `docs/runbooks/s1-residential-evidence.md`). No dispatch loop is needed — the schedule fires daily. Raw GitHub logs return `EOF` in this sandbox and local Gradle cannot run without a JDK.
 
 ## Pre-merge verification — 2026-09-18
 
@@ -420,7 +420,7 @@ recorded here.
 
 ### v0.1.0 release gate
 
-- [ ] `extraction-health` has a current green live run on the release candidate (run **35306224822** is the current mixed RED; the Home parser and runner-network findings remain open).
+- [ ] `extraction-health` has a current green live run on the release candidate (scheduled runs **35421383687**/**35489268023** on `main@6f7fa48` classify `ENVIRONMENT_BLOCKED`: Home no longer fails, resolver runner-gated, no audio bytes validated — residential/device evidence still open).
 - [ ] Android APK and AAB build and install on a clean target.
 - [ ] Windows MSI installs and launches on a clean Windows VM/user — **published baseline `0920148` launches on the user’s machine; install-over failed and clean-target hygiene is still OPEN**.
 - [ ] Android and Desktop soak evidence is attached above (both still OPEN; use an identified candidate that first passes real playback).
