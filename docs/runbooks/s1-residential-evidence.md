@@ -18,12 +18,20 @@ contingency-trigger T1 evidence — equally valuable, not a wasted run).
 
 ## Build under test
 
-The rolling `test` release (retargeted on every push to `main` — always
-report the commit shown on the release page; `39b8748` as of 2026-09-20
-after PR #92 merged, published 07:15:29Z; `6f7fa48` at original filing):
+The rolling `test` release is retargeted on **every** push to `main`, so it is
+always the newest build. As of **2026-09-20 (session `arena/01a0bf52-dhun`)**
+it is published from `fabeb5f` (PR #93 merge) at 2026-09-20T13:34:04Z —
+earlier candidates were `39b8748` (07:15:29Z) and `6f7fa48`.
 
 - Release page: `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`
-- Android: `dhun-test.apk` (~17.9 MB) · Windows: `dhun-test.msi` (~112.9 MB)
+- Android: `dhun-test.apk` = **17,948,508 bytes** · Windows: `dhun-test.msi` =
+  **112,861,184 bytes** (each with a `.sha256` sidecar next to it)
+
+**How to say which build you tested:** the release page does *not* print a
+commit SHA — it shows the release's publish time and the asset sizes. So in the
+evidence bundle report the **date+time shown beside the `test` release title**
+and the **file size your device downloaded**; that pins the build exactly.
+Copying the `.sha256` sidecar value is the gold standard if it is convenient.
 
 Do **Path A** (phone) or **Path B** (PC) — or both. Path C is an advanced
 alternative that also satisfies S1.
@@ -43,7 +51,10 @@ alternative that also satisfies S1.
    does the position advance smoothly? Any `Reconnecting…` or error?
 6. **Lock the phone mid-play** for 30 seconds: does audio continue?
    (record yes/no — valuable background-playback signal).
-7. On failure: tap the error → open **Details** → copy the exact text.
+7. On failure: tap the mini-player (its action is labelled **Show playback
+   details** when an error is active), or open the full player and use
+   **Details** in the red error band. The **Playback details** dialog holds the
+   full text and it is selectable — long-press → Copy.
 8. Send back the evidence bundle below.
 
 ## Path B — Windows PC (~15 min)
@@ -82,14 +93,17 @@ Needs git + JDK 17 + Python 3 on a home-network computer:
 ## Evidence bundle to send back (copy-paste template)
 
 ```
-Build commit: (from the release page, e.g. 6f7fa48)
-File tested: (APK / MSI + size shown on the release page)
+Build tested: (the date+time shown beside the `test` release title, and the
+  file size your device downloaded — e.g. "2026-09-20 13:34 UTC, APK
+  17,948,508 bytes"; the page shows no commit SHA, and that pairing pins it)
+sha256 (optional, best): (contents of the matching `.sha256` sidecar)
+File tested: (APK / MSI)
 Device/OS: (e.g. Galaxy A54 / Android 14; Win11 + VLC 3.0.x)
 Network: (home WiFi / mobile data; ISP if known; VPN off confirmed?)
 Track tested: (exact title — artist as shown in the app)
 Result: AUDIBLE YES/NO; position advanced YES/NO; played ~X min
 Background (phone): audio continued with screen locked YES/NO
-Errors (exact text from Details, if any):
+Errors (exact text from the "Playback details" dialog, if any):
 Screenshots/recordings attached: (yes/no)
 yt-dlp (PC): (version or "not installed")
 ```

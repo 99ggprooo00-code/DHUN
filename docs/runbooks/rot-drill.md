@@ -7,15 +7,15 @@ does not prove *this* commit — so confirming stream health for a
 release is an operator task. Do it once per release candidate, on
 `main`, after merge.
 
-## State (2026-09-18): Home transport repaired; resolver gate remains
+## State (2026-09-20): drill fires daily, verdict is ENVIRONMENT_BLOCKED; S1 waits on device evidence
 
-- **Current `main`:** `33e94b06125b8ce1eefe9aab0a2faca116ca53fe` (PR #90). Its baseline CI/test-release evidence remains separate from this unmerged candidate.
-- **Current candidate:** PR **#91**, branch `arena/01a0b224-dhun`, docs head **`89187f0`** (production repair **`c71d1bb`**), is OPEN and unmerged. Android and Windows/Desktop production paths remain preserved and were not replaced.
+- **Current `main`:** `fabeb5f79a195eac0a536eaccc5e20f892d4fd70` (PR #93 merge, 2026-09-20T13:29:15Z, on top of PR #92 `39b8748` and PR #91 `6f7fa48`). Post-merge push CI green on the merge SHA: CI 35513643996 · Build APK 35513643853 · test-release 35513643918. Rolling `test` release targets exactly `fabeb5f` (published 2026-09-20T13:34:04Z; `dhun-test.apk` 17,948,508 B, `dhun-test.msi` 112,861,184 B + both `.sha256` sidecars).
+- **PR #91 (Home continuation request-contract repair) is MERGED** as `6f7fa48` (2026-09-18T14:06Z); PR #92 and PR #93 are docs reconciles on top. Android and Windows/Desktop production extraction paths were preserved, not replaced.
 - **Healthy drill:** `.github/workflows/extraction-health.yml`, workflow id **360655315**, is active and registered with the correct name `extraction-health`.
-- **Latest candidate evidence:** push run **35325690972** tested `c71d1bb`. Its classifier step passed, the rot-drill issue step was skipped, and the final result was `ENVIRONMENT_BLOCKED`; only the intentional non-PASS gate failed. This means the prior Home-driven `FAIL` no longer controls the result. The resolver remains blocked by the GitHub runner's YouTube bot gate, so no live audio bytes were validated.
+- **Latest scheduled evidence (re-verified 2026-09-20):** runs **35421383687** (2026-09-19 04:28:36Z) and **35489268023** (2026-09-20 04:29:25Z) both tested `main@6f7fa48` — both fired *before* PR #92 merged — and both classified **`ENVIRONMENT_BLOCKED`** (read from the check-run annotation, job 106021243260 for the 09-20 run). Offline + metadata + Home + search + related stages pass; the resolver is bot-gated on the runner's datacenter IP, so no live audio bytes are validated there. Only the intentional non-PASS gate fails (exit 2). The prior Home-driven `FAIL` no longer controls the result: `6f7fa48` (PR #91) carries the request-contract repair.
 - **Request contract:** `InnerTubeClient` now matches the independent `ytmusicapi` comparison: `alt=json`, empty `context.user`, `browseId` in the body, `ctoken` and `continuation` in the query, and cached anonymous `X-Goog-Visitor-Id`. `HomeFeedParser.kt` remains unchanged.
 - **Parser boundary:** a tab-only shell is still a genuine parse failure if encountered. Do not accept it as an exhausted page, follow its opaque endpoint, or add a speculative parser branch. The independent client supplied a real `continuationContents.sectionListContinuation` contract, so no parser change was needed.
-- **Gate:** S1 remains open/RED pending approved residential/device playback evidence; S2 is blocked and PR #91 remains open/unmerged. Raw GitHub logs return `EOF` in this sandbox, the agent cannot dispatch the workflow (HTTP 403), and no local Gradle test ran because no JDK is installed.
+- **Gate:** S1 remains open/RED pending residential/device playback evidence; S2 stays blocked. The first scheduled run on `main@fabeb5f` is due 2026-09-21 04:17 UTC (observed starts land ~04:28–04:30 UTC). Raw GitHub logs return `EOF` in this sandbox, the agent cannot dispatch the workflow (HTTP 403), and no local Gradle test ran because no JDK is installed.
 
 ## Dispatch
 
@@ -30,9 +30,11 @@ request-contract comparison and run **35325690972**.
    (repo → **Actions** → **extraction-health** in the left sidebar — the
    workflow's declared name is `extraction-health`; sidebar label should
    reflect that name when registration is healthy).
-2. Click **Run workflow** (right side, above the runs list). For the current
-   PR candidate validation select **`arena/01a0b224-dhun`** (not `main`),
-   then click the green **Run workflow** button.
+2. Click **Run workflow** (right side, above the runs list). Select **`main`** —
+   the scheduled drill already runs there daily, so dispatch only when a
+   materially new candidate needs an immediate verdict. (Earlier guidance to
+   pick `arena/01a0b224-dhun` is obsolete: that branch was PR #91, merged as
+   `6f7fa48` on 2026-09-18.) Then click the green **Run workflow** button.
 3. A new run appears at top within ~30 s. Click it, watch **probe** job
    (≈5–12 min; installs yt-dlp and runs offline + live probes).
 
@@ -44,14 +46,38 @@ zero-job artifact from that path; use `extraction-health` instead.
 403):**
 
 ```bash
-# Current PR candidate validation:
-gh workflow run extraction-health.yml --ref arena/01a0b224-dhun --repo 99ggprooo00-code/DHUN
-# After the candidate is merged, release-baseline validation uses main:
-# gh workflow run extraction-health.yml --ref main --repo 99ggprooo00-code/DHUN
-# or by declared name / workflow id with the same --ref:
-# gh workflow run extraction-health --ref arena/01a0b224-dhun --repo 99ggprooo00-code/DHUN
-# gh workflow run 360655315 --ref arena/01a0b224-dhun --repo 99ggprooo00-code/DHUN
+# Release-baseline validation — the normal case. main is what the schedule
+# already tests daily, so dispatch only for a materially new candidate:
+gh workflow run extraction-health.yml --ref main --repo 99ggprooo00-code/DHUN
+# By declared name or workflow id with the same --ref:
+# gh workflow run extraction-health --ref main --repo 99ggprooo00-code/DHUN
+# gh workflow run 360655315 --ref main --repo 99ggprooo00-code/DHUN
 ```
+
+## Reading the verdict without job logs (sandbox recipe)
+
+There is no local JDK and job/artifact blob downloads return `EOF` in the agent
+sandbox, so the verdict is read from two REST endpoints — both work with the
+agent token, and both are what ROADMAP evidence cites:
+
+```bash
+run=35489268023                                                    # any run id
+job=$(gh api repos/99ggprooo00-code/DHUN/actions/runs/$run/jobs --jq '.jobs[0].id')
+gh api "repos/99ggprooo00-code/DHUN/actions/jobs/$job" \
+  --jq '.steps[] | [.number,.name,.conclusion] | @tsv'            # per-step truth
+gh api "repos/99ggprooo00-code/DHUN/check-runs/$job/annotations" \
+  --jq '.[] | [.annotation_level,(.title//"-"),.message] | @tsv'  # classification
+```
+
+Step shape of a correctly-blocked run (verified on 35489268023, job
+106021243260): steps 1–10 `success` — the probe step is `continue-on-error`, so
+a non-zero `:tools:playback-probe:run` is parsed from `PROBE|workflow-status` by
+the classifier instead of showing as a red step; the two issue steps `skipped`;
+the final gate step (`Keep the check non-zero when live health is unverified`)
+is the only failure, exit code **2**. That pattern means *the drill works and
+live health is unverified* — it is not a DHUN failure. A red step **before**
+`Classify probe result` means something else broke (checkout, toolchain,
+Gradle) and is a CI defect, not an extraction verdict.
 
 ## Reading the verdict
 

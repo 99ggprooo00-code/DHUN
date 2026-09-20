@@ -239,7 +239,9 @@ DHUN/
 ├── tests/fixtures/             # captured InnerTube JSON for parser tests
 ├── scripts/                    # python packaging/CI-contract gates (29 tests)
 └── .github/workflows/          # ci.yml · test-release.yml · build-apk.yml ·
-                                # rot-drill.yml (schedule BROKEN — see S1)
+                                # extraction-health.yml (id 360655315 — the
+                                # restored daily drill; superseded the deleted
+                                # rot-drill.yml, schedule fixed 2026-09-17)
 ```
 
 ---
@@ -291,19 +293,27 @@ acceptance gates the next. File-level tasking lives in
 [ROADMAP.md](ROADMAP.md).
 
 ### Stage S1 — Restore the maintenance contract (FIRST — nothing else matters if extraction is blind)
-- **Objective:** the rot drill runs daily again and produces a live
-  verdict on the current chain; issue #14 reflects reality.
-- Tasks: human presses *Run workflow* on `rot-drill.yml@main` +
-  Settings → Actions inspection (agents get 403); fix schedule or
-  cadence; close/supersede stale PR #53 (do-not-merge); record fresh
-  verdict on #14 (green → auto-close path proven; red → new evidence,
-  check contingency triggers T1/T2); silence or fix the 0-job
-  push-noise (docs-only: stop citing it; optionally add `paths-ignore`
-  or a no-op job — needs user OK as a workflow change).
-- **Acceptance:** ≥1 scheduled (or manually dispatched) drill verdict
-  on current `main`, artifact attached, #14 updated.
-- **Files:** `.github/workflows/rot-drill.yml`, issue #14, ROADMAP,
-  KNOWN_LIMITATIONS. **Tests:** none (live verdict IS the test).
+- **Objective:** the drill runs daily again and produces a live verdict on
+  the current chain; issue #14 reflects reality.
+- Tasks (status as of 2026-09-20): ~~fix schedule/cadence~~ **DONE** —
+  `.github/workflows/extraction-health.yml` (id **360655315**) fires daily on
+  `17 4 * * *` UTC (PR #88 → `3c593fb`; the deleted `rot-drill.yml` /
+  `rot-drill-daily.yml` registrations are retired history, do not cite them);
+  ~~close/supersede stale PR #53~~ **DONE** (closed unmerged 2026-09-16);
+  ~~record fresh verdict~~ **DONE, non-green** — runs 35421383687 (09-19) +
+  35489268023 (09-20) classified `ENVIRONMENT_BLOCKED`, issue #14 correctly
+  untouched (the workflow files against `FAIL` only);
+  **OPEN:** one honest residential/device playback result
+  (`docs/runbooks/s1-residential-evidence.md`) — a human *Run workflow* click
+  on `extraction-health@main` is optional now that the schedule fires (agents
+  get 403 on dispatch); the 0-job push-noise is documented and no longer cited
+  as a verdict (removing the stale `push:` branch trigger needs the user's OK).
+- **Acceptance:** ≥1 scheduled (or manually dispatched) drill verdict on
+  current `main` **plus** a playback result outside the GitHub runner — a
+  runner-only `ENVIRONMENT_BLOCKED` never closes S1 in either direction.
+- **Files:** `.github/workflows/extraction-health.yml`, issue #14,
+  `docs/runbooks/`, ROADMAP, KNOWN_LIMITATIONS. **Tests:** none (live verdict
+  IS the test).
 
 ### Stage S2 — Architectural cleanup (small, safe, unblocks review)
 - **Objective:** remove dead/confusing weight; zero behavior change.
