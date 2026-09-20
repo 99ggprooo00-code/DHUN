@@ -24,6 +24,21 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — Home continuation request contract — 2026-09-18
+
+- **`InnerTubeClient` Home continuation requests now match the observed
+  anonymous browse contract** (PR #91): `alt=json`, an explicit empty
+  `context.user`, the Home `browseId` in the JSON body, the opaque token
+  in the `ctoken` + `continuation` query parameters, and the cached
+  anonymous `X-Goog-Visitor-Id` header. The wire difference was isolated
+  by comparing against the independent `ytmusicapi` client on the same
+  runner; `HomeFeedParser.kt` is unchanged (a tab-only shell is still a
+  genuine parse failure, never synthesized into an empty page).
+- **Result:** the `extraction-health` probe no longer fails on Home — runs
+  classify `ENVIRONMENT_BLOCKED` (runner bot-gating, no audio bytes
+  validated) instead of the prior Home-driven `FAIL`. This is a request
+  repair + CI verification only, not live playback acceptance.
+
 ### Added — Stage S4 settings surface, slice 1 — 2026-09-16
 - **Settings page** (`DetailRoute.SettingsPage`, entry from the Library
   header): theme (dark/light) + accent pickers that apply live via the

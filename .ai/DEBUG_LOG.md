@@ -1,6 +1,36 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-20 — Scheduled runs confirm post-merge boundary; annotation readout method (`arena/01a0bd98-dhun`)
+
+**Run identity.** Scheduled `extraction-health` runs **35421383687**
+(2026-09-19, artifact `rot-drill-35421383687`) and **35489268023**
+(2026-09-20, job **106021243260**, artifact `rot-drill-35489268023`) both
+tested `main@6f7fa48c2546575d9cfca44d5eafbfeabf295f31` (PR #91 merged). Both
+completed with conclusion `failure` at the intentional final gate only.
+
+**Classification evidence without log egress.** Artifact and raw-log blob
+downloads still return `EOF` in this sandbox, but the check-run annotations
+API is reachable and carries the verdict: both runs emit
+`warning: Extraction health is not a production pass ::
+ENVIRONMENT_BLOCKED — inspect the probe log and verify playback outside
+the GitHub runner.` The final gate's `Process completed with exit code 2`
+is the `ENVIRONMENT_BLOCKED` branch of `extraction-health.yml`
+(`UNAVAILABLE` would exit 3, unclassified `FAIL` would exit 1), and the
+`Open or update a rot-drill issue` step was skipped in both runs (it fires
+on `FAIL` only) — three independent signals agreeing, no step-name
+guessing. Method: `gh run view <id> --json jobs` → job `databaseId` →
+`gh api .../check-runs/<job>/annotations`.
+
+**Decision.** The post-merge boundary holds: Home no longer drives a
+`FAIL`, the resolver is honestly runner-gated, and no audio bytes are
+validated. S1 stays open pending residential/device playback evidence;
+no code change is indicated and none was made. A Node.js 20 deprecation
+warning (checkout/setup-python/upload-artifact forced onto Node 24)
+appears on both runs — pre-existing action-runtime maintenance noise,
+not a verdict.
+
+
 ## 2026-09-18 — Home continuation transport aligned with independent client (`c71d1bb`)
 
 **Comparison.** The diagnostic `ytmusicapi` client on the same GitHub runner returned
