@@ -24,6 +24,30 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Verified — Stage S1 closed: first residential playback evidence — 2026-09-20
+
+- **Live user verification of the production extraction chain on `main@d99060e`.**
+  The rolling `test` build (published 2026-09-20T16:46:20Z; `dhun-test.apk`
+  17,948,508 B, `dhun-test.msi` 112,861,184 B) was installed on **Android and
+  Windows** over home WiFi with no VPN. Search worked; **4 songs played with
+  audible sound and advancing position; no failures**; on Android audio continued
+  with the screen locked; install and uninstall were straightforward on both
+  platforms. This is the first end-to-end playback confirmation recorded outside a
+  CI runner.
+- **The daily `extraction-health` drill's `ENVIRONMENT_BLOCKED` verdict is now
+  explained rather than merely observed.** The drill probed `6f7fa48`; the user
+  played `d99060e`; the diff between them is **9 documentation files and no source
+  files**, so both verdicts describe the same extraction code. The runner block is
+  YouTube gating datacenter IPs — contingency trigger **T1 is disproven** and
+  ADR-007 remains PROPOSED and unimplemented. No extraction, resolver, probe or
+  workflow code was changed.
+- **Not claimed by this entry:** 30-minute soaks, media-notification/lock-screen
+  controls, downloads + offline playback, lyrics, Settings/theme persistence,
+  Android EQ, and the Windows native surface (tray, single-instance,
+  close-to-tray, jump lists, media keys/SMTC). Those remain Stage S3/S6 gates and
+  block the `v0.1.0` tag.
+
+
 ### Fixed — Home continuation request contract — 2026-09-18
 
 - **`InnerTubeClient` Home continuation requests now match the observed

@@ -96,9 +96,16 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
 >    sign-in** unless a trigger below fires. That research (open PR #54 /
 >    proposed ADR-007) is **contingency reference material**, not a
 >    backlog item.
-> 5. The maintenance contract stands and is currently **in breach**: the
->    daily rot drill has not executed on schedule since 2026-09-07
->    (restoring it is completion Stage S1 — the single most urgent task).
+> 5. The maintenance contract stands and is **restored as of 2026-09-20**:
+>    the daily drill runs (`extraction-health`, id 360655315, cron
+>    `17 4 * * *`) and Stage S1 closed **GREEN** — the runner verdict is
+>    `ENVIRONMENT_BLOCKED` (datacenter gating) while user-supplied
+>    residential evidence on `main@d99060e` proved real audible playback on
+>    Android **and** Windows (4 songs, no failures, Android lock-screen
+>    audio continued). The two verdicts describe the *same code* — the
+>    `6f7fa48...d99060e` diff is documentation only — so the block is
+>    network-shaped, not rot. Keep the contract honest: a red drill on a
+>    residential re-test, not on the runner, is what triggers a patch.
 
 | Layer | Implementation (actual) | Status |
 |---|---|---|
@@ -113,6 +120,9 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
 - T1: reproducible `AuthRequired`/gating failures on residential
   (non-datacenter) networks with the current chain, confirmed by a
   green-CI build + captured probe output — not by CI-runner IPs alone.
+  **Status 2026-09-20: DISPROVEN, not merely unmet.** A residential home-WiFi
+  test of `main@d99060e` on Android and Windows played 4 songs audibly with
+  zero failures. Re-opening T1 requires *new* residential failure evidence.
 - T2: rot drill red on the production chain ≥14 days with no upstream
   recovery (per RISK_REGISTER).
 - Until a trigger fires, extraction work is **forbidden** except:
@@ -292,9 +302,20 @@ agents did not work out). Stages run **in order**; each stage's
 acceptance gates the next. File-level tasking lives in
 [ROADMAP.md](ROADMAP.md).
 
-### Stage S1 — Restore the maintenance contract (FIRST — nothing else matters if extraction is blind)
+### Stage S1 — Restore the maintenance contract ✅ COMPLETE (GREEN 2026-09-20)
 - **Objective:** the drill runs daily again and produces a live verdict on
   the current chain; issue #14 reflects reality.
+- **Outcome:** both acceptance halves met. Daily schedule restored (PR #88,
+  id 360655315) with honest classification — runs 35421383687 / 35489268023
+  → `ENVIRONMENT_BLOCKED`. Residential half supplied by the user on
+  `main@d99060e` (rolling `test` published 2026-09-20T16:46:20Z, APK
+  17,948,508 B / MSI 112,861,184 B, home WiFi, no VPN): installs easy on both
+  platforms, 4 songs searched and played, audible with advancing position,
+  no failures, Android playback continued on the locked screen. The probed
+  SHA and the tested SHA differ by documentation only (0 code files), so the
+  runner block is datacenter gating. Issue #14 is closable by the user (agent
+  token gets 403 on issue writes). **Not** claimed by S1: soaks, media
+  controls, offline, lyrics, EQ, Windows native surface — those are S3/S6.
 - Tasks (status as of 2026-09-20): ~~fix schedule/cadence~~ **DONE** —
   `.github/workflows/extraction-health.yml` (id **360655315**) fires daily on
   `17 4 * * *` UTC (PR #88 → `3c593fb`; the deleted `rot-drill.yml` /
@@ -303,14 +324,17 @@ acceptance gates the next. File-level tasking lives in
   ~~record fresh verdict~~ **DONE, non-green** — runs 35421383687 (09-19) +
   35489268023 (09-20) classified `ENVIRONMENT_BLOCKED`, issue #14 correctly
   untouched (the workflow files against `FAIL` only);
-  **OPEN:** one honest residential/device playback result
+  ~~**OPEN:** one honest residential/device playback result~~ **DONE 2026-09-20**
+  (user evidence on `main@d99060e` — see Outcome above); former text:
+  one honest residential/device playback result
   (`docs/runbooks/s1-residential-evidence.md`) — a human *Run workflow* click
   on `extraction-health@main` is optional now that the schedule fires (agents
   get 403 on dispatch); the 0-job push-noise is documented and no longer cited
   as a verdict (removing the stale `push:` branch trigger needs the user's OK).
-- **Acceptance:** ≥1 scheduled (or manually dispatched) drill verdict on
-  current `main` **plus** a playback result outside the GitHub runner — a
-  runner-only `ENVIRONMENT_BLOCKED` never closes S1 in either direction.
+- **Acceptance (MET 2026-09-20):** ≥1 scheduled (or manually dispatched) drill
+  verdict on current `main` **plus** a playback result outside the GitHub
+  runner — a runner-only `ENVIRONMENT_BLOCKED` never closes S1 in either
+  direction. Both halves are now on record.
 - **Files:** `.github/workflows/extraction-health.yml`, issue #14,
   `docs/runbooks/`, ROADMAP, KNOWN_LIMITATIONS. **Tests:** none (live verdict
   IS the test).

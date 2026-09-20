@@ -14,6 +14,24 @@ failure as *expected vs actual*. Paste the filled checklist back to the
 agent — failures become S3-found functional bugs (the only UI work allowed
 pre-tag besides this list).
 
+## Partial credit already banked (2026-09-20, `main@d99060e`)
+
+The S1 residential test covered a few of these boxes. Recorded here so they are
+not re-litigated, with scope stated honestly — everything else below is still open.
+
+- **Android, install + search + play:** PASS — clean install from the rolling
+  `test` APK, search worked, 4 songs played audibly with advancing position, no
+  failures. Uninstall easy.
+- **Android, background audio:** PASS for *audio continuation* with the screen
+  locked. **Not** covered: whether the media notification's title/artwork/buttons
+  are correct and functional — still tick that separately.
+- **Windows, install + play:** PASS — install and uninstall easy, search, audible
+  playback. **Not** covered: every native box (single-instance, tray, close-to-tray,
+  jump-list verb, media keys/SMTC, shortcuts).
+- **Still entirely open on both platforms:** 30-minute soaks, rotation/process
+  death, downloads + airplane-mode offline, lyrics, Settings/theme/accent
+  persistence, EQ, resume toggle.
+
 ## A. Android (clean install)
 
 - [ ] Uninstall any existing DHUN, install `dhun-test.apk` fresh.
