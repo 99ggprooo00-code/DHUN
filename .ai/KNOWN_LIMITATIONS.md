@@ -3,6 +3,15 @@
 Updated every phase. Nothing hidden.
 
 
+## 2026-09-20 (session 2) — Post-#92 reconcile at `main@39b8748`; S1 still user-gated (`arena/01a0beed-dhun`)
+
+- **PR #92 is merged** (`39b8748`, 2026-09-20T07:10:47Z; docs-only reconcile on top of PR #91's `6f7fa48`). Post-merge push CI green on the merge SHA: CI **35496174865**, Build APK **35496174870**, test-release **35496174877** (all `success`). Rolling `test` retargeted at exactly `39b8748` (published 2026-09-20T07:15:29Z) with `dhun-test.apk` 17,948,508 B, `dhun-test.msi` 112,861,184 B, and both `.sha256` sidecars — byte-identical sizes to the `6f7fa48` build, as expected for a docs-only change. No code changed; nothing about extraction, playback, or packaging was touched.
+- **Schedule evidence re-verified directly this session.** Scheduled runs **35421383687** (2026-09-19) and **35489268023** (2026-09-20) both tested `main@6f7fa48` (both fired before the #92 merge) and both classified **`ENVIRONMENT_BLOCKED`**. For 35489268023 the classification was read straight from the check-run annotations API (job 106021243260): `Extraction health is not a production pass — ENVIRONMENT_BLOCKED — inspect the probe log and verify playback outside the GitHub runner`, plus exit code 2 on the intentional non-PASS gate and `:tools:playback-probe:run` non-zero as designed. Issue #14 correctly untouched (issue step opens only on `FAIL`). The first scheduled run on `main@39b8748` is due ~04:28Z 2026-09-21.
+- **S1 stays open for the same single reason:** no live audio bytes have been validated anywhere. Residential/device playback evidence remains user-gated (`docs/runbooks/s1-residential-evidence.md`, build-commit line refreshed to `39b8748` this session). Triggers T1/T2 not met — no extraction/probe change authorized; ADR-007 stays PROPOSED contingency-only; PR #54 stays untouched per the user's 2026-09-20 instruction.
+- **New CI watch items (observed in runner annotations, no action taken — workflow changes are S2-era and need the user's OK):** (1) `ubuntu-latest` migrates to Ubuntu 26 beginning **2026-10-19** (runner-images issue #14748) — within ~30 days, watch the scheduled drill across that migration; (2) Node.js 20 deprecation notice for the pinned actions in use (`actions/checkout@v4`, `actions/setup-python@v5`, `actions/upload-artifact@v4`, forced onto Node 24). Neither is a current failure.
+- **Standing sandbox limits re-verified this session:** no JDK (CI is the compiler); `gh` + GitHub API reachable; artifact/log blob downloads still `EOF` (annotations API is the readout); agent workflow dispatch not re-probed (no dispatch needed while the schedule fires daily).
+
+
 ## 2026-09-20 — Post-#91 reconcile at `main@6f7fa48`; scheduled runs confirm `ENVIRONMENT_BLOCKED` (`arena/01a0bd98-dhun`)
 
 - **PR #91 is merged** (`6f7fa48`, 2026-09-18T14:06Z) with post-merge CI green on the merge SHA: CI **35354234754**, Build APK **35354234582**, test-release **35354234760**. The rolling `test` release targets exactly `6f7fa48` (APK 17,948,508 B, MSI 112,861,184 B, both `.sha256` sidecars). The merge claims the request-contract repair + CI only — not live playback acceptance.

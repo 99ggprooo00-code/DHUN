@@ -1,17 +1,18 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-20** · session **`arena/01a0bd98-dhun`** · `main`/`origin/main` `6f7fa48c2546575d9cfca44d5eafbfeabf295f31` (PR #91 merged 2026-09-18).
+Updated **2026-09-20** · session **`arena/01a0beed-dhun`** · `main`/`origin/main` `39b87489a8ae6a3988aa85395f7111d4b7f1dbfd` (PR #92 merged 2026-09-20T07:10Z, docs-only reconcile on top of PR #91's `6f7fa48`).
 
-**Phase/status:** Stage **S1 — restore the maintenance contract** remains **RED/open** and S2 remains blocked: the drill fires daily and classifies honestly, but no live audio bytes have been validated anywhere — the runner verdict is `ENVIRONMENT_BLOCKED` and residential/device playback evidence is still missing. PR #91 (Home continuation request-contract repair) is merged; Android and Windows/Desktop production extraction work was not reopened or replaced.
+**Phase/status:** Stage **S1 — restore the maintenance contract** remains **RED/open** and S2 remains blocked: the drill fires daily and classifies honestly, but no live audio bytes have been validated anywhere — the runner verdict is `ENVIRONMENT_BLOCKED` and residential/device playback evidence is still missing. PR #91 (Home continuation request-contract repair) and PR #92 (docs reconcile) are merged; Android and Windows/Desktop production extraction work was not reopened or replaced.
 
 **GitHub state verified live (this session, not inherited):**
-- PR **#91 MERGED** as `6f7fa48` (2026-09-18T14:06Z). Post-merge CI green on the merge SHA: CI **35354234754**, Build APK **35354234582**, test-release **35354234760** (all `success`). Rolling `test` retargeted at exactly `6f7fa48` (2026-09-18T14:06:48Z): `dhun-test.apk` 17,948,508 B + `.sha256`, `dhun-test.msi` 112,861,184 B + `.sha256`.
-- Scheduled `extraction-health` runs **35421383687** (2026-09-19) and **35489268023** (2026-09-20) both ran on `main@6f7fa48` and both classified **`ENVIRONMENT_BLOCKED`** — read from the `Extraction health is not a production pass` warning annotation (artifact/log blob downloads still return `EOF` here). Step pattern is the accepted boundary: probes + `Classify probe result` pass, rot-drill issue step correctly skipped, only the intentional non-PASS gate fails (exit 2).
-- Open items unchanged: PR **#54** only (docs-only contingency reference, conflicting — user said take no action 2026-09-20); issues **#14** (rot-drill, last updated 2026-09-18 — correctly untouched by the scheduled runs), **#60**, **#63**.
+- PR **#92 MERGED** as `39b8748` (2026-09-20T07:10:47Z). Post-merge push CI green on the merge SHA: CI **35496174865**, Build APK **35496174870**, test-release **35496174877** (all `success`, created 07:10:50Z). Rolling `test` retargeted at exactly `39b8748` (published 2026-09-20T07:15:29Z): `dhun-test.apk` 17,948,508 B + `.sha256`, `dhun-test.msi` 112,861,184 B + `.sha256` — byte-identical sizes to the `6f7fa48` build, consistent with a docs-only change.
+- Scheduled `extraction-health` runs **35421383687** (2026-09-19) and **35489268023** (2026-09-20) both ran on `main@6f7fa48` (both fired before the #92 merge) and both classified **`ENVIRONMENT_BLOCKED`**. The 09-20 run was re-verified **directly this session** via the check-run annotations API (job 106021243260): warning annotation `Extraction health is not a production pass — ENVIRONMENT_BLOCKED — inspect the probe log and verify playback outside the GitHub runner`, exit code 2 on the intentional final gate, `:tools:playback-probe:run` non-zero as designed. Artifact/log blob downloads still return `EOF` here. First scheduled run on `main@39b8748` is due ~04:28Z on **2026-09-21** — the next session records its classification.
+- Open items unchanged: PR **#54** only (docs-only contingency reference, conflicting — user said take no action 2026-09-20); issues **#14** (rot-drill, last updated 2026-09-18 — correctly untouched by the scheduled runs, issue step skips unless `FAIL`), **#60**, **#63**.
+- **New watch items (read from runner annotations, no action taken):** GitHub announced `ubuntu-latest` migrates to Ubuntu 26 beginning **2026-10-19** (runner-images #14748), and Node.js 20 is deprecated for the pinned actions in use (`actions/checkout@v4`, `actions/setup-python@v5`, `actions/upload-artifact@v4` — forced onto Node 24). Both are CI-hygiene (S2-era) decisions; no workflow change is authorized without the user's OK.
 
-**Last actual result:** no code changed this session — docs-only S1 reconcile at `6f7fa48` (this file + KNOWN_LIMITATIONS + DEBUG_LOG + `14-release.md` + CHANGELOG + new `docs/runbooks/s1-residential-evidence.md`). Same standing limits: no JDK (CI is the compiler), no artifact/log blob downloads (`EOF`), agent workflow dispatch not re-probed (no dispatch needed while the schedule fires).
+**Last actual result:** no code changed this session — docs-only S1 reconcile at `39b8748` (this file + KNOWN_LIMITATIONS + `14-release.md` + `s1-residential-evidence.md` build commit). Same standing limits: no JDK (CI is the compiler), no artifact/log blob downloads (`EOF`; annotations API is the readout), agent workflow dispatch not re-probed (no dispatch needed while the schedule fires).
 
-**Exact next step and boundary:** ship this reconcile (PR → CI green → routine merge), then S1 waits on the user for residential/device playback evidence (step-by-step guide supplied in chat + filed at `docs/runbooks/s1-residential-evidence.md` 2026-09-20). Do not start S2, do not dispatch live runs in a loop, do not touch extraction/probe semantics (triggers T1/T2 not met), and never implement ADR-007 without the user's explicit go-ahead.
+**Exact next step and boundary:** ship this reconcile (PR → CI green → routine merge), then S1 waits on the user for residential/device playback evidence (step-by-step guide supplied in chat + filed at `docs/runbooks/s1-residential-evidence.md` 2026-09-20, build-commit line refreshed to `39b8748` this session). Next session: record the 2026-09-21 scheduled-run classification on `39b8748`. Do not start S2, do not dispatch live runs in a loop, do not touch extraction/probe semantics (triggers T1/T2 not met), and never implement ADR-007 without the user's explicit go-ahead.
 
 ---
 
@@ -153,14 +154,17 @@ Legend: ✅ done (pushed + CI green + verified where required) ·
 🟨 code merged + CI green, **hardware verification open** ·
 ⬜ not started · 🔴 blocked/open problem.
 
-**`main@6f7fa48` (2026-09-18, after PR #91 merge): post-merge CI and rolling release green**
-(Build APK **35354234582**, CI **35354234754**, and test-release
-**35354234760** — all success on the merge SHA). Rolling `test` currently
-targets exactly `6f7fa48` and has `dhun-test.apk`, `dhun-test.msi`, and both
-`.sha256` sidecars; release assets are 17,948,508 B and 112,861,184 B.
-Workflow **360655315 `extraction-health`** is active and correctly named,
-and scheduled runs **35421383687** (2026-09-19) + **35489268023** (2026-09-20)
-both classified `ENVIRONMENT_BLOCKED` on `main@6f7fa48`; S1 therefore remains open
+**`main@39b8748` (2026-09-20, after PR #92 docs reconcile merged on top of PR #91): post-merge CI and rolling release green**
+(CI **35496174865**, Build APK **35496174870**, and test-release
+**35496174877** — all success on the merge SHA). Rolling `test` currently
+targets exactly `39b8748` (published 2026-09-20T07:15:29Z) and has
+`dhun-test.apk`, `dhun-test.msi`, and both `.sha256` sidecars; release
+assets are 17,948,508 B and 112,861,184 B (same sizes as the `6f7fa48`
+build — docs-only change). Workflow **360655315 `extraction-health`** is
+active and correctly named; scheduled runs **35421383687** (2026-09-19) +
+**35489268023** (2026-09-20) both classified `ENVIRONMENT_BLOCKED` on
+`main@6f7fa48` (annotation-verified); the first scheduled run on
+`main@39b8748` is due ~04:28Z 2026-09-21. S1 therefore remains open
 pending residential/device playback evidence.
 
 ### 2a. Build history — Phases 01–16 (ALL code-merged; do not re-implement)
@@ -191,7 +195,7 @@ All are 🟨/⬜ — closing them is Stage S3.
 
 | Stage | Objective | Status | Gate |
 |---|---|---|---|
-| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | 🔴 drill fires daily on schedule; PR #91 repair merged (`6f7fa48`); scheduled runs **35421383687**/**35489268023** on current `main` classify `ENVIRONMENT_BLOCKED` (Home no longer `FAIL`, resolver runner-gated, no audio bytes validated). | Obtain residential/device playback evidence (guide filed 2026-09-20 at `docs/runbooks/s1-residential-evidence.md`), then record S1 outcome before S2 |
+| **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | 🔴 drill fires daily on schedule; PRs #91 (repair, `6f7fa48`) + #92 (reconcile, `39b8748`) merged; scheduled runs **35421383687**/**35489268023** on `6f7fa48` classify `ENVIRONMENT_BLOCKED` (Home no longer `FAIL`, resolver runner-gated, no audio bytes validated); first run on `39b8748` due 2026-09-21. | Obtain residential/device playback evidence (guide filed 2026-09-20 at `docs/runbooks/s1-residential-evidence.md`, build commit refreshed to `39b8748`), then record S1 outcome before S2 |
 | **S2** | Architectural cleanup (dead harness UI, PR #53/#54 hygiene, docs index, stale root notes) | ⬜ | CI green; zero dead screens; PRs resolved |
 | **S3** | Hardware verification round 1 (core loop both platforms, signed checklists) | ⬜ | `docs/verification/` checklists signed with build SHAs |
 | **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | 🟨 code merged + CI green (PR #74); S4 hardware boxes ride in S3 | Every shipped key reachable or removed; EQ decision recorded |

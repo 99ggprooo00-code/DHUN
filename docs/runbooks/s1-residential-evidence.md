@@ -19,7 +19,8 @@ contingency-trigger T1 evidence — equally valuable, not a wasted run).
 ## Build under test
 
 The rolling `test` release (retargeted on every push to `main` — always
-report the commit shown on the release page; `6f7fa48` at filing time):
+report the commit shown on the release page; `39b8748` as of 2026-09-20
+after PR #92 merged, published 07:15:29Z; `6f7fa48` at original filing):
 
 - Release page: `https://github.com/99ggprooo00-code/DHUN/releases/tag/test`
 - Android: `dhun-test.apk` (~17.9 MB) · Windows: `dhun-test.msi` (~112.9 MB)
