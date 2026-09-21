@@ -238,10 +238,10 @@ class SeamlessRadioRefillTest {
         // untouched. No re-prepare, no rebuild, no re-buffer, no seek.
         // (Media3 trims around it, so after the swap it sits at index 0.)
         assertSame("sounding item must keep its exact instance", soundingBefore, double.items[0])
-        assertEquals(1, double.prepareCalls, "no re-prepare (would re-buffer = gap)")
-        assertEquals(1, double.setMediaItemsCalls, "no timeline rebuild")
-        assertTrue(double.seekToCalls.isEmpty(), "no seek, same position")
-        assertEquals(listOf(4 to 7, 0 to 3), double.removedRanges, "trim around the head, then append")
+        assertTrue("no re-prepare (would re-buffer = gap)", double.prepareCalls == 1)
+        assertTrue("no timeline rebuild", double.setMediaItemsCalls == 1)
+        assertTrue("no seek, same position", double.seekToCalls.isEmpty())
+        assertEquals(listOf(4 to 7, 0 to 3), double.removedRanges)
 
         // Tail swapped around the head: the played prefix and the old tail
         // are gone, the station page sits behind the current song.
@@ -250,7 +250,7 @@ class SeamlessRadioRefillTest {
             double.items.map { it.mediaId },
         )
         assertEquals(0, double.currentIndex)
-        assertEquals(25, double.addedItems.size, "the new page is appended as one batch")
+        assertEquals(25, double.addedItems.size)
 
         // Flows agree with the engine: queue tab, highlight, state.
         assertEquals(
