@@ -5,6 +5,36 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
+## Explicit-close report and clarified contract — 2026-09-21
+
+User: music continues after closing on both platforms; Windows needs Task
+Manager and Android notification pause. Clarified Android means **swipe away
+from Recents**; Windows **X must close the app completely and stop music**.
+This supersedes close-to-tray as a supported setting, not merely its default.
+
+In-flight PR #106 (same session branch, NOT merged) now includes:
+- Windows X → existing full `quit()` path (release player, native session,
+  tray, single-instance lease, persistence and scope; exit application).
+  Old `close_to_tray=true` is ignored; removed the setting from the UI.
+  Legacy key/model retained for storage/API compatibility, not consumed by host.
+- Android task removal → pause + stop engine, remove foreground notification,
+  stop service. Not in Activity lifecycle, so Home/lock/rotation remain safe.
+  Unit coverage for shutdown ordering, missing session and engine-stop exception.
+- ASCII MSI description avoids the reported `a€"` dash encoding artifact.
+
+**Required hardware checks (not yet passed):**
+1. Windows: play → X. Sound stops, window and tray disappear; no Task Manager
+   needed. Relaunch works. Repeat with old close-to-tray enabled in existing DB.
+2. Windows: minimize continues playback; Ctrl+Q and tray Quit still shut down.
+3. Android: play → swipe out of Recents; sound stops and foreground media
+   notification goes away. Repeat while buffering and while paused.
+4. Android: Home, lock and rotation continue playback; reopen after dismissal
+   and play again. Download service is separate and is not stopped by this change.
+5. Check Windows installer description no longer has a garbled dash.
+
+Previous docs head c6326f0 passed CI. Close-fix CI/hardware still pending.
+No merge permission. Rolling release remains #105 until an authorized merge.
+
 ## Round 2 results (user, 2026-09-20, build `8635851`) — verbatim
 
 > Notification works normally as well as in lock screen. Button also works

@@ -1,6 +1,24 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — Explicit close left music playing (`arena/01a0c24e-dhun`)
+
+User clarified Windows X must quit completely; Android close means swiping the
+app from Recents. Code: desktop X defaulted to hiding the window, with player
+still alive; Android MediaSessionService had no explicit onTaskRemoved policy.
+Initial default-only desktop proposal was superseded by the user's unconditional
+X requirement before committing. X now calls the existing quit path regardless
+of stored close-to-tray; obsolete settings UI removed (legacy key/model retained).
+Android task removal pauses/stops the engine before foreground/service shutdown,
+without stopping playback on Activity background/rotation. Helper regression
+cases cover order/no queue clear, absent session, and cleanup despite stop error.
+ASCII installer-description hyphen addresses reported shell metadata mojibake.
+
+No local JDK/SDK: diff checks only; CI and hardware are required. Prior docs
+commit c6326f0 on PR #106 passed all required checks. PR scope expanded on the
+same fixed session branch; nothing merged and no merge permission given.
+Windows download/playback report remains independently open pending evidence.
+
 ## 2026-09-21 — #105 release verification and Windows failure triage (`arena/01a0c24e-dhun`)
 
 Docs-only follow-up: release API + tag both target `414cd79`, published

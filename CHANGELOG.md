@@ -24,6 +24,18 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — explicit close stops playback (2026-09-21, CI/hardware verification pending)
+
+- **Windows X now quits completely**, using the same player/resource teardown
+  as Ctrl+Q and tray Quit. It no longer hides the window with music playing,
+  even if an older install stored `close_to_tray=true`. Removed the obsolete
+  Close to tray switch. Minimize remains available for background listening.
+- **Android swipe-away from Recents stops playback**, including buffering
+  playback, and requests media-service shutdown. Home, screen lock and
+  Activity recreation are not treated as explicit close.
+- Windows installer description uses an ASCII hyphen to avoid the reported
+  garbled dash (`a€"`) in shell metadata; verify on the next MSI.
+
 ### Fixed — radio / shuffle-gap / Android downloads (2026-09-21, hardware re-test pending)
 
 - **"Play radio" is now seamless (replaces the #99 behavior).** Tapping it

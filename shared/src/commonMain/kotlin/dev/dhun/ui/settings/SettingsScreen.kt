@@ -45,7 +45,7 @@ import kotlin.math.round
  *
  * Every control here is wired to behaviour (see [SettingsViewModel]); keys
  * with no behaviour behind them are deliberately absent. Appearance applies
- * live; the cache budget and close-to-tray apply on the next launch, which
+ * live; the cache budget applies on the next launch, which
  * the section notes say outright.
  *
  * @param equalizerSession the platform EQ session, or null when the platform
@@ -115,16 +115,6 @@ fun SettingsScreen(
                 checked = viewModel.resumeOnLaunch.collectAsState().value,
                 onCheckedChange = viewModel::setResumeOnLaunch,
             )
-
-            if (isDesktop) {
-                SectionHeader(title = "Desktop")
-                SettingsSwitchRow(
-                    title = "Close to tray",
-                    subtitle = "Closing the window hides the app instead of quitting. Applies on next launch.",
-                    checked = viewModel.closeToTray.collectAsState().value,
-                    onCheckedChange = viewModel::setCloseToTray,
-                )
-            }
 
             if (equalizerSession != null) {
                 SectionHeader(title = "Equalizer")

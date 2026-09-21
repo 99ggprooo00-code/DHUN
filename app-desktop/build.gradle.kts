@@ -82,7 +82,7 @@ compose.desktop {
             includeAllModules = true
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "DHUN"
-            description = "DHUN — YouTube Music player (test build)"
+            description = "DHUN - YouTube Music player (test build)"
             vendor = "DHUN"
             copyright = "© DHUN contributors. GPL-3.0."
             packageVersion = installerVersion
