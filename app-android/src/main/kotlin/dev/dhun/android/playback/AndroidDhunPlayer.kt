@@ -11,6 +11,7 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.player.DhunPlayer
+import dev.dhun.player.QueueManager
 import dev.dhun.player.StreamRecoverySignal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +66,8 @@ class AndroidDhunPlayer(
     }
 
     private val trackMap = ConcurrentHashMap<String, Track>()
+    /** Queue bookkeeper: display order (shuffled when on) + cursor sync with the engine timeline. */
+    private val queueManager = QueueManager()
     private var prefetchJob: Job? = null
 
     /**
