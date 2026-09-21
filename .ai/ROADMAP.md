@@ -1,64 +1,80 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-21** · session **`arena/01a0c24e-dhun`** · PR **#106**
-(branch `arena/01a0c24e-dhun`, baseline `main` **`414cd79`**, PR #105).
+Updated **2026-09-21** · session **`arena/01a0c2c7-dhun`** · baseline `main`
+**`810bef1`** (the PR #106 merge).
 
-**PR #106 implementation verified; user authorized merge after verification.**
-Final code head **`35d76f6`** is pushed and all four checks are GREEN:
-- build: run **35564494454**, job 106223521571 ✓
-- build-and-test: run **35564494452**, job 106223521636 ✓ (shared, Android
-  Robolectric, probe/classification, Desktop JVM); push CI 35564267958 also ✓
-- APK + MSI: run **35564494458**, jobs 106223521998 / 106223521810 ✓
-- Local packaging/helper tests: **29 passed**; whole-PR `git diff --check` ✓.
-No local JDK/Android SDK; CI is the compile/test gate. This final docs-only
-verdict commit must also pass its own checks before the authorized merge.
+**PR #106 is MERGED; `main` and the rolling `test` release are verified; the
+docs in `main` were STALE until this session's docs-sync commit** — the
+previous session (`arena/01a0c24e-dhun`) lost GitHub access right after the
+merge, so its post-merge doc commits (runs 35566034664 / 35566013932, pushed
+only to the now-deleted branch `arena/01a0c24e-dhun`) never reached `main`.
+This session re-recorded those facts from the session record.
 
-**Scope complete in code (not hardware-certified):**
-1. Owed #105 docs/release verification: seamless radio expectation, download
-   diagnostics and build identity corrected.
-2. Explicit close: Windows X always uses full quit (old close-to-tray key is
-   ignored, switch removed); minimize keeps playing. Android Recents dismissal
-   pauses/stops engine and requests foreground/service shutdown; Home/lock not
-   treated as close. Three Android shutdown regression cases.
-3. Windows offline playback: user confirmed **Downloaded** and playback from
-   **Library → Downloads**, track `O3-6zB3kg8M`. Raw `file://` + Windows path was
-   malformed; portable URI escaping handles drive/UNC/space/Unicode/reserved
-   bytes. Local errors no longer enter CDN recovery. Six shared URI/resolver
-   and two desktop error-routing regression cases. MSI metadata dash → ASCII.
-4. Home moods: actual topic-song search results for Focus/Chill/Workout/Party;
-   For you restores browse feed. Not a signed-in personalized mood API.
-   Generation-safe requests, category-preserving retry/refresh, separate search
-   pagination, dedup/cycle guards. Seven Home regression cases.
-5. Pull-to-refresh: Material3 threshold + top-of-list nested-scroll handling,
-   indicator, repeated-refresh guard. Header refresh icon removed; footer/F5/
-   accessibility fallback retained. Controls stay usable on loading/error/empty.
+**Merged state (verified on GitHub this session):**
+- PR #106 merged into `main` as commit **`810bef1`** at
+  **2026-09-21T05:41:01Z** after full CI verification, under explicit user
+  authorization. Post-merge CI on `main` green: CI 35565454488, Build APK
+  35565454483, test-release 35565454562 (all success).
+- Shipped: Home moods Focus/Chill/Workout/Party fetch topic-SEARCH song feeds
+  (not personalized mood endpoints); For you restores the normal Home browse
+  feed; generation-safe selection/refresh/pagination; pull-to-refresh at top;
+  header refresh icon removed; footer "Refresh music" + F5 fallback kept.
+  Explicit close: Windows X ALWAYS fully quits and stops music (old
+  close-to-tray preference ignored); minimize keeps playing; Android Recents
+  swipe-away stops playback; Home button/lock keep playing. Windows
+  downloaded-file playback: portable file-URI escaping (drive/UNC/spaces/
+  Unicode/reserved bytes) + local failures no longer misreported as CDN
+  rejection. 18 regression tests; all CI green on merged head.
+- Rolling `test` re-published **2026-09-21T05:47:48Z**, tag AND target =
+  **`810bef13f34227360282df88f57372d6b0feba7c`**. APK **18,334,451 B**; MSI
+  **112,889,856 B** (old MSI was **112,873,472 B** — this size distinguishes
+  new vs old installer).
 
-**Last error / limits:** no compile or test failures on final code head. Windows
-physical playback failure is NOT yet a PASS: file integrity/libVLC behavior needs
-retest. No user console expertise is required: ask for new on-screen playback
-details if it still fails. Pull gestures, category relevance and explicit-close
-hardware checks remain OPEN. #105 radio/Related/shuffle/Android-download checks
-also await explicit user verdicts. Endless radio is NOT started.
+**Hardware verdicts (exact, as of 2026-09-21):**
+- **Android: PASS** — user tested the merged build: "android all working"
+  (Home moods, pull-to-refresh, close/swipe behavior).
+- **Windows: NOT hardware-verified.** The user's machine was still running an
+  OLD copy (old round header refresh icon visible), which caused an earlier
+  "nothing works" report. User accepted the new build as good-to-go but has
+  NOT tested it ("I'm not testing windows now"). **Do not record a Windows
+  PASS.** Downloading works; downloaded-song playback is fixed in code but
+  untested on device. The saved four-gate retest procedure lives in
+  `HANDOFF_NEXT_SESSION.md`.
 
-**Exact next steps:** verify final docs-head CI, then merge PR #106 under the
-user's latest explicit authorization (supersedes earlier no-merge messages).
-After merge, verify main's build/release and rolling `test` target/tag, publish
-time and asset sizes. If the connection ends on merge, next session performs
-that release check FIRST. Install that new build and run HANDOFF's Home/close/
-offline tests plus original #105 tests. Only after all pass: endless radio,
-then S3/S6 soaks, rotation/process death, settings and Windows native checks.
+**Queue of work (priority order):**
+1. Help the user verify/fix Windows when they report results (gates in
+   HANDOFF).
+2. **UI polish (user-requested 2026-09-21):** (a) lighter Home/Search/Library
+   backgrounds toward the full player's brightness — lower
+   `DhunTokens` dark-ladder and `FullPlayer.kt` scrim/ambientScrim alphas,
+   keep WCAG-AA pins green (`DhunAppearanceTest`), light theme untouched;
+   (b) `DhunSpacing.artworkThumb` 56.dp → ~64.dp, check rails don't clip;
+   (c) glassy bottom dock: MiniPlayer + BottomNavigationBar via
+   BlurredArtworkCache + glass tokens (LYRICS-style background), no new
+   dependencies. CI green first, then user eyeballs both platforms;
+   record "awaiting user visual verdict"; no merge without it.
+3. **Endless radio (ask user before starting):** when ≤3 songs remain in a
+   playing radio, auto-queue more via the `/next` continuation; same song,
+   same position, no gap, tail replaced on refill (supersedes the #99
+   "different song" semantic). Reproduce in engine code, regression tests,
+   fix. Android is PASS so the blocker is lifted; ask first.
+4. Remaining #105 hardware checklist per user reports: S3/S6 soaks,
+   rotation/process death, persistence, Windows tray/jump-list/SMTC/media
+   keys.
 
-**Last verified published build BEFORE #106 merge:** `test` published
-**2026-09-21T03:00:04Z**, release target AND tag
-**`414cd7941d69e185b5628e8b9b7fffe5a0a5a4f0`**. APK **18,334,451 B**, MSI
-**112,873,472 B**. This is the OLD build, not evidence that #106 shipped.
-Scheduled extraction-health **35561269411** failed with **ENVIRONMENT_BLOCKED**
-annotation; not a production pass or demonstrated device root cause.
+**Last error / limits:** none on the merged head (all CI green). Visual
+changes cannot be verified in-sandbox — CI is only the compile/test gate;
+visual verdicts come from the user on real hardware.
 
-**Session discipline:** live PR/run checks showed only old research PR #54
-beside this session; no sibling work observed. All changes on the fixed session
-branch; no forks/vendoring. Docs/code/verdicts completed BEFORE merge. Review
-`HANDOFF_NEXT_SESSION.md`, `DEBUG_LOG.md` and CHANGELOG for tests and rationale.
+**Exact next step:** docs-sync commit pushed; then ask the user whether to
+start UI polish, start endless radio, or wait for Windows results. Never
+merge without explicit user authorization for that specific work.
+
+**Session discipline:** boot checked `gh pr list` (only stale research PR
+#54 open) and `gh run list` (no live runs — PR #106 verifications all
+completed); no sibling agent active. All work on the fixed session branch
+`arena/01a0c2c7-dhun`; no forks/vendoring. Review `HANDOFF_NEXT_SESSION.md`,
+`DEBUG_LOG.md` and CHANGELOG for tests and rationale.
 
 ---
 

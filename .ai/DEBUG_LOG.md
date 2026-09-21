@@ -1,6 +1,62 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — PR #106 merged; `main` docs were stale; sync + verdict record (`arena/01a0c2c7-dhun`)
+
+**Merged state (verified via `gh` on boot):** PR #106 merged into `main` as
+`810bef1` at 2026-09-21T05:41:01Z after full green CI (post-merge main runs:
+CI 35565454488, Build APK 35565454483, test-release 35565454562). Rolling
+`test` re-published 2026-09-21T05:47:48Z with tag AND target =
+`810bef13f34227360282df88f57372d6b0feba7c`; APK 18,334,451 B, MSI 112,889,856 B
+(previous MSI 112,873,472 B — the byte size distinguishes new vs old installer).
+
+**Incident:** the previous session (`arena/01a0c24e-dhun`) lost GitHub access
+right after the merge. Its post-merge doc commits (push runs 35566034664 /
+35566013932) landed only on that session branch, which has since been deleted
+from origin — so `main`'s `.ai` docs still described the pre-merge state.
+`origin/main` was verified to be exactly `810bef1` (= this session's branch
+base). This session re-recorded the merged state, hardware verdicts, the saved
+Windows gate procedure and the new task queue in ROADMAP/HANDOFF/CHANGELOG
+before any code work.
+
+**Hardware verdicts recorded (exact, no extrapolation):** Android **PASS** on
+the merged build — "android all working" (Home moods, pull-to-refresh,
+close/swipe behavior). Windows **NOT hardware-verified**: the user's machine
+was still running an OLD copy (old round header refresh icon visible), which
+explains the earlier "nothing works" report; the user accepted the new build
+as good-to-go but has not tested it ("I'm not testing windows now"). Downloaded
+playback `O3-6zB3kg8M` is fixed in code but untested on device — the earlier
+Windows download/playback FAIL is triaged to the stale install, not disproven;
+Gate 4 of the saved procedure is its retest.
+
+**New user-requested task (2026-09-21): UI polish.** (a) Home/Search/Library
+sit on the near-black dark ladder (`DhunTokens` dark defaults: background
+0xFF0A0A0A, surfaces 0A→2A) — decrease darkness toward the full player's
+background brightness; the full player's scrim over blurred artwork
+(`Color.Black.copy(alpha = if (lyricsDominant) 0.52f else 0.16f)` plus
+`ambientScrimBrush()` gradient stops ~0.42–0.62) is also lowered so artwork
+shows through; WCAG-AA + `DhunAppearanceTest` contrast pins must stay green;
+light theme untouched unless trivially symmetric. (b) `DhunSpacing.artworkThumb`
+56.dp → ~64.dp, verify row heights/rails don't clip. (c) MiniPlayer +
+`BottomNavigationBar` (ui/shell/DhunAppShell.kt ~line 570) become a glassy
+bottom dock using the LYRICS-style background: BlurredArtworkCache +
+`DhunColors.glass/glassDeep/glassStrong/glassBarTop`; no new dependencies.
+Visual changes cannot be verified in-sandbox: CI green first, then user
+eyeballs both platforms; record "awaiting user visual verdict"; never merge
+without it.
+
+**Queued (not started): endless radio.** While a radio plays, when ≤3 songs
+remain, auto-queue more via the `/next` continuation (YouTube "Up next" for
+the current track): same song, same position, seamless, no gap, then continue
+the queue; replace the tail when refilling — supersedes the #99 "different
+song" semantic. Related-songs row keeps excluding the current track, but an
+explicit row tap still plays that row; gapless shuffle must visibly reorder.
+Reproduce in engine code, add regression tests, fix. Gated on asking the user
+first (Android is PASS; Windows accepted but untested).
+
+**Boot discipline:** `gh pr list` shows only stale research PR #54;
+`gh run list` shows no live runs; single-agent doctrine holds.
+
 ## 2026-09-21 — PR #106 final code verification before authorized merge
 
 Exact code head **35d76f6**: build 35564494454 ✓, build-and-test 35564494452 ✓,

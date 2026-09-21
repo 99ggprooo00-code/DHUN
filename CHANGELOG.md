@@ -24,7 +24,32 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### Fixed — Home categories and pull-to-refresh (2026-09-21, hardware verification pending)
+### Released and verified — PR #106 merged; rolling `test` republished (2026-09-21)
+
+- **Merged:** PR #106 landed on `main` as `810bef1` (2026-09-21T05:41:01Z)
+  after full green CI and explicit user authorization. It shipped the Home
+  mood topic-search feeds with pull-to-refresh, explicit close on both
+  platforms, and the Windows downloaded-file playback fix (18 regression
+  tests; all CI green on the merged head).
+- **Rolling `test` re-published** 2026-09-21T05:47:48Z; release tag AND
+  target = `810bef13f34227360282df88f57372d6b0feba7c`. `dhun-test.apk`
+  **18,334,451 B**; `dhun-test.msi` **112,889,856 B** (the previous MSI was
+  112,873,472 B — the byte size distinguishes the new installer from the old).
+- **Hardware verdicts:** **Android PASS** — the user tested the merged build:
+  "android all working" (Home moods, pull-to-refresh, close/swipe behavior).
+  **Windows NOT hardware-verified** — the machine under test was still running
+  an old copy (its round header refresh icon was still visible), which caused
+  an earlier "nothing works" report; the user accepted the new build but has
+  not tested it. No Windows PASS is recorded. Downloading works; downloaded-
+  song playback is fixed in code and awaits the device retest.
+- **Docs sync:** the previous session's post-merge records never reached
+  `main` (its GitHub access closed after the merge and its branch was
+  deleted); this entry and the `.ai` updates restore those facts. The saved
+  Windows retest procedure (MSI byte-size gate, clean uninstall, Start-menu
+  launch, "round refresh icon gone" proof, downloaded-track offline replay)
+  is recorded in `.ai/HANDOFF_NEXT_SESSION.md`.
+
+### Fixed — Home categories and pull-to-refresh (2026-09-21; Android verified, Windows retest pending)
 
 - **Focus, Chill, Workout and Party now fetch topic-specific songs**, instead
   of just highlighting a chip and reordering matching shelf titles. For you
@@ -40,7 +65,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   remains available for non-touch use. Same songs may return if the server's
   results have not changed; refresh fetches again rather than shuffling locally.
 
-### Fixed — Windows downloaded-file playback (2026-09-21, CI verified; hardware verification pending)
+### Fixed — Windows downloaded-file playback (2026-09-21, CI verified; Windows device retest pending)
 
 - Completed downloads now resolve to escaped file URIs: Windows drive paths
   use `file:///C:/...`, separators are normalized, and spaces, `%`, `#`, `?`
@@ -232,7 +257,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   tab list unreachable while a page was open. The master now renders
   the tab (`detailRoute = null`); the detail pane keeps the page.
 - **Desktop: Escape is Back.** The desktop window had shortcuts for
-  transport, search and quit but no way to collapse the player or pop
+  transport, search and quit but no way to collapse the player or pplayer or pop
   a page from the keyboard. Escape now runs the shared back contract
   (collapse → pop page → previous tab).
 - **Restoring onto CATALOG no longer strands the user.** The developer
