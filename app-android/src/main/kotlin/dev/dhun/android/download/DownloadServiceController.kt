@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import android.util.Log
 import dev.dhun.core.DownloadState
 import dev.dhun.core.DownloadedTrack
 import dev.dhun.download.DownloadManager
@@ -46,6 +47,7 @@ class DownloadServiceController : KoinComponent {
     private var service: DhunDownloadService? = null
     private var serviceScope: CoroutineScope? = null
     private var stateJob: Job? = null
+    private var hasSeenWork = false
 
     /** Called by [DhunDownloadService.onCreate]. */
     fun attach(service: DhunDownloadService) {
@@ -56,7 +58,17 @@ class DownloadServiceController : KoinComponent {
         // to be called from onCreate (or shortly after startService) for
         // services with a foregroundServiceType. The initial notification
         // will be replaced as soon as the state collector emits.
-        service.startForegroundCompat(service.buildStartingNotification())
+        try {
+            service.startForegroundCompat(service.buildStartingNotification())
+        } catch (t: Throwable) {
+            // Android 14+ (API 34) throws ForegroundServiceStartNotAllowedException
+            // when a dataSync FGS is started while the app is not in a valid
+            // start state (targetSdk 35 tightens this further). The download
+            // engine (FileDownloadManager) still runs — the foreground
+            // promotion is a best-effort survival affordance, not a gate.
+            Log.w("DHUN", "download FGS start failed (continuing without foreground): ${t.message}", t)
+        }
+        hasSeenWork = false
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         serviceScope = scope
         observeState(scope)
@@ -68,6 +80,7 @@ class DownloadServiceController : KoinComponent {
             existing.filter {
                 it.downloadState == DownloadState.QUEUED || it.downloadState == DownloadState.PAUSED
             }.forEach { row ->
+                hasSeenWork = true
                 runCatching { downloadManager.resume(row.trackId) }
             }
         }
@@ -80,6 +93,7 @@ class DownloadServiceController : KoinComponent {
         serviceScope?.cancel()
         serviceScope = null
         service = null
+        hasSeenWork = false
     }
 
     private fun observeState(scope: CoroutineScope) {
@@ -95,15 +109,31 @@ class DownloadServiceController : KoinComponent {
         val svc = service ?: return
         val active = rows.count { it.downloadState == DownloadState.DOWNLOADING }
         val queued = rows.count { it.downloadState == DownloadState.QUEUED }
+        if (active > 0 || queued > 0) hasSeenWork = true
         if (active == 0 && queued == 0) {
-            // No work to keep the service alive for — drop foreground and
-            // stop. The repository persists state, so a future enqueue
-            // (or a process restart that re-attaches the controller) will
-            // re-arm the queue.
-            svc.stopForegroundCompat()
+            // Race guard (defect 1): ForegroundServiceDownloadManager
+            // calls ensureRunning() BEFORE delegate.enqueue(). The
+            // controller's collector therefore sees its first emission
+            // (empty list) BEFORE the QUEUED row exists. The old code
+            // stopped the service on that first empty emission, killing
+            // the FGS microseconds after it started — before the worker
+            // could run. Windows has no FGS, so "Windows works, Android
+            // doesn't" matched exactly. Fix: require a transition from
+            // "had work" to "no work" (hasSeenWork latch) before stopping.
+            if (!hasSeenWork) return
+            hasSeenWork = false
+            try {
+                svc.stopForegroundCompat()
+            } catch (t: Throwable) {
+                Log.w("DHUN", "download FGS stop failed: ${t.message}", t)
+            }
             return
         }
-        svc.postNotification(buildProgressNotification(svc, active, queued))
+        try {
+            svc.postNotification(buildProgressNotification(svc, active, queued))
+        } catch (t: Throwable) {
+            Log.w("DHUN", "download notification post failed: ${t.message}", t)
+        }
     }
 
     private fun buildProgressNotification(
@@ -131,8 +161,16 @@ class DownloadServiceController : KoinComponent {
      * thread — startForegroundService is non-blocking.
      */
     fun ensureRunning(context: Context) {
-        val intent = Intent(context, DhunDownloadService::class.java)
-        ContextCompat.startForegroundService(context, intent)
+        try {
+            val intent = Intent(context, DhunDownloadService::class.java)
+            ContextCompat.startForegroundService(context, intent)
+        } catch (t: Throwable) {
+            // API 34+ ForegroundServiceStartNotAllowedException or
+            // SecurityException when the app is not in a valid FGS start
+            // state. The download still proceeds in-process; the FGS is a
+            // survival optimization, not a correctness gate.
+            Log.w("DHUN", "startForegroundService failed (download continues without FGS): ${t.message}", t)
+        }
     }
 
     companion object {

@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import dev.dhun.android.R
 import org.koin.android.ext.android.inject
@@ -64,32 +65,68 @@ class DhunDownloadService : Service() {
     /**
      * Promote the service to foreground. Safe to call multiple times —
      * subsequent calls re-issue the notification with current state.
+     *
+     * Wrapped in try/catch for Android 14+ FGS policy: targetSdk 35 with
+     * `dataSync` type throws ForegroundServiceStartNotAllowedException
+     * when the app is not in a valid start state (background start
+     * budget exhausted, or start attempted while app is backgrounded).
+     * The download engine still runs in-process; the promotion is best-effort.
      */
     internal fun startForegroundCompat(notification: Notification) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (t: Throwable) {
+            // API 34+ ForegroundServiceStartNotAllowedException, SecurityException
+            // (missing FOREGROUND_SERVICE_DATA_SYNC permission on some OEM builds),
+            // or IllegalStateException. Log and continue — the service still
+            // exists, just without foreground priority. The worker pool in
+            // FileDownloadManager is not gated on this call.
+            Log.w("DHUN", "startForegroundCompat failed (service continues without FGS): ${t.message}", t)
+            // Best-effort fallback: try without the type flag (covers OEMs
+            // that reject dataSync on older OS levels).
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                runCatching { startForeground(NOTIFICATION_ID, notification) }
+            }
         }
     }
 
     internal fun stopForegroundCompat() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (t: Throwable) {
+            Log.w("DHUN", "stopForeground failed: ${t.message}", t)
         }
-        stopSelf()
+        try {
+            stopSelf()
+        } catch (t: Throwable) {
+            Log.w("DHUN", "stopSelf failed: ${t.message}", t)
+        }
     }
 
     internal fun postNotification(notification: Notification) {
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(NOTIFICATION_ID, notification)
+        try {
+            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            manager.notify(NOTIFICATION_ID, notification)
+        } catch (t: Throwable) {
+            // POST_NOTIFICATIONS denied on API 33+ can throw SecurityException
+            // for non-FGS notifications, but FGS notifications are exempt.
+            // This path is for the progress updates; a failure here must not
+            // abort the download, so we catch and log.
+            Log.w("DHUN", "postNotification failed: ${t.message}", t)
+        }
     }
 
     internal fun ensureChannel() {
