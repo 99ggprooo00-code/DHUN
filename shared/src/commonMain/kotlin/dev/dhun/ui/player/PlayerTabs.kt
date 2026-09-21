@@ -441,9 +441,9 @@ internal fun LyricsTabContent(
                         )
                         Text(
                             text = state.text,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.titleMedium,
                             color = DhunColors.textSecondary,
-                            lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight,
+                            lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
                         )
                         Spacer(modifier = Modifier.height(DhunSpacing.huge))
                     }
