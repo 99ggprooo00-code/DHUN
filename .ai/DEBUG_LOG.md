@@ -1,5 +1,36 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-21 — PR #107 merged; release republished and verified (connection survived)
+
+Merged `44e1ffd` (2026-09-21T09:54:37Z) under the user's "it's good go
+ahead". Pre-merge turbulence, recorded honestly: the docs head `b8b669d`
+failed build-and-test in 30s with `403 Forbidden` from Maven Central for
+`app.cash.sqldelight:sqlite-driver:2.1.0` — a dependency-resolution flake on
+a docs-only diff (the identical tree had passed 30 minutes earlier). The
+rerun API refused ("workflow file may be broken"); an empty retrigger commit
+(`1def7ee`) produced all-green checks (build / build-and-test / apk / msi),
+and the merge followed.
+
+Post-merge main runs SUCCESS: CI 35585878593, Build APK 35585878634,
+test-release 35585878637. Rolling `test` republished 2026-09-21T09:59:24Z
+with tag AND target = `44e1ffd`; APK 18,334,451 B (same bytes-size as the
+previous build — size alone no longer distinguishes them, use the target
+SHA), MSI **112,885,760 B** (previous 112,889,856 — the new size
+distinguishes the UI-polish build; old guidance that referenced
+112,889,856 as "the new MSI" is superseded).
+
+Environment trap encountered mid-session: a sandbox recreation restored
+workspace files but NOT the local git commit chain, producing an apparent
+divergence; reconciled by fetching the pushed head, hard-resetting to it,
+and restoring only the new docs delta from a backup branch. No force-push.
+Lesson: after any sandbox recreation, diff local HEAD against the pushed
+branch before committing.
+
+User verdicts in force: Android PASS + Windows PASS (user-tested, "its
+great") on the `810bef1` build; thumbnail remark retracted as a load
+hiccup. The UI-polish look itself awaits the user's re-download and
+eyeball on both platforms. Endless radio: ask first.
+
 
 ## 2026-09-21 — Windows PASS reported; thumbnail remark retracted; PR #107 merge authorized
 

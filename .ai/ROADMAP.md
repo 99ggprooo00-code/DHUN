@@ -1,35 +1,52 @@
 # CURRENT ACTIVE TASK
 
 Updated **2026-09-21** · session **`arena/01a0c2c7-dhun`** · baseline `main`
-**`810bef1`** (the PR #106 merge).
+**`44e1ffd`** (the PR #107 merge).
 
-**USER VERDICTS + AUTHORIZATION (2026-09-21, latest):** the user tested the
-updated **Windows** app — the rolling `test` release of `810bef1` (PR #106
-scope) — and reports **"its great"**: Windows is now user-tested (supersedes
-"NOT hardware-verified"). The user's "blurry thumbnail is gone" observation
-was **retracted/clarified by the user**: "sorry thumbnail wasent loded well" —
-a transient artwork-load hiccup, not a blur-pipeline regression (desktop
-blur support is unconditional: `BlurSupport.jvm.kt` actual = true). The user
-then said **"it's good go ahead"** — explicit authorization to merge PR
-#107. Note recorded honestly: the Windows build the user tested predates
-#107 (the UI polish is not in any released build yet); #107's own visuals
-are covered by the user's go-ahead, not by an itemized on-device review.
+**PR #107 (UI polish) is MERGED and the release is verified.** Merged as
+`44e1ffd` at 2026-09-21T09:54:37Z under the user's explicit authorization
+("it's good go ahead") after all checks were green on the final head
+`1def7ee` (the intermediate docs head `b8b669d` hit a Maven Central 403
+flake on `sqlite-driver` dependency resolution — infrastructure, not code;
+retriggered with an empty commit and everything passed). Post-merge main
+runs all SUCCESS: CI **35585878593**, Build APK **35585878634**,
+test-release **35585878637**.
 
-**Exact next step:** record these verdicts (this commit), get the docs-head
-checks green on PR #107, then MERGE #107 under the user's authorization, and
-same-turn verify main's post-merge CI and the republished rolling `test`
-release (new tag/target = merge commit; new APK/MSI byte sizes WILL differ —
-the user must re-download to actually see the polish). If the GitHub
-connection survives the merge, a follow-up docs-only reconciliation PR may
-record the post-merge facts on main (routine-docs autonomy); otherwise the
-next session performs that release check FIRST.
+**Rolling `test` (verified):** re-published **2026-09-21T09:59:24Z**, tag
+AND target = **`44e1ffd`** (merge commit). `dhun-test.apk` **18,334,451 B**
+(same byte size as before, new content); `dhun-test.msi` **112,885,760 B**
+(old: 112,889,856 — this new size is the identifier for the build that
+carries the UI polish). The user must re-download to see the polish; their
+"its great" Windows verdict was on the `810bef1` build.
 
-**PR #107 status: all checks GREEN on the final head `1d1ec6c`** (push CI
-35572454014; PR checks build ✓ / build-and-test ✓ / apk ✓ / msi ✓ — publish
-jobs skip on PRs, `main`-gated, rolling release untouched). The one earlier
-failure (push run 35572182843) was a stale placeholder/shimmer hex pin in
-`DhunAppearanceTest` that 78743bf missed; fixed in `fd053df`, mechanically
-cross-checked.
+**Hardware verdicts (2026-09-21):** Android PASS on `810bef1` ("android all
+working"). Windows PASS (user-tested) on `810bef1`: "its great"; the
+"blurry thumbnail is gone" remark was retracted by the user as an
+artwork-load hiccup ("thumbnail wasent loded well"; desktop blur support is
+unconditional — `BlurSupport.jvm.kt` = true); Gate-4 items were not itemized
+individually and no failure was reported. UI-polish visuals themselves:
+covered by the user's go-ahead; itemized on-device review of the new look
+still pending on both platforms.
+
+**Next steps (priority order):** (1) user re-downloads the new `test`
+release and reports the new look on both platforms (lighter surfaces, one
+glass dock, 64dp thumbs); (2) endless radio — ASK the user before starting
+(≤3 songs left → auto-queue via `/next`; same song, same position, no gap,
+tail replaced on refill; engine reproduction + regression tests first);
+(3) remaining #105 checklist: S3/S6 soaks, rotation/process death,
+persistence, itemized Windows native checks (tray/jump-list/SMTC/media
+keys). Never merge feature work without the user's explicit authorization.
+
+**Last error / limits:** the Maven Central 403 flake above (transient);
+otherwise none. No JDK/SDK in the sandbox — CI is the compile/test gate;
+visual verdicts are the user's gate on real hardware.
+
+**Session discipline:** boot checked PRs/runs (only stale research PR #54
+besides this session's). A sandbox recreation mid-session restored the
+workspace files but not the local commit chain; it was reconciled by
+resetting to the pushed branch head and re-committing only the new docs
+delta — no force-push, no history rewrite. All work on the fixed session
+branch; no forks/vendoring.
 
 **PR #106 is MERGED; `main` and the rolling `test` release are verified; the
 docs in `main` were STALE until this session's docs-sync commit** — the
