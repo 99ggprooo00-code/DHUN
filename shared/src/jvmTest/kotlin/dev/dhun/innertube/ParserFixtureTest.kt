@@ -7,6 +7,7 @@ import dev.dhun.core.Lyrics
 import dev.dhun.core.Playlist
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
