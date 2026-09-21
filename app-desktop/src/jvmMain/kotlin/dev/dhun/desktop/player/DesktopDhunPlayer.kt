@@ -209,7 +209,9 @@ class DesktopDhunPlayer(
     override fun playAt(index: Int) {
         scope.launch {
             opMutex.withLock {
-                if (queueManager.playAt(index) != null) playCurrentLocked()
+                // [index] is a position in the VISUAL queue (displayQueue);
+                // map it to the source entry before jumping.
+                if (queueManager.playAtDisplay(index) != null) playCurrentLocked()
             }
         }
     }
@@ -217,8 +219,8 @@ class DesktopDhunPlayer(
     override fun removeFromQueue(index: Int) {
         scope.launch {
             opMutex.withLock {
-                val removingCurrent = index == queueManager.currentIndex
-                if (!queueManager.removeAt(index)) return@withLock
+                val removingCurrent = index == queueManager.displayCurrentIndex
+                if (!queueManager.removeAtDisplay(index)) return@withLock
                 publishQueueLocked()
                 if (removingCurrent) {
                     // Removing the playing entry advances to whatever now
@@ -232,7 +234,7 @@ class DesktopDhunPlayer(
     override fun moveInQueue(from: Int, to: Int) {
         scope.launch {
             opMutex.withLock {
-                if (queueManager.move(from, to)) publishQueueLocked()
+                if (queueManager.moveInDisplay(from, to)) publishQueueLocked()
             }
         }
     }
@@ -682,6 +684,8 @@ class DesktopDhunPlayer(
 
     /** Publishes queue + current-index flows. Call only while holding [opMutex]. */
     private fun publishQueueLocked() {
+        // The VISUAL queue is the shuffled play order when shuffle is on —
+        // playback follows the same list, so row indices and traversal agree.
         _queue.value = queueManager.displayQueue
         _currentQueueIndex.value = queueManager.displayCurrentIndex
     }
