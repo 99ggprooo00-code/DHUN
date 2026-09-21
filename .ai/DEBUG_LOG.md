@@ -46,6 +46,17 @@ transparent NavigationBar inside one GlassDock, so mini + nav read as one
 glass sheet over the artwork. Rail layouts keep the floating MiniPlayer
 (default `embedded = false` path unchanged). No new dependencies.
 
+**CI result (2026-09-21):** first push run 35572182843 FAILED on exactly
+one assertion — `DhunAppearanceTest` line 89 still expected the old
+placeholderStart hex: the placeholder/shimmer pin edit in 78743bf did not
+land even though the tool reported success. Fixed in `fd053df`, with every
+pinned neutral now mechanically cross-checked against `DhunTokens` defaults
+(parser compares test literals to production values — zero mismatches).
+Re-run **35572454014 GREEN** (shared jvmTest incl. updated pins, Android
+Robolectric + assembleDebug, probe, Desktop JVM, packaging helpers). Work is
+PR **#107**; awaiting its packaging checks, then the user's visual verdict on
+both platforms — no merge without it.
+
 **Verification state:** local Python packaging/helper suite 29 OK (nothing
 in scripts/ affected); brace-balance diff vs HEAD clean on all ten touched
 files; WCAG replication as above. No JDK in sandbox — compile/test gate is

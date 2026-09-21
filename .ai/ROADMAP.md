@@ -82,12 +82,15 @@ visual verdicts come from the user on real hardware. The UI-polish commit is
 pushed but CI-unverified at the time of writing; until its checks come back
 green the work is NOT done by the repo's own definition.
 
-**Exact next step:** docs-sync commit pushed; UI polish implemented and
-pushed on top — await its CI (build + shared jvmTest incl. updated
-`DhunAppearanceTest` pins, Android, Desktop, packaging), record the run ids,
-then ask the user to eyeball both platforms ("awaiting user visual verdict").
-Endless radio stays queued behind the user's go-ahead. Never merge without
-explicit user authorization for that specific work.
+**Exact next step:** UI polish is PR **#107** (`arena/01a0c2c7-dhun` →
+`main`). Push CI green on `fd053df` (run **35572454014**, build-and-test ✓ —
+the one earlier failure, run 35572182843, was a stale placeholder/shimmer hex
+pin in `DhunAppearanceTest` that 78743bf missed; fixed in `fd053df` and
+mechanically cross-checked). Awaiting PR checks (Build APK, test-release
+build — publish is `main`-gated so the rolling release is untouched), then
+the user's visual verdict on both platforms. **Do not merge #107 without the
+user's explicit authorization AND the visual verdict.** Endless radio stays
+queued behind the user's go-ahead.
 
 **Session discipline:** boot checked `gh pr list` (only stale research PR
 #54 open) and `gh run list` (no live runs — PR #106 verifications all
