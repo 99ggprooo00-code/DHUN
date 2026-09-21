@@ -5,6 +5,19 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
+## MERGED + release verified — 2026-09-21T05:47Z (supersedes pending/hold text below)
+
+PR #106 merged as **810bef1** at **05:41:01Z** under the user's explicit
+authorization (finish, verify, test, merge). Final heads 35d76f6 and 79ebec9
+were green on every check before merge. Post-merge main CI/APK/test-release
+green on 810bef1. Rolling `test` build re-published **05:47:48Z** with tag and
+target both = merge commit; APK 18,334,451 B, MSI 112,889,856 B, sha256 sidecars.
+That is now the correct install for all hardware retests below.
+
+Everything below this block that says "pending CI", "no merge authorized" or
+references 414cd79 as the current `test` build is historical only. The OPEN
+hardware test scripts below remain the exact acceptance checklist:
+
 ## Final pre-merge verification — supersedes pending/hold statuses below
 
 Code head **35d76f6** on PR #106 is pushed and GREEN: build **35564494454**,

@@ -1,6 +1,20 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — PR #106 merged; rolling test build verified
+
+User authorized completion, verification/testing and merge. Both heads green:
+35d76f6 (code) and 79ebec9 (docs) passed build, build-and-test, APK and MSI.
+Merge commit 810bef1 landed 05:41:01Z; post-merge main workflows green.
+New `test` build published 05:47:48Z, tag+target = 810bef1, APK 18,334,451 B,
+MSI 112,889,856 B. Nothing merged before docs/verdicts were complete.
+
+OPEN (hardware only, no code work): Home category topic relevance and pull
+gesture; Windows downloaded-track O3-6zB3kg8M offline replay (keep the existing
+file, test online then airplane mode, report on-screen playback details only);
+Windows X quit/minimize; Android swipe-dismiss vs Home/lock; all remaining #105
+checklist items. Endless radio intentionally not started until hardware PASSes.
+
 ## 2026-09-21 — PR #106 final code verification before authorized merge
 
 Exact code head **35d76f6**: build 35564494454 ✓, build-and-test 35564494452 ✓,

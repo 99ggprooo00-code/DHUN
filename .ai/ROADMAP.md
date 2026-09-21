@@ -1,64 +1,57 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-21** · session **`arena/01a0c24e-dhun`** · PR **#106**
-(branch `arena/01a0c24e-dhun`, baseline `main` **`414cd79`**, PR #105).
+Updated **2026-09-21** · session **`arena/01a0c24e-dhun`** · PR **#106 MERGED**.
 
-**PR #106 implementation verified; user authorized merge after verification.**
-Final code head **`35d76f6`** is pushed and all four checks are GREEN:
-- build: run **35564494454**, job 106223521571 ✓
-- build-and-test: run **35564494452**, job 106223521636 ✓ (shared, Android
-  Robolectric, probe/classification, Desktop JVM); push CI 35564267958 also ✓
-- APK + MSI: run **35564494458**, jobs 106223521998 / 106223521810 ✓
-- Local packaging/helper tests: **29 passed**; whole-PR `git diff --check` ✓.
-No local JDK/Android SDK; CI is the compile/test gate. This final docs-only
-verdict commit must also pass its own checks before the authorized merge.
+**PR #106 merged under explicit user authorization after verification.**
+Merge commit **`810bef1`** on `main`, merged **2026-09-21T05:41:01Z**. Final
+code head **`35d76f6`** and docs head **`79ebec9`** both green on every check
+(build 35565024017, build-and-test 35565024012, APK/MSI 35565024023).
+Post-merge main workflows also green: CI **35565454488**, Build APK
+**35565454483**, test-release **35565454562** (all on 810bef1).
 
-**Scope complete in code (not hardware-certified):**
-1. Owed #105 docs/release verification: seamless radio expectation, download
-   diagnostics and build identity corrected.
-2. Explicit close: Windows X always uses full quit (old close-to-tray key is
-   ignored, switch removed); minimize keeps playing. Android Recents dismissal
-   pauses/stops engine and requests foreground/service shutdown; Home/lock not
-   treated as close. Three Android shutdown regression cases.
-3. Windows offline playback: user confirmed **Downloaded** and playback from
-   **Library → Downloads**, track `O3-6zB3kg8M`. Raw `file://` + Windows path was
-   malformed; portable URI escaping handles drive/UNC/space/Unicode/reserved
-   bytes. Local errors no longer enter CDN recovery. Six shared URI/resolver
-   and two desktop error-routing regression cases. MSI metadata dash → ASCII.
-4. Home moods: actual topic-song search results for Focus/Chill/Workout/Party;
-   For you restores browse feed. Not a signed-in personalized mood API.
-   Generation-safe requests, category-preserving retry/refresh, separate search
-   pagination, dedup/cycle guards. Seven Home regression cases.
-5. Pull-to-refresh: Material3 threshold + top-of-list nested-scroll handling,
-   indicator, repeated-refresh guard. Header refresh icon removed; footer/F5/
-   accessibility fallback retained. Controls stay usable on loading/error/empty.
+**Rolling `test` release verified post-merge:** tag AND target
+**`810bef13f34227360282df88f57372d6b0feba7c`**, published
+**2026-09-21T05:47:48Z**. APK **18,334,451 B**, MSI **112,889,856 B** (MSI
+grew vs old 112,873,472 B, confirming new code shipped) + sha256 sidecars.
+This supersedes the previous `test` build on `414cd79` (published 03:00:04Z).
 
-**Last error / limits:** no compile or test failures on final code head. Windows
-physical playback failure is NOT yet a PASS: file integrity/libVLC behavior needs
-retest. No user console expertise is required: ask for new on-screen playback
-details if it still fails. Pull gestures, category relevance and explicit-close
-hardware checks remain OPEN. #105 radio/Related/shuffle/Android-download checks
-also await explicit user verdicts. Endless radio is NOT started.
+**Scope merged (code/CI verified; NOT hardware-certified):**
+1. #105 docs/release verification corrections (radio expectation, download
+   diagnostics, build identity).
+2. Explicit close: Windows X always full quit (old tray key ignored, switch
+   removed); minimize keeps playing. Android Recents dismissal pauses/stops;
+   Home/lock keep playing. Three shutdown regression cases.
+3. Windows offline playback: portable file URI (drive/UNC/space/Unicode/
+   reserved bytes), local errors no longer enter CDN recovery, honest local
+   error messages. Six URI/resolver + two routing regression cases.
+4. Home moods: Focus/Chill/Workout/Party fetch topic-song searches (NOT
+   personalized mood endpoints); For you restores browse feed. Generation-safe,
+   category-preserving retry/refresh, separate search pagination/dedup/cycles.
+   Seven regression cases.
+5. Pull-to-refresh at top (Material3, threshold/indicator/coalesce); header
+   refresh icon removed; footer/F5/accessibility fallback kept for non-touch.
 
-**Exact next steps:** verify final docs-head CI, then merge PR #106 under the
-user's latest explicit authorization (supersedes earlier no-merge messages).
-After merge, verify main's build/release and rolling `test` target/tag, publish
-time and asset sizes. If the connection ends on merge, next session performs
-that release check FIRST. Install that new build and run HANDOFF's Home/close/
-offline tests plus original #105 tests. Only after all pass: endless radio,
-then S3/S6 soaks, rotation/process death, settings and Windows native checks.
+**Hardware checks still OPEN (CI does not certify device behavior):**
+- Home: topic relevance per category, pull gesture threshold/boundary, rapid
+  switching, empty/error recovery, footer/F5 fallback.
+- Windows: existing download `O3-6zB3kg8M` offline replay (user should keep
+  the existing file and test new build online, then airplane mode), X quit /
+  minimize behavior, tray/SMTC/media keys, jump list.
+- Android: swipe-dismiss stop, Home/lock continue, airplane-mode download play,
+  rotation/process death, persistence.
+- #105 acceptance items: radio same-song seamless continuation + queue tail
+  replacement, Related row behavior, gapless shuffle reorder.
+Endless radio (`/next` continuation at <=3 remaining) is NOT started; it waits
+for all hardware PASSes, then S3/S6 soaks.
 
-**Last verified published build BEFORE #106 merge:** `test` published
-**2026-09-21T03:00:04Z**, release target AND tag
-**`414cd7941d69e185b5628e8b9b7fffe5a0a5a4f0`**. APK **18,334,451 B**, MSI
-**112,873,472 B**. This is the OLD build, not evidence that #106 shipped.
-Scheduled extraction-health **35561269411** failed with **ENVIRONMENT_BLOCKED**
-annotation; not a production pass or demonstrated device root cause.
+**Next steps:** user hardware testing of the new `test` build. If any verdict
+FAILS, open a fix PR from the session branch (never from main). After all
+hardware PASS: endless radio, then soaks and native-platform checks. No new
+release ritual needed — `test` auto-replaces on main pushes.
 
-**Session discipline:** live PR/run checks showed only old research PR #54
-beside this session; no sibling work observed. All changes on the fixed session
-branch; no forks/vendoring. Docs/code/verdicts completed BEFORE merge. Review
-`HANDOFF_NEXT_SESSION.md`, `DEBUG_LOG.md` and CHANGELOG for tests and rationale.
+**Session discipline:** merge done only after exact-head green checks, docs
+and verdicts first, no fork/vendor code, all work on `arena/01a0c24e-dhun`.
+Review `HANDOFF_NEXT_SESSION.md`, `DEBUG_LOG.md` and CHANGELOG for detail.
 
 ---
 
