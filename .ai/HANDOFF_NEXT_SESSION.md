@@ -19,15 +19,20 @@ reached `main` (its GitHub access closed after the merge; the branch is
 deleted), so `main`'s `.ai` docs were stale until this session's docs-sync
 commit.
 
-**Hardware verdicts (exact):**
+**Hardware verdicts (exact, updated 2026-09-21):**
 - **Android: PASS** on the merged build — user: "android all working" (Home
   moods, pull-to-refresh, close/swipe behavior).
-- **Windows: NOT hardware-verified — never record a PASS.** The user's machine
-  was still running an OLD copy (the old round header refresh icon was visible),
-  which caused an earlier "nothing works" report. The user accepted the new
-  build as good-to-go but has NOT tested it ("I'm not testing windows now").
-  Downloading works; downloaded-song playback (`O3-6zB3kg8M` from Library →
-  Downloads) is fixed in code but untested on device.
+- **Windows: PASS (user-tested 2026-09-21)** — the user installed the updated
+  app (the `810bef1` rolling release, PR #106 scope) and reports **"its
+  great"**; the earlier failure was the stale install. Gate-4 items were not
+  itemized individually and no failure was reported. The user's "blurry
+  thumbnail is gone" remark was retracted minutes later: "sorry thumbnail
+  wasent loded well" — a transient artwork-load hiccup, not a regression
+  (desktop blur support is unconditional, `BlurSupport.jvm.kt` = true).
+- **PR #107 (UI polish) is NOT in any released build** — the user authorized
+  its merge ("it's good go ahead") knowing this; its visuals arrive with the
+  next rolling `test` release after merge. The four-gate procedure below is
+  retained for any future clean-install verification.
 
 **Saved Windows verification procedure — run it when the user tests Windows:**
 - **Gate 1:** downloaded `dhun-test.msi` must be exactly **112,889,856 bytes**;

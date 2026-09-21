@@ -1,6 +1,32 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — Windows PASS reported; thumbnail remark retracted; PR #107 merge authorized
+
+Sequence, verbatim where it matters: the user first messaged "it's good go
+ahead also i tested the updated windows app its great but the blurry
+thumbnail is gone i think it ll be improvised in this pr", then interrupted
+and clarified: "sorry thumblail wasent loded well".
+
+**Verdicts recorded:** (1) Windows is now user-tested on the updated app —
+the `810bef1` rolling release (PR #106 scope): "its great". This closes the
+stale-install episode; Gate-4 items were not itemized and no failure was
+reported with any of them, so the Windows verdict is recorded as a general
+PASS, not per-item confirmations (the `O3-6zB3kg8M` offline replay and
+explicit-close itemization remain unconfirmed-but-unfailed). (2) The
+"blurry thumbnail is gone" observation was retracted by the user as a
+transient artwork-load hiccup — no code action. Cross-check done anyway:
+`supportsRealtimeBlur` on desktop is unconditionally `true`
+(`BlurSupport.jvm.kt`), so no platform gate could hide the dock/backdrop
+blur on Windows; consistent with the retraction. (3) "it's good go ahead" is
+the explicit user authorization to merge PR #107.
+
+**Honesty note kept in the record:** the Windows build the user tested does
+NOT contain #107 — the UI polish ships in the rolling `test` release
+published right after the merge, and the user must re-download to see it.
+The authorization covers merging #107 on the strength of green CI + the
+user's go-ahead, not an itemized on-device review of the polish.
+
 ## 2026-09-21 — UI polish implemented: lighter dark ladder, 64dp thumbs, continuous glass dock (`arena/01a0c2c7-dhun`)
 
 User picked UI polish over endless radio this session. All three sub-tasks

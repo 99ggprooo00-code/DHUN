@@ -24,7 +24,13 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### Changed — UI polish: lighter dark surfaces, larger thumbnails, continuous glass dock (2026-09-21, CI verification + user visual verdict pending)
+### Changed — UI polish: lighter dark surfaces, larger thumbnails, continuous glass dock (2026-09-21, merged under user authorization)
+
+> User verdicts, 2026-09-21: Windows tested on the `810bef1` rolling release:
+> "its great" (the earlier "blurry thumbnail is gone" was retracted as
+> "thumbnail wasent loded well" — a load hiccup). Merge authorized: "it's
+> good go ahead". The polish itself ships in the rolling `test` release
+> published right after this merge.
 
 - **Dark surfaces lifted one step** (each neutral rung +0x0C: background
   `#0A0A0A` → `#161616`, surface ladder now 16 → 36, tonal highest `#3C3C3C`)
@@ -65,11 +71,11 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   112,873,472 B — the byte size distinguishes the new installer from the old).
 - **Hardware verdicts:** **Android PASS** — the user tested the merged build:
   "android all working" (Home moods, pull-to-refresh, close/swipe behavior).
-  **Windows NOT hardware-verified** — the machine under test was still running
-  an old copy (its round header refresh icon was still visible), which caused
-  an earlier "nothing works" report; the user accepted the new build but has
-  not tested it. No Windows PASS is recorded. Downloading works; downloaded-
-  song playback is fixed in code and awaits the device retest.
+  **Windows PASS (user-tested)** — the user later installed the updated
+  Windows app and reports "its great"; the earlier "nothing works" report was
+  the stale install. Their "blurry thumbnail is gone" remark was retracted as
+  an artwork-load hiccup ("thumbnail wasent loded well"). Gate-4 items were
+  not itemized individually and no failure was reported.
 - **Docs sync:** the previous session's post-merge records never reached
   `main` (its GitHub access closed after the merge and its branch was
   deleted); this entry and the `.ai` updates restore those facts. The saved

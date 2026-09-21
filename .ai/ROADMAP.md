@@ -3,6 +3,34 @@
 Updated **2026-09-21** · session **`arena/01a0c2c7-dhun`** · baseline `main`
 **`810bef1`** (the PR #106 merge).
 
+**USER VERDICTS + AUTHORIZATION (2026-09-21, latest):** the user tested the
+updated **Windows** app — the rolling `test` release of `810bef1` (PR #106
+scope) — and reports **"its great"**: Windows is now user-tested (supersedes
+"NOT hardware-verified"). The user's "blurry thumbnail is gone" observation
+was **retracted/clarified by the user**: "sorry thumbnail wasent loded well" —
+a transient artwork-load hiccup, not a blur-pipeline regression (desktop
+blur support is unconditional: `BlurSupport.jvm.kt` actual = true). The user
+then said **"it's good go ahead"** — explicit authorization to merge PR
+#107. Note recorded honestly: the Windows build the user tested predates
+#107 (the UI polish is not in any released build yet); #107's own visuals
+are covered by the user's go-ahead, not by an itemized on-device review.
+
+**Exact next step:** record these verdicts (this commit), get the docs-head
+checks green on PR #107, then MERGE #107 under the user's authorization, and
+same-turn verify main's post-merge CI and the republished rolling `test`
+release (new tag/target = merge commit; new APK/MSI byte sizes WILL differ —
+the user must re-download to actually see the polish). If the GitHub
+connection survives the merge, a follow-up docs-only reconciliation PR may
+record the post-merge facts on main (routine-docs autonomy); otherwise the
+next session performs that release check FIRST.
+
+**PR #107 status: all checks GREEN on the final head `1d1ec6c`** (push CI
+35572454014; PR checks build ✓ / build-and-test ✓ / apk ✓ / msi ✓ — publish
+jobs skip on PRs, `main`-gated, rolling release untouched). The one earlier
+failure (push run 35572182843) was a stale placeholder/shimmer hex pin in
+`DhunAppearanceTest` that 78743bf missed; fixed in `fd053df`, mechanically
+cross-checked.
+
 **PR #106 is MERGED; `main` and the rolling `test` release are verified; the
 docs in `main` were STALE until this session's docs-sync commit** — the
 previous session (`arena/01a0c24e-dhun`) lost GitHub access right after the
@@ -30,16 +58,17 @@ This session re-recorded those facts from the session record.
   **112,889,856 B** (old MSI was **112,873,472 B** — this size distinguishes
   new vs old installer).
 
-**Hardware verdicts (exact, as of 2026-09-21):**
-- **Android: PASS** — user tested the merged build: "android all working"
+**Hardware verdicts (exact, updated 2026-09-21 after the user's report):**
+- **Android: PASS** — user tested the `810bef1` build: "android all working"
   (Home moods, pull-to-refresh, close/swipe behavior).
-- **Windows: NOT hardware-verified.** The user's machine was still running an
-  OLD copy (old round header refresh icon visible), which caused an earlier
-  "nothing works" report. User accepted the new build as good-to-go but has
-  NOT tested it ("I'm not testing windows now"). **Do not record a Windows
-  PASS.** Downloading works; downloaded-song playback is fixed in code but
-  untested on device. The saved four-gate retest procedure lives in
-  `HANDOFF_NEXT_SESSION.md`.
+- **Windows: PASS (user-tested, 2026-09-21)** — the user installed and tested
+  the updated Windows app (the `810bef1` rolling release) and reports
+  **"its great"**; the earlier "nothing works" report was conclusively the
+  stale install. Not itemized per Gate-4 check: the downloaded-track
+  offline replay and explicit-close items were not individually confirmed,
+  but no failure was reported with any of them. The "blurry thumbnail gone"
+  observation was retracted by the user as an artwork-load hiccup
+  ("thumbnail wasent loded well"), not a defect verdict.
 
 **Queue of work (priority order):**
 1. Help the user verify/fix Windows when they report results (gates in
