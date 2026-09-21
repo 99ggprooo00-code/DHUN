@@ -326,11 +326,9 @@ class DesktopDhunPlayer(
     }
 
     override fun setShuffle(enabled: Boolean) {
-        if (queueManager.shuffleEnabled != enabled) {
-            queueManager.toggleShuffle()
-            _shuffleEnabled.value = queueManager.shuffleEnabled
-            publishQueueLocked()
-        }
+        queueManager.setShuffle(enabled)
+        _shuffleEnabled.value = queueManager.shuffleEnabled
+        publishQueueLocked()
     }
 
     override fun setVolume(volume: Float) {
@@ -684,8 +682,8 @@ class DesktopDhunPlayer(
 
     /** Publishes queue + current-index flows. Call only while holding [opMutex]. */
     private fun publishQueueLocked() {
-        _queue.value = queueManager.snapshot
-        _currentQueueIndex.value = queueManager.currentIndex
+        _queue.value = queueManager.displayQueue
+        _currentQueueIndex.value = queueManager.displayCurrentIndex
     }
 
     companion object {
