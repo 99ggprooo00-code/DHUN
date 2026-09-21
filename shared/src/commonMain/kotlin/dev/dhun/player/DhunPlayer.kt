@@ -16,8 +16,10 @@ import kotlinx.coroutines.flow.StateFlow
  *    the UI can render live state instead of poking setters blindly.
  *  - Queue mutation by index — [playAt], [removeFromQueue], [moveInQueue]
  *    power tap-to-jump, swipe-remove and drag-reorder. All indices refer to
- *    the *visual* queue ([queue]) order; when shuffle is on the engine maps
- *    them to its internal play order.
+ *    the *visual* queue ([queue]) order. With shuffle ON, [queue] IS the
+ *    shuffled play order (current track head; mutations keep the user's
+ *    arranged order instead of re-shuffling), so tapping the row you see
+ *    always plays exactly that row.
  */
 interface DhunPlayer {
     val state: StateFlow<PlaybackState>
