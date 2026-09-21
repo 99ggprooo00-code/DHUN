@@ -433,17 +433,24 @@ class PlayerViewModelTest {
             val fixture = startRadioWithTail(scope, token = null)
             // r4's own /next page (a fresh /next lists the seeding video
             // first, #99 shape) — the related load and the re-seed both read
-            // this, so call order cannot race the assertion.
+            // this, so call order cannot race the assertion. The page is
+            // longer than the refill threshold so the swap settles without
+            // an immediate re-trigger (real /next pages are ~25 songs).
+            // The seed itself leads the page (RDAMVM shape), 6 more behind
+            // it — longer than the refill threshold, so the swap settles.
             fixture.provider.radioPagesByVideo["r4"] = DhunResult.Success(
                 dev.dhun.core.RadioQueuePage(
-                    tracks = listOf(track("r4"), track("s1"), track("s2"), track("s3")),
+                    tracks = listOf(track("r4")) + (1..6).map { track("s$it") },
                     continuationToken = "tok-s",
                 ),
             )
             // 1 song remains (now on r4) and the token is null: the refill
             // must RE-SEED a fresh /next from the playing track.
             fixture.player.advanceTo(4)
-            eventually { fixture.player.queue.value.map { it.id } == listOf("r4", "s1", "s2", "s3") }
+            eventually {
+                fixture.player.queue.value.map { it.id } ==
+                    listOf("r4") + (1..6).map { "s$it" }
+            }
             assertEquals("r4", fixture.player.currentTrack.value?.id)
             // The re-seed targeted the CURRENT track (the head is filtered
             // out of the refilled tail — no self-replay), and the page's
@@ -481,7 +488,17 @@ class PlayerViewModelTest {
             fixture.player.advanceTo(4)
             eventually { fixture.player.queue.value.map { it.id } == listOf("r4", "r6", "r7", "r8") }
             assertEquals("r4", fixture.player.currentTrack.value?.id)
-            assertEquals(listOf("tok-a", "tok-a"), fixture.provider.continuationCalls)
+            // The failed attempt consumed nothing; the retry used the same
+            // (still-valid) token. The 3-track tail then sits exactly at the
+            // threshold, so the monitor probes once more; the fake's
+            // repeated page is a duplicate and the guard must swallow it
+            // WITHOUT swapping again (the queue stays put).
+            assertEquals(listOf("r4", "r6", "r7", "r8"), fixture.player.queue.value.map { it.id })
+            assertTrue(
+                fixture.provider.continuationCalls.size in 2..3,
+                "expected the failure, the retry, and at most one guard probe, got ${fixture.provider.continuationCalls}",
+            )
+            assertEquals(listOf("tok-a", "tok-a"), fixture.provider.continuationCalls.take(2))
             assertEquals("tok-2", fixture.vm.radioSession.continuationToken)
         } finally {
             scope.cancel()
