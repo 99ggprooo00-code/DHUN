@@ -315,8 +315,28 @@ class PlayerViewModel(
         _skipDirection.value = SkipDirection.FORWARD
     }
 
-    /** "Start radio": the whole related list from the top. */
-    suspend fun startRadio(context: PlayContext = PlayContext.QUEUE) = playRelatedAt(0, context)
+    /**
+     * "Start radio" / "Play radio": keeps the CURRENT song playing from its
+     * current position (no restart, no pause) and replaces the rest of the
+     * queue with the Related (radio) list. Semantics match InnerTune's
+     * `startRadioSeamlessly` / ViMusic's seamless radio: the head never
+     * moves, the tail becomes the station.
+     *
+     * No-op when nothing is playing or the radio list isn't loaded yet.
+     * Deliberately does NOT touch [_skipDirection]: the head track didn't
+     * change, so the artwork must not slide.
+     */
+    fun startRadio(context: PlayContext = PlayContext.QUEUE) {
+        val current = currentTrack.value ?: return
+        val tracks = (relatedState.value as? RelatedUiState.Success)?.tracks ?: return
+        if (tracks.isEmpty()) return
+        // Defensive: the Related loader already filters the head, but a
+        // stale emission must never duplicate it into the queue.
+        val rest = tracks.filter { it.id != current.id }
+        if (rest.isEmpty()) return
+        persistence?.setPlayContext(context)
+        scope.launch { player.replaceQueueKeepingCurrent(rest) }
+    }
 
     /** Loads an arbitrary track list as the queue (album/playlist/artist actions). */
     suspend fun playTracks(tracks: List<Track>, startIndex: Int = 0, context: PlayContext = PlayContext.UNKNOWN) {
@@ -344,11 +364,11 @@ class PlayerViewModel(
             _relatedState.value = RelatedUiState.Loading
             when (val r = provider.relatedTracks(track.id)) {
                 is DhunResult.Success -> {
-                    // Defect 2: /next playlistPanelVideoRenderer includes the
-                    // currently-playing video as its first entry. Playing
-                    // radio from index 0 would therefore restart the current
-                    // song instead of advancing. Filter the current track out
-                    // so startRadio and the Related tab never show it.
+                    // /next playlistPanelVideoRenderer includes the
+                    // currently-playing video as its first entry. Filter the
+                    // current track out so the Related tab never lists the
+                    // playing song as a row, and the seamless radio tail
+                    // never duplicates the head.
                     val filtered = r.value.filter { it.id != track.id }
                     _relatedState.value =
                         if (filtered.isEmpty()) RelatedUiState.Empty else RelatedUiState.Success(filtered)

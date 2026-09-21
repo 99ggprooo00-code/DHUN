@@ -55,6 +55,31 @@ class QueueManager(private val random: Random = Random.Default) {
         return items[index]
     }
 
+    /**
+     * Seamless radio handoff: keeps the CURRENT track at the head and
+     * replaces everything behind it with [upcoming] (the radio list).
+     *
+     * The head object is preserved (not re-created), so engines can keep
+     * the sounding item untouched — no restart, no pause. Any occurrence
+     * of the current track inside [upcoming] is dropped defensively.
+     *
+     * Shuffle resets to OFF (a fresh radio list is already an order; the
+     * user can re-shuffle it), while [repeatMode] is preserved. No-op when
+     * the queue is empty ([current] == null) or [upcoming] is empty —
+     * callers must not wipe the queue on a failed/empty radio fetch.
+     */
+    fun replaceKeepingCurrent(upcoming: List<Track>) {
+        val head = current ?: return
+        if (upcoming.isEmpty()) return
+        val rest = upcoming.filter { it.id != head.id }
+        items.clear()
+        items += head
+        items += rest
+        currentIndexInItems = 0
+        shuffleEnabled = false
+        rebuildOrder()
+    }
+
     /** Insert right after the currently playing track ("play next"). */
     fun addNext(track: Track) {
         if (items.isEmpty()) {

@@ -211,10 +211,10 @@ class PlayerViewModelTest {
             eventually { vm.lyricsState.value is LyricsUiState.Synced }
             assertEquals(2, (vm.lyricsState.value as LyricsUiState.Synced).lines.size)
 
-            // startRadio plays the related list from the top
+            // startRadio is seamless: head stays, radio becomes the tail
             vm.startRadio()
-            eventually { player.queue.value.map { it.id } == listOf("r1", "r2") }
-            assertEquals("r1", player.currentTrack.value?.id)
+            eventually { player.queue.value.map { it.id } == listOf("a", "r1", "r2") }
+            assertEquals("a", player.currentTrack.value?.id)
         } finally {
             scope.cancel()
         }
@@ -257,26 +257,52 @@ class PlayerViewModelTest {
     }
 
     @Test
-    fun startRadioDoesNotReplayCurrentTrack(): Unit = runBlocking {
+    fun startRadioKeepsHeadPlayingAndReplacesTail(): Unit = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
             val player = FakePlayer()
-            // Provider returns related list where first is the current track (defect 2 source)
+            // Provider returns related list where first is the current track
             val provider = FakeProvider(
                 related = DhunResult.Success(listOf(track("a"), track("b"), track("c"))),
             )
             val vm = newVm(player, provider, scope)
-            player.prepareQueue(listOf(track("a")), 0)
+            player.prepareQueue(listOf(track("a"), track("old")), 0)
+            player.positionMs.value = 42_000 // a few seconds in
             eventually { vm.relatedState.value is RelatedUiState.Success }
             val related = (vm.relatedState.value as RelatedUiState.Success).tracks
-            // Must not contain current id — ViewModel filters it
+            // Related tab must not show the playing song as a row
             assertFalse(related.any { it.id == "a" }, "related must filter current track")
             assertEquals(listOf("b", "c"), related.map { it.id })
-            // startRadio should start at b, not restart a
+            // startRadio keeps a sounding and swaps the tail to the radio
             vm.startRadio()
-            eventually { player.queue.value.isNotEmpty() }
-            assertEquals("b", player.currentTrack.value?.id, "startRadio must not replay current track")
-            assertEquals(listOf("b", "c"), player.queue.value.map { it.id })
+            eventually { player.queue.value.map { it.id } == listOf("a", "b", "c") }
+            assertEquals("a", player.currentTrack.value?.id, "startRadio must not move off the head")
+            assertEquals(42_000, player.positionMs.value, "position must be untouched")
+            assertTrue(player.seeks.isEmpty(), "no seek may happen — never restart")
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun startRadioIsNoopWithoutPlaybackOrRadio(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            // Nothing playing at all.
+            val idle = FakePlayer()
+            val vmIdle = newVm(idle, FakeProvider(related = DhunResult.Success(listOf(track("b")))), scope)
+            vmIdle.startRadio()
+            delay(200)
+            assertTrue(idle.queue.value.isEmpty())
+
+            // Playing, but the radio list is empty.
+            val player = FakePlayer()
+            val vm = newVm(player, FakeProvider(related = DhunResult.Success(emptyList())), scope)
+            player.prepareQueue(listOf(track("a"), track("old")), 0)
+            eventually { vm.relatedState.value is RelatedUiState.Empty }
+            vm.startRadio()
+            delay(200)
+            assertEquals(listOf("a", "old"), player.queue.value.map { it.id })
         } finally {
             scope.cancel()
         }

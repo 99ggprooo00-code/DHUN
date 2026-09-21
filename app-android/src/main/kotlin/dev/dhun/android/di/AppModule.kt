@@ -17,7 +17,7 @@ import dev.dhun.download.DownloadRepository
 import dev.dhun.download.DownloadStorage
 import dev.dhun.download.FileDownloadManager
 import dev.dhun.download.KtorStreamDownloader
-import dev.dhun.download.createDownloadHttpClient
+import dev.dhun.download.createAndroidDownloadHttpClient
 import dev.dhun.extraction.OfflineFirstStreamResolver
 import dev.dhun.extraction.OwnClientStreamResolver
 import dev.dhun.extraction.StreamResolver
@@ -91,7 +91,7 @@ val appModule = module {
         FileDownloadManager(
             repository = get<DownloadRepository>(),
             resolver = get<StreamResolver>(),
-            downloader = KtorStreamDownloader(createDownloadHttpClient(), get()),
+            downloader = KtorStreamDownloader(createAndroidDownloadHttpClient(), get()),
             storage = get(),
             scope = get(),
         )

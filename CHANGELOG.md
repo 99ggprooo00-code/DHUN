@@ -24,6 +24,31 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — radio / shuffle-gap / Android downloads (2026-09-21, hardware re-test pending)
+
+- **"Play radio" is now seamless (replaces the #99 behavior).** Tapping it
+  mid-song keeps the current song playing from its position — no restart, no
+  pause — and swaps the rest of the queue to the radio list (the
+  InnerTune/ViMusic `startRadioSeamlessly` semantic). The Related tab still
+  never lists the playing song as a row. Tapping a Related row still plays
+  that row explicitly.
+- **Shuffle toggle is gapless on Android.** Queue mutations (shuffle,
+  play-next, add-to-queue, radio) no longer rebuild the whole Media3
+  timeline with `setMediaItems` + `prepare()` — the source of the small
+  pause. The engine timeline is now mutated around the untouched sounding
+  item (OuterTune/InnerTune pattern). Desktop was already gapless (engine
+  untouched on reorder) and keeps that contract for radio.
+- **Android downloads reworked (root-cause pass).** The downloader now uses
+  OkHttp on Android instead of Ktor CIO (every reference app downloads over
+  OkHttp; CIO streaming reads stall on ART), always sends `Range`
+  (YouTube throttles non-Range requests — the old code only ranged on
+  resume), runs workers on `Dispatchers.IO` instead of Main, restarts the
+  `.part` file when a server ignores Range (200 to a resume), treats 416 on
+  a complete part as success, and adds connect/socket-idle timeouts so a
+  stuck transfer fails visibly instead of hanging forever. Download
+  failures are now logged (`DHUN download …` in logcat) and a crashed
+  worker marks its row FAILED instead of sticking in DOWNLOADING.
+
 ### Fixed — S3 Round-2 device defects (2026-09-21, builds #98/#99/#101/#102, hardware re-test pending)
 
 - **Android downloads work again (#98).** The download foreground service

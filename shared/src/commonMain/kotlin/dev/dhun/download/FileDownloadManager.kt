@@ -8,6 +8,7 @@ import dev.dhun.data.EpochClock
 import dev.dhun.extraction.StreamResolver
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 
 /**
  * Concrete [DownloadManager] (ADR-006) over a [StreamResolver], a
@@ -131,7 +133,22 @@ class FileDownloadManager(
         if (jobs.containsKey(track.id)) return
         val job = scope.launch {
             try {
-                semaphore.withPermit { downloadOne(track) }
+                // Pinned to IO: the injected scope is Dispatchers.Main on
+                // Android — the streaming read loop, storage IO and DB
+                // writes must never run there (reference apps run their
+                // download executors off-main too: RiMusic's cached pool,
+                // InnerTune's DownloadManager executor).
+                withContext(Dispatchers.IO) {
+                    semaphore.withPermit { downloadOne(track) }
+                }
+            } catch (t: CancellationException) {
+                throw t // pause/cancel: state already set by the caller
+            } catch (t: Throwable) {
+                // A worker must never die silently: a storage/SQL crash used
+                // to leave the row stuck in DOWNLOADING with no trace.
+                println("DHUN download worker failed for ${track.id}: ${t.message}")
+                runCatching { repository.updateState(track.id, DownloadState.FAILED) }
+                _progress.value = _progress.value - track.id
             } finally {
                 jobsLock.withLock { jobs.remove(track.id) }
             }
@@ -155,6 +172,9 @@ class FileDownloadManager(
         val resolved = when (val r = resolver.resolve(track.id)) {
             is DhunResult.Success -> r.value
             is DhunResult.Failure -> {
+                // println reaches logcat on Android and the console on
+                // desktop — a FAILED row with no reason is undebuggable.
+                println("DHUN download ${track.id}: resolve failed: ${r.error}")
                 repository.updateState(track.id, DownloadState.FAILED)
                 return
             }
@@ -194,11 +214,13 @@ class FileDownloadManager(
                 // Persist COMPLETED before the (best-effort, cancellable)
                 // artwork fetch so pause/cancel can never orphan the audio.
                 repository.upsert(base)
+                println("DHUN download ${track.id}: completed ${result.value} bytes -> $final")
                 val art = fetchArtwork(track.thumbnailUrl, track.id)
                 if (art != null) repository.upsert(base.copy(localArtworkPath = art))
                 _progress.value = _progress.value - track.id
             }
             is DhunResult.Failure -> {
+                println("DHUN download ${track.id}: bytes failed: ${result.error}")
                 repository.updateState(track.id, DownloadState.FAILED)
                 _progress.value = _progress.value - track.id
             }

@@ -1,6 +1,59 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — Seamless radio + gapless shuffle + Android download rework, learned from GPL peers (`arena/01a0c1c9-dhun`)
+
+**User report (round 3).** (1) "Play radio" must keep the SAME song playing
+without pause and replace the queue — never restart (supersedes the #99
+"move to a different song" semantic). Related tab must not list the playing
+song. (2) Audible micro-pause on every shuffle toggle. (3) Downloads still
+dead on Android after #98; Windows untested. Plus: study how similar OSS
+projects implement downloads/radio/shuffle — learn, don't fork.
+
+**Reference study (read-only via GitHub API; no fork, no vendored copy —
+provenance row in THIRD_PARTY.md).** InnerTune `dev`
+`MusicService.startRadioSeamlessly`: trim the timeline to the sounding item
+with `removeMediaItems` before/after, fetch radio, `addMediaItems(radio
+.drop(1))` — head untouched, zero interruption; shuffle is engine
+`shuffleModeEnabled` + a pinned `DefaultShuffleOrder` (no timeline rebuild,
+no gap); downloads run on Media3 `DownloadManager` over `OkHttpDataSource`
+with `&range=0-N` appended "to avoid YouTube's throttling",
+`maxParallelDownloads = 3`. OuterTune `lite` QueueBoard seamless branch:
+same trim-around-playing trick ("`replaceMediaItems` seems to stop playback")
+applied to every queue switch, including shuffle. ViMusic `master`
+`startRadio(justAdd=true)`: `addMediaItems(process().drop(1))` + auto-extend
+when ≤3 items remain (`maybeProcessRadio`) — endless-radio follow-up, not
+this fix. RiMusic `master` (also KMP): `MyDownloadService :
+DownloadService` + `SimpleCache`/`NoOpCacheEvictor` + retry 2 +
+`Requirements(NETWORK)`; radio = `/next` + continuation (endless follow-up).
+
+**What DHUN changed (fresh implementations, attribution comments in code).**
+Radio: new `DhunPlayer.replaceQueueKeepingCurrent` (default = rebuild for
+fakes only; both engines override seamlessly) + `QueueManager.
+replaceKeepingCurrent` (head object preserved, shuffle reset, repeat kept);
+Android trims/appends around the sounding MediaItem, desktop only repoints
+the bookkeeper (engine untouched); `PlayerViewModel.startRadio` keeps the
+head, position and artwork still; Related-tab filter from #99 kept.
+Shuffle/mutations: deleted `reloadTimelinePreservingPlayback`
+(`setMediaItems` + `prepare()` was the pause); new
+`syncTimelineAroundCurrent` + single-insert `addNext`/`addToQueue`.
+Downloads: Android transport CIO → OkHttp (`ktor-client-okhttp` in
+`shared/androidMain`); always-Range (`bytes=0-` fresh); restart `.part` on
+200-to-resume; 416-on-complete-part = success; connect + socket-idle
+timeouts (no request timeout); workers pinned to `Dispatchers.IO`
+(Android scope is Main); every failure `println`d (`DHUN download …` in
+logcat) and worker crashes mark FAILED instead of sticking. If Android
+downloads STILL fail after this, the logcat line names the stage (resolve
+vs bytes vs worker) — ask the user for it instead of guessing again.
+
+**Tests.** `QueueManagerTest` +4 (head/tail, defensive filter, noops,
+shuffle-reset/repeat-keep); `PlayerViewModelTest` startRadio rewritten to
+the seamless contract (head+position+no-seek) + no-op cases;
+`StreamDownloaderTest` Range-always + 200-restart + 416; `FileDownloadManagerTest`
+awaits terminal states (IO hop) + worker-crash case. CI is the compile
+gate (no JDK in sandbox); hardware re-test per HANDOFF script items 1–6
+(radio expectation flips to "same song continues").
+
 ## 2026-09-21 — Two sessions raced on the same defects; reconciliation without history damage (`arena/01a0c174-dhun`)
 
 **Incident.** This session booted per handoff to "continue from where it is
