@@ -9,6 +9,14 @@ message and is transcribed verbatim below, now in-repo).
 
 This section supersedes the pre-merge statuses below it.
 
+**PR #107 (UI polish) has since been MERGED** as `44e1ffd`
+(2026-09-21T09:54:37Z, user-authorized; all checks green on `1def7ee` — a
+Maven Central 403 flake on `b8b669d` was retriggered away). Rolling `test`
+republished 2026-09-21T09:59:24Z at target/tag `44e1ffd`: APK 18,334,451 B,
+MSI **112,885,760 B** (the size that identifies the polish build). The
+user's Windows "its great" verdict was on the previous `810bef1` build; the
+polish look itself awaits their re-download and eyeball on both platforms.
+
 **Merge + release (verified on GitHub):** PR #106 merged into `main` as
 **`810bef1`** at 2026-09-21T05:41:01Z after full green CI, under explicit user
 authorization. Rolling `test` re-published **2026-09-21T05:47:48Z**; tag AND

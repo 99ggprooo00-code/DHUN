@@ -29,8 +29,9 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 > User verdicts, 2026-09-21: Windows tested on the `810bef1` rolling release:
 > "its great" (the earlier "blurry thumbnail is gone" was retracted as
 > "thumbnail wasent loded well" — a load hiccup). Merge authorized: "it's
-> good go ahead". The polish itself ships in the rolling `test` release
-> published right after this merge.
+> good go ahead". The polish ships in the rolling `test` release republished
+> 2026-09-21T09:59:24Z at target/tag `44e1ffd` (APK 18,334,451 B; MSI
+> 112,885,760 B — that byte size identifies the polish build).
 
 - **Dark surfaces lifted one step** (each neutral rung +0x0C: background
   `#0A0A0A` → `#161616`, surface ladder now 16 → 36, tonal highest `#3C3C3C`)
