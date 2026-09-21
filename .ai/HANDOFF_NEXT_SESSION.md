@@ -50,15 +50,22 @@ before starting the next one** (the one-agent rule in MASTER_PROMPT §8.1).
 
 ## Build identity for the re-test below (release API, live-verified)
 
-- Rolling `test` **published 2026-09-21T01:24:37Z**, `target_commitish`
-  **`4d693ce`** (= PR #102 merge HEAD), assets: `dhun-test.apk`
-  **17,948,508 B**, `dhun-test.msi` **112,861,184 B** (+ `.sha256` sidecars).
-  Post-merge CI on exactly `4d693ce`: CI 35550567894 ✓ · Build APK
-  35550567913 ✓ · test-release 35550567905 ✓.
+- Rolling `test` **published 2026-09-21T01:45:26Z**, `target_commitish`
+  **`c4c5d04`** (= PR #103 merge HEAD; #102 `4d693ce` beneath it), assets:
+  `dhun-test.apk` **17,948,508 B**, `dhun-test.msi` **112,861,184 B**
+  (+ `.sha256` sidecars). Post-merge CI on exactly `c4c5d04`:
+  CI 35551566277 ✓ · Build APK 35551566265 ✓ · test-release 35551566274 ✓.
+  (The earlier 01:24:37Z publish @ `4d693ce` carried the identical binaries;
+  it was superseded by the docs-only #103 merge.)
+- **Self-correcting rule:** every push to `main` replaces `test`. Docs-only
+  merges change only the publish time/target, never the byte sizes — so
+  **the newest `test` publish with APK 17,948,508 B / MSI 112,861,184 B is
+  the current qualifying build** regardless of when you read this. If your
+  downloaded file sizes differ, you have a stale build.
 
 ---
 
-## HARDWARE RE-TEST SCRIPT — build `test` @ 2026-09-21T01:24:37Z (APK 17,948,508 B / MSI 112,861,184 B)
+## HARDWARE RE-TEST SCRIPT — build `test` @ 2026-09-21T01:45:26Z or newer with APK 17,948,508 B / MSI 112,861,184 B
 
 Re-download BOTH installers after this merge (rolling `test` was replaced at
 the publish time above; if your file sizes differ, you have a stale build).

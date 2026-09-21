@@ -9,9 +9,11 @@ Builds: the rolling [`test` pre-release](https://github.com/99ggprooo00-code/DHU
 Always re-download after the merge you are qualifying, and note the
 `main@<sha>` you tested.
 
-**Current qualifying build for this round: `test` published
-2026-09-21T01:24:37Z, target `main@4d693ce`, APK 17,948,508 B / MSI
-112,861,184 B** — it carries the four Round-2 defect fixes (Android
+**Current qualifying build for this round: the newest `test` publish with
+APK 17,948,508 B / MSI 112,861,184 B** (first such publish this round:
+2026-09-21T01:45:26Z, target `main@c4c5d04`; docs-only merges republish at
+a later time with identical bytes — always take the newest) — it carries the
+four Round-2 defect fixes (Android
 downloads #98, radio-restart #99, shuffle #100+#102, lyrics #101). Run the
 numbered defect re-test first: **`.ai/HANDOFF_NEXT_SESSION.md` → "HARDWARE
 RE-TEST SCRIPT"** (Android items 1–9, Windows 10–12), then continue with
