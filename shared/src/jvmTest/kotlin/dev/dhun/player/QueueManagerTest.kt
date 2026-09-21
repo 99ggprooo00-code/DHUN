@@ -116,13 +116,27 @@ class QueueManagerTest {
         assertTrue(q.next() != null) // wraps instead of ending
     }
 
+    /* ---------------- setShuffle + visible (display) order ---------------- */
+
+    /** Deterministic random: every nextInt(bound) is 0, so stdlib shuffled() always swaps toward index 0. */
+    private class ZeroRandom : Random() {
+        override fun nextBits(bitCount: Int): Int = 0
+    }
+
+    /** 8-track queue positioned at index 3 with shuffle on — the shared fixture for display-order tests. */
+    private fun shuffledQueueAt3(): QueueManager = QueueManager(ZeroRandom()).apply {
+        setQueue((1..8).map { track("t$it") })
+        playAt(3)
+        setShuffle(true)
+    }
+
     @Test
     fun setShuffleIsIdempotentAndToggleIsInverse() {
         val q = QueueManager(Random(42)).apply { setQueue(listOf(track("a"), track("b"), track("c"))) }
         assertFalse(q.shuffleEnabled)
         assertTrue(q.setShuffle(true))
         assertTrue(q.shuffleEnabled)
-        // second call with same value is no-op
+        // second call with same value is a no-op
         assertTrue(q.setShuffle(true))
         assertTrue(q.shuffleEnabled)
         assertFalse(q.setShuffle(false))
@@ -135,35 +149,106 @@ class QueueManagerTest {
 
     @Test
     fun displayQueueShowsShuffledOrderWithCurrentFirst() {
-        val q = QueueManager(Random(42)).apply { setQueue((1..6).map { track("t$it") }) }
-        q.playAt(2) // current = t3
+        val q = QueueManager(ZeroRandom()).apply { setQueue((1..6).map { track("t$it") }); playAt(2) }
         q.setShuffle(true)
         val display = q.displayQueue
         assertEquals(6, display.size)
         assertEquals("t3", display.first().id, "shuffled display must keep current first")
         assertEquals("t3", q.current?.id)
         assertEquals(0, q.displayCurrentIndex)
-        // display contains all tracks distinct
+        // display contains all tracks exactly once
         assertEquals(6, display.map { it.id }.toSet().size)
-        // snapshot still source order
-        assertEquals(listOf("t1","t2","t3","t4","t5","t6"), q.snapshot.map { it.id })
-        // upcoming is tail of display after current
+        // snapshot stays SOURCE order regardless of shuffle
+        assertEquals(listOf("t1", "t2", "t3", "t4", "t5", "t6"), q.snapshot.map { it.id })
+        // upcoming is the display tail after current
         assertEquals(display.drop(1), q.upcoming)
         // toggling off restores source order
         q.setShuffle(false)
-        assertEquals(listOf("t1","t2","t3","t4","t5","t6"), q.displayQueue.map { it.id })
+        assertEquals(listOf("t1", "t2", "t3", "t4", "t5", "t6"), q.displayQueue.map { it.id })
         assertEquals(2, q.displayCurrentIndex)
         assertEquals("t3", q.displayQueue[q.displayCurrentIndex].id)
     }
 
     @Test
-    fun shuffleDisplayOrderDiffersFromSourceWithSeededRandom() {
-        val q = QueueManager(Random(1)).apply { setQueue(listOf(track("a"), track("b"), track("c"), track("d"), track("e"))) }
+    fun shuffledDisplayOrderDiffersFromSourceOrder() {
+        val q = QueueManager(ZeroRandom()).apply { setQueue(listOf(track("a"), track("b"), track("c"), track("d"), track("e"))) }
         q.setShuffle(true)
-        // With seeded random, display order should differ from source
-        assertTrue(q.displayQueue.map { it.id } != listOf("a","b","c","d","e"))
-        // but first is still a (current)
+        assertTrue(q.displayQueue.map { it.id } != listOf("a", "b", "c", "d", "e"))
+        // but first is still the current track ("a" — startIndex 0)
         assertEquals("a", q.displayQueue.first().id)
+    }
+
+    @Test
+    fun playAtDisplayPlaysExactlyTheVisibleRow() {
+        val display = shuffledQueueAt3().displayQueue
+        for (i in display.indices) {
+            val probe = shuffledQueueAt3()
+            probe.playAtDisplay(i)
+            assertEquals(display[i].id, probe.current?.id, "tapping visible row $i must play that row")
+            assertEquals(i, probe.displayCurrentIndex)
+        }
+    }
+
+    @Test
+    fun removeAtDisplayRemovesTheVisibleRowAndKeepsOrder() {
+        val q = shuffledQueueAt3()
+        val before = q.displayQueue
+        val victim = before[3]
+        assertTrue(q.removeAtDisplay(3))
+        assertEquals(before.size - 1, q.displayQueue.size)
+        assertTrue(victim.id !in q.displayQueue.map { it.id })
+        assertEquals(
+            before.filterIndexed { i, _ -> i != 3 }.map { it.id },
+            q.displayQueue.map { it.id },
+            "relative order of the survivors must be preserved",
+        )
+    }
+
+    @Test
+    fun moveInDisplayUnderShufflePermutesExactlyAsDragged() {
+        val q = shuffledQueueAt3()
+        val before = q.displayQueue
+        assertTrue(q.moveInDisplay(4, 1))
+        val expected = before.toMutableList().apply { add(1, removeAt(4)) }
+        assertEquals(expected.map { it.id }, q.displayQueue.map { it.id }, "no re-shuffle may happen on drag")
+        // the playback order follows: peek from current == display after current
+        assertEquals(q.displayQueue.drop(1), q.upcoming)
+    }
+
+    @Test
+    fun moveInDisplayWithoutShuffleReordersSourceLikeDrag() {
+        val q = QueueManager(ZeroRandom()).apply { setQueue((1..5).map { track("t$it") }) }
+        assertTrue(q.moveInDisplay(0, 3))
+        assertEquals(listOf("t2", "t3", "t4", "t1", "t5"), q.displayQueue.map { it.id })
+    }
+
+    @Test
+    fun addNextUnderShuffleIsNextInPlayback() {
+        val q = shuffledQueueAt3()
+        q.addNext(track("next"))
+        val display = q.displayQueue
+        assertEquals("next", display[1].id, "play-next must sit directly after the current row")
+        assertEquals("next", q.peekNext()?.id, "and it must be what actually plays next")
+    }
+
+    @Test
+    fun addToQueueUnderShuffleAppendsAtPlaybackEnd() {
+        val q = shuffledQueueAt3()
+        q.addToQueue(track("last"))
+        assertEquals("last", q.displayQueue.last().id)
+        assertEquals("last", q.upcoming.last().id)
+    }
+
+    @Test
+    fun syncCurrentFollowsEngineAdvanceWithoutDisturbingOrder() {
+        val q = shuffledQueueAt3()
+        val before = q.displayQueue
+        val engineAdvanced = before[1]
+        assertTrue(q.syncCurrent(engineAdvanced.id))
+        assertEquals(1, q.displayCurrentIndex)
+        assertEquals(before.map { it.id }, q.displayQueue.map { it.id }, "order must be untouched by sync")
+        assertFalse(q.syncCurrent("no-such-track"))
+        assertEquals(1, q.displayCurrentIndex)
     }
 
     /* ---------------- add / remove / move ---------------- */

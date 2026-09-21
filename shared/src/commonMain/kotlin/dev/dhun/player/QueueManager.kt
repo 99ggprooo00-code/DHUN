@@ -61,21 +61,27 @@ class QueueManager(private val random: Random = Random.Default) {
             addToQueue(track)
             return
         }
-        items.add(currentIndexInItems + 1, track)
-        rebuildOrder()
-        // keep cursor on current; find the inserted track's order position
+        val insertAt = currentIndexInItems + 1
+        items.add(insertAt, track)
+        // Order-preserving splice: entries referencing shifted source positions
+        // move +1, and the new track plays directly after the current one —
+        // "play next" under shuffle too (no rebuild, no re-shuffle).
+        for (i in playOrder.indices) if (playOrder[i] >= insertAt) playOrder[i]++
+        playOrder.add(orderCursor + 1, insertAt)
         orderCursor = playOrder.indexOf(currentIndexInItems)
     }
 
     fun addToQueue(track: Track) {
         val wasEmpty = items.isEmpty()
+        val appendedAt = items.size
         items += track
-        rebuildOrder()
         if (wasEmpty) {
-            orderCursor = 0
             currentIndexInItems = 0
+            orderCursor = 0
+            rebuildOrder()
         } else {
-            orderCursor = playOrder.indexOf(currentIndexInItems)
+            // Append = the END of the playback order, shuffled or not.
+            playOrder.add(appendedAt)
         }
     }
 
@@ -83,21 +89,29 @@ class QueueManager(private val random: Random = Random.Default) {
         if (index !in items.indices) return false
         val removingCurrent = index == currentIndexInItems
         items.removeAt(index)
-        when {
-            items.isEmpty() -> {
-                currentIndexInItems = -1
-                orderCursor = -1
-            }
-            else -> {
-                // shift: current moved left if we removed before it
-                if (index < currentIndexInItems) currentIndexInItems--
-                if (removingCurrent) {
-                    currentIndexInItems = currentIndexInItems.coerceAtMost(items.size - 1)
-                }
-                rebuildOrder()
-                orderCursor = playOrder.indexOf(currentIndexInItems).coerceAtLeast(0)
-            }
+        if (items.isEmpty()) {
+            currentIndexInItems = -1
+            orderCursor = -1
+            playOrder.clear()
+            return true
         }
+        // Order-preserving removal: drop the entry from the play order and
+        // close the gap — the rest of the (possibly shuffled) order is kept
+        // exactly as the user saw it.
+        val orderPos = playOrder.indexOf(index)
+        if (orderPos >= 0) playOrder.removeAt(orderPos)
+        for (i in playOrder.indices) if (playOrder[i] > index) playOrder[i]--
+        when {
+            removingCurrent -> {
+                // Advance to whatever now occupies the removed slot in PLAY
+                // order ("removing the playing entry advances"); identity
+                // order reproduces the old source-position semantics.
+                currentIndexInItems = (playOrder.getOrNull(orderPos) ?: index)
+                    .coerceIn(0, items.size - 1)
+            }
+            index < currentIndexInItems -> currentIndexInItems--
+        }
+        orderCursor = playOrder.indexOf(currentIndexInItems).coerceAtLeast(0)
         return true
     }
 
@@ -121,12 +135,19 @@ class QueueManager(private val random: Random = Random.Default) {
         return shuffleEnabled
     }
 
+    /** Idempotent counterpart to [toggleShuffle]; safe to call with the current value. */
     fun setShuffle(enabled: Boolean): Boolean {
         if (shuffleEnabled == enabled) return shuffleEnabled
         return toggleShuffle()
     }
 
-    /** Visible queue order: shuffled when enabled (current first), source order otherwise. */
+    /**
+     * The order the user sees (and the queue tab renders): the shuffled play
+     * order — current track head — when shuffle is on, source order otherwise.
+     * Playback follows this list on every platform, so a row's position here
+     * is exactly what the [playAtDisplay]/[removeAtDisplay]/[moveInDisplay]
+     * indices mean.
+     */
     val displayQueue: List<Track>
         get() = if (shuffleEnabled) {
             playOrder.mapNotNull { items.getOrNull(it) }
@@ -137,6 +158,56 @@ class QueueManager(private val random: Random = Random.Default) {
     /** Index of the current track inside [displayQueue]; -1 when empty. */
     val displayCurrentIndex: Int
         get() = if (isEmpty) -1 else displayQueue.indexOfFirst { it.id == current?.id }.takeIf { it >= 0 } ?: 0
+
+    /** [playAt] in display space: plays the track the user sees at [index]. */
+    fun playAtDisplay(index: Int): Track? {
+        val source = displaySourceIndex(index) ?: return null
+        return playAt(source)
+    }
+
+    /** [removeAt] in display space: removes the row the user sees at [index]. */
+    fun removeAtDisplay(index: Int): Boolean {
+        val source = displaySourceIndex(index) ?: return false
+        return removeAt(source)
+    }
+
+    /**
+     * Drag-reorder in display space. Shuffle off this reorders the source
+     * queue (display == source). Shuffle on this permutes the shuffled play
+     * order EXACTLY as dragged — no re-shuffle — so what the user arranged is
+     * what will play.
+     */
+    fun moveInDisplay(from: Int, to: Int): Boolean {
+        if (from !in displayQueue.indices || to !in displayQueue.indices || from == to) return false
+        if (!shuffleEnabled) return move(from, to)
+        playOrder.add(to, playOrder.removeAt(from))
+        orderCursor = playOrder.indexOf(currentIndexInItems).coerceAtLeast(0)
+        return true
+    }
+
+    /**
+     * Re-point the current track to [trackId] WITHOUT touching the play
+     * order — for engines whose timeline advances itself (Android/Media3):
+     * keeps the visible highlight in step with what is actually sounding
+     * after a natural advance, engine-side next/previous, or a service-side
+     * seek. No-op when the id is unknown or already current.
+     *
+     * @return true when the id was found in the queue.
+     */
+    fun syncCurrent(trackId: String): Boolean {
+        val idx = items.indexOfFirst { it.id == trackId }
+        if (idx < 0) return false
+        if (idx == currentIndexInItems) return true
+        currentIndexInItems = idx
+        orderCursor = playOrder.indexOf(idx).coerceAtLeast(0)
+        return true
+    }
+
+    /** Map a display position to its source ([items]) index; null out of bounds. */
+    private fun displaySourceIndex(displayIndex: Int): Int? {
+        if (displayIndex !in displayQueue.indices) return null
+        return if (shuffleEnabled) playOrder.getOrNull(displayIndex) else displayIndex
+    }
 
     fun setRepeatMode(mode: RepeatMode) {
         repeatMode = mode
