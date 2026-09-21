@@ -24,6 +24,18 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — Windows downloaded-file playback (2026-09-21, CI/hardware verification pending)
+
+- Completed downloads now resolve to escaped file URIs: Windows drive paths
+  use `file:///C:/...`, separators are normalized, and spaces, `%`, `#`, `?`
+  and Unicode are encoded without changing the filename. Previously raw
+  `file://` + Windows path could give libVLC an invalid media location.
+- Desktop local-file errors no longer enter CDN/cache-fill recovery or claim
+  a User-Agent/CDN rejection. They identify local-file playback failure instead.
+- Regression coverage includes Windows drive/UNC paths, Android/Unix paths,
+  reserved characters and Unicode, completed-download network bypass, and
+  local-vs-remote playback-error routing. Windows hardware retest still required.
+
 ### Fixed — explicit close stops playback (2026-09-21, CI/hardware verification pending)
 
 - **Windows X now quits completely**, using the same player/resource teardown

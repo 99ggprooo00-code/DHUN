@@ -1,6 +1,30 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — Downloaded Windows row fails from Downloads: malformed file URI
+
+User confirmed **Downloaded** row and **Library → Downloads** playback for
+`O3-6zB3kg8M`; cannot collect logs. Code-level defects are independently visible:
+`OfflineFirstStreamResolver.toFileUri` was just `"file://$path"`. A stored
+`C:\Program Files\...` path became `file://C:\Program Files\...`, not a valid
+escaped drive file URI. Desktop's remote-recovery bookkeeping also accepted the
+local URI, then checked only the separate bounded cache on failure, explaining
+why the shown error could falsely blame CDN/User-Agent instead of local media.
+
+Fresh portable URI formatter normalizes Windows drive/UNC separators, percent
+encodes UTF-8 filename bytes (including literal %, space, # and ?), preserves
+Unix literal backslashes and leaves raw paths unchanged for file existence checks.
+Desktop records the actual MRL at startMedia (including cache paths), reports
+local errors directly and reserves CDN fallback for HTTP(S). Six shared cases
+(path vectors + offline resolver/network bypass) and two desktop routing cases.
+No forks/vendor code; no transport change or requirement for user console logs.
+
+CI is the compile gate (no local JDK/SDK). Existing downloaded bytes/integrity
+and libVLC behavior on the user's machine remain unverified: do NOT mark the
+hardware failure fixed until existing download replays offline on the new build.
+PR #106 remains unmerged, rolling test unchanged. Close-fix head 16a6cd6 had
+build/APK green and build-and-test/MSI pending at this pre-push check.
+
 ## 2026-09-21 — Explicit close left music playing (`arena/01a0c24e-dhun`)
 
 User clarified Windows X must quit completely; Android close means swiping the

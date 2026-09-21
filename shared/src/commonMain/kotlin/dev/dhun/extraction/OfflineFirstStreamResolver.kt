@@ -34,7 +34,7 @@ class OfflineFirstStreamResolver(
             return DhunResult.Success(
                 StreamInfo(
                     videoId = videoId,
-                    audioUrl = toFileUri(downloaded.localAudioPath),
+                    audioUrl = localAudioFileUri(downloaded.localAudioPath),
                     mimeType = downloaded.mimeType.ifBlank { "audio/webm" },
                     bitrateKbps = downloaded.bitrateKbps,
                     contentLengthBytes = downloaded.fileSizeBytes,
@@ -46,5 +46,4 @@ class OfflineFirstStreamResolver(
         return primary.resolve(videoId)
     }
 
-    private fun toFileUri(path: String): String = "file://$path"
 }

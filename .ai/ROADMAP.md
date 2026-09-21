@@ -30,16 +30,23 @@ Files include those above, settings model/key documentation, CHANGELOG and
 handoff/debug docs. The earlier docs-only #105 follow-up is the first commit
 of PR #106; this report expands that same session PR to the close fixes.
 
-**Last reported error:** Windows track `O3-6zB3kg8M`: “Stream rejected by the
-CDN and no local copy could be fetched”; user says it downloads but fails to play.
-Completion state, playback entry point, installed build and local-file presence
-are not yet confirmed. The older Windows download pass does not close this report.
+**Windows download evidence updated:** user confirms the row says **Downloaded**
+and playback was from **Library → Downloads**, track `O3-6zB3kg8M`; user does
+not know how to collect logs. No logs required to address the demonstrated code
+bugs: `OfflineFirstStreamResolver` concatenated `file://` with raw Windows paths
+(invalid drive/separator/escaping semantics), while desktop treated local MRL
+errors as CDN failures. New portable `localAudioFileUri` fixes drive/UNC and
+UTF-8 percent escaping; desktop local errors bypass network recovery with an
+honest local-file message. Six shared cases (incl. resolver integration) and two
+desktop error-routing cases added. File existence/integrity and actual Windows
+playback are not proven; this is a candidate fix, not a hardware PASS.
 
-**Exact next step:** CI for the new close changes, then hardware checks in
-HANDOFF (X must remove tray/stop sound; Android swipe must stop but Home/lock
-must not). For the still-open download issue ask whether the row is COMPLETED / DOWNLOADING / FAILED
-and whether playback was from Library → Downloads; obtain matching `DHUN download`
-and `DHUN cache` lines (redact signed URLs/personal paths). Trace is in HANDOFF.
+**Exact next step:** fresh CI for path/error-routing changes, then hardware:
+Library → Downloads → play `O3-6zB3kg8M` online and offline without redownloading
+first; if it still fails, collect the new playback details (no console expertise
+required). Close checks in HANDOFF also remain (X must remove tray/stop sound;
+Android swipe must stop but Home/lock must not). `test` is still #105 and does
+not yet include these changes; no merge authorized.
 For Android failure request the actual resolve/bytes/worker logcat line before
 fixing the named stage. Reproduce engine defects and add regression tests before
 code fixes. Endless radio (extend `/next` continuation at ≤3 remaining) waits
@@ -50,8 +57,9 @@ Windows native checks remain.
 research-docs PR #54 open, no active runs observed (not proof another agent is
 inactive). Work only on this session branch; no merge without user approval.
 PR #106 docs commit `c6326f0` is pushed and CI-green (35562760973,
-35562760709, 35562760707). Close changes are locally reviewed with
-`git diff --check`; their own CI is not yet verified. No JDK/Android SDK locally;
+35562760709, 35562760707). Close commit `16a6cd6` is pushed: build/APK passed, build-and-test/MSI were
+still pending at the pre-push check. Path/error-routing changes pass
+`git diff --check` locally; their own CI is not yet verified. No JDK/Android SDK locally;
 CI is the compile gate. No merge authorized; current `test` is still #105.
 
 ---

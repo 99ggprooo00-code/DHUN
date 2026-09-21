@@ -92,6 +92,16 @@ before starting the next one** (the one-agent rule in MASTER_PROMPT §8.1).
 
 ## Latest hardware report / triage — 2026-09-21
 
+**Latest user clarification:** row says **Downloaded**; playback launched from
+**Library → Downloads**. User cannot collect console logs; do not keep blocking
+on those. Candidate fix now in this session PR: portable escaped file URI from
+raw path + local-file error routing, not a transport rewrite. Tests exercise
+Windows paths on Linux CI so this cannot hide behind platform-specific coverage.
+Hardware cause is still not proven without a replay of the corrected build.
+Retest the existing download online then offline before deleting/redownloading;
+if it fails, request the updated on-screen playback details first.
+
+
 **Windows download/playback FAIL**, track `O3-6zB3kg8M`: user reports it
 “downloads but on playing” shows “Stream rejected by the CDN and no local copy
 could be fetched”, with details “libVLC rejected the stream URL and the cache
@@ -99,7 +109,7 @@ fill produced no file (VLC cannot send the resolving identity's User-Agent).”
 Tests 1–5 remain **unconfirmed**; do not interpret the supplied PASS criteria as
 results. Earlier Round-2 Windows pass is historical, not a verdict on this build.
 
-**Code trace, not root-cause verdict:** desktop DI wraps playback resolution in
+**Original #105 code trace (branches corrected by the pending PR), not hardware root-cause verdict:** desktop DI wraps playback resolution in
 `OfflineFirstStreamResolver`: COMPLETED row + existing file → local file URI;
 otherwise network resolver. `DesktopDhunPlayer` checks its separate bounded
 cache first, then the provider. It sets `streamingRemoteUrl = info.audioUrl`
@@ -109,12 +119,10 @@ Thus the reported text alone cannot distinguish network failure from local-file
 playback failure. Do not claim a CDN rejection or successful persistent download
 based only on that text.
 
-**Requested evidence:** installed build; download row state (COMPLETED,
-DOWNLOADING %, FAILED, QUEUED or absent); play from Library → Downloads vs another
-screen; matching `DHUN download O3-6zB3kg8M:` completion/failure and `DHUN cache:`
+**Remaining optional evidence:** installed build and matching `DHUN download O3-6zB3kg8M:` completion/failure and `DHUN cache:`
 lines. If completed, confirm the reported local file exists and is nonempty.
-Redact signed URLs, credentials and personal path segments. Fix the demonstrated
-stage with regression coverage; no speculative transport changes in this docs PR.
+Redact signed URLs, credentials and personal path segments. The raw-path URI and misleading local-error branches now have candidate fixes
+and regression coverage; no speculative transport changes.
 
 **Android download failure:** request logcat line exactly as emitted:
 - `DHUN download <id>: resolve failed: …`

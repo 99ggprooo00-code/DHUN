@@ -58,6 +58,25 @@ class OfflineFirstStreamResolverTest {
     }
 
     @Test
+    fun completedWindowsDownloadReturnsEncodedLocalUriWithoutNetwork(): Unit = runBlocking {
+        val repo = repo()
+        val path = "C:\\Program Files\\DHUN\\downloads\\audio\\O3-6zB3kg8M.webm"
+        repo.upsert(downloadedTrack("O3-6zB3kg8M").copy(localAudioPath = path))
+        val network = NetworkResolver()
+        val resolver = OfflineFirstStreamResolver(repo, network) { candidate ->
+            assertEquals(path, candidate) // existence check uses the raw path, not the URI
+            true
+        }
+        val result = resolver.resolve("O3-6zB3kg8M")
+        assertIs<DhunResult.Success<StreamInfo>>(result)
+        assertEquals(
+            "file:///C:/Program%20Files/DHUN/downloads/audio/O3-6zB3kg8M.webm",
+            result.value.audioUrl,
+        )
+        assertEquals(0, network.calls)
+    }
+
+    @Test
     fun missingFileOrNotCompletedFallsThroughToNetwork(): Unit = runBlocking {
         val repo = repo()
         repo.upsert(downloadedTrack("v2")) // COMPLETED but file absent

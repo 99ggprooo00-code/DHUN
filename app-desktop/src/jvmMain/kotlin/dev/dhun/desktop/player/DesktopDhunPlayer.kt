@@ -70,13 +70,13 @@ class DesktopDhunPlayer(
     private val opMutex = Mutex()
 
     /**
-     * Remote MRL currently handed to libVLC, and whether the local-copy
+     * MRL currently handed to libVLC (local or remote), and whether the local-copy
      * fallback already ran for it. libVLC cannot send a custom User-Agent,
      * so a googlevideo URL bound to a specific InnerTube identity may be
      * rejected at the CDN even though resolution succeeded — the fallback
      * replays the same track from a file DHUN downloaded *with* that agent.
      */
-    @Volatile private var streamingRemoteUrl: String? = null
+    @Volatile private var playingMediaUrl: String? = null
     @Volatile private var localFallbackAttempted = false
 
     private val vlcAvailable: Boolean get() = factory != null && mediaPlayer != null
@@ -420,7 +420,7 @@ class DesktopDhunPlayer(
             if (promoted != null) {
                 log("pre-buffered hit: promoted temp to permanent ${track.id} (${promoted.length()} bytes) — instant playback")
                 audioCache.clearTemp(keepVideoId = null)
-                streamingRemoteUrl = null
+                playingMediaUrl = null
                 localFallbackAttempted = false
                 startMedia(track, promoted.absolutePath)
                 return
@@ -432,7 +432,7 @@ class DesktopDhunPlayer(
         if (cached != null) {
             log("cache hit ${track.id} (${cached.length()} bytes) — playing local file")
             audioCache?.clearTemp(keepVideoId = null)
-            streamingRemoteUrl = null
+            playingMediaUrl = null
             localFallbackAttempted = false
             startMedia(track, cached.absolutePath)
             return
@@ -447,7 +447,7 @@ class DesktopDhunPlayer(
         when (val result = provider.getStreamInfo(track.id)) {
             is DhunResult.Success -> {
                 val info = result.value
-                streamingRemoteUrl = info.audioUrl
+                playingMediaUrl = info.audioUrl
                 localFallbackAttempted = false
                 log(
                     "resolved ${track.id} in ${System.currentTimeMillis() - startedAtMs}ms: " +
@@ -479,6 +479,7 @@ class DesktopDhunPlayer(
     }
 
     private fun startMedia(track: Track, mrl: String) {
+        playingMediaUrl = mrl
         if (!vlcAvailable) {
             _state.value = PlaybackState.Error(
                 track,
@@ -505,10 +506,6 @@ class DesktopDhunPlayer(
      * Bandwidth is spent twice for a first play (stream + fill) — accepted
      * v1 trade-off for a URL-only engine; documented in KNOWN_LIMITATIONS.
      */
-    /** A `file://` (or bare path) MRL means the media is already local. */
-    private fun isLocalMediaUrl(url: String?): Boolean =
-        url == null || url.startsWith("file://") || !url.startsWith("http")
-
     private fun startCacheFill(
         videoId: String,
         url: String,
@@ -607,8 +604,12 @@ class DesktopDhunPlayer(
      */
     private fun handlePlaybackError() {
         val track = _currentTrack.value
-        val remoteUrl = streamingRemoteUrl
-        if (track == null || remoteUrl == null || localFallbackAttempted) {
+        val mediaUrl = playingMediaUrl
+        localFilePlaybackError(track, mediaUrl)?.let { error ->
+            _state.value = error
+            return
+        }
+        if (track == null || mediaUrl == null || localFallbackAttempted) {
             _state.value = PlaybackState.Error(
                 track,
                 "Playback failed (stream URL or network).",
@@ -625,7 +626,7 @@ class DesktopDhunPlayer(
             if (_currentTrack.value?.id != track.id) return@launch
             val file = audioCache?.fileFor(track.id)
             if (file != null && file.length() > 0) {
-                streamingRemoteUrl = null
+                playingMediaUrl = null
                 log("playing ${track.id} from the local copy (${file.length()} bytes)")
                 startMedia(track, file.absolutePath)
             } else {
@@ -669,7 +670,7 @@ class DesktopDhunPlayer(
     }
 
     private fun stopLocked() {
-        streamingRemoteUrl = null
+        playingMediaUrl = null
         localFallbackAttempted = false
         cancelCacheFill()
         cancelPrebuffer()
