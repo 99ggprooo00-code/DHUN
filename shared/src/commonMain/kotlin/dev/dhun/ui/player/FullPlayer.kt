@@ -1303,16 +1303,18 @@ private fun ArtworkBackdrop(
  *
  * Kept as data (not a hard-coded brush) so the legibility contract — clears
  * out in the middle, darkens monotonically towards the bottom, never fully
- * opaque — is unit-tested rather than eyeballed.
+ * opaque — is unit-tested rather than eyeballed. The 2026-09-21 UI-polish
+ * pass lowered every stop so the artwork shows through more; the bottom stop
+ * respects the ≥0.85 legibility floor pinned by `PlayerSheetLayoutTest`.
  */
 internal fun playerAmbientScrimStops(): List<Pair<Float, Float>> = listOf(
-    0.00f to 0.30f,
-    0.16f to 0.10f,
+    0.00f to 0.24f,
+    0.16f to 0.08f,
     0.42f to 0.00f,
-    0.58f to 0.24f,
-    0.72f to 0.52f,
-    0.86f to 0.78f,
-    1.00f to 0.92f,
+    0.58f to 0.18f,
+    0.72f to 0.38f,
+    0.86f to 0.62f,
+    1.00f to 0.86f,
 )
 
 /** [playerAmbientScrimStops] as the brush the backdrop actually paints. */

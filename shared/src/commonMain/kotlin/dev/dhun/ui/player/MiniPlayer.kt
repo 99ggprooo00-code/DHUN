@@ -58,6 +58,12 @@ import dev.dhun.presentation.player.PlayerViewModel
  * The docked, in-app MiniPlayer (ADR-004): artwork wash, track-local progress,
  * readable metadata and independent transport targets. Click/keyboard activation
  * expands it (or opens error details); a density-aware swipe up always expands.
+ *
+ * [embedded] renders the row **without its own glass chrome** for placement
+ * inside the shared [dev.dhun.design.components.GlassDock] (the continuous
+ * mini + nav bottom dock): the dock owns the glass, the blurred artwork and
+ * the outer shape, so the two read as one surface. The default `false` keeps
+ * the standalone floating-card look (rail layouts).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -65,6 +71,7 @@ fun MiniPlayer(
     viewModel: PlayerViewModel,
     onExpand: () -> Unit,
     modifier: Modifier = Modifier,
+    embedded: Boolean = false,
 ) {
     val state by viewModel.state.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
@@ -93,16 +100,7 @@ fun MiniPlayer(
     val swipeThresholdPx = with(LocalDensity.current) { DhunSpacing.touchTarget.toPx() }
     val actionLabel = playbackActionLabel(state)
 
-    GlassBottomBar(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(DhunShapes.large)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(ambientTint, DhunColors.glassHighlight.copy(alpha = 0.15f), ambientTint.copy(alpha = 0.08f)),
-                ),
-            ),
-    ) {
+    val miniContent: @Composable () -> Unit = {
         Column(modifier = Modifier.fillMaxWidth()) {
             // A new track starts at its own position, never a sweep backwards
             // from the previous track. Playback ticks are gently interpolated.
@@ -255,6 +253,23 @@ fun MiniPlayer(
                     }
                 }
             }
+        }
+    }
+    if (embedded) {
+        // The continuous glass dock owns the chrome — render content only.
+        Box(modifier = modifier.fillMaxWidth()) { miniContent() }
+    } else {
+        GlassBottomBar(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(DhunShapes.large)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(ambientTint, DhunColors.glassHighlight.copy(alpha = 0.15f), ambientTint.copy(alpha = 0.08f)),
+                    ),
+                ),
+        ) {
+            miniContent()
         }
     }
 

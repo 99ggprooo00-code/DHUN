@@ -5,7 +5,74 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## Final pre-merge verification — supersedes pending/hold statuses below
+## CURRENT STATE — post-merge sync, 2026-09-21, session `arena/01a0c2c7-dhun`
+
+This section supersedes the pre-merge statuses below it.
+
+**Merge + release (verified on GitHub):** PR #106 merged into `main` as
+**`810bef1`** at 2026-09-21T05:41:01Z after full green CI, under explicit user
+authorization. Rolling `test` re-published **2026-09-21T05:47:48Z**; tag AND
+target = **`810bef13f34227360282df88f57372d6b0feba7c`**; APK **18,334,451 B**,
+MSI **112,889,856 B** (old MSI was **112,873,472 B** — this size distinguishes
+new vs old installer). The previous session's post-merge doc commits never
+reached `main` (its GitHub access closed after the merge; the branch is
+deleted), so `main`'s `.ai` docs were stale until this session's docs-sync
+commit.
+
+**Hardware verdicts (exact, updated 2026-09-21):**
+- **Android: PASS** on the merged build — user: "android all working" (Home
+  moods, pull-to-refresh, close/swipe behavior).
+- **Windows: PASS (user-tested 2026-09-21)** — the user installed the updated
+  app (the `810bef1` rolling release, PR #106 scope) and reports **"its
+  great"**; the earlier failure was the stale install. Gate-4 items were not
+  itemized individually and no failure was reported. The user's "blurry
+  thumbnail is gone" remark was retracted minutes later: "sorry thumbnail
+  wasent loded well" — a transient artwork-load hiccup, not a regression
+  (desktop blur support is unconditional, `BlurSupport.jvm.kt` = true).
+- **PR #107 (UI polish) is NOT in any released build** — the user authorized
+  its merge ("it's good go ahead") knowing this; its visuals arrive with the
+  next rolling `test` release after merge. The four-gate procedure below is
+  retained for any future clean-install verification.
+
+**Saved Windows verification procedure — run it when the user tests Windows:**
+- **Gate 1:** downloaded `dhun-test.msi` must be exactly **112,889,856 bytes**;
+  if different, re-download from
+  `https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.msi`.
+- **Gate 2:** kill any dhun process; Settings → Apps → uninstall ALL DHUN
+  entries.
+- **Gate 3:** install the MSI, launch from the Start menu (old pins may point
+  at a stale exe).
+- **Gate 4:** proof = the round refresh icon next to the Home greeting is
+  **GONE**. Then verify: moods switch the whole page to "<Mood> songs"; For
+  you restores Home; X fully quits and stops music; downloaded track
+  `O3-6zB3kg8M` plays from Library → Downloads (online first, then airplane
+  mode; keep the existing file).
+- If Gate 4 fails with correct MSI size + clean install: inspect the shipped
+  MSI binary itself (search bundled jars for HomeMood / "Refresh music"
+  strings).
+- The user cannot comfortably collect console logs — prefer on-screen
+  feedback; redact signed URLs/credentials/personal paths. For Android download
+  issues ask for the exact `DHUN download <id>: <stage>` log line
+  (resolve/bytes/worker) and fix the named stage, never guess.
+
+**Session queue (priority order):** (1) help verify/fix Windows per user
+reports; (2) user-requested UI polish — **IMPLEMENTED 2026-09-21 on the
+session branch**: dark ladder +0x0C per rung (bg 0x16, surfaces 1E→36,
+highest 3C), FullPlayer dim 0.42/0.10 + ambient stops lowered (bottom 0.86),
+shell backdrop dim 0.45 + stops 0.50/0.32/0.44/0.62, `DARK_LEGIBILITY_FLOOR`
+0.42→0.45 (contrast replicated locally, all WCAG gates pass),
+`artworkThumb` 56→64dp (no clip risks found), new continuous `GlassDock`
+(blurred-artwork veil under glassBarTop→glassStrong) holding
+MiniPlayer(`embedded = true`) + NavigationBar on the single-pane shell;
+CI green then user visual verdict on both platforms — record "awaiting user
+visual verdict", no merge without it; (3) endless radio via `/next`
+continuation when ≤3 songs remain — ask the user before starting (Android is
+PASS; Windows accepted but untested); supersedes the old #99 "different song"
+behavior — same song, same position, no gap, tail replaced on refill; (4)
+remaining #105 checklist: S3/S6 soaks, rotation/process death, persistence,
+Windows tray/jump-list/SMTC/media keys.
+
+## Final pre-merge verification — superseded by the CURRENT STATE section above
 
 Code head **35d76f6** on PR #106 is pushed and GREEN: build **35564494454**,
 build-and-test **35564494452**, APK/MSI **35564494458**. Full shared, Android

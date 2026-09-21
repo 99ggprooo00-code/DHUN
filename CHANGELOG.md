@@ -24,7 +24,66 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### Fixed — Home categories and pull-to-refresh (2026-09-21, hardware verification pending)
+### Changed — UI polish: lighter dark surfaces, larger thumbnails, continuous glass dock (2026-09-21, merged under user authorization)
+
+> User verdicts, 2026-09-21: Windows tested on the `810bef1` rolling release:
+> "its great" (the earlier "blurry thumbnail is gone" was retracted as
+> "thumbnail wasent loded well" — a load hiccup). Merge authorized: "it's
+> good go ahead". The polish itself ships in the rolling `test` release
+> published right after this merge.
+
+- **Dark surfaces lifted one step** (each neutral rung +0x0C: background
+  `#0A0A0A` → `#161616`, surface ladder now 16 → 36, tonal highest `#3C3C3C`)
+  so Home/Search/Library sit closer to the full player's backdrop brightness.
+  Placeholders and shimmer follow; glass, text, scrim and accent tokens are
+  unchanged; the light theme is untouched.
+- **The full player lets the artwork show through more**: the backdrop dim
+  dropped from 0.52/0.16 to 0.42/0.10 and the ambient scrim's stops were
+  lowered (bottom stop 0.92 → 0.86, still inside the ≥0.85 legibility pin).
+  The shell's blurred-artwork backdrop dim/scrim were lightened the same way
+  (0.55 → 0.45; stops 0.62/0.42/0.58/0.78 → 0.50/0.32/0.44/0.62).
+- **Artwork-derived control accents were re-floored for the lighter surfaces**
+  (`DARK_LEGIBILITY_FLOOR` 0.42 → 0.45): at 0.42 the darkest artwork primaries
+  measured 2.85:1 against the new surface, under the WCAG 1.4.11 3:1 floor;
+  0.45 measures 3.12:1 worst-case. All `DhunThemeContrastTest` gates pass on
+  the new palette (replicated exactly before pushing); `DhunAppearanceTest`
+  pins updated to the new baseline.
+- **List thumbnails grew 56 → 64dp** (`DhunSpacing.artworkThumb`); every
+  consumer was audited — rows wrap content, no rail or fixed-height row clips.
+- **One continuous glass dock on phones/narrow windows**: the MiniPlayer and
+  the bottom navigation now share a single `GlassDock` surface filled with the
+  current track's blurred artwork (the LYRICS-card treatment, prepared once
+  per track via `BlurredArtworkCache`, same Coil request as the shell
+  backdrop) under the `glassBarTop → glassStrong` veil — no more two stacked
+  boxes. Rail/desktop layouts keep the floating MiniPlayer card. No new
+  dependencies.
+
+### Released and verified — PR #106 merged; rolling `test` republished (2026-09-21)
+
+- **Merged:** PR #106 landed on `main` as `810bef1` (2026-09-21T05:41:01Z)
+  after full green CI and explicit user authorization. It shipped the Home
+  mood topic-search feeds with pull-to-refresh, explicit close on both
+  platforms, and the Windows downloaded-file playback fix (18 regression
+  tests; all CI green on the merged head).
+- **Rolling `test` re-published** 2026-09-21T05:47:48Z; release tag AND
+  target = `810bef13f34227360282df88f57372d6b0feba7c`. `dhun-test.apk`
+  **18,334,451 B**; `dhun-test.msi` **112,889,856 B** (the previous MSI was
+  112,873,472 B — the byte size distinguishes the new installer from the old).
+- **Hardware verdicts:** **Android PASS** — the user tested the merged build:
+  "android all working" (Home moods, pull-to-refresh, close/swipe behavior).
+  **Windows PASS (user-tested)** — the user later installed the updated
+  Windows app and reports "its great"; the earlier "nothing works" report was
+  the stale install. Their "blurry thumbnail is gone" remark was retracted as
+  an artwork-load hiccup ("thumbnail wasent loded well"). Gate-4 items were
+  not itemized individually and no failure was reported.
+- **Docs sync:** the previous session's post-merge records never reached
+  `main` (its GitHub access closed after the merge and its branch was
+  deleted); this entry and the `.ai` updates restore those facts. The saved
+  Windows retest procedure (MSI byte-size gate, clean uninstall, Start-menu
+  launch, "round refresh icon gone" proof, downloaded-track offline replay)
+  is recorded in `.ai/HANDOFF_NEXT_SESSION.md`.
+
+### Fixed — Home categories and pull-to-refresh (2026-09-21; Android verified, Windows retest pending)
 
 - **Focus, Chill, Workout and Party now fetch topic-specific songs**, instead
   of just highlighting a chip and reordering matching shelf titles. For you
@@ -40,7 +99,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   remains available for non-touch use. Same songs may return if the server's
   results have not changed; refresh fetches again rather than shuffling locally.
 
-### Fixed — Windows downloaded-file playback (2026-09-21, CI verified; hardware verification pending)
+### Fixed — Windows downloaded-file playback (2026-09-21, CI verified; Windows device retest pending)
 
 - Completed downloads now resolve to escaped file URIs: Windows drive paths
   use `file:///C:/...`, separators are normalized, and spaces, `%`, `#`, `?`
@@ -232,7 +291,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   tab list unreachable while a page was open. The master now renders
   the tab (`detailRoute = null`); the detail pane keeps the page.
 - **Desktop: Escape is Back.** The desktop window had shortcuts for
-  transport, search and quit but no way to collapse the player or pop
+  transport, search and quit but no way to collapse the player or pplayer or pop
   a page from the keyboard. Escape now runs the shared back contract
   (collapse → pop page → previous tab).
 - **Restoring onto CATALOG no longer strands the user.** The developer

@@ -46,14 +46,17 @@ class DhunAppearanceTest {
 
     @Test
     fun darkPaletteMatchesBaselineIncludingS5ErrorContrastRetune() {
-        // Preserve the dark baseline except for the intentional S5 error retune.
-        // Error and its translucent border share the new accessible hue.
-        assertEquals(Color(0xFF0A0A0A), DhunColors.background, "background")
-        assertEquals(Color(0xFF121212), DhunColors.surface, "surface")
-        assertEquals(Color(0xFF1A1A1A), DhunColors.surfaceVariant, "surfaceVariant")
-        assertEquals(Color(0xFF242424), DhunColors.surfaceElevated, "surfaceElevated")
-        assertEquals(Color(0xFF2A2A2A), DhunColors.surfaceHighest, "surfaceHighest")
-        assertEquals(Color(0xFF1E1E1E), DhunColors.surfaceCard, "surfaceCard")
+        // Preserve the dark baseline except for the two intentional retunes:
+        // the S5 error-contrast fix (error + its translucent border share the
+        // accessible hue) and the 2026-09-21 UI-polish surface lift (every
+        // neutral rung +0x0C from the shipped 0A→2A ladder; glass, text,
+        // scrim and accent tokens untouched).
+        assertEquals(Color(0xFF161616), DhunColors.background, "background")
+        assertEquals(Color(0xFF1E1E1E), DhunColors.surface, "surface")
+        assertEquals(Color(0xFF262626), DhunColors.surfaceVariant, "surfaceVariant")
+        assertEquals(Color(0xFF303030), DhunColors.surfaceElevated, "surfaceElevated")
+        assertEquals(Color(0xFF363636), DhunColors.surfaceHighest, "surfaceHighest")
+        assertEquals(Color(0xFF2A2A2A), DhunColors.surfaceCard, "surfaceCard")
         assertEquals(Color(0x5E20202A), DhunColors.glassHighlight, "glassHighlight")
         assertEquals(Color(0x7016161E), DhunColors.glass, "glass")
         assertEquals(Color(0x8A0E0E14), DhunColors.glassDeep, "glassDeep")
@@ -83,17 +86,17 @@ class DhunAppearanceTest {
         assertEquals(Color(0x0FFFFFFF), DhunColors.overlayHover, "overlayHover")
         assertEquals(Color(0x14FFFFFF), DhunColors.overlayPressed, "overlayPressed")
         assertEquals(Color(0x1FFFFFFF), DhunColors.overlayFocus, "overlayFocus")
-        assertEquals(Color(0xFF1A1A1A), DhunColors.placeholderStart, "placeholderStart")
-        assertEquals(Color(0xFF2A2A2A), DhunColors.placeholderEnd, "placeholderEnd")
-        assertEquals(Color(0xFF333333), DhunColors.placeholderPulse, "placeholderPulse")
-        assertEquals(Color(0xFF1E1E1E), DhunColors.shimmerBase, "shimmerBase")
-        assertEquals(Color(0xFF2E2E2E), DhunColors.shimmerHighlight, "shimmerHighlight")
+        assertEquals(Color(0xFF262626), DhunColors.placeholderStart, "placeholderStart")
+        assertEquals(Color(0xFF363636), DhunColors.placeholderEnd, "placeholderEnd")
+        assertEquals(Color(0xFF3F3F3F), DhunColors.placeholderPulse, "placeholderPulse")
+        assertEquals(Color(0xFF2A2A2A), DhunColors.shimmerBase, "shimmerBase")
+        assertEquals(Color(0xFF3A3A3A), DhunColors.shimmerHighlight, "shimmerHighlight")
         // Tonal ladder — same values as before it was promoted to tokens.
         assertEquals(DhunColors.background, DhunColors.surfaceContainerLowest)
         assertEquals(DhunColors.surface, DhunColors.surfaceContainerLow)
         assertEquals(DhunColors.surfaceElevated, DhunColors.surfaceContainer)
         assertEquals(DhunColors.surfaceHighest, DhunColors.surfaceContainerHigh)
-        assertEquals(Color(0xFF303030), DhunColors.surfaceContainerHighest)
+        assertEquals(Color(0xFF3C3C3C), DhunColors.surfaceContainerHighest)
     }
 
     @Test

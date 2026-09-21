@@ -136,8 +136,13 @@ enum class NowPlayingBackdropPhase { Idle, Loading, Loaded, Failed }
  */
 object NowPlayingBackdropPolicy {
 
-    /** Flat black laid over the blur: low contrast, text stays readable. */
-    const val DIM_ALPHA = 0.55f
+    /**
+     * Flat black laid over the blur: low contrast, text stays readable.
+     * Lowered 0.55 → 0.45 by the 2026-09-21 UI-polish pass so the artwork
+     * glows through more (still inside the 0.4–0.75 legibility band pinned by
+     * `NowPlayingBackdropPolicyTest`).
+     */
+    const val DIM_ALPHA = 0.45f
 
     /** Blur radius, as a multiple of [DhunSpacing.glassBlur] (16dp → 64dp). */
     const val BLUR_SCALE = 4

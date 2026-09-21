@@ -62,7 +62,7 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.catalog.ComponentCatalogScreen
-import dev.dhun.design.components.GlassBottomBar
+import dev.dhun.design.components.GlassDock
 import dev.dhun.design.components.NowPlayingBackdrop
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.equalizer.EqualizerSession
@@ -572,39 +572,43 @@ private fun BottomNavigationBar(
     playerViewModel: PlayerViewModel,
     layout: DhunShellLayout,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    // One continuous glass dock (2026-09-21 UI polish): the MiniPlayer row and
+    // the nav bar share a single [GlassDock] whose fill is the current track's
+    // blurred artwork under the glass tokens — the LYRICS-card treatment — so
+    // docked chrome reads as one surface over the artwork, not stacked boxes.
+    val currentTrack by playerViewModel.currentTrack.collectAsState()
+    GlassDock(
+        artworkUrl = currentTrack?.thumbnailUrl,
+        modifier = Modifier.fillMaxWidth(),
+        shape = DhunShapes.bottomSheet,
+    ) {
         if (!nav.playerExpanded) {
             MiniPlayer(
                 viewModel = playerViewModel,
                 onExpand = { nav.playerExpanded = true },
+                embedded = true,
             )
         }
-        // Frosted M3 bottom bar (glass-morphism dock — not Liquid Glass).
-        GlassBottomBar(
-            modifier = Modifier.fillMaxWidth(),
-            shape = DhunShapes.bottomSheet,
+        NavigationBar(
+            containerColor = Color.Transparent,
+            contentColor = DhunColors.textPrimary,
+            tonalElevation = DhunSpacing.zero,
+            modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
         ) {
-            NavigationBar(
-                containerColor = Color.Transparent,
-                contentColor = DhunColors.textPrimary,
-                tonalElevation = DhunSpacing.zero,
-                modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
-            ) {
-                AppTab.userTabs.forEach { tab ->
-                    AppBottomNavigationItem(
+            AppTab.userTabs.forEach { tab ->
+                AppBottomNavigationItem(
+                    tab = tab,
+                    selected = DhunShellPolicy.isTabSelected(
+                        layout = layout,
+                        selectedTab = nav.selectedTab,
                         tab = tab,
-                        selected = DhunShellPolicy.isTabSelected(
-                            layout = layout,
-                            selectedTab = nav.selectedTab,
-                            tab = tab,
-                            detailDepth = nav.detailStack.size,
-                        ),
-                        // A bottom bar only exists in the single-pane layout, so
-                        // `false` here is the phone rule by construction: switching
-                        // tabs drops the stack that was covering the tab.
-                        onClick = { nav.selectTab(tab, keepDetailOnTabChange = false) },
-                    )
-                }
+                        detailDepth = nav.detailStack.size,
+                    ),
+                    // A bottom bar only exists in the single-pane layout, so
+                    // `false` here is the phone rule by construction: switching
+                    // tabs drops the stack that was covering the tab.
+                    onClick = { nav.selectTab(tab, keepDetailOnTabChange = false) },
+                )
             }
         }
     }

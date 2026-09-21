@@ -1,6 +1,152 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — Windows PASS reported; thumbnail remark retracted; PR #107 merge authorized
+
+Sequence, verbatim where it matters: the user first messaged "it's good go
+ahead also i tested the updated windows app its great but the blurry
+thumbnail is gone i think it ll be improvised in this pr", then interrupted
+and clarified: "sorry thumblail wasent loded well".
+
+**Verdicts recorded:** (1) Windows is now user-tested on the updated app —
+the `810bef1` rolling release (PR #106 scope): "its great". This closes the
+stale-install episode; Gate-4 items were not itemized and no failure was
+reported with any of them, so the Windows verdict is recorded as a general
+PASS, not per-item confirmations (the `O3-6zB3kg8M` offline replay and
+explicit-close itemization remain unconfirmed-but-unfailed). (2) The
+"blurry thumbnail is gone" observation was retracted by the user as a
+transient artwork-load hiccup — no code action. Cross-check done anyway:
+`supportsRealtimeBlur` on desktop is unconditionally `true`
+(`BlurSupport.jvm.kt`), so no platform gate could hide the dock/backdrop
+blur on Windows; consistent with the retraction. (3) "it's good go ahead" is
+the explicit user authorization to merge PR #107.
+
+**Honesty note kept in the record:** the Windows build the user tested does
+NOT contain #107 — the UI polish ships in the rolling `test` release
+published right after the merge, and the user must re-download to see it.
+The authorization covers merging #107 on the strength of green CI + the
+user's go-ahead, not an itemized on-device review of the polish.
+
+## 2026-09-21 — UI polish implemented: lighter dark ladder, 64dp thumbs, continuous glass dock (`arena/01a0c2c7-dhun`)
+
+User picked UI polish over endless radio this session. All three sub-tasks
+implemented on the session branch; **no visual verdict exists yet — CI first,
+then the user eyeballs both platforms. Never merge without it.**
+
+**(a) Lighter backgrounds.** Dark surface ladder lifted one rung in
+`DhunTokens` (each neutral +0x0C): background 0A→16, surface 12→1E,
+surfaceVariant 1A→26, surfaceCard 1E→2A, surfaceElevated 24→30,
+surfaceHighest 2A→36; tonal ladder follows (lowest=bg … highest 30→3C);
+placeholders/shimmer retuned to keep their relative steps. FullPlayer: dim
+0.52/0.16 → 0.42/0.10; `playerAmbientScrimStops` every stop lowered (bottom
+0.92→0.86 — the ≥0.85 floor pinned by `PlayerSheetLayoutTest` is respected).
+Shell backdrop (`NowPlayingBackdropPolicy`): DIM_ALPHA 0.55→0.45 (inside the
+0.4–0.75 pin), scrimStops 0.62/0.42/0.58/0.78 → 0.50/0.32/0.44/0.62. Light
+theme untouched.
+
+**Contrast was proven before pushing** by replicating `DhunThemeContrastTest`'s
+exact WCAG math in Python over the new ladder (all 5 text steps × 11 surfaces,
+4 semantic colors, 6 accents × 2 surfaces, 6 accents × 8 artwork primaries ×
+2 surfaces): every gate passes. One real regression was found and fixed that
+way: on the lighter surface the control-accent floor 0.42 yields only 2.85:1
+for the darkest artwork — `DARK_LEGIBILITY_FLOOR` retuned 0.42→0.45 (measured
+worst case 3.12:1, same-margin as before). `DhunAppearanceTest` hex pins
+updated to the new baseline with a comment naming both intentional retunes.
+
+**(b) Thumbnails.** `DhunSpacing.artworkThumb` 56→64dp. Every consumer
+audited: `TrackRow` and both Library cards wrap content (no fixed heights);
+queue/playlist reorder rows use 44/48dp tokens, not the thumb;
+`LoadingShimmer` is size-only; `DhunShellLayout.detailPaneMinWidth` grows
+8dp (a min, harmless). No clip risk found.
+
+**(c) Continuous glass dock.** New `GlassDock` in
+`design/components/GlassCard.kt`: one clipped bottomSheet surface = blurred
+current-track artwork (LYRICS-card treatment: `ArtworkImage` blur
+glassBlur×2, `key(BlurredArtworkCache.keyFor)` + `markPrepared`, list-tier
+URL via `NowPlayingBackdropPolicy.resolveUrl` so Coil reuses the shell
+backdrop's cached request; skipped entirely when no URL or no realtime
+blur) under the `glassBarTop→glassStrong` veil + glassEdge hairline.
+`MiniPlayer` gained `embedded = true` (content only, no own chrome); the
+single-pane `BottomNavigationBar` now renders MiniPlayer(embedded) +
+transparent NavigationBar inside one GlassDock, so mini + nav read as one
+glass sheet over the artwork. Rail layouts keep the floating MiniPlayer
+(default `embedded = false` path unchanged). No new dependencies.
+
+**CI result (2026-09-21):** first push run 35572182843 FAILED on exactly
+one assertion — `DhunAppearanceTest` line 89 still expected the old
+placeholderStart hex: the placeholder/shimmer pin edit in 78743bf did not
+land even though the tool reported success. Fixed in `fd053df`, with every
+pinned neutral now mechanically cross-checked against `DhunTokens` defaults
+(parser compares test literals to production values — zero mismatches).
+Re-run **35572454014 GREEN** (shared jvmTest incl. updated pins, Android
+Robolectric + assembleDebug, probe, Desktop JVM, packaging helpers). Work is
+PR **#107**; awaiting its packaging checks, then the user's visual verdict on
+both platforms — no merge without it.
+
+**Verification state:** local Python packaging/helper suite 29 OK (nothing
+in scripts/ affected); brace-balance diff vs HEAD clean on all ten touched
+files; WCAG replication as above. No JDK in sandbox — compile/test gate is
+CI (`:shared:jvmTest` with the updated pins, Android Robolectric, Desktop
+JVM, packaging). Open after CI: user visual verdict on Android + Windows
+(lighter screens readable? dock glassy and continuous? thumbnails not
+clipped in any rail?); record the verdict here before any merge.
+
+## 2026-09-21 — PR #106 merged; `main` docs were stale; sync + verdict record (`arena/01a0c2c7-dhun`)
+
+**Merged state (verified via `gh` on boot):** PR #106 merged into `main` as
+`810bef1` at 2026-09-21T05:41:01Z after full green CI (post-merge main runs:
+CI 35565454488, Build APK 35565454483, test-release 35565454562). Rolling
+`test` re-published 2026-09-21T05:47:48Z with tag AND target =
+`810bef13f34227360282df88f57372d6b0feba7c`; APK 18,334,451 B, MSI 112,889,856 B
+(previous MSI 112,873,472 B — the byte size distinguishes new vs old installer).
+
+**Incident:** the previous session (`arena/01a0c24e-dhun`) lost GitHub access
+right after the merge. Its post-merge doc commits (push runs 35566034664 /
+35566013932) landed only on that session branch, which has since been deleted
+from origin — so `main`'s `.ai` docs still described the pre-merge state.
+`origin/main` was verified to be exactly `810bef1` (= this session's branch
+base). This session re-recorded the merged state, hardware verdicts, the saved
+Windows gate procedure and the new task queue in ROADMAP/HANDOFF/CHANGELOG
+before any code work.
+
+**Hardware verdicts recorded (exact, no extrapolation):** Android **PASS** on
+the merged build — "android all working" (Home moods, pull-to-refresh,
+close/swipe behavior). Windows **NOT hardware-verified**: the user's machine
+was still running an OLD copy (old round header refresh icon visible), which
+explains the earlier "nothing works" report; the user accepted the new build
+as good-to-go but has not tested it ("I'm not testing windows now"). Downloaded
+playback `O3-6zB3kg8M` is fixed in code but untested on device — the earlier
+Windows download/playback FAIL is triaged to the stale install, not disproven;
+Gate 4 of the saved procedure is its retest.
+
+**New user-requested task (2026-09-21): UI polish.** (a) Home/Search/Library
+sit on the near-black dark ladder (`DhunTokens` dark defaults: background
+0xFF0A0A0A, surfaces 0A→2A) — decrease darkness toward the full player's
+background brightness; the full player's scrim over blurred artwork
+(`Color.Black.copy(alpha = if (lyricsDominant) 0.52f else 0.16f)` plus
+`ambientScrimBrush()` gradient stops ~0.42–0.62) is also lowered so artwork
+shows through; WCAG-AA + `DhunAppearanceTest` contrast pins must stay green;
+light theme untouched unless trivially symmetric. (b) `DhunSpacing.artworkThumb`
+56.dp → ~64.dp, verify row heights/rails don't clip. (c) MiniPlayer +
+`BottomNavigationBar` (ui/shell/DhunAppShell.kt ~line 570) become a glassy
+bottom dock using the LYRICS-style background: BlurredArtworkCache +
+`DhunColors.glass/glassDeep/glassStrong/glassBarTop`; no new dependencies.
+Visual changes cannot be verified in-sandbox: CI green first, then user
+eyeballs both platforms; record "awaiting user visual verdict"; never merge
+without it.
+
+**Queued (not started): endless radio.** While a radio plays, when ≤3 songs
+remain, auto-queue more via the `/next` continuation (YouTube "Up next" for
+the current track): same song, same position, seamless, no gap, then continue
+the queue; replace the tail when refilling — supersedes the #99 "different
+song" semantic. Related-songs row keeps excluding the current track, but an
+explicit row tap still plays that row; gapless shuffle must visibly reorder.
+Reproduce in engine code, add regression tests, fix. Gated on asking the user
+first (Android is PASS; Windows accepted but untested).
+
+**Boot discipline:** `gh pr list` shows only stale research PR #54;
+`gh run list` shows no live runs; single-agent doctrine holds.
+
 ## 2026-09-21 — PR #106 final code verification before authorized merge
 
 Exact code head **35d76f6**: build 35564494454 ✓, build-and-test 35564494452 ✓,
