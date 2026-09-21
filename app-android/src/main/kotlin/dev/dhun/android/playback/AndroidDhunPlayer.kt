@@ -11,7 +11,6 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.player.DhunPlayer
-import dev.dhun.player.QueueManager
 import dev.dhun.player.StreamRecoverySignal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +65,6 @@ class AndroidDhunPlayer(
     }
 
     private val trackMap = ConcurrentHashMap<String, Track>()
-    private val queueManager = QueueManager()
     private var prefetchJob: Job? = null
 
     /**
@@ -136,15 +134,21 @@ class AndroidDhunPlayer(
 
     override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
         tracks.forEach { trackMap[it.id] = it }
-        queueManager.setQueue(tracks, startIndex)
         // Suspend-aware: runs on main AND waits, so callers that chain
         // calls (e.g. restore() → seekTo) keep their order.
         withContext(Dispatchers.Main) {
+            // QueueManager is the queue bookkeeper: the MEDIA TIMELINE is
+            // loaded in display order (shuffled when shuffle is on), so
+            // traversal, the queue tab and tap indices all agree.
+            queueManager.setQueue(tracks, startIndex)
             val display = queueManager.displayQueue
-            val displayIndex = queueManager.displayCurrentIndex.coerceIn(0, display.size - 1).takeIf { display.isNotEmpty() } ?: 0
+            val displayIndex = if (display.isEmpty()) 0
+            else queueManager.displayCurrentIndex.coerceIn(0, display.size - 1)
             player.setMediaItems(display.map { it.toMediaItem() }, displayIndex, 0L)
             player.playWhenReady = playWhenReady
             player.prepare()
+            // Manual order: the timeline itself is shuffled; the engine's
+            // shuffle mode stays off so the two can never disagree.
             player.shuffleModeEnabled = false
         }
         refresh()
@@ -152,46 +156,45 @@ class AndroidDhunPlayer(
 
     override fun addNext(track: Track) {
         trackMap[track.id] = track
-        queueManager.addNext(track)
         onMain {
-            val display = queueManager.displayQueue
-            val idx = queueManager.displayCurrentIndex
-            val pos = player.currentPosition
-            val wasPlaying = player.isPlaying
-            // Sync player order to displayQueue (which is shuffled when enabled)
-            player.setMediaItems(display.map { it.toMediaItem() }, idx, pos)
-            player.playWhenReady = wasPlaying
-            player.prepare()
-            player.shuffleModeEnabled = false
+            queueManager.addNext(track)
+            reloadTimelinePreservingPlayback()
         }
         refresh()
     }
 
     override fun addToQueue(track: Track) {
         trackMap[track.id] = track
-        queueManager.addToQueue(track)
         onMain {
-            val display = queueManager.displayQueue
-            val idx = queueManager.displayCurrentIndex
-            val pos = player.currentPosition
-            val wasPlaying = player.isPlaying
-            player.setMediaItems(display.map { it.toMediaItem() }, idx, pos)
-            player.playWhenReady = wasPlaying
-            player.prepare()
-            player.shuffleModeEnabled = false
+            queueManager.addToQueue(track)
+            reloadTimelinePreservingPlayback()
         }
         refresh()
     }
 
+    /**
+     * Rebuilds the media timeline from [QueueManager.displayQueue] at the
+     * current position — used after queue mutations so the visible order and
+     * the playback order stay the same list.
+     */
+    private fun reloadTimelinePreservingPlayback() {
+        val display = queueManager.displayQueue
+        if (display.isEmpty()) return
+        val idx = queueManager.displayCurrentIndex.coerceIn(0, display.size - 1)
+        val pos = player.currentPosition
+        val wasPlaying = player.isPlaying
+        player.setMediaItems(display.map { it.toMediaItem() }, idx, pos)
+        player.playWhenReady = wasPlaying
+        player.prepare()
+        player.shuffleModeEnabled = false
+    }
+
     override fun playAt(index: Int) {
-        // Index is in displayQueue order (what the UI shows). Translate via
-        // queueManager when shuffle is on, otherwise it's the same as source.
         onMain {
             if (index !in 0 until player.mediaItemCount) return@onMain
-            // Keep queueManager in sync so next/previous follow shuffled order
-            queueManager.playAt(queueManager.displayQueue.getOrNull(index)?.let { track ->
-                queueManager.snapshot.indexOfFirst { it.id == track.id }
-            } ?: index)
+            // [index] is the VISUAL row (displayQueue); keep QueueManager's
+            // cursor in step so next/previous/upcoming follow the same order.
+            queueManager.playAtDisplay(index)
             player.seekTo(index, androidx.media3.common.C.TIME_UNSET)
             player.play()
         }
@@ -199,26 +202,20 @@ class AndroidDhunPlayer(
     }
 
     override fun removeFromQueue(index: Int) {
-        // Translate display index to source index for QueueManager
-        val track = queueManager.displayQueue.getOrNull(index) ?: return
-        val sourceIndex = queueManager.snapshot.indexOfFirst { it.id == track.id }
-        if (sourceIndex >= 0) queueManager.removeAt(sourceIndex)
         onMain {
             if (index !in 0 until player.mediaItemCount) return@onMain
+            queueManager.removeAtDisplay(index)
             player.removeMediaItem(index)
         }
         refresh()
     }
 
     override fun moveInQueue(from: Int, to: Int) {
-        // Move in display order: translate to source indices for QueueManager
-        val fromTrack = queueManager.displayQueue.getOrNull(from) ?: return
-        val toTrack = queueManager.displayQueue.getOrNull(to) ?: return
-        val sourceFrom = queueManager.snapshot.indexOfFirst { it.id == fromTrack.id }
-        val sourceTo = queueManager.snapshot.indexOfFirst { it.id == toTrack.id }
-        if (sourceFrom >= 0 && sourceTo >= 0) queueManager.move(sourceFrom, sourceTo)
         onMain {
             if (from !in 0 until player.mediaItemCount || to !in 0 until player.mediaItemCount || from == to) return@onMain
+            // Drag in display space permutes the shuffled order exactly as
+            // dragged — no re-shuffle.
+            queueManager.moveInDisplay(from, to)
             player.moveMediaItem(from, to)
         }
         refresh()
@@ -254,20 +251,14 @@ class AndroidDhunPlayer(
     }
 
     override fun setShuffle(enabled: Boolean) {
-        queueManager.setShuffle(enabled)
         onMain {
-            val display = queueManager.displayQueue
-            val idx = queueManager.displayCurrentIndex.coerceAtLeast(0)
-            val pos = player.currentPosition
-            val wasPlaying = player.isPlaying
-            if (display.isEmpty()) {
-                player.shuffleModeEnabled = false
-            } else {
-                player.setMediaItems(display.map { it.toMediaItem() }, idx, pos)
-                player.playWhenReady = wasPlaying
-                player.prepare()
-                player.shuffleModeEnabled = false
-            }
+            queueManager.setShuffle(enabled)
+            // Rebuild the timeline IN the new order (current track keeps its
+            // position): the queue tab visibly reorders and playback follows
+            // the same list. Engine shuffle mode stays off — the timeline is
+            // already shuffled.
+            reloadTimelinePreservingPlayback()
+            player.shuffleModeEnabled = false
         }
         refresh()
     }
@@ -341,10 +332,13 @@ class AndroidDhunPlayer(
         onMain {
             val track = trackOf(player.currentMediaItem)
             _currentTrack.value = track
-            // When queueManager is in use (after prepareQueue), its displayQueue
-            // is the source of truth for visible order; otherwise fall back to
-            // the player's timeline (before any queue is set).
-            if (queueManager.size > 0) {
+            // The engine's timeline advances itself (natural end, engine-side
+            // next/previous, service seeks). Reconcile QueueManager's cursor
+            // to the item that is ACTUALLY sounding before publishing, or the
+            // queue tab would keep highlighting the previous track.
+            val inSync = queueManager.size > 0 &&
+                player.currentMediaItem?.mediaId?.let { queueManager.syncCurrent(it) } == true
+            if (inSync) {
                 _queue.value = queueManager.displayQueue
                 _currentQueueIndex.value = queueManager.displayCurrentIndex
                 _shuffleEnabled.value = queueManager.shuffleEnabled
