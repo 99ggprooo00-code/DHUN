@@ -1,6 +1,21 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — PR #106 final code verification before authorized merge
+
+Exact code head **35d76f6**: build 35564494454 ✓, build-and-test 35564494452 ✓,
+APK/MSI 35564494458 ✓. All relevant suites executed: shared, Android Robolectric,
+probe/classification, Desktop JVM; 18 new regression cases across Home, close,
+URI/resolver and local error routing. Local Python packaging/helper suite:
+29 passed; whole-PR diff check passed. Earlier push CI 35564267958 also green.
+
+User now explicitly authorizes merge after verification. Record docs/verdicts
+before merge, await final docs-head CI too, then merge only the session PR #106.
+No hardware PASS claimed: topic relevance, pull gesture, explicit-close behavior,
+Windows downloaded-file replay and #105 checklist still need device evidence.
+Post-merge release verification is the exact next step; if GitHub disconnects
+on merge, next session must verify target/tag/publish time/bytes first.
+
 ## 2026-09-21 — Home chips were cosmetic; pull-to-refresh requested
 
 User: For you / Focus / Chill / Workout / Party do not change songs below;

@@ -1,86 +1,64 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-21** · session **`arena/01a0c24e-dhun`** · baseline `main` **`414cd79`** (PR #105 merged).
+Updated **2026-09-21** · session **`arena/01a0c24e-dhun`** · PR **#106**
+(branch `arena/01a0c24e-dhun`, baseline `main` **`414cd79`**, PR #105).
 
-**Current task: finish Home category + pull-to-refresh fixes and merge PR #106
-only after exact-head CI passes.** User explicitly authorized “after completion
-create PR, verify, test, and merge” in the latest message (supersedes earlier
-no-merge hold). Same session branch and existing PR #106; no parallel session
-observed (only older research PR #54 open beside this PR).
+**PR #106 implementation verified; user authorized merge after verification.**
+Final code head **`35d76f6`** is pushed and all four checks are GREEN:
+- build: run **35564494454**, job 106223521571 ✓
+- build-and-test: run **35564494452**, job 106223521636 ✓ (shared, Android
+  Robolectric, probe/classification, Desktop JVM); push CI 35564267958 also ✓
+- APK + MSI: run **35564494458**, jobs 106223521998 / 106223521810 ✓
+- Local packaging/helper tests: **29 passed**; whole-PR `git diff --check` ✓.
+No local JDK/Android SDK; CI is the compile/test gate. This final docs-only
+verdict commit must also pass its own checks before the authorized merge.
 
-**Home changes:** `HomeMood.kt`, `UseCases.kt`, `HomeViewModel.kt`, `HomeScreen.kt`,
-`Entities.kt`, `HomePaginationTest.kt`. Chips previously only highlighted/reordered
-shelf names; now topic-search songs replace the feed, For you restores browse,
-selection survives refresh/error, old responses are generation-rejected, and
-search tokens never go to browse pagination. Persistent chips + Material3
-pull-to-refresh at the scroll boundary; header refresh removed, footer/F5/
-accessibility fallback retained. Seven regression tests cover switching, repeated
-selection/refresh, late home/search responses, pagination and failure/empty retry.
+**Scope complete in code (not hardware-certified):**
+1. Owed #105 docs/release verification: seamless radio expectation, download
+   diagnostics and build identity corrected.
+2. Explicit close: Windows X always uses full quit (old close-to-tray key is
+   ignored, switch removed); minimize keeps playing. Android Recents dismissal
+   pauses/stops engine and requests foreground/service shutdown; Home/lock not
+   treated as close. Three Android shutdown regression cases.
+3. Windows offline playback: user confirmed **Downloaded** and playback from
+   **Library → Downloads**, track `O3-6zB3kg8M`. Raw `file://` + Windows path was
+   malformed; portable URI escaping handles drive/UNC/space/Unicode/reserved
+   bytes. Local errors no longer enter CDN recovery. Six shared URI/resolver
+   and two desktop error-routing regression cases. MSI metadata dash → ASCII.
+4. Home moods: actual topic-song search results for Focus/Chill/Workout/Party;
+   For you restores browse feed. Not a signed-in personalized mood API.
+   Generation-safe requests, category-preserving retry/refresh, separate search
+   pagination, dedup/cycle guards. Seven Home regression cases.
+5. Pull-to-refresh: Material3 threshold + top-of-list nested-scroll handling,
+   indicator, repeated-refresh guard. Header refresh icon removed; footer/F5/
+   accessibility fallback retained. Controls stay usable on loading/error/empty.
 
-**Pre-push verdict:** diff check passes; no local JDK/SDK. Prior URI head
-`2599a7a` has build + build-and-test + APK green, MSI pending at last check.
-New Home changes still require fresh CI. Gesture/device playback remains
-hardware-unverified; no claim of device PASS is made by a green CI run.
+**Last error / limits:** no compile or test failures on final code head. Windows
+physical playback failure is NOT yet a PASS: file integrity/libVLC behavior needs
+retest. No user console expertise is required: ask for new on-screen playback
+details if it still fails. Pull gestures, category relevance and explicit-close
+hardware checks remain OPEN. #105 radio/Related/shuffle/Android-download checks
+also await explicit user verdicts. Endless radio is NOT started.
 
-**Phase: S3 hardware verification; Windows download/playback failure OPEN.**
-PR #105 shipped seamless radio (SAME song/position continues, queue tail replaced),
-gapless Android shuffle via surgical timeline mutations, and Android download
-OkHttp transport + Range/resume handling + IO workers + failure-stage logging.
-Related still excludes the playing track; tapping a Related row plays that row.
-These are merged implementations, NOT hardware passes. Tests 1–5 in the latest
-user message are instructions/expectations, not confirmed verdicts.
+**Exact next steps:** verify final docs-head CI, then merge PR #106 under the
+user's latest explicit authorization (supersedes earlier no-merge messages).
+After merge, verify main's build/release and rolling `test` target/tag, publish
+time and asset sizes. If the connection ends on merge, next session performs
+that release check FIRST. Install that new build and run HANDOFF's Home/close/
+offline tests plus original #105 tests. Only after all pass: endless radio,
+then S3/S6 soaks, rotation/process death, settings and Windows native checks.
 
-**Verified rolling build:** `test` published **2026-09-21T03:00:04Z**;
-release target AND tag commit **`414cd7941d69e185b5628e8b9b7fffe5a0a5a4f0`**.
-`dhun-test.apk` **18,334,451 B**; `dhun-test.msi` **112,873,472 B**.
-Build/release runs 35555585912 / 35555585908 / 35555585893 succeeded.
-Later scheduled extraction-health run **35561269411 failed**; check-run
-106214457210 annotations classify **ENVIRONMENT_BLOCKED** (live health
-unverified), not a production pass or a demonstrated device root cause.
+**Last verified published build BEFORE #106 merge:** `test` published
+**2026-09-21T03:00:04Z**, release target AND tag
+**`414cd7941d69e185b5628e8b9b7fffe5a0a5a4f0`**. APK **18,334,451 B**, MSI
+**112,873,472 B**. This is the OLD build, not evidence that #106 shipped.
+Scheduled extraction-health **35561269411** failed with **ENVIRONMENT_BLOCKED**
+annotation; not a production pass or demonstrated device root cause.
 
-**Current change: explicit close stops playback.** User clarified Windows X
-must exit completely (not an opt-in/default-only change); Android swipe-away
-from Recents must stop, while Home/lock keep playing. Desktop `Main.kt` now
-routes X unconditionally to `quit()` and ignores the retired close-to-tray key;
-removed its settings UI. Android `DhunPlaybackService.onTaskRemoved` pauses and
-stops the engine before removing foreground notification and stopping the service.
-`TaskRemovalPlaybackTest` covers call order, missing session and teardown on
-engine-stop exception. MSI description uses an ASCII hyphen for garbled dash.
-Files include those above, settings model/key documentation, CHANGELOG and
-handoff/debug docs. The earlier docs-only #105 follow-up is the first commit
-of PR #106; this report expands that same session PR to the close fixes.
-
-**Windows download evidence updated:** user confirms the row says **Downloaded**
-and playback was from **Library → Downloads**, track `O3-6zB3kg8M`; user does
-not know how to collect logs. No logs required to address the demonstrated code
-bugs: `OfflineFirstStreamResolver` concatenated `file://` with raw Windows paths
-(invalid drive/separator/escaping semantics), while desktop treated local MRL
-errors as CDN failures. New portable `localAudioFileUri` fixes drive/UNC and
-UTF-8 percent escaping; desktop local errors bypass network recovery with an
-honest local-file message. Six shared cases (incl. resolver integration) and two
-desktop error-routing cases added. File existence/integrity and actual Windows
-playback are not proven; this is a candidate fix, not a hardware PASS.
-
-**Exact next step:** fresh CI for path/error-routing changes, then hardware:
-Library → Downloads → play `O3-6zB3kg8M` online and offline without redownloading
-first; if it still fails, collect the new playback details (no console expertise
-required). Close checks in HANDOFF also remain (X must remove tray/stop sound;
-Android swipe must stop but Home/lock must not). `test` is still #105 and does
-not yet include these changes; merge authorized only after green CI.
-For Android failure request the actual resolve/bytes/worker logcat line before
-fixing the named stage. Reproduce engine defects and add regression tests before
-code fixes. Endless radio (extend `/next` continuation at ≤3 remaining) waits
-until all current hardware tests pass; then S3/S6 soaks, lifecycle, settings and
-Windows native checks remain.
-
-**Session discipline/status:** boot checked open PRs and recent runs: only older
-research-docs PR #54 open, no active runs observed (not proof another agent is
-inactive). Work only on this session branch; latest user message authorizes merge after completion and verification.
-PR #106 docs commit `c6326f0` is pushed and CI-green (35562760973,
-35562760709, 35562760707). Close commit `16a6cd6` is pushed: build/APK passed, build-and-test/MSI were
-still pending at the pre-push check. Path/error-routing changes pass
-`git diff --check` locally; their own CI is not yet verified. No JDK/Android SDK locally;
-CI is the compile gate. Merge now authorized after green CI; current `test` is still #105.
+**Session discipline:** live PR/run checks showed only old research PR #54
+beside this session; no sibling work observed. All changes on the fixed session
+branch; no forks/vendoring. Docs/code/verdicts completed BEFORE merge. Review
+`HANDOFF_NEXT_SESSION.md`, `DEBUG_LOG.md` and CHANGELOG for tests and rationale.
 
 ---
 

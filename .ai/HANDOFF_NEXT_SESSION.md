@@ -5,6 +5,21 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
+## Final pre-merge verification — supersedes pending/hold statuses below
+
+Code head **35d76f6** on PR #106 is pushed and GREEN: build **35564494454**,
+build-and-test **35564494452**, APK/MSI **35564494458**. Full shared, Android
+Robolectric and Desktop JVM suites passed, including 18 added regression cases
+(7 Home, 3 task dismissal, 6 URI/resolver, 2 local-error routing). Local Python
+packaging/helper suite: **29 passed**. Full diff whitespace check passed.
+
+User explicitly authorized finish → verify/test → merge. Final docs-only
+verdict commit still needs its own green checks before merging. After merge,
+verify post-merge CI/release target/tag/asset sizes; the #105 build identity
+below is only the **last pre-merge baseline**, NOT a new #106 download.
+If this session loses GitHub after merge, the next session checks release first.
+Hardware tests below are still OPEN; CI does not certify VLC/device gestures.
+
 ## Home categories / refresh and current authorization — 2026-09-21
 
 User reports For you/Focus/Chill/Workout/Party leave music unchanged and requests

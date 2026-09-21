@@ -40,7 +40,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   remains available for non-touch use. Same songs may return if the server's
   results have not changed; refresh fetches again rather than shuffling locally.
 
-### Fixed — Windows downloaded-file playback (2026-09-21, CI/hardware verification pending)
+### Fixed — Windows downloaded-file playback (2026-09-21, CI verified; hardware verification pending)
 
 - Completed downloads now resolve to escaped file URIs: Windows drive paths
   use `file:///C:/...`, separators are normalized, and spaces, `%`, `#`, `?`
@@ -52,7 +52,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   reserved characters and Unicode, completed-download network bypass, and
   local-vs-remote playback-error routing. Windows hardware retest still required.
 
-### Fixed — explicit close stops playback (2026-09-21, CI/hardware verification pending)
+### Fixed — explicit close stops playback (2026-09-21, CI verified; hardware verification pending)
 
 - **Windows X now quits completely**, using the same player/resource teardown
   as Ctrl+Q and tray Quit. It no longer hides the window with music playing,
