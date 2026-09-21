@@ -2,6 +2,26 @@
 
 Updated **2026-09-21** · session **`arena/01a0c24e-dhun`** · baseline `main` **`414cd79`** (PR #105 merged).
 
+**Current task: finish Home category + pull-to-refresh fixes and merge PR #106
+only after exact-head CI passes.** User explicitly authorized “after completion
+create PR, verify, test, and merge” in the latest message (supersedes earlier
+no-merge hold). Same session branch and existing PR #106; no parallel session
+observed (only older research PR #54 open beside this PR).
+
+**Home changes:** `HomeMood.kt`, `UseCases.kt`, `HomeViewModel.kt`, `HomeScreen.kt`,
+`Entities.kt`, `HomePaginationTest.kt`. Chips previously only highlighted/reordered
+shelf names; now topic-search songs replace the feed, For you restores browse,
+selection survives refresh/error, old responses are generation-rejected, and
+search tokens never go to browse pagination. Persistent chips + Material3
+pull-to-refresh at the scroll boundary; header refresh removed, footer/F5/
+accessibility fallback retained. Seven regression tests cover switching, repeated
+selection/refresh, late home/search responses, pagination and failure/empty retry.
+
+**Pre-push verdict:** diff check passes; no local JDK/SDK. Prior URI head
+`2599a7a` has build + build-and-test + APK green, MSI pending at last check.
+New Home changes still require fresh CI. Gesture/device playback remains
+hardware-unverified; no claim of device PASS is made by a green CI run.
+
 **Phase: S3 hardware verification; Windows download/playback failure OPEN.**
 PR #105 shipped seamless radio (SAME song/position continues, queue tail replaced),
 gapless Android shuffle via surgical timeline mutations, and Android download
@@ -46,7 +66,7 @@ Library → Downloads → play `O3-6zB3kg8M` online and offline without redownlo
 first; if it still fails, collect the new playback details (no console expertise
 required). Close checks in HANDOFF also remain (X must remove tray/stop sound;
 Android swipe must stop but Home/lock must not). `test` is still #105 and does
-not yet include these changes; no merge authorized.
+not yet include these changes; merge authorized only after green CI.
 For Android failure request the actual resolve/bytes/worker logcat line before
 fixing the named stage. Reproduce engine defects and add regression tests before
 code fixes. Endless radio (extend `/next` continuation at ≤3 remaining) waits
@@ -55,12 +75,12 @@ Windows native checks remain.
 
 **Session discipline/status:** boot checked open PRs and recent runs: only older
 research-docs PR #54 open, no active runs observed (not proof another agent is
-inactive). Work only on this session branch; no merge without user approval.
+inactive). Work only on this session branch; latest user message authorizes merge after completion and verification.
 PR #106 docs commit `c6326f0` is pushed and CI-green (35562760973,
 35562760709, 35562760707). Close commit `16a6cd6` is pushed: build/APK passed, build-and-test/MSI were
 still pending at the pre-push check. Path/error-routing changes pass
 `git diff --check` locally; their own CI is not yet verified. No JDK/Android SDK locally;
-CI is the compile gate. No merge authorized; current `test` is still #105.
+CI is the compile gate. Merge now authorized after green CI; current `test` is still #105.
 
 ---
 

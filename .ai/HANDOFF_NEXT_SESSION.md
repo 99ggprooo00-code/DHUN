@@ -5,6 +5,33 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
+## Home categories / refresh and current authorization — 2026-09-21
+
+User reports For you/Focus/Chill/Workout/Party leave music unchanged and requests
+pull-down refresh at the top instead of the header refresh icon. Original chips
+only reordered title matches in lower shelves; top rows never changed.
+
+PR #106 adds topic-song searches for the four moods; For you uses the original
+Home browse feed. This is explicitly NOT a signed-in personalized mood API.
+Mood state belongs to the model: selection, retry and refresh keep the category;
+page and first-load generation guards discard old-category responses. Category
+views hide unrelated history/recommendations, and chips stay usable on errors.
+Material3 PullToRefreshBox handles overscroll-at-top threshold/indicator; no
+header refresh icon. Footer + F5 (when Home has focus) + accessibility refresh
+are non-touch fallbacks. Seven new HomePaginationTest regressions added.
+
+**Latest authorization supersedes earlier holds in historical entries below:**
+user said to finish, create PR, verify/test and merge. Existing PR #106 is the
+session PR. Must await exact-head green CI and record verdicts BEFORE merge.
+
+**Home hardware script (OPEN):** tap every category → topic-song row replaces
+Home rows; tap For you → normal Home returns. Tap moods rapidly, including on
+a slow network; newest selection must win. On a mood, pull down at top far
+enough and release → indicator then refreshed same-category results. Mid-list
+scroll should scroll, not refresh until top; short/horizontal drags should not
+refresh. Test empty/error recovery, pagination and Windows footer/F5 fallback.
+Server can return identical results on refresh; no artificial randomization.
+
 ## Explicit-close report and clarified contract — 2026-09-21
 
 User: music continues after closing on both platforms; Windows needs Task

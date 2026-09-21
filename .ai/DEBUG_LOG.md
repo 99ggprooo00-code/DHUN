@@ -1,6 +1,29 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — Home chips were cosmetic; pull-to-refresh requested
+
+User: For you / Focus / Chill / Workout / Party do not change songs below;
+replace header refresh with a long downward swipe at top. Verified root cause:
+HomeScreen stored selectedMood locally and only reordered title-matching lower
+shelves, leaving quick picks/history/recommendations unchanged. No mood request.
+
+Fresh HomeMood enum defines explicit topic-song search queries; GetHomeFeedUseCase
+routes For you to browse and moods to song search + search continuation. No guessed
+YouTube mood endpoints. HomeViewModel stores mood with feed generation, cancels
+old work, preserves mood on retry/refresh and rejects late responses. Category
+views omit unrelated rows. Persistent controls survive loading/empty/error; reset
+list on category change. Material3 PullToRefreshBox provides threshold/indicator
+and nested-scroll boundary handling, replacing header icon. Keep footer/F5/
+accessibility refresh for non-touch users. No dependency additions.
+
+Seven regression tests: all category queries/For-you return; repeat selection;
+coalesced refresh in same mood; stale Home page; late prior-mood search; search
+pagination/dedup; empty/error retry. Local diff check only; CI is compile/test
+gate, hardware gesture and topic relevance remain open. User subsequently
+explicitly authorized completion → verify/test → merge; do all docs/verdicts
+before merge on the same PR #106 and branch.
+
 ## 2026-09-21 — Downloaded Windows row fails from Downloads: malformed file URI
 
 User confirmed **Downloaded** row and **Library → Downloads** playback for

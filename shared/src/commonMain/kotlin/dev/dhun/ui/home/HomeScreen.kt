@@ -2,8 +2,9 @@ package dev.dhun.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,13 +30,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
@@ -54,7 +64,6 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunHorizontalRail
-import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.LoadingShimmer
@@ -62,6 +71,7 @@ import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.SectionShimmer
 import dev.dhun.design.components.TrackCard
+import dev.dhun.domain.HomeMood
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.HomeShelfKind
 import dev.dhun.download.DownloadManager
@@ -74,8 +84,8 @@ import dev.dhun.ui.components.TrackDownloadRowActions
  *
  * Layout top → bottom:
  * 1. Brand + greeting
- * 2. Quick-action chips (Liked / Offline / Sleep timer)
- * 3. Mood & genre filter chips (from feed shelf titles + defaults)
+ * 2. Persistent mood chips (topic-song requests; For you restores the normal feed)
+ * 3. Quick-action chips (Liked / Offline / Sleep timer)
  * 4. Quick Picks responsive grid
  * 5. Recommended songs (seeded from listening history / saved songs)
  * 6. Listen again (history)
@@ -86,6 +96,7 @@ import dev.dhun.ui.components.TrackDownloadRowActions
  *
  * Typography is clean sans only; brand wordmark uses [DhunTypographyTokens.brand].
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -102,6 +113,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val selectedMood by viewModel.selectedMood.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val loadMoreError by viewModel.loadMoreError.collectAsState()
@@ -109,51 +121,94 @@ fun HomeScreen(
     val recommendedSongs by viewModel.recommendedSongs.collectAsState()
     val isLoadingRecommended by viewModel.isLoadingRecommended.collectAsState()
 
-    Box(modifier = modifier.fillMaxSize()) {
-        when (val state = uiState) {
-            is HomeUiState.Loading -> {
-                HomeShimmerSkeleton(modifier = Modifier.fillMaxSize())
-            }
-            is HomeUiState.Error -> {
-                ErrorView(
-                    message = state.message,
-                    title = "Could not load Home",
-                    onRetry = { viewModel.load() },
-                    modifier = Modifier.fillMaxSize(),
+    // Persistent controls remain usable while a category is loading/empty/error.
+    Column(modifier = modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        if (event.type == KeyEventType.KeyDown && event.key == Key.F5) {
+            viewModel.refresh()
+            true
+        } else false
+    }.semantics {
+        customActions = listOf(CustomAccessibilityAction("Refresh music") {
+            viewModel.refresh()
+            true
+        })
+    }) {
+        Column(Modifier.padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md)) {
+            Text("DHUN", style = DhunTypographyTokens.brand, color = DhunColors.accent)
+            Text(
+                (uiState as? HomeUiState.Success)?.feed?.greeting ?: "Discover music",
+                style = MaterialTheme.typography.headlineMedium,
+                color = DhunColors.textPrimary,
+            )
+        }
+        DhunHorizontalRail(
+            contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
+            horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+        ) {
+            items(HomeMood.entries, key = { it.name }) { mood ->
+                DhunFilterChip(
+                    selected = selectedMood == mood,
+                    onClick = { viewModel.selectMood(mood) },
+                    label = { Text(mood.label, style = MaterialTheme.typography.labelLarge) },
                 )
             }
-            is HomeUiState.Empty -> {
-                EmptyView(
-                    title = "Nothing to display",
-                    message = "Could not find any music recommendations right now.",
-                    actionLabel = "Retry",
-                    onAction = { viewModel.load() },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            is HomeUiState.Success -> {
-                HomeFeedContent(
-                    feed = state.feed,
-                    recentlyPlayed = recentlyPlayed,
-                    recommendedSongs = recommendedSongs,
-                    isLoadingRecommended = isLoadingRecommended,
-                    isRefreshing = isRefreshing,
-                    isLoadingMore = isLoadingMore,
-                    loadMoreError = loadMoreError,
-                    onLoadMore = viewModel::loadMore,
-                    onRetryMore = viewModel::retryLoadMore,
-                    onRefresh = { viewModel.refresh() },
-                    onTrackClick = onTrackClick,
-                    onAlbumClick = onAlbumClick,
-                    onPlaylistClick = onPlaylistClick,
-                    onArtistClick = onArtistClick,
-                    onTrackOverflow = onTrackOverflow,
-                    downloadManager = downloadManager,
-                    onOpenLiked = onOpenLiked,
-                    onOpenOffline = onOpenOffline,
-                    sleepTimerLabel = sleepTimerLabel,
-                    onCycleSleepTimer = onCycleSleepTimer,
-                )
+        }
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = viewModel::refresh,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        ) {
+            when (val state = uiState) {
+                is HomeUiState.Loading -> {
+                    HomeShimmerSkeleton(modifier = Modifier.fillMaxSize())
+                }
+                is HomeUiState.Error -> {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        ErrorView(
+                            message = state.message,
+                            title = "Could not load Home",
+                            onRetry = { viewModel.load() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                is HomeUiState.Empty -> {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        EmptyView(
+                            title = "Nothing to display",
+                            message = "Could not find any music recommendations right now.",
+                            actionLabel = "Retry",
+                            onAction = { viewModel.load() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                is HomeUiState.Success -> {
+                    key(selectedMood) {
+                        HomeFeedContent(
+                            feed = state.feed,
+                            recentlyPlayed = if (selectedMood == HomeMood.FOR_YOU) recentlyPlayed else emptyList(),
+                            recommendedSongs = if (selectedMood == HomeMood.FOR_YOU) recommendedSongs else emptyList(),
+                            isLoadingRecommended = selectedMood == HomeMood.FOR_YOU && isLoadingRecommended,
+                            isRefreshing = isRefreshing,
+                            isLoadingMore = isLoadingMore,
+                            loadMoreError = loadMoreError,
+                            onLoadMore = viewModel::loadMore,
+                            onRetryMore = viewModel::retryLoadMore,
+                            onRefresh = { viewModel.refresh() },
+                            onTrackClick = onTrackClick,
+                            onAlbumClick = onAlbumClick,
+                            onPlaylistClick = onPlaylistClick,
+                            onArtistClick = onArtistClick,
+                            onTrackOverflow = onTrackOverflow,
+                            downloadManager = downloadManager,
+                            onOpenLiked = onOpenLiked,
+                            onOpenOffline = onOpenOffline,
+                            sleepTimerLabel = sleepTimerLabel,
+                            onCycleSleepTimer = onCycleSleepTimer,
+                        )
+                    }
+                }
             }
         }
     }
@@ -185,33 +240,11 @@ private fun HomeFeedContent(
     val classified = remember(feed.sections) {
         feed.sections.map { it to GetHomeFeedUseCase.classifySection(it.title) }
     }
-    val moodTitles = remember(classified) {
-        classified.filter { it.second == HomeShelfKind.MOOD }.map { it.first.title }
-    }
-    val moodChips = remember(moodTitles) {
-        (listOf("For you") + moodTitles.take(6) + listOf("Focus", "Chill", "Workout", "Party"))
-            .distinct()
-            .take(10)
-    }
-    var selectedMood by remember { mutableStateOf("For you") }
-
     val mixSections = classified.filter { it.second == HomeShelfKind.MIX }.map { it.first }
     val chartSections = classified.filter { it.second == HomeShelfKind.CHARTS }.map { it.first }
     val albumSections = classified.filter { it.second == HomeShelfKind.ALBUMS }.map { it.first }
     val otherSections = remember(feed.sections, feed.quickPicks) {
         remainingHomeSections(feed)
-    }
-
-    // Mood filter: when a named mood chip matches a shelf title, pin that shelf first.
-    val orderedOther = remember(selectedMood, otherSections) {
-        if (selectedMood == "For you") {
-            otherSections
-        } else {
-            val match = otherSections.filter {
-                it.title.contains(selectedMood, ignoreCase = true)
-            }
-            (match + otherSections.filterNot { it in match }).distinct()
-        }
     }
 
     val listState = rememberLazyListState()
@@ -238,42 +271,6 @@ private fun HomeFeedContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
-        // ---- Brand + greeting -------------------------------------------------
-        item(key = "header") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(
-                        text = "DHUN",
-                        style = DhunTypographyTokens.brand,
-                        color = DhunColors.accent,
-                    )
-                    Text(
-                        text = feed.greeting,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = DhunColors.textPrimary,
-                    )
-                }
-                DhunIconButton(
-                    onClick = onRefresh,
-                    enabled = !isRefreshing,
-                    contentDescription = if (isRefreshing) "Refreshing" else "Refresh home",
-                ) {
-                    DhunIconView(
-                        icon = DhunIcon.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(DhunSpacing.iconSize),
-                        tint = DhunColors.textSecondary,
-                    )
-                }
-            }
-        }
-
         // ---- Quick-action chips (rail, same pattern as the mood row:
         // symmetric edge padding via contentPadding holds while scrolling —
         // horizontalScroll + padding drops the trailing inset at scroll end,
@@ -331,25 +328,6 @@ private fun HomeFeedContent(
                                 modifier = Modifier.size(DhunSpacing.iconSizeSm),
                                 tint = if (sleepTimerLabel != null) DhunColors.accent else DhunColors.textSecondary,
                             )
-                        },
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(DhunSpacing.sm))
-        }
-
-        // ---- Mood & genre chips -----------------------------------------------
-        item(key = "mood_chips") {
-            DhunHorizontalRail(
-                contentPadding = PaddingValues(horizontal = DhunSpacing.screenPadding),
-                horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-            ) {
-                items(moodChips, key = { it }) { chip ->
-                    DhunFilterChip(
-                        selected = selectedMood == chip,
-                        onClick = { selectedMood = chip },
-                        label = {
-                            Text(chip, style = MaterialTheme.typography.labelLarge)
                         },
                     )
                 }
@@ -464,8 +442,8 @@ private fun HomeFeedContent(
             }
         }
 
-        // ---- Remaining dynamic shelves (mood-filtered order) ------------------
-        orderedOther.forEachIndexed { index, section ->
+        // ---- Remaining dynamic shelves ------------------
+        otherSections.forEachIndexed { index, section ->
             // Skip if already rendered under mix/chart/album
             val kind = GetHomeFeedUseCase.classifySection(section.title)
             if (kind == HomeShelfKind.MIX || kind == HomeShelfKind.CHARTS || kind == HomeShelfKind.ALBUMS) {
@@ -506,9 +484,10 @@ private fun HomeFeedContent(
                     canLoadMore -> TextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
                     else -> {
                         Text("You're all caught up", color = DhunColors.textTertiary)
-                        TextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh recommendations") }
                     }
                 }
+                // Mouse/keyboard/accessibility fallback; no header refresh icon.
+                TextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh music") }
             }
         }
     }
