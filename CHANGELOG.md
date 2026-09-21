@@ -24,7 +24,14 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### Fixed — Home categories and pull-to-refresh (2026-09-21, hardware verification pending)
+### Merged to main and shipped in rolling `test` build — 2026-09-21
+
+PR #106 merged as **810bef1** (merged 05:41:01Z; hardware verification still
+open — see `.ai/HANDOFF_NEXT_SESSION.md` for the exact device retest
+checklist). Rolling `test` release re-published 2026-09-21T05:47:48Z: APK
+18,334,451 B, MSI 112,889,856 B, both with sha256 sidecars.
+
+### Fixed — Home categories and pull-to-refresh (2026-09-21, CI verified; hardware verification pending)
 
 - **Focus, Chill, Workout and Party now fetch topic-specific songs**, instead
   of just highlighting a chip and reordering matching shelf titles. For you
