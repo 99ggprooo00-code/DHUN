@@ -1,6 +1,103 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — PR #106 final code verification before authorized merge
+
+Exact code head **35d76f6**: build 35564494454 ✓, build-and-test 35564494452 ✓,
+APK/MSI 35564494458 ✓. All relevant suites executed: shared, Android Robolectric,
+probe/classification, Desktop JVM; 18 new regression cases across Home, close,
+URI/resolver and local error routing. Local Python packaging/helper suite:
+29 passed; whole-PR diff check passed. Earlier push CI 35564267958 also green.
+
+User now explicitly authorizes merge after verification. Record docs/verdicts
+before merge, await final docs-head CI too, then merge only the session PR #106.
+No hardware PASS claimed: topic relevance, pull gesture, explicit-close behavior,
+Windows downloaded-file replay and #105 checklist still need device evidence.
+Post-merge release verification is the exact next step; if GitHub disconnects
+on merge, next session must verify target/tag/publish time/bytes first.
+
+## 2026-09-21 — Home chips were cosmetic; pull-to-refresh requested
+
+User: For you / Focus / Chill / Workout / Party do not change songs below;
+replace header refresh with a long downward swipe at top. Verified root cause:
+HomeScreen stored selectedMood locally and only reordered title-matching lower
+shelves, leaving quick picks/history/recommendations unchanged. No mood request.
+
+Fresh HomeMood enum defines explicit topic-song search queries; GetHomeFeedUseCase
+routes For you to browse and moods to song search + search continuation. No guessed
+YouTube mood endpoints. HomeViewModel stores mood with feed generation, cancels
+old work, preserves mood on retry/refresh and rejects late responses. Category
+views omit unrelated rows. Persistent controls survive loading/empty/error; reset
+list on category change. Material3 PullToRefreshBox provides threshold/indicator
+and nested-scroll boundary handling, replacing header icon. Keep footer/F5/
+accessibility refresh for non-touch users. No dependency additions.
+
+Seven regression tests: all category queries/For-you return; repeat selection;
+coalesced refresh in same mood; stale Home page; late prior-mood search; search
+pagination/dedup; empty/error retry. Local diff check only; CI is compile/test
+gate, hardware gesture and topic relevance remain open. User subsequently
+explicitly authorized completion → verify/test → merge; do all docs/verdicts
+before merge on the same PR #106 and branch.
+
+## 2026-09-21 — Downloaded Windows row fails from Downloads: malformed file URI
+
+User confirmed **Downloaded** row and **Library → Downloads** playback for
+`O3-6zB3kg8M`; cannot collect logs. Code-level defects are independently visible:
+`OfflineFirstStreamResolver.toFileUri` was just `"file://$path"`. A stored
+`C:\Program Files\...` path became `file://C:\Program Files\...`, not a valid
+escaped drive file URI. Desktop's remote-recovery bookkeeping also accepted the
+local URI, then checked only the separate bounded cache on failure, explaining
+why the shown error could falsely blame CDN/User-Agent instead of local media.
+
+Fresh portable URI formatter normalizes Windows drive/UNC separators, percent
+encodes UTF-8 filename bytes (including literal %, space, # and ?), preserves
+Unix literal backslashes and leaves raw paths unchanged for file existence checks.
+Desktop records the actual MRL at startMedia (including cache paths), reports
+local errors directly and reserves CDN fallback for HTTP(S). Six shared cases
+(path vectors + offline resolver/network bypass) and two desktop routing cases.
+No forks/vendor code; no transport change or requirement for user console logs.
+
+CI is the compile gate (no local JDK/SDK). Existing downloaded bytes/integrity
+and libVLC behavior on the user's machine remain unverified: do NOT mark the
+hardware failure fixed until existing download replays offline on the new build.
+PR #106 remains unmerged, rolling test unchanged. Close-fix head 16a6cd6 had
+build/APK green and build-and-test/MSI pending at this pre-push check.
+
+## 2026-09-21 — Explicit close left music playing (`arena/01a0c24e-dhun`)
+
+User clarified Windows X must quit completely; Android close means swiping the
+app from Recents. Code: desktop X defaulted to hiding the window, with player
+still alive; Android MediaSessionService had no explicit onTaskRemoved policy.
+Initial default-only desktop proposal was superseded by the user's unconditional
+X requirement before committing. X now calls the existing quit path regardless
+of stored close-to-tray; obsolete settings UI removed (legacy key/model retained).
+Android task removal pauses/stops the engine before foreground/service shutdown,
+without stopping playback on Activity background/rotation. Helper regression
+cases cover order/no queue clear, absent session, and cleanup despite stop error.
+ASCII installer-description hyphen addresses reported shell metadata mojibake.
+
+No local JDK/SDK: diff checks only; CI and hardware are required. Prior docs
+commit c6326f0 on PR #106 passed all required checks. PR scope expanded on the
+same fixed session branch; nothing merged and no merge permission given.
+Windows download/playback report remains independently open pending evidence.
+
+## 2026-09-21 — #105 release verification and Windows failure triage (`arena/01a0c24e-dhun`)
+
+Docs-only follow-up: release API + tag both target `414cd79`, published
+2026-09-21T03:00:04Z, APK 18,334,451 B / MSI 112,873,472 B. Updated ROADMAP
+and HANDOFF to the seamless-radio contract and current download diagnostics.
+Boot: only older PR #54 open, no active runs in recent list. Build/release CI
+passed; scheduled extraction-health 35561269411 is later red with
+ENVIRONMENT_BLOCKED annotation (check-run 106214457210), not a hardware verdict.
+
+User reports Windows downloads but playback fails on `O3-6zB3kg8M` with CDN /
+no-local-copy details. Other supplied test criteria are not confirmed passes.
+Read-only trace found that DesktopDhunPlayer sets streamingRemoteUrl even for
+an offline-first local URI, so the error wording alone cannot identify the
+failure stage. Need row completion state, playback entry point, installed build,
+matching download/cache diagnostics and, if completed, file existence/size.
+No root-cause claim or speculative code change; endless radio remains gated.
+
 ## 2026-09-21 — Seamless radio + gapless shuffle + Android download rework, learned from GPL peers (`arena/01a0c1c9-dhun`)
 
 **User report (round 3).** (1) "Play radio" must keep the SAME song playing

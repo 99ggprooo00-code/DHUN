@@ -17,6 +17,7 @@ import dev.dhun.core.Track
 import dev.dhun.data.HistoryRepository
 import dev.dhun.data.LibraryRepository
 import dev.dhun.data.PlayContext
+import dev.dhun.domain.HomeMood
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.innertube.SearchFilter
@@ -172,6 +173,142 @@ class HomePaginationTest {
         assertEquals("a", vm.feed().sections.single().tracks.single().id)
     }
 
+    @Test
+    fun eachMoodRequestsDifferentSongsAndForYouRestoresHome() = runTest {
+        val provider = PagingProvider(DhunResult.Success(page("home", "home-next")))
+        val vm = model(provider, backgroundScope)
+        runCurrent()
+        for (mood in HomeMood.entries.filterNot { it == HomeMood.FOR_YOU }) {
+            vm.selectMood(mood)
+            runCurrent()
+            assertEquals(mood, vm.selectedMood.value)
+            assertEquals(listOf(mood.query), vm.feed().sections.flatMap { it.tracks }.map { it.id })
+            assertTrue(vm.feed().quickPicks.isEmpty(), "old home quick picks must not survive a mood switch")
+        }
+        assertEquals(HomeMood.entries.mapNotNull { it.query }, provider.searches)
+        vm.selectMood(HomeMood.FOR_YOU)
+        runCurrent()
+        assertEquals("home", vm.feed().sections.single().tracks.single().id)
+        assertEquals("home-next", vm.feed().continuationToken)
+    }
+
+    @Test
+    fun selectingTheAlreadySelectedMoodDoesNotIssueAnotherRequest() = runTest {
+        val provider = PagingProvider(DhunResult.Success(page("home", null)))
+        val vm = model(provider, backgroundScope)
+        runCurrent()
+        vm.selectMood(HomeMood.CHILL)
+        runCurrent()
+        repeat(5) { vm.selectMood(HomeMood.CHILL) }
+        runCurrent()
+        assertEquals(listOf(HomeMood.CHILL.query), provider.searches)
+    }
+
+    @Test
+    fun refreshingKeepsSelectedMoodAndCoalescesRepeatedGestures() = runTest {
+        val provider = PagingProvider(DhunResult.Success(page("home", null)))
+        val vm = model(provider, backgroundScope)
+        runCurrent()
+        vm.selectMood(HomeMood.FOCUS)
+        runCurrent()
+        val gate = CompletableDeferred<Unit>()
+        provider.searchPage = { query ->
+            gate.await()
+            DhunResult.Success(SearchResults(query, songs = listOf(Track("fresh", "Fresh", "Artist"))))
+        }
+        repeat(5) { vm.refresh() }
+        runCurrent()
+        assertTrue(vm.isRefreshing.value)
+        assertEquals(listOf(HomeMood.FOCUS.query, HomeMood.FOCUS.query), provider.searches)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(HomeMood.FOCUS, vm.selectedMood.value)
+        assertEquals("fresh", vm.feed().sections.single().tracks.single().id)
+        assertFalse(vm.isRefreshing.value)
+    }
+
+    @Test
+    fun staleHomeContinuationCannotOverwriteMoodSongs() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val provider = PagingProvider(DhunResult.Success(page("home", "home-next"))).apply {
+            more = {
+                withContext(NonCancellable) { gate.await() }
+                DhunResult.Success(page("stale", "old-next"))
+            }
+        }
+        val vm = model(provider, backgroundScope)
+        runCurrent()
+        vm.loadMore()
+        runCurrent()
+        vm.selectMood(HomeMood.CHILL)
+        runCurrent()
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(listOf(HomeMood.CHILL.query), vm.feed().sections.flatMap { it.tracks }.map { it.id })
+        assertFalse(vm.isLoadingMore.value)
+    }
+
+    @Test
+    fun rapidMoodSwitchRejectsLateSearchAndKeepsNewestSelection() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val provider = PagingProvider(DhunResult.Success(page("home", null))).apply {
+            searchPage = { query ->
+                if (query == HomeMood.FOCUS.query) withContext(NonCancellable) { gate.await() }
+                DhunResult.Success(SearchResults(query, songs = listOf(Track(query, query, "Artist"))))
+            }
+        }
+        val vm = model(provider, backgroundScope)
+        runCurrent()
+        vm.selectMood(HomeMood.FOCUS)
+        runCurrent()
+        vm.selectMood(HomeMood.PARTY)
+        runCurrent()
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(HomeMood.PARTY, vm.selectedMood.value)
+        assertEquals(HomeMood.PARTY.query, vm.feed().sections.single().tracks.single().id)
+    }
+
+    @Test
+    fun moodContinuationUsesSearchAndDeduplicatesSongs() = runTest {
+        val song = Track("a", "A", "Artist")
+        val provider = PagingProvider(DhunResult.Success(page("home", "home-next"))).apply {
+            searchPage = { DhunResult.Success(SearchResults(it, songs = listOf(song), continuationToken = "search-next")) }
+            searchMore = { DhunResult.Success(SearchResults("", songs = listOf(song, song.copy(id = "b")))) }
+        }
+        val vm = model(provider, backgroundScope)
+        runCurrent()
+        vm.selectMood(HomeMood.WORKOUT)
+        runCurrent()
+        vm.loadMore()
+        runCurrent()
+        assertEquals(listOf("search-next"), provider.searchTokens)
+        assertTrue(provider.requests.isEmpty(), "search tokens must never reach browse continuation")
+        assertEquals(listOf("a", "b"), vm.feed().sections.flatMap { it.tracks }.map { it.id })
+        assertNull(vm.feed().continuationToken)
+    }
+
+    @Test
+    fun failedOrEmptyMoodNeverFallsBackToUnrelatedHomeSongsAndRetryKeepsMood() = runTest {
+        val provider = PagingProvider(DhunResult.Success(page("home", null))).apply {
+            searchPage = { DhunResult.Failure(DhunError.Network()) }
+        }
+        val vm = model(provider, backgroundScope)
+        runCurrent()
+        vm.selectMood(HomeMood.PARTY)
+        runCurrent()
+        assertTrue(vm.uiState.value is HomeUiState.Error)
+        assertEquals(HomeMood.PARTY, vm.selectedMood.value)
+        provider.searchPage = { DhunResult.Success(SearchResults(it)) }
+        vm.load()
+        runCurrent()
+        assertTrue(vm.uiState.value is HomeUiState.Empty)
+        assertEquals(listOf(HomeMood.PARTY.query, HomeMood.PARTY.query), provider.searches)
+        vm.selectMood(HomeMood.FOR_YOU)
+        runCurrent()
+        assertEquals("home", vm.feed().sections.single().tracks.single().id)
+    }
+
     private class PagingProvider(var first: DhunResult<HomeFeedPage>) : MusicProvider {
         val requests = mutableListOf<String>()
         var more: suspend (String) -> DhunResult<HomeFeedPage> = { DhunResult.Success(HomeFeedPage()) }
@@ -181,8 +318,21 @@ class HomePaginationTest {
             return more(continuationToken)
         }
         override suspend fun homeFeed(): DhunResult<List<HomeSection>> = error("unused")
-        override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> = error("unused")
-        override suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults> = error("unused")
+        val searches = mutableListOf<String>()
+        val searchTokens = mutableListOf<String>()
+        var searchPage: suspend (String) -> DhunResult<SearchResults> = { query ->
+            DhunResult.Success(SearchResults(query, songs = listOf(Track(query, query, "Artist"))))
+        }
+        var searchMore: suspend (String) -> DhunResult<SearchResults> = { DhunResult.Success(SearchResults("")) }
+        override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> {
+            assertEquals(SearchFilter.SONGS, filter)
+            searches += query
+            return searchPage(query)
+        }
+        override suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults> {
+            searchTokens += continuationToken
+            return searchMore(continuationToken)
+        }
         override suspend fun searchSuggestions(query: String): DhunResult<List<String>> = error("unused")
         override suspend fun relatedTracks(videoId: String): DhunResult<List<Track>> = error("unused")
         override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> = error("unused")

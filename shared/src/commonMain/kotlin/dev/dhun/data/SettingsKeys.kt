@@ -44,7 +44,7 @@ object SettingsKeys {
     const val EXPLICIT_CONTENT = "explicit_content"
     const val EXPLICIT_CONTENT_DEFAULT = true
 
-    /** Desktop: minimize to tray on close (Phase 12). */
+    /** Legacy persisted key; desktop no longer reads it. X always quits. */
     const val CLOSE_TO_TRAY = "close_to_tray"
     const val CLOSE_TO_TRAY_DEFAULT = true
 

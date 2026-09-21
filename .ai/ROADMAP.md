@@ -1,16 +1,64 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-21** · session **`arena/01a0c198-dhun`** · `main`/`origin/main` **`c4c5d04`** (PR #103 — Round-2 defect ledger, race incident, hardware re-test script — merged 2026-09-21T01:38:40Z; beneath it #102 `4d693ce` defect 3 v2, #101 `2c619b9` defect 4, #100 `80e94bf` defect 3 v1, #99 `870d3bc` defect 2, #98 `b102c78` defect 1, #97 `8635851` S1 close).
+Updated **2026-09-21** · session **`arena/01a0c24e-dhun`** · PR **#106**
+(branch `arena/01a0c24e-dhun`, baseline `main` **`414cd79`**, PR #105).
 
-**Phase: Stage S3 in progress — all four Round-2 device defects now have MERGED, CI-green fixes; blocked only on the user's hardware re-test.** Round 2 (user, build `8635851`, transcribed in `.ai/HANDOFF_NEXT_SESSION.md`) banked: notification + lock-screen buttons, Windows downloads, lyrics loading, desktop EQ, full-player visual OK. It opened four defects; every one is fixed: (1) Android downloads — #98, `hasSeenWork` latch killed the start/stop race + FGS-policy try/catch; (2) play-radio restart — #99, current track filtered out of the `/next` panel in `loadRelated` (fixes the Related tab too); (3) shuffle — #100 + corrective **#102** (this session): the visible queue now IS the shuffled play order on both platforms, engine-driven advances re-sync the queue cursor (`syncCurrent`), visual-row indices are translated (`playAtDisplay`/`removeAtDisplay`/`moveInDisplay`), and queue mutations preserve the user's arranged order instead of re-shuffling; (4) lyrics UI — #101: synced base size up to `headlineSmall` with bold-accent active line, unsynced bumped to readable `titleMedium` (no auto-scroll is possible without timestamps — by design).
+**PR #106 implementation verified; user authorized merge after verification.**
+Final code head **`35d76f6`** is pushed and all four checks are GREEN:
+- build: run **35564494454**, job 106223521571 ✓
+- build-and-test: run **35564494452**, job 106223521636 ✓ (shared, Android
+  Robolectric, probe/classification, Desktop JVM); push CI 35564267958 also ✓
+- APK + MSI: run **35564494458**, jobs 106223521998 / 106223521810 ✓
+- Local packaging/helper tests: **29 passed**; whole-PR `git diff --check` ✓.
+No local JDK/Android SDK; CI is the compile/test gate. This final docs-only
+verdict commit must also pass its own checks before the authorized merge.
 
-**Concurrency incident (user must arbitrate):** the previous session (`arena/01a0c154-dhun`) was still live when this one started and merged #100/#101 mid-flight (00:58Z / 01:07Z) while this session was reviewing #100. #100's three real holes (stale Android highlight after natural advance; desktop source-vs-display index mismatch → wrong-track taps under shuffle; rebuild-on-mutation reshuffle) lived on main ~22 minutes until #102 closed them. This session rebased onto the moved main and merged #102 as the corrective follow-up. The one-agent rule (MASTER_PROMPT §8.1) needs the user to confirm the other session is dead before the next session starts.
+**Scope complete in code (not hardware-certified):**
+1. Owed #105 docs/release verification: seamless radio expectation, download
+   diagnostics and build identity corrected.
+2. Explicit close: Windows X always uses full quit (old close-to-tray key is
+   ignored, switch removed); minimize keeps playing. Android Recents dismissal
+   pauses/stops engine and requests foreground/service shutdown; Home/lock not
+   treated as close. Three Android shutdown regression cases.
+3. Windows offline playback: user confirmed **Downloaded** and playback from
+   **Library → Downloads**, track `O3-6zB3kg8M`. Raw `file://` + Windows path was
+   malformed; portable URI escaping handles drive/UNC/space/Unicode/reserved
+   bytes. Local errors no longer enter CDN recovery. Six shared URI/resolver
+   and two desktop error-routing regression cases. MSI metadata dash → ASCII.
+4. Home moods: actual topic-song search results for Focus/Chill/Workout/Party;
+   For you restores browse feed. Not a signed-in personalized mood API.
+   Generation-safe requests, category-preserving retry/refresh, separate search
+   pagination, dedup/cycle guards. Seven Home regression cases.
+5. Pull-to-refresh: Material3 threshold + top-of-list nested-scroll handling,
+   indicator, repeated-refresh guard. Header refresh icon removed; footer/F5/
+   accessibility fallback retained. Controls stay usable on loading/error/empty.
 
-**CI evidence (this session, exact final heads):** PR #102 @ `4b8204c`: build ✓ (35550218902) · build-and-test ✓ incl. 9 new QueueManagerTest cases (35550218900) · apk ✓ (35550218899) · msi ✓. Post-merge on `4d693ce`: CI 35550567894 ✓ · Build APK 35550567913 ✓ · test-release 35550567905 ✓. Rolling `test` republished **2026-09-21T01:24:37Z** targeting **`4d693ce`** — APK **17,948,508 B** / MSI **112,861,184 B**. (First #102 CI run failed Android compile — missing `queueManager` field+import, caught by the annotations API, fixed in `4b8204c`; see DEBUG_LOG.)
+**Last error / limits:** no compile or test failures on final code head. Windows
+physical playback failure is NOT yet a PASS: file integrity/libVLC behavior needs
+retest. No user console expertise is required: ask for new on-screen playback
+details if it still fails. Pull gestures, category relevance and explicit-close
+hardware checks remain OPEN. #105 radio/Related/shuffle/Android-download checks
+also await explicit user verdicts. Endless radio is NOT started.
 
-**Session `arena/01a0c198-dhun` (verification + #103 close-out, 2026-09-21):** no code was owed — the four defect fixes (#98–#102) were already merged with per-PR green CI and their tests verified present at HEAD (`DownloadServiceStopLogicTest`, `ParserFixtureTest` radio-fixture + `PlayerViewModelTest`, 9 new `QueueManagerTest` display-shuffle cases, `LyricsFollowTest`). The only paused item was **PR #103** (docs-only, its `msi` check still pending at boot): all four required checks went green (build 35550928766 ✓ · build-and-test 35550928779 ✓ · apk 35550928827 ✓ · msi 35550928827 ✓) and it was merged as **`c4c5d04`**. Post-merge on `c4c5d04`: CI 35551566277 ✓ · Build APK 35551566265 ✓ · test-release 35551566274 ✓. Rolling `test` republished **2026-09-21T01:45:26Z** targeting **`c4c5d04`** — APK **17,948,508 B** / MSI **112,861,184 B**, bytes unchanged (docs-only diff). **Qualifying-build rule for the user re-test: the newest `test` publish carrying these exact byte sizes** (docs-only merges change only the publish time/target, never the bytes); the exact publish time of the final republish is recorded in PR #104's post-merge state and the session report.
+**Exact next steps:** verify final docs-head CI, then merge PR #106 under the
+user's latest explicit authorization (supersedes earlier no-merge messages).
+After merge, verify main's build/release and rolling `test` target/tag, publish
+time and asset sizes. If the connection ends on merge, next session performs
+that release check FIRST. Install that new build and run HANDOFF's Home/close/
+offline tests plus original #105 tests. Only after all pass: endless radio,
+then S3/S6 soaks, rotation/process death, settings and Windows native checks.
 
-**Exact next step: the user re-tests on hardware** against the build identity above, following the numbered script in `.ai/HANDOFF_NEXT_SESSION.md` (Android 1–9: download + offline, radio, visible shuffle + highlight tracking + tap-correctness + play-next, lyrics, lock-screen regression, sanity; Windows 10–12: shuffle set, radio, tray sanity). Agent-side S3/S6 remainder is unchanged and waits on those results or is agent-executable docs/CI work: 30-min soaks, rotation/process-death, Settings/theme persistence checks, Windows native column, then S2 leftovers (`extraction-health.yml` trigger retirement needs a live drill watch; `14-release.md` stale merge-chain section; ubuntu-latest/Node-20 hygiene). Issue #14 still needs the user to close it (agent 403 on issue writes).
+**Last verified published build BEFORE #106 merge:** `test` published
+**2026-09-21T03:00:04Z**, release target AND tag
+**`414cd7941d69e185b5628e8b9b7fffe5a0a5a4f0`**. APK **18,334,451 B**, MSI
+**112,873,472 B**. This is the OLD build, not evidence that #106 shipped.
+Scheduled extraction-health **35561269411** failed with **ENVIRONMENT_BLOCKED**
+annotation; not a production pass or demonstrated device root cause.
+
+**Session discipline:** live PR/run checks showed only old research PR #54
+beside this session; no sibling work observed. All changes on the fixed session
+branch; no forks/vendoring. Docs/code/verdicts completed BEFORE merge. Review
+`HANDOFF_NEXT_SESSION.md`, `DEBUG_LOG.md` and CHANGELOG for tests and rationale.
 
 ---
 

@@ -24,6 +24,46 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — Home categories and pull-to-refresh (2026-09-21, hardware verification pending)
+
+- **Focus, Chill, Workout and Party now fetch topic-specific songs**, instead
+  of just highlighting a chip and reordering matching shelf titles. For you
+  restores the regular Home feed. These are song searches, not signed-in
+  personalized YouTube mood feeds. Unrelated history/recommendation rows are
+  hidden in category views; chips remain available during loading/errors.
+- Category changes cancel prior feed/page work; late responses cannot replace
+  the selected category. Search continuations stay separate from Home browse
+  continuations, with duplicate-song and repeated-token protection.
+- **Pull down past the threshold at the top of Home to refresh** the selected
+  category. Removed the header refresh icon; shows the Material refresh
+  indicator and coalesces repeated refreshes. Footer/F5/accessibility refresh
+  remains available for non-touch use. Same songs may return if the server's
+  results have not changed; refresh fetches again rather than shuffling locally.
+
+### Fixed — Windows downloaded-file playback (2026-09-21, CI verified; hardware verification pending)
+
+- Completed downloads now resolve to escaped file URIs: Windows drive paths
+  use `file:///C:/...`, separators are normalized, and spaces, `%`, `#`, `?`
+  and Unicode are encoded without changing the filename. Previously raw
+  `file://` + Windows path could give libVLC an invalid media location.
+- Desktop local-file errors no longer enter CDN/cache-fill recovery or claim
+  a User-Agent/CDN rejection. They identify local-file playback failure instead.
+- Regression coverage includes Windows drive/UNC paths, Android/Unix paths,
+  reserved characters and Unicode, completed-download network bypass, and
+  local-vs-remote playback-error routing. Windows hardware retest still required.
+
+### Fixed — explicit close stops playback (2026-09-21, CI verified; hardware verification pending)
+
+- **Windows X now quits completely**, using the same player/resource teardown
+  as Ctrl+Q and tray Quit. It no longer hides the window with music playing,
+  even if an older install stored `close_to_tray=true`. Removed the obsolete
+  Close to tray switch. Minimize remains available for background listening.
+- **Android swipe-away from Recents stops playback**, including buffering
+  playback, and requests media-service shutdown. Home, screen lock and
+  Activity recreation are not treated as explicit close.
+- Windows installer description uses an ASCII hyphen to avoid the reported
+  garbled dash (`a€"`) in shell metadata; verify on the next MSI.
+
 ### Fixed — radio / shuffle-gap / Android downloads (2026-09-21, hardware re-test pending)
 
 - **"Play radio" is now seamless (replaces the #99 behavior).** Tapping it

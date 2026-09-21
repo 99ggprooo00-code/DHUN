@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 /**
  * Settings screen model (S4).
  *
- * Owns the five user-facing settings that are actually wired to behaviour:
+ * Owns the user-facing settings and a legacy close-to-tray value:
  *
  * - [themeId] / [accentId] — persisted ids; the screen maps them onto
  *   `DhunThemeMode` / `DhunAccent` and applies them live through
@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
  * - [cacheSizeMb] — the audio-segment cache budget, honoured by the platform
  *   players on the next process start (the running cache cannot be resized).
  * - [resumeOnLaunch] — honoured by `RestoreNowPlayingUseCase` on cold start.
- * - [closeToTray] — read by the desktop host at startup (hidden on Android).
+ * - [closeToTray] — legacy storage compatibility only; no UI or host consumer.
+ *   Desktop X always quits, regardless of this stored value.
  *
  * Settings whose keys exist but have no behaviour behind them yet
  * (`AUDIO_QUALITY`, `COUNTRY_CODE`, `LYRICS_ENABLED`, `ACCENT_MODE`,

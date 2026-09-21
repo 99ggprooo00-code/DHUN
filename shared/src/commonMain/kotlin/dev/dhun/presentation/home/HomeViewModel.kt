@@ -8,6 +8,7 @@ import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
 import dev.dhun.data.HistoryRepository
 import dev.dhun.data.LibraryRepository
+import dev.dhun.domain.HomeMood
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.domain.ToggleFavoriteUseCase
@@ -46,6 +47,7 @@ class HomeViewModel(
     // the desktop's Default dispatcher (check-then-write race).
     private data class State(
         val generation: Long = 0,
+        val mood: HomeMood = HomeMood.FOR_YOU,
         val ui: HomeUiState = HomeUiState.Loading,
         val refreshing: Boolean = false,
         val loadingMore: Boolean = false,
@@ -55,6 +57,8 @@ class HomeViewModel(
     )
 
     private val state = MutableStateFlow(State())
+    val selectedMood: StateFlow<HomeMood> = state.map { it.mood }
+        .stateIn(scope, SharingStarted.Eagerly, HomeMood.FOR_YOU)
     val uiState: StateFlow<HomeUiState> = state.map { it.ui }
         .stateIn(scope, SharingStarted.Eagerly, HomeUiState.Loading)
     val isRefreshing: StateFlow<Boolean> = state.map { it.refreshing }
@@ -90,7 +94,16 @@ class HomeViewModel(
     }
 
     fun load() = requestFeed(refresh = false)
-    fun refresh() = requestFeed(refresh = true)
+    fun refresh() {
+        if (state.value.refreshing) return
+        requestFeed(refresh = true)
+        if (state.value.mood == HomeMood.FOR_YOU) refreshRecommendations()
+    }
+
+    fun selectMood(mood: HomeMood) {
+        if (state.value.mood == mood) return
+        requestFeed(refresh = false, mood = mood)
+    }
 
     /**
      * Rebuild the recommended row whenever the seed signal — the ordered set
@@ -158,10 +171,11 @@ class HomeViewModel(
         return ids
     }
 
-    private fun requestFeed(refresh: Boolean) {
+    private fun requestFeed(refresh: Boolean, mood: HomeMood = state.value.mood) {
         val request = state.updateAndGet {
             State(
                 generation = it.generation + 1,
+                mood = mood,
                 ui = if (refresh && it.ui is HomeUiState.Success) it.ui else HomeUiState.Loading,
                 refreshing = refresh,
             )
@@ -170,7 +184,7 @@ class HomeViewModel(
         pageJob?.cancel()
         feedJob = scope.launch {
             try {
-                val result = getHomeFeed()
+                val result = getHomeFeed(request.mood)
                 state.update { current ->
                     if (current.generation != request.generation) current else current.copy(
                         ui = when (result) {
@@ -219,7 +233,7 @@ class HomeViewModel(
         if (!state.compareAndSet(before, request)) return
         pageJob = scope.launch {
             try {
-                val result = getHomeFeed.loadMore(current)
+                val result = getHomeFeed.loadMore(current, request.mood)
                 state.update { latest ->
                     if (latest.generation != request.generation) return@update latest
                     when (result) {

@@ -3,6 +3,9 @@ package dev.dhun.domain
 import dev.dhun.core.DhunResult
 import dev.dhun.core.HistoryEntry
 import dev.dhun.core.HomeFeed
+import dev.dhun.core.HomeItem
+import dev.dhun.core.SearchResults
+import dev.dhun.innertube.SearchFilter
 import dev.dhun.core.HomeSection
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
@@ -32,7 +35,19 @@ class GetHomeFeedUseCase(
     private val history: HistoryRepository,
     private val clock: EpochClock = EpochClock.System,
 ) {
-    suspend operator fun invoke(): DhunResult<HomeFeed> {
+    suspend operator fun invoke(mood: HomeMood = HomeMood.FOR_YOU): DhunResult<HomeFeed> {
+        if (mood != HomeMood.FOR_YOU) {
+            return when (val result = provider.search(requireNotNull(mood.query), SearchFilter.SONGS)) {
+                is DhunResult.Success -> DhunResult.Success(
+                    HomeFeed(
+                        greeting = greetingForCurrentTime(clock),
+                        sections = moodSections(mood, result.value),
+                        continuationToken = result.value.continuationToken,
+                    ),
+                )
+                is DhunResult.Failure -> result
+            }
+        }
         val greeting = greetingForCurrentTime(clock)
         return when (val r = provider.homeFeedPage()) {
             is DhunResult.Success -> {
@@ -60,9 +75,22 @@ class GetHomeFeedUseCase(
      * A no-op Success when the feed is exhausted. The ViewModel owns the
      * in-flight guard, retries and cross-page continuation-cycle detection.
      */
-    suspend fun loadMore(current: HomeFeed): DhunResult<HomeFeed> {
+    suspend fun loadMore(current: HomeFeed, mood: HomeMood = HomeMood.FOR_YOU): DhunResult<HomeFeed> {
         val token = current.continuationToken
             ?: return DhunResult.Success(current.copy(continuationToken = null))
+        if (mood != HomeMood.FOR_YOU) {
+            return when (val result = provider.searchContinuation(token)) {
+                is DhunResult.Success -> {
+                    val seen = current.sections.flatMap { it.tracks }.map { it.id }.toSet()
+                    val page = result.value.copy(songs = result.value.songs.filterNot { it.id in seen })
+                    DhunResult.Success(current.copy(
+                        sections = current.sections + moodSections(mood, page),
+                        continuationToken = page.continuationToken?.takeIf { it.isNotBlank() && it != token },
+                    ))
+                }
+                is DhunResult.Failure -> result
+            }
+        }
         return when (val r = provider.homeFeedContinuation(token)) {
             is DhunResult.Success -> {
                 val page = r.value
@@ -96,6 +124,15 @@ class GetHomeFeedUseCase(
             is DhunResult.Failure -> DhunResult.Failure(r.error)
         }
     }
+
+    private fun moodSections(mood: HomeMood, results: SearchResults): List<HomeSection> =
+        results.songs.distinctBy { it.id }.takeIf { it.isNotEmpty() }?.let { tracks ->
+            listOf(HomeSection(
+                title = "${mood.label} songs",
+                subtitle = "Songs for ${mood.label.lowercase()}",
+                items = tracks.map { HomeItem.TrackItem(it) },
+            ))
+        } ?: emptyList()
 
     private fun extractQuickPicks(sections: List<HomeSection>): List<Track> {
         val quickSection = sections.firstOrNull { it.title.contains("quick", ignoreCase = true) }

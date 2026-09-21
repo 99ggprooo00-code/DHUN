@@ -95,8 +95,7 @@ import javax.swing.SwingUtilities
  *  - SMTC phase 2: now-playing metadata, remote thumbnail, playback state,
  *    previous/next enablement, and native ButtonPressed dispatch to the
  *    shared player; activation failures degrade to the tray path
- *  - close-to-tray (setting [SettingsKeys.CLOSE_TO_TRAY], default on): the
- *    main window's X hides to tray; tray "Quit" exits clean
+ *  - X, Ctrl+Q and tray Quit all stop playback and exit; minimize keeps playing
  *  - window geometry persisted to [SettingsKeys.WINDOW_GEOMETRY] ("x,y,w,h"
  *    px) — read from the live [WindowState] (position is kept current by the
  *    Compose window's component listener), restored via WindowPosition
@@ -335,7 +334,7 @@ fun main(args: Array<String>) {
                 }
             }
 
-            // Phase 12: persisted window geometry + close-to-tray (Phase 05 DB).
+            // Persisted window geometry (Phase 05 DB).
             val initialGeometry: WindowGeometry? = runBlocking {
                 runCatching { settings.getString(SettingsKeys.WINDOW_GEOMETRY) }
                     .getOrNull()
@@ -350,14 +349,7 @@ fun main(args: Array<String>) {
                         )
                     }
             }
-            val closeToTray = runBlocking {
-                runCatching {
-                    settings.getBoolean(SettingsKeys.CLOSE_TO_TRAY, SettingsKeys.CLOSE_TO_TRAY_DEFAULT)
-                }.getOrDefault(true)
-            }
-
-            // Window states (hoisted so close-to-tray/quit can read the live geometry:
-            // Compose keeps position/size current via the AWT component listener).
+            // Hoisted so quit can save the live window geometry.
             val mainState = rememberWindowState(
                 width = initialGeometry?.w?.toFloat()?.dp ?: DhunSpacing.windowDefaultWidth,
                 height = initialGeometry?.h?.toFloat()?.dp ?: DhunSpacing.windowDefaultHeight,
@@ -419,7 +411,7 @@ fun main(args: Array<String>) {
                 onQuit = { quitRef.get().invoke() },
             )
 
-            /** Tray \"Quit\" and Ctrl+Q converge here — one clean exit, no zombies. */
+            /** Window X, tray Quit and Ctrl+Q converge here — one clean exit. */
             fun quit() {
                 saveGeometry()
                 runCatching { tray.stop() }
@@ -527,15 +519,9 @@ fun main(args: Array<String>) {
 
             // ---- main window ------------------------------------------------------- //
             Window(
-                onCloseRequest = {
-                    if (closeToTray) {
-                        // Phase 12: close → tray (default on). Tray \"Quit\" exits.
-                        saveGeometry()
-                        mainWindowRef.get()?.isVisible = false
-                    } else {
-                        quit()
-                    }
-                },
+                // Explicit close always exits, including installs with the
+                // retired close_to_tray=true preference. Minimize is separate.
+                onCloseRequest = ::quit,
                 state = mainState,
                 title = "DHUN",
                 // Window-scope shortcuts. onKeyEvent (NOT onPreviewKeyEvent) receives

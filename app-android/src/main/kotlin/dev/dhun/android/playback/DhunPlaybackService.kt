@@ -3,6 +3,7 @@ package dev.dhun.android.playback
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -198,6 +199,16 @@ class DhunPlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         mediaSession
+
+    // Task dismissal is an explicit close, unlike Home, screen lock or an
+    // Activity recreation. Do not put this in Activity.onStop/onDestroy:
+    // those callbacks also run during ordinary background listening.
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        stopPlaybackOnTaskRemoval(mediaSession?.player) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
 
     override fun onDestroy() {
         widgetHandler.removeCallbacks(widgetTick)

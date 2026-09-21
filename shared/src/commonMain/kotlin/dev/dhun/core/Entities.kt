@@ -76,7 +76,8 @@ data class HomeFeed(
     val listenAgain: List<Track> = emptyList(),
     val sections: List<HomeSection> = emptyList(),
     /**
-     * InnerTube continuation for the home shelf list. Null = the feed is
+     * Opaque continuation for the selected feed (browse for For you, search
+     * for a topic mood). Null = the feed is
      * exhausted; the Home screen stops asking for more (endless scroll).
      */
     val continuationToken: String? = null,
