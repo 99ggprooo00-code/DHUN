@@ -255,4 +255,46 @@ class PlayerViewModelTest {
             scope.cancel()
         }
     }
+
+    @Test
+    fun startRadioDoesNotReplayCurrentTrack(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val player = FakePlayer()
+            // Provider returns related list where first is the current track (defect 2 source)
+            val provider = FakeProvider(
+                related = DhunResult.Success(listOf(track("a"), track("b"), track("c"))),
+            )
+            val vm = newVm(player, provider, scope)
+            player.prepareQueue(listOf(track("a")), 0)
+            eventually { vm.relatedState.value is RelatedUiState.Success }
+            val related = (vm.relatedState.value as RelatedUiState.Success).tracks
+            // Must not contain current id — ViewModel filters it
+            assertFalse(related.any { it.id == "a" }, "related must filter current track")
+            assertEquals(listOf("b", "c"), related.map { it.id })
+            // startRadio should start at b, not restart a
+            vm.startRadio()
+            eventually { player.queue.value.isNotEmpty() }
+            assertEquals("b", player.currentTrack.value?.id, "startRadio must not replay current track")
+            assertEquals(listOf("b", "c"), player.queue.value.map { it.id })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun relatedFiltersCurrentTrackToEmptyWhenOnlyCurrent(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val player = FakePlayer()
+            val provider = FakeProvider(
+                related = DhunResult.Success(listOf(track("solo"))),
+            )
+            val vm = newVm(player, provider, scope)
+            player.prepareQueue(listOf(track("solo")), 0)
+            eventually { vm.relatedState.value is RelatedUiState.Empty }
+        } finally {
+            scope.cancel()
+        }
+    }
 }

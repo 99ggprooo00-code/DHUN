@@ -193,4 +193,22 @@ class ParserFixtureTest {
         assertTrue(playlist.tracks.all { it.artistName.isNotBlank() })
     }
 
+
+    @Test
+    fun radioFixtureFirstEntryIsCurrentTrack() {
+        val root = obj(fixture("next-radio-utwMHfDZ6SA.json"))
+        val tracks = parseRelatedTracks(root)
+        // Fixture's currentVideoEndpoint is utwMHfDZ6SA (Bohemian Rhapsody)
+        // and the first playlistPanelVideoRenderer is the same id — the source
+        // of defect 2 (play radio restarts current song). The raw parser
+        // returns 50 including the current; ViewModel filtering removes it.
+        assertEquals(50, tracks.size)
+        assertEquals("utwMHfDZ6SA", tracks.first().id)
+        assertEquals("Bohemian Rhapsody", tracks.first().title)
+        val filtered = tracks.filter { it.id != "utwMHfDZ6SA" }
+        assertEquals(49, filtered.size)
+        assertFalse(filtered.any { it.id == "utwMHfDZ6SA" })
+        assertEquals("I7HR7Nd2FqU", filtered.first().id)
+    }
+
 }

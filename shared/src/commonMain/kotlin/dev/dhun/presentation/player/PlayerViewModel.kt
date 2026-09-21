@@ -343,9 +343,16 @@ class PlayerViewModel(
         relatedJob = scope.launch {
             _relatedState.value = RelatedUiState.Loading
             when (val r = provider.relatedTracks(track.id)) {
-                is DhunResult.Success ->
+                is DhunResult.Success -> {
+                    // Defect 2: /next playlistPanelVideoRenderer includes the
+                    // currently-playing video as its first entry. Playing
+                    // radio from index 0 would therefore restart the current
+                    // song instead of advancing. Filter the current track out
+                    // so startRadio and the Related tab never show it.
+                    val filtered = r.value.filter { it.id != track.id }
                     _relatedState.value =
-                        if (r.value.isEmpty()) RelatedUiState.Empty else RelatedUiState.Success(r.value)
+                        if (filtered.isEmpty()) RelatedUiState.Empty else RelatedUiState.Success(filtered)
+                }
                 is DhunResult.Failure ->
                     _relatedState.value = RelatedUiState.Error(r.error.toUserMessage())
             }
