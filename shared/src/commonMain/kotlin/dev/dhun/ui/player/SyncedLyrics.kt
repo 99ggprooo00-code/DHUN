@@ -112,12 +112,12 @@ internal fun SyncedLyricsContent(
             itemsIndexed(lines, key = { index, _ -> index }) { index, line ->
                 val active = index == activeIndex
                 val color by animateColorAsState(
-                    targetValue = if (active) accent else DhunColors.textTertiary,
+                    targetValue = if (active) accent else DhunColors.textSecondary.copy(alpha = 0.72f),
                     animationSpec = DhunAnimations.mediumTween(),
                     label = "lyricColor$index",
                 )
                 val emphasis by animateFloatAsState(
-                    targetValue = if (active) 1f else 0.94f,
+                    targetValue = if (active) 1.04f else 0.92f,
                     // ADR-002 P8: the line pops in on a spring, karaoke-style;
                     // the color keeps a calm tween so hues never bounce.
                     animationSpec = DhunAnimations.springSpec(),
@@ -127,9 +127,11 @@ internal fun SyncedLyricsContent(
                 Text(
                     text = line.text.ifBlank { " " },
                     // Keep measurement stable while emphasis changes; changing
-                    // font size per line made wrapping fight the scroll animation.
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    // font size per line made wrapping fight the scroll animation —
+                    // we bump the base to headlineSmall (larger, more readable)
+                    // and use scale/weight/colour for the active pop.
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                     color = color,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -141,7 +143,7 @@ internal fun SyncedLyricsContent(
                             Brush.horizontalGradient(
                                 listOf(
                                     Color.Transparent,
-                                    if (active) accent.copy(alpha = 0.12f) else Color.Transparent,
+                                    if (active) accent.copy(alpha = 0.16f) else Color.Transparent,
                                     Color.Transparent,
                                 ),
                             ),
