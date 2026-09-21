@@ -83,14 +83,15 @@ pushed but CI-unverified at the time of writing; until its checks come back
 green the work is NOT done by the repo's own definition.
 
 **Exact next step:** UI polish is PR **#107** (`arena/01a0c2c7-dhun` →
-`main`). Push CI green on `fd053df` (run **35572454014**, build-and-test ✓ —
-the one earlier failure, run 35572182843, was a stale placeholder/shimmer hex
-pin in `DhunAppearanceTest` that 78743bf missed; fixed in `fd053df` and
-mechanically cross-checked). Awaiting PR checks (Build APK, test-release
-build — publish is `main`-gated so the rolling release is untouched), then
-the user's visual verdict on both platforms. **Do not merge #107 without the
-user's explicit authorization AND the visual verdict.** Endless radio stays
-queued behind the user's go-ahead.
+`main`). ALL checks GREEN on the final head `1d1ec6c`: push CI 35572454014
+(build-and-test ✓) and PR checks build ✓ / build-and-test ✓ / apk ✓ / msi ✓
+(publish/release_draft/aab skip — `main`-gated; the rolling `test` release is
+untouched). The one earlier failure (push run 35572182843) was a stale
+placeholder/shimmer hex pin in `DhunAppearanceTest` that 78743bf missed;
+fixed in `fd053df`, mechanically cross-checked. **Status: awaiting user
+visual verdict on both platforms — do not merge #107 without the user's
+explicit authorization AND that verdict.** Endless radio stays queued behind
+the user's go-ahead.
 
 **Session discipline:** boot checked `gh pr list` (only stale research PR
 #54 open) and `gh run list` (no live runs — PR #106 verifications all
