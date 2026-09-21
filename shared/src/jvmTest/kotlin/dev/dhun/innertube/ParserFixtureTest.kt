@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -120,6 +121,60 @@ class ParserFixtureTest {
         """.trimIndent()
         val token = parseContinuationToken(obj(json))
         assertEquals("4smCG...==", token)
+    }
+
+/* ---------------- endless radio: /next page + continuation -------------- */
+
+    @Test
+    fun radioFixtureParsesPageWithContinuationToken() {
+        val page = parseRadioQueuePage(obj(fixture("next-radio-utwMHfDZ6SA.json")))
+        assertEquals(50, page.tracks.size)
+        // Pin the exact next-page token the live RDAMVM panel carried for
+        // this seed (nextRadioContinuationData under the playlist panel).
+        assertEquals(
+            "CDISNRILeHBNNTllNmx5d3MiEVJEQU1WTXV0d01IZkRaNlNBODH6ARBENjI1QUI0MDI5NEQzODFEGAo%3D",
+            page.continuationToken,
+        )
+    }
+
+    @Test
+    fun radioContinuationIgnoresGenericAndReloadTokens() {
+        // A /next response can carry OTHER tabs' paging (generic
+        // nextContinuationData, comment reloadContinuationData). None of
+        // those is the radio chain — following one would page the wrong
+        // endpoint and clobber the queue with an unrelated list.
+        val json = """
+            {"contents":{"musicQueueRenderer":{"a":{"continuations":[
+                {"nextContinuationData":{"continuation":"generic-token"}},
+                {"reloadContinuationData":{"continuation":"reload-token"}}
+            ]}}}}
+        """.trimIndent()
+        assertNull(parseRadioContinuationToken(obj(json)))
+    }
+
+    @Test
+    fun parsesWrappedRadioContinuationPage() {
+        // Continuation pages arrive wrapped in onResponseReceivedActions +
+        // continuationContents (no full panel context), with the next token
+        // among the contents entries.
+        val json = """
+            {"onResponseReceivedActions":{"reloadContinuationCommand":{"continuationContents":{
+              "playlistPanelRenderer":{"contents":[
+                {"playlistPanelVideoRenderer":{"title":{"runs":[{"text":"Next Song"}]},
+                 "longBylineText":{"runs":[{"text":"Some Artist"}]},
+                 "videoId":"nextvid1","lengthText":{"runs":[{"text":"3:33"}]}}},
+                {"playlistPanelVideoRenderer":{"title":{"runs":[{"text":"Next Song 2"}]},
+                 "longBylineText":{"runs":[{"text":"Some Artist"}]},
+                 "videoId":"nextvid2","lengthText":{"runs":[{"text":"4:00"}]}}},
+                {"continuations":[{"nextRadioContinuationData":{"continuation":"next-page-token"}}]}
+              ]}
+            }}}}
+        """.trimIndent()
+        val page = parseRadioQueuePage(obj(json))
+        assertEquals(listOf("nextvid1", "nextvid2"), page.tracks.map { it.id })
+        assertEquals("Next Song", page.tracks[0].title)
+        assertEquals(213, page.tracks[0].durationSeconds) // 3:33
+        assertEquals("next-page-token", page.continuationToken)
     }
 
 /* ---------------- Phase 09 browse fixtures ------------------------------- */

@@ -81,6 +81,7 @@ class BrowseViewModelTest {
         var album: DhunResult<AlbumDetail> = DhunResult.Failure(DhunError.Network()),
         var playlist: DhunResult<PlaylistDetail> = DhunResult.Failure(DhunError.Network()),
         var radio: List<Track> = emptyList(),
+        var radioToken: String? = null,
     ) : MusicProvider {
         override suspend fun search(query: String, filter: SearchFilter) = DhunResult.Success(SearchResults(query))
         override suspend fun searchContinuation(continuationToken: String) = DhunResult.Success(SearchResults(""))
@@ -91,6 +92,8 @@ class BrowseViewModelTest {
         override suspend fun homeFeedContinuation(continuationToken: String) =
             DhunResult.Success(dev.dhun.core.HomeFeedPage())
         override suspend fun relatedTracks(videoId: String) = DhunResult.Success(radio)
+        override suspend fun radioQueuePage(videoId: String): DhunResult<dev.dhun.core.RadioQueuePage> =
+            DhunResult.Success(dev.dhun.core.RadioQueuePage(radio, radioToken))
         override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> = DhunResult.Failure(DhunError.Unavailable())
         override suspend fun getLyrics(videoId: String) = DhunResult.Success(Lyrics.NotAvailable)
         override suspend fun artistPage(browseId: String) = artist
@@ -127,6 +130,38 @@ class BrowseViewModelTest {
 
             vm.startRadio()
             eventually { player.queue.value.size == 2 && player.queue.value[0].id == "t1" }
+        } finally {
+            vm.close()
+        }
+    }
+
+    @Test
+    fun artistRadioMarksSharedSessionAndDedupesSeed(): Unit = runBlocking {
+        val player = FakePlayer()
+        val session = dev.dhun.domain.RadioSession()
+        val provider = FakeBrowseProvider(
+            artist = DhunResult.Success(
+                ArtistPage(
+                    artist = Artist(id = "UC1", name = "Queen"),
+                    topSongs = listOf(track("t1"), track("t2")),
+                ),
+            ),
+            // The RDAMVM panel lists the seed video itself first (live
+            // fixture shape, #99) — the queue must contain it exactly once.
+            radio = listOf(track("t1"), track("r1"), track("r2")),
+            radioToken = "artist-tok",
+        )
+        val vm = ArtistViewModel(provider, player, "UC1", session)
+        try {
+            eventually { vm.state.value is ArtistUiState.Success }
+            vm.startRadio()
+            eventually { player.queue.value.size == 3 }
+            assertEquals(listOf("t1", "r1", "r2"), player.queue.value.map { it.id })
+            // The station is handed to the SAME session the PlayerViewModel
+            // refill monitor watches, with the station's paging chain.
+            assertTrue(session.isActive)
+            assertEquals("t1", session.seedTrackId)
+            assertEquals("artist-tok", session.continuationToken)
         } finally {
             vm.close()
         }

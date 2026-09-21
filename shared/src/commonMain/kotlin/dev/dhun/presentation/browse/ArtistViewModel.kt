@@ -4,6 +4,7 @@ import dev.dhun.core.ArtistPage
 import dev.dhun.core.DhunResult
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
+import dev.dhun.domain.RadioSession
 import dev.dhun.player.DhunPlayer
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +30,8 @@ class ArtistViewModel(
     private val provider: MusicProvider,
     private val player: DhunPlayer,
     private val artistId: String,
+    /** Shared endless-radio bookkeeping (same instance as PlayerViewModel). */
+    private val radioSession: RadioSession = RadioSession(),
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -79,11 +82,20 @@ class ArtistViewModel(
         _radioLoading.value = true
         scope.launch {
             try {
-                when (val r = provider.relatedTracks(seed.id)) {
-                    is DhunResult.Success ->
-                        if (r.value.isNotEmpty()) {
-                            player.prepareQueue(listOf(seed) + r.value, 0, playWhenReady = true)
+                when (val r = provider.radioQueuePage(seed.id)) {
+                    is DhunResult.Success -> {
+                        // The RDAMVM panel lists the seed video itself as its
+                        // first entry (#99 root cause) — drop it so the queue
+                        // starts with the seed exactly once.
+                        val rest = r.value.tracks.filter { it.id != seed.id }
+                        if (rest.isNotEmpty()) {
+                            player.prepareQueue(listOf(seed) + rest, 0, playWhenReady = true)
+                            // Hand the station (seed + paging chain) to the
+                            // refill monitor so the artist radio is endless
+                            // like the FullPlayer radio.
+                            radioSession.start(seed.id, r.value.continuationToken)
                         }
+                    }
                     is DhunResult.Failure -> {
                         // Radio failed silently is fine — the tracks list stays.
                     }
