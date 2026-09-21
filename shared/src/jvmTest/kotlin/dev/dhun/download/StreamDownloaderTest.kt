@@ -80,7 +80,7 @@ class StreamDownloaderTest {
         storage.append(dest, "stale-stale".encodeToByteArray())
 
         val engine = MockEngine { request ->
-            assertEquals("bytes=10-", request.headers[HttpHeaders.Range])
+            assertEquals("bytes=11-", request.headers[HttpHeaders.Range]) // "stale-stale" is 11 bytes
             // Server ignored the Range: full object with 200.
             respond(
                 content = content,
