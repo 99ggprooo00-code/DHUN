@@ -17,7 +17,7 @@ message and is transcribed verbatim below, now in-repo).
 > for now it is OK. On play radio, the song that is playing starts over from
 > start.
 
-### PASSES banked (do not re-test)
+### Historical Round-2 passes (latest failures supersede these)
 
 - Android media notification correct and functional, incl. lock screen.
 - Notification/lock-screen transport **buttons** work.
@@ -48,29 +48,68 @@ in-flight corrective work onto the new main, and merged it as **#102
 by #102. **User action: confirm no other agent session is still running
 before starting the next one** (the one-agent rule in MASTER_PROMPT §8.1).
 
-## Build identity for the re-test below (release API, live-verified)
+## Build identity for the re-test (verified 2026-09-21)
 
-- Rolling `test` **published 2026-09-21T01:45:26Z**, `target_commitish`
-  **`c4c5d04`** (= PR #103 merge HEAD; #102 `4d693ce` beneath it), assets:
-  `dhun-test.apk` **17,948,508 B**, `dhun-test.msi` **112,861,184 B**
-  (+ `.sha256` sidecars). Post-merge CI on exactly `c4c5d04`:
-  CI 35551566277 ✓ · Build APK 35551566265 ✓ · test-release 35551566274 ✓.
-  (The earlier 01:24:37Z publish @ `4d693ce` carried the identical binaries;
-  it was superseded by the docs-only #103 merge.)
-- **Self-correcting rule:** every push to `main` replaces `test`. Docs-only
-  merges change only the publish time/target, never the byte sizes — so
-  **the newest `test` publish with APK 17,948,508 B / MSI 112,861,184 B is
-  the current qualifying build** regardless of when you read this. If your
-  downloaded file sizes differ, you have a stale build.
+- Rolling `test` published **2026-09-21T03:00:04Z**. Release target and tag
+  both resolve to **`414cd7941d69e185b5628e8b9b7fffe5a0a5a4f0`** (PR #105).
+- APK **18,334,451 bytes**; MSI **112,873,472 bytes**, with SHA-256 sidecars.
+- Build/release runs 35555585912 / 35555585908 / 35555585893 succeeded.
+- Scheduled extraction-health 35561269411 later failed: check-run annotations
+  say **ENVIRONMENT_BLOCKED**; live health remains unverified.
+- Recheck the release target/tag and sidecars whenever `test` is replaced.
+  Byte sizes alone do not prove identity; reproducibility across rebuilds is
+  not assumed. Old c4c5d04 / 17,948,508-byte APK instructions are superseded.
+
+## Latest hardware report / triage — 2026-09-21
+
+**Windows download/playback FAIL**, track `O3-6zB3kg8M`: user reports it
+“downloads but on playing” shows “Stream rejected by the CDN and no local copy
+could be fetched”, with details “libVLC rejected the stream URL and the cache
+fill produced no file (VLC cannot send the resolving identity's User-Agent).”
+Tests 1–5 remain **unconfirmed**; do not interpret the supplied PASS criteria as
+results. Earlier Round-2 Windows pass is historical, not a verdict on this build.
+
+**Code trace, not root-cause verdict:** desktop DI wraps playback resolution in
+`OfflineFirstStreamResolver`: COMPLETED row + existing file → local file URI;
+otherwise network resolver. `DesktopDhunPlayer` checks its separate bounded
+cache first, then the provider. It sets `streamingRemoteUrl = info.audioUrl`
+even for a local URI. `handlePlaybackError` does not reject local URIs before
+entering the purported CDN fallback; it checks only the bounded cache afterward.
+Thus the reported text alone cannot distinguish network failure from local-file
+playback failure. Do not claim a CDN rejection or successful persistent download
+based only on that text.
+
+**Requested evidence:** installed build; download row state (COMPLETED,
+DOWNLOADING %, FAILED, QUEUED or absent); play from Library → Downloads vs another
+screen; matching `DHUN download O3-6zB3kg8M:` completion/failure and `DHUN cache:`
+lines. If completed, confirm the reported local file exists and is nonempty.
+Redact signed URLs, credentials and personal path segments. Fix the demonstrated
+stage with regression coverage; no speculative transport changes in this docs PR.
+
+**Android download failure:** request logcat line exactly as emitted:
+- `DHUN download <id>: resolve failed: …`
+- `DHUN download <id>: bytes failed: …`
+- `DHUN download worker failed for <id>: …`
+Do not guess which stage failed. Completion is logged as
+`DHUN download <id>: completed <bytes> bytes -> <path>`.
+
+## PR #105 supersedes the old radio/shuffle/download ledger
+
+- Radio uses `replaceQueueKeepingCurrent`: same sounding song and position,
+  no pause/restart; new radio tail. Related excludes current; row taps still play.
+- Android shuffle no longer reloads/prepares the timeline; mutations preserve
+  the sounding item. Queue display/cursor fixes from #102 remain.
+- Android downloads use OkHttp, always-Range, safe resume/restart and complete
+  416 handling, IO workers and terminal FAILED on crashes. Hardware gate open.
+- Only after all hardware checks pass: endless radio via `/next` continuation
+  when ≤3 tracks remain (read-only reference notes in DEBUG_LOG). No forks or
+  vendoring. Then S3/S6 tail below. Never merge without user permission.
 
 ---
 
-## HARDWARE RE-TEST SCRIPT — build `test` @ 2026-09-21T01:45:26Z or newer with APK 17,948,508 B / MSI 112,861,184 B
+## HARDWARE RE-TEST SCRIPT — verified #105 build above
 
-Re-download BOTH installers after this merge (rolling `test` was replaced at
-the publish time above; if your file sizes differ, you have a stale build).
-Report per number: PASS / FAIL (+ what you saw; use "Show playback details"
-on the error band if anything fails to play).
+Report PASS / FAIL for each test; include playback details on errors.
 
 ### A. Android (upgrade-install over your current build)
 
@@ -82,13 +121,15 @@ on the error band if anything fails to play).
    the background immediately. Expect: download still completes (FGS race
    fix).
 3. **Play radio (defect 2):** play any song, let it get a few seconds in,
-   then tap **"Play radio"** (or Start radio). Expect: it moves to a
-   DIFFERENT song, never restarting the current one. Also check the
+   then tap **"Play radio"** (or Start radio). Expect: the SAME song keeps
+   playing at the same position, without pause/restart; Queue shows it on
+   top with radio songs behind it. Also check the
    **Related tab**: the currently-playing song must NOT appear as a row.
 4. **Shuffle (defect 3 — visible reordering):** queue up several tracks
    (album or radio) → open the **Queue tab** → toggle **shuffle ON**.
    Expect: the list VISIBLY REORDERS, with the playing track at top and its
-   highlight following as songs advance. Let one song end naturally: the
+   highlight following as songs advance. Toggle ON/OFF several times while
+   listening: no hiccup, pause or restart. Let one song end naturally: the
    highlight must move down the (shuffled) list — it must not stick.
 5. **Shuffle taps still hit the right row:** with shuffle ON, tap any visible
    queue row → that exact track must play.
@@ -113,6 +154,9 @@ on the error band if anything fails to play).
     tapped, "Play next" is next.
 11. **Radio (defect 2):** as 3 — starting radio must not restart the song.
 12. **Sanity:** play/pause, next/previous, tray still alive after 10 min.
+13. **Windows download + offline:** download via a track's menu, wait for
+    completion in Library → Downloads, disconnect network and play it from
+    Downloads. On failure send row state and the evidence requested above.
 
 ### C. Still open after this round (S3/S6 — unchanged)
 

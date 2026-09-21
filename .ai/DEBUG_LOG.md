@@ -1,6 +1,23 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — #105 release verification and Windows failure triage (`arena/01a0c24e-dhun`)
+
+Docs-only follow-up: release API + tag both target `414cd79`, published
+2026-09-21T03:00:04Z, APK 18,334,451 B / MSI 112,873,472 B. Updated ROADMAP
+and HANDOFF to the seamless-radio contract and current download diagnostics.
+Boot: only older PR #54 open, no active runs in recent list. Build/release CI
+passed; scheduled extraction-health 35561269411 is later red with
+ENVIRONMENT_BLOCKED annotation (check-run 106214457210), not a hardware verdict.
+
+User reports Windows downloads but playback fails on `O3-6zB3kg8M` with CDN /
+no-local-copy details. Other supplied test criteria are not confirmed passes.
+Read-only trace found that DesktopDhunPlayer sets streamingRemoteUrl even for
+an offline-first local URI, so the error wording alone cannot identify the
+failure stage. Need row completion state, playback entry point, installed build,
+matching download/cache diagnostics and, if completed, file existence/size.
+No root-cause claim or speculative code change; endless radio remains gated.
+
 ## 2026-09-21 — Seamless radio + gapless shuffle + Android download rework, learned from GPL peers (`arena/01a0c1c9-dhun`)
 
 **User report (round 3).** (1) "Play radio" must keep the SAME song playing

@@ -1,16 +1,44 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-21** · session **`arena/01a0c198-dhun`** · `main`/`origin/main` **`c4c5d04`** (PR #103 — Round-2 defect ledger, race incident, hardware re-test script — merged 2026-09-21T01:38:40Z; beneath it #102 `4d693ce` defect 3 v2, #101 `2c619b9` defect 4, #100 `80e94bf` defect 3 v1, #99 `870d3bc` defect 2, #98 `b102c78` defect 1, #97 `8635851` S1 close).
+Updated **2026-09-21** · session **`arena/01a0c24e-dhun`** · baseline `main` **`414cd79`** (PR #105 merged).
 
-**Phase: Stage S3 in progress — all four Round-2 device defects now have MERGED, CI-green fixes; blocked only on the user's hardware re-test.** Round 2 (user, build `8635851`, transcribed in `.ai/HANDOFF_NEXT_SESSION.md`) banked: notification + lock-screen buttons, Windows downloads, lyrics loading, desktop EQ, full-player visual OK. It opened four defects; every one is fixed: (1) Android downloads — #98, `hasSeenWork` latch killed the start/stop race + FGS-policy try/catch; (2) play-radio restart — #99, current track filtered out of the `/next` panel in `loadRelated` (fixes the Related tab too); (3) shuffle — #100 + corrective **#102** (this session): the visible queue now IS the shuffled play order on both platforms, engine-driven advances re-sync the queue cursor (`syncCurrent`), visual-row indices are translated (`playAtDisplay`/`removeAtDisplay`/`moveInDisplay`), and queue mutations preserve the user's arranged order instead of re-shuffling; (4) lyrics UI — #101: synced base size up to `headlineSmall` with bold-accent active line, unsynced bumped to readable `titleMedium` (no auto-scroll is possible without timestamps — by design).
+**Phase: S3 hardware verification; Windows download/playback failure OPEN.**
+PR #105 shipped seamless radio (SAME song/position continues, queue tail replaced),
+gapless Android shuffle via surgical timeline mutations, and Android download
+OkHttp transport + Range/resume handling + IO workers + failure-stage logging.
+Related still excludes the playing track; tapping a Related row plays that row.
+These are merged implementations, NOT hardware passes. Tests 1–5 in the latest
+user message are instructions/expectations, not confirmed verdicts.
 
-**Concurrency incident (user must arbitrate):** the previous session (`arena/01a0c154-dhun`) was still live when this one started and merged #100/#101 mid-flight (00:58Z / 01:07Z) while this session was reviewing #100. #100's three real holes (stale Android highlight after natural advance; desktop source-vs-display index mismatch → wrong-track taps under shuffle; rebuild-on-mutation reshuffle) lived on main ~22 minutes until #102 closed them. This session rebased onto the moved main and merged #102 as the corrective follow-up. The one-agent rule (MASTER_PROMPT §8.1) needs the user to confirm the other session is dead before the next session starts.
+**Verified rolling build:** `test` published **2026-09-21T03:00:04Z**;
+release target AND tag commit **`414cd7941d69e185b5628e8b9b7fffe5a0a5a4f0`**.
+`dhun-test.apk` **18,334,451 B**; `dhun-test.msi` **112,873,472 B**.
+Build/release runs 35555585912 / 35555585908 / 35555585893 succeeded.
+Later scheduled extraction-health run **35561269411 failed**; check-run
+106214457210 annotations classify **ENVIRONMENT_BLOCKED** (live health
+unverified), not a production pass or a demonstrated device root cause.
 
-**CI evidence (this session, exact final heads):** PR #102 @ `4b8204c`: build ✓ (35550218902) · build-and-test ✓ incl. 9 new QueueManagerTest cases (35550218900) · apk ✓ (35550218899) · msi ✓. Post-merge on `4d693ce`: CI 35550567894 ✓ · Build APK 35550567913 ✓ · test-release 35550567905 ✓. Rolling `test` republished **2026-09-21T01:24:37Z** targeting **`4d693ce`** — APK **17,948,508 B** / MSI **112,861,184 B**. (First #102 CI run failed Android compile — missing `queueManager` field+import, caught by the annotations API, fixed in `4b8204c`; see DEBUG_LOG.)
+**Files this session:** `.ai/ROADMAP.md`, `.ai/HANDOFF_NEXT_SESSION.md`,
+`.ai/DEBUG_LOG.md` — docs-only #105 follow-up; no speculative engine changes.
+**Last reported error:** Windows track `O3-6zB3kg8M`: “Stream rejected by the
+CDN and no local copy could be fetched”; user says it downloads but fails to play.
+Completion state, playback entry point, installed build and local-file presence
+are not yet confirmed. The older Windows download pass does not close this report.
 
-**Session `arena/01a0c198-dhun` (verification + #103 close-out, 2026-09-21):** no code was owed — the four defect fixes (#98–#102) were already merged with per-PR green CI and their tests verified present at HEAD (`DownloadServiceStopLogicTest`, `ParserFixtureTest` radio-fixture + `PlayerViewModelTest`, 9 new `QueueManagerTest` display-shuffle cases, `LyricsFollowTest`). The only paused item was **PR #103** (docs-only, its `msi` check still pending at boot): all four required checks went green (build 35550928766 ✓ · build-and-test 35550928779 ✓ · apk 35550928827 ✓ · msi 35550928827 ✓) and it was merged as **`c4c5d04`**. Post-merge on `c4c5d04`: CI 35551566277 ✓ · Build APK 35551566265 ✓ · test-release 35551566274 ✓. Rolling `test` republished **2026-09-21T01:45:26Z** targeting **`c4c5d04`** — APK **17,948,508 B** / MSI **112,861,184 B**, bytes unchanged (docs-only diff). **Qualifying-build rule for the user re-test: the newest `test` publish carrying these exact byte sizes** (docs-only merges change only the publish time/target, never the bytes); the exact publish time of the final republish is recorded in PR #104's post-merge state and the session report.
+**Exact next step:** ask whether the row is COMPLETED / DOWNLOADING / FAILED
+and whether playback was from Library → Downloads; obtain matching `DHUN download`
+and `DHUN cache` lines (redact signed URLs/personal paths). Trace is in HANDOFF.
+For Android failure request the actual resolve/bytes/worker logcat line before
+fixing the named stage. Reproduce engine defects and add regression tests before
+code fixes. Endless radio (extend `/next` continuation at ≤3 remaining) waits
+until all current hardware tests pass; then S3/S6 soaks, lifecycle, settings and
+Windows native checks remain.
 
-**Exact next step: the user re-tests on hardware** against the build identity above, following the numbered script in `.ai/HANDOFF_NEXT_SESSION.md` (Android 1–9: download + offline, radio, visible shuffle + highlight tracking + tap-correctness + play-next, lyrics, lock-screen regression, sanity; Windows 10–12: shuffle set, radio, tray sanity). Agent-side S3/S6 remainder is unchanged and waits on those results or is agent-executable docs/CI work: 30-min soaks, rotation/process-death, Settings/theme persistence checks, Windows native column, then S2 leftovers (`extraction-health.yml` trigger retirement needs a live drill watch; `14-release.md` stale merge-chain section; ubuntu-latest/Node-20 hygiene). Issue #14 still needs the user to close it (agent 403 on issue writes).
+**Session discipline/status:** boot checked open PRs and recent runs: only older
+research-docs PR #54 open, no active runs observed (not proof another agent is
+inactive). Work only on this session branch; no merge without user approval.
+This docs change is locally reviewed; its own pushed/CI status must be checked
+on GitHub after push. No JDK/Android SDK locally; CI is the compile gate.
 
 ---
 
