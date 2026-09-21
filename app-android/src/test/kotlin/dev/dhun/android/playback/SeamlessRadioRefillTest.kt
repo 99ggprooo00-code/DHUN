@@ -26,13 +26,13 @@ import java.lang.reflect.Proxy
 /**
  * Endless-radio engine regression (2026-09-21). The refill hands the next
  * /next page to [AndroidDhunPlayer.replaceQueueKeepingCurrent]; this test
- * pins the engine-level contract that makes the refill seamless — the
- * SOUNDING MediaItem instance is never replaced, re-prepared or re-buffered:
- * the tail is trimmed around it and the new page is appended behind it.
+ * pins the engine-level contract that makes the refill seamless: the
+ * SOUNDING MediaItem instance is never replaced, re-prepared or re-buffered.
+ * The tail is trimmed around it and the new page is appended behind it.
  *
- * (A regression that rebuilt the timeline — `setMediaItems` + `prepare()` —
- * would restart the current song: an audible gap, exactly what endless radio
- * must not do. The counters below fail on that, not just on final order.)
+ * A regression that rebuilt the timeline (setMediaItems + prepare) would
+ * restart the current song: an audible gap, exactly what endless radio must
+ * not do. The counters below fail on that, not just on final order.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -63,84 +63,97 @@ class SeamlessRadioRefillTest {
             },
         ) as Player
 
-        private fun dispatch(name: String, returnType: Class<*>, args: Array<Any?>?): Any? =
+        /** Non-null arg capture; null (zero-arg member) falls through. */
+        private fun arg(args: Array<out Any?>?, i: Int): Any? = args?.getOrNull(i)
+
+        private fun dispatch(name: String, returnType: Class<*>, args: Array<out Any?>?): Any? {
+            // ---- getters (the values refresh() observes) ----
             when (name) {
-                // ---- getters (the values refresh() observes) ----
-                "isPlaying" -> isPlaying
-                "getPlaybackState" -> playbackState
-                "getCurrentMediaItem" -> items.getOrNull(currentIndex)
-                "getMediaItemCount" -> items.size
-                "getMediaItemAt" -> items[args![0] as Int]
-                "getCurrentMediaItemIndex" -> currentIndex
-                "getRepeatMode" -> Player.REPEAT_MODE_OFF
-                "isShuffleModeEnabled" -> false
-                "getVolume" -> 1f
-                "getPlayerError" -> null
-                "getCurrentPosition" -> 42_000L
-                "getDuration" -> 200_000L
-                "hasNextMediaItem" -> currentIndex + 1 < items.size
-                "hasPreviousMediaItem" -> currentIndex > 0
-                "getPlayWhenReady" -> true
-                // ---- timeline mutations (recorded) ----
+                "isPlaying" -> return isPlaying
+                "getPlaybackState" -> return playbackState
+                "getCurrentMediaItem" -> return items.getOrNull(currentIndex)
+                "getMediaItemCount" -> return items.size
+                "getMediaItemAt" -> return items[arg(args, 0) as Int]
+                "getCurrentMediaItemIndex" -> return currentIndex
+                "getRepeatMode" -> return Player.REPEAT_MODE_OFF
+                "isShuffleModeEnabled" -> return false
+                "getVolume" -> return 1f
+                "getPlayerError" -> return null
+                "getCurrentPosition" -> return 42_000L
+                "getDuration" -> return 200_000L
+                "hasNextMediaItem" -> return currentIndex + 1 < items.size
+                "hasPreviousMediaItem" -> return currentIndex > 0
+                "getPlayWhenReady" -> return true
+            }
+            // ---- timeline mutations (recorded) ----
+            when (name) {
                 "setMediaItems" -> {
                     setMediaItemsCalls++
                     items.clear()
-                    items += args![0] as List<MediaItem>
-                    currentIndex = args[1] as Int
-                    null
+                    items += arg(args, 0) as List<MediaItem>
+                    currentIndex = arg(args, 1) as Int
+                    return null
                 }
-                "prepare" -> { prepareCalls++; null }
-                "addMediaItems" -> when (args!!.size) {
-                    1 -> {
-                        val list = args[0] as List<MediaItem>
-                        addedItems += list; items += list
-                        null
+                "prepare" -> {
+                    prepareCalls++
+                    return null
+                }
+                "addMediaItems" -> when {
+                    args == null || args.size == 1 -> {
+                        val list = arg(args, 0) as List<MediaItem>
+                        addedItems += list
+                        items += list
                     }
                     else -> {
-                        val at = args[0] as Int
-                        val list = args[1] as List<MediaItem>
-                        addedItems += list; items.addAll(at, list)
+                        val at = arg(args, 0) as Int
+                        val list = arg(args, 1) as List<MediaItem>
+                        addedItems += list
+                        items.addAll(at, list)
                         if (currentIndex >= at) currentIndex += list.size
-                        null
                     }
                 }
-                "addMediaItem" -> when (args!!.size) {
-                    1 -> {
-                        val it = args[0] as MediaItem
-                        addedItems += it; items += it
-                        null
+                "addMediaItem" -> when {
+                    args == null || args.size == 1 -> {
+                        val item = arg(args, 0) as MediaItem
+                        addedItems += item
+                        items += item
                     }
                     else -> {
-                        val at = args[0] as Int
-                        val it = args[1] as MediaItem
-                        addedItems += it; items.add(at, it)
+                        val at = arg(args, 0) as Int
+                        val item = arg(args, 1) as MediaItem
+                        addedItems += item
+                        items.add(at, item)
                         if (currentIndex >= at) currentIndex++
-                        null
                     }
                 }
                 "removeMediaItems" -> {
-                    val from = args![0] as Int
-                    val to = args[1] as Int
-                    removedRanges += from to to
-                    items.subList(from, to).clear()
+                    val from = arg(args, 0) as Int
+                    val end = arg(args, 1) as Int
+                    removedRanges += from to end
+                    items.subList(from, end).clear()
                     // Media3 keeps the CURRENT item across a trim; only its
                     // index shifts.
                     currentIndex = when {
-                        currentIndex >= to -> (currentIndex - (to - from)).coerceAtLeast(0)
-                        currentIndex >= from -> (to - 1).coerceAtLeast(0)
+                        currentIndex >= end -> (currentIndex - (end - from)).coerceAtLeast(0)
+                        currentIndex >= from -> (end - 1).coerceAtLeast(0)
                         else -> currentIndex
                     }
-                    null
+                    return null
                 }
                 "seekTo" -> {
-                    if (args != null && args.size == 1) seekToCalls += (args[0] as? Long) ?: 0L
-                    null
+                    if (args != null && args.size == 1) {
+                        seekToCalls += (arg(args, 0) as? Long) ?: 0L
+                    }
+                    return null
                 }
-                // ---- no-op setters / lifecycle ----
-                "setPlayWhenReady", "setShuffleModeEnabled", "setRepeatMode", "setVolume",
-                "play", "pause", "stop", "release", "addListener", "removeListener" -> null
-                else -> defaultValue(returnType)
             }
+            // ---- no-op setters / lifecycle ----
+            when (name) {
+                "setPlayWhenReady", "setShuffleModeEnabled", "setRepeatMode", "setVolume",
+                "play", "pause", "stop", "release", "addListener", "removeListener" -> return null
+            }
+            return defaultValue(returnType)
+        }
 
         private fun defaultValue(type: Class<*>): Any? = when (type) {
             java.lang.Boolean.TYPE -> false
@@ -222,12 +235,12 @@ class SeamlessRadioRefillTest {
         drain()
 
         // THE contract: the sounding MediaItem instance is literally
-        // untouched — no re-prepare, no rebuild, no re-buffer, no seek.
+        // untouched. No re-prepare, no rebuild, no re-buffer, no seek.
         // (Media3 trims around it, so after the swap it sits at index 0.)
         assertSame("sounding item must keep its exact instance", soundingBefore, double.items[0])
         assertEquals(1, double.prepareCalls, "no re-prepare (would re-buffer = gap)")
         assertEquals(1, double.setMediaItemsCalls, "no timeline rebuild")
-        assertTrue(double.seekToCalls.isEmpty(), "no seek — same position")
+        assertTrue(double.seekToCalls.isEmpty(), "no seek, same position")
         assertEquals(listOf(4 to 7, 0 to 3), double.removedRanges, "trim around the head, then append")
 
         // Tail swapped around the head: the played prefix and the old tail

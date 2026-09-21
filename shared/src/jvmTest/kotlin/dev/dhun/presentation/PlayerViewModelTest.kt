@@ -119,10 +119,11 @@ class PlayerViewModelTest {
         override suspend fun radioQueuePage(videoId: String): DhunResult<dev.dhun.core.RadioQueuePage> {
             radioPageCalls += videoId
             radioPagesByVideo[videoId]?.let { return it }
-            return when (related) {
+            val page = related // local: `related` is a var, not smart-castable
+            return when (page) {
                 is DhunResult.Success ->
-                    DhunResult.Success(dev.dhun.core.RadioQueuePage(related.value, relatedToken))
-                is DhunResult.Failure -> related
+                    DhunResult.Success(dev.dhun.core.RadioQueuePage(page.value, relatedToken))
+                is DhunResult.Failure -> page
             }
         }
         override suspend fun radioQueueContinuation(continuationToken: String): DhunResult<dev.dhun.core.RadioQueuePage> {
