@@ -116,6 +116,56 @@ class QueueManagerTest {
         assertTrue(q.next() != null) // wraps instead of ending
     }
 
+    @Test
+    fun setShuffleIsIdempotentAndToggleIsInverse() {
+        val q = QueueManager(Random(42)).apply { setQueue(listOf(track("a"), track("b"), track("c"))) }
+        assertFalse(q.shuffleEnabled)
+        assertTrue(q.setShuffle(true))
+        assertTrue(q.shuffleEnabled)
+        // second call with same value is no-op
+        assertTrue(q.setShuffle(true))
+        assertTrue(q.shuffleEnabled)
+        assertFalse(q.setShuffle(false))
+        assertFalse(q.shuffleEnabled)
+        assertFalse(q.setShuffle(false))
+        // toggle still flips
+        assertTrue(q.toggleShuffle())
+        assertFalse(q.toggleShuffle())
+    }
+
+    @Test
+    fun displayQueueShowsShuffledOrderWithCurrentFirst() {
+        val q = QueueManager(Random(42)).apply { setQueue((1..6).map { track("t$it") }) }
+        q.playAt(2) // current = t3
+        q.setShuffle(true)
+        val display = q.displayQueue
+        assertEquals(6, display.size)
+        assertEquals("t3", display.first().id, "shuffled display must keep current first")
+        assertEquals("t3", q.current?.id)
+        assertEquals(0, q.displayCurrentIndex)
+        // display contains all tracks distinct
+        assertEquals(6, display.map { it.id }.toSet().size)
+        // snapshot still source order
+        assertEquals(listOf("t1","t2","t3","t4","t5","t6"), q.snapshot.map { it.id })
+        // upcoming is tail of display after current
+        assertEquals(display.drop(1), q.upcoming)
+        // toggling off restores source order
+        q.setShuffle(false)
+        assertEquals(listOf("t1","t2","t3","t4","t5","t6"), q.displayQueue.map { it.id })
+        assertEquals(2, q.displayCurrentIndex)
+        assertEquals("t3", q.displayQueue[q.displayCurrentIndex].id)
+    }
+
+    @Test
+    fun shuffleDisplayOrderDiffersFromSourceWithSeededRandom() {
+        val q = QueueManager(Random(1)).apply { setQueue(listOf(track("a"), track("b"), track("c"), track("d"), track("e"))) }
+        q.setShuffle(true)
+        // With seeded random, display order should differ from source
+        assertTrue(q.displayQueue.map { it.id } != listOf("a","b","c","d","e"))
+        // but first is still a (current)
+        assertEquals("a", q.displayQueue.first().id)
+    }
+
     /* ---------------- add / remove / move ---------------- */
 
     @Test

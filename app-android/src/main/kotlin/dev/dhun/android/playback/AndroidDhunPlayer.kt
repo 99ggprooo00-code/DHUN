@@ -11,6 +11,7 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.player.DhunPlayer
+import dev.dhun.player.QueueManager
 import dev.dhun.player.StreamRecoverySignal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +66,7 @@ class AndroidDhunPlayer(
     }
 
     private val trackMap = ConcurrentHashMap<String, Track>()
+    private val queueManager = QueueManager()
     private var prefetchJob: Job? = null
 
     /**
@@ -134,34 +136,62 @@ class AndroidDhunPlayer(
 
     override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
         tracks.forEach { trackMap[it.id] = it }
+        queueManager.setQueue(tracks, startIndex)
         // Suspend-aware: runs on main AND waits, so callers that chain
         // calls (e.g. restore() → seekTo) keep their order.
         withContext(Dispatchers.Main) {
-            player.setMediaItems(tracks.map { it.toMediaItem() }, startIndex, 0L)
+            val display = queueManager.displayQueue
+            val displayIndex = queueManager.displayCurrentIndex.coerceIn(0, display.size - 1).takeIf { display.isNotEmpty() } ?: 0
+            player.setMediaItems(display.map { it.toMediaItem() }, displayIndex, 0L)
             player.playWhenReady = playWhenReady
             player.prepare()
+            player.shuffleModeEnabled = false
         }
         refresh()
     }
 
     override fun addNext(track: Track) {
         trackMap[track.id] = track
+        queueManager.addNext(track)
         onMain {
-            val nextIndex = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
-            player.addMediaItem(nextIndex, track.toMediaItem())
+            val display = queueManager.displayQueue
+            val idx = queueManager.displayCurrentIndex
+            val pos = player.currentPosition
+            val wasPlaying = player.isPlaying
+            // Sync player order to displayQueue (which is shuffled when enabled)
+            player.setMediaItems(display.map { it.toMediaItem() }, idx, pos)
+            player.playWhenReady = wasPlaying
+            player.prepare()
+            player.shuffleModeEnabled = false
         }
         refresh()
     }
 
     override fun addToQueue(track: Track) {
         trackMap[track.id] = track
-        onMain { player.addMediaItem(track.toMediaItem()) }
+        queueManager.addToQueue(track)
+        onMain {
+            val display = queueManager.displayQueue
+            val idx = queueManager.displayCurrentIndex
+            val pos = player.currentPosition
+            val wasPlaying = player.isPlaying
+            player.setMediaItems(display.map { it.toMediaItem() }, idx, pos)
+            player.playWhenReady = wasPlaying
+            player.prepare()
+            player.shuffleModeEnabled = false
+        }
         refresh()
     }
 
     override fun playAt(index: Int) {
+        // Index is in displayQueue order (what the UI shows). Translate via
+        // queueManager when shuffle is on, otherwise it's the same as source.
         onMain {
             if (index !in 0 until player.mediaItemCount) return@onMain
+            // Keep queueManager in sync so next/previous follow shuffled order
+            queueManager.playAt(queueManager.displayQueue.getOrNull(index)?.let { track ->
+                queueManager.snapshot.indexOfFirst { it.id == track.id }
+            } ?: index)
             player.seekTo(index, androidx.media3.common.C.TIME_UNSET)
             player.play()
         }
@@ -169,6 +199,10 @@ class AndroidDhunPlayer(
     }
 
     override fun removeFromQueue(index: Int) {
+        // Translate display index to source index for QueueManager
+        val track = queueManager.displayQueue.getOrNull(index) ?: return
+        val sourceIndex = queueManager.snapshot.indexOfFirst { it.id == track.id }
+        if (sourceIndex >= 0) queueManager.removeAt(sourceIndex)
         onMain {
             if (index !in 0 until player.mediaItemCount) return@onMain
             player.removeMediaItem(index)
@@ -177,6 +211,12 @@ class AndroidDhunPlayer(
     }
 
     override fun moveInQueue(from: Int, to: Int) {
+        // Move in display order: translate to source indices for QueueManager
+        val fromTrack = queueManager.displayQueue.getOrNull(from) ?: return
+        val toTrack = queueManager.displayQueue.getOrNull(to) ?: return
+        val sourceFrom = queueManager.snapshot.indexOfFirst { it.id == fromTrack.id }
+        val sourceTo = queueManager.snapshot.indexOfFirst { it.id == toTrack.id }
+        if (sourceFrom >= 0 && sourceTo >= 0) queueManager.move(sourceFrom, sourceTo)
         onMain {
             if (from !in 0 until player.mediaItemCount || to !in 0 until player.mediaItemCount || from == to) return@onMain
             player.moveMediaItem(from, to)
@@ -214,7 +254,21 @@ class AndroidDhunPlayer(
     }
 
     override fun setShuffle(enabled: Boolean) {
-        onMain { player.shuffleModeEnabled = enabled }
+        queueManager.setShuffle(enabled)
+        onMain {
+            val display = queueManager.displayQueue
+            val idx = queueManager.displayCurrentIndex.coerceAtLeast(0)
+            val pos = player.currentPosition
+            val wasPlaying = player.isPlaying
+            if (display.isEmpty()) {
+                player.shuffleModeEnabled = false
+            } else {
+                player.setMediaItems(display.map { it.toMediaItem() }, idx, pos)
+                player.playWhenReady = wasPlaying
+                player.prepare()
+                player.shuffleModeEnabled = false
+            }
+        }
         refresh()
     }
 
@@ -287,15 +341,24 @@ class AndroidDhunPlayer(
         onMain {
             val track = trackOf(player.currentMediaItem)
             _currentTrack.value = track
-            _queue.value = (0 until player.mediaItemCount)
-                .mapNotNull { trackOf(player.getMediaItemAt(it)) }
-            _currentQueueIndex.value = player.currentMediaItemIndex
+            // When queueManager is in use (after prepareQueue), its displayQueue
+            // is the source of truth for visible order; otherwise fall back to
+            // the player's timeline (before any queue is set).
+            if (queueManager.size > 0) {
+                _queue.value = queueManager.displayQueue
+                _currentQueueIndex.value = queueManager.displayCurrentIndex
+                _shuffleEnabled.value = queueManager.shuffleEnabled
+            } else {
+                _queue.value = (0 until player.mediaItemCount)
+                    .mapNotNull { trackOf(player.getMediaItemAt(it)) }
+                _currentQueueIndex.value = player.currentMediaItemIndex
+                _shuffleEnabled.value = player.shuffleModeEnabled
+            }
             _repeatMode.value = when (player.repeatMode) {
                 Player.REPEAT_MODE_ALL -> RepeatMode.ALL
                 Player.REPEAT_MODE_ONE -> RepeatMode.ONE
                 else -> RepeatMode.OFF
             }
-            _shuffleEnabled.value = player.shuffleModeEnabled
             _volume.value = player.volume.coerceIn(0f, 1f)
 
             val now = clock()

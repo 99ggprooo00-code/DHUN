@@ -121,6 +121,23 @@ class QueueManager(private val random: Random = Random.Default) {
         return shuffleEnabled
     }
 
+    fun setShuffle(enabled: Boolean): Boolean {
+        if (shuffleEnabled == enabled) return shuffleEnabled
+        return toggleShuffle()
+    }
+
+    /** Visible queue order: shuffled when enabled (current first), source order otherwise. */
+    val displayQueue: List<Track>
+        get() = if (shuffleEnabled) {
+            playOrder.mapNotNull { items.getOrNull(it) }
+        } else {
+            items.toList()
+        }
+
+    /** Index of the current track inside [displayQueue]; -1 when empty. */
+    val displayCurrentIndex: Int
+        get() = if (isEmpty) -1 else displayQueue.indexOfFirst { it.id == current?.id }.takeIf { it >= 0 } ?: 0
+
     fun setRepeatMode(mode: RepeatMode) {
         repeatMode = mode
     }
