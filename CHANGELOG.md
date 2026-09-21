@@ -24,6 +24,27 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — S3 Round-2 device defects (2026-09-21, builds #98/#99/#101/#102, hardware re-test pending)
+
+- **Android downloads work again (#98).** The download foreground service
+  was stopping itself microseconds after start: the controller's first
+  (empty) state collection ran before the QUEUED row existed. The stop is
+  now latched behind a "had work" transition, and FGS start/stop is guarded
+  for Android 14/15 `dataSync` policy.
+- **"Play radio" no longer restarts the playing song (#99).** YouTube
+  Music's watch-next panel leads with the current video; it is now filtered
+  out of the radio queue and the Related tab.
+- **Shuffle actually shuffles — visibly (#100 + #102).** The queue tab now
+  shows the shuffled order (playing track head) on both platforms and
+  playback follows the same list: tapping a visible row plays that row, the
+  highlight follows natural track advances, "Play next" is next and
+  "Add to queue" appends even under shuffle, and removing a row no longer
+  re-shuffles the rest. Toggling keeps the playing track and position.
+- **Lyrics readability (#101).** Synced lyrics: larger type, the current
+  line highlighted in the accent color with a bold pop, clearer inactive
+  dimming; plain-text lyrics bumped to a readable size with more leading.
+  (Unsynced lyrics cannot auto-scroll — they have no timestamps.)
+
 ### Verified — Stage S1 closed: first residential playback evidence — 2026-09-20
 
 - **Live user verification of the production extraction chain on `main@d99060e`.**
