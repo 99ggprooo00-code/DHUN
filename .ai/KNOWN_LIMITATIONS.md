@@ -3,6 +3,17 @@
 Updated every phase. Nothing hidden.
 
 
+## 2026-09-21 (session `arena/01a0c174-dhun`) — S3 Round-2 defects fixed; shuffle semantics redefined; race incident
+
+- **All four Round-2 device defects have merged fixes (#98/#99/#101/#102), but NONE is hardware-verified yet.** They were verified only by CI (unit tests + compile + packaging). The re-test script and build identity live in `.ai/HANDOFF_NEXT_SESSION.md`.
+- **Shuffle semantics redefined (intentional behavior change, #102).** With shuffle ON, the queue the user sees IS the shuffled play order (current track head at toggle time; the highlight walks down as tracks advance). Toggling shuffle does not audibly interrupt playback, but on Android the Media3 timeline is rebuilt to the new order preserving position — a sub-second rebuffer at the toggle point is possible and accepted. Queue mutations under shuffle preserve the arranged order: "Play next" = next in playback, append = end, removing a row no longer re-shuffles the rest.
+- **Shuffle + repeat reset when a NEW queue is prepared mid-session (both platforms; desktop pre-existing, Android now consistent).** Boot-restore replays the saved queue in its saved (display) order with the toggle reset — the persisted shuffle preference is recorded but not re-applied after the restore's `prepareQueue` (`NowPlayingPersistence.restore()` calls `setShuffle` BEFORE `prepareQueue`, which resets it). Pre-existing order-of-operations; left as-is this session, candidate for S4.
+- **Unsynced lyrics have no auto-scroll/highlight and never will (no timestamps exist).** #101 made them readable (`titleMedium`, more leading). Synced lyrics keep the "Follow lyrics" chip after manual scroll, by design.
+- **Concurrency incident.** Two agent sessions were live simultaneously (previous session merged #100/#101 mid-review by this one). #100's defects (stale Android queue highlight after natural advance; desktop taps under shuffle playing the wrong row because it consumed source indices while displaying the shuffled list; every mutation re-shuffling the upcoming order) were live on main ~22 minutes until #102 corrected them. Single-agent doctrine needs user enforcement — see ROADMAP top block.
+- **CI-as-compiler worked as designed:** the first #102 run failed only the Android unit-test compilation step ("Unresolved reference 'queueManager'" — a missing field+import); annotations pinpointed all 10 references, fix landed in `4b8204c`, all suites green on the next run.
+- **Carried over unchanged:** drill `ENVIRONMENT_BLOCKED` steady state is expected (escalate only on `FAIL` or residential failure); issue #14 closable only by the user (agent 403); `extraction-health.yml` inert push-trigger + CI hygiene items remain S2 with a live-drill-watch requirement; no in-app Android EQ (S4 deferral, user's phone EQ covers it); full-player visual changes deferred until the user specifies them.
+
+
 ## 2026-09-20 (session 5) — **S1 CLOSED GREEN** by residential evidence; what is still unproven (`arena/01a0c11b-dhun`)
 
 - **The S1 exit item is satisfied.** The user tested the rolling `test` build on a home WiFi network (no VPN) on **both** platforms: install and uninstall easy on Android and Windows, searched a song, **played 4 songs — audio audible, position advancing, no failure in any of them**, and on Android **playback continued with the screen locked**. No "Playback details" text exists because nothing failed.

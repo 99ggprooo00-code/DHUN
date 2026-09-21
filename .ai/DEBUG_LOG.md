@@ -1,6 +1,55 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — Two sessions raced on the same defects; reconciliation without history damage (`arena/01a0c174-dhun`)
+
+**Incident.** This session booted per handoff to "continue from where it is
+paused": PR #100 (defect 3, shuffle) open with `build-and-test` pending.
+While this session reviewed it (finding three real holes: Android queue
+cursor never re-synced after engine auto-advance; desktop consuming source
+indices while publishing the shuffled list — wrong-track taps under shuffle;
+every queue mutation rebuilding + re-shuffling the upcoming order), the
+previous session `arena/01a0c154-dhun` came back alive, merged #100
+(00:58:25Z) AND opened+merged #101 (lyrics, 01:07:26Z). Detection was pure
+luck-of-the-query: an early `gh pr list` showed #100 OPEN; a later
+`gh run list --workflow=build-apk.yml` showed "#100 … main … 00:58:25Z
+success" — the Actions log, not PR state, is what proved the race.
+
+**Reconciliation.** (1) Treat merged #100 as immutable main history; do not
+revert it (defect-3's core direction was correct). (2) Rebase this session's
+corrective commits onto the new main (`git rebase --onto origin/main
+870d3bc`), resolving each conflict toward this session's file versions —
+they are strict supersets of #100's (kept #100's `setShuffle`/`displayQueue`/
+`displayCurrentIndex` API so its surface survives; replaced its untested
+seed-lottery test with a provable `ZeroRandom`-stub test). (3) Push with
+`--force-with-lease=<branch>:<exact-old-sha>` — lease-guarded to THIS
+session's branch only; main never rewritten. (4) Merged as #102 at
+01:20:08Z; #100's holes were live on main ~22 minutes. (5) Post-merge CI +
+rolling-`test` verified on the exact merge SHA. **Lesson for the user:** the
+"one agent" rule is procedural, not technical — two sessions CAN interleave
+merges; check `gh run list` (not just `gh pr list`) at boot for signs of a
+live sibling before starting work.
+
+## 2026-09-21 — CI caught a missing field declaration; annotations API readout (`arena/01a0c174-dhun`)
+
+**Shape.** First CI run of PR #102: `build` ✓, `apk` ✓, `msi` ✓, but
+`build-and-test` failed in step **"Unit tests — Android (Robolectric)"** —
+10 × `Unresolved reference 'queueManager'` / `'it'` annotations, all in
+`AndroidDhunPlayer.kt`. The android commit had used `queueManager` without
+declaring it (the declaration+import existed on the superseded #100 branch
+this session replaced; the JVM test step in the SAME run had already passed,
+proving the shared `QueueManager` + its 9 new tests were green).
+
+**Method.** No JDK in the sandbox; diagnosis purely via
+`gh run view <id> --json jobs` (failed step name) +
+`gh api .../check-runs/<job-id>/annotations` (per-line messages). Fix =
+declare `private val queueManager = QueueManager()` + import, commit
+`4b8204c`, next run fully green (build-and-test 5m52s). **Lesson:** failed
+*step names* alone are ambiguous; the annotations endpoint is the real
+compiler-output channel.
+
+
+
 ## 2026-09-20 — S1 closed: separating "runner-blocked" from "broken" with a diff, not a hunch (`arena/01a0c11b-dhun`)
 
 **The problem this entry solves.** For two weeks the only extraction signal
