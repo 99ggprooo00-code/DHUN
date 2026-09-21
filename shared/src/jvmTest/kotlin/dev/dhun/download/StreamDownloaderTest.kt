@@ -24,7 +24,8 @@ class StreamDownloaderTest {
     fun downloadsBytesToStorageAndReportsProgress(): Unit = runBlocking {
         val storage = TestDownloadStorage()
         val engine = MockEngine { request ->
-            assertTrue(request.headers[HttpHeaders.Range].isNullOrEmpty(), "no Range on first fetch")
+            // Always Range — even on a fresh fetch (anti-throttle, InnerTune rule).
+            assertEquals("bytes=0-", request.headers[HttpHeaders.Range])
             respond(
                 content = content,
                 status = HttpStatusCode.OK,
@@ -70,6 +71,50 @@ class StreamDownloaderTest {
         assertIs<DhunResult.Success<Long>>(result)
         assertEquals(content.size.toLong(), result.value) // existing 8 + resumed 8
         assertEquals(content.size, storage.files[dest]?.size)
+    }
+
+    @Test
+    fun serverIgnoringRangeRestartsFileInsteadOfCorrupting(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val dest = "${storage.root}/audio/x.webm.part"
+        storage.append(dest, "stale-stale".encodeToByteArray())
+
+        val engine = MockEngine { request ->
+            assertEquals("bytes=11-", request.headers[HttpHeaders.Range]) // "stale-stale" is 11 bytes
+            // Server ignored the Range: full object with 200.
+            respond(
+                content = content,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentLength, content.size.toString()),
+            )
+        }
+        val downloader = KtorStreamDownloader(client(engine), storage)
+        var lastTotal: Long? = null
+        val result = downloader.download("https://example/a", null, dest) { _, total -> lastTotal = total }
+
+        assertIs<DhunResult.Success<Long>>(result)
+        assertEquals(content.size.toLong(), result.value, "byte count restarts from zero")
+        assertEquals(content.size, storage.files[dest]?.size, "stale bytes must be gone")
+        assertTrue(storage.files[dest]!!.contentEquals(content))
+        assertEquals(content.size.toLong(), lastTotal)
+    }
+
+    @Test
+    fun rangeNotSatisfiableOnCompletePartIsSuccess(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val dest = "${storage.root}/audio/x.webm.part"
+        storage.append(dest, content) // previous run wrote everything, died before commit
+
+        val engine = MockEngine { _ ->
+            respond(content = ByteArray(0), status = HttpStatusCode.RequestedRangeNotSatisfiable)
+        }
+        val downloader = KtorStreamDownloader(client(engine), storage)
+        var progressCalls = 0
+        val result = downloader.download("https://example/a", null, dest) { _, _ -> progressCalls++ }
+
+        assertIs<DhunResult.Success<Long>>(result)
+        assertEquals(content.size.toLong(), result.value)
+        assertEquals(0, progressCalls, "no bytes flow on a 416")
     }
 
     @Test

@@ -41,6 +41,25 @@ interface DhunPlayer {
      */
     suspend fun prepareQueue(tracks: List<Track>, startIndex: Int = 0, playWhenReady: Boolean = true)
 
+    /**
+     * Seamless radio handoff ("Play radio"): keeps the currently-playing
+     * track sounding from its current position — no restart, no pause —
+     * and replaces the rest of the queue with [upcoming] (the radio list,
+     * already excluding the current track).
+     *
+     * No-op when nothing is playing or [upcoming] is empty.
+     *
+     * Engines MUST override this with a seamless implementation (mutate
+     * around the sounding item; never re-prepare it). The default rebuilds
+     * via [prepareQueue] and exists only so fakes/tests keep compiling —
+     * the same convention as [retry].
+     */
+    suspend fun replaceQueueKeepingCurrent(upcoming: List<Track>) {
+        val head = currentTrack.value ?: return
+        if (upcoming.isEmpty()) return
+        prepareQueue(listOf(head) + upcoming.filter { it.id != head.id }, 0, playWhenReady = true)
+    }
+
     /** Inserts [track] immediately after the currently playing track. */
     fun addNext(track: Track)
 

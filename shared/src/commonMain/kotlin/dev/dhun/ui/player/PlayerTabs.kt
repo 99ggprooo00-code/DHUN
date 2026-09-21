@@ -544,10 +544,11 @@ internal fun RelatedTabContent(
                             )
                             DhunTonalButton(
                                 enabled = tracks.isNotEmpty(),
-                                // Capture the displayed list; a provider refresh must
-                                // not make this index play a different recommendation.
-                                // The VM owns the job, so switching tabs won't cancel it.
-                                onClick = { viewModel.playQueue(tracks, 0, PlayContext.QUEUE) },
+                                // Seamless radio: the current song keeps playing
+                                // from its position; the list below becomes the
+                                // rest of the queue. The VM owns the job, so
+                                // switching tabs won't cancel it.
+                                onClick = { viewModel.startRadio(PlayContext.QUEUE) },
                             ) {
                                 DhunIconView(
                                     icon = DhunIcon.Play,
@@ -558,7 +559,7 @@ internal fun RelatedTabContent(
                                 Text("Play radio (${tracks.size})")
                             }
                             Text(
-                                text = "Replaces your queue • Use + to add a song instead",
+                                text = "Keeps this song playing • Replaces the rest of your queue",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DhunColors.textTertiary,
                             )

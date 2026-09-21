@@ -157,11 +157,60 @@ class AndroidDhunPlayer(
         refresh()
     }
 
+    override suspend fun replaceQueueKeepingCurrent(upcoming: List<Track>) {
+        if (upcoming.isEmpty()) return
+        upcoming.forEach { trackMap[it.id] = it }
+        withContext(Dispatchers.Main) {
+            val head = queueManager.current ?: return@withContext
+            queueManager.replaceKeepingCurrent(upcoming)
+            val display = queueManager.displayQueue // [head, ...radio]
+            val playerIndex = player.currentMediaItemIndex
+            val soundingId = player.currentMediaItem?.mediaId
+            if (soundingId == head.id && playerIndex in 0 until player.mediaItemCount) {
+                // Seamless radio (InnerTune `startRadioSeamlessly` /
+                // OuterTune QueueBoard): the sounding MediaItem instance is
+                // never touched — remove everything around it, then append
+                // the radio behind it. No seek, no prepare, no gap.
+                if (playerIndex < player.mediaItemCount - 1) {
+                    player.removeMediaItems(playerIndex + 1, player.mediaItemCount)
+                }
+                if (playerIndex > 0) {
+                    player.removeMediaItems(0, playerIndex)
+                }
+                // Head is now the only item, at index 0.
+                val rest = display.drop(1).map { it.toMediaItem() }
+                if (rest.isNotEmpty()) player.addMediaItems(rest)
+                player.shuffleModeEnabled = false
+            } else {
+                // Bookkeeper/engine drift (or an empty timeline) — fall back
+                // to a clean load at the head. Rare; correctness first.
+                player.setMediaItems(display.map { it.toMediaItem() }, 0, 0L)
+                player.playWhenReady = true
+                player.prepare()
+                player.shuffleModeEnabled = false
+            }
+        }
+        refresh()
+    }
+
     override fun addNext(track: Track) {
         trackMap[track.id] = track
         onMain {
+            val wasEmpty = player.mediaItemCount == 0
             queueManager.addNext(track)
-            reloadTimelinePreservingPlayback()
+            if (wasEmpty) {
+                // Nothing loaded yet: single insert + prepare (loads paused,
+                // matching the old rebuild path's playWhenReady=false).
+                player.addMediaItem(track.toMediaItem())
+                player.playWhenReady = false
+                player.prepare()
+            } else {
+                // One insert directly after the sounding item — the playing
+                // instance is untouched, so there is no gap (the old full
+                // `setMediaItems` + `prepare()` rebuild re-buffered audibly).
+                val at = (player.currentMediaItemIndex + 1).coerceIn(0, player.mediaItemCount)
+                player.addMediaItem(at, track.toMediaItem())
+            }
         }
         refresh()
     }
@@ -169,27 +218,60 @@ class AndroidDhunPlayer(
     override fun addToQueue(track: Track) {
         trackMap[track.id] = track
         onMain {
+            val wasEmpty = player.mediaItemCount == 0
             queueManager.addToQueue(track)
-            reloadTimelinePreservingPlayback()
+            if (wasEmpty) {
+                player.addMediaItem(track.toMediaItem())
+                player.playWhenReady = false
+                player.prepare()
+            } else {
+                player.addMediaItem(track.toMediaItem())
+            }
         }
         refresh()
     }
 
     /**
-     * Rebuilds the media timeline from [QueueManager.displayQueue] at the
-     * current position — used after queue mutations so the visible order and
-     * the playback order stay the same list.
+     * Re-applies [QueueManager.displayQueue] to the engine timeline WITHOUT
+     * touching the sounding item: everything around it is removed, then the
+     * new order is spliced back around the untouched instance. Removing and
+     * re-adding never re-buffers the current item, unlike `setMediaItems` +
+     * `prepare()` — which is what made every shuffle toggle (and every
+     * queue mutation) produce a small but audible pause.
+     *
+     * Pattern learned from OuterTune's QueueBoard seamless branch; the
+     * insert-before-current step mirrors InnerTune's preload backsplice
+     * (`addMediaItems(0, …)` "without affecting current playing song").
      */
-    private fun reloadTimelinePreservingPlayback() {
+    private fun syncTimelineAroundCurrent() {
         val display = queueManager.displayQueue
         if (display.isEmpty()) return
-        val idx = queueManager.displayCurrentIndex.coerceIn(0, display.size - 1)
-        val pos = player.currentPosition
-        val wasPlaying = player.isPlaying
-        player.setMediaItems(display.map { it.toMediaItem() }, idx, pos)
-        player.playWhenReady = wasPlaying
-        player.prepare()
-        player.shuffleModeEnabled = false
+        val head = queueManager.current ?: return
+        val playerIndex = player.currentMediaItemIndex
+        val soundingId = player.currentMediaItem?.mediaId
+        if (soundingId != head.id || playerIndex !in 0 until player.mediaItemCount) {
+            // Bookkeeper/engine drift — full reload at the head position.
+            // Rare; correctness first.
+            val idx = queueManager.displayCurrentIndex.coerceIn(0, display.size - 1)
+            player.setMediaItems(display.map { it.toMediaItem() }, idx, player.currentPosition)
+            player.playWhenReady = player.isPlaying
+            player.prepare()
+            return
+        }
+        if (playerIndex < player.mediaItemCount - 1) {
+            player.removeMediaItems(playerIndex + 1, player.mediaItemCount)
+        }
+        if (playerIndex > 0) {
+            player.removeMediaItems(0, playerIndex)
+        }
+        // Head is now the only item, at index 0: splice the new order
+        // around it. Inserting before the playing item shifts its index
+        // without disturbing playback.
+        val at = queueManager.displayCurrentIndex.coerceIn(0, display.size - 1)
+        val before = display.subList(0, at).map { it.toMediaItem() }
+        val after = display.subList(at + 1, display.size).map { it.toMediaItem() }
+        if (before.isNotEmpty()) player.addMediaItems(0, before)
+        if (after.isNotEmpty()) player.addMediaItems(after)
     }
 
     override fun playAt(index: Int) {
@@ -255,12 +337,14 @@ class AndroidDhunPlayer(
 
     override fun setShuffle(enabled: Boolean) {
         onMain {
+            if (queueManager.shuffleEnabled == enabled) return@onMain
             queueManager.setShuffle(enabled)
-            // Rebuild the timeline IN the new order (current track keeps its
-            // position): the queue tab visibly reorders and playback follows
-            // the same list. Engine shuffle mode stays off — the timeline is
-            // already shuffled.
-            reloadTimelinePreservingPlayback()
+            // Re-apply the timeline IN the new order (current track keeps
+            // its position): the queue tab visibly reorders and playback
+            // follows the same list. Surgical — the sounding item is never
+            // re-prepared, so toggling shuffle is gapless. Engine shuffle
+            // mode stays off — the timeline itself is already shuffled.
+            syncTimelineAroundCurrent()
             player.shuffleModeEnabled = false
         }
         refresh()

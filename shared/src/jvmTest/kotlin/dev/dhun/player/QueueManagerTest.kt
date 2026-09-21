@@ -329,6 +329,56 @@ class QueueManagerTest {
         assertEquals("b", q.current?.id)
     }
 
+    /* ---------------- seamless radio (replaceKeepingCurrent) ---------------- */
+
+    @Test
+    fun radioKeepsHeadAndReplacesTail() {
+        val q = queueOf("a", "b", "c")
+        q.playAt(1) // b playing mid-queue
+        val headObject = q.current
+        q.replaceKeepingCurrent(listOf(track("r1"), track("r2")))
+        assertEquals("b", q.current?.id, "head must not move")
+        assertTrue(q.current === headObject, "head object must be preserved, not re-created")
+        assertEquals(listOf("b", "r1", "r2"), q.displayQueue.map { it.id })
+        assertEquals(0, q.displayCurrentIndex)
+        assertEquals(listOf("r1", "r2"), q.upcoming.map { it.id })
+        // Playback follows the new tail.
+        assertEquals("r1", q.next()?.id)
+        assertEquals("r2", q.next()?.id)
+        assertNull(q.next())
+    }
+
+    @Test
+    fun radioDropsCurrentFromUpcomingDefensively() {
+        val q = queueOf("a", "b")
+        q.replaceKeepingCurrent(listOf(track("a"), track("r1"), track("a")))
+        assertEquals(listOf("a", "r1"), q.displayQueue.map { it.id })
+    }
+
+    @Test
+    fun radioOnEmptyQueueAndEmptyUpcomingAreNoops() {
+        val empty = QueueManager()
+        empty.replaceKeepingCurrent(listOf(track("r1")))
+        assertTrue(empty.isEmpty)
+        assertNull(empty.current)
+
+        val q = queueOf("a", "b")
+        q.replaceKeepingCurrent(emptyList())
+        assertEquals(listOf("a", "b"), q.displayQueue.map { it.id })
+        assertEquals("a", q.current?.id)
+    }
+
+    @Test
+    fun radioResetsShuffleButPreservesRepeat() {
+        val q = QueueManager(ZeroRandom()).apply { setQueue((1..4).map { track("t$it") }) }
+        q.setShuffle(true)
+        q.setRepeatMode(RepeatMode.ALL)
+        q.replaceKeepingCurrent(listOf(track("r1"), track("r2")))
+        assertFalse(q.shuffleEnabled, "fresh radio order is already an order")
+        assertEquals(RepeatMode.ALL, q.repeatMode)
+        assertEquals(0, q.displayCurrentIndex)
+    }
+
     @Test
     fun peekNextInspectsWithoutAdvancingCursor() {
         val q = queueOf("a", "b", "c")

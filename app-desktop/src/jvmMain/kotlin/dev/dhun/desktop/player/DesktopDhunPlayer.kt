@@ -188,6 +188,20 @@ class DesktopDhunPlayer(
         }
     }
 
+    override suspend fun replaceQueueKeepingCurrent(upcoming: List<Track>) {
+        if (upcoming.isEmpty()) return
+        opMutex.withLock {
+            if (queueManager.current == null) return@withLock
+            queueManager.replaceKeepingCurrent(upcoming)
+            _shuffleEnabled.value = queueManager.shuffleEnabled
+            publishQueueLocked()
+            // Deliberately NO engine touch: libVLC keeps playing the current
+            // file from its current position — no resolve, no restart, no
+            // gap. (On Android the same contract is honoured by mutating the
+            // Media3 timeline around the sounding item.)
+        }
+    }
+
     override fun addNext(track: Track) {
         scope.launch {
             opMutex.withLock {

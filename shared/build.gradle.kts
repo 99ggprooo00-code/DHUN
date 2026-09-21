@@ -42,6 +42,10 @@ kotlin {
         }
         androidMain.dependencies {
             api("app.cash.sqldelight:android-driver:2.1.0")
+            // ADR-006 Android download transport: OkHttp, not CIO (InnerTune /
+            // RiMusic / OuterTune all download over OkHttp on Android; CIO's
+            // streaming reads stall on ART). Version matches ktor-client-cio.
+            implementation("io.ktor:ktor-client-okhttp:3.1.3")
         }
         jvmTest.dependencies {
             implementation("io.ktor:ktor-client-mock:3.1.3")

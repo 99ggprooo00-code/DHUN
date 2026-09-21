@@ -12,7 +12,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -20,12 +22,24 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Drives ADR-006's [FileDownloadManager] state machine end to end. The
- * manager is given a scope on [Dispatchers.Unconfined] so the download worker
- * runs eagerly on the caller's thread (the fakes have no real suspension),
- * making the assertions deterministic.
+ * Drives ADR-006's [FileDownloadManager] state machine end to end. Workers
+ * are pinned to [Dispatchers.IO] (never the caller's thread), so every test
+ * awaits a terminal row state instead of assuming eager completion.
  */
 class FileDownloadManagerTest {
+
+    private suspend fun awaitTerminal(
+        repo: SqlDelightDownloadRepository,
+        id: String,
+        timeoutMs: Long = 15_000,
+    ): DownloadState = withTimeout(timeoutMs) {
+        var state = repo.get(id)?.downloadState
+        while (state != DownloadState.COMPLETED && state != DownloadState.FAILED) {
+            delay(10)
+            state = repo.get(id)?.downloadState
+        }
+        state ?: error("row vanished for $id")
+    }
 
     private fun repository() = SqlDelightDownloadRepository(
         DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()),
@@ -59,8 +73,8 @@ class FileDownloadManagerTest {
         )
         try {
             manager.enqueue(track("v1"))
+            assertEquals(DownloadState.COMPLETED, awaitTerminal(repo, "v1"))
             val row = repo.get("v1") ?: error("no row")
-            assertEquals(DownloadState.COMPLETED, row.downloadState)
             assertTrue(row.localAudioPath.endsWith("v1.webm"), "path ${row.localAudioPath}")
             assertTrue(storage.exists(row.localAudioPath))
         } finally { managerScope.cancel() }
@@ -77,7 +91,7 @@ class FileDownloadManagerTest {
         )
         try {
             manager.enqueue(track("v2"))
-            assertEquals(DownloadState.FAILED, repo.get("v2")?.downloadState)
+            assertEquals(DownloadState.FAILED, awaitTerminal(repo, "v2"))
         } finally { managerScope.cancel() }
     }
 
@@ -92,7 +106,23 @@ class FileDownloadManagerTest {
         )
         try {
             manager.enqueue(track("v2b"))
-            assertEquals(DownloadState.FAILED, repo.get("v2b")?.downloadState)
+            assertEquals(DownloadState.FAILED, awaitTerminal(repo, "v2b"))
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
+    fun workerCrashMarksFailedInsteadOfSticking(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream("v2c"))),
+            FakeStreamDownloader(storage, throwable = IllegalStateException("disk gone")),
+            storage, managerScope,
+        )
+        try {
+            manager.enqueue(track("v2c"))
+            assertEquals(DownloadState.FAILED, awaitTerminal(repo, "v2c"))
         } finally { managerScope.cancel() }
     }
 
@@ -107,6 +137,7 @@ class FileDownloadManagerTest {
         )
         try {
             manager.enqueue(track("v3"))
+            assertEquals(DownloadState.COMPLETED, awaitTerminal(repo, "v3"))
             val path = repo.get("v3")!!.localAudioPath
             assertTrue(storage.exists(path))
 
@@ -127,6 +158,7 @@ class FileDownloadManagerTest {
         )
         try {
             manager.enqueue(track("v4"))
+            assertEquals(DownloadState.COMPLETED, awaitTerminal(repo, "v4"))
             manager.pause("v4")
             assertEquals(DownloadState.COMPLETED, repo.get("v4")?.downloadState)
         } finally { managerScope.cancel() }
@@ -143,6 +175,7 @@ class FileDownloadManagerTest {
         )
         try {
             manager.enqueue(track("v5"))
+            assertEquals(DownloadState.COMPLETED, awaitTerminal(repo, "v5"))
             val countAfterFirst = repo.count()
             manager.enqueue(track("v5"))
             assertEquals(countAfterFirst, repo.count())
