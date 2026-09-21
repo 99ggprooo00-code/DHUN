@@ -24,6 +24,34 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — UI polish: lighter dark surfaces, larger thumbnails, continuous glass dock (2026-09-21, CI verification + user visual verdict pending)
+
+- **Dark surfaces lifted one step** (each neutral rung +0x0C: background
+  `#0A0A0A` → `#161616`, surface ladder now 16 → 36, tonal highest `#3C3C3C`)
+  so Home/Search/Library sit closer to the full player's backdrop brightness.
+  Placeholders and shimmer follow; glass, text, scrim and accent tokens are
+  unchanged; the light theme is untouched.
+- **The full player lets the artwork show through more**: the backdrop dim
+  dropped from 0.52/0.16 to 0.42/0.10 and the ambient scrim's stops were
+  lowered (bottom stop 0.92 → 0.86, still inside the ≥0.85 legibility pin).
+  The shell's blurred-artwork backdrop dim/scrim were lightened the same way
+  (0.55 → 0.45; stops 0.62/0.42/0.58/0.78 → 0.50/0.32/0.44/0.62).
+- **Artwork-derived control accents were re-floored for the lighter surfaces**
+  (`DARK_LEGIBILITY_FLOOR` 0.42 → 0.45): at 0.42 the darkest artwork primaries
+  measured 2.85:1 against the new surface, under the WCAG 1.4.11 3:1 floor;
+  0.45 measures 3.12:1 worst-case. All `DhunThemeContrastTest` gates pass on
+  the new palette (replicated exactly before pushing); `DhunAppearanceTest`
+  pins updated to the new baseline.
+- **List thumbnails grew 56 → 64dp** (`DhunSpacing.artworkThumb`); every
+  consumer was audited — rows wrap content, no rail or fixed-height row clips.
+- **One continuous glass dock on phones/narrow windows**: the MiniPlayer and
+  the bottom navigation now share a single `GlassDock` surface filled with the
+  current track's blurred artwork (the LYRICS-card treatment, prepared once
+  per track via `BlurredArtworkCache`, same Coil request as the shell
+  backdrop) under the `glassBarTop → glassStrong` veil — no more two stacked
+  boxes. Rail/desktop layouts keep the floating MiniPlayer card. No new
+  dependencies.
+
 ### Released and verified — PR #106 merged; rolling `test` republished (2026-09-21)
 
 - **Merged:** PR #106 landed on `main` as `810bef1` (2026-09-21T05:41:01Z)

@@ -46,14 +46,17 @@ class DhunAppearanceTest {
 
     @Test
     fun darkPaletteMatchesBaselineIncludingS5ErrorContrastRetune() {
-        // Preserve the dark baseline except for the intentional S5 error retune.
-        // Error and its translucent border share the new accessible hue.
-        assertEquals(Color(0xFF0A0A0A), DhunColors.background, "background")
-        assertEquals(Color(0xFF121212), DhunColors.surface, "surface")
-        assertEquals(Color(0xFF1A1A1A), DhunColors.surfaceVariant, "surfaceVariant")
-        assertEquals(Color(0xFF242424), DhunColors.surfaceElevated, "surfaceElevated")
-        assertEquals(Color(0xFF2A2A2A), DhunColors.surfaceHighest, "surfaceHighest")
-        assertEquals(Color(0xFF1E1E1E), DhunColors.surfaceCard, "surfaceCard")
+        // Preserve the dark baseline except for the two intentional retunes:
+        // the S5 error-contrast fix (error + its translucent border share the
+        // accessible hue) and the 2026-09-21 UI-polish surface lift (every
+        // neutral rung +0x0C from the shipped 0A→2A ladder; glass, text,
+        // scrim and accent tokens untouched).
+        assertEquals(Color(0xFF161616), DhunColors.background, "background")
+        assertEquals(Color(0xFF1E1E1E), DhunColors.surface, "surface")
+        assertEquals(Color(0xFF262626), DhunColors.surfaceVariant, "surfaceVariant")
+        assertEquals(Color(0xFF303030), DhunColors.surfaceElevated, "surfaceElevated")
+        assertEquals(Color(0xFF363636), DhunColors.surfaceHighest, "surfaceHighest")
+        assertEquals(Color(0xFF2A2A2A), DhunColors.surfaceCard, "surfaceCard")
         assertEquals(Color(0x5E20202A), DhunColors.glassHighlight, "glassHighlight")
         assertEquals(Color(0x7016161E), DhunColors.glass, "glass")
         assertEquals(Color(0x8A0E0E14), DhunColors.glassDeep, "glassDeep")
@@ -93,7 +96,7 @@ class DhunAppearanceTest {
         assertEquals(DhunColors.surface, DhunColors.surfaceContainerLow)
         assertEquals(DhunColors.surfaceElevated, DhunColors.surfaceContainer)
         assertEquals(DhunColors.surfaceHighest, DhunColors.surfaceContainerHigh)
-        assertEquals(Color(0xFF303030), DhunColors.surfaceContainerHighest)
+        assertEquals(Color(0xFF3C3C3C), DhunColors.surfaceContainerHighest)
     }
 
     @Test

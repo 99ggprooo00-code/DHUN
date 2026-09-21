@@ -1,6 +1,59 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
 
+## 2026-09-21 — UI polish implemented: lighter dark ladder, 64dp thumbs, continuous glass dock (`arena/01a0c2c7-dhun`)
+
+User picked UI polish over endless radio this session. All three sub-tasks
+implemented on the session branch; **no visual verdict exists yet — CI first,
+then the user eyeballs both platforms. Never merge without it.**
+
+**(a) Lighter backgrounds.** Dark surface ladder lifted one rung in
+`DhunTokens` (each neutral +0x0C): background 0A→16, surface 12→1E,
+surfaceVariant 1A→26, surfaceCard 1E→2A, surfaceElevated 24→30,
+surfaceHighest 2A→36; tonal ladder follows (lowest=bg … highest 30→3C);
+placeholders/shimmer retuned to keep their relative steps. FullPlayer: dim
+0.52/0.16 → 0.42/0.10; `playerAmbientScrimStops` every stop lowered (bottom
+0.92→0.86 — the ≥0.85 floor pinned by `PlayerSheetLayoutTest` is respected).
+Shell backdrop (`NowPlayingBackdropPolicy`): DIM_ALPHA 0.55→0.45 (inside the
+0.4–0.75 pin), scrimStops 0.62/0.42/0.58/0.78 → 0.50/0.32/0.44/0.62. Light
+theme untouched.
+
+**Contrast was proven before pushing** by replicating `DhunThemeContrastTest`'s
+exact WCAG math in Python over the new ladder (all 5 text steps × 11 surfaces,
+4 semantic colors, 6 accents × 2 surfaces, 6 accents × 8 artwork primaries ×
+2 surfaces): every gate passes. One real regression was found and fixed that
+way: on the lighter surface the control-accent floor 0.42 yields only 2.85:1
+for the darkest artwork — `DARK_LEGIBILITY_FLOOR` retuned 0.42→0.45 (measured
+worst case 3.12:1, same-margin as before). `DhunAppearanceTest` hex pins
+updated to the new baseline with a comment naming both intentional retunes.
+
+**(b) Thumbnails.** `DhunSpacing.artworkThumb` 56→64dp. Every consumer
+audited: `TrackRow` and both Library cards wrap content (no fixed heights);
+queue/playlist reorder rows use 44/48dp tokens, not the thumb;
+`LoadingShimmer` is size-only; `DhunShellLayout.detailPaneMinWidth` grows
+8dp (a min, harmless). No clip risk found.
+
+**(c) Continuous glass dock.** New `GlassDock` in
+`design/components/GlassCard.kt`: one clipped bottomSheet surface = blurred
+current-track artwork (LYRICS-card treatment: `ArtworkImage` blur
+glassBlur×2, `key(BlurredArtworkCache.keyFor)` + `markPrepared`, list-tier
+URL via `NowPlayingBackdropPolicy.resolveUrl` so Coil reuses the shell
+backdrop's cached request; skipped entirely when no URL or no realtime
+blur) under the `glassBarTop→glassStrong` veil + glassEdge hairline.
+`MiniPlayer` gained `embedded = true` (content only, no own chrome); the
+single-pane `BottomNavigationBar` now renders MiniPlayer(embedded) +
+transparent NavigationBar inside one GlassDock, so mini + nav read as one
+glass sheet over the artwork. Rail layouts keep the floating MiniPlayer
+(default `embedded = false` path unchanged). No new dependencies.
+
+**Verification state:** local Python packaging/helper suite 29 OK (nothing
+in scripts/ affected); brace-balance diff vs HEAD clean on all ten touched
+files; WCAG replication as above. No JDK in sandbox — compile/test gate is
+CI (`:shared:jvmTest` with the updated pins, Android Robolectric, Desktop
+JVM, packaging). Open after CI: user visual verdict on Android + Windows
+(lighter screens readable? dock glassy and continuous? thumbnails not
+clipped in any rail?); record the verdict here before any merge.
+
 ## 2026-09-21 — PR #106 merged; `main` docs were stale; sync + verdict record (`arena/01a0c2c7-dhun`)
 
 **Merged state (verified via `gh` on boot):** PR #106 merged into `main` as

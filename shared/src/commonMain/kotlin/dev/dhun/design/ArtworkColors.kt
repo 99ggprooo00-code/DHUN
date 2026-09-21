@@ -77,8 +77,17 @@ data class ArtworkColors(
 /** Share of brand accent mixed into every artwork-derived control colour. */
 private const val BRAND_MIX_DEFAULT = 0.45f
 
-/** Minimum lightness a control colour may have on the dark surfaces (`#121212`). */
-internal const val DARK_LEGIBILITY_FLOOR = 0.42f
+/**
+ * Minimum lightness a control colour may have on the dark surfaces.
+ *
+ * Retuned 0.42 → 0.45 by the 2026-09-21 UI-polish pass: the dark surfaces
+ * themselves lifted one rung (`#121212` → `#1E1E1E`), and at 0.42 the darkest
+ * artwork-derived controls fell to ~2.85:1 against the new surface — under the
+ * WCAG 1.4.11 floor. At 0.45 the measured worst case across all six accents
+ * and a spread of artwork primaries is 3.12:1 (pinned by
+ * `DhunThemeContrastTest`).
+ */
+internal const val DARK_LEGIBILITY_FLOOR = 0.45f
 
 /**
  * Maximum lightness a control colour may have on the light surfaces.
@@ -106,12 +115,13 @@ internal fun Color.mix(other: Color, t: Float): Color {
  * brand accent, then moves it until it is legible on the active surface.
  *
  * Direction matters and is the whole reason this reads [DhunAppearance]: on
- * the near-black dark surfaces an artwork colour can only be too *dark*, so it
+ * the dark surfaces an artwork colour can only be too *dark*, so it
  * is lifted to a lightness floor. On light surfaces the same colour can only
  * be too *pale*, so it is pushed down instead — flooring it there would paint
- * an invisible play disc on white. The thresholds are measured: 0.42 against
- * `#121212` (the shipped dark behaviour, unchanged) and 0.46 against
- * `#FFFFFF`/`#F6F4F1` — see [LIGHT_LEGIBILITY_CEILING].
+ * an invisible play disc on white. The thresholds are measured: 0.45 against
+ * `#1E1E1E` (the dark floor followed the 2026-09-21 surface lift; was 0.42
+ * against `#121212`) and 0.46 against `#FFFFFF`/`#F6F4F1` — see
+ * [LIGHT_LEGIBILITY_CEILING].
  */
 internal fun Color.tamedForControls(): Color {
     val blended = mix(DhunColors.accent, BRAND_MIX_DEFAULT)

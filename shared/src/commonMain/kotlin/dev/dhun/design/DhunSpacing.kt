@@ -98,7 +98,8 @@ object DhunSpacing {
     val iconSize = 24.dp
     val iconSizeSm = 18.dp
     val iconSizeLg = 32.dp
-    val artworkThumb = 56.dp
+    /** List-row thumbnail. 2026-09-21 UI polish: 56 → 64dp (rows wrap content — verified no rail/row clips). */
+    val artworkThumb = 64.dp
     val artworkCard = 160.dp
     val artworkLarge = 280.dp
     val glassBlur = 16.dp

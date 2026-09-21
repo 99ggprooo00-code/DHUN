@@ -18,11 +18,13 @@ import androidx.compose.ui.graphics.Color
  * object-initialiser and the JVM tests depend on.
  *
  * With the default appearance — [DhunThemeMode.DARK] + [DhunAccent.BRAND] —
- * every value below is exactly the palette that shipped before candidate 28:
- * warm near-black surfaces (0A → 2A) so artwork pops, translucent glass with a
- * 10%-white hairline border, 4-step alpha text, and the static `#BB86FC`
- * accent fallback. The dynamic artwork-derived accent still arrives via
- * [ArtworkColors].
+ * every value below is the shipped palette with one deliberate change: the
+ * 2026-09-21 UI-polish pass lifted the dark surfaces (16 → 36, each rung
+ * +0x0C from the original 0A → 2A) so Home/Search/Library sit closer to the
+ * full player's backdrop brightness. Glass (translucent fills with a 10%-white
+ * hairline border), the 4-step alpha text ladder and the static `#BB86FC`
+ * accent fallback are unchanged; the dynamic artwork-derived accent still
+ * arrives via [ArtworkColors].
  *
  * The hex values themselves live in [DhunTokens] — this file only names them.
  */

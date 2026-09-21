@@ -51,16 +51,21 @@ commit.
   (resolve/bytes/worker) and fix the named stage, never guess.
 
 **Session queue (priority order):** (1) help verify/fix Windows per user
-reports; (2) user-requested UI polish — lighter Home/Search/Library +
-full-player backgrounds, `artworkThumb` 56→~64dp, glassy MiniPlayer + bottom
-nav dock (BlurredArtworkCache + glass tokens; details in ROADMAP); CI green
-then user visual verdict on both platforms — record "awaiting user visual
-verdict", no merge without it; (3) endless radio via `/next` continuation
-when ≤3 songs remain — ask the user before starting (Android is PASS; Windows
-accepted but untested); supersedes the old #99 "different song" behavior —
-same song, same position, no gap, tail replaced on refill; (4) remaining #105
-checklist: S3/S6 soaks, rotation/process death, persistence, Windows
-tray/jump-list/SMTC/media keys.
+reports; (2) user-requested UI polish — **IMPLEMENTED 2026-09-21 on the
+session branch**: dark ladder +0x0C per rung (bg 0x16, surfaces 1E→36,
+highest 3C), FullPlayer dim 0.42/0.10 + ambient stops lowered (bottom 0.86),
+shell backdrop dim 0.45 + stops 0.50/0.32/0.44/0.62, `DARK_LEGIBILITY_FLOOR`
+0.42→0.45 (contrast replicated locally, all WCAG gates pass),
+`artworkThumb` 56→64dp (no clip risks found), new continuous `GlassDock`
+(blurred-artwork veil under glassBarTop→glassStrong) holding
+MiniPlayer(`embedded = true`) + NavigationBar on the single-pane shell;
+CI green then user visual verdict on both platforms — record "awaiting user
+visual verdict", no merge without it; (3) endless radio via `/next`
+continuation when ≤3 songs remain — ask the user before starting (Android is
+PASS; Windows accepted but untested); supersedes the old #99 "different song"
+behavior — same song, same position, no gap, tail replaced on refill; (4)
+remaining #105 checklist: S3/S6 soaks, rotation/process death, persistence,
+Windows tray/jump-list/SMTC/media keys.
 
 ## Final pre-merge verification — superseded by the CURRENT STATE section above
 

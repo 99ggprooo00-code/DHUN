@@ -10,8 +10,11 @@ import androidx.compose.ui.graphics.Color
  * Candidate 28 — themes beyond dark-first.
  *
  * DHUN is dark-first and stays that way: [DhunThemeMode.DARK] + [DhunAccent.BRAND]
- * is the default and is byte-for-byte the palette that shipped before this file
- * existed. What this file adds is (a) a **light** scheme built from the same
+ * is the default. It was byte-for-byte the palette that shipped before this
+ * file existed until the 2026-09-21 UI-polish pass lifted the dark *surface*
+ * ladder one step (each rung +0x0C) so the shell screens read less near-black;
+ * the glass, text, scrim and accent tokens are untouched. What this file adds
+ * is (a) a **light** scheme built from the same
  * token names, and (b) an **accent selector**, both reachable through one
  * observable holder, [DhunAppearance].
  *
@@ -219,8 +222,9 @@ enum class DhunAccent(
  * [DhunColors] accessor — this is the only file in the repo allowed to hold
  * raw hex values.
  *
- * The default constructor **is** the dark palette DHUN shipped with, so
- * `DhunTokens()` is the regression baseline; the light set is
+ * The default constructor is the dark palette as of the 2026-09-21 UI-polish
+ * lift (surfaces +0x0C per rung; glass/text/accents as shipped), so
+ * `DhunTokens()` remains the regression baseline; the light set is
  * [DhunTokens.light], written out in full rather than patched onto the dark
  * one so no dark value can leak through by omission.
  */
@@ -228,13 +232,17 @@ data class DhunTokens(
     /** Selects `lightColorScheme()` as the Material3 base and flips a few token-derived rules. */
     val isLight: Boolean = false,
 
-    // Surfaces (dark: warm near-black stack so artwork pops)
-    val background: Color = Color(0xFF0A0A0A),
-    val surface: Color = Color(0xFF121212),
-    val surfaceVariant: Color = Color(0xFF1A1A1A),
-    val surfaceElevated: Color = Color(0xFF242424),
-    val surfaceHighest: Color = Color(0xFF2A2A2A),
-    val surfaceCard: Color = Color(0xFF1E1E1E),
+    // Surfaces (dark: warm lifted stack — the 2026-09-21 UI-polish pass moved
+    // every rung up 0x0C from the shipped 0A→2A ladder so Home/Search/Library
+    // sit closer to the full player's backdrop brightness; WCAG gates in
+    // DhunThemeContrastTest still pass, and the control-accent floor in
+    // ArtworkColors was retuned 0.42→0.45 to match)
+    val background: Color = Color(0xFF161616),
+    val surface: Color = Color(0xFF1E1E1E),
+    val surfaceVariant: Color = Color(0xFF262626),
+    val surfaceElevated: Color = Color(0xFF303030),
+    val surfaceHighest: Color = Color(0xFF363636),
+    val surfaceCard: Color = Color(0xFF2A2A2A),
 
     // Glass-morphism (M3 translucent atmosphere — not Liquid Glass).
     val glassHighlight: Color = Color(0x5E20202A),
@@ -281,20 +289,20 @@ data class DhunTokens(
     val overlayFocus: Color = Color(0x1FFFFFFF),
 
     // Artwork placeholders
-    val placeholderStart: Color = Color(0xFF1A1A1A),
-    val placeholderEnd: Color = Color(0xFF2A2A2A),
-    val placeholderPulse: Color = Color(0xFF333333),
+    val placeholderStart: Color = Color(0xFF262626),
+    val placeholderEnd: Color = Color(0xFF363636),
+    val placeholderPulse: Color = Color(0xFF3F3F3F),
 
     // Shimmer
-    val shimmerBase: Color = Color(0xFF1E1E1E),
-    val shimmerHighlight: Color = Color(0xFF2E2E2E),
+    val shimmerBase: Color = Color(0xFF2A2A2A),
+    val shimmerHighlight: Color = Color(0xFF3A3A3A),
 
     // Material 3 tonal surface ladder
-    val surfaceContainerLowest: Color = Color(0xFF0A0A0A),
-    val surfaceContainerLow: Color = Color(0xFF121212),
-    val surfaceContainer: Color = Color(0xFF242424),
-    val surfaceContainerHigh: Color = Color(0xFF2A2A2A),
-    val surfaceContainerHighest: Color = Color(0xFF303030),
+    val surfaceContainerLowest: Color = Color(0xFF161616),
+    val surfaceContainerLow: Color = Color(0xFF1E1E1E),
+    val surfaceContainer: Color = Color(0xFF303030),
+    val surfaceContainerHigh: Color = Color(0xFF363636),
+    val surfaceContainerHighest: Color = Color(0xFF3C3C3C),
 
     /** Tertiary role — scheme-only in dark (teal); kept as a token so light can retune it. */
     val tertiary: Color = Color(0xFF80CBC4),
@@ -365,7 +373,7 @@ data class DhunTokens(
     }
 
     companion object {
-        /** The palette DHUN shipped with — and still the default. */
+        /** The dark palette as of the 2026-09-21 UI-polish lift — still the default. */
         val dark: DhunTokens = DhunTokens()
 
         /**

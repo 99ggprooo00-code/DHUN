@@ -44,31 +44,50 @@ This session re-recorded those facts from the session record.
 **Queue of work (priority order):**
 1. Help the user verify/fix Windows when they report results (gates in
    HANDOFF).
-2. **UI polish (user-requested 2026-09-21):** (a) lighter Home/Search/Library
-   backgrounds toward the full player's brightness — lower
-   `DhunTokens` dark-ladder and `FullPlayer.kt` scrim/ambientScrim alphas,
-   keep WCAG-AA pins green (`DhunAppearanceTest`), light theme untouched;
-   (b) `DhunSpacing.artworkThumb` 56.dp → ~64.dp, check rails don't clip;
-   (c) glassy bottom dock: MiniPlayer + BottomNavigationBar via
-   BlurredArtworkCache + glass tokens (LYRICS-style background), no new
-   dependencies. CI green first, then user eyeballs both platforms;
-   record "awaiting user visual verdict"; no merge without it.
+2. **UI polish (user-requested 2026-09-21) — IMPLEMENTED this session, CI
+   pending, then user visual verdict (do not merge without it):**
+   (a) dark surface ladder lifted one rung (`DhunTokens`: background
+   0x0A→0x16, surfaces 0A→2A each +0x0C → 16→36, tonal ladder + placeholders +
+   shimmer retuned with it); FullPlayer scrim lowered (dim 0.52/0.16 →
+   0.42/0.10; `playerAmbientScrimStops` bottom 0.92→0.86, respecting the
+   ≥0.85 pin); shell backdrop dim 0.55→0.45 and scrimStops 0.62/0.42/0.58/
+   0.78 → 0.50/0.32/0.44/0.62. WCAG replicated locally in Python (same math
+   as `DhunThemeContrastTest`): all gates pass; `DARK_LEGIBILITY_FLOOR`
+   retuned 0.42→0.45 (worst control-accent ratio 3.12:1 on the new surface —
+   0.42 gave 2.85:1). Light theme untouched. `DhunAppearanceTest` hex pins
+   updated to the new baseline.
+   (b) `DhunSpacing.artworkThumb` 56→64dp; every consumer audited (TrackRow
+   and Library cards wrap content; queue/playlist reorder rows use 44/48dp
+   tokens; shimmer is size-only) — no clip risk.
+   (c) New `GlassDock` in design/components: ONE continuous bottom dock =
+   MiniPlayer (new `embedded = true` mode, no own chrome) + NavigationBar,
+   filled with the LYRICS-card background — current track's artwork blurred
+   once per track (BlurredArtworkCache, blur = glassBlur×2, list-tier URL
+   shared with the shell backdrop) under the glassBarTop→glassStrong veil.
+   Single-pane `BottomNavigationBar` now uses it; rail layouts keep the
+   floating MiniPlayer. No new dependencies.
+   **Awaiting user visual verdict on both platforms after CI green.**
 3. **Endless radio (ask user before starting):** when ≤3 songs remain in a
    playing radio, auto-queue more via the `/next` continuation; same song,
    same position, no gap, tail replaced on refill (supersedes the #99
    "different song" semantic). Reproduce in engine code, regression tests,
-   fix. Android is PASS so the blocker is lifted; ask first.
+   fix. NOT started — the user chose UI polish first this session.
 4. Remaining #105 hardware checklist per user reports: S3/S6 soaks,
    rotation/process death, persistence, Windows tray/jump-list/SMTC/media
    keys.
 
 **Last error / limits:** none on the merged head (all CI green). Visual
 changes cannot be verified in-sandbox — CI is only the compile/test gate;
-visual verdicts come from the user on real hardware.
+visual verdicts come from the user on real hardware. The UI-polish commit is
+pushed but CI-unverified at the time of writing; until its checks come back
+green the work is NOT done by the repo's own definition.
 
-**Exact next step:** docs-sync commit pushed; then ask the user whether to
-start UI polish, start endless radio, or wait for Windows results. Never
-merge without explicit user authorization for that specific work.
+**Exact next step:** docs-sync commit pushed; UI polish implemented and
+pushed on top — await its CI (build + shared jvmTest incl. updated
+`DhunAppearanceTest` pins, Android, Desktop, packaging), record the run ids,
+then ask the user to eyeball both platforms ("awaiting user visual verdict").
+Endless radio stays queued behind the user's go-ahead. Never merge without
+explicit user authorization for that specific work.
 
 **Session discipline:** boot checked `gh pr list` (only stale research PR
 #54 open) and `gh run list` (no live runs — PR #106 verifications all
