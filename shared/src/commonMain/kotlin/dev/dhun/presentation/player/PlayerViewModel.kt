@@ -113,6 +113,8 @@ class PlayerViewModel(
     private var lastRelatedPageToken: String? = null
     @Volatile
     private var radioRefillInFlight = false
+    @Volatile
+    private var lastRefillProbe: RefillProbe? = null
 
     /* ---------------- Sleep timer (Home quick-action) ---------------- */
 
@@ -189,15 +191,20 @@ class PlayerViewModel(
         // fetch the next /next page and swap the queue tail around the
         // sounding item (same song, same position, no gap). Failures are
         // fail-open — the queue is never touched.
+        // The probe carries a PLAYING FLAG, not the state object: a natural
+        // advance emits index AND state (Playing(a) -> Playing(r3)) for the
+        // same refill-relevant situation, and distinctUntilChanged conflates
+        // the pair so one advance = at most one trigger.
         scope.launch {
             combine(player.queue, player.currentQueueIndex, player.state) { q, i, s ->
-                RefillProbe(q, i, s)
-            }.collect { probe -> maybeRefillRadio(probe) }
+                RefillProbe(q, i, s is PlaybackState.Playing)
+            }.distinctUntilChanged()
+                .collect { probe -> maybeRefillRadio(probe) }
         }
     }
 
-    /** One conflated (queue, index, state) snapshot for the refill gate. */
-    private data class RefillProbe(val queue: List<Track>, val index: Int, val state: PlaybackState)
+    /** One conflated (queue, index, playing) snapshot for the refill gate. */
+    private data class RefillProbe(val queue: List<Track>, val index: Int, val playing: Boolean)
 
     /**
      * Gate for the endless-radio refill. Fires at most one in-flight refill:
@@ -205,23 +212,33 @@ class PlayerViewModel(
      * [RADIO_REFILL_THRESHOLD_SONGS] songs after the current one.
      */
     private fun maybeRefillRadio(probe: RefillProbe) {
+        // The last LAUNCHED probe: a re-check that lands on the same
+        // situation (nothing changed while a refill was in flight) stops
+        // the chain instead of spinning.
+        if (probe == lastRefillProbe) return
         if (!radioSession.isActive) return
         val queue = probe.queue
         if (probe.index !in 0 until queue.size) return
-        if (probe.state !is PlaybackState.Playing) return
+        if (!probe.playing) return
         val remaining = queue.size - probe.index - 1
         if (remaining > RADIO_REFILL_THRESHOLD_SONGS) return
         if (radioRefillInFlight) return
         // Claim BEFORE launch: the flag guards the coroutine that runs
-        // later, so back-to-back probes (a natural advance emits index AND
-        // state) must not both pass the check while the first refill has
-        // not started yet — that window caused a double fetch.
+        // later, so back-to-back probes must not both pass the check while
+        // the first refill has not started yet — that window caused a
+        // double fetch.
         radioRefillInFlight = true
+        lastRefillProbe = probe
         scope.launch {
             try {
                 refillRadio(queue, probe.index)
             } finally {
                 radioRefillInFlight = false
+                // Probes that arrived while this refill was in flight were
+                // skipped; re-gate on the LATEST snapshot so a rapid
+                // advance sequence still gets its refill.
+                val p = player
+                maybeRefillRadio(RefillProbe(p.queue.value, p.currentQueueIndex.value, p.state.value is PlaybackState.Playing))
             }
         }
     }
