@@ -378,6 +378,10 @@ class PlayerViewModelTest {
         eventually { vm.relatedState.value is RelatedUiState.Success }
         vm.startRadio()
         eventually { player.queue.value.map { it.id } == listOf("a", "r1", "r2", "r3", "r4", "r5") }
+        // The station handoff must be complete before any test depends on
+        // the chain: the session holds the related page's token (null only
+        // when the fixture explicitly starts the station without a chain).
+        assertEquals(token, vm.radioSession.continuationToken)
         return RadioFixture(player, provider, vm)
     }
 
@@ -473,6 +477,9 @@ class PlayerViewModelTest {
             fixture.provider.continuationResults += DhunResult.Failure(DhunError.Network())
             fixture.player.advanceTo(3)
             delay(300)
+            // The failed refill must consume nothing: the SAME chain token
+            // is kept for the retry (a re-seed would have swapped the queue).
+            assertEquals("tok-a", fixture.vm.radioSession.continuationToken)
             assertEquals(listOf("a", "r1", "r2", "r3", "r4", "r5"), fixture.player.queue.value.map { it.id })
             assertEquals(3, fixture.player.currentQueueIndex.value)
             assertEquals("r3", fixture.player.currentTrack.value?.id)

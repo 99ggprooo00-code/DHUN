@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.concurrent.Volatile
 
 /* ---------------- tab states ---------------- */
 
@@ -108,7 +109,9 @@ class PlayerViewModel(
      * chain [startRadio]/[playRelatedAt] hand to [radioSession] so refills
      * continue the SAME station instead of re-seeding.
      */
+    @Volatile
     private var lastRelatedPageToken: String? = null
+    @Volatile
     private var radioRefillInFlight = false
 
     /* ---------------- Sleep timer (Home quick-action) ---------------- */
@@ -209,7 +212,18 @@ class PlayerViewModel(
         val remaining = queue.size - probe.index - 1
         if (remaining > RADIO_REFILL_THRESHOLD_SONGS) return
         if (radioRefillInFlight) return
-        scope.launch { refillRadio(queue, probe.index) }
+        // Claim BEFORE launch: the flag guards the coroutine that runs
+        // later, so back-to-back probes (a natural advance emits index AND
+        // state) must not both pass the check while the first refill has
+        // not started yet — that window caused a double fetch.
+        radioRefillInFlight = true
+        scope.launch {
+            try {
+                refillRadio(queue, probe.index)
+            } finally {
+                radioRefillInFlight = false
+            }
+        }
     }
 
     /**
@@ -225,36 +239,33 @@ class PlayerViewModel(
         val current = player.currentTrack.value ?: return
         // The probe is one state emission old by the time this runs: re-check
         // the sounding track still matches, so a late refill can never
-        // clobber a newer queue.
+        // clobber a newer queue. A station that stopped in the meantime
+        // (user switched queue) must not refill either.
         if (expectedQueue.getOrNull(expectedIndex)?.id != current.id) return
-        radioRefillInFlight = true
-        try {
-            val page = when (val token = radioSession.continuationToken) {
-                null -> provider.radioQueuePage(current.id)
-                else -> provider.radioQueueContinuation(token)
-            }
-            when (page) {
-                is DhunResult.Success -> {
-                    val tail = page.value.tracks.filter { it.id != current.id }
-                    val currentTailIds =
-                        expectedQueue.subList(expectedIndex + 1, expectedQueue.size).map { it.id }.toSet()
-                    val tailIsAllNew = tail.isNotEmpty() &&
-                        tail.any { it.id !in currentTailIds }
-                    if (tailIsAllNew) {
-                        player.replaceQueueKeepingCurrent(tail)
-                    }
-                    // Consume the token whether or not we swapped: a page that
-                    // duplicates the visible tail still advances the server's
-                    // paging state (and a null next-token marks the chain
-                    // exhausted → re-seed on the next trigger).
-                    radioSession.tokenConsumed(page.value.continuationToken)
+        if (!radioSession.isActive) return
+        val page = when (val token = radioSession.continuationToken) {
+            null -> provider.radioQueuePage(current.id)
+            else -> provider.radioQueueContinuation(token)
+        }
+        when (page) {
+            is DhunResult.Success -> {
+                val tail = page.value.tracks.filter { it.id != current.id }
+                val currentTailIds =
+                    expectedQueue.subList(expectedIndex + 1, expectedQueue.size).map { it.id }.toSet()
+                val tailIsAllNew = tail.isNotEmpty() &&
+                    tail.any { it.id !in currentTailIds }
+                if (tailIsAllNew) {
+                    player.replaceQueueKeepingCurrent(tail)
                 }
-                is DhunResult.Failure -> {
-                    // Leave the queue alone; the next track advance retries.
-                }
+                // Consume the token whether or not we swapped: a page that
+                // duplicates the visible tail still advances the server's
+                // paging state (and a null next-token marks the chain
+                // exhausted → re-seed on the next trigger).
+                radioSession.tokenConsumed(page.value.continuationToken)
             }
-        } finally {
-            radioRefillInFlight = false
+            is DhunResult.Failure -> {
+                // Leave the queue alone; the next track advance retries.
+            }
         }
     }
 
