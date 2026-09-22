@@ -24,7 +24,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### Changed — CI hygiene (Stage S2): drill trigger retirement + Node-24 actions (2026-09-22, PR #S2PIN)
+### Changed — CI hygiene (Stage S2): drill trigger retirement + Node-24 actions (2026-09-22, PR #111)
 
 - **`extraction-health.yml`:** the inert `push: branches: [arena/01a0b224-dhun]`
   validation-branch trigger is retired — that branch merged as PR #91

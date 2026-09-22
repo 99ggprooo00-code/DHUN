@@ -20,13 +20,13 @@ sha256 `6e124a90709efb50280dfa469a898335b660f51ed3413066b0e451ccc8840024`).
 Those sizes identify the build carrying endless radio + the UI polish. NOTE:
 this session's S2 PR republishes the rolling `test` again on its own merge
 SHA — the authoritative download identity for the user is the LATEST
-publish; check the S2 PR's post-merge comment (or the release API) before
+publish; check PR #111's post-merge comment (or the release API) before
 quoting sizes. **The open gate is the user's hardware round:** re-download,
 visual check of the UI polish on both platforms, and the ~30-min radio soak
 (first auto-refill at ≤3 songs left must be gapless — same song, same
 position, tail replaced).
 
-**S2 (the last agent-executable stage) was executed in this session's PR:**
+**S2 (the last agent-executable stage) was executed in PR #111:**
 (1) the inert `push: branches: [arena/01a0b224-dhun]` trigger was retired
 from `extraction-health.yml` under a live drill watch — the merge is timed
 BEFORE the 2026-09-22 04:17 UTC cron so the scheduled run executes on the

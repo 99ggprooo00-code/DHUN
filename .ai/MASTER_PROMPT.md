@@ -333,7 +333,7 @@ acceptance gates the next. File-level tasking lives in
   as a verdict (the stale `push:` branch trigger was RETIRED 2026-09-22 as the
   S2 agent task — the ROADMAP's newer S1-close assignment `6a55dc9` superseded
   this parenthetical's "needs the user's OK"; executed under a live drill
-  watch in the 2026-09-22 S2 PR).
+  watch in PR #111).
 - **Acceptance (MET 2026-09-20):** ≥1 scheduled (or manually dispatched) drill
   verdict on current `main` **plus** a playback result outside the GitHub
   runner — a runner-only `ENVIRONMENT_BLOCKED` never closes S1 in either

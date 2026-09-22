@@ -1,7 +1,7 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
 > **Current status (2026-09-22, session `arena/01a0c6dd-dhun` — S2 CI hygiene in
-> flight in this session's PR).** The release baseline is **`main@500b6a8`** (PR #109
+> flight in PR #111).** The release baseline is **`main@500b6a8`** (PR #109
 > endless radio, merged 2026-09-22T02:00:55Z; post-merge CI **35677895454** / Build APK
 > **35677895471** / test-release **35677895534** all green on that SHA). Rolling `test`
 > targets exactly `500b6a8`, published **2026-09-22T02:05:41Z**, four assets:
