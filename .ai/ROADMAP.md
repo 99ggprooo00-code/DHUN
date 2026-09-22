@@ -14,10 +14,16 @@ test-release **35677895534**. Rolling `test` republished
 **2026-09-22T02:05:41Z**, tag AND target = **`500b6a8`**: `dhun-test.apk`
 **18,350,835 B** (sha256 `4bca3172bcee93b8c982fc503468e3a8212aacc3b1d195236e46d8517b62e76e`),
 `dhun-test.msi` **112,914,432 B** (internal ProductVersion **2.112.1**, sha256
-`6e124a90709efb50280dfa469a898335b660f51ed3413066b0e451ccc8840024`) — these
-sizes identify the build that carries endless radio + the UI polish. The
-user's open gate: re-download and run the radio soak + visual check (guide in
-the session handoff message).
+`6e124a90709efb50280dfa469a898335b660f51ed3413066b0e451ccc8840024`).
+**Superseding publish:** the previous session then merged its own docs-only
+post-merge re-pin (**PR #110 → `0d83216`**, 2026-09-22T02:18:11Z), and
+rolling `test` republished again at **2026-09-22T02:22:42Z**, target
+`0d83216` — APK **18,350,835 B** byte-identical (sha256 `4bca3172…e76e`),
+MSI **112,914,432 B** same size with internal ProductVersion **2.114.1**
+and sha256 `505e707a9ddd5757a64b86618b51b2e80edc768b3ab07bc5f00fde19875a8e95`
+(the MSI counter advances every packaging run). Those builds carry endless
+radio + the UI polish. The user's open gate: re-download and run the radio
+soak + visual check (guide in the session handoff message).
 
 **This session executed Stage S2 — the last agent-executable stage before the
 S3 hardware round.** In this PR: (1) retired the inert
@@ -37,7 +43,7 @@ all four workflows now use Node-24 majors (checkout@v5, setup-java@v5,
 setup-python@v6, upload/download-artifact@v6). (3) Repaired
 `docs/verification/14-release.md`: the floating 2026-09-07 "merge chain now
 ends at PR #32" block is now a dated retained-history section, and the ledger
-header is re-pinned to `500b6a8`. (4) Reconciled the PR #109 post-merge facts
+header is re-pinned to the current `0d83216` baseline. (4) Reconciled the PR #109 post-merge facts
 across ROADMAP / HANDOFF / KNOWN_LIMITATIONS / CHANGELOG / the 14-release
 ledger. Safety evidence for editing the drill workflow: this exact file
 survived THREE in-place edits on 2026-09-18 (`7928774`, `19f1e8e`, `a7c4d5d`)
@@ -77,7 +83,11 @@ workflow_dispatch and on issue writes.
 **Session discipline:** boot verified on GitHub FIRST (PR #109 merged,
 post-merge runs green, release republished) before any edit; one asserted
 patch per file per block; every edit grep-verified; full diff re-read before
-push. All work on the fixed session branch `arena/01a0c6dd-dhun`; no
+push. **Concurrent-session reconciliation:** the previous session's
+post-merge re-pin (PR #110 → `0d83216`) landed mid-flight and conflicted
+with this branch's reconciliation; resolved by merging `origin/main` into
+the session branch (no force-push, no history rewrite), integrating both
+records — noted here because single-agent doctrine assumes no overlap. All work on the fixed session branch `arena/01a0c6dd-dhun`; no
 forks/vendoring.
 
 **Endless radio (item 2 of the previous step list) — previous session's

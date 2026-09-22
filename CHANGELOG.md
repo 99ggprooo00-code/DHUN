@@ -46,8 +46,9 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 - **`docs/verification/14-release.md` repair (S2 task):** the floating
   2026-09-07 "merge chain now ends at PR #32" status block is now a dated
   retained-history section, and the ledger header is re-pinned to the
-  current baseline `500b6a8` with full release identity (APK 18,350,835 B /
-  MSI 112,914,432 B, ProductVersion 2.112.1, both sha256).
+  current baseline `0d83216` with full release identity (rolling `test`
+  published 2026-09-22T02:22:42Z: APK 18,350,835 B sha256 `4bca3172…e76e`,
+  MSI 112,914,432 B ProductVersion 2.114.1 sha256 `505e707a…8e95`).
 - No product-code change. Local gates: 29/29 packaging/CI-contract tests
   pass before and after; PyYAML parse check on all four workflows.
 
