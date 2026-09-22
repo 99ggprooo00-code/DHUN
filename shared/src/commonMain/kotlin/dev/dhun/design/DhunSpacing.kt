@@ -86,6 +86,22 @@ object DhunSpacing {
     val skeletonMetaWidth = 140.dp
     val skeletonArtistWidth = 150.dp
     val dialogListHeight = 180.dp
+    /**
+     * The compact ⋮ menu (every track overflow, plus the queue row menu).
+     *
+     * These replaced the old overflow *sheet* geometry (280–380dp wide, double
+     * padding, 48dp+ rows, a divider and its own Close button), which read as a
+     * long dialog rather than a menu on both Android and Windows. The ceiling
+     * is Material's own 280dp menu width; the floor is what keeps a short label
+     * ("Download") from collapsing into a pill. Nothing here stretches to the
+     * window — a menu is sized to its actions.
+     */
+    val menuMinWidth = 220.dp
+    val menuMaxWidth = 280.dp
+    /** One menu row. Compact, but still above the 40dp pointer floor. */
+    val menuRowHeight = 44.dp
+    /** Track artwork in the menu header — a thumbnail, not a hero. */
+    val menuArtwork = 40.dp
     val artworkPlaylist = 200.dp
     val artworkAlbum = 220.dp
     val artistHeaderHeight = 240.dp
