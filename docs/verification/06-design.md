@@ -4,6 +4,16 @@ Status: **CODE COMPLETE — unit-verified in CI; on-device visual verification O
 
 Date: 2026-09-04. Branch `arena/01a06a22-dhun` (next PR).
 
+> **Token values below are the 2026-09-04 phase record, not the live palette.**
+> As of 2026-09-22 the dark ladder is the #107 lift (`background` `#161616`,
+> not `#0A0A0A`) and `artworkThumb` is **64dp**, not 56. PR #113
+> (`d2a9045`, CI-green, pre-merge) changes overlays only: player dim
+> 0.40/0.08, shell dim 0.40, shell scrim 0.50/0.32/0.44/0.62, lyrics-card
+> veil on chips / the tab band / Related, acrylic mini-player. Another
+> surface rung was measured and refused (3.12:1 on `#1E1E1E`, 2.97:1 on
+> `#222222`). Hardware eyeball of that look is still open. Live source:
+> `DhunTokens` / `DhunSpacing` / `CHANGELOG.md`.
+
 ## What Phase 06 delivers
 
 1. **Tokens** (`shared/src/commonMain/kotlin/dev/dhun/design/Dhun*.kt`):

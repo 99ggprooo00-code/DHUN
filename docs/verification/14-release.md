@@ -1,28 +1,30 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Current status (2026-09-22, session `arena/01a0c6dd-dhun` — S2 CI hygiene in
-> flight in PR #111).** The release baseline is **`main@0d83216`** (PR #110,
-> the previous session's docs-only post-merge re-pin, merged 2026-09-22T02:18:11Z on top
-> of **PR #109 endless radio → `500b6a8`**, merged 2026-09-22T02:00:55Z; post-merge CI
-> on `500b6a8` — **35677895454** / Build APK **35677895471** / test-release
-> **35677895534** — and on `0d83216` — **35678969644** / **35678969636** /
-> **35678969651** — all green). Rolling `test` now targets exactly `0d83216`, published
-> **2026-09-22T02:22:42Z**, four assets: `dhun-test.apk` **18,350,835 B** (sha256
-> `4bca3172bcee93b8c982fc503468e3a8212aacc3b1d195236e46d8517b62e76e` — byte-identical to
-> the `500b6a8` publish), `dhun-test.msi` **112,914,432 B** (internal ProductVersion
-> **2.114.1**, sha256 `505e707a9ddd5757a64b86618b51b2e80edc768b3ab07bc5f00fde19875a8e95`
-> — same size as the `500b6a8` publish, whose ProductVersion was 2.112.1 / sha256
-> `6e124a90…0024`; the counter advances every packaging run) and both `.sha256`
-> sidecars. PR #111's own merge republishes again at its merge SHA — quote the LATEST
-> publish (its PR comment) as the download identity. This build carries endless radio
-> (#109) on top of the UI polish (`44e1ffd`, #107), the Home-moods/close/offline-replay
-> batch (`810bef1`, #106) and the #105 batch (`414cd79`); `6317a1b` (#108) and
-> `0d83216` (#110) were docs-only between/after them. Earlier
-> baselines in this ledger: `d99060e` (PR #96 — **the S1 user-evidence build**),
-> `7304abb` (PR #94), `fabeb5f` (PR #93), `39b8748` (PR #92), `6f7fa48` (PR #91).
-> The daily drill keeps firing on schedule: 2026-09-21 run **35561269411** on
-> `414cd79` classified `ENVIRONMENT_BLOCKED` (exit 2) — the known-correct runner
-> steady state, not a product verdict.
+> **Current status (2026-09-22, session `arena/01a0c716-dhun` — PR #113 pre-merge).**
+> The release baseline is **`main@7fcadbe`** (PR #111, S2 CI hygiene, merged).
+> Post-merge CI on that SHA is green: CI **35681131215**, Build APK
+> **35681131195**, test-release **35681131229**. Rolling `test` targets exactly
+> `7fcadbe`, published **2026-09-22T02:58:26Z**: `dhun-test.apk` **18,350,835 B**,
+> `dhun-test.msi` **112,914,432 B**, both `.sha256` sidecars present (hashes not
+> re-read; asset blobs EOF here). **That download does not contain PR #113.**
+> PR #113's merge will republish again — quote the post-merge release API, not
+> this paragraph, as the download identity. The 2026-09-22 04:17 UTC drill had
+> not appeared at this writing; the latest schedule is still **35561269411**
+> (2026-09-21, `414cd79`, `ENVIRONMENT_BLOCKED`). Earlier baselines: `0d83216`
+> (PR #110), `500b6a8` (PR #109), `d99060e` (PR #96 — **the S1 user-evidence
+> build**), `7304abb`, `fabeb5f`, `39b8748`, `6f7fa48`.
+>
+> **Pre-merge verification — PR #113, code head `d2a9045` (this session).**
+> Glass restyle `4166633` + scrim follow-up `d2a9045`, based on `main@7fcadbe`.
+> Watched to completion, all success: push CI **35685053236** (5m2s), PR CI
+> **35685055740** (5m44s), Build APK **35685055672** (2m33s), test-release
+> **35685055772** (apk 2m49s, msi 3m40s including hosted install-over/userdata).
+> `aab` / `publish` / `release_draft` skipped — `main`-gated. Suites that ran:
+> shared domain, Android Robolectric, Android debug, probes, extraction-health
+> classification, desktop compile, desktop JVM. No local JDK. This is compile,
+> unit and packaging evidence only — not a visual or playback acceptance.
+> Merge records the glass/scrim change and that CI; it does not close S3, sign
+> a soak, or certify the look on a device.
 >
 > **Stage S1 closed GREEN on 2026-09-20 (retained record below).** The S1 evidence
 > paragraphs that follow describe the `d99060e` build and remain the residential

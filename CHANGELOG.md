@@ -24,6 +24,14 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Verified — PR #113 pre-merge CI on `d2a9045` (2026-09-22)
+
+- Code head **`d2a9045`** (glass `4166633` + the scrim follow-up) is green:
+  push CI **35685053236**, PR CI **35685055740**, Build APK **35685055672**,
+  test-release **35685055772** (apk + msi, install-over included; publish
+  skipped — PR). Not a device verdict, and not yet the rolling `test`
+  download (that still targets `7fcadbe` until this PR merges).
+
 ### Changed — lighter artwork scrims on the shell and the full player (2026-09-22)
 
 - Home / Search / Library and the full player share the same dark surface (`#161616`). Another surface step was measured and not taken: artwork-derived controls are 3.12:1 on `#1E1E1E`, and `#222222` drops the worst case to 2.97:1, under the WCAG 1.4.11 pin in `DhunThemeContrastTest`. Light theme untouched.

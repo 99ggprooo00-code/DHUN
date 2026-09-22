@@ -1,5 +1,32 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-22 — Glass / scrim follow-up: surfaces were not the darkness (`arena/01a0c716-dhun`)
+
+**Ask.** After the lyrics-veil / acrylic mini-player pass, the user asked to
+decrease Home/Search/Library darkness toward the full player's background,
+ease the full-player dim so blurred artwork shows through, keep WCAG-AA and
+the `DhunAppearanceTest` pins, leave the light theme alone, and keep list
+thumbs a little larger (~64dp) and borderless.
+
+**What was already true, and easy to "fix" twice.** `artworkThumb` was
+already 64dp and `ArtworkImage` already draws no stroke (PR #107). The dark
+ladder was already the one-rung lift (`background` `#161616`). Another rung
+was measured with the same WCAG math as `DhunThemeContrastTest`:
+artwork-derived controls are **3.12:1** on `#1E1E1E` and **2.97:1** on
+`#222222`. The second fails the 3:1 pin. The surfaces were not lifted.
+
+**What was actually still dark.** The artwork overlays, not the hexes.
+Player black dim was still 0.52/0.16 (the 2026-09-21 changelog had claimed
+0.42/0.10; the code had not moved). Shell scrim stops were still
+0.62/0.42/0.58/0.78. Those landed in `d2a9045`: dim **0.40/0.08**, ambient
+bottom stop on the **≥0.85** floor (not under it — `PlayerSheetLayoutTest`
+pins that), shell dim **0.40**, scrim **0.50/0.32/0.44/0.62**.
+
+**CI.** No JDK. Code head `d2a9045` watched green: push **35685053236**, PR
+**35685055740**, Build APK **35685055672**, test-release **35685055772**.
+Publish skipped on the PR, so the rolling download at `7fcadbe` does not
+contain this. Visual acceptance is the user's after the post-merge republish.
+
 ## 2026-09-21 — PR #107 merged; release republished and verified (connection survived)
 
 Merged `44e1ffd` (2026-09-21T09:54:37Z) under the user's "it's good go
