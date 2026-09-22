@@ -24,6 +24,43 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Added — Endless radio: a playing station refills itself, gaplessly (2026-09-21, PR #109)
+
+> Spec pinned in `.ai/DEBUG_LOG.md` (2026-09-21): while a radio station
+> plays and ≤3 songs remain, auto-queue the station's next `/next` page
+> (its "Up next") behind the current track — same song, same position,
+> seamless, no gap; the remaining tail is replaced by the new page.
+> Supersedes the #99 "different song" seed semantic. The related row keeps
+> excluding the current track; an explicit row tap still plays that row.
+
+- **Refill monitor** (shared `PlayerViewModel`, all platforms): when
+  playing on a radio-started queue with ≤3 songs left from the current
+  track, it fetches the next page of the station — the session's
+  continuation chain while a token exists, otherwise a fresh `/next`
+  re-seed from the currently playing track (the server list is finite;
+  when it ends the station continues from a new seed).
+- **Gapless swap** (`DhunPlayer.replaceQueueKeepingCurrent`): the Android
+  engine trims the Media3 timeline around the sounding item and appends the
+  new page behind it — the sounding MediaItem is the same instance, never
+  re-prepared, no timeline rebuild, no seek; the desktop engine uses the
+  queue-replace path. Regression-pinned by `SeamlessRadioRefillTest`
+  (engine level, Robolectric): the test fails on any re-prepare/rebuild/
+  seek, not just on final queue order.
+- **Station chain** (in-memory `RadioSession`, one Koin single): holds the
+  per-station continuation token plus a page-duplicate signature so the
+  same page is never queued twice (no loop). Fail-open: a failed fetch
+  leaves the queue untouched and the token is kept, so the next advance
+  retries the same chain.
+- **Wire:** `RadioQueuePage` + `Parsers` read `nextRadioContinuationData`
+  (the field carrying both the track list and the next continuation token);
+  continuation requests send `ctoken` + `continuation` as URL parameters on
+  the `/next` POST — the same endpoint and contract as the seed, so one
+  code path serves "first page" and "next page".
+- **Tests:** five new shared view-model regressions (low-remaining refill,
+  duplicate-page guard, fail-open + same-token retry, exhausted-chain
+  re-seed targeting the playing track, non-radio queues ignored) + the
+  engine-level regression above + parser coverage for the new field.
+
 ### Changed — UI polish: lighter dark surfaces, larger thumbnails, continuous glass dock (2026-09-21, merged under user authorization)
 
 > User verdicts, 2026-09-21: Windows tested on the `810bef1` rolling release:

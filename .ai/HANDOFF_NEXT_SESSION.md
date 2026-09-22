@@ -5,9 +5,31 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — post-merge sync, 2026-09-21, session `arena/01a0c2c7-dhun`
+## CURRENT STATE — endless radio merged, 2026-09-21, session `arena/01a0c3b7-dhun`
 
-This section supersedes the pre-merge statuses below it.
+This section supersedes the statuses below it.
+
+**PR #109 (endless radio) — the next session starts HERE.** Implementation
+landed in `62de262`; three CI-driven fix commits followed (`ad3d614`,
+`c5b85e5`, `063040d`); docs updated in the pre-merge docs commit. Merged
+into `main` under this session's standing merge-without-asking directive —
+merge SHA and post-merge CI recorded in the ROADMAP top block (re-pin it
+here if it landed after this writing). The rolling `test` release
+republished on merge carries the feature; the user's hardware verdict
+(re-download + 30-min station soak, watching for a gap at the first
+refill) is the open gate. The station chain (`RadioSession`) is
+in-memory by design — a cold start re-seeds a fresh `/next` from the
+current track when the restored queue falls to ≤3 songs (see
+KNOWN_LIMITATIONS).
+
+**Sandbox notes that held this session (no JDK, logs EOF, annotations
+API is the readout) are unchanged** — see the DEBUG_LOG entry
+"Endless radio: implementation + 6 regression tests" for the three
+compiler/test gotchas CI caught (var smart-cast, `args![0]` K2 parser
+cascade, 3-arg `assertEquals` not resolving in Android tests) and the
+fake-page-threshold test-design slip.
+
+## PREVIOUS STATE — post-merge sync, 2026-09-21, session `arena/01a0c2c7-dhun`
 
 **PR #107 (UI polish) has since been MERGED** as `44e1ffd`
 (2026-09-21T09:54:37Z, user-authorized; all checks green on `1def7ee` — a

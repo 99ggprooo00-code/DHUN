@@ -3,6 +3,13 @@
 Updated every phase. Nothing hidden.
 
 
+## 2026-09-21 (session `arena/01a0c3b7-dhun`) — endless radio shipped; the station chain is in-memory
+
+- **The radio station chain does not survive an app restart (by design; in-memory).** `RadioSession` (continuation token + duplicate guard) is a process-lifetime Koin single. After a cold start, now-playing restore replays the saved queue (pre-existing behavior) but carries no continuation chain; when that restored queue falls to ≤3 songs the refill monitor re-seeds a fresh `/next` from the current track, so the station continues seamlessly from a new seed. There is no persisted "radio identity".
+- **A refill page of ≤3 songs re-triggers the monitor immediately** (remaining = 3 = threshold). Real `/next` pages are ~25 songs, so this does not occur in practice; if it ever did, the duplicate guard and the fail-open path keep it a no-op probe, not a loop.
+- **Carried over unchanged:** everything in the previous sections (S3/S6 hardware items, the #105 checklist, drill `ENVIRONMENT_BLOCKED` steady state, issue #14 user-closable, no in-app Android EQ, etc.).
+
+
 ## 2026-09-21 (session `arena/01a0c174-dhun`) — S3 Round-2 defects fixed; shuffle semantics redefined; race incident
 
 - **All four Round-2 device defects have merged fixes (#98/#99/#101/#102), but NONE is hardware-verified yet.** They were verified only by CI (unit tests + compile + packaging). The re-test script and build identity live in `.ai/HANDOFF_NEXT_SESSION.md`.
