@@ -1,6 +1,7 @@
 package dev.dhun.ui.browse
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import dev.dhun.design.DhunSpacing
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.graphics.Brush
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
@@ -90,7 +92,8 @@ fun AlbumScreen(
             modifier = Modifier
                 .padding(DhunSpacing.sm)
                 .clip(DhunShapes.full)
-                .background(DhunColors.glassStrong)
+                .background(lyricsVeilBrush())
+                .border(androidx.compose.foundation.BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.full)
                 .padding(DhunSpacing.xs),
         ) {
             DhunIconButton(

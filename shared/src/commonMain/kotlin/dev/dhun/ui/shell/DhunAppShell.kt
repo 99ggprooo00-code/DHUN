@@ -64,6 +64,8 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.GlassDock
 import dev.dhun.design.components.NowPlayingBackdrop
+import dev.dhun.design.components.acrylicGlass
+import dev.dhun.design.components.lyricsVeil
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.presentation.browse.AlbumViewModel
@@ -575,43 +577,56 @@ private fun BottomNavigationBar(
     playerViewModel: PlayerViewModel,
     layout: DhunShellLayout,
 ) {
-    // One continuous glass dock (2026-09-21 UI polish): the MiniPlayer row and
-    // the nav bar share a single [GlassDock] whose fill is the current track's
-    // blurred artwork under the glass tokens — the LYRICS-card treatment — so
-    // docked chrome reads as one surface over the artwork, not stacked boxes.
+    // One clipped dock, two materials (the lyrics-card artwork is painted once
+    // by [GlassDock]):
+    //  - the MiniPlayer row is translucent acrylic — a milky veil, not the old
+    //    near-black `glassStrong` slab;
+    //  - Home / Search / Library, the tabs that sit *below* the mini-player,
+    //    use the lyrics-card veil so that band matches the lyrics background.
     val currentTrack by playerViewModel.currentTrack.collectAsState()
+    val showMini = !nav.playerExpanded && currentTrack != null
     GlassDock(
         artworkUrl = currentTrack?.thumbnailUrl,
         modifier = Modifier.fillMaxWidth(),
         shape = DhunShapes.bottomSheet,
     ) {
-        if (!nav.playerExpanded) {
-            MiniPlayer(
-                viewModel = playerViewModel,
-                onExpand = { nav.playerExpanded = true },
-                embedded = true,
+        if (showMini) {
+            Box(modifier = Modifier.fillMaxWidth().acrylicGlass()) {
+                MiniPlayer(
+                    viewModel = playerViewModel,
+                    onExpand = { nav.playerExpanded = true },
+                    embedded = true,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(DhunSpacing.border)
+                    .background(DhunColors.glassEdge),
             )
         }
-        NavigationBar(
-            containerColor = Color.Transparent,
-            contentColor = DhunColors.textPrimary,
-            tonalElevation = DhunSpacing.zero,
-            modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
-        ) {
-            AppTab.userTabs.forEach { tab ->
-                AppBottomNavigationItem(
-                    tab = tab,
-                    selected = DhunShellPolicy.isTabSelected(
-                        layout = layout,
-                        selectedTab = nav.selectedTab,
+        Box(modifier = Modifier.fillMaxWidth().lyricsVeil()) {
+            NavigationBar(
+                containerColor = Color.Transparent,
+                contentColor = DhunColors.textPrimary,
+                tonalElevation = DhunSpacing.zero,
+                modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
+            ) {
+                AppTab.userTabs.forEach { tab ->
+                    AppBottomNavigationItem(
                         tab = tab,
-                        detailDepth = nav.detailStack.size,
-                    ),
-                    // A bottom bar only exists in the single-pane layout, so
-                    // `false` here is the phone rule by construction: switching
-                    // tabs drops the stack that was covering the tab.
-                    onClick = { nav.selectTab(tab, keepDetailOnTabChange = false) },
-                )
+                        selected = DhunShellPolicy.isTabSelected(
+                            layout = layout,
+                            selectedTab = nav.selectedTab,
+                            tab = tab,
+                            detailDepth = nav.detailStack.size,
+                        ),
+                        // A bottom bar only exists in the single-pane layout, so
+                        // `false` here is the phone rule by construction: switching
+                        // tabs drops the stack that was covering the tab.
+                        onClick = { nav.selectTab(tab, keepDetailOnTabChange = false) },
+                    )
+                }
             }
         }
     }

@@ -49,9 +49,9 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.components.AcrylicSurface
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
-import dev.dhun.design.components.GlassBottomBar
 import dev.dhun.presentation.player.PlayerViewModel
 
 /**
@@ -59,11 +59,10 @@ import dev.dhun.presentation.player.PlayerViewModel
  * readable metadata and independent transport targets. Click/keyboard activation
  * expands it (or opens error details); a density-aware swipe up always expands.
  *
- * [embedded] renders the row **without its own glass chrome** for placement
- * inside the shared [dev.dhun.design.components.GlassDock] (the continuous
- * mini + nav bottom dock): the dock owns the glass, the blurred artwork and
- * the outer shape, so the two read as one surface. The default `false` keeps
- * the standalone floating-card look (rail layouts).
+ * [embedded] renders the row **without its own chrome** for placement inside
+ * the shared dock: the dock owns the blurred artwork, and the shell veils
+ * this row with acrylic. The default `false` keeps the standalone floating
+ * card — the same acrylic recipe, with its own blurred artwork (rail layouts).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -82,11 +81,6 @@ fun MiniPlayer(
     val colors = remember(track.thumbnailUrl, track.id) {
         ArtworkColorExtractor.extractFromSeed(track.thumbnailUrl ?: track.id)
     }
-    val ambientTint by animateColorAsState(
-        targetValue = colors.backgroundTint.copy(alpha = 0.20f),
-        animationSpec = DhunAnimations.slowTween(),
-        label = "miniPlayerAmbient",
-    )
     val accent by animateColorAsState(
         targetValue = colors.controlAccent,
         animationSpec = DhunAnimations.slowTween(),
@@ -256,18 +250,13 @@ fun MiniPlayer(
         }
     }
     if (embedded) {
-        // The continuous glass dock owns the chrome — render content only.
+        // The dock owns the blurred artwork and veils this row with acrylic.
         Box(modifier = modifier.fillMaxWidth()) { miniContent() }
     } else {
-        GlassBottomBar(
-            modifier = modifier
-                .fillMaxWidth()
-                .clip(DhunShapes.large)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(ambientTint, DhunColors.glassHighlight.copy(alpha = 0.15f), ambientTint.copy(alpha = 0.08f)),
-                    ),
-                ),
+        AcrylicSurface(
+            artworkUrl = track.thumbnailUrl,
+            modifier = modifier.fillMaxWidth(),
+            shape = DhunShapes.large,
         ) {
             miniContent()
         }

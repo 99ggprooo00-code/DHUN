@@ -24,6 +24,13 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — lyrics-card material on chips, the dock, Related, and an acrylic mini-player (2026-09-22)
+
+- Like / more / collapse / back / queue-close discs no longer paint the near-black `glassStrong` fill. They use the lyrics-card veil (background at 0.42 → 0.62) so the blurred artwork shows through.
+- On Home / Search / Library, only the band under the mini-player (the tab bar) uses that veil. List cards above the dock are unchanged.
+- The Related list in the full player carries one blurred-artwork layer plus that veil. Queue rows are unchanged.
+- The phone dock splits its veil: the mini-player row is a lighter acrylic (milky frost, well under the old ~72% black slab) and the nav band below it uses the lyrics veil. Rail and two-pane mini-players use the same acrylic card. Still Material 3 + one blur per track — not Liquid Glass, not a platform Acrylic API.
+
 ### Changed — CI hygiene (Stage S2): drill trigger retirement + Node-24 actions (2026-09-22, PR #111)
 
 - **`extraction-health.yml`:** the inert `push: branches: [arena/01a0b224-dhun]`

@@ -114,6 +114,7 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.design.components.GlassBottomBar
+import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.fittedPlayerArtworkSize
 import dev.dhun.design.fullPlayerLayoutMode
@@ -996,11 +997,7 @@ private fun PlayerStatusPill(
     Box(
         modifier = modifier
             .clip(DhunShapes.full)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(DhunColors.glassHighlight, DhunColors.glassStrong),
-                ),
-            )
+            .background(lyricsVeilBrush())
             .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.full)
             .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.xs),
         contentAlignment = Alignment.Center,
@@ -1540,19 +1537,13 @@ private fun LyricsCard(
                 )
             }
         }
-        // Readability scrim behind the lyric lines — adaptive: near-black in
-        // dark, a light wash in light so the dark lyric text keeps contrast.
+        // Readability scrim behind the lyric lines — the shared lyrics-card
+        // veil (background at 0.42 → 0.62), so Related and the tab cards can
+        // use the same material without a second set of numbers.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            DhunColors.background.copy(alpha = 0.42f),
-                            DhunColors.background.copy(alpha = 0.62f),
-                        ),
-                    ),
-                ),
+                .background(lyricsVeilBrush()),
         )
         PlayerTabContent(
             tab = LYRICS_TAB_INDEX,
@@ -1564,8 +1555,10 @@ private fun LyricsCard(
 }
 
 /**
- * Circular glass chip — the reference's "more / like" affordances beside the
- * track name and the collapse control up top.
+ * Circular chip — the reference's "more / like" affordances beside the track
+ * name and the collapse control up top. The fill is the lyrics-card veil, not
+ * the old `glassStrong` disc (that read as a translucent black button over the
+ * already-blurred player).
  */
 @Composable
 private fun PlayerChipButton(
@@ -1581,7 +1574,7 @@ private fun PlayerChipButton(
         modifier = Modifier
             .size(DhunSpacing.compactTarget)
             .clip(DhunShapes.full)
-            .background(DhunColors.glassStrong)
+            .background(lyricsVeilBrush())
             .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.full),
         contentDescription = contentDescription,
     ) {
@@ -1839,7 +1832,7 @@ private fun QueueSheetHeader(title: String, onClose: () -> Unit) {
                 modifier = Modifier
                     .size(DhunSpacing.touchTarget)
                     .clip(DhunShapes.full)
-                    .background(DhunColors.glassStrong)
+                    .background(lyricsVeilBrush())
                     .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.full),
                 contentDescription = "Close queue",
             ) {

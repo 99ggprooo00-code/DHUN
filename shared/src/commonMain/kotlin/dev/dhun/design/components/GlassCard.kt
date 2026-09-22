@@ -11,24 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.key
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
-import dev.dhun.design.BlurredArtworkCache
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
-import dev.dhun.design.supportsRealtimeBlur
 
 /**
  * Frosted Material 3 surface — **glass-morphism atmosphere**, not Liquid Glass.
@@ -165,21 +157,12 @@ fun GlassBottomBar(
 
 /**
  * The continuous bottom dock: the MiniPlayer and the navigation bar in ONE
- * frosted surface (2026-09-21 UI polish). Where [GlassBottomBar] is a plain
- * translucent fill, the dock carries the **LYRICS-card background** — the
- * current track's artwork, blurred once per track ([BlurredArtworkCache],
- * ADR-002 P4) and veiled by the same glass tokens — so the mini player and
- * the nav bar read as one glass sheet over the artwork instead of two stacked
- * boxes.
- *
- * Layering, back to front:
- *  1. the blurred, overscanned artwork (only when there is a usable URL and
- *     the platform can really blur — otherwise the plain glass fill below is
- *     the whole look, exactly like [GlassBottomBar]);
- *  2. the translucent glass veil (`glassBarTop` → `glassStrong`), which is
- *     what makes the artwork read as frosted material rather than a photo;
- *  3. the dock content (MiniPlayer row, then the nav bar) — always sharp;
- *     blurring content is banned by the [GlassCard] contract.
+ * clipped sheet. The artwork is blurred once per track (the lyrics-card
+ * pipeline, [LyricsArtworkLayer]). This surface does **not** paint the old
+ * `glassBarTop` → `glassStrong` slab — that near-black veil is what made the
+ * dock read as translucent black. Callers veil each band themselves:
+ * [acrylicGlass] on the mini-player row, [lyricsVeil] on the Home / Search /
+ * Library tabs that sit below it. Content stays sharp.
  *
  * No new dependency and no per-frame work: the artwork is the same Coil
  * request the shell backdrop already makes (list tier via
@@ -193,40 +176,16 @@ fun GlassDock(
     shape: Shape = DhunShapes.bottomSheet,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val resolvedUrl = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) }
-    val cacheKey = remember(artworkUrl) { BlurredArtworkCache.keyFor(artworkUrl, null) }
     Box(
         modifier = modifier
-            .shadow(DhunSpacing.md, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.4f))
+            .shadow(DhunSpacing.md, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.28f))
             .clip(shape)
             .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), shape),
     ) {
-        if (resolvedUrl != null && supportsRealtimeBlur) {
-            key(cacheKey) {
-                // Bookkeeping for the blur-once contract: same key the
-                // FullPlayer backdrop records, so "prepared per track" holds
-                // across both surfaces.
-                LaunchedEffect(cacheKey) { BlurredArtworkCache.markPrepared(cacheKey) }
-                ArtworkImage(
-                    imageUrl = resolvedUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .blur(DhunSpacing.glassBlur * 2),
-                    shape = RectangleShape,
-                    contentScale = ContentScale.Crop,
-                )
-            }
-        }
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(DhunColors.glassBarTop, DhunColors.glassStrong),
-                    ),
-                ),
-        )
+        // One blur for the whole dock. Each band veils itself so the
+        // mini-player can be acrylic and the tabs below it can be the
+        // lyrics material, instead of one near-black slab over both.
+        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize())
         Column(modifier = Modifier.fillMaxWidth(), content = content)
     }
 }
