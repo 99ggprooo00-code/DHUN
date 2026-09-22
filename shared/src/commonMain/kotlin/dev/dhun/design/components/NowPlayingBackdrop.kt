@@ -127,6 +127,32 @@ fun NowPlayingBackdrop(
     }
 }
 
+/**
+ * A detail page's own backdrop: the **same** blurred-and-darkened artwork
+ * treatment as [NowPlayingBackdrop], pointed at the page's subject (an album
+ * cover, an artist portrait) rather than at the playing track.
+ *
+ * Album and Artist pages used to paint an opaque `DhunColors.background` over
+ * themselves. That hid the shell backdrop completely and left the page a flat
+ * colour wash (an [dev.dhun.design.ArtworkColorExtractor] seed tint) while
+ * Home / Search / Library glowed with real artwork. Those pages now stay
+ * transparent and paint this instead — including while nothing is playing,
+ * which is exactly when the shell backdrop has nothing to show.
+ *
+ * It is a wrapper on purpose: one recipe, one set of numbers
+ * ([NowPlayingBackdropPolicy] — list-tier request, 64dp blur, dim and scrim),
+ * so a page backdrop can never drift away from the shell's, and a page with no
+ * artwork (or a platform that cannot really blur) draws nothing at all and
+ * leaves the shell backdrop / base colour as the fallback.
+ */
+@Composable
+fun PageArtworkBackdrop(
+    artworkUrl: String?,
+    modifier: Modifier = Modifier,
+) {
+    NowPlayingBackdrop(artworkUrl = artworkUrl, modifier = modifier)
+}
+
 /** Load lifecycle of the backdrop's artwork request. */
 enum class NowPlayingBackdropPhase { Idle, Loading, Loaded, Failed }
 

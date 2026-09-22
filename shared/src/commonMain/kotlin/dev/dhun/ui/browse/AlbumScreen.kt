@@ -40,7 +40,9 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.PageArtworkBackdrop
 import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunIconButton
@@ -56,6 +58,13 @@ import dev.dhun.presentation.browse.AlbumViewModel
 /**
  * Album page (Phase 09): artwork-tinted header, play/shuffle actions,
  * ordered numbered track list, "More by artist" navigation.
+ *
+ * The page is transparent and paints its own blurred album cover as the
+ * backdrop ([PageArtworkBackdrop]) — the same treatment Home / Search /
+ * Library get from the shell — so an album reads as its artwork rather than as
+ * a flat colour wash, including while nothing is playing. Track rows carry the
+ * album cover when the page shipped no per-row thumbnail (see
+ * `dev.dhun.innertube.parseAlbumPage`).
  */
 @Composable
 fun AlbumScreen(
@@ -68,7 +77,19 @@ fun AlbumScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    Box(modifier = modifier.fillMaxSize().background(DhunColors.background)) {
+    // The album page is transparent like Home / Search / Library and paints its
+    // OWN blurred cover as the backdrop, so the page glows with the album's
+    // artwork instead of a flat colour — including while nothing is playing
+    // (when the shell's now-playing backdrop has nothing to show). No artwork,
+    // or a platform that cannot really blur, draws nothing here and the shell
+    // backdrop / base colour stays the fallback.
+    val detail = (state as? AlbumUiState.Success)?.detail
+
+    Box(modifier = modifier.fillMaxSize()) {
+        PageArtworkBackdrop(
+            artworkUrl = detail?.thumbnailUrl,
+            modifier = Modifier.fillMaxSize(),
+        )
         when (val s = state) {
             is AlbumUiState.Loading -> AlbumSkeleton()
             is AlbumUiState.Error -> ErrorView(
@@ -134,14 +155,16 @@ private fun AlbumContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
-        // Header: big artwork + meta over the artwork-tinted gradient
+        // Header: big artwork + meta over the artwork-tinted gradient. The
+        // wash fades to TRANSPARENT, not to `DhunColors.background`: an opaque
+        // stop here is what used to hide the blurred cover behind the page.
         item(key = "header") {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
-                            listOf(headerTint, DhunColors.background),
+                            listOf(headerTint, Color.Transparent),
                         ),
                     )
                     .padding(top = DhunSpacing.huge, bottom = DhunSpacing.lg),
