@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -73,7 +72,9 @@ import dev.dhun.presentation.player.LyricsUiState
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.player.RelatedUiState
 import dev.dhun.ui.components.DragHandleGrip
+import dev.dhun.ui.components.MenuActionRow
 import dev.dhun.ui.components.ReorderableList
+import dev.dhun.ui.components.TrackMenuSurface
 import kotlinx.coroutines.delay
 
 @Composable
@@ -283,30 +284,50 @@ private fun QueueRowActions(
                 tint = DhunColors.textSecondary,
             )
         }
-        DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text("Move up") },
-                enabled = index > 0,
-                onClick = {
-                    expanded = false
-                    viewModel.moveQueueItem(index, index - 1, queue)
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Move down") },
-                enabled = index < queue.lastIndex,
-                onClick = {
-                    expanded = false
-                    viewModel.moveQueueItem(index, index + 1, queue)
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Remove from queue", color = DhunColors.error) },
-                onClick = {
-                    expanded = false
-                    viewModel.removeQueueItem(index, queue)
-                },
-            )
+        DropdownMenu(
+            expanded = expanded && enabled,
+            onDismissRequest = { expanded = false },
+            // The queue ⋮ stays an anchored Material 3 popup — it is not the
+            // track overflow menu and keeps its own actions — but it draws into
+            // the SAME frosted surface and rows, so the Material container
+            // (the old opaque slab) is turned off rather than painted over.
+            shape = DhunShapes.large,
+            containerColor = Color.Transparent,
+            tonalElevation = DhunSpacing.zero,
+            shadowElevation = DhunSpacing.zero,
+        ) {
+            TrackMenuSurface(
+                artworkUrl = track.thumbnailUrl,
+                // An anchored menu is sized to its actions: the compact menu
+                // width, never the pane it popped out of.
+                modifier = Modifier.width(DhunSpacing.menuMinWidth),
+                shape = DhunShapes.large,
+            ) {
+                MenuActionRow(
+                    label = "Move up",
+                    enabled = index > 0,
+                    onClick = {
+                        expanded = false
+                        viewModel.moveQueueItem(index, index - 1, queue)
+                    },
+                )
+                MenuActionRow(
+                    label = "Move down",
+                    enabled = index < queue.lastIndex,
+                    onClick = {
+                        expanded = false
+                        viewModel.moveQueueItem(index, index + 1, queue)
+                    },
+                )
+                MenuActionRow(
+                    label = "Remove from queue",
+                    destructive = true,
+                    onClick = {
+                        expanded = false
+                        viewModel.removeQueueItem(index, queue)
+                    },
+                )
+            }
         }
     }
 }

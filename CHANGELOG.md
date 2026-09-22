@@ -24,6 +24,78 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Verified — PR #114 CI on `80fe28b` (2026-09-22)
+
+- Code head **`80fe28b`** (three fix commits — `cd11056` album cover
+  fallback, `f70124f` page backdrops, `5d5f77e` compact ⋮ menu — plus the
+  changelog commit) was watched to completion and is **green**: push CI
+  **35692075343**, PR CI **35692215784**, Build APK **35692215748**,
+  test-release **35692215751** (`apk` + `msi` success, hosted install-over
+  included; `aab` / `publish` / `release_draft` skipped because a PR cannot
+  publish). Every CI step passed, including `:shared:jvmTest` (the new
+  `ParserFixtureTest` and `TrackMenuPolicyTest` cases), the Android
+  Robolectric suite, `assembleDebug`, and desktop `compileKotlinJvm` +
+  `jvmTest`.
+- The run's only annotation is the standing `ubuntu-latest` → Ubuntu 26
+  migration notice (begins 2026-10-19); no Kotlin error annotations, no
+  Node-20 deprecation warning on this head. Log blobs still EOF in-sandbox
+  (257 bytes) — the annotations API and the step conclusions are the readout.
+- Not a device verdict: whether the menu reads as a compact menu on a phone,
+  whether album-page body text stays readable over a bright cover, and whether
+  album playback really paints artwork end to end are the user's gate after the
+  post-merge republish. The rolling `test` download still targets **`03a27b1`**
+  (PR #113) at this writing.
+
+### Fixed — album artwork on playback, album/artist page backdrops, one compact ⋮ menu (2026-09-22)
+
+Three separate visual defects, fixed independently (no polish pass over the
+accepted glass/scrim work, and no change to the dark surface hexes, the
+Android mini player, the phone dock, or the Home / Search / Library cards).
+
+- **Album tracks carry the album cover.** YTM ships plenty of album pages with
+  no per-row thumbnail at all — the cover exists only on the header's
+  `croppedSquareThumbnailRenderer`. `parseAlbumPage` read it for the page but
+  `parseBrowseSongRow` only called `thumbnailOf()`, so album rows queued
+  artwork-less tracks: playing a song from an album left the full player, the
+  mini player and the shell blur with nothing to show, while Home and Search
+  playback (rows that do carry art) looked fine. Rows now inherit the header
+  cover when they have none — a pass-through, never a guess: a page with
+  neither still yields `thumbnailUrl = null`. Album rows also render that
+  artwork now (48dp, the playlist-row size) instead of only a track number.
+  Regression: `browse-album-anato-no-row-thumbs.json` — the live album fixture
+  with its six row thumbnails removed — plus `ParserFixtureTest` pins that row
+  art still wins where a page ships it and that no URL is invented.
+- **The album and artist pages sit on their own blurred artwork.** Both painted
+  an opaque `DhunColors.background` over the whole page, so the shell's
+  `NowPlayingBackdrop` never showed and the album header was a flat
+  `ArtworkColorExtractor` seed tint rather than blurred cover art. Both are
+  transparent now and paint `PageArtworkBackdrop` — a thin wrapper on the
+  *same* recipe and numbers as the shell backdrop (list tier, 64dp blur, dim
+  0.40, scrim 0.50/0.32/0.44/0.62), pointed at the album cover / artist
+  portrait, so the page glows with its own artwork **including while nothing is
+  playing**. No accepted brightness or scrim value was retuned; the artist
+  hero's fade ends on the existing lyrics-card veil (0.62) instead of an opaque
+  slab so the seam into that backdrop stays soft, and the album header wash
+  fades to transparent. A page with no artwork — or a platform that cannot
+  really blur — draws nothing and keeps the shell backdrop / base colour.
+- **Every ⋮ is the same compact menu.** `TrackOverflowDialog` (mounted once
+  from `DhunAppShell`, so the full player, playlist, album, artist, Home,
+  Search and Library all open it) was a centered Material sheet: the old opaque
+  `GlassCard` at 280–380dp, double padding, a 52dp header, a divider, ~48dp
+  action rows and a separate Close button — a long old slab on both Android and
+  Windows. It is a menu now: the track's own artwork blurred once under the
+  lyrics-card veil (`LyricsMaterial`) on an opaque `surface` base, Material's
+  280dp menu ceiling, 44dp rows, one line of padding, no divider and no Close
+  button (tap outside or Back dismisses). Same actions, same order, same
+  visibility rules and same behaviour — extracted as pure `TrackMenuPolicy` /
+  `TrackMenuAction` and pinned by `TrackMenuPolicyTest`; only the labels lost
+  their parenthetical target names ("Go to artist (Queen)" → "Go to artist"),
+  which is what stretched the old sheet, and the menu header already names the
+  track and artist. The queue row's ⋮ in `PlayerTabs` stays an anchored
+  Material 3 `DropdownMenu` with its own actions, but its Material container is
+  turned off and it draws into the same `TrackMenuSurface` / `MenuActionRow` —
+  one menu system, not two.
+
 ### Verified — PR #113 pre-merge CI on `d2a9045` (2026-09-22)
 
 - Code head **`d2a9045`** (glass `4166633` + the scrim follow-up) is green:

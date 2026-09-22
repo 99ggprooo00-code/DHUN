@@ -1,5 +1,107 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-22 — Album playback had no artwork; album/artist pages had no backdrop; every ⋮ was the old sheet (`arena/01a0c772-dhun`)
+
+**Ask.** Three visual defects, fixed *separately* — explicitly not one polish
+pass — with four standing constraints: do not regress the Android mini player
+or the accepted Home / Search / Library cards, do not lift the dark surface
+hexes, do not retune the accepted brightness/scrim, and do not discard the
+uncommitted edits in `LyricsMaterial.kt` / `FullPlayer.kt`.
+
+**Environment note first.** This checkout was **clean** at `03a27b1` (PR #113's
+merge). There were no uncommitted edits in `LyricsMaterial.kt` or
+`FullPlayer.kt` to preserve — that work is already on `main` — and neither file
+is touched by this session. No JDK and no Maven egress, so CI stayed the
+compiler; `scripts/validate_fixtures.py` (35 files) and the 29
+packaging/CI-contract tests were the only local gates.
+
+**Defect 1 — album playback artwork.** `parseBrowseSongRow` called
+`thumbnailOf(item)` and nothing else. YTM ships many album pages with **no**
+per-row `musicThumbnailRenderer`; the cover exists only on the header's
+`croppedSquareThumbnailRenderer`, which `parseAlbumPage` already read *for the
+page*. So the tracks `AlbumViewModel` queues carried `thumbnailUrl = null` and
+the full player, mini player and shell blur — all of which read that field —
+had nothing, while Home / Search rows (which do carry art) looked fine. Fix:
+the row parser takes a `fallbackThumbnail`, the album page reads the header
+cover once (`coverUrl`) and passes it to **both** row-collection paths (the
+Songs shelf *and* the tree-wide `collectObjects` fallback). Row art still wins;
+a page with neither yields `null` — no invented URL to fetch, fail and paint a
+placeholder over the player. `AlbumTrackRow` now renders that art at the
+playlist-row size (48dp `touchTarget`, `DhunShapes.medium`) beside the number.
+
+**Defect 2 — flat album/artist pages.** Both screens painted an opaque
+`DhunColors.background` over the whole page. That hid the shell's
+`NowPlayingBackdrop` completely and left the album header an
+`ArtworkColorExtractor` *seed* tint rather than blurred cover art — i.e. the
+only two screens in the app that could not glow. Fix: `PageArtworkBackdrop`, a
+**wrapper** on `NowPlayingBackdrop` so the recipe and every pinned number
+(`NowPlayingBackdropPolicy`: list tier, 64dp blur, dim 0.40, scrim
+0.50/0.32/0.44/0.62) are the shell's, pointed at the page's own artwork. Both
+pages are transparent now and paint it, so they glow **while nothing is
+playing** — exactly when the shell backdrop has nothing. The album header wash
+fades to transparent (its opaque second stop was what hid the backdrop); the
+artist parallax hero's fade ends on the existing lyrics-card veil (0.62) rather
+than an opaque slab, so the sharp→blurred seam stays soft and the name stays
+readable. Nothing was retuned to get there, and no fallback changed: no
+artwork, or no real blur (`supportsRealtimeBlur`), draws nothing.
+
+**Defect 3 — the ⋮ was still the old UI, and long.** One dialog
+(`TrackOverflowDialog`, mounted once from `DhunAppShell`) serves the full
+player, playlist, album, artist, Home, Search and Library. It was a centered
+Material sheet on the old opaque `GlassCard`: 280–380dp, double padding, a 52dp
+header, a divider, ~48dp rows and a separate Close button — ~470dp of slab on
+both platforms. Fix: frosted artwork material (the track's own cover blurred
+once under the lyrics-card veil, `LyricsMaterial`, on an opaque
+`DhunColors.surface` base — the same rule `GlassCard(opaqueBase = true)` exists
+for, because a menu floats over a dimmed scrim), new `DhunSpacing.menu*` tokens
+(Material's 280dp ceiling, 220dp floor, 44dp rows, 40dp header thumbnail), no
+divider, no Close button (tap outside / Back dismisses, unchanged). Tallest
+possible menu ≈ 340dp. Actions, order, visibility rules and the
+dismiss-then-navigate ordering are unchanged and are now pure data —
+`TrackMenuAction` / `TrackMenuPolicy` — pinned by `TrackMenuPolicyTest`. Only
+the labels lost their parentheticals ("Go to artist (Queen)" → "Go to artist",
+"Download for offline" → "Download"): the header already names the track and
+artist, and the long label was what stretched the sheet. The queue row's ⋮
+stays an anchored Material3 `DropdownMenu` with its own actions, but its
+container is turned off (transparent, zero tonal/shadow elevation) and it draws
+into the same `TrackMenuSurface` / `MenuActionRow` — one menu system, not two.
+
+**Traps worth remembering.**
+- Material3's `DropdownMenu` sizes its popup column with
+  `width(IntrinsicSize.Max)` (verified against the CMP **1.8.2** source, since
+  the sandbox has no compiler). A child that fills max width would therefore
+  stretch the menu to the pane; giving the frosted surface a *fixed* 220dp
+  width short-circuits the intrinsic query and keeps it menu-sized.
+- `DropdownMenu(shape=, containerColor=, tonalElevation=, shadowElevation=)`
+  exists in the pinned material3 — but `border` is newer and was not used.
+- `internal` commonMain declarations are visible to `:shared`'s `jvmTest`
+  across packages (precedent: `PlayerSheetLayoutTest` uses `dev.dhun.design`'s
+  internal layout functions), which is what lets a pure policy test pin a menu
+  that lives in `ui/components`.
+- Fixtures live in **two** roots (`tests/fixtures` and
+  `shared/src/jvmTest/resources/fixtures`); `validate_fixtures.py` checks both,
+  so a new regression fixture must be written twice and byte-identical.
+
+**CI.** Head `80fe28b` watched green: push **35692075343**, PR **35692215784**
+(all 12 steps, including `:shared:jvmTest`, the Robolectric suite,
+`assembleDebug`, desktop compile + `jvmTest`), Build APK **35692215748**,
+test-release **35692215751** (apk + msi; publish skipped — PR). Only
+annotation: the standing `ubuntu-latest` → Ubuntu 26 notice. Log blobs EOF
+(257 bytes) as usual; annotations + step conclusions are the readout.
+
+**Incidental observation, not caused by this work and not fixed here.** The daily
+`extraction-health` drill (`schedule: cron '17 4 * * *'` UTC) did **not** fire on
+2026-09-22: the newest run of any event is still **35561269411**
+(2026-09-21T04:30:45Z, `414cd79`, failing `ENVIRONMENT_BLOCKED` as the drill
+always does), nothing queued at 04:17 UTC, and the workflow timing API reports no
+`last_run_started_at`. PR #111's workflow edit reached `main` at `7fcadbe`
+~02:58 UTC — between the two fires — so the wedged schedule registration the
+previous handoff predicted is what the run list shows. Left alone deliberately:
+no workflow file is touched by this PR, agents get 403 on `workflow_dispatch`,
+and a re-registration cannot be verified until the next 04:17 UTC. It is the
+next session's first task (attempt-5 fresh-file re-registration); see
+`.ai/KNOWN_LIMITATIONS.md`.
+
 ## 2026-09-22 — Glass / scrim follow-up: surfaces were not the darkness (`arena/01a0c716-dhun`)
 
 **Ask.** After the lyrics-veil / acrylic mini-player pass, the user asked to

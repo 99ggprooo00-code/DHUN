@@ -55,6 +55,8 @@ import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
+import dev.dhun.design.components.LyricsMaterialPolicy
+import dev.dhun.design.components.PageArtworkBackdrop
 import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.SectionShimmer
@@ -66,6 +68,14 @@ import dev.dhun.presentation.browse.ArtistViewModel
  * Artist page (Phase 09): parallax artwork header that collapses into a
  * glass toolbar on scroll, shuffle/radio actions, top songs (ordered list,
  * plays as queue), albums & singles carousels, related artists, about card.
+ *
+ * The page is transparent and paints its own blurred portrait as the backdrop
+ * ([PageArtworkBackdrop]) — the same treatment Home / Search / Library get
+ * from the shell — so the content below the sharp parallax header sits on the
+ * artist's artwork instead of on a flat colour. The header's fade ends on the
+ * lyrics-card veil for that reason: it used to end on an opaque
+ * `DhunColors.background`, which hid the backdrop and drew a hard band where
+ * the header met the list.
  */
 @Composable
 fun ArtistScreen(
@@ -87,7 +97,16 @@ fun ArtistScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(DhunColors.background)) {
+    Box(modifier = modifier.fillMaxSize()) {
+        // The artist page is transparent like Home / Search / Library and
+        // paints its own blurred portrait as the backdrop, so the page below
+        // the sharp parallax header glows with the artist's artwork instead of
+        // a flat colour. No portrait (or no real blur on this platform) draws
+        // nothing here and the shell backdrop / base colour stays the fallback.
+        PageArtworkBackdrop(
+            artworkUrl = (state as? ArtistUiState.Success)?.page?.artist?.thumbnailUrl,
+            modifier = Modifier.fillMaxSize(),
+        )
         when (val s = state) {
             is ArtistUiState.Loading -> ArtistSkeleton()
             is ArtistUiState.Error -> ErrorView(
@@ -209,7 +228,13 @@ private fun ArtistContent(
                                 listOf(
                                     DhunColors.background.copy(alpha = 0.15f),
                                     DhunColors.background.copy(alpha = 0.05f),
-                                    DhunColors.background,
+                                    // Fades into the page backdrop instead of
+                                    // ending on an opaque slab: below the hero
+                                    // sits the same portrait, blurred
+                                    // ([PageArtworkBackdrop]), so the veil the
+                                    // lyrics material uses keeps the seam soft
+                                    // and the name still readable.
+                                    DhunColors.background.copy(alpha = LyricsMaterialPolicy.LYRICS_VEIL_BOTTOM),
                                 ),
                             ),
                         ),

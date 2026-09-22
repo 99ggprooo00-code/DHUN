@@ -34,6 +34,26 @@ Phase 07 delivers the primary discovery and browsing interface of DHUN:
      - "Toggle favorite" (♥/♡ synced with `LibraryRepository`).
      - "Go to artist" & "Go to album" (switches to search tab and executes query).
    - Track tap anywhere in Home or Search queues the entire context playlist and begins playback.
+
+   > **2026-09-22 update (session `arena/01a0c772-dhun`) — the list above is the
+   > Phase-07 record; this is what the menu is now.** `TrackOverflowDialog` is a
+   > compact frosted **menu**, not a centered sheet: Material's 280dp menu
+   > ceiling (`DhunSpacing.menuMinWidth`/`menuMaxWidth`), 44dp rows, a 40dp
+   > header thumbnail, no divider and no Close button (tap outside or Back
+   > dismisses). Its material is the track's own artwork blurred once under the
+   > lyrics-card veil (`LyricsMaterial`) over an opaque `surface` base, so the
+   > dimmed page cannot read through the labels. Actions, order, behaviour and
+   > visibility rules are unchanged and are now pure data — `TrackMenuAction` /
+   > `TrackMenuPolicy`, pinned by `TrackMenuPolicyTest`; only the labels lost
+   > their parentheticals ("Add to playlist…" → "Add to playlist", "Go to artist
+   > (Queen)" → "Go to artist", "Download for offline" → "Download"). "Toggle
+   > favorite" left this menu earlier: it is a dedicated button beside Shuffle
+   > in the FullPlayer transport. This one dialog is mounted from `DhunAppShell`,
+   > so the full player, playlist / album / artist pages, Home, Search and
+   > Library all open it. The queue row's ⋮ (`PlayerTabs.kt`) stays an anchored
+   > Material 3 `DropdownMenu` with its own actions (Move up / Move down /
+   > Remove from queue) but draws into the same `TrackMenuSurface` and
+   > `MenuActionRow` — one menu system, not two.
 4. **Shared Shell Integration (`DhunAppShell`):**
    - Docked bottom `MiniPlayerBar` with 1dp progress line, live track info, and playback transport controls.
    - Glass bottom navigation bar with Home, Search, and Catalog tabs.

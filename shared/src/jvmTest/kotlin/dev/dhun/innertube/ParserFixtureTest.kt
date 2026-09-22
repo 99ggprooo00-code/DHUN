@@ -232,6 +232,93 @@ class ParserFixtureTest {
     }
 
     @Test
+    fun albumRowsWithoutTheirOwnThumbnailInheritTheAlbumCover() {
+        // `browse-album-anato-no-row-thumbs.json` is the live album page above
+        // with all six per-row `thumbnail` renderers removed — the shape YTM
+        // really ships for plenty of albums, where the cover only exists on the
+        // header's `croppedSquareThumbnailRenderer`. Queued rows must inherit
+        // it: without that, playing an album gave the full player, the mini
+        // player and the shell backdrop no artwork at all, while Home and
+        // Search playback (rows that do carry art) looked fine.
+        val album = parseAlbumPage(obj(fixture("browse-album-anato-no-row-thumbs.json")), "MPREb_anato")
+        assertEquals(6, album.tracks.size)
+        val cover = assertNotNull(album.thumbnailUrl, "the header cover must still parse")
+        assertTrue(cover.contains("anato_544"), "cover: $cover")
+        album.tracks.forEach { track ->
+            assertEquals(cover, track.thumbnailUrl, "row ${track.id} lost the album cover")
+        }
+        // Everything else about the page is untouched by the fallback.
+        assertEquals("A Night at the Opera (Deluxe Remastered Version)", album.title)
+        assertEquals("Death on Two Legs", album.tracks[0].title)
+        assertEquals(355, album.tracks[5].durationSeconds)
+    }
+
+    @Test
+    fun albumRowsKeepTheirOwnThumbnailWhenThePageShipsOne() {
+        // The fallback must not overwrite real per-row art — this is the
+        // fixture above *with* its row thumbnails.
+        val album = parseAlbumPage(obj(fixture("browse-album-anato.json")), "MPREb_anato")
+        assertEquals(6, album.tracks.size)
+        assertTrue(album.tracks.all { !it.thumbnailUrl.isNullOrBlank() })
+        assertTrue(
+            album.tracks.none { it.thumbnailUrl == album.thumbnailUrl },
+            "row art must stay row art, not the header cover",
+        )
+        assertTrue(album.tracks.first().thumbnailUrl?.contains("anato_track_0") == true)
+        assertTrue(album.tracks.last().thumbnailUrl?.contains("anato_track_5") == true)
+    }
+
+    @Test
+    fun albumWithNoArtworkAnywhereInventsNoThumbnail() {
+        // Neither the rows nor the header carry art: the tracks stay
+        // thumbnail-less rather than getting a fabricated URL (which would
+        // then be fetched, fail, and paint a placeholder over the player).
+        val json = """
+            {
+              "header": {
+                "musicResponsiveHeaderRenderer": {
+                  "title": {"runs": [{"text": "No Art Album"}]},
+                  "subtitle": {"runs": [{"text": "Someone"}, {"text": " \u2022 Album \u2022 2020"}]}
+                }
+              },
+              "contents": {
+                "twoColumnBrowseResultsRenderer": {
+                  "secondaryContents": {
+                    "sectionListRenderer": {
+                      "contents": [
+                        {
+                          "musicShelfRenderer": {
+                            "contents": [
+                              {
+                                "musicResponsiveListItemRenderer": {
+                                  "flexColumns": [
+                                    {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Track One"}]}}},
+                                    {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Someone"}, {"text": " \u2022 3:00"}]}}}
+                                  ],
+                                  "playlistItemData": {"videoId": "vid_one"}
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+        val album = parseAlbumPage(obj(json), "MPREb_no_art")
+        assertEquals("No Art Album", album.title)
+        assertEquals("Someone", album.artistName)
+        assertEquals(1, album.tracks.size)
+        assertEquals("vid_one", album.tracks[0].id)
+        assertEquals(180, album.tracks[0].durationSeconds)
+        assertNull(album.thumbnailUrl)
+        assertNull(album.tracks[0].thumbnailUrl)
+    }
+
+    @Test
     fun parsesPlaylistPageFixture() {
         val playlist = parsePlaylistPage(obj(fixture("browse-playlist-todays-hits.json")), "VLPL_todays_hits")
         assertEquals("VLPL_todays_hits", playlist.id)

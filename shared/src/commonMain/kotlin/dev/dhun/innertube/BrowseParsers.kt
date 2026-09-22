@@ -110,8 +110,26 @@ private fun carouselHeaderTitle(shelf: JsonObject): String? =
     shelf.obj("header")?.obj("musicCarouselShelfBasicHeaderRenderer")?.shelfTitle()
         ?: shelf.obj("header")?.obj("musicImmersiveCarouselShelfBasicHeaderRenderer")?.shelfTitle()
 
-/** A browse song row (musicResponsiveListItemRenderer with playlistItemData). */
-private fun parseBrowseSongRow(item: JsonObject, fallbackArtist: String? = null): Track? {
+/**
+ * A browse song row (musicResponsiveListItemRenderer with playlistItemData).
+ *
+ * [fallbackArtist] and [fallbackThumbnail] are page-level values a row may
+ * inherit when it carries none of its own. The thumbnail fallback exists for
+ * album pages: YTM ships many of them with **no** per-row
+ * `musicThumbnailRenderer` at all — the cover lives only on the page header
+ * (`croppedSquareThumbnailRenderer`). Without it, album rows queued
+ * artwork-less tracks, so the full player, the mini player and the shell
+ * backdrop had nothing to show even though the cover was one field away.
+ *
+ * The fallback is a pass-through, never a guess: a page with neither a row
+ * thumbnail nor a header cover still yields `thumbnailUrl = null`, so no
+ * placeholder URL is invented.
+ */
+private fun parseBrowseSongRow(
+    item: JsonObject,
+    fallbackArtist: String? = null,
+    fallbackThumbnail: String? = null,
+): Track? {
     val videoId = item.searchVideoId()
         ?: (descend(item, listOf("navigationEndpoint", "watchEndpoint", "videoId")) as? JsonPrimitive)
             ?.contentOrNull
@@ -133,7 +151,8 @@ private fun parseBrowseSongRow(item: JsonObject, fallbackArtist: String? = null)
         albumName = parts.getOrNull(1),
         albumId = idsCol2.second ?: idsCol1.second,
         durationSeconds = trailingDuration(item),
-        thumbnailUrl = thumbnailOf(item),
+        // Row art wins; the page's own cover is the fallback (see KDoc).
+        thumbnailUrl = thumbnailOf(item) ?: fallbackThumbnail,
     )
 }
 
@@ -282,6 +301,11 @@ internal fun parseArtistPage(root: JsonObject, browseId: String): ArtistPage {
 internal fun parseAlbumPage(root: JsonObject, browseId: String): AlbumDetail {
     val header = pageHeader(root)
     val title = header?.firstRunText("title", "runs") ?: "Album"
+    // Read the header cover ONCE: it is both the album's own `thumbnailUrl`
+    // and the artwork every track row inherits when the page shipped no
+    // per-row thumbnail — so the tracks that get queued from this page carry a
+    // real URL and the player / mini player / shell blur can all show it.
+    val coverUrl = thumbnailsLastUrl(header)
 
     val subtitleRuns = mutableListOf<Pair<String, String>>()
     collectBrowseRuns(header?.obj("subtitle"), subtitleRuns)
@@ -313,12 +337,14 @@ internal fun parseAlbumPage(root: JsonObject, browseId: String): AlbumDetail {
         val shelf = section.obj("musicShelfRenderer") ?: continue
         val rows = shelf.arr("contents").orEmpty()
         sectionSongs += rows.mapNotNull { (it as? JsonObject)?.obj("musicResponsiveListItemRenderer") }
-            .mapNotNull { parseBrowseSongRow(it, fallbackArtist = artistName) }
+            .mapNotNull { parseBrowseSongRow(it, fallbackArtist = artistName, fallbackThumbnail = coverUrl) }
     }
     if (sectionSongs.isEmpty()) {
         val allRows = mutableListOf<JsonObject>()
         root.collectObjects("musicResponsiveListItemRenderer", allRows)
-        sectionSongs += allRows.mapNotNull { parseBrowseSongRow(it, fallbackArtist = artistName) }
+        sectionSongs += allRows.mapNotNull {
+            parseBrowseSongRow(it, fallbackArtist = artistName, fallbackThumbnail = coverUrl)
+        }
     }
     val tracks = sectionSongs.distinctBy { it.id }
 
@@ -349,7 +375,7 @@ internal fun parseAlbumPage(root: JsonObject, browseId: String): AlbumDetail {
         year = year,
         trackCountText = trackCount,
         durationText = durationText,
-        thumbnailUrl = thumbnailsLastUrl(header),
+        thumbnailUrl = coverUrl,
         description = description,
         tracks = tracks,
         moreByArtistBrowseId = moreBy,
