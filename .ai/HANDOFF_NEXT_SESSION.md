@@ -5,21 +5,25 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — endless radio merged, 2026-09-21, session `arena/01a0c3b7-dhun`
+## CURRENT STATE — endless radio MERGED, 2026-09-22, session `arena/01a0c3b7-dhun`
 
 This section supersedes the statuses below it.
 
-**PR #109 (endless radio) — the next session starts HERE.** Implementation
-landed in `62de262`; CI-driven fix commits followed (`ad3d614`,
-`c5b85e5`, `063040d` — compile/test details; `4cd3e41`, `f0edb97` — a
-real premature-refill race the test suite exposed: the station was
-marked active BEFORE the queue swap landed, so the monitor could fire a
-refill over the old one-song queue and consume/null the continuation
-chain; the session now starts only after the swap). Docs updated in the
-pre-merge docs commit. Merged into `main` under this session's standing
-merge-without-asking directive — merge SHA and post-merge CI recorded in
-the ROADMAP top block (re-pin it here if it landed after this writing). The rolling `test` release
-republished on merge carries the feature; the user's hardware verdict
+**PR #109 (endless radio) — the next session starts HERE — MERGED.**
+Implementation landed in `62de262`; CI-driven fix commits followed
+(`ad3d614`, `c5b85e5`, `063040d` — compile/test details; `4cd3e41`,
+`f0edb97` — a real premature-refill race the test suite exposed: the
+station was marked active BEFORE the queue swap landed, so the monitor
+could fire a refill over the old one-song queue and consume/null the
+continuation chain; the session now starts only after the swap;
+`638a442` — probe conflation, one advance = at most one refill).
+**Merged into `main` as `500b6a8`** (2026-09-22T02:00:55Z) under this
+session's standing merge-without-asking directive. **Post-merge main CI
+green** (CI 35677895454 · Build APK 35677895471 · test-release
+35677895534). **Rolling `test` re-published** 2026-09-22T02:05:41Z at
+target `500b6a8cb30bcc590a716057add308fe90518ef5`: **APK 18,350,835 B,
+MSI 112,914,432 B** — the byte sizes that identify the endless-radio
+build when the user re-downloads. The user's hardware verdict
 (re-download + 30-min station soak, watching for a gap at the first
 refill) is the open gate. The station chain (`RadioSession`) is
 in-memory by design — a cold start re-seeds a fresh `/next` from the
@@ -28,10 +32,12 @@ KNOWN_LIMITATIONS).
 
 **Sandbox notes that held this session (no JDK, logs EOF, annotations
 API is the readout) are unchanged** — see the DEBUG_LOG entry
-"Endless radio: implementation + 6 regression tests" for the three
-compiler/test gotchas CI caught (var smart-cast, `args![0]` K2 parser
-cascade, 3-arg `assertEquals` not resolving in Android tests) and the
-fake-page-threshold test-design slip.
+"Endless radio: implementation + 6 regression tests" for the compiler/
+test gotchas CI caught (var smart-cast, `args![0]` K2 parser cascade,
+3-arg `assertEquals` not resolving in Android tests, the
+fake-page-threshold test-design slip) AND the premature-refill race the
+test suite exposed in the VM itself (active-before-swap window + probe
+conflation) — plus the sandbox ref-reset reconciliation note.
 
 ## PREVIOUS STATE — post-merge sync, 2026-09-21, session `arena/01a0c2c7-dhun`
 
