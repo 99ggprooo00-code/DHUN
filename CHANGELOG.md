@@ -24,6 +24,28 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Verified — PR #113 pre-merge CI on `d2a9045` (2026-09-22)
+
+- Code head **`d2a9045`** (glass `4166633` + the scrim follow-up) is green:
+  push CI **35685053236**, PR CI **35685055740**, Build APK **35685055672**,
+  test-release **35685055772** (apk + msi, install-over included; publish
+  skipped — PR). Not a device verdict, and not yet the rolling `test`
+  download (that still targets `7fcadbe` until this PR merges).
+
+### Changed — lighter artwork scrims on the shell and the full player (2026-09-22)
+
+- Home / Search / Library and the full player share the same dark surface (`#161616`). Another surface step was measured and not taken: artwork-derived controls are 3.12:1 on `#1E1E1E`, and `#222222` drops the worst case to 2.97:1, under the WCAG 1.4.11 pin in `DhunThemeContrastTest`. Light theme untouched.
+- The overlays that were still at the old darkness are what actually hid the artwork. Full-player black dim 0.52/0.16 → 0.40/0.08. Ambient scrim stops lowered again; the bottom stop sits on the ≥0.85 floor (`PlayerSheetLayoutTest`), not under it.
+- Shell backdrop dim 0.45 → 0.40 (the light end of the 0.4–0.75 band) and scrim stops 0.62/0.42/0.58/0.78 → 0.50/0.32/0.44/0.62, so a playing Home/Search/Library reads closer to the player without giving a bright cover a clear field under body text.
+- List thumbnails stay 64dp and borderless (`ArtworkImage` draws no stroke). Wrapping rows grow with the thumb; fixed 72dp queue rows still use the 48dp touch target, so nothing clips.
+
+### Changed — lyrics-card material on chips, the dock, Related, and an acrylic mini-player (2026-09-22)
+
+- Like / more / collapse / back / queue-close discs no longer paint the near-black `glassStrong` fill. They use the lyrics-card veil (background at 0.42 → 0.62) so the blurred artwork shows through.
+- On Home / Search / Library, only the band under the mini-player (the tab bar) uses that veil. List cards above the dock are unchanged.
+- The Related list in the full player carries one blurred-artwork layer plus that veil. Queue rows are unchanged.
+- The phone dock splits its veil: the mini-player row is a lighter acrylic (milky frost, well under the old ~72% black slab) and the nav band below it uses the lyrics veil. Rail and two-pane mini-players use the same acrylic card. Still Material 3 + one blur per track — not Liquid Glass, not a platform Acrylic API.
+
 ### Changed — CI hygiene (Stage S2): drill trigger retirement + Node-24 actions (2026-09-22, PR #111)
 
 - **`extraction-health.yml`:** the inert `push: branches: [arena/01a0b224-dhun]`
@@ -103,11 +125,12 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   so Home/Search/Library sit closer to the full player's backdrop brightness.
   Placeholders and shimmer follow; glass, text, scrim and accent tokens are
   unchanged; the light theme is untouched.
-- **The full player lets the artwork show through more**: the backdrop dim
-  dropped from 0.52/0.16 to 0.42/0.10 and the ambient scrim's stops were
-  lowered (bottom stop 0.92 → 0.86, still inside the ≥0.85 legibility pin).
-  The shell's blurred-artwork backdrop dim/scrim were lightened the same way
-  (0.55 → 0.45; stops 0.62/0.42/0.58/0.78 → 0.50/0.32/0.44/0.62).
+- **The full player lets the artwork show through more**: the ambient scrim's
+  stops were lowered (bottom stop 0.92 → 0.86, still inside the ≥0.85
+  legibility pin) and the shell backdrop dim dropped 0.55 → 0.45. The player
+  black dim stayed 0.52/0.16 and the shell scrim stops stayed
+  0.62/0.42/0.58/0.78 — those two were written here as already lowered, but
+  they landed in the 2026-09-22 scrim follow-up above.
 - **Artwork-derived control accents were re-floored for the lighter surfaces**
   (`DARK_LEGIBILITY_FLOOR` 0.42 → 0.45): at 0.42 the darkest artwork primaries
   measured 2.85:1 against the new surface, under the WCAG 1.4.11 3:1 floor;

@@ -5,9 +5,65 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — PR #109 merged + verified; S2 CI hygiene executed, 2026-09-22, session `arena/01a0c6dd-dhun`
+## CURRENT STATE — PR #113 glass/scrim CI-green, docs before merge, 2026-09-22, session `arena/01a0c716-dhun`
 
 This section supersedes the statuses below it.
+
+**PR #113 is the session PR** (`arena/01a0c716-dhun` → `main`). Code head
+**`d2a9045`** (glass `4166633`, scrim follow-up `d2a9045`) was watched to
+completion and is green: push CI **35685053236**, PR CI **35685055740**,
+Build APK **35685055672**, test-release **35685055772** (apk 2m49s, msi
+3m40s with install-over/userdata; `aab` / `publish` / `release_draft`
+skipped — PR cannot publish). User authorized: finish verification, update
+documentation, only then merge. This docs commit must itself be CI-green
+before that merge. Post-merge CI and the new rolling `test` identity are
+recorded in the PR comment the same turn — never pre-claimed here.
+
+**What the user should see after they re-download the post-merge build
+(not the build they have now):**
+- Like / more / collapse / back / queue-close are no longer translucent
+  black discs. They use the lyrics-card veil.
+- Home / Search / Library: only the tab band under the mini-player uses
+  that veil. List cards above the dock are unchanged.
+- Mini-player (phone dock and rail / two-pane card) reads as lighter
+  acrylic, not the old ~72% black slab.
+- Full player lets more blurred artwork through (dim 0.40/0.08; ambient
+  scrim bottom on the 0.85 floor). Home/Search/Library backdrop dim 0.40,
+  scrim 0.50/0.32/0.44/0.62 — closer to the player, not a second surface
+  lift. Dark hexes stay `#161616` because `#1E1E1E` is 3.12:1 and
+  `#222222` is 2.97:1 on artwork-derived controls.
+- Related list uses the lyrics material. Queue rows do not.
+- Thumbs stay 64dp and borderless. Light theme untouched.
+- Still Material 3 blur + a veil. Not Liquid Glass.
+
+**Do not download yet if you want this look.** Rolling `test` right now
+targets **`7fcadbe`** (PR #111 merge), published **2026-09-22T02:58:26Z**:
+APK **18,350,835 B**, MSI **112,914,432 B**. That build is endless radio +
+the earlier polish, not #113. After merge, confirm the release
+`target_commitish` moved off `7fcadbe` before installing. Byte size alone
+will not prove it — the APK has stayed 18,350,835 B across recent publishes.
+
+**S2 leftover, not this PR:** the 2026-09-22 04:17 UTC drill had not
+appeared when these docs were written (latest schedule **35561269411**,
+2026-09-21). If it never fired, the #111 workflow edit wedged the
+registration — attempt-5 fresh-file re-registration is the first task.
+`download-artifact@v6` still emits the Node-20 deprecation warning (publish
+job of **35681131229**). Ubuntu 26 migration begins 2026-10-19.
+
+**Sandbox:** no JDK. CI is the compiler. Asset/log blobs EOF; annotations
+API is the readout. Agent 403 on workflow_dispatch and issue writes.
+
+**After the user's eyeball:** radio soak (~30 min, first refill at ≤3 songs
+must be gapless), then the remaining #105 / S3 / S6 list in the sections
+below. No v0.1.0, no signing decision.
+
+## PREVIOUS STATE — PR #109 merged + verified; S2 CI hygiene executed, 2026-09-22, session `arena/01a0c6dd-dhun`
+
+Superseded by the CURRENT STATE section above. PR #111 has since merged as
+`7fcadbe` (post-merge CI 35681131215 / 35681131195 / 35681131229; rolling
+`test` republished 2026-09-22T02:58:26Z at that SHA). The "in flight" and
+"check PR #111's comment for the download identity" lines below were true
+when that session wrote them.
 
 **PR #109 (endless radio) is MERGED as `500b6a8` (2026-09-22T02:00:55Z) and
 post-merge VERIFIED on GitHub:** CI **35677895454** / Build APK

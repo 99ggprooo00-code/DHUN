@@ -98,7 +98,13 @@ object DhunSpacing {
     val iconSize = 24.dp
     val iconSizeSm = 18.dp
     val iconSizeLg = 32.dp
-    /** List-row thumbnail. 2026-09-21 UI polish: 56 → 64dp (rows wrap content — verified no rail/row clips). */
+    /**
+     * List-row thumbnail. 2026-09-21 UI polish: 56 → 64dp. Borderless —
+     * [dev.dhun.design.components.ArtworkImage] draws no stroke. Wrapping rows
+     * (TrackRow) grow with it. Fixed 72dp queue/playlist rows use the 48dp
+     * touch target, not this token, so a 64dp thumb never enters that slot.
+     * 64 + the 4dp queue inset still fits [listRowHeight] if a row ever does.
+     */
     val artworkThumb = 64.dp
     val artworkCard = 160.dp
     val artworkLarge = 280.dp

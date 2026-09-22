@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -63,6 +64,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
+import dev.dhun.design.components.LyricsMaterial
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
@@ -475,19 +477,43 @@ internal fun RelatedTabContent(
     val relatedState by viewModel.relatedState.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
     val current = currentTrack
-    if (current == null) {
-        EmptyView(
-            title = "Nothing playing",
-            message = "Play a track to discover related music.",
-            modifier = modifier.fillMaxSize(),
+    // The queue sheet paints an opaque base, so this list carries its own
+    // lyrics-card material (blurred playing artwork + the same veil) instead
+    // of sitting on near-black row fills.
+    LyricsMaterial(
+        artworkUrl = current?.thumbnailUrl,
+        modifier = modifier.fillMaxSize(),
+        shape = RectangleShape,
+        drawBorder = false,
+    ) {
+        if (current == null) {
+            EmptyView(
+                title = "Nothing playing",
+                message = "Play a track to discover related music.",
+                modifier = Modifier.fillMaxSize(),
+            )
+            return@LyricsMaterial
+        }
+        RelatedList(
+            viewModel = viewModel,
+            accent = accent,
+            current = current,
+            relatedState = relatedState,
         )
-        return
     }
+}
 
+@Composable
+private fun RelatedList(
+    viewModel: PlayerViewModel,
+    accent: Color,
+    current: Track,
+    relatedState: RelatedUiState,
+) {
     key(current.id) {
         when (val state = relatedState) {
             is RelatedUiState.Loading -> {
-                Column(modifier = modifier.fillMaxSize().padding(DhunSpacing.md)) {
+                Column(modifier = Modifier.fillMaxSize().padding(DhunSpacing.md)) {
                     repeat(5) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -512,7 +538,7 @@ internal fun RelatedTabContent(
                     message = "No recommendations were found for this track. Try another song or check again.",
                     actionLabel = "Check again",
                     onAction = viewModel::refreshRelated,
-                    modifier = modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
             is RelatedUiState.Error -> {
@@ -520,13 +546,13 @@ internal fun RelatedTabContent(
                     title = "Related tracks unavailable",
                     message = state.message,
                     onRetry = viewModel::refreshRelated,
-                    modifier = modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
             is RelatedUiState.Success -> {
                 val tracks = state.tracks
                 LazyColumn(
-                    modifier = modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = DhunSpacing.xs),
                 ) {
                     item(key = "start_radio") {
@@ -592,12 +618,6 @@ private fun RelatedRow(track: Track, accent: Color, onClick: () -> Unit, onAddTo
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.xs)
-            .clip(DhunShapes.large)
-            .background(
-                Brush.verticalGradient(
-                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.45f)),
-                ),
-            )
             .clickable(role = Role.Button, onClickLabel = "Play ${track.title}", onClick = onClick)
             .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,

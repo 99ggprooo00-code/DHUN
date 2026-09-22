@@ -236,7 +236,10 @@ data class DhunTokens(
     // every rung up 0x0C from the shipped 0A→2A ladder so Home/Search/Library
     // sit closer to the full player's backdrop brightness; WCAG gates in
     // DhunThemeContrastTest still pass, and the control-accent floor in
-    // ArtworkColors was retuned 0.42→0.45 to match)
+    // ArtworkColors was retuned 0.42→0.45 to match).
+    // Do not lift another rung: artwork-derived controls are 3.12:1 on
+    // #1E1E1E, and #222222 drops the worst case to 2.97:1 (under WCAG 1.4.11).
+    // Further brightness belongs on the artwork scrims, not these hexes.
     val background: Color = Color(0xFF161616),
     val surface: Color = Color(0xFF1E1E1E),
     val surfaceVariant: Color = Color(0xFF262626),

@@ -236,3 +236,17 @@ polish pass does not re-introduce them:
   height is converted to dp before use as the sheet's bottom inset, the sheet
   is floored at `DhunSpacing.queuePanelMinHeight`, and it paints an opaque
   base under the glass so rows read on a phone and on a Windows window.
+
+## Addendum — 2026-09-22 lyrics material (not Acrylic-as-primary)
+
+The near-black `glassStrong` disc read as a translucent black button.
+Like/more/back chips, the nav band under the mini-player, and the Related
+list now share the lyrics-card veil (`LyricsMaterialPolicy`: background alpha
+0.42 → 0.62 over a blur prepared once per track). List cards above the dock
+are unchanged — the veil is only for chrome that sits on the already-blurred
+player or shell backdrop, plus the Related sheet which paints its own blur
+because its base is opaque. The mini-player uses a lighter milky cut of that
+same recipe (`acrylicGlass`) — still Compose `Modifier.blur` + an M3 veil,
+not Windows Acrylic, not Liquid Glass, and not a replacement for the token
+system. `DhunColors.glassStrong` stays the token for the navigation rail and
+dialog composites.

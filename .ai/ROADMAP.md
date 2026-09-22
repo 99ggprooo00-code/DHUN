@@ -1,5 +1,75 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-22** · session **`arena/01a0c716-dhun`** · baseline `main`
+**`7fcadbe`** (PR #111, merged; post-merge CI green — see below). **This
+session's glass / scrim PR #113 is open.** Code head **`d2a9045`** is
+CI-green. This docs commit is the pre-merge record; it is not itself
+CI-green until the checks on this commit finish, and the merge / rolling
+`test` republish are not claimed here.
+
+**What shipped in PR #113 (not yet merged):**
+- `4166633` — lyrics-card veil on like/more/collapse/back/queue-close discs;
+  on Home / Search / Library only the tab band under the mini-player uses
+  that veil (list cards above the dock unchanged); Related list carries one
+  blurred-artwork layer plus that veil (queue rows unchanged); mini-player
+  is a lighter acrylic on the phone dock and on the rail / two-pane card.
+  Material 3 blur + a veil — not Liquid Glass, not a platform Acrylic API.
+- `d2a9045` — the overlays that were still at the old darkness. Full-player
+  black dim **0.52/0.16 → 0.40/0.08**. Ambient scrim stops lowered again;
+  the bottom stop sits on the **≥0.85** floor (`PlayerSheetLayoutTest`),
+  not under it. Shell backdrop dim **0.45 → 0.40** and scrim stops
+  **0.62/0.42/0.58/0.78 → 0.50/0.32/0.44/0.62**. Dark surface hexes stay at
+  the #107 lift (`background` `#161616`): another rung was measured and not
+  taken (artwork-derived controls are **3.12:1** on `#1E1E1E`, and
+  `#222222` drops the worst case to **2.97:1**, under the WCAG 1.4.11 pin).
+  Light theme untouched. List thumbnails stay **64dp** and borderless.
+
+**Verified CI on code head `d2a9045` (watched to completion, all success):**
+push CI **35685053236** (5m2s), PR CI **35685055740** (5m44s), Build APK
+**35685055672** (2m33s), test-release **35685055772** (apk 2m49s, msi 3m40s
+including the hosted install-over/userdata check). Shared domain, Android
+Robolectric, Android debug, probes, extraction-health classification,
+desktop compile and desktop JVM tests passed. `aab` / `publish` /
+`release_draft` skipped — those jobs are `main`-gated, so this PR did not
+touch the rolling `test` release.
+
+**Baseline already on `main` (verified this session, not this PR):** PR #111
+merged as **`7fcadbe`**. Post-merge CI green: CI **35681131215**, Build APK
+**35681131195**, test-release **35681131229**. Rolling `test` republished
+**2026-09-22T02:58:26Z**, target **`7fcadbe`**: `dhun-test.apk`
+**18,350,835 B**, `dhun-test.msi` **112,914,432 B** (sha256 sidecars
+present; hashes not re-read — asset blobs EOF in this sandbox). **That
+download does not contain #113.** The 2026-09-22 04:17 UTC drill watch was
+**not yet observed** (latest schedule still **35561269411**, 2026-09-21, on
+`414cd79`). A Node-20 deprecation annotation still fires on
+`actions/download-artifact@v6` (publish job of 35681131229) — the v6 bump
+did not clear that warning.
+
+**Last error:** none on `d2a9045`. No JDK in the sandbox — CI is the
+compiler. Visual look of the glass, the acrylic mini-player and the lighter
+scrims is **not** device-verified.
+
+**Exact next step:** CI green on this docs head, then merge PR #113 (user
+authorized: finish verification, update documentation, only then merge).
+Same turn: confirm post-merge CI and the new rolling `test` target / sizes
+in the PR comment. Do not pre-claim those. After publish, the user
+re-downloads and eyeballs both platforms (chips no longer black discs;
+dock acrylic; Home/Search/Library closer to the player; Related uses the
+lyrics material; queue rows unchanged; 64dp thumbs not clipped). Then the
+open S3/S6 list (radio soak, soaks, Windows native column) and the unread
+2026-09-22 drill result.
+
+**Files this session:** `FullPlayer.kt`, `NowPlayingBackdrop.kt`,
+`DhunAppearance.kt`, `DhunSpacing.kt`, `PlayerSheetLayoutTest.kt`,
+`NowPlayingBackdropPolicyTest.kt`, plus this docs pass. Session branch
+`arena/01a0c716-dhun`. No forks, no vendoring.
+
+---
+
+**Previous session's record (retained; superseded by the block above).**
+PR #111 has since merged as `7fcadbe` — the "in flight" wording below was
+true when that session wrote it.
+
 Updated **2026-09-22** · session **`arena/01a0c6dd-dhun`** · baseline `main`
 **`0d83216`** (the docs-only PR #110 post-merge re-pin on top of the PR #109
 merge `500b6a8` — post-merge states verified below) · **this session's S2
@@ -464,7 +534,7 @@ All are 🟨/⬜ — closing them is Stage S3.
 | Stage | Objective | Status | Gate |
 |---|---|---|---|
 | **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | ✅ **GREEN 2026-09-20.** Drill fires daily (runs **35421383687**/**35489268023** on `6f7fa48` → `ENVIRONMENT_BLOCKED`, honest runner-gating). **Residential evidence supplied by the user on `main@d99060e`** (rolling `test` published 2026-09-20T16:46:20Z = 22:16 IST; APK 17,948,508 B ≈ "17 MB", MSI 112,861,184 B ≈ "108 MB"; home WiFi, no VPN): installed on Android **and** Windows, searched, **4 songs played — audible, position advancing, zero failures**, Android audio continued on the locked screen. `compare/6f7fa48...d99060e` = **9 files, all docs, 0 code** → runner block and residential success are the *same code*, so the block is a datacenter-IP artifact and **T1 is disproven**. | **MET:** ≥1 scheduled verdict on current `main` **+** a playback result outside the runner. |
-| **S2** | Architectural cleanup (workflow-trigger retirement + CI hygiene, PR #54 disposition, stale `14-release.md` body) | 🟨 **EXECUTED 2026-09-22 in PR #111 (in flight at writing; done = merged + CI green + the next scheduled drill fires on the edited workflow).** Retired the inert `push: [arena/01a0b224-dhun]` trigger under a live drill watch (merge timed before the 2026-09-22 04:17 UTC cron; watch result in the PR comment — expected `ENVIRONMENT_BLOCKED`/exit 2; a non-firing schedule = wedged re-registration → attempt-5 fresh file). Moved every workflow to Node-24 action majors (live warnings on `main@500b6a8` runs: `upload-artifact@v4`, `download-artifact@v4`, `checkout@v4`, `setup-python@v5`); in-place-edit safety proven by this file's own history (3 edits 09-18, schedule kept firing). `14-release.md`: PR #32-era block dated as retained history, header re-pinned to `500b6a8`. Earlier audit (2026-09-20) already found: no `HarnessScreen`/`DesktopHarness*` in any `*.kt`, no root `agent-*-status.md`, `docs/decisions/README.md` complete (ADR-001…006 + PROPOSED 007). **Deferred by decision:** `ubuntu-latest`→Ubuntu 26 (migration begins 2026-10-19 — no pin before the label exists; watch the drill across it), `dev-release` orphan registration id 347425736 (agent DELETE → 404, needs admin; inert — fold into ticket #4765894 if touched), PR #54 (user: no action). | CI green; zero dead screens; PRs resolved; drill still firing after any workflow edit |
+| **S2** | Architectural cleanup (workflow-trigger retirement + CI hygiene, PR #54 disposition, stale `14-release.md` body) | 🟨 **MERGED 2026-09-22 as PR #111 → `7fcadbe`.** Post-merge CI green: CI **35681131215**, Build APK **35681131195**, test-release **35681131229**. Rolling `test` republished **2026-09-22T02:58:26Z** at target `7fcadbe` (APK 18,350,835 B, MSI 112,914,432 B). The 2026-09-22 04:17 UTC drill watch was **not yet observed** at the #113 pre-merge docs pass (latest schedule still **35561269411**, 2026-09-21, on `414cd79`). `download-artifact@v6` still emits the Node-20 deprecation warning (publish job of 35681131229). **Deferred:** Ubuntu 26 (begins 2026-10-19), `dev-release` orphan id 347425736 (agent DELETE → 404), PR #54 (user: no action). | CI green on the merge SHA; drill-after-edit still the open watch |
 | **S3** | Hardware verification round 1 (core loop both platforms, signed checklists) | ⬜ | `docs/verification/` checklists signed with build SHAs |
 | **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | 🟨 code merged + CI green (PR #74); S4 hardware boxes ride in S3 | Every shipped key reachable or removed; EQ decision recorded |
 | **S5** | Testing + hardening (contrast fix, dep audit, THIRD_PARTY review) | ✅ merged (PR #74): CI green; contrast 4.66:1 asserted both schemes (`DhunThemeContrastTest`); dep audit all-HOLD with post-tag upgrade order (`.ai/DEPENDENCY_AUDIT.md`); THIRD_PARTY reviewed | CI green; contrast ≥4.5:1 or re-recorded exception; review logged |
@@ -552,7 +622,7 @@ S1 → S2 → S3 → S6.
 1. ~~Merge this re-baseline (user review).~~ **DONE** — merged as PR #72
    (main `5023b38`, 2026-09-16T17:08:09Z).
 2. ~~**S1** — restore the drill + fresh live verdict.~~ **DONE / GREEN 2026-09-20.** The drill fires daily and classifies honestly (`ENVIRONMENT_BLOCKED` on the runner), and the user supplied the residential half on `main@d99060e`: Android + Windows installs, 4 songs, audible, advancing, no failures, Android lock-screen audio continued. The `6f7fa48...d99060e` compare is docs-only (0 code files), so runner-block and residential-success are the same code — T1 disproven, ADR-007 stays PROPOSED. Next scheduled run (2026-09-21 04:17 UTC, first on `d99060e`) is expected to stay `ENVIRONMENT_BLOCKED`; that is now a known-correct runner result, not an open question.
-3. **S2** (agent: workflow-trigger retirement + CI hygiene + `14-release.md` body; PR #54 stays open per the user) — **EXECUTED 2026-09-22** in PR #111 under a live drill watch (merge timed ahead of the 04:17 UTC cron; the scheduled run on the edited registration is the watch — result recorded in the PR comment, never pre-claimed). Most original S2 items were already clean (verified 2026-09-20). Deferred by decision: the Ubuntu-26 runner-migration watch (begins 2026-10-19) and the `dev-release` orphan-registration deletion (agent DELETE → 404, needs admin; inert).
+3. **S2** (agent: workflow-trigger retirement + CI hygiene + `14-release.md` body; PR #54 stays open per the user) — **MERGED 2026-09-22 as PR #111 → `7fcadbe`**, post-merge CI green (35681131215 / 35681131195 / 35681131229). The 2026-09-22 04:17 UTC drill watch was not yet observed at the #113 docs pass (latest schedule still 35561269411). Deferred: Ubuntu-26 watch (begins 2026-10-19) and the `dev-release` orphan deletion (agent DELETE → 404).
 4. **S3** (user drives devices; agent records + fixes fallout) — includes
    the S4 hardware boxes (settings, EQ, jump-list verb, close-to-tray).
 5. ~~**S4** (agent: settings/themes/EQ/jump-list verb).~~ CODE MERGED in
