@@ -277,12 +277,23 @@ private fun AlbumTrackRow(
             .clickable(onClick = onClick)
             .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.smPlus),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
         Text(
             text = "%2d".format(number),
             style = MaterialTheme.typography.labelMedium,
             color = DhunColors.textHint,
             modifier = Modifier.width(DhunSpacing.xxxl),
+        )
+        // The row's artwork, at the same size playlist rows use. Album pages
+        // often ship no per-row thumbnail — `parseAlbumPage` stamps the header
+        // cover onto every track, so this is the album cover rather than a
+        // placeholder glyph.
+        ArtworkImage(
+            imageUrl = track.thumbnailUrl,
+            contentDescription = track.title,
+            modifier = Modifier.size(DhunSpacing.touchTarget),
+            shape = DhunShapes.medium,
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -340,6 +351,8 @@ private fun AlbumSkeleton() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 LoadingShimmer(modifier = Modifier.width(DhunSpacing.xxxl).height(DhunSpacing.mdPlus))
+                // Rows carry artwork now (see AlbumTrackRow) — so does the skeleton.
+                LoadingShimmer(modifier = Modifier.size(DhunSpacing.touchTarget))
                 Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
                     LoadingShimmer(modifier = Modifier.width(DhunSpacing.artworkAlbum).height(DhunSpacing.mdPlus))
                     LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonTextWidth).height(DhunSpacing.md))
