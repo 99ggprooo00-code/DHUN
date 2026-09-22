@@ -12,16 +12,23 @@ This section supersedes the statuses below it.
 **PR #109 (endless radio) is MERGED as `500b6a8` (2026-09-22T02:00:55Z) and
 post-merge VERIFIED on GitHub:** CI **35677895454** / Build APK
 **35677895471** / test-release **35677895534** all green on the merge SHA;
-rolling `test` republished **2026-09-22T02:05:41Z** at tag AND target
-`500b6a8` — `dhun-test.apk` **18,350,835 B** (sha256
+rolling `test` republished **2026-09-22T02:05:41Z** at target `500b6a8` —
+`dhun-test.apk` **18,350,835 B** (sha256
 `4bca3172bcee93b8c982fc503468e3a8212aacc3b1d195236e46d8517b62e76e`),
 `dhun-test.msi` **112,914,432 B** (internal ProductVersion **2.112.1**,
 sha256 `6e124a90709efb50280dfa469a898335b660f51ed3413066b0e451ccc8840024`).
-Those sizes identify the build carrying endless radio + the UI polish. NOTE:
-this session's S2 PR republishes the rolling `test` again on its own merge
-SHA — the authoritative download identity for the user is the LATEST
-publish; check PR #111's post-merge comment (or the release API) before
-quoting sizes. **The open gate is the user's hardware round:** re-download,
+**Since then the previous session merged its own post-merge re-pin (PR #110,
+docs-only) as `0d83216` (2026-09-22T02:18:11Z), and rolling `test` was
+republished again at 2026-09-22T02:22:42Z, target `0d83216`:** APK
+**18,350,835 B** byte-identical (same sha256 `4bca3172…e76e`); MSI
+**112,914,432 B** same size but new internal ProductVersion **2.114.1** and
+sha256 `505e707a9ddd5757a64b86618b51b2e80edc768b3ab07bc5f00fde19875a8e95`
+(the MSI version counter advances with every packaging run). PR #111
+integrates both reconciliations via a merge of `origin/main` (no history
+rewrite). Those builds carry endless radio + the UI polish. NOTE: PR #111's
+own merge republishes rolling `test` again at its merge SHA — the
+authoritative download identity for the user is the LATEST publish; check
+PR #111's post-merge comment (or the release API) before quoting sizes. **The open gate is the user's hardware round:** re-download,
 visual check of the UI polish on both platforms, and the ~30-min radio soak
 (first auto-refill at ≤3 songs left must be gapless — same song, same
 position, tail replaced).
@@ -42,7 +49,7 @@ setup-python@v6, upload/download-artifact@v6), clearing the LIVE Node-20
 deprecation warnings annotated on main's runs (35677895471 / 35677895534 /
 35561269411). (3) `docs/verification/14-release.md`: the floating
 2026-09-07 "merge chain now ends at PR #32" block is now a dated
-retained-history section; the ledger header is re-pinned to `500b6a8`.
+retained-history section; the ledger header is re-pinned to the current baseline (`0d83216` chain).
 (4) PR #109 post-merge facts reconciled across ROADMAP / HANDOFF /
 KNOWN_LIMITATIONS / CHANGELOG / the ledger. Deferred by decision:
 `ubuntu-latest`→Ubuntu 26 (migration begins **2026-10-19** — no pin before
@@ -55,20 +62,26 @@ all four workflows, grep verification of every edit. **The next session
 starts at: the drill-watch result in the S2 PR's comment → the user's
 hardware reports → S3 sign-off drives S6.**
 
-## PREVIOUS STATE — endless radio merged, 2026-09-21, session `arena/01a0c3b7-dhun`
 
-**PR #109 (endless radio) — merged since this writing as `500b6a8`; see the
-CURRENT STATE section above.** Implementation
-landed in `62de262`; CI-driven fix commits followed (`ad3d614`,
-`c5b85e5`, `063040d` — compile/test details; `4cd3e41`, `f0edb97` — a
-real premature-refill race the test suite exposed: the station was
-marked active BEFORE the queue swap landed, so the monitor could fire a
-refill over the old one-song queue and consume/null the continuation
-chain; the session now starts only after the swap). Docs updated in the
-pre-merge docs commit. Merged into `main` under this session's standing
-merge-without-asking directive — merge SHA and post-merge CI recorded in
-the ROADMAP top block (re-pin it here if it landed after this writing). The rolling `test` release
-republished on merge carries the feature; the user's hardware verdict
+## PREVIOUS STATE — endless radio MERGED, 2026-09-22, session `arena/01a0c3b7-dhun`
+
+(Superseded by the CURRENT STATE section above; kept as the merging session's final record.)
+
+**PR #109 (endless radio) — MERGED.**
+Implementation landed in `62de262`; CI-driven fix commits followed
+(`ad3d614`, `c5b85e5`, `063040d` — compile/test details; `4cd3e41`,
+`f0edb97` — a real premature-refill race the test suite exposed: the
+station was marked active BEFORE the queue swap landed, so the monitor
+could fire a refill over the old one-song queue and consume/null the
+continuation chain; the session now starts only after the swap;
+`638a442` — probe conflation, one advance = at most one refill).
+**Merged into `main` as `500b6a8`** (2026-09-22T02:00:55Z) under this
+session's standing merge-without-asking directive. **Post-merge main CI
+green** (CI 35677895454 · Build APK 35677895471 · test-release
+35677895534). **Rolling `test` re-published** 2026-09-22T02:05:41Z at
+target `500b6a8cb30bcc590a716057add308fe90518ef5`: **APK 18,350,835 B,
+MSI 112,914,432 B** — the byte sizes that identify the endless-radio
+build when the user re-downloads. The user's hardware verdict
 (re-download + 30-min station soak, watching for a gap at the first
 refill) is the open gate. The station chain (`RadioSession`) is
 in-memory by design — a cold start re-seeds a fresh `/next` from the
@@ -77,10 +90,12 @@ KNOWN_LIMITATIONS).
 
 **Sandbox notes that held this session (no JDK, logs EOF, annotations
 API is the readout) are unchanged** — see the DEBUG_LOG entry
-"Endless radio: implementation + 6 regression tests" for the three
-compiler/test gotchas CI caught (var smart-cast, `args![0]` K2 parser
-cascade, 3-arg `assertEquals` not resolving in Android tests) and the
-fake-page-threshold test-design slip.
+"Endless radio: implementation + 6 regression tests" for the compiler/
+test gotchas CI caught (var smart-cast, `args![0]` K2 parser cascade,
+3-arg `assertEquals` not resolving in Android tests, the
+fake-page-threshold test-design slip) AND the premature-refill race the
+test suite exposed in the VM itself (active-before-swap window + probe
+conflation) — plus the sandbox ref-reset reconciliation note.
 
 ## PREVIOUS STATE — post-merge sync, 2026-09-21, session `arena/01a0c2c7-dhun`
 
