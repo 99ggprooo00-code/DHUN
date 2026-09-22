@@ -121,6 +121,8 @@ val appModule = module {
     single { SaveNowPlayingUseCase(get<DataLayer>().nowPlaying) }
     single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
     single { RecordPlayUseCase(get<DataLayer>().history) }
+    // Shared endless-radio bookkeeping (PlayerViewModel + ArtistViewModel).
+    single { dev.dhun.domain.RadioSession() }
     single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
     single { GetRecommendationsUseCase(get(), get<DataLayer>().history, get<DataLayer>().library) }
 

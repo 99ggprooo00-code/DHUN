@@ -213,6 +213,7 @@ class MainActivity : ComponentActivity() {
                                     player = p,
                                     provider = provider,
                                     scope = activityScope,
+                                    radioSession = koin.get(),
                                     persistence = persistence,
                                     lyricsRepository = lyricsRepository,
                                 )

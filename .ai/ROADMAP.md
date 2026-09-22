@@ -1,7 +1,36 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-21** · session **`arena/01a0c2c7-dhun`** · baseline `main`
-**`44e1ffd`** (the PR #107 merge).
+Updated **2026-09-21** · session **`arena/01a0c3b7-dhun`** · baseline `main`
+**`44e1ffd`** (the PR #107 merge) · **PR #109 (endless radio) in flight on
+head `063040d`** — see the block below for its state.
+
+**Endless radio (item 2 of the previous step list) is IMPLEMENTED and in
+final verification.** Spec (pinned in `.ai/DEBUG_LOG.md` 2026-09-21): while
+a radio plays and ≤3 songs remain, auto-queue the station's next `/next`
+page behind the current track — same song, same position, seamless, no
+gap; tail replaced on refill; supersedes the #99 "different song" seed
+semantic; related row still excludes the current track. Delivered in
+`62de262` (engine + provider + session + UI wiring) and three fix commits
+(`ad3d614`, `c5b85e5`, `063040d`) driven entirely by CI check-run
+annotations (no JDK in sandbox; log downloads EOF — annotations API is the
+readout): a `var` smart-cast in a test Fake, a K2 parser cascade on
+`args![0]` in the engine test's reflective Player double, and the
+toolchain's rejection of 3-arg `assertEquals(a, b, msg)` in Android tests
+(repo convention: 2-arg asserts + `assertTrue("msg", cond)`). Six new
+regression tests: five shared view-model cases + the engine-level
+`SeamlessRadioRefillTest` that fails on any re-prepare/rebuild/seek.
+**Merge authorization:** this session's standing directive (execute the
+next step and merge without asking). **State at this writing:** fix
+commits `ad3d614`, `c5b85e5`, `063040d` (compile/test details),
+`4cd3e41` (volatile + single-flight), `f0edb97` (the premature-refill
+window: station started after the queue swap — the test suite found a
+real production race the compile fixes did not) and `638a442` (probe
+conflation: one advance = at most one refill). Docs updated in the
+pre-merge docs commits. **Final head `638a442` CI VERIFIED GREEN** — CI
+35677043222 ✓ + CI 35677046154 ✓ (both duplicate runs — no flake), Build
+APK 35677046120 ✓, test-release 35677046192 ✓. Merging under the standing
+directive.
+
 
 **PR #107 (UI polish) is MERGED and the release is verified.** Merged as
 `44e1ffd` at 2026-09-21T09:54:37Z under the user's explicit authorization
@@ -30,12 +59,13 @@ still pending on both platforms.
 
 **Next steps (priority order):** (1) user re-downloads the new `test`
 release and reports the new look on both platforms (lighter surfaces, one
-glass dock, 64dp thumbs); (2) endless radio — ASK the user before starting
-(≤3 songs left → auto-queue via `/next`; same song, same position, no gap,
-tail replaced on refill; engine reproduction + regression tests first);
-(3) remaining #105 checklist: S3/S6 soaks, rotation/process death,
+glass dock, 64dp thumbs) AND tries endless radio: start any artist/track
+radio and leave it running ~30 min — the first auto-refill (≤3 songs left)
+must land with no audible gap, same song, same position, tail replaced;
+(2) remaining #105 checklist: S3/S6 soaks, rotation/process death,
 persistence, itemized Windows native checks (tray/jump-list/SMTC/media
-keys). Never merge feature work without the user's explicit authorization.
+keys). (Endless radio itself was item (2) of the previous list — done in
+PR #109 this session.)
 
 **Last error / limits:** the Maven Central 403 flake above (transient);
 otherwise none. No JDK/SDK in the sandbox — CI is the compile/test gate;

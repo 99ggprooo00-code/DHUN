@@ -331,6 +331,41 @@ internal fun parseRelatedTracks(root: JsonObject): List<Track> {
     }
 }
 
+/**
+ * Next-page token of the /next radio panel, if the server sent one.
+ *
+ * The radio panel (`playlistPanelRenderer`, `playlistId` RDAMVM…) carries
+ * it as `nextRadioContinuationData` — deliberately NOT the generic
+ * `nextContinuationData`, which sibling tabs use for their own paging
+ * (search catalog etc.); following that token would return the wrong page.
+ * Continuation pages wrap the panel differently, so a tree-wide fallback
+ * for `nextRadioContinuationData` covers both shapes.
+ */
+internal fun parseRadioContinuationToken(root: JsonObject): String? {
+    val panels = mutableListOf<JsonObject>()
+    root.collectObjects("playlistPanelRenderer", panels)
+    for (panel in panels) {
+        for (c in panel.arr("continuations") ?: emptyList()) {
+            val token = (c as? JsonObject)?.obj("nextRadioContinuationData")?.str("continuation")
+            if (!token.isNullOrBlank()) return token
+        }
+    }
+    val tokens = mutableListOf<JsonObject>()
+    root.collectObjects("nextRadioContinuationData", tokens)
+    for (t in tokens) {
+        val token = t.str("continuation")
+        if (!token.isNullOrBlank()) return token
+    }
+    return null
+}
+
+/** One page of the /next radio queue + its next-page token (if any). */
+internal fun parseRadioQueuePage(root: JsonObject): dev.dhun.core.RadioQueuePage =
+    dev.dhun.core.RadioQueuePage(
+        tracks = parseRelatedTracks(root),
+        continuationToken = parseRadioContinuationToken(root),
+    )
+
 /* ---------------- suggestions ------------------------------------------- */
 
 internal fun parseSuggestions(root: JsonObject): List<String> {

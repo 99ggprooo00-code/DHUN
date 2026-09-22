@@ -8,6 +8,7 @@ import dev.dhun.core.HomeFeedPage
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
 import dev.dhun.core.RateLimitGate
+import dev.dhun.core.map
 import dev.dhun.core.SearchResults
 import dev.dhun.core.Track
 import io.ktor.client.HttpClient
@@ -225,13 +226,38 @@ class InnerTubeClient(
 
     /** Radio queue for a track (RDAMVM playlist = "start radio from this"). */
     suspend fun relatedTracks(videoId: String): DhunResult<List<Track>> =
+        radioQueuePage(videoId).map { it.tracks }
+
+    /**
+     * First page of the radio queue for a track + the next-page token
+     * (endless radio). Same RDAMVM /next request as [relatedTracks]; the
+     * panel is `isInfinite` and pages through `nextRadioContinuationData`.
+     */
+    suspend fun radioQueuePage(videoId: String): DhunResult<dev.dhun.core.RadioQueuePage> =
         resultify {
             val body = buildJsonObject {
                 put("context", context())
                 put("videoId", videoId)
                 put("playlistId", "RDAMVM$videoId")
             }
-            parseRelatedTracks(postJson("next", body))
+            parseRadioQueuePage(postJson("next", body))
+        }
+
+    /**
+     * Next page of the radio queue (endless-radio refill).
+     *
+     * Wire contract (same as [homeFeedContinuation]): the opaque token goes
+     * in the query parameters (`ctoken` + `continuation`), NOT as a JSON
+     * body field — body-only tokens can return a tab-navigation shell
+     * instead of the continuation contents.
+     */
+    suspend fun radioQueueContinuation(continuationToken: String): DhunResult<dev.dhun.core.RadioQueuePage> =
+        resultify {
+            parseRadioQueuePage(
+                postJson("browse", buildJsonObject {
+                    put("context", context())
+                }, continuationToken)
+            )
         }
 
     suspend fun getLyrics(videoId: String): DhunResult<Lyrics> =

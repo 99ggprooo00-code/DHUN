@@ -89,6 +89,18 @@ data class HomeFeedPage(
     val continuationToken: String? = null,
 )
 
+/**
+ * One page of the /next radio queue (the "Up next" RDAMVM list) plus the
+ * token that fetches the NEXT page. The radio panel is `isInfinite` and
+ * pages through `nextRadioContinuationData`; a null token means the server
+ * sent no continuation for this page (endless radio re-seeds then instead
+ * of dead-ending).
+ */
+data class RadioQueuePage(
+    val tracks: List<Track> = emptyList(),
+    val continuationToken: String? = null,
+)
+
 data class HistoryEntry(
     val track: Track,
     val playedAtEpochMs: Long,

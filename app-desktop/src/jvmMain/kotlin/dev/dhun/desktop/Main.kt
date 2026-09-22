@@ -728,12 +728,16 @@ private val desktopModule = module {
         LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get())
     }
 
+    // Shared endless-radio bookkeeping (PlayerViewModel + ArtistViewModel).
+    single { dev.dhun.domain.RadioSession() }
+
     // Phase 08 player UI model (queue ops, related/lyrics tabs, hold-to-seek) + Phase 11 lyrics repo.
     single {
         PlayerViewModel(
             player = get<DesktopDhunPlayer>(),
             provider = get(),
             scope = get(),
+            radioSession = get(),
             persistence = get(),
             lyricsRepository = get(),
         )

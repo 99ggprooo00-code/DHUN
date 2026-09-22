@@ -358,6 +358,7 @@ fun DhunAppShell(
                             provider = provider,
                             dataLayer = dataLayer,
                             player = player,
+                            radioSession = playerViewModel.radioSession,
                             nav = nav,
                             onPlayTrack = onPlayTrack,
                             onPlayArtist = onPlayArtist,
@@ -413,6 +414,7 @@ fun DhunAppShell(
                                 provider = provider,
                                 dataLayer = dataLayer,
                                 player = player,
+                                radioSession = playerViewModel.radioSession,
                                 nav = nav,
                                 onPlayTrack = onPlayTrack,
                                 onPlayArtist = onPlayArtist,
@@ -444,6 +446,7 @@ fun DhunAppShell(
                                 provider = provider,
                                 dataLayer = dataLayer,
                                 player = player,
+                                radioSession = playerViewModel.radioSession,
                                 nav = nav,
                                 onPlayArtist = onPlayArtist,
                                 onPlayAlbum = onPlayAlbum,
@@ -698,6 +701,8 @@ private fun ShellMasterPane(
     provider: MusicProvider,
     dataLayer: DataLayer,
     player: DhunPlayer,
+    /** Shared endless-radio session (same instance PlayerViewModel refills on). */
+    radioSession: dev.dhun.domain.RadioSession,
     nav: AppNavState,
     onPlayTrack: (Track, List<Track>, Int) -> Unit,
     onPlayArtist: (Track, List<Track>, Int) -> Unit,
@@ -732,7 +737,7 @@ private fun ShellMasterPane(
             onOpenSettings = onOpenSettings,
         )
         is DetailRoute.ArtistPage -> {
-            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id) }
+            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             ArtistScreen(
                 viewModel = vm,
@@ -794,6 +799,8 @@ private fun ShellDetailPane(
     provider: MusicProvider,
     dataLayer: DataLayer,
     player: DhunPlayer,
+    /** Shared endless-radio session (same instance PlayerViewModel refills on). */
+    radioSession: dev.dhun.domain.RadioSession,
     nav: AppNavState,
     onPlayArtist: (Track, List<Track>, Int) -> Unit,
     onPlayAlbum: (Track, List<Track>, Int) -> Unit,
@@ -805,7 +812,7 @@ private fun ShellDetailPane(
 ) {
     when (route) {
         is DetailRoute.ArtistPage -> {
-            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id) }
+            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             ArtistScreen(
                 viewModel = vm,

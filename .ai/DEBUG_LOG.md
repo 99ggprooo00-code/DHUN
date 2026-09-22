@@ -2708,3 +2708,110 @@ CI:** on-device / on-Windows eyeball of the animation curve, a rapid
 open↔close mash on a 60Hz and a 120Hz panel, and a dragged Desktop window mid
 transition. The seam, reversal, freeze, visibility-window and
 restored-layout contracts are pinned by `PlayerSheetLayoutTest` instead.
+
+## 2026-09-21 — Endless radio: implementation + 6 regression tests (session `arena/01a0c3b7-dhun`)
+
+**Task:** the spec queued in this log under "Queued (not started): endless
+radio" — while a radio plays and ≤3 songs remain, auto-queue the station's
+next `/next` page behind the current track; same song, same position,
+seamless, no gap; tail replaced on refill; supersedes the #99 "different
+song" seed semantic; related row still excludes the current track.
+Implemented, tested, and merged under the session's standing
+merge-without-asking directive (PR #109, head `063040d`).
+
+**What shipped:**
+- `RadioQueuePage` entity + `Parsers.radioQueuePage` reading
+  `nextRadioContinuationData` (carries the track list AND the next
+  continuation token; token = `nextRadioContinuationData`) — pinned by
+  `ParserFixtureTest` on a real wire fixture.
+- `MusicProvider.radioQueuePage(videoId)` / `radioQueueContinuation(token)`
+  (interface defaults keep every fake honest) → `InnerTubeClient` posts the
+  `/next` endpoint; continuation goes as URL parameters `ctoken` +
+  `continuation` in the POST's 3rd argument (NOT the body) — the exact
+  contract `relatedTracks` already uses, so seed and continuation share
+  one endpoint path.
+- `RadioSession` (commonMain, Koin single, in-memory): per-station
+  continuation token + page-duplicate signature (track-id list). A fetched
+  page whose tracks are already queued is NOT swapped in (loop guard);
+  `tokenConsumed` on a null next-token marks the chain exhausted → re-seed
+  on the next trigger.
+- `PlayerViewModel` refill monitor: `combine(queue, index, state)` → when
+  Playing on a radio-started queue with ≤3 songs remaining from the
+  current track, `maybeRefillRadio()` — continuation while a token exists,
+  else re-seed `/next` from the CURRENT track (head filtered out of the
+  page → no self-replay). Success → `replaceQueueKeepingCurrent(tail)`.
+  Failure → queue untouched, token kept (next advance retries the same
+  chain). Non-radio queues (user-built lists, search results) are ignored.
+- `DhunPlayer.replaceQueueKeepingCurrent` (interface default = plain
+  `prepareQueue`; Android engine override = Media3 `removeMediaItems`
+  around the sounding item + `addMediaItems` behind it — the sounding
+  MediaItem is never re-prepared; desktop uses the default path).
+- UI wiring unchanged in look: the refill is silent; artist/track radio
+  start seeds through the new session.
+
+**CI-as-compiler, third consecutive session — and a new diagnostic route:**
+sandbox still has no JDK and log/blob downloads still EOF. The working
+readout is the **check-run annotations API**: `gh api
+repos/…/commits/{sha}/check-runs` → `/check-runs/{id}/annotations` returns
+the real compiler/test errors with file + line. It caught all three red
+runs on this PR: (1) Kotlin smart-cast of a `var` property in a test Fake
+(`val local = theVar` before the `when`); (2) a K2 parser cascade on
+`args![0]` index expressions inside when-branches of a reflective
+`Proxy`-based Player double — rewritten around a null-safe `arg(args, i)`
+helper with explicit when blocks; (3) the 3-arg `assertEquals(a, b, msg)`
+form does NOT resolve in this toolchain's Android test compile — repo
+convention stands: 2-arg `assertEquals` and `assertTrue("msg", cond)`
+(message FIRST). Test-design slips the suite caught: a 3-track fake refill
+page left the queue exactly at the ≤3 threshold and re-triggered the
+monitor (size fake pages past the threshold — real pages are ~25), and the
+duplicate guard legitimately probes once more after a small page lands
+(assert the guard, don't forbid it). One documented flake:
+`LibraryViewModelTest` 15s timeout under CI load (in-memory driver +
+polling; test untouched — repo's own comment flags the 5s→15s history).
+
+**Sandbox recreation incident (mid-session):** the GitHub token expired
+(user reconnected; the 2-minute unblock worked) and a sandbox
+recreation reset the LOCAL branch ref to the session base `6317a1b`
+while the remote kept the four pushed commits. Reconciled exactly per
+the previous session's playbook: verified the working tree byte-identical
+to the remote head for all feature files (the 20-file mishap commit
+`1d26ce5` differed from the remote by exactly the 7 new files),
+`git reset --hard` to the remote head, `git checkout 1d26ce5 -- <7 files>`
+back, re-committed as two clean commits (`4cd3e41` code, `2c54a2a` docs)
+— no force-push, no history rewrite.
+
+**The premature-refill race (found after the compile fixes, by the test
+suite itself):** the first two red runs after the compile fixes failed in
+different endless-radio tests with the NEW diagnostic assertions naming
+the state — the fixture's session token was `null` right after
+`startRadio`, and the non-radio test saw a continuation call "that cannot
+happen". Root cause: `startRadio`/`playRelatedAt` marked the station
+ACTIVE (radioSession.start) BEFORE the async queue swap landed — the
+station was active over the OLD one-song queue (remaining = 0, at the
+threshold), so a monitor sample in that window fired a premature refill:
+in production it would fetch and consume the station's first /next page
+early; in the tests the fake's empty-chain fallback returned an empty
+page whose null token went through `tokenConsumed(null)` — nulling the
+chain, so the next refill re-seeded instead of continuing (exactly the
+`[r3, a, r1, r2, r4, r5]` swap the fail-open test caught on `063040d`).
+Fixed in three waves as the suite kept exposing the next layer: (1) the
+session starts only AFTER the swap (both entry points); (2)
+`radioRefillInFlight` is claimed BEFORE the launch (single-flight across
+the launch gap), `lastRelatedPageToken`/`radioRefillInFlight` are
+`@Volatile` (cross-thread), and a post-fetch re-check stops a late page
+from clobbering a queue the user replaced mid round-trip; (3) probe
+CONFLATION — a natural advance emits index AND state, so the combine
+delivered two probes for one refill-relevant situation, and the second
+fetched again once the first refill finished (the duplicate-page test's
+"expected 1 but was 2"): the probe now carries a playing flag (not the
+state object) + `distinctUntilChanged`, `lastRefillProbe` stops a
+no-change re-check from spinning, and the refill's `finally` re-gates on
+the latest snapshot so probes skipped while a fetch was in flight (rapid
+advance sequences) still get their refill.
+
+**Verification:** CI green on the final head across all four workflows
+(CI / Build APK / test-release / publish chain) — see ROADMAP top block.
+Open, user-gated: re-download of the rolling `test` build carrying endless
+radio + an itemized hardware soak (leave a station running 30 min, watch
+for a gap at the first refill; related row still excludes the current
+track).

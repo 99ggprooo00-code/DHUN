@@ -8,6 +8,7 @@ import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
 import dev.dhun.data.PlayContext
+import dev.dhun.domain.RadioSession
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.NowPlayingPersistence
@@ -19,10 +20,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.concurrent.Volatile
 
 /* ---------------- tab states ---------------- */
 
@@ -57,6 +60,12 @@ class PlayerViewModel(
     private val player: DhunPlayer,
     private val provider: MusicProvider,
     private val scope: CoroutineScope,
+    /**
+     * Shared endless-radio bookkeeping (Koin `single` in production).
+     * Exposed so other screens that start radios (ArtistScreen) can hand
+     * their session to the SAME instance the refill monitor watches.
+     */
+    val radioSession: RadioSession = RadioSession(),
     private val persistence: NowPlayingPersistence? = null,
     private val lyricsRepository: LyricsRepository? = null,
 ) {
@@ -92,6 +101,20 @@ class PlayerViewModel(
     private var holdSeekJob: Job? = null
     private var sleepTimerJob: Job? = null
     private var lastSeenTrackId: String? = null
+
+    /* ---------------- endless radio ---------------- */
+
+    /**
+     * Next-page token of the LAST related list [loadRelated] fetched — the
+     * chain [startRadio]/[playRelatedAt] hand to [radioSession] so refills
+     * continue the SAME station instead of re-seeding.
+     */
+    @Volatile
+    private var lastRelatedPageToken: String? = null
+    @Volatile
+    private var radioRefillInFlight = false
+    @Volatile
+    private var lastRefillProbe: RefillProbe? = null
 
     /* ---------------- Sleep timer (Home quick-action) ---------------- */
 
@@ -163,6 +186,109 @@ class PlayerViewModel(
                     loadRelated(track)
                     loadLyrics(track)
                 }
+        }
+        // Endless radio: while a radio plays and only a few songs remain,
+        // fetch the next /next page and swap the queue tail around the
+        // sounding item (same song, same position, no gap). Failures are
+        // fail-open — the queue is never touched.
+        // The probe carries a PLAYING FLAG, not the state object: a natural
+        // advance emits index AND state (Playing(a) -> Playing(r3)) for the
+        // same refill-relevant situation, and distinctUntilChanged conflates
+        // the pair so one advance = at most one trigger.
+        scope.launch {
+            combine(player.queue, player.currentQueueIndex, player.state) { q, i, s ->
+                RefillProbe(q, i, s is PlaybackState.Playing)
+            }.distinctUntilChanged()
+                .collect { probe -> maybeRefillRadio(probe) }
+        }
+    }
+
+    /** One conflated (queue, index, playing) snapshot for the refill gate. */
+    private data class RefillProbe(val queue: List<Track>, val index: Int, val playing: Boolean)
+
+    /**
+     * Gate for the endless-radio refill. Fires at most one in-flight refill:
+     * radio active + queue loaded + currently PLAYING + ≤
+     * [RADIO_REFILL_THRESHOLD_SONGS] songs after the current one.
+     */
+    private fun maybeRefillRadio(probe: RefillProbe) {
+        // The last LAUNCHED probe: a re-check that lands on the same
+        // situation (nothing changed while a refill was in flight) stops
+        // the chain instead of spinning.
+        if (probe == lastRefillProbe) return
+        if (!radioSession.isActive) return
+        val queue = probe.queue
+        if (probe.index !in 0 until queue.size) return
+        if (!probe.playing) return
+        val remaining = queue.size - probe.index - 1
+        if (remaining > RADIO_REFILL_THRESHOLD_SONGS) return
+        if (radioRefillInFlight) return
+        // Claim BEFORE launch: the flag guards the coroutine that runs
+        // later, so back-to-back probes must not both pass the check while
+        // the first refill has not started yet — that window caused a
+        // double fetch.
+        radioRefillInFlight = true
+        lastRefillProbe = probe
+        scope.launch {
+            try {
+                refillRadio(queue, probe.index)
+            } finally {
+                radioRefillInFlight = false
+                // Probes that arrived while this refill was in flight were
+                // skipped; re-gate on the LATEST snapshot so a rapid
+                // advance sequence still gets its refill.
+                val p = player
+                maybeRefillRadio(RefillProbe(p.queue.value, p.currentQueueIndex.value, p.state.value is PlaybackState.Playing))
+            }
+        }
+    }
+
+    /**
+     * Fetches the next page of the station and swaps the queue tail around
+     * the sounding track via [DhunPlayer.replaceQueueKeepingCurrent] — the
+     * same seamless primitive "Play radio" uses, so the current song keeps
+     * sounding from the same position with no gap.
+     *
+     * Fail-open contract: a failed OR duplicate page leaves the queue
+     * exactly as it was (the next advance re-triggers the check).
+     */
+    private suspend fun refillRadio(expectedQueue: List<Track>, expectedIndex: Int) {
+        val current = player.currentTrack.value ?: return
+        // The probe is one state emission old by the time this runs: re-check
+        // the sounding track still matches, so a late refill can never
+        // clobber a newer queue. A station that stopped in the meantime
+        // (user switched queue) must not refill either.
+        if (expectedQueue.getOrNull(expectedIndex)?.id != current.id) return
+        if (!radioSession.isActive) return
+        val page = when (val token = radioSession.continuationToken) {
+            null -> provider.radioQueuePage(current.id)
+            else -> provider.radioQueueContinuation(token)
+        }
+        when (page) {
+            is DhunResult.Success -> {
+                // A network round-trip is enough time for the user to
+                // replace the queue: a late page must never clobber a
+                // newer queue (or a stopped station).
+                if (!radioSession.isActive) return
+                val queueNow = player.queue.value
+                if (queueNow.getOrNull(expectedIndex)?.id != current.id) return
+                val tail = page.value.tracks.filter { it.id != current.id }
+                val currentTailIds =
+                    queueNow.subList(expectedIndex + 1, queueNow.size).map { it.id }.toSet()
+                val tailIsAllNew = tail.isNotEmpty() &&
+                    tail.any { it.id !in currentTailIds }
+                if (tailIsAllNew) {
+                    player.replaceQueueKeepingCurrent(tail)
+                }
+                // Consume the token whether or not we swapped: a page that
+                // duplicates the visible tail still advances the server's
+                // paging state (and a null next-token marks the chain
+                // exhausted → re-seed on the next trigger).
+                radioSession.tokenConsumed(page.value.continuationToken)
+            }
+            is DhunResult.Failure -> {
+                // Leave the queue alone; the next track advance retries.
+            }
         }
     }
 
@@ -257,6 +383,8 @@ class PlayerViewModel(
     /** Helper for screens that don't go through [playTracks] (e.g. Home/Search shell). */
     fun playQueue(tracks: List<Track>, index: Int, context: PlayContext = PlayContext.UNKNOWN) {
         if (tracks.isEmpty()) return
+        // A fresh non-radio queue takes over: the old station stops refilling.
+        radioSession.stop()
         persistence?.setPlayContext(context)
         _skipDirection.value = SkipDirection.FORWARD
         // Fire in scope so caller needn't be suspend.
@@ -310,8 +438,13 @@ class PlayerViewModel(
     /** Plays the related list (radio queue) from [index]. Suspends: caller launches. */
     suspend fun playRelatedAt(index: Int, context: PlayContext = PlayContext.QUEUE) {
         val tracks = (relatedState.value as? RelatedUiState.Success)?.tracks ?: return
+        val track = tracks.getOrNull(index) ?: return
         persistence?.setPlayContext(context)
+        // The queue IS the station: the refill monitor keeps it going.
+        // Prepare first, start the session second — the monitor must never
+        // see an active station over the previous (possibly short) queue.
         player.prepareQueue(tracks, index, playWhenReady = true)
+        radioSession.start(track.id, lastRelatedPageToken)
         _skipDirection.value = SkipDirection.FORWARD
     }
 
@@ -335,12 +468,22 @@ class PlayerViewModel(
         val rest = tracks.filter { it.id != current.id }
         if (rest.isEmpty()) return
         persistence?.setPlayContext(context)
-        scope.launch { player.replaceQueueKeepingCurrent(rest) }
+        // The queue becomes the station: the refill monitor keeps it going.
+        // The session starts only AFTER the swap has landed — an active
+        // station over the OLD (possibly one-song) queue would let the
+        // monitor fire a premature refill that consumes a page of the
+        // continuation chain (or nulls the token when the page ends).
+        scope.launch {
+            player.replaceQueueKeepingCurrent(rest)
+            radioSession.start(current.id, lastRelatedPageToken)
+        }
     }
 
     /** Loads an arbitrary track list as the queue (album/playlist/artist actions). */
     suspend fun playTracks(tracks: List<Track>, startIndex: Int = 0, context: PlayContext = PlayContext.UNKNOWN) {
         if (tracks.isEmpty()) return
+        // A fresh non-radio queue takes over: any running station stops refilling.
+        radioSession.stop()
         persistence?.setPlayContext(context)
         player.prepareQueue(tracks, startIndex, playWhenReady = true)
         _skipDirection.value = SkipDirection.FORWARD
@@ -362,19 +505,25 @@ class PlayerViewModel(
         relatedJob?.cancel()
         relatedJob = scope.launch {
             _relatedState.value = RelatedUiState.Loading
-            when (val r = provider.relatedTracks(track.id)) {
+            when (val r = provider.radioQueuePage(track.id)) {
                 is DhunResult.Success -> {
+                    // Remember the station's paging chain: startRadio /
+                    // playRelatedAt hand it to the refill monitor so endless
+                    // radio continues the SAME /next list.
+                    lastRelatedPageToken = r.value.continuationToken
                     // /next playlistPanelVideoRenderer includes the
                     // currently-playing video as its first entry. Filter the
                     // current track out so the Related tab never lists the
                     // playing song as a row, and the seamless radio tail
                     // never duplicates the head.
-                    val filtered = r.value.filter { it.id != track.id }
+                    val filtered = r.value.tracks.filter { it.id != track.id }
                     _relatedState.value =
                         if (filtered.isEmpty()) RelatedUiState.Empty else RelatedUiState.Success(filtered)
                 }
-                is DhunResult.Failure ->
+                is DhunResult.Failure -> {
+                    lastRelatedPageToken = null
                     _relatedState.value = RelatedUiState.Error(r.error.toUserMessage())
+                }
             }
         }
     }
@@ -412,5 +561,13 @@ class PlayerViewModel(
         private const val HOLD_SEEK_FRACTION = 120L
         private const val MIN_HOLD_STEP_MS = 1_000L
         private const val MAX_HOLD_STEP_MS = 15_000L
+
+        /**
+         * Endless radio: fetch the next /next page when at most this many
+         * songs remain after the current one. 3 = the queue still has a
+         * short buffer while the fetch is in flight, so playback never
+         * dead-ends on a slow network.
+         */
+        const val RADIO_REFILL_THRESHOLD_SONGS = 3
     }
 }
