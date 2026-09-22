@@ -22,11 +22,14 @@ regression tests: five shared view-model cases + the engine-level
 **Merge authorization:** this session's standing directive (execute the
 next step and merge without asking). **State at this writing:** fix
 commits `ad3d614`, `c5b85e5`, `063040d` (compile/test details),
-`4cd3e41` (volatile + single-flight) and `f0edb97` (the premature-refill
+`4cd3e41` (volatile + single-flight), `f0edb97` (the premature-refill
 window: station started after the queue swap — the test suite found a
-real production race the compile fixes did not). Docs updated in the
-pre-merge docs commit; CI verification of the final head in flight —
-merge follows green CI.
+real production race the compile fixes did not) and `638a442` (probe
+conflation: one advance = at most one refill). Docs updated in the
+pre-merge docs commits. **Final head `638a442` CI VERIFIED GREEN** — CI
+35677043222 ✓ + CI 35677046154 ✓ (both duplicate runs — no flake), Build
+APK 35677046120 ✓, test-release 35677046192 ✓. Merging under the standing
+directive.
 
 
 **PR #107 (UI polish) is MERGED and the release is verified.** Merged as

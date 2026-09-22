@@ -2794,11 +2794,20 @@ early; in the tests the fake's empty-chain fallback returned an empty
 page whose null token went through `tokenConsumed(null)` — nulling the
 chain, so the next refill re-seeded instead of continuing (exactly the
 `[r3, a, r1, r2, r4, r5]` swap the fail-open test caught on `063040d`).
-Fixed: the session starts only AFTER the swap (both entry points),
+Fixed in three waves as the suite kept exposing the next layer: (1) the
+session starts only AFTER the swap (both entry points); (2)
 `radioRefillInFlight` is claimed BEFORE the launch (single-flight across
 the launch gap), `lastRelatedPageToken`/`radioRefillInFlight` are
 `@Volatile` (cross-thread), and a post-fetch re-check stops a late page
-from clobbering a queue the user replaced mid round-trip.
+from clobbering a queue the user replaced mid round-trip; (3) probe
+CONFLATION — a natural advance emits index AND state, so the combine
+delivered two probes for one refill-relevant situation, and the second
+fetched again once the first refill finished (the duplicate-page test's
+"expected 1 but was 2"): the probe now carries a playing flag (not the
+state object) + `distinctUntilChanged`, `lastRefillProbe` stops a
+no-change re-check from spinning, and the refill's `finally` re-gates on
+the latest snapshot so probes skipped while a fetch was in flight (rapid
+advance sequences) still get their refill.
 
 **Verification:** CI green on the final head across all four workflows
 (CI / Build APK / test-release / publish chain) — see ROADMAP top block.
