@@ -377,7 +377,12 @@ class PlayerViewModelTest {
         player.positionMs.value = 42_000
         eventually { vm.relatedState.value is RelatedUiState.Success }
         vm.startRadio()
-        eventually { player.queue.value.map { it.id } == listOf("a", "r1", "r2", "r3", "r4", "r5") }
+        // The session starts AFTER the swap lands (see startRadio), so wait
+        // for both: queue swapped AND session active.
+        eventually {
+            player.queue.value.map { it.id } == listOf("a", "r1", "r2", "r3", "r4", "r5") &&
+                vm.radioSession.isActive
+        }
         // The station handoff must be complete before any test depends on
         // the chain: the session holds the related page's token (null only
         // when the fixture explicitly starts the station without a chain).

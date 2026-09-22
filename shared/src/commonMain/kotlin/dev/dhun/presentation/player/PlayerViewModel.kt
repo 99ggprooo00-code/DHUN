@@ -249,9 +249,15 @@ class PlayerViewModel(
         }
         when (page) {
             is DhunResult.Success -> {
+                // A network round-trip is enough time for the user to
+                // replace the queue: a late page must never clobber a
+                // newer queue (or a stopped station).
+                if (!radioSession.isActive) return
+                val queueNow = player.queue.value
+                if (queueNow.getOrNull(expectedIndex)?.id != current.id) return
                 val tail = page.value.tracks.filter { it.id != current.id }
                 val currentTailIds =
-                    expectedQueue.subList(expectedIndex + 1, expectedQueue.size).map { it.id }.toSet()
+                    queueNow.subList(expectedIndex + 1, queueNow.size).map { it.id }.toSet()
                 val tailIsAllNew = tail.isNotEmpty() &&
                     tail.any { it.id !in currentTailIds }
                 if (tailIsAllNew) {
@@ -418,8 +424,10 @@ class PlayerViewModel(
         val track = tracks.getOrNull(index) ?: return
         persistence?.setPlayContext(context)
         // The queue IS the station: the refill monitor keeps it going.
-        radioSession.start(track.id, lastRelatedPageToken)
+        // Prepare first, start the session second — the monitor must never
+        // see an active station over the previous (possibly short) queue.
         player.prepareQueue(tracks, index, playWhenReady = true)
+        radioSession.start(track.id, lastRelatedPageToken)
         _skipDirection.value = SkipDirection.FORWARD
     }
 
@@ -444,8 +452,14 @@ class PlayerViewModel(
         if (rest.isEmpty()) return
         persistence?.setPlayContext(context)
         // The queue becomes the station: the refill monitor keeps it going.
-        radioSession.start(current.id, lastRelatedPageToken)
-        scope.launch { player.replaceQueueKeepingCurrent(rest) }
+        // The session starts only AFTER the swap has landed — an active
+        // station over the OLD (possibly one-song) queue would let the
+        // monitor fire a premature refill that consumes a page of the
+        // continuation chain (or nulls the token when the page ends).
+        scope.launch {
+            player.replaceQueueKeepingCurrent(rest)
+            radioSession.start(current.id, lastRelatedPageToken)
+        }
     }
 
     /** Loads an arbitrary track list as the queue (album/playlist/artist actions). */
