@@ -1,8 +1,8 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-21** · session **`arena/01a0c3b7-dhun`** · baseline `main`
-**`44e1ffd`** (the PR #107 merge) · **PR #109 (endless radio) in flight on
-head `063040d`** — see the block below for its state.
+Updated **2026-09-22** · session **`arena/01a0c3b7-dhun`** · baseline `main`
+**`44e1ffd`** (the PR #107 merge) · **PR #109 (endless radio) MERGED as
+`500b6a8`** — see the block below for its state.
 
 **Endless radio (item 2 of the previous step list) is IMPLEMENTED and in
 final verification.** Spec (pinned in `.ai/DEBUG_LOG.md` 2026-09-21): while
@@ -20,16 +20,21 @@ toolchain's rejection of 3-arg `assertEquals(a, b, msg)` in Android tests
 regression tests: five shared view-model cases + the engine-level
 `SeamlessRadioRefillTest` that fails on any re-prepare/rebuild/seek.
 **Merge authorization:** this session's standing directive (execute the
-next step and merge without asking). **State at this writing:** fix
-commits `ad3d614`, `c5b85e5`, `063040d` (compile/test details),
-`4cd3e41` (volatile + single-flight), `f0edb97` (the premature-refill
-window: station started after the queue swap — the test suite found a
-real production race the compile fixes did not) and `638a442` (probe
-conflation: one advance = at most one refill). Docs updated in the
-pre-merge docs commits. **Final head `638a442` CI VERIFIED GREEN** — CI
-35677043222 ✓ + CI 35677046154 ✓ (both duplicate runs — no flake), Build
-APK 35677046120 ✓, test-release 35677046192 ✓. Merging under the standing
-directive.
+next step and merge without asking). **PR #109 is MERGED as `500b6a8`**
+(2026-09-22T02:00:55Z) after final head `9922798` was CI-verified green
+— CI 35677467390 ✓ + CI 35677471343 ✓ (both duplicate runs — no flake),
+Build APK 35677471161 ✓, test-release 35677471195 ✓. Fix commits on the
+PR: `ad3d614`, `c5b85e5`, `063040d` (compile/test details), `4cd3e41`
+(volatile + single-flight), `f0edb97` (the premature-refill window:
+station started after the queue swap — the test suite found a real
+production race the compile fixes did not) and `638a442` (probe
+conflation: one advance = at most one refill). **Post-merge main CI
+GREEN** — CI 35677895454 ✓, Build APK 35677895471 ✓, test-release
+35677895534 ✓. **Rolling `test` re-published** 2026-09-22T02:05:41Z at
+target/tag `500b6a8cb30bcc590a716057add308fe90518ef5`: `dhun-test.apk`
+**18,350,835 B** (old: 18,334,451), `dhun-test.msi` **112,914,432 B**
+(old: 112,885,760) — these byte sizes identify the endless-radio build
+for the user's re-download gate.
 
 
 **PR #107 (UI polish) is MERGED and the release is verified.** Merged as
