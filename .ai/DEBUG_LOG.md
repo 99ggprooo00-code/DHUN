@@ -2769,7 +2769,38 @@ duplicate guard legitimately probes once more after a small page lands
 `LibraryViewModelTest` 15s timeout under CI load (in-memory driver +
 polling; test untouched — repo's own comment flags the 5s→15s history).
 
-**Verification:** CI green on `063040d` across all four workflows
+**Sandbox recreation incident (mid-session):** the GitHub token expired
+(user reconnected; the 2-minute unblock worked) and a sandbox
+recreation reset the LOCAL branch ref to the session base `6317a1b`
+while the remote kept the four pushed commits. Reconciled exactly per
+the previous session's playbook: verified the working tree byte-identical
+to the remote head for all feature files (the 20-file mishap commit
+`1d26ce5` differed from the remote by exactly the 7 new files),
+`git reset --hard` to the remote head, `git checkout 1d26ce5 -- <7 files>`
+back, re-committed as two clean commits (`4cd3e41` code, `2c54a2a` docs)
+— no force-push, no history rewrite.
+
+**The premature-refill race (found after the compile fixes, by the test
+suite itself):** the first two red runs after the compile fixes failed in
+different endless-radio tests with the NEW diagnostic assertions naming
+the state — the fixture's session token was `null` right after
+`startRadio`, and the non-radio test saw a continuation call "that cannot
+happen". Root cause: `startRadio`/`playRelatedAt` marked the station
+ACTIVE (radioSession.start) BEFORE the async queue swap landed — the
+station was active over the OLD one-song queue (remaining = 0, at the
+threshold), so a monitor sample in that window fired a premature refill:
+in production it would fetch and consume the station's first /next page
+early; in the tests the fake's empty-chain fallback returned an empty
+page whose null token went through `tokenConsumed(null)` — nulling the
+chain, so the next refill re-seeded instead of continuing (exactly the
+`[r3, a, r1, r2, r4, r5]` swap the fail-open test caught on `063040d`).
+Fixed: the session starts only AFTER the swap (both entry points),
+`radioRefillInFlight` is claimed BEFORE the launch (single-flight across
+the launch gap), `lastRelatedPageToken`/`radioRefillInFlight` are
+`@Volatile` (cross-thread), and a post-fetch re-check stops a late page
+from clobbering a queue the user replaced mid round-trip.
+
+**Verification:** CI green on the final head across all four workflows
 (CI / Build APK / test-release / publish chain) — see ROADMAP top block.
 Open, user-gated: re-download of the rolling `test` build carrying endless
 radio + an itemized hardware soak (leave a station running 30 min, watch

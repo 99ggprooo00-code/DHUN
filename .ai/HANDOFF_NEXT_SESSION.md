@@ -10,11 +10,15 @@ message and is transcribed verbatim below, now in-repo).
 This section supersedes the statuses below it.
 
 **PR #109 (endless radio) — the next session starts HERE.** Implementation
-landed in `62de262`; three CI-driven fix commits followed (`ad3d614`,
-`c5b85e5`, `063040d`); docs updated in the pre-merge docs commit. Merged
-into `main` under this session's standing merge-without-asking directive —
-merge SHA and post-merge CI recorded in the ROADMAP top block (re-pin it
-here if it landed after this writing). The rolling `test` release
+landed in `62de262`; CI-driven fix commits followed (`ad3d614`,
+`c5b85e5`, `063040d` — compile/test details; `4cd3e41`, `f0edb97` — a
+real premature-refill race the test suite exposed: the station was
+marked active BEFORE the queue swap landed, so the monitor could fire a
+refill over the old one-song queue and consume/null the continuation
+chain; the session now starts only after the swap). Docs updated in the
+pre-merge docs commit. Merged into `main` under this session's standing
+merge-without-asking directive — merge SHA and post-merge CI recorded in
+the ROADMAP top block (re-pin it here if it landed after this writing). The rolling `test` release
 republished on merge carries the feature; the user's hardware verdict
 (re-download + 30-min station soak, watching for a gap at the first
 refill) is the open gate. The station chain (`RadioSession`) is

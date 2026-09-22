@@ -20,10 +20,13 @@ toolchain's rejection of 3-arg `assertEquals(a, b, msg)` in Android tests
 regression tests: five shared view-model cases + the engine-level
 `SeamlessRadioRefillTest` that fails on any re-prepare/rebuild/seek.
 **Merge authorization:** this session's standing directive (execute the
-next step and merge without asking). **State at this writing:** CI on
-`063040d` is running/green per the verification block below; docs
-(CHANGELOG / KNOWN_LIMITATIONS / DEBUG_LOG / HANDOFF) updated in the
-pre-merge docs commit.
+next step and merge without asking). **State at this writing:** fix
+commits `ad3d614`, `c5b85e5`, `063040d` (compile/test details),
+`4cd3e41` (volatile + single-flight) and `f0edb97` (the premature-refill
+window: station started after the queue swap — the test suite found a
+real production race the compile fixes did not). Docs updated in the
+pre-merge docs commit; CI verification of the final head in flight —
+merge follows green CI.
 
 
 **PR #107 (UI polish) is MERGED and the release is verified.** Merged as
