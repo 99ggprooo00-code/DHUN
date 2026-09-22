@@ -24,6 +24,28 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Verified — PR #114 CI on `80fe28b` (2026-09-22)
+
+- Code head **`80fe28b`** (three fix commits — `cd11056` album cover
+  fallback, `f70124f` page backdrops, `5d5f77e` compact ⋮ menu — plus the
+  changelog commit) was watched to completion and is **green**: push CI
+  **35692075343**, PR CI **35692215784**, Build APK **35692215748**,
+  test-release **35692215751** (`apk` + `msi` success, hosted install-over
+  included; `aab` / `publish` / `release_draft` skipped because a PR cannot
+  publish). Every CI step passed, including `:shared:jvmTest` (the new
+  `ParserFixtureTest` and `TrackMenuPolicyTest` cases), the Android
+  Robolectric suite, `assembleDebug`, and desktop `compileKotlinJvm` +
+  `jvmTest`.
+- The run's only annotation is the standing `ubuntu-latest` → Ubuntu 26
+  migration notice (begins 2026-10-19); no Kotlin error annotations, no
+  Node-20 deprecation warning on this head. Log blobs still EOF in-sandbox
+  (257 bytes) — the annotations API and the step conclusions are the readout.
+- Not a device verdict: whether the menu reads as a compact menu on a phone,
+  whether album-page body text stays readable over a bright cover, and whether
+  album playback really paints artwork end to end are the user's gate after the
+  post-merge republish. The rolling `test` download still targets **`03a27b1`**
+  (PR #113) at this writing.
+
 ### Fixed — album artwork on playback, album/artist page backdrops, one compact ⋮ menu (2026-09-22)
 
 Three separate visual defects, fixed independently (no polish pass over the
