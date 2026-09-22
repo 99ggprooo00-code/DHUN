@@ -138,11 +138,12 @@ object NowPlayingBackdropPolicy {
 
     /**
      * Flat black laid over the blur: low contrast, text stays readable.
-     * Lowered 0.55 → 0.45 by the 2026-09-21 UI-polish pass so the artwork
-     * glows through more (still inside the 0.4–0.75 legibility band pinned by
-     * `NowPlayingBackdropPolicyTest`).
+     * Lowered 0.55 → 0.45 by the 2026-09-21 polish, then 0.45 → 0.40 so
+     * Home / Search / Library sit closer to the full player's artwork glow.
+     * 0.40 is the light end of the 0.4–0.75 band pinned by
+     * `NowPlayingBackdropPolicyTest` — do not go under it.
      */
-    const val DIM_ALPHA = 0.45f
+    const val DIM_ALPHA = 0.40f
 
     /** Blur radius, as a multiple of [DhunSpacing.glassBlur] (16dp → 64dp). */
     const val BLUR_SCALE = 4
@@ -180,11 +181,15 @@ object NowPlayingBackdropPolicy {
      * docked mini-player sit — and lightest across the middle so the artwork
      * still glows through. Every stop is well below opaque: the artwork is a
      * wash, never a photo.
+     *
+     * Lowered 0.62/0.42/0.58/0.78 → 0.50/0.32/0.44/0.62 so the shell screens
+     * read closer to the full player's backdrop. The shape (edges heavier than
+     * the middle, nothing opaque) is pinned by `NowPlayingBackdropPolicyTest`.
      */
     fun scrimStops(): List<Pair<Float, Float>> = listOf(
-        0.00f to 0.62f,
-        0.35f to 0.42f,
-        0.72f to 0.58f,
-        1.00f to 0.78f,
+        0.00f to 0.50f,
+        0.35f to 0.32f,
+        0.72f to 0.44f,
+        1.00f to 0.62f,
     )
 }

@@ -72,10 +72,23 @@ class NowPlayingBackdropPolicyTest {
     @Test
     fun theDimKeepsContrastLowEnoughToRead() {
         // Together with the scrim this is what stops a bright album cover from
-        // fighting the text on top of it.
+        // fighting the text on top of it. 0.40 is the light end of the band —
+        // Home/Search/Library were darkened past the player by sitting higher.
         assertTrue(NowPlayingBackdropPolicy.DIM_ALPHA in 0.4f..0.75f)
+        assertTrue(NowPlayingBackdropPolicy.DIM_ALPHA <= 0.42f, "shell dim drifted back toward the old 0.55 wash")
         assertTrue(NowPlayingBackdropPolicy.BLUR_SCALE >= 3, "a background must be heavily blurred")
         assertTrue(NowPlayingBackdropPolicy.OVERSCAN > 1f, "the blur rim must never be visible")
+    }
+
+    @Test
+    fun theScrimStaysAWashAfterTheBrightnessPass() {
+        val stops = NowPlayingBackdropPolicy.scrimStops()
+        val lightest = stops.minOf { it.second }
+        val heaviest = stops.maxOf { it.second }
+        // Old stops were 0.62/0.42/0.58/0.78. A regression to that wash fails here.
+        assertTrue(lightest <= 0.36f, "middle wash too heavy: $lightest")
+        assertTrue(heaviest <= 0.70f, "edge wash too heavy: $heaviest")
+        assertTrue(heaviest > lightest, "the wash must still be heavier at the chrome")
     }
 
     @Test

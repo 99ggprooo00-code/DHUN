@@ -615,6 +615,39 @@ class PlayerSheetLayoutTest {
     }
 
     @Test
+    fun playerBackdropDimLetsArtworkThroughWithoutGoingClear() {
+        // The flat black over the bleed was 0.16 / 0.52. It has to stay under
+        // those — that is the "artwork shows through" contract — and above a
+        // floor, so a bright cover cannot erase the control cluster entirely.
+        // The ambient scrim, not this dim, carries the bottom-edge legibility.
+        assertTrue(PLAYER_BACKDROP_DIM in 0.04f..0.12f, "normal dim out of range: $PLAYER_BACKDROP_DIM")
+        assertTrue(
+            PLAYER_BACKDROP_DIM_LYRICS in 0.28f..0.48f,
+            "lyrics dim out of range: $PLAYER_BACKDROP_DIM_LYRICS",
+        )
+        assertTrue(
+            PLAYER_BACKDROP_DIM < PLAYER_BACKDROP_DIM_LYRICS,
+            "lyrics mode must stay darker than the plain player",
+        )
+    }
+
+    @Test
+    fun listThumbFitsTheFixedRowBudget() {
+        // artworkThumb is the wrapping-row size (TrackRow). The fixed 72dp
+        // queue slot uses touchTarget, but 64 + the 4dp inset must still fit
+        // that slot so a later swap cannot clip.
+        assertEquals(64.dp, DhunSpacing.artworkThumb)
+        assertTrue(
+            DhunSpacing.artworkThumb + DhunSpacing.xs * 2 <= DhunSpacing.listRowHeight,
+            "thumb ${DhunSpacing.artworkThumb} plus the queue inset exceeds ${DhunSpacing.listRowHeight}",
+        )
+        assertTrue(
+            DhunSpacing.artworkThumb > DhunSpacing.touchTarget,
+            "the list thumb must stay larger than the compact 48dp slot",
+        )
+    }
+
+    @Test
     fun playerBackdropPolicySuppressesSharpArtworkWhenBlurIsUnsupported() {
         // Platforms without RenderEffect (Android < API 31) fall back to the clean dark surface.
         assertTrue(shouldRenderPlayerBackdrop("https://example.com/art.jpg", supportsBlur = true))

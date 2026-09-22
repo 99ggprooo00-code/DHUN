@@ -1258,7 +1258,9 @@ private fun ArtworkBackdrop(
     cacheKey: String,
 ) {
     val dimColor by animateColorAsState(
-        targetValue = Color.Black.copy(alpha = if (lyricsDominant) 0.52f else 0.16f),
+        targetValue = Color.Black.copy(
+            alpha = if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM,
+        ),
         animationSpec = DhunAnimations.slowTween(),
         label = "backdropDim",
     )
@@ -1293,6 +1295,19 @@ private fun ArtworkBackdrop(
 }
 
 /**
+ * Flat black over the blurred bleed, painted on top of [playerAmbientScrimStops].
+ *
+ * Lowered 0.16 → 0.08 (lyrics-dominant 0.52 → 0.40) so the artwork shows
+ * through more. The control cluster stays readable because the ambient
+ * scrim's bottom stop stays on the ≥0.85 floor; lyrics mode keeps a heavier
+ * dim so the lyrics card still separates from the bleed.
+ */
+internal const val PLAYER_BACKDROP_DIM = 0.08f
+
+/** Heavier dim while the lyrics card is up. Still under the old 0.52 wash. */
+internal const val PLAYER_BACKDROP_DIM_LYRICS = 0.40f
+
+/**
  * Ambient scrim color stops (`offset to alpha`, alphas applied to the surface
  * colour): clear across the middle so the blurred bleed glows, dark towards
  * the bottom so titles, progress and transport stay legible, and light at the
@@ -1300,18 +1315,18 @@ private fun ArtworkBackdrop(
  *
  * Kept as data (not a hard-coded brush) so the legibility contract — clears
  * out in the middle, darkens monotonically towards the bottom, never fully
- * opaque — is unit-tested rather than eyeballed. The 2026-09-21 UI-polish
- * pass lowered every stop so the artwork shows through more; the bottom stop
- * respects the ≥0.85 legibility floor pinned by `PlayerSheetLayoutTest`.
+ * opaque — is unit-tested rather than eyeballed. Stops were lowered again
+ * after the 2026-09-21 polish; the bottom stop sits on the ≥0.85 floor pinned
+ * by `PlayerSheetLayoutTest` and is not taken below it.
  */
 internal fun playerAmbientScrimStops(): List<Pair<Float, Float>> = listOf(
-    0.00f to 0.24f,
-    0.16f to 0.08f,
+    0.00f to 0.16f,
+    0.16f to 0.04f,
     0.42f to 0.00f,
-    0.58f to 0.18f,
-    0.72f to 0.38f,
-    0.86f to 0.62f,
-    1.00f to 0.86f,
+    0.58f to 0.12f,
+    0.72f to 0.28f,
+    0.86f to 0.50f,
+    1.00f to 0.85f,
 )
 
 /** [playerAmbientScrimStops] as the brush the backdrop actually paints. */
