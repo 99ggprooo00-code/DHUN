@@ -5,11 +5,60 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — endless radio merged, 2026-09-21, session `arena/01a0c3b7-dhun`
+## CURRENT STATE — PR #109 merged + verified; S2 CI hygiene executed, 2026-09-22, session `arena/01a0c6dd-dhun`
 
 This section supersedes the statuses below it.
 
-**PR #109 (endless radio) — the next session starts HERE.** Implementation
+**PR #109 (endless radio) is MERGED as `500b6a8` (2026-09-22T02:00:55Z) and
+post-merge VERIFIED on GitHub:** CI **35677895454** / Build APK
+**35677895471** / test-release **35677895534** all green on the merge SHA;
+rolling `test` republished **2026-09-22T02:05:41Z** at tag AND target
+`500b6a8` — `dhun-test.apk` **18,350,835 B** (sha256
+`4bca3172bcee93b8c982fc503468e3a8212aacc3b1d195236e46d8517b62e76e`),
+`dhun-test.msi` **112,914,432 B** (internal ProductVersion **2.112.1**,
+sha256 `6e124a90709efb50280dfa469a898335b660f51ed3413066b0e451ccc8840024`).
+Those sizes identify the build carrying endless radio + the UI polish. NOTE:
+this session's S2 PR republishes the rolling `test` again on its own merge
+SHA — the authoritative download identity for the user is the LATEST
+publish; check the S2 PR's post-merge comment (or the release API) before
+quoting sizes. **The open gate is the user's hardware round:** re-download,
+visual check of the UI polish on both platforms, and the ~30-min radio soak
+(first auto-refill at ≤3 songs left must be gapless — same song, same
+position, tail replaced).
+
+**S2 (the last agent-executable stage) was executed in this session's PR:**
+(1) the inert `push: branches: [arena/01a0b224-dhun]` trigger was retired
+from `extraction-health.yml` under a live drill watch — the merge is timed
+BEFORE the 2026-09-22 04:17 UTC cron so the scheduled run executes on the
+edited registration; its fire + classification (expected
+`ENVIRONMENT_BLOCKED`, exit 2) is recorded in the PR comment the same turn
+as the merge. **If the schedule did NOT fire: the re-registration wedged →
+attempt-5 fresh-file re-registration (new path+name, per the attempt-4
+pattern) is the next session's FIRST task.** In-place-edit safety was proven
+from this file's own history: three edits on 2026-09-18 (`7928774`,
+`19f1e8e`, `a7c4d5d`) with the daily schedule firing afterwards. (2) All
+workflows moved to Node-24 action majors (checkout@v5, setup-java@v5,
+setup-python@v6, upload/download-artifact@v6), clearing the LIVE Node-20
+deprecation warnings annotated on main's runs (35677895471 / 35677895534 /
+35561269411). (3) `docs/verification/14-release.md`: the floating
+2026-09-07 "merge chain now ends at PR #32" block is now a dated
+retained-history section; the ledger header is re-pinned to `500b6a8`.
+(4) PR #109 post-merge facts reconciled across ROADMAP / HANDOFF /
+KNOWN_LIMITATIONS / CHANGELOG / the ledger. Deferred by decision:
+`ubuntu-latest`→Ubuntu 26 (migration begins **2026-10-19** — no pin before
+the label exists; watch the drill across it), `dev-release` orphaned
+workflow registration (id **347425736**, file long deleted, state active;
+agent DELETE → 404, needs admin — inert, fold into Support ticket
+#4765894 if ever touched), PR #54 stays open per the user. Local gates all
+green: 29/29 packaging/CI-contract tests before and after, PyYAML parse of
+all four workflows, grep verification of every edit. **The next session
+starts at: the drill-watch result in the S2 PR's comment → the user's
+hardware reports → S3 sign-off drives S6.**
+
+## PREVIOUS STATE — endless radio merged, 2026-09-21, session `arena/01a0c3b7-dhun`
+
+**PR #109 (endless radio) — merged since this writing as `500b6a8`; see the
+CURRENT STATE section above.** Implementation
 landed in `62de262`; CI-driven fix commits followed (`ad3d614`,
 `c5b85e5`, `063040d` — compile/test details; `4cd3e41`, `f0edb97` — a
 real premature-refill race the test suite exposed: the station was

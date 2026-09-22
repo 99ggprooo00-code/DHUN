@@ -24,6 +24,33 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — CI hygiene (Stage S2): drill trigger retirement + Node-24 actions (2026-09-22, PR #S2PIN)
+
+- **`extraction-health.yml`:** the inert `push: branches: [arena/01a0b224-dhun]`
+  validation-branch trigger is retired — that branch merged as PR #91
+  (2026-09-18) and was deleted, so the trigger could never fire again. The
+  daily 04:17 UTC schedule and human `workflow_dispatch` are now the only
+  triggers (agents get 403 on dispatch). Executed under a live drill watch:
+  the merge lands before the 2026-09-22 cron so the next scheduled run
+  proves the edited registration still fires. In-place-edit safety evidence:
+  the file survived three edits on 2026-09-18 with the schedule firing
+  afterwards; the historically wedged registrations were the old rot-drill
+  files only.
+- **Node-24 action majors everywhere** (clears the live "Node.js 20 is
+  deprecated" runner warnings annotated on main's runs 35677895471 /
+  35677895534 / 35561269411): `extraction-health.yml` checkout@v4→v5,
+  setup-python@v5→v6, upload-artifact@v4→v6; `build-apk.yml`
+  upload-artifact@v4→v6; `test-release.yml` download-artifact@v4→v6 (×5).
+  `ci.yml` was already clean. Uploads stay v6-compatible with the existing
+  v6 downloads in the same workflows.
+- **`docs/verification/14-release.md` repair (S2 task):** the floating
+  2026-09-07 "merge chain now ends at PR #32" status block is now a dated
+  retained-history section, and the ledger header is re-pinned to the
+  current baseline `500b6a8` with full release identity (APK 18,350,835 B /
+  MSI 112,914,432 B, ProductVersion 2.112.1, both sha256).
+- No product-code change. Local gates: 29/29 packaging/CI-contract tests
+  pass before and after; PyYAML parse check on all four workflows.
+
 ### Added — Endless radio: a playing station refills itself, gaplessly (2026-09-21, PR #109)
 
 > Spec pinned in `.ai/DEBUG_LOG.md` (2026-09-21): while a radio station
