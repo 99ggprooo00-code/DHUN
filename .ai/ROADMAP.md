@@ -1,11 +1,28 @@
 # CURRENT ACTIVE TASK
 
 Updated **2026-09-22** · session **`arena/01a0c6dd-dhun`** · baseline `main`
-**`0d83216`** (the docs-only PR #110 post-merge re-pin on top of the PR #109
-merge `500b6a8` — post-merge states verified below) · **this session's S2
-CI-hygiene + reconciliation PR #111 is in flight at the time of writing** (its merge SHA, drill-watch result and the republished rolling
-`test` identity land in its PR comment and the next docs pass — never
-pre-claimed here).
+**`7fcadbe`** (the PR #111 merge — post-merge state verified below) ·
+**follow-up PR #112 (download-artifact@v7) is in flight at the time of
+writing** (its merge SHA and republished rolling `test` identity land in
+its PR comment and the next docs pass — never pre-claimed here).
+
+**PR #111 (S2 CI hygiene + reconciliation) is MERGED as `7fcadbe`
+(2026-09-22T02:53:32Z), post-merge VERIFIED:** CI **35681131215** ✓ /
+Build APK **35681131195** ✓ / test-release **35681131229** ✓ on the merge
+SHA; rolling `test` republished **2026-09-22T02:58:26Z**, target
+`7fcadbe` — APK **18,350,835 B** byte-identical to the two prior
+publishes (sha256 `4bca3172…e76e`), MSI **112,914,432 B** ProductVersion
+**2.116.1** (sha256 `d4c120abe3122a4ad088e32a197e275b3609b0eeecc6d5ebf9c72dc47bc709a4`).
+**The publish run caught a real residue:** `download-artifact@v6` still
+declares `using: node20` (verified in the upstream `action.yml`) and
+re-flagged the deprecation warning — PR checks could not catch it because
+the publish job (the only download-artifact consumer) is main-gated and
+skipped on PRs. Follow-up PR #112 bumps it to **v7** (the Node-24
+migration release; v8's ESM + hash-mismatch-errors-by-default behavior
+changes deliberately NOT taken on the release path — one step at a time).
+**Drill watch:** the 2026-09-22 04:17 UTC scheduled run is the first on
+the edited registration — pending at this writing; result recorded in
+PR #111's comment.
 
 **PR #109 (endless radio) is MERGED and the post-merge state is VERIFIED on
 GitHub.** Merged as **`500b6a8`** at **2026-09-22T02:00:55Z**. Post-merge CI
@@ -40,7 +57,13 @@ annotations on `main@500b6a8` flagged `upload-artifact@v4` (Build APK run
 35677895471), `download-artifact@v4` (test-release run 35677895534) and
 `checkout@v4`/`setup-python@v5`/`upload-artifact@v4` (drill run 35561269411);
 all four workflows now use Node-24 majors (checkout@v5, setup-java@v5,
-setup-python@v6, upload/download-artifact@v6). (3) Repaired
+setup-python@v6, upload/download-artifact@v6). **Follow-up (PR #112, this
+session):** download-artifact@v6 turned out to STILL declare `node20`
+(upstream source check; warning reappeared on the post-merge publish run
+35681131229 — invisible to PR checks because the publish job is
+main-gated), so it is bumped to **v7**, whose release IS the Node-24
+migration (runner ≥2.327.1 ≪ current hosted runners); upload-artifact@v6
+verified `node24` at source and stays. (3) Repaired
 `docs/verification/14-release.md`: the floating 2026-09-07 "merge chain now
 ends at PR #32" block is now a dated retained-history section, and the ledger
 header is re-pinned to the current `0d83216` baseline. (4) Reconciled the PR #109 post-merge facts

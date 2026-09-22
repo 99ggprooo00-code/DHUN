@@ -52,6 +52,22 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 - No product-code change. Local gates: 29/29 packaging/CI-contract tests
   pass before and after; PyYAML parse check on all four workflows.
 
+### Fixed — CI hygiene follow-up: download-artifact@v6 still ran Node 20 (2026-09-22, PR #112)
+
+- The PR #111 bump to `download-artifact@v6` did NOT clear the deprecation
+  warning: v6's own `action.yml` declares `using: node20` (verified at the
+  upstream source), and the warning reappeared on the post-merge publish run
+  **35681131229** on `main@7fcadbe`. PR checks could not catch it — the
+  publish job, the only download-artifact consumer, is main-gated and skipped
+  on PRs. Bumped to **v7** (×5 in `test-release.yml`), whose release is
+  exactly the Node-24 migration (`using: node24`, runner ≥2.327.1 — far below
+  current hosted runners). **v7 chosen over v8 deliberately:** v8 adds ESM
+  internals and hash-mismatch-errors-by-default to the release publish path —
+  unnecessary behavior risk for a hygiene fix (repo policy: upgrade one step
+  at a time). `upload-artifact@v6` verified `node24` at source — stays.
+- Lesson recorded in KNOWN_LIMITATIONS: a Node-20 audit is only proven by runs
+  in which each flagged step actually EXECUTES.
+
 ### Added — Endless radio: a playing station refills itself, gaplessly (2026-09-21, PR #109)
 
 > Spec pinned in `.ai/DEBUG_LOG.md` (2026-09-21): while a radio station

@@ -25,10 +25,15 @@ republished again at 2026-09-22T02:22:42Z, target `0d83216`:** APK
 sha256 `505e707a9ddd5757a64b86618b51b2e80edc768b3ab07bc5f00fde19875a8e95`
 (the MSI version counter advances with every packaging run). PR #111
 integrates both reconciliations via a merge of `origin/main` (no history
-rewrite). Those builds carry endless radio + the UI polish. NOTE: PR #111's
-own merge republishes rolling `test` again at its merge SHA — the
-authoritative download identity for the user is the LATEST publish; check
-PR #111's post-merge comment (or the release API) before quoting sizes. **The open gate is the user's hardware round:** re-download,
+rewrite). Those builds carry endless radio + the UI polish. **PR #111 is
+MERGED as `7fcadbe` (2026-09-22T02:53:32Z), post-merge CI green
+(35681131215 / 35681131195 / 35681131229); rolling `test` republished
+02:58:26Z at target `7fcadbe` — APK 18,350,835 B byte-identical (sha256
+`4bca3172…e76e`), MSI 112,914,432 B ProductVersion 2.116.1 (sha256
+`d4c120ab…09a4`).** NOTE: follow-up PR #112's merge republishes rolling
+`test` again — the authoritative download identity for the user is the
+LATEST publish; check the PR comments (or the release API) before quoting
+sizes. **The open gate is the user's hardware round:** re-download,
 visual check of the UI polish on both platforms, and the ~30-min radio soak
 (first auto-refill at ≤3 songs left must be gapless — same song, same
 position, tail replaced).
@@ -47,7 +52,11 @@ from this file's own history: three edits on 2026-09-18 (`7928774`,
 workflows moved to Node-24 action majors (checkout@v5, setup-java@v5,
 setup-python@v6, upload/download-artifact@v6), clearing the LIVE Node-20
 deprecation warnings annotated on main's runs (35677895471 / 35677895534 /
-35561269411). (3) `docs/verification/14-release.md`: the floating
+35561269411). **Follow-up PR #112 (this session): download-artifact@v6 still
+declares `node20`** — the post-merge publish run 35681131229 on `7fcadbe`
+re-flagged it (PR checks skip the main-gated publish job, so they could not
+catch it); bumped to **v7** (the Node-24 release; v8's behavior changes
+deliberately not taken). (3) `docs/verification/14-release.md`: the floating
 2026-09-07 "merge chain now ends at PR #32" block is now a dated
 retained-history section; the ledger header is re-pinned to the current baseline (`0d83216` chain).
 (4) PR #109 post-merge facts reconciled across ROADMAP / HANDOFF /
