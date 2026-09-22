@@ -1,7 +1,19 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Current status (2026-09-22, session `arena/01a0c6dd-dhun` — S2 CI hygiene in
-> flight in PR #111).** The release baseline is **`main@0d83216`** (PR #110,
+> **Current status (2026-09-22, session `arena/01a0c6dd-dhun` — S2 CI hygiene
+> MERGED as PR #111 → `7fcadbe`; download-artifact@v7 follow-up in flight in
+> PR #112).** The release baseline is **`main@7fcadbe`** (PR #111, merged
+> 2026-09-22T02:53:32Z; post-merge CI **35681131215** / Build APK
+> **35681131195** / test-release **35681131229** all green). Rolling `test`
+> targets exactly `7fcadbe`, published **2026-09-22T02:58:26Z**:
+> `dhun-test.apk` **18,350,835 B** — byte-identical across the `500b6a8`,
+> `0d83216` and `7fcadbe` publishes (sha256
+> `4bca3172bcee93b8c982fc503468e3a8212aacc3b1d195236e46d8517b62e76e`),
+> `dhun-test.msi` **112,914,432 B** (internal ProductVersion **2.116.1**,
+> sha256 `d4c120abe3122a4ad088e32a197e275b3609b0eeecc6d5ebf9c72dc47bc709a4`)
+> and both `.sha256` sidecars. PR #112's merge republishes again (workflow +
+> docs only — expect identical APK bytes). The previous baseline was
+> **`0d83216`** (PR #110,
 > the previous session's docs-only post-merge re-pin, merged 2026-09-22T02:18:11Z on top
 > of **PR #109 endless radio → `500b6a8`**, merged 2026-09-22T02:00:55Z; post-merge CI
 > on `500b6a8` — **35677895454** / Build APK **35677895471** / test-release
@@ -13,8 +25,8 @@
 > **2.114.1**, sha256 `505e707a9ddd5757a64b86618b51b2e80edc768b3ab07bc5f00fde19875a8e95`
 > — same size as the `500b6a8` publish, whose ProductVersion was 2.112.1 / sha256
 > `6e124a90…0024`; the counter advances every packaging run) and both `.sha256`
-> sidecars. PR #111's own merge republishes again at its merge SHA — quote the LATEST
-> publish (its PR comment) as the download identity. This build carries endless radio
+> sidecars. Quote the LATEST publish (the newest PR comment) as the download
+> identity. This build carries endless radio
 > (#109) on top of the UI polish (`44e1ffd`, #107), the Home-moods/close/offline-replay
 > batch (`810bef1`, #106) and the #105 batch (`414cd79`); `6317a1b` (#108) and
 > `0d83216` (#110) were docs-only between/after them. Earlier
