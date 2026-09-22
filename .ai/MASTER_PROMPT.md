@@ -330,7 +330,10 @@ acceptance gates the next. File-level tasking lives in
   (`docs/runbooks/s1-residential-evidence.md`) — a human *Run workflow* click
   on `extraction-health@main` is optional now that the schedule fires (agents
   get 403 on dispatch); the 0-job push-noise is documented and no longer cited
-  as a verdict (removing the stale `push:` branch trigger needs the user's OK).
+  as a verdict (the stale `push:` branch trigger was RETIRED 2026-09-22 as the
+  S2 agent task — the ROADMAP's newer S1-close assignment `6a55dc9` superseded
+  this parenthetical's "needs the user's OK"; executed under a live drill
+  watch in PR #111).
 - **Acceptance (MET 2026-09-20):** ≥1 scheduled (or manually dispatched) drill
   verdict on current `main` **plus** a playback result outside the GitHub
   runner — a runner-only `ENVIRONMENT_BLOCKED` never closes S1 in either

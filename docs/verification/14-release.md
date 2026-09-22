@@ -1,14 +1,33 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Current status (2026-09-20, session 5 — STAGE S1 CLOSED GREEN).** The release
-> baseline is **`main@d99060e`** (PR #96, merged 2026-09-20T16:40Z; post-merge push
-> CI **35523474108** / Build APK **35523474088** / test-release **35523474032** all
-> green on that SHA). Rolling `test` targets exactly `d99060e`, published
-> **2026-09-20T16:46:20Z**, four assets: `dhun-test.apk` **17,948,508 B**,
-> `dhun-test.msi` **112,861,184 B**, `.sha256` sidecars 80 B / 81 B — sizes unchanged
-> since `6f7fa48` because every merge since has been documentation-only. Earlier
-> baselines in this ledger: `7304abb` (PR #94), `fabeb5f` (PR #93), `39b8748`
-> (PR #92), `6f7fa48` (PR #91).
+> **Current status (2026-09-22, session `arena/01a0c6dd-dhun` — S2 CI hygiene in
+> flight in PR #111).** The release baseline is **`main@0d83216`** (PR #110,
+> the previous session's docs-only post-merge re-pin, merged 2026-09-22T02:18:11Z on top
+> of **PR #109 endless radio → `500b6a8`**, merged 2026-09-22T02:00:55Z; post-merge CI
+> on `500b6a8` — **35677895454** / Build APK **35677895471** / test-release
+> **35677895534** — and on `0d83216` — **35678969644** / **35678969636** /
+> **35678969651** — all green). Rolling `test` now targets exactly `0d83216`, published
+> **2026-09-22T02:22:42Z**, four assets: `dhun-test.apk` **18,350,835 B** (sha256
+> `4bca3172bcee93b8c982fc503468e3a8212aacc3b1d195236e46d8517b62e76e` — byte-identical to
+> the `500b6a8` publish), `dhun-test.msi` **112,914,432 B** (internal ProductVersion
+> **2.114.1**, sha256 `505e707a9ddd5757a64b86618b51b2e80edc768b3ab07bc5f00fde19875a8e95`
+> — same size as the `500b6a8` publish, whose ProductVersion was 2.112.1 / sha256
+> `6e124a90…0024`; the counter advances every packaging run) and both `.sha256`
+> sidecars. PR #111's own merge republishes again at its merge SHA — quote the LATEST
+> publish (its PR comment) as the download identity. This build carries endless radio
+> (#109) on top of the UI polish (`44e1ffd`, #107), the Home-moods/close/offline-replay
+> batch (`810bef1`, #106) and the #105 batch (`414cd79`); `6317a1b` (#108) and
+> `0d83216` (#110) were docs-only between/after them. Earlier
+> baselines in this ledger: `d99060e` (PR #96 — **the S1 user-evidence build**),
+> `7304abb` (PR #94), `fabeb5f` (PR #93), `39b8748` (PR #92), `6f7fa48` (PR #91).
+> The daily drill keeps firing on schedule: 2026-09-21 run **35561269411** on
+> `414cd79` classified `ENVIRONMENT_BLOCKED` (exit 2) — the known-correct runner
+> steady state, not a product verdict.
+>
+> **Stage S1 closed GREEN on 2026-09-20 (retained record below).** The S1 evidence
+> paragraphs that follow describe the `d99060e` build and remain the residential
+> playback record; Gates 2–7 accounting below still stands (S3 checklists, soaks,
+> clean installs, signing, final docs review, user go-ahead).
 >
 > **S1 acceptance is MET — the first live user playback evidence in this ledger.**
 > On 2026-09-20 the user downloaded this exact rolling build over **home WiFi (no
@@ -64,8 +83,14 @@
 - Merge disposition: the user explicitly authorized merging after this record. Merging records the request-contract repair and CI verification only; it does **not** close S1, certify live audio, or unblock S2.
 
 
-Status: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
-RELEASE ACCEPTANCE OPEN.** The merge chain now ends at **PR #32 → `862f0ac`**
+## Phase 14 status snapshot — 2026-09-07 (retained history)
+
+> Superseded by the current-status header at the top of this file: the merge
+> chain has since continued through PR #109 → `500b6a8` (2026-09-22). This
+> section is the 2026-09-07 snapshot, kept verbatim as evidence.
+
+Status then: 🟨 **REPAIR CODE MERGED / TEST RELEASE PUBLISHED; HARDWARE AND STABLE
+RELEASE ACCEPTANCE OPEN.** The merge chain then ended at **PR #32 → `862f0ac`**
 (2026-09-07T01:24:20Z), stacking on PR #30 (`76c68eb`) and the earlier repair
 batch. Main CI **34072908037** and test-release **34072908097** passed. Rolling
 `test` pre-release published at **`862f0ac`** **2026-09-07T01:29:28Z**.

@@ -1,11 +1,98 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-22** · session **`arena/01a0c3b7-dhun`** · baseline `main`
-**`44e1ffd`** (the PR #107 merge) · **PR #109 (endless radio) MERGED as
-`500b6a8`** — see the block below for its state.
+Updated **2026-09-22** · session **`arena/01a0c6dd-dhun`** · baseline `main`
+**`0d83216`** (the docs-only PR #110 post-merge re-pin on top of the PR #109
+merge `500b6a8` — post-merge states verified below) · **this session's S2
+CI-hygiene + reconciliation PR #111 is in flight at the time of writing** (its merge SHA, drill-watch result and the republished rolling
+`test` identity land in its PR comment and the next docs pass — never
+pre-claimed here).
 
-**Endless radio (item 2 of the previous step list) is IMPLEMENTED and in
-final verification.** Spec (pinned in `.ai/DEBUG_LOG.md` 2026-09-21): while
+**PR #109 (endless radio) is MERGED and the post-merge state is VERIFIED on
+GitHub.** Merged as **`500b6a8`** at **2026-09-22T02:00:55Z**. Post-merge CI
+on `main` all green: CI **35677895454**, Build APK **35677895471**,
+test-release **35677895534**. Rolling `test` republished
+**2026-09-22T02:05:41Z**, tag AND target = **`500b6a8`**: `dhun-test.apk`
+**18,350,835 B** (sha256 `4bca3172bcee93b8c982fc503468e3a8212aacc3b1d195236e46d8517b62e76e`),
+`dhun-test.msi` **112,914,432 B** (internal ProductVersion **2.112.1**, sha256
+`6e124a90709efb50280dfa469a898335b660f51ed3413066b0e451ccc8840024`).
+**Superseding publish:** the previous session then merged its own docs-only
+post-merge re-pin (**PR #110 → `0d83216`**, 2026-09-22T02:18:11Z), and
+rolling `test` republished again at **2026-09-22T02:22:42Z**, target
+`0d83216` — APK **18,350,835 B** byte-identical (sha256 `4bca3172…e76e`),
+MSI **112,914,432 B** same size with internal ProductVersion **2.114.1**
+and sha256 `505e707a9ddd5757a64b86618b51b2e80edc768b3ab07bc5f00fde19875a8e95`
+(the MSI counter advances every packaging run). Those builds carry endless
+radio + the UI polish. The user's open gate: re-download and run the radio
+soak + visual check (guide in the session handoff message).
+
+**This session executed Stage S2 — the last agent-executable stage before the
+S3 hardware round.** In this PR: (1) retired the inert
+`push: branches: [arena/01a0b224-dhun]` trigger in `extraction-health.yml`
+(that branch merged as PR #91 on 09-18 and was deleted — the trigger could
+never fire again). Authorization trail: KNOWN_LIMITATIONS 2026-09-18/20 had
+already designated it "an S2 task to perform with a live watch of the next
+scheduled run", and the ROADMAP's S1-close commit `6a55dc9` (09-20 23:26,
+NEWER than the MASTER_PROMPT "needs the user's OK" parenthetical of 09-20
+15:07) assigns "workflow-trigger retirement" to the agent — the parenthetical
+is reconciled in this PR; this session's standing directive authorizes
+execution. (2) Cleared the LIVE Node.js-20 deprecation warnings: runner
+annotations on `main@500b6a8` flagged `upload-artifact@v4` (Build APK run
+35677895471), `download-artifact@v4` (test-release run 35677895534) and
+`checkout@v4`/`setup-python@v5`/`upload-artifact@v4` (drill run 35561269411);
+all four workflows now use Node-24 majors (checkout@v5, setup-java@v5,
+setup-python@v6, upload/download-artifact@v6). (3) Repaired
+`docs/verification/14-release.md`: the floating 2026-09-07 "merge chain now
+ends at PR #32" block is now a dated retained-history section, and the ledger
+header is re-pinned to the current `0d83216` baseline. (4) Reconciled the PR #109 post-merge facts
+across ROADMAP / HANDOFF / KNOWN_LIMITATIONS / CHANGELOG / the 14-release
+ledger. Safety evidence for editing the drill workflow: this exact file
+survived THREE in-place edits on 2026-09-18 (`7928774`, `19f1e8e`, `a7c4d5d`)
+and the daily schedule kept firing afterwards (09-19/09-20/09-21 runs) — the
+wedged registrations were the old rot-drill files only. **Drill watch:** the
+merge is timed BEFORE the 2026-09-22 04:17 UTC cron so the next scheduled run
+executes on the edited registration; its fire + classification is recorded in
+the PR comment the same turn as the merge (expected: `ENVIRONMENT_BLOCKED`,
+exit 2 — the known-correct steady state; a NON-FIRING schedule would mean a
+wedged re-registration → attempt-5 fresh-file re-registration next session).
+Local gates: 29/29 packaging/CI-contract tests pass before and after; PyYAML
+parse check on all four workflows; grep verification of every edit.
+
+**S2 remaining after this PR (deferred by decision, not skipped):**
+`ubuntu-latest` → Ubuntu 26 migration begins **2026-10-19** (runner-images
+#14748) — no pin before the label exists; watch the scheduled drill across
+the migration. `dev-release` orphaned workflow registration (id 347425736,
+file long deleted, state active): agent DELETE → 404 (needs admin) — inert;
+fold into Support ticket #4765894 if that is ever touched. PR #54 stays open
+per the user (contingency reference).
+
+**Next steps (priority order):** (1) USER hardware round on the new rolling
+build — re-download `test` (identity above), eyeball the UI polish on both
+platforms, then the endless-radio soak: start any artist/track radio, leave
+it ~30 min; the first auto-refill (≤3 songs left) must land with no audible
+gap — same song, same position, tail replaced; (2) remaining #105 checklist:
+S3/S6 soaks, rotation/process death, persistence, itemized Windows native
+checks (tray/jump-list/SMTC/media keys); (3) read the drill-watch result in
+PR #111's comment — if the schedule did NOT fire, execute attempt-5
+re-registration (fresh file/name) immediately; (4) S3 sign-offs drive S6.
+
+**Last error / limits:** none new. Standing sandbox facts: no JDK (CI is the
+compiler), release-asset/log blobs EOF (annotations API is the readout — the
+sha256 values above came from the publisher annotations), agent 403 on
+workflow_dispatch and on issue writes.
+
+**Session discipline:** boot verified on GitHub FIRST (PR #109 merged,
+post-merge runs green, release republished) before any edit; one asserted
+patch per file per block; every edit grep-verified; full diff re-read before
+push. **Concurrent-session reconciliation:** the previous session's
+post-merge re-pin (PR #110 → `0d83216`) landed mid-flight and conflicted
+with this branch's reconciliation; resolved by merging `origin/main` into
+the session branch (no force-push, no history rewrite), integrating both
+records — noted here because single-agent doctrine assumes no overlap. All work on the fixed session branch `arena/01a0c6dd-dhun`; no
+forks/vendoring.
+
+**Endless radio (item 2 of the previous step list) — previous session's
+record, retained; MERGED since this writing as `500b6a8` (see the verified
+post-merge block above).** Spec (pinned in `.ai/DEBUG_LOG.md` 2026-09-21): while
 a radio plays and ≤3 songs remain, auto-queue the station's next `/next`
 page behind the current track — same song, same position, seamless, no
 gap; tail replaced on refill; supersedes the #99 "different song" seed
@@ -62,7 +149,8 @@ individually and no failure was reported. UI-polish visuals themselves:
 covered by the user's go-ahead; itemized on-device review of the new look
 still pending on both platforms.
 
-**Next steps (priority order):** (1) user re-downloads the new `test`
+**Next steps (2026-09-21 list — superseded by the current block at the top;
+retained as the state of that session's handoff):** (1) user re-downloads the new `test`
 release and reports the new look on both platforms (lighter surfaces, one
 glass dock, 64dp thumbs) AND tries endless radio: start any artist/track
 radio and leave it running ~30 min — the first auto-refill (≤3 songs left)
@@ -376,7 +464,7 @@ All are 🟨/⬜ — closing them is Stage S3.
 | Stage | Objective | Status | Gate |
 |---|---|---|---|
 | **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | ✅ **GREEN 2026-09-20.** Drill fires daily (runs **35421383687**/**35489268023** on `6f7fa48` → `ENVIRONMENT_BLOCKED`, honest runner-gating). **Residential evidence supplied by the user on `main@d99060e`** (rolling `test` published 2026-09-20T16:46:20Z = 22:16 IST; APK 17,948,508 B ≈ "17 MB", MSI 112,861,184 B ≈ "108 MB"; home WiFi, no VPN): installed on Android **and** Windows, searched, **4 songs played — audible, position advancing, zero failures**, Android audio continued on the locked screen. `compare/6f7fa48...d99060e` = **9 files, all docs, 0 code** → runner block and residential success are the *same code*, so the block is a datacenter-IP artifact and **T1 is disproven**. | **MET:** ≥1 scheduled verdict on current `main` **+** a playback result outside the runner. |
-| **S2** | Architectural cleanup (workflow-trigger retirement + CI hygiene, PR #54 disposition, stale `14-release.md` body) | 🟨 **unblocked; mostly already clean.** Re-audited 2026-09-20: no `HarnessScreen`/`DesktopHarness*` in any `*.kt` (only a private `Harness` test class + 3 comments — legitimate), no root `agent-*-status.md`, `docs/decisions/README.md` complete (ADR-001…006 + PROPOSED 007). Remaining: inert `push: [arena/01a0b224-dhun]` trigger in `extraction-health.yml` (edit re-registers the workflow — registration wedged twice, ticket #4765894, so do it with a live drill watch), `ubuntu-latest`→Ubuntu 26 (2026-10-19) + Node-20 action deprecations, PR #54 (user: no action), stale "merge chain ends at PR #32" section. | CI green; zero dead screens; PRs resolved; drill still firing after any workflow edit |
+| **S2** | Architectural cleanup (workflow-trigger retirement + CI hygiene, PR #54 disposition, stale `14-release.md` body) | 🟨 **EXECUTED 2026-09-22 in PR #111 (in flight at writing; done = merged + CI green + the next scheduled drill fires on the edited workflow).** Retired the inert `push: [arena/01a0b224-dhun]` trigger under a live drill watch (merge timed before the 2026-09-22 04:17 UTC cron; watch result in the PR comment — expected `ENVIRONMENT_BLOCKED`/exit 2; a non-firing schedule = wedged re-registration → attempt-5 fresh file). Moved every workflow to Node-24 action majors (live warnings on `main@500b6a8` runs: `upload-artifact@v4`, `download-artifact@v4`, `checkout@v4`, `setup-python@v5`); in-place-edit safety proven by this file's own history (3 edits 09-18, schedule kept firing). `14-release.md`: PR #32-era block dated as retained history, header re-pinned to `500b6a8`. Earlier audit (2026-09-20) already found: no `HarnessScreen`/`DesktopHarness*` in any `*.kt`, no root `agent-*-status.md`, `docs/decisions/README.md` complete (ADR-001…006 + PROPOSED 007). **Deferred by decision:** `ubuntu-latest`→Ubuntu 26 (migration begins 2026-10-19 — no pin before the label exists; watch the drill across it), `dev-release` orphan registration id 347425736 (agent DELETE → 404, needs admin; inert — fold into ticket #4765894 if touched), PR #54 (user: no action). | CI green; zero dead screens; PRs resolved; drill still firing after any workflow edit |
 | **S3** | Hardware verification round 1 (core loop both platforms, signed checklists) | ⬜ | `docs/verification/` checklists signed with build SHAs |
 | **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | 🟨 code merged + CI green (PR #74); S4 hardware boxes ride in S3 | Every shipped key reachable or removed; EQ decision recorded |
 | **S5** | Testing + hardening (contrast fix, dep audit, THIRD_PARTY review) | ✅ merged (PR #74): CI green; contrast 4.66:1 asserted both schemes (`DhunThemeContrastTest`); dep audit all-HOLD with post-tag upgrade order (`.ai/DEPENDENCY_AUDIT.md`); THIRD_PARTY reviewed | CI green; contrast ≥4.5:1 or re-recorded exception; review logged |
@@ -464,7 +552,7 @@ S1 → S2 → S3 → S6.
 1. ~~Merge this re-baseline (user review).~~ **DONE** — merged as PR #72
    (main `5023b38`, 2026-09-16T17:08:09Z).
 2. ~~**S1** — restore the drill + fresh live verdict.~~ **DONE / GREEN 2026-09-20.** The drill fires daily and classifies honestly (`ENVIRONMENT_BLOCKED` on the runner), and the user supplied the residential half on `main@d99060e`: Android + Windows installs, 4 songs, audible, advancing, no failures, Android lock-screen audio continued. The `6f7fa48...d99060e` compare is docs-only (0 code files), so runner-block and residential-success are the same code — T1 disproven, ADR-007 stays PROPOSED. Next scheduled run (2026-09-21 04:17 UTC, first on `d99060e`) is expected to stay `ENVIRONMENT_BLOCKED`; that is now a known-correct runner result, not an open question.
-3. **S2** (agent: workflow-trigger retirement + CI hygiene + `14-release.md` body; PR #54 stays open per the user) — **unblocked now.** Most original S2 items were already clean (verified 2026-09-20). The workflow edit must be made with a live drill watch, never blind.
+3. **S2** (agent: workflow-trigger retirement + CI hygiene + `14-release.md` body; PR #54 stays open per the user) — **EXECUTED 2026-09-22** in PR #111 under a live drill watch (merge timed ahead of the 04:17 UTC cron; the scheduled run on the edited registration is the watch — result recorded in the PR comment, never pre-claimed). Most original S2 items were already clean (verified 2026-09-20). Deferred by decision: the Ubuntu-26 runner-migration watch (begins 2026-10-19) and the `dev-release` orphan-registration deletion (agent DELETE → 404, needs admin; inert).
 4. **S3** (user drives devices; agent records + fixes fallout) — includes
    the S4 hardware boxes (settings, EQ, jump-list verb, close-to-tray).
 5. ~~**S4** (agent: settings/themes/EQ/jump-list verb).~~ CODE MERGED in
