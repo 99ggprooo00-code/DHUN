@@ -1,26 +1,17 @@
 # 15 — Test-build gate: step-by-step procedure
 
-> **⚠ Digest update (2026-09-28, third pass).** The §1 table now carries the
-> digests of the **`5bbb16d`** publish (PR #117, 2026-09-28T10:56:10Z, MSI
-> ProductVersion **2.134.1**) — read from the publisher's own annotations on
-> test-release run **36412080887**, which is the rolling download `test`
-> serves right now. **This sheet ships in PR #118; when #118 merges, `test`
-> moves again** and every publish changes the MSI hash (its ProductVersion
-> counter advances). The APK can keep the same size and still be a different
-> build — `5bbb16d`'s and `935e068`'s are both 18,367,219 B. So the definitive
-> comparison for the build you actually download is the **`.sha256` sidecars
-> published beside the assets** or the digests in **the newest merged PR's
-> comment** — the §1 table is the fallback, not the source of truth.
+> **Verified publish — 2026-09-28.** PR #118 is merged as `16ad2e5`.
+> Post-merge CI **36425394319**, Build APK **36425394304**, and test-release
+> **36425394409** passed. Rolling `test` published **13:04:52Z**, targeting
+> `16ad2e5`; the tag resolves to the same commit. §1 records that build.
+> This is automated build/package evidence, **not hardware acceptance**.
+> Any later main push (including docs-only) replaces `test`: verify the current
+> release target/tag and matching `.sha256` sidecars before installing.
 >
-> The 18 checks are unchanged by PR #118 and still assume the PR #117 build:
-> **step 11** is the playlist backdrop (playlist pages sit on their own blurred
-> artwork). On a pre-#117 build (for example `935e068`) playlist pages are
-> still flat: that is the old behaviour, not a regression — re-download.
-> PR #118's two fixes are engine-room and have **no step of their own**: an
-> offline broadcast now reports "This track isn't available right now."
-> instead of "DHUN couldn't read the service" (needs an actually-offline live
-> stream to observe), and a track that has been audible for 10 s gets its
-> automatic-recovery budget back (needs a long session with real 403s).
+> The 18 checks still cover the existing UI fixes (step 11: playlist backdrop).
+> PR #118's offline-broadcast verdict and delayed retry-budget refund have no
+> deterministic manual step here: observe them if a real offline broadcast or
+> long-session recovery is available, otherwise record **not exercised**.
 
 > **Purpose.** Device-side acceptance for the `test` rolling build. The sheet
 > was written around PR #114's three defects — album artwork on playback,
@@ -59,10 +50,10 @@ Windows build: `Win + R` → `winver`. Android version: Settings → About phone
 
 ## 1. Verify the digest (do this BEFORE installing)
 
-> **Why this is step 1 and not optional:** the APK is **18,367,219 B — byte-identical
-> in size to the previous two publishes.** Size proves nothing. Only the hash proves you
-> have the current `main` and not an older build. This step could not be verified from the
-> coding sandbox (no network path to GitHub's asset hosts), so it is entirely on you.
+> **Why verify hashes:** the observed APK is **18,367,219 B**, the same size
+> as earlier publishes but with a different digest. Equal size is not equal
+> bytes. The sandbox verified job annotations and release metadata, not an
+> independent artifact download; verify your downloaded bytes below.
 
 **Android / macOS / Linux:**
 ```sh
@@ -74,16 +65,16 @@ sha256sum dhun-test.apk
 Get-FileHash .\dhun-test.msi -Algorithm SHA256
 ```
 
-**Compare against** — latest observed publish when this sheet was re-pinned:
-`test` targeting **`5bbb16d`** (PR #117), published **2026-09-28T10:56:10Z**;
-MSI internal ProductVersion **2.134.1**. Digests are the publisher's own
-annotations on test-release run **36412080887** (`source=5bbb16da5d8…`,
-`buildOnly=false`):
+**Compare against** — verified publish `test` targeting **`16ad2e5b9fa53c13f26e8c2e3e551c7496481de3`**
+(PR #118), published **2026-09-28T13:04:52Z**; MSI ProductVersion **2.137.1**.
+Digests come from test-release **36425394409** staging-job annotations
+**108937985529** (APK) / **108937985866** (MSI), both `buildOnly=false` and
+`source=16ad2e5b9fa53c13f26e8c2e3e551c7496481de3`. The publish job succeeded.
 
 | Asset | Bytes | Expected SHA-256 |
 |---|---|---|
-| `dhun-test.apk` | 18,367,219 | `864d41c4bb8cb02b283a02c716af3da5460786b74b9c646d64872a3c8c92d0de` |
-| `dhun-test.msi` | 112,934,912 | `d0c74087a290a72507c9579c129cbcf8e1bfe88600673bf3446d388034ac0c12` |
+| `dhun-test.apk` | 18,367,219 | `8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` |
+| `dhun-test.msi` | 112,934,912 | `4e28c551db2834c699351b3eb1c4d03c96dc46d536156242203845ee28d46b6e` |
 
 > If your hash matches **neither** this table **nor** the newest merged PR
 > comment's digests, a newer publish has replaced `test` — do not guess:

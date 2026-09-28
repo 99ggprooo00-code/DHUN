@@ -2,6 +2,30 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-28 — post-#118 verification (`arena/01a0e81a-dhun`)
+
+- PR #118 is merged as `16ad2e5`; post-merge CI 36425394319, Build APK
+  36425394304 and test-release 36425394409 succeeded. Rolling `test` published
+  13:04:52Z on that SHA, MSI 2.137.1. Full identity/digests are in
+  `docs/verification/15-test-build-gate.md` §1. This supersedes the earlier
+  pre-merge statuses below, not their behavioural limitations.
+- No new hardware or live-service evidence: S3/S6 remain open. Hosted Windows
+  install-over and uninstall passed on disposable data, not a user's machine.
+- Latest extraction-health 36412874929 remains `ENVIRONMENT_BLOCKED`; not green
+  playback proof. No JDK locally; use branch CI, not repeated toolchain downloads.
+- Documentation drift found: the S3 runbook named an obsolete build and implied
+  equal byte sizes proved identical bytes. Corrected to release/tag + digests;
+  upgrade testing now preserves existing user data and destructive clean-install
+  checks explicitly require a disposable environment. Recents dismissal,
+  force-stop, and process death are separate checks, not synonyms.
+- **Android EQ documentation contradiction:** repeated “no in-app Android EQ”
+  carry-forward notes below conflict with current code. `MainActivity.kt` passes
+  the Koin `EqualizerSession` into `DhunAppShell`; `SettingsScreen.kt` renders
+  it; `AppModule.kt` binds `AndroidEqualizerEngine`. This is existing code,
+  not a new feature authorization. Audible DSP behaviour remains unverified;
+  keep the runbook's EQ observation rather than claim it is absent or works.
+- No change to accepted ADRs, production code, dependency pins or workflows.
+
 ## 2026-09-28 (session `arena/01a0e7ee-dhun`) — two standing S5 findings executed: the offline-broadcast verdict and the never-refunded retry budget
 
 - **PR #118 code head `614134b` is CI-green; merge and republish are not claimed here.** Push CI **36422490521**, PR CI **36422590223** (all 12 named steps), Build APK **36422590089**, test-release **36422590222** (`apk` + `msi` incl. the hosted Windows install-over 2.134.1 → 2.135.1 with the userdata/cache sentinels preserved, `buildOnly=true` on the PR merge-preview source; `aab` / `publish` / `release_draft` skipped — `main`-gated). Intermediate fix-only head `57febe6`: push CI **36422438830** green. The only annotation anywhere is the standing Ubuntu-26 notice — no Node-20 warning. **The rolling `test` download at this writing targets `5bbb16d` (PR #117) and contains neither fix.**

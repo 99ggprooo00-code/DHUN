@@ -1,5 +1,29 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-28 — Post-#118 reconciliation (`arena/01a0e81a-dhun`)
+
+Boot inherited a clean checkout at `16ad2e5`, but the roadmap still said
+#118 was open. GitHub confirmed it merged at 12:59:01Z; its post-merge runs
+were in progress at boot, then all succeeded (CI 36425394319, APK 36425394304,
+test-release 36425394409). Release/tag both target that SHA; published
+13:04:52Z. Staging annotations supply digests (APK job 108937985529, MSI job
+108937985866); publish-job annotations contain only the Ubuntu-26 notice.
+Do not call staging annotations publisher annotations or infer bytes from size.
+Hosted Windows 2.134.1 → 2.137.1 preserved sentinels; no audio/UI claim.
+
+The old S3 runbook prescribed uninstalling existing apps and named a stale
+build; corrected to upgrade first, disposable clean-install/uninstall tests,
+and digest-based identity. Also separated recents dismissal, force-stop and
+OS process death. Android EQ's carried-forward absence claim contradicts the
+actual MainActivity → Koin session → SettingsScreen wiring; documented the
+contradiction without changing code or claiming audible DSP proof.
+
+Local checks: 29 Python helper tests passed; 35 JSON fixtures syntax-valid.
+No JDK locally; Kotlin/PowerShell/build/package checks use GitHub CI.
+Installed `gh run list` has no `--commit`; use `--branch main` and inspect
+`headSha`. Deepening the shallow clone succeeded without changing the branch.
+No extraction semantics, dependencies, workflows or application code changed.
+
 ## 2026-09-28 — Two standing second-look findings executed: the offline-broadcast verdict and the never-refunded retry budget (`arena/01a0e7ee-dhun`)
 
 **Where they came from.** Boot found the agent lane officially empty (S1/S2/S4/S5 code merged; S3/S6 are device gates; the only watch is the Ubuntu-26 runner migration on 2026-10-19). The highest-value code left that CI can prove was in KNOWN_LIMITATIONS' 2026-09-16 "second-look code findings": `[NIT/LOW — S5] checkPlayability passes LIVE_STREAM_OFFLINE as OK` and `[NIT/LOW — S5] PlaybackGraph.retries never reset on success`. Neither was executed in the S5 merge (PR #74) twelve days earlier. A third finding in that list (`cancelCacheFill()` not cancelling its job) turned out to have been fixed on 2026-09-16 in `92383ab` without the entry being annotated — verified by reading the code at `main@5bbb16d` and by the GitHub commits API, and now marked resolved.
