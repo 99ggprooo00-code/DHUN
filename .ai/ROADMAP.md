@@ -1,5 +1,88 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-28** · session **`arena/01a0e6c8-dhun`** · baseline `main`
+**`dcdd41b`** (PR #115, merged 2026-09-28T06:46:14Z; post-merge CI green —
+see below). **This session's PR #116 is open.** Code head **`fbf69bb`** is
+CI-green. This docs commit is the pre-merge record; it is not itself
+CI-green until its own checks finish, and the merge / rolling `test`
+republish are not claimed here (they go in the PR #116 comment).
+
+**Phase:** S3 (hardware round — user-gated). The agent lane this session was
+S5 hardening (a CI-visible race) + S2 CI hygiene + post-merge reconciliation.
+
+**What shipped in PR #116 (not yet merged):**
+- `c58572a` — two deterministic endless-radio regressions
+  (`endlessRadioIgnoresAStaleProbeOfThePreStationQueue`,
+  `endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`).
+  **Mutation proof:** CI **36389023330** on this commit (no fix yet) failed on
+  exactly these two tests with the predicted messages.
+- `cd9d4f3` — the fix. The refill monitor could judge a lagging probe of the
+  pre-station queue `[a]` against the now-active session ("0 songs left") and
+  fetch page 2 of the station, then apply it over page 1 (the post-fetch check
+  compared only the head id). Now: a probe must match the live queue + index;
+  the whole queue must be unchanged before and after the fetch; a mismatched
+  page is dropped unconsumed and the existing re-gate refetches the same
+  token. This was the `endlessRadioReplacesTailWhenSongsRunLow` flake that
+  went red on push CI **35979756610** (`67068a7`) while PR CI passed the same
+  SHA — and PR #115 merged over that red push check.
+- `fbf69bb` — `download-artifact@v6` → `@v7` (×5). Upstream: v6 `node20`,
+  v7 `node24`. The warning was still live on `main@dcdd41b` (publish job
+  108818910798). Supersedes PR #112 (same change, stale docs) — close #112
+  after this merges.
+
+**Verified CI on code head `fbf69bb` (watched to completion, all success):**
+push CI **36389230165**, PR CI **36389248363** (all 12 steps), Build APK
+**36389248349**, test-release **36389248359** (`apk` + `msi` incl. hosted
+install-over 2.128.1 → 2.129.1; `aab` / `publish` / `release_draft` skipped —
+`main`-gated). The v7 proof is the post-merge publish job's annotations.
+
+**Baseline on `main` (verified this session):**
+- PR #114 merged **2026-09-22T06:10:44Z** as **`edf19e0`**; post-merge CI
+  **35693686731**, Build APK **35693686689**, test-release **35693686796** all
+  green; rolling `test` then targeted `edf19e0` (APK 18,367,219 B sha256
+  `75ed9fbb…04e7`, MSI 112,934,912 B ProductVersion 2.124.1 sha256
+  `c95b004f…f5a3`).
+- PR #115 (`9fec2d9` ⋮ menu wraps its content, `67068a7` player artwork card
+  fills with Crop + album header covers fall back to the shallowest
+  thumbnails array, `4df515e` device-gate doc) merged **2026-09-28T06:46:14Z**
+  as **`dcdd41b`**; post-merge CI **36388115963**, Build APK **36388115954**,
+  test-release **36388116013** all green. Rolling `test` republished
+  **2026-09-28T06:51:17Z**, target **`dcdd41b`**: `dhun-test.apk`
+  **18,367,219 B** (sha256 `9857a3fe071cb3b2a2e2408046342eba05b5eebb79c041fc8c94681d03eab7ef`),
+  `dhun-test.msi` **112,934,912 B**, ProductVersion **2.128.1** (sha256
+  `69e42993fdfb263a55f11988173699c233318243f23652235cf3906e5cb5d2ab`) —
+  digests from the publisher annotations.
+- **Drill: NOT wedged — the previous session's claim is retracted.** The
+  schedule fired every day 09-22 → 09-27 (runs 35709793101, 35842385136,
+  35980652608, 36119584587, 36232608074, 36311265246; all on `edf19e0`, all
+  `ENVIRONMENT_BLOCKED` = steady state). GitHub fires the `17 4 * * *` cron
+  ~5h late (09:20–10:02 UTC observed); the 09-22 run appeared after the
+  previous session checked at ~06:00. **No attempt-5 re-registration is
+  needed.**
+
+**Last error:** none on `fbf69bb`. No JDK in the sandbox — CI is the compiler.
+
+**Exact next step:** CI green on this docs head, then merge PR #116 (user
+authorized: all tests + verification, docs, only then merge). Same turn:
+post-merge CI, the publish job's annotations (zero Node-20 warnings expected),
+and the new rolling `test` identity in the PR #116 comment; close PR #112 as
+superseded. Then the user gates: `docs/verification/15-test-build-gate.md` on
+the NEW build (digests from the release `.sha256` sidecars / PR #116 comment —
+the hashes printed in that file are for `edf19e0`), the endless-radio 30-min
+soak, S3/S6 soaks, Windows native column.
+
+**Files this session:** `PlayerViewModel.kt`, `PlayerViewModelTest.kt`,
+`test-release.yml`, plus this docs pass (ROADMAP, HANDOFF, KNOWN_LIMITATIONS,
+DEBUG_LOG, RISK_REGISTER, CHANGELOG, `docs/verification/14-release.md`,
+`docs/verification/15-test-build-gate.md`). No forks, no vendoring.
+
+---
+
+**Previous session records (retained; superseded by the block above).** PR
+#113 merged as `03a27b1` (2026-09-22T04:14:52Z), #114 as `edf19e0` and #115 as
+`dcdd41b` since the block below was written; its "drill did not fire"
+worry is retracted above.
+
 Updated **2026-09-22** · session **`arena/01a0c716-dhun`** · baseline `main`
 **`7fcadbe`** (PR #111, merged; post-merge CI green — see below). **This
 session's glass / scrim PR #113 is open.** Code head **`d2a9045`** is

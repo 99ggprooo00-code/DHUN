@@ -1,6 +1,28 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Current status (2026-09-22, session `arena/01a0c716-dhun` — PR #113 pre-merge).**
+> **Current status (2026-09-28, session `arena/01a0e6c8-dhun` — PR #116 pre-merge).**
+> The release baseline is **`main@dcdd41b`** (PR #115, merged
+> 2026-09-28T06:46:14Z). Post-merge CI green: CI **36388115963**, Build APK
+> **36388115954**, test-release **36388116013**. Rolling `test` targets exactly
+> `dcdd41b`, published **2026-09-28T06:51:17Z**: `dhun-test.apk` **18,367,219 B**
+> (sha256 `9857a3fe071cb3b2a2e2408046342eba05b5eebb79c041fc8c94681d03eab7ef`),
+> `dhun-test.msi` **112,934,912 B**, ProductVersion **2.128.1** (sha256
+> `69e42993fdfb263a55f11988173699c233318243f23652235cf3906e5cb5d2ab`), from the
+> publisher annotations. Intermediate baseline: `edf19e0` (PR #114, merged
+> 2026-09-22T06:10:44Z; post-merge CI 35693686731 / 35693686689 / 35693686796
+> green; APK sha256 `75ed9fbb…04e7`, MSI 2.124.1 sha256 `c95b004f…f5a3`).
+> **PR #116** (endless-radio stale-probe fix + `download-artifact@v7`) code head
+> `fbf69bb` is green: push CI **36389230165**, PR CI **36389248363**, Build APK
+> **36389248349**, test-release **36389248359** (apk + msi incl. hosted
+> install-over; `aab` / `publish` / `release_draft` skipped because they are
+> `main`-gated). Its merge republishes again. Quote the post-merge release API
+> or the PR #116 comment as the download identity, not this paragraph. Drill:
+> daily runs 09-22 → 09-27, all `ENVIRONMENT_BLOCKED` (see the live evidence
+> log). The previous session's "did not fire" note was cron latency. This is
+> compile, unit and packaging evidence only. It closes no S3 checklist and
+> signs no soak.
+>
+> **Previous status (2026-09-22, session `arena/01a0c716-dhun` — PR #113 pre-merge; retained).**
 > The release baseline is **`main@7fcadbe`** (PR #111, S2 CI hygiene, merged).
 > Post-merge CI on that SHA is green: CI **35681131215**, Build APK
 > **35681131195**, test-release **35681131229**. Rolling `test` targets exactly
@@ -176,6 +198,7 @@ for upstream recovery.
 
 ### Rot-drill / extraction-health
 
+- [x] **Scheduled runs 2026-09-22 → 09-27, all on `main@edf19e0`, all `ENVIRONMENT_BLOCKED`** (annotation `Extraction health is not a production pass — ENVIRONMENT_BLOCKED — inspect the probe log and verify playback outside the GitHub runner`): 35709793101 (09-22 09:20:13Z), 35842385136 (09-23 09:20:47Z), 35980652608 (09-24 09:20:40Z), 36119584587 (09-25 09:38:37Z), 36232608074 (09-26 09:23:04Z), 36311265246 (09-27 10:02:34Z). This is the steady state; issue #14 was correctly left untouched. The runs **retract** the 2026-09-22 "schedule wedged" note: the `17 4 * * *` cron fires ~5h late on this repo, and the 09-22 run appeared after that check. The PR #111 in-place edit did not wedge the registration. First run on `dcdd41b` or later: 2026-09-28's fire.
 - [x] **Scheduled run — 35489268023 (2026-09-20 04:29:25 UTC, `main@6f7fa48`, job 106021243260): `ENVIRONMENT_BLOCKED`.** Read via `check-runs/<job>/annotations` + the job-steps API (log/blob download returns `EOF` in the sandbox): steps 1–10 `success` — offline probe, live probe (under `continue-on-error`), the independent `ytmusicapi` Home comparison, artifact upload, classification — issue steps `skipped`, and step 13 `Keep the check non-zero when live health is unverified` failed with **exit 2 by design**. Annotation: `Extraction health is not a production pass — ENVIRONMENT_BLOCKED — inspect the probe log and verify playback outside the GitHub runner`. Artifact `rot-drill-35489268023` retained 14 days. No live audio bytes were validated on the runner and issue #14 was correctly left untouched. First scheduled run on `main@7304abb`: 2026-09-21 04:17 UTC.
 - [x] **Scheduled run — 35421383687 (2026-09-19 04:28:36 UTC, `main@6f7fa48`): `ENVIRONMENT_BLOCKED`.** Same classification and same failure shape as the 09-20 run; this is the first pair of runs proving the daily cadence is restored on the repaired Home request contract (`6f7fa48`).
 
