@@ -221,6 +221,24 @@ class PlayerViewModel(
         // the chain instead of spinning.
         if (probe == lastRefillProbe) return
         if (!radioSession.isActive) return
+        // Stale-probe guard. The monitor can lag behind the player: a probe
+        // of the PRE-station queue (e.g. the one-song [a] before "Play
+        // radio" swapped in [a, r1..r5]) may still be in flight when the
+        // session starts, and judged against the live session it reads as
+        // "0 songs left" and fires a premature refill that consumes (and
+        // then applies) page 2 of the station over page 1. Only the probe
+        // matching the CURRENT queue AND index may trigger (a probe caught
+        // mid-publication can pair the new queue with the old index); a
+        // newer probe is always still on its way to the collector, so
+        // nothing is lost.
+        // Order matters: isActive is read FIRST. Every station start calls
+        // radioSession.start only after its queue call returned, and the
+        // engines publish player.queue inside that call — so an active
+        // session here means player.queue already holds the station. An
+        // engine that ever published late would still be caught by the
+        // whole-queue re-check after the fetch (page dropped unconsumed).
+        if (probe.queue != player.queue.value) return
+        if (probe.index != player.currentQueueIndex.value) return
         val queue = probe.queue
         if (probe.index !in 0 until queue.size) return
         if (!probe.playing) return
@@ -264,6 +282,9 @@ class PlayerViewModel(
         // (user switched queue) must not refill either.
         if (expectedQueue.getOrNull(expectedIndex)?.id != current.id) return
         if (!radioSession.isActive) return
+        // The queue changed between the gate and this launch: skip the
+        // fetch; the caller's finally re-gates on the live snapshot.
+        if (player.queue.value != expectedQueue) return
         val page = when (val token = radioSession.continuationToken) {
             null -> provider.radioQueuePage(current.id)
             else -> provider.radioQueueContinuation(token)
@@ -275,6 +296,12 @@ class PlayerViewModel(
                 // newer queue (or a stopped station).
                 if (!radioSession.isActive) return
                 val queueNow = player.queue.value
+                // The WHOLE queue must still be the one this page was
+                // fetched for — a head-id match is not enough (a stale
+                // [a] and the station [a, r1..] share their head). On a
+                // mismatch the page is dropped UNCONSUMED: the token stays,
+                // and the finally re-gate refetches it for the live queue.
+                if (queueNow != expectedQueue) return
                 if (queueNow.getOrNull(expectedIndex)?.id != current.id) return
                 val tail = page.value.tracks.filter { it.id != current.id }
                 val currentTailIds =
