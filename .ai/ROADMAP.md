@@ -1,5 +1,87 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-28** · session **`arena/01a0e78c-dhun`** · baseline `main`
+**`935e068`** (PR #116, merged 2026-09-28T07:16:51Z; post-merge CI green — see
+below). **This session's PR #117 is open.** Code head **`06b57d3`** is
+CI-green. This docs commit is the pre-merge record; it is not itself CI-green
+until its own checks finish, and the merge / rolling `test` republish are not
+claimed here (they go in the PR #117 comment).
+
+**Phase:** S3 (hardware round — user-gated). The agent lane this session was
+the designated PR #114 two-line follow-up (`PlaylistScreen` backdrop) + the
+post-#116 doc re-pins.
+
+**What shipped in PR #117 (not yet merged):**
+- `06b57d3` — `PlaylistScreen` is transparent and paints `PageArtworkBackdrop`
+  (PR #114's wrapper on `NowPlayingBackdrop`: one recipe, one set of pinned
+  numbers — list tier, 64dp blur, dim 0.40, scrim 0.50/0.32/0.44/0.62). Remote
+  playlists use their own `detail.thumbnailUrl`; local playlists borrow the
+  first track's art (the same art the header shows); loading / error / empty
+  local playlists paint nothing and the shell backdrop / base colour stays the
+  fallback. Rows, header, dialogs, reorder unchanged. This closes the last
+  "flat colour wash" browse page — the follow-up designated in HANDOFF and
+  KNOWN_LIMITATIONS on 2026-09-22 and carried since.
+- Docs (this commit): `15-test-build-gate.md` §1 re-pinned from `edf19e0` to
+  the `935e068` publish digests + banner + purpose; **step 11 inverted**
+  (playlist pages now glow; on a pre-#117 build they are flat — old behaviour,
+  not a regression); `09-browse-pages.md` dated section; CHANGELOG entry +
+  Verified block; KNOWN_LIMITATIONS new section (first-track-follows-backdrop
+  behaviour, one more blur layer on detail pages, drill watch); ROADMAP +
+  HANDOFF (this pass).
+
+**Baseline on `main` (verified this session at boot):**
+- PR #116 merged **2026-09-28T07:16:51Z** as **`935e068`**; post-merge CI
+  **36390812448**, Build APK **36390812361**, test-release **36390812362**
+  all green (`apk` + `msi` + `publish`). **The v7 bump is proven:** the
+  publish job (check-run 108827250407) has zero Node-20 deprecation
+  annotations — only the standing `ubuntu-latest` → Ubuntu 26 notice. Rolling
+  `test` republished **2026-09-28T07:21:56Z**, target **`935e068`**:
+  `dhun-test.apk` **18,367,219 B** (sha256
+  `bef638caf1e407d3622cfaaf2b0fe39414390fc7204958007c0d66a961af7a3f`),
+  `dhun-test.msi` **112,934,912 B**, ProductVersion **2.131.1** (sha256
+  `8c4359362d600e07080dd827d4762212578a75690e897c1564b687114d29ce00`) —
+  digests from the publisher annotations. PR #112 closed as superseded.
+- The drill fired daily 09-22 → 09-27 on `edf19e0` (runs 35709793101 →
+  36311265246, all `ENVIRONMENT_BLOCKED` = steady state). **The 2026-09-28
+  run had not fired when these docs were written** (checked 10:40 UTC; the
+  observed fire window is 09:20–10:02 UTC, ~5h after the cron). The ≥12h rule
+  applies before any wedge claim; the merge-time check re-looks, and
+  tomorrow's run executes on whichever `main` exists then.
+
+**Verified CI on code head `06b57d3` (watched to completion, all success):**
+push CI **36410248524**, PR CI **36410271539** (all 12 named steps), Build APK
+**36410271574**, test-release **36410271536** (`apk` + `msi` incl. hosted
+install-over 2.131.1 → 2.132.1 with userdata/cache sentinels preserved;
+`aab` / `publish` / `release_draft` skipped — `main`-gated). Zero failed
+steps; the only annotations are the standing Ubuntu 26 notice — **no Node-20
+warning anywhere**, so the v7 bump holds on PR paths too.
+
+**Last error:** none on `06b57d3`. No JDK in the sandbox — CI is the compiler.
+
+**Exact next step:** CI green on this docs head, then merge PR #117 (user
+authorized: all tests + verification, docs, only then merge). Same turn:
+post-merge CI, the publish job's annotations, and the new rolling `test`
+identity in the PR #117 comment — the §1 table in `15-test-build-gate.md` is
+the `935e068` publish, so the PR comment is the source of truth for the
+post-merge build. Re-check the drill once at merge time. Then the user gates:
+`docs/verification/15-test-build-gate.md` on the NEW build (18 checks; step 11
+is now the playlist backdrop), the endless-radio 30-min soak, S3/S6 soaks, the
+Windows native column. Agent lane after this: Ubuntu 26 runner migration watch
+(begins 2026-10-19; no pin before the label exists) — nothing else is open.
+
+**Files this session:** `PlaylistScreen.kt`, plus this docs pass
+(`15-test-build-gate.md`, `09-browse-pages.md`, CHANGELOG, KNOWN_LIMITATIONS,
+ROADMAP, HANDOFF). No forks, no vendoring.
+
+---
+
+**Previous session record (retained; superseded by the block above).** PR #116
+merged as **`935e068`** (2026-09-28T07:16:51Z) — post-merge CI green, the
+zero-Node-20 annotation proof, the rolling `test` republish and PR #112's
+closure are recorded in the PR #116 comment and the block above. The block
+below is that session's pre-merge record ("PR #116 is open" was true when
+written).
+
 Updated **2026-09-28** · session **`arena/01a0e6c8-dhun`** · baseline `main`
 **`dcdd41b`** (PR #115, merged 2026-09-28T06:46:14Z; post-merge CI green —
 see below). **This session's PR #116 is open.** Code head **`fbf69bb`** is
@@ -617,7 +699,7 @@ All are 🟨/⬜ — closing them is Stage S3.
 | Stage | Objective | Status | Gate |
 |---|---|---|---|
 | **S1** | Restore the rot drill; fresh live verdict; issue #14 reflects reality | ✅ **GREEN 2026-09-20.** Drill fires daily (runs **35421383687**/**35489268023** on `6f7fa48` → `ENVIRONMENT_BLOCKED`, honest runner-gating). **Residential evidence supplied by the user on `main@d99060e`** (rolling `test` published 2026-09-20T16:46:20Z = 22:16 IST; APK 17,948,508 B ≈ "17 MB", MSI 112,861,184 B ≈ "108 MB"; home WiFi, no VPN): installed on Android **and** Windows, searched, **4 songs played — audible, position advancing, zero failures**, Android audio continued on the locked screen. `compare/6f7fa48...d99060e` = **9 files, all docs, 0 code** → runner block and residential success are the *same code*, so the block is a datacenter-IP artifact and **T1 is disproven**. | **MET:** ≥1 scheduled verdict on current `main` **+** a playback result outside the runner. |
-| **S2** | Architectural cleanup (workflow-trigger retirement + CI hygiene, PR #54 disposition, stale `14-release.md` body) | 🟨 **MERGED 2026-09-22 as PR #111 → `7fcadbe`.** Post-merge CI green: CI **35681131215**, Build APK **35681131195**, test-release **35681131229**. Rolling `test` republished **2026-09-22T02:58:26Z** at target `7fcadbe` (APK 18,350,835 B, MSI 112,914,432 B). The 2026-09-22 04:17 UTC drill watch was **not yet observed** at the #113 pre-merge docs pass (latest schedule still **35561269411**, 2026-09-21, on `414cd79`). `download-artifact@v6` still emits the Node-20 deprecation warning (publish job of 35681131229). **Deferred:** Ubuntu 26 (begins 2026-10-19), `dev-release` orphan id 347425736 (agent DELETE → 404), PR #54 (user: no action). | CI green on the merge SHA; drill-after-edit still the open watch |
+| **S2** | Architectural cleanup (workflow-trigger retirement + CI hygiene, PR #54 disposition, stale `14-release.md` body) | 🟨 **MERGED 2026-09-22 as PR #111 → `7fcadbe`.** Post-merge CI green: CI **35681131215**, Build APK **35681131195**, test-release **35681131229**. Rolling `test` republished **2026-09-22T02:58:26Z** at target `7fcadbe` (APK 18,350,835 B, MSI 112,914,432 B). The 2026-09-22 04:17 UTC drill watch was **not yet observed** at the #113 pre-merge docs pass (latest schedule still **35561269411**, 2026-09-21, on `414cd79`). `download-artifact@v6` still emits the Node-20 deprecation warning (publish job of 35681131229) — **cleared 2026-09-28 by PR #116** (`fbf69bb` → v7; zero Node-20 annotations on the `935e068` publish job and on PR #117's runs). **Deferred:** Ubuntu 26 (begins 2026-10-19), `dev-release` orphan id 347425736 (agent DELETE → 404), PR #54 (user: no action). | CI green on the merge SHA; drill-after-edit still the open watch |
 | **S3** | Hardware verification round 1 (core loop both platforms, signed checklists) | ⬜ | `docs/verification/` checklists signed with build SHAs |
 | **S4** | Settings surface + themes/EQ wiring (keys-without-UI gap) | 🟨 code merged + CI green (PR #74); S4 hardware boxes ride in S3 | Every shipped key reachable or removed; EQ decision recorded |
 | **S5** | Testing + hardening (contrast fix, dep audit, THIRD_PARTY review) | ✅ merged (PR #74): CI green; contrast 4.66:1 asserted both schemes (`DhunThemeContrastTest`); dep audit all-HOLD with post-tag upgrade order (`.ai/DEPENDENCY_AUDIT.md`); THIRD_PARTY reviewed | CI green; contrast ≥4.5:1 or re-recorded exception; review logged |
