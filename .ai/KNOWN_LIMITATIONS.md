@@ -2,6 +2,18 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-09-28 (session `arena/01a0e7ee-dhun`) — two standing S5 findings executed: the offline-broadcast verdict and the never-refunded retry budget
+
+- **PR #118 code head `614134b` is CI-green; merge and republish are not claimed here.** Push CI **36422490521**, PR CI **36422590223** (all 12 named steps), Build APK **36422590089**, test-release **36422590222** (`apk` + `msi` incl. the hosted Windows install-over 2.134.1 → 2.135.1 with the userdata/cache sentinels preserved, `buildOnly=true` on the PR merge-preview source; `aab` / `publish` / `release_draft` skipped — `main`-gated). Intermediate fix-only head `57febe6`: push CI **36422438830** green. The only annotation anywhere is the standing Ubuntu-26 notice — no Node-20 warning. **The rolling `test` download at this writing targets `5bbb16d` (PR #117) and contains neither fix.**
+- **Neither defect was ever observed on a device or against the live service.** Both were found by reading code (the 2026-09-16 second-look pass) and both are pinned here against synthetic responses / direct policy calls. No user ever reported "DHUN couldn't read the service" for an offline broadcast, and no session ever produced the drained-retry symptom — the fixes remove a wrong answer and a slow degradation, they do not repair a reported crash.
+- **`LIVE_STREAM_OFFLINE` shape is assumed, not captured.** The runner is `ENVIRONMENT_BLOCKED` (no YouTube egress) and the sandbox has no path to a real offline broadcast, so the status/reason/subreason placement is modelled on the `UNPLAYABLE`/`ERROR` responses the parser already handles. If a real offline response carries its reason somewhere else, the *category* stays right (`Unavailable`) and only the reason text degrades to `status=LIVE_STREAM_OFFLINE`. First real observation should re-check this.
+- **The pass-through half is a deliberate hole.** `LIVE_STREAM_OFFLINE` *with* format entries is still handed to the parser unchanged, so a finished broadcast serving its VOD keeps playing. Consequence: if YouTube ever ships that status with formats that are not actually fetchable, the failure surfaces as the parser's error, not as `Unavailable`. That is the safer direction — rejecting a playable response would be a playback regression.
+- **The retry refund is policy-tested, the listener wiring is reviewed-not-executed.** `StreamRetryBudgetTest` pins the cap (3), the backoff schedule (0/1500/3000 ms), the refund, per-track isolation of the refund and the shipped constants. The wiring that calls it — a real ExoPlayer, a main-looper `Handler`, the 10 s delayed refund, the cancel-on-error/pause — cannot run in CI: no emulator reproduces a mid-stream 403, and the listener is a private anonymous object inside `buildExoPlayer`. Same honest split as the equalizer's binder calls. **Device-observable only in a long session with real failures** (S3 item 4 / the S6 soaks).
+- **The refund window is a judgement call, not a measurement.** `RESET_AFTER_PLAYING_MS = 10 s` is long enough that a flapping track (audio → error → audio) cannot farm fresh re-resolves, and short enough that a genuinely recovered track is whole again before the next gate. Nothing measured it; it is pinned by a test so a retune is a deliberate act. A track that flaps with a period longer than 10 s *can* still accumulate refunds — bounded by the fact that each cycle requires 10 s of real audio.
+- **Behaviour change worth naming:** a track can now receive more than 3 automatic recoveries over a long session (3 per "stayed audible" epoch instead of 3 per process). That is the intent — the old cap was per-process by accident — but it means the recovery path is reachable more often on a bad network. Each recovery is one re-resolve (≤45 s budget) and one seek; none is a new network *pattern*.
+- **Environment traps re-confirmed this session:** `gh run view --log` EOFs in-sandbox (`results-receiver.actions.githubusercontent.com`) and so do release asset downloads (`release-assets.githubusercontent.com`) — the **annotations API** is the readout for both CI verdicts and publish digests. `gh run list --jq 'select(…)'` silently returned nothing; parse with python. No JDK — CI is the compiler.
+- **Carried over unchanged:** device gates for #114/#115/#117 (artwork end to end, page backdrops over bright covers, compact menu in the hand, Crop on non-square covers, playlist backdrop incl. first-track-follows-backdrop), radio chain in-memory, the S3/S6 hardware items, the #105 checklist, no in-app Android EQ, dark-surface ceiling, asset/log blobs EOF, no JDK in the sandbox, Ubuntu-26 runner migration from 2026-10-19.
+
 ## 2026-09-28 (session `arena/01a0e78c-dhun`) — playlist page backdrop CI-green; the `PlaylistScreen`-opaque limitation resolved
 
 - **PR #117 code head `06b57d3` is CI-green; merge and republish are not claimed here.** Push CI **36410248524**, PR CI **36410271539** (all 12 named steps, including `:shared:jvmTest`, Android Robolectric, `assembleDebug`, probe compiles, extraction-health classification, desktop `compileKotlinJvm` + `jvmTest`), Build APK **36410271574**, test-release **36410271536** (`apk` + `msi` success incl. the hosted Windows install-over 2.131.1 → 2.132.1 with userdata/cache sentinels preserved; `aab` / `publish` / `release_draft` skipped — `main`-gated). Zero failed steps on all four runs; the only annotations are the standing `ubuntu-latest` → Ubuntu 26 notice — **no Node-20 deprecation warning anywhere**, the v7 bump holds. The rolling `test` download at this writing targets **`935e068`** and does **not** contain the playlist backdrop yet.
@@ -439,6 +451,12 @@ not inherited:
   fill is actually running (narrow race → premature Error instead of
   local-copy recovery). `cancelPrebuffer()` in the same file does it
   right (`job?.cancel()`); mirror that + a test.
+  **RESOLVED 2026-09-16 (`92383ab`, `chore(s2): delete dead harness UI,
+  archive session notes, fix cache-fill cancel`) — verified by reading the
+  code at `main@5bbb16d` on 2026-09-28:** `cancelCacheFill()` now sets the
+  flag **and** calls `cacheFillJob?.cancel()` before nulling the reference,
+  with the rationale in a comment. This entry sat un-annotated for twelve days;
+  the 2026-09-28 session marks it closed.
 - **[UNVERIFIED/LOW — S3 checklist] vlcj volume scale mapping**
   (`DesktopDhunPlayer.kt`: init `volume()/100f`, set `(v*100)`).
   Assumes native 0–100. If libVLC's native range differs, init still
@@ -448,9 +466,26 @@ not inherited:
   Per-track error counts accumulate for the process lifetime; a track
   that recovered once has fewer retries left hours later. Clear on
   STATE_READY/playing. Memory bounded by distinct tracks (trivial).
+  **RESOLVED 2026-09-28 (PR #118, `614134b`).** The counter moved into a pure
+  `StreamRetryBudget` (+6 tests) and is refunded after 10 s of continuous
+  audible playback. **Deliberate deviation from the suggestion above:** the
+  refund is *not* on the first `STATE_READY`/`isPlaying = true` — that would
+  let a flapping track (audio → error → audio) farm endless fresh re-resolves
+  and never reach the user, which is worse than the drain it fixes. The id is
+  captured when the refund is scheduled, and any error or pause inside the
+  window cancels it. The wiring itself stays reviewed-not-executed (see the
+  2026-09-28 section at the top).
 - **[NIT/LOW] `checkPlayability` passes `LIVE_STREAM_OFFLINE` as OK**
   → downstream "no formats" Parse error. Harmless for a music app;
   could map to Unavailable("live stream") if touched.
+  **RESOLVED 2026-09-28 (PR #118, `57febe6`; tests `017f4fc`, mutation-proven
+  by CI 36422015540).** Not harmless after all: the Parse error survived
+  `aggregateResolveFailures` (which prefers a non-Parse error and found none),
+  so the user was told "the music service sent something DHUN couldn't read"
+  and the service's own reason never reached the headline. Now
+  `LIVE_STREAM_OFFLINE` **with no format entries** throws `Unavailable(detail)`
+  like `UNPLAYABLE`/`ERROR`; **with** formats it is still passed through, so a
+  finished broadcast serving its VOD keeps playing.
 - **[NOTE] `visitorData` cached forever, never revalidated.**
   Fail-open covers fetch failure, not mid-session staleness (stale
   value likely behaves as no value). Extraction-maintenance note.

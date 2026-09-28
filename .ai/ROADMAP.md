@@ -1,5 +1,136 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-28** · session **`arena/01a0e7ee-dhun`** · baseline `main`
+**`5bbb16d`** (PR #117, merged 2026-09-28T10:50:31Z; post-merge CI green —
+verified this session against GitHub, not against the docs). **This session's
+PR #118 is open.** Code head **`614134b`** is CI-green (all four runs watched
+to completion). This docs commit is the pre-merge record; it is not itself
+CI-green until its own checks finish, and the merge / rolling `test` republish
+are not claimed here (they go in the PR #118 comment).
+
+**Phase:** S3 (hardware round — user-gated), with the S5-hardening leftovers
+executed in the agent lane. Boot found the lane officially empty — S1/S2/S4/S5
+code merged, S3/S6 need devices — so this session took the two `[NIT/LOW — S5]`
+"second-look code findings" that have been recorded in KNOWN_LIMITATIONS since
+**2026-09-16** and were never executed in the S5 merge (PR #74). Both are
+pure-logic defects CI can prove; neither is a feature and neither needs a
+device to be *tested* (only to be *seen*).
+
+**What shipped in PR #118 (not yet merged):**
+- `017f4fc` — **tests only, expected red.** Three pins for the
+  offline-broadcast verdict. **Mutation proof:** CI **36422015540** on this
+  commit (no fix) failed in `:shared:jvmTest` on exactly the two that assert
+  new behaviour — `AssertionError: Expected an exception of class
+  dev.dhun.core.DhunException to be thrown, but was completed successfully`
+  (`InnerTubeRequestTest.kt:179`) and `IllegalStateException:
+  LIVE_STREAM_OFFLINE was treated as playable by identity visionos`
+  (`OwnClientStreamResolverTest.kt:223`). The third pins the pass-through half
+  and was green before the fix too — it exists to stop the fix over-reaching.
+- `57febe6` — **the fix.** `checkPlayability` passed `LIVE_STREAM_OFFLINE`
+  through as playable, so an offline broadcast died later in `parseStreamInfo`
+  with `Parse("no formats in player response (streamingData empty)")`; every
+  identity in the wave answers the same way and `aggregateResolveFailures`
+  prefers a non-Parse error and finds none, so the user was told *"The music
+  service sent something DHUN couldn't read. Try again in a moment."* for a
+  track that is simply not broadcasting — the service's own reason never
+  reached the headline, and Parse reads as our bug *and* as worth retrying.
+  Now: no format entries at all → `Unavailable(detail)` carrying
+  status + reason + subreason (the `UNPLAYABLE`/`ERROR` path), so the aggregate
+  surfaces *"This track isn't available right now."* Formats present → passed
+  through untouched, because a finished broadcast still serving its VOD is
+  playable and the status string alone is not the blocker. The new
+  `hasAnyFormat` is a **presence** check only; audio-capability and direct-URL
+  judgement stay the parser's, so this cannot mask a ciphered response as
+  "unavailable".
+- `614134b` — **the second fix.** `PlaybackGraph`'s recovery listener counted
+  automatic re-resolves in a `HashMap` that lives as long as the playback
+  service and never forgot, so `MAX_RETRIES = 3` meant *3 per track per
+  process*, not 3 per incident: a track that recovered at minute 2 reached
+  minute 90 with one retry left and then none, after which an expired URL or a
+  gated endpoint surfaced as the Error state instead of "Reconnecting…". The
+  counter moves into a pure `StreamRetryBudget` (same pinned numbers — 3
+  recoveries, 0/1500/3000 ms backoff — same exhaustion behaviour, +6 tests in
+  `StreamRetryBudgetTest`) and the listener refunds a track's full budget after
+  `RESET_AFTER_PLAYING_MS` = 10 s of continuous audible playback. **The refund
+  is deliberately not immediate:** a flapping track (two seconds of audio,
+  error, two more) would earn endless fresh re-resolves and never reach the
+  user. The id is captured when the refund is *scheduled* — never read from the
+  player when it fires — so a skip inside the window cannot refund the wrong
+  track, and any error or pause inside it cancels the refund.
+- Docs (this commit): ROADMAP (this block), HANDOFF, KNOWN_LIMITATIONS (new
+  section + the two 2026-09-16 findings marked RESOLVED), DEBUG_LOG,
+  CHANGELOG entry + Verified block, `15-test-build-gate.md` (banner → third
+  pass; **§1 re-pinned to the `5bbb16d` digests the rolling release actually
+  serves**, read from the publisher annotations, not from the PR #117 comment;
+  note that PR #118 adds no gate step), `03-android-skeleton.md` (the stale
+  "max 2 retries per track" corrected to the pinned 3 + the refund rule).
+
+**Baseline on `main` (verified this session at boot):**
+- PR #117 merged **2026-09-28T10:50:31Z** as **`5bbb16d`**; post-merge CI
+  **36412080952**, Build APK **36412080763**, test-release **36412080887** all
+  green (`apk` + `msi` + `publish`). Rolling `test` republished
+  **2026-09-28T10:56:10Z**, `target_commitish`
+  **`5bbb16da5d8cee3dce3d6874425e3e4caa433766`**: `dhun-test.apk`
+  **18,367,219 B** (sha256
+  `864d41c4bb8cb02b283a02c716af3da5460786b74b9c646d64872a3c8c92d0de`),
+  `dhun-test.msi` **112,934,912 B**, ProductVersion **2.134.1** (sha256
+  `d0c74087a290a72507c9579c129cbcf8e1bfe88600673bf3446d388034ac0c12`) —
+  digests re-read this session from the publisher annotations on run
+  36412080887 and the release's `target_commitish`, independently of the PR
+  #117 comment. `.sha256` sidecars exist but their bytes could not be fetched
+  in-sandbox (asset host EOF). The publish job carries only the standing
+  Ubuntu-26 notice — the `download-artifact@v7` bump still holds.
+- **The 2026-09-28 drill DID fire:** run **36412874929** at **10:58:41Z** on
+  `5bbb16d`, verdict **`ENVIRONMENT_BLOCKED`** (steady state; read from the job
+  annotations because log blobs EOF in-sandbox). That supersedes the "had not
+  fired" notes in the block below, in the PR #117 comment and in
+  KNOWN_LIMITATIONS — the observed fire window is now 09:20–10:58 UTC, still
+  ~5–7h after the `17 4 * * *` cron, so the ≥12h rule stands. Issue #14
+  correctly untouched (the issue step fires on `FAIL` only).
+- Board: PR #54 still open as the ADR-007 contingency reference (user: no
+  action). Issues #14 / #60 / #63 open and correctly parked. No other PR open.
+
+**Verified CI on code head `614134b` (watched to completion, all success):**
+push CI **36422490521**, PR CI **36422590223** (all 12 named steps, including
+`:shared:jvmTest` for the extraction tests and the Android Robolectric suite
+that runs `StreamRetryBudgetTest`), Build APK **36422590089**, test-release
+**36422590222** (`apk` + `msi` success incl. the hosted Windows install-over
+**2.134.1 → 2.135.1** with the userdata/cache sentinels preserved,
+`buildOnly=true` against the PR merge-preview source `dbdb7b9`;
+`aab` / `publish` / `release_draft` skipped — `main`-gated). Intermediate
+fix-A-only head `57febe6`: push CI **36422438830** green. The only annotation
+anywhere is the standing Ubuntu-26 notice — **no Node-20 warning**.
+
+**Last error:** none on `614134b`. No JDK in the sandbox — CI is the compiler.
+
+**Exact next step:** CI green on this docs head, then merge PR #118
+(`gh pr merge 118 --merge` — this repo merges with merge commits). Same turn:
+post-merge CI, the publish job's annotations and the new rolling `test`
+identity in the PR #118 comment (the §1 table in `15-test-build-gate.md` prints
+the `5bbb16d` publish, so that comment becomes the source of truth for the
+post-merge build). Re-check the drill once at merge time. Then the user gates:
+the 18-check sheet on the NEW build, the endless-radio 30-min soak, S3/S6
+soaks, the Windows native column — and, if either is ever observable, the two
+behaviours this PR changes (an offline broadcast's error text; automatic
+recovery still working late in a long session). Agent lane after this: Ubuntu-26
+runner migration watch (begins 2026-10-19; no pin before the label exists) —
+nothing else is open. **No blocker.**
+
+**Files this session:** `InnerTubeClient.kt`, `InnerTubeRequestTest.kt`,
+`OwnClientStreamResolverTest.kt`, `StreamRetryBudget.kt` (new),
+`PlaybackGraph.kt`, `StreamRetryBudgetTest.kt` (new), plus this docs pass
+(`15-test-build-gate.md`, `03-android-skeleton.md`, CHANGELOG,
+KNOWN_LIMITATIONS, DEBUG_LOG, ROADMAP, HANDOFF). No forks, no vendoring.
+
+---
+
+**Previous session record (retained; superseded by the block above).** PR #117
+merged as **`5bbb16d`** (2026-09-28T10:50:31Z) — post-merge CI green, the
+rolling `test` republish and the 2026-09-28 drill run (**36412874929**,
+`ENVIRONMENT_BLOCKED`) are recorded in the PR #117 comment and in the block
+above. The block below is that session's pre-merge record ("PR #117 is open"
+and "the 2026-09-28 drill had not fired" were both true when it was written).
+
 Updated **2026-09-28** · session **`arena/01a0e78c-dhun`** · baseline `main`
 **`935e068`** (PR #116, merged 2026-09-28T07:16:51Z; post-merge CI green — see
 below). **This session's PR #117 is open.** Code head **`06b57d3`** is
@@ -712,7 +843,14 @@ the UI button — agents get 403, re-verified 2026-09-17; the user
 cannot API-dispatch). Note: S4/S5 CODE was executed out of stage order
 with user authorization and merged in PR #74 (2026-09-16); the S4
 hardware boxes ride in S3. Remaining work order is unchanged:
-S1 → S2 → S3 → S6.
+S1 → S2 → S3 → S6. **S5 addendum (2026-09-28, PR #118):** two `[NIT/LOW — S5]`
+"second-look code findings" recorded on 2026-09-16 were never executed in
+PR #74 and were closed this session — `checkPlayability` passing
+`LIVE_STREAM_OFFLINE` as OK (an offline broadcast was reported to the user as a
+parse failure) and `PlaybackGraph`'s per-track recovery counter never being
+reset on success (a long session silently drained a track's automatic-recovery
+budget). Both are pure-logic fixes with unit tests, i.e. inside S5's
+"protect what works" objective; S5 stays ✅ and the stage order is unchanged.
 
 ---
 

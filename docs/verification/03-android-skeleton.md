@@ -38,8 +38,20 @@ row, hear audio, lock the phone, use lock controls, swipe the app away.
   player error (never crashes the service).
 - 403 mid-stream recovery: on `ERROR_CODE_IO_BAD_HTTP_STATUS` the cache
   entry is invalidated, the player seeks back to its current position and
-  re-prepares (max 2 retries per track) — playback resumes where the user
-  was.
+  re-prepares (**max 3 automatic retries per track**, backoff 0 / 1500 /
+  3000 ms — the "max 2" this line carried until 2026-09-28 was stale against
+  `MAX_RETRIES = 3`) — playback resumes where the user was.
+  _(2026-09-28, PR #118)_ The budget now lives in `StreamRetryBudget`
+  (pure, `StreamRetryBudgetTest`-pinned) and is **refunded** once a track has
+  been continuously audible for `RESET_AFTER_PLAYING_MS` (10 s): the listener
+  outlives every track it plays, so the old inline counter never forgot, and a
+  track that recovered at minute 2 reached minute 90 with no automatic
+  recovery left — the fault the engine had been fixing all session surfaced as
+  the Error state instead of "Reconnecting…". The refund is delayed on purpose
+  (an immediate one would let a flapping track re-resolve forever) and is
+  cancelled by any error or pause inside the window. Device item 4 below is
+  still the only place this can be *seen*; the policy is unit-tested, the
+  listener wiring is reviewed-not-executed.
 - `AndroidDhunPlayer`: shared `DhunPlayer` interface over a MediaController;
   state/position/duration flows polled at 500ms; queue projected from the
   session timeline.

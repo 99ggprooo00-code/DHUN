@@ -5,7 +5,113 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — PR #117 playlist page backdrop + post-#116 re-pins: CI-green, docs before merge, 2026-09-28, session `arena/01a0e78c-dhun`
+## CURRENT STATE — PR #118 two S5 leftovers executed (offline-broadcast verdict + retry-budget refund): CI-green, docs before merge, 2026-09-28, session `arena/01a0e7ee-dhun`
+
+This section supersedes the statuses below it.
+
+**Baseline.** `main@5bbb16d` — PR #117 merged 2026-09-28T10:50:31Z; post-merge
+CI **36412080952** / Build APK **36412080763** / test-release **36412080887**
+all green (`apk` + `msi` + `publish`), rolling `test` republished
+**2026-09-28T10:56:10Z** with `target_commitish`
+`5bbb16da5d8cee3dce3d6874425e3e4caa433766` (APK 18,367,219 B sha256
+`864d41c4…d0de`, MSI 112,934,912 B ProductVersion **2.134.1** sha256
+`d0c74087…ce12` — re-read this session from the publisher annotations on run
+36412080887, not from the PR comment; the `.sha256` sidecars exist but the asset
+host EOFs in-sandbox). **The 2026-09-28 drill DID fire**: run **36412874929**
+at 10:58:41Z on `5bbb16d`, `ENVIRONMENT_BLOCKED` (steady state) — that closes
+the "had not fired" watch carried by the section below and by the PR #117
+comment. Observed fire window is now 09:20–10:58 UTC (~5–7h after the
+`17 4 * * *` cron), so the ≥12h rule stands. The section below still says "to
+finish this session: merge PR #117" — done; that is history.
+
+**What PR #118 does.** Boot found the agent lane officially empty (S1/S2/S4/S5
+code merged; S3/S6 are device gates; only the Ubuntu-26 runner watch on
+2026-10-19 remains), so this session executed the two `[NIT/LOW — S5]`
+second-look findings recorded since 2026-09-16 and never done in PR #74:
+
+1. `017f4fc` **tests only, expected red** — three pins for the
+   offline-broadcast verdict. **Mutation proof:** CI **36422015540** failed in
+   `:shared:jvmTest` on exactly the two that assert new behaviour
+   (`Expected an exception of class dev.dhun.core.DhunException … but was
+   completed successfully`; `LIVE_STREAM_OFFLINE was treated as playable by
+   identity visionos`). The third pins the pass-through half and was green
+   before the fix too — the guard against over-reach.
+2. `57febe6` **fix(extraction)** — `checkPlayability` passed
+   `LIVE_STREAM_OFFLINE` through as playable, so an offline broadcast died in
+   `parseStreamInfo` as `Parse("no formats in player response …")`; every
+   identity answers that way and `aggregateResolveFailures` prefers a non-Parse
+   error and finds none, so the user was told *"the music service sent
+   something DHUN couldn't read"* and the service's own reason never reached
+   the headline. Now: no formats → `Unavailable(detail)` (status + reason +
+   subreason, the `UNPLAYABLE`/`ERROR` path) → *"This track isn't available
+   right now."*; formats present → passed through untouched (a finished
+   broadcast serving its VOD stays playable). `hasAnyFormat` is a presence
+   check only, so a ciphered response can never be mislabelled "unavailable".
+3. `614134b` **fix(android)** — `PlaybackGraph`'s recovery listener counted
+   re-resolves in a map that lives as long as the playback service, so
+   `MAX_RETRIES = 3` meant *3 per track per process*: a track that recovered at
+   minute 2 reached minute 90 with none left and an expired URL surfaced as the
+   Error state instead of "Reconnecting…". The counter moves into a pure
+   `StreamRetryBudget` (+6 tests, same pinned numbers and exhaustion behaviour)
+   and is refunded after **10 s of continuous audible playback**
+   (`RESET_AFTER_PLAYING_MS`). **Not** on the first `isPlaying = true` — a
+   flapping track would farm endless re-resolves and never reach the user. The
+   id is captured when the refund is scheduled (a skip inside the window cannot
+   refund the wrong track) and any error or pause inside the window cancels it.
+4. Docs (this commit): ROADMAP, this file, KNOWN_LIMITATIONS (new section + the
+   three 2026-09-16 findings annotated — including `cancelCacheFill()`, which
+   was already fixed in `92383ab` on 2026-09-16 and sat un-annotated),
+   DEBUG_LOG, CHANGELOG entry + Verified block, `15-test-build-gate.md` (banner
+   third pass + **§1 re-pinned to the `5bbb16d` digests the rolling release
+   actually serves**, plus an explicit note that PR #118 adds no gate step),
+   `03-android-skeleton.md` (the stale "max 2 retries per track" corrected to
+   the pinned 3 + the refund rule).
+
+**CI on code head `614134b` (all success, watched to completion):** push CI
+**36422490521**, PR CI **36422590223** (all 12 named steps, including
+`:shared:jvmTest` and the Android Robolectric suite that runs
+`StreamRetryBudgetTest`), Build APK **36422590089**, test-release
+**36422590222** (`apk` + `msi` incl. the hosted Windows install-over
+2.134.1 → 2.135.1 with the userdata/cache sentinels preserved, `buildOnly=true`
+on the PR merge-preview source `dbdb7b9`; `aab` / `publish` / `release_draft`
+skipped — `main`-gated). Intermediate fix-only head `57febe6`: push CI
+**36422438830** green. Zero failed steps; the only annotation anywhere is the
+standing `ubuntu-latest` → Ubuntu 26 notice.
+
+**What is NOT claimed.** No hardware anything, and no live-service observation:
+the runner is `ENVIRONMENT_BLOCKED`, no real offline broadcast was reachable,
+and no emulator reproduces a mid-stream 403. `StreamRetryBudgetTest` pins the
+policy; the listener wiring (real ExoPlayer + main looper) stays
+reviewed-not-executed, exactly like the equalizer's binder calls. Neither
+defect was ever user-reported — these remove a wrong answer and a slow
+degradation.
+
+**To finish this session.** Docs head CI green → `gh pr merge 118 --merge`
+(merge commits, not squash) → watch post-merge CI + publish; record the new
+rolling identity and the publish job's annotations **in a PR #118 comment**.
+Never pre-claim them. Re-check the drill once at merge time.
+
+**Next session.** User device gates on the post-#118 build:
+`docs/verification/15-test-build-gate.md` (18 checks, step 11 = the playlist
+backdrop; take digests from the PR #118 comment or the `.sha256` sidecars — §1
+prints `5bbb16d`'s, which this merge replaces), the endless-radio 30-min soak,
+the S3/S6 soaks, the Windows native column. PR #118 adds two things worth
+watching *if* they are ever observable: an offline broadcast's error text
+("This track isn't available right now." not "DHUN couldn't read the service"),
+and automatic recovery still working late in a long session. Agent lane:
+**nothing open** except the Ubuntu-26 runner migration watch (begins
+2026-10-19; no pin before the label exists) and reading the next drill run on
+the new `main`.
+
+---
+
+## PREVIOUS STATE — PR #117 playlist page backdrop + post-#116 re-pins: merged as `5bbb16d`, 2026-09-28, session `arena/01a0e78c-dhun`
+
+Superseded: PR #117 merged as `5bbb16d` (2026-09-28T10:50:31Z) — post-merge CI
+green, the rolling `test` republish and the 2026-09-28 drill run
+(**36412874929**, 10:58:41Z, `ENVIRONMENT_BLOCKED`) are recorded in the PR #117
+comment and in the section above. "PR #117 is open" and "the 2026-09-28 drill
+had not fired" were both true when this was written.
 
 This section supersedes the statuses below it.
 

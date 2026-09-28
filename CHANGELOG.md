@@ -24,6 +24,84 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — two S5 leftovers: the offline-broadcast verdict and the never-refunded retry budget (2026-09-28, PR #118)
+
+- **An offline broadcast no longer blames the parser.** `checkPlayability`
+  passed `LIVE_STREAM_OFFLINE` through as playable, so the response reached
+  `parseStreamInfo` with no `streamingData` and died there with
+  `Parse("no formats in player response (streamingData empty)")`. Every client
+  identity in the resolve wave answers the same way, and
+  `aggregateResolveFailures` prefers a non-Parse error and found none — so the
+  user was told *"The music service sent something DHUN couldn't read. Try
+  again in a moment."* for a track that is simply not broadcasting: the
+  service's own reason never reached the headline, and `Parse` reads as DHUN's
+  bug *and* as something worth retrying. Now a `LIVE_STREAM_OFFLINE` response
+  with no format entries throws `Unavailable` carrying
+  `status` + `reason` + `subreason` exactly like `UNPLAYABLE`/`ERROR`, so the
+  headline becomes *"This track isn't available right now."* and the
+  diagnostics keep `visionos=UNAVAILABLE(status=LIVE_STREAM_OFFLINE; This live
+  stream is offline)`. A response that **does** carry formats is still passed
+  through untouched — a finished broadcast serving its VOD stays playable, and
+  the new `hasAnyFormat` is a presence check only, so audio-capability and
+  direct-URL judgement remain the parser's and a ciphered response can never be
+  mislabelled "unavailable".
+- **A track that stays audible gets its automatic-recovery budget back.**
+  `PlaybackGraph`'s 403 / dropped-stream listener counted re-resolves in a map
+  that lives as long as the playback service and never forgot, so
+  `MAX_RETRIES = 3` meant *three per track per process*, not three per
+  incident: a track that recovered at minute 2 reached minute 90 with one retry
+  left and then none, after which an expired URL or a gated endpoint surfaced
+  as the Error state instead of "Reconnecting…" — the engine stopped fixing by
+  itself the fault it had been fixing all session. The counter now lives in a
+  pure `StreamRetryBudget` (same pinned numbers: 3 recoveries, 0 / 1500 /
+  3000 ms backoff, same exhaustion behaviour) and the listener refunds a
+  track's full budget after **10 s of continuous audible playback**. The refund
+  is deliberately *not* immediate on the first `isPlaying = true` — a flapping
+  track (two seconds of audio, error, two more seconds) would earn endless
+  fresh re-resolves and never reach the user. The track id is captured when the
+  refund is scheduled, never read from the player when it fires, so a skip
+  inside the window cannot refund the wrong track; any error or pause inside
+  the window cancels it and leaves the failures counted.
+- Both were recorded on 2026-09-16 as `[NIT/LOW — S5]` "second-look code
+  findings" and never executed in the S5 merge (PR #74). A third finding from
+  that list (`cancelCacheFill()` not cancelling its job) was verified to have
+  been fixed on 2026-09-16 in `92383ab` and is now annotated as resolved.
+  `docs/verification/03-android-skeleton.md`'s stale "max 2 retries per track"
+  is corrected to the pinned 3 + the refund rule, and
+  `docs/verification/15-test-build-gate.md` §1 is re-pinned to the `5bbb16d`
+  digests the rolling `test` release actually serves (it printed `935e068`'s).
+
+### Verified — PR #118 CI on `614134b` (2026-09-28)
+
+- **Mutation proof first:** the tests-only commit `017f4fc` went red on CI
+  **36422015540** in `:shared:jvmTest` on exactly the two assertions that
+  require the fix — `AssertionError: Expected an exception of class
+  dev.dhun.core.DhunException to be thrown, but was completed successfully`
+  (`InnerTubeRequestTest.kt:179`) and `IllegalStateException:
+  LIVE_STREAM_OFFLINE was treated as playable by identity visionos`
+  (`OwnClientStreamResolverTest.kt:223`). The third new test pins the
+  pass-through half and was green before the fix too.
+- Code head **`614134b`** watched to completion, **green**: push CI
+  **36422490521**, PR CI **36422590223** (all 12 named steps, including
+  `:shared:jvmTest`, the Android Robolectric suite that runs
+  `StreamRetryBudgetTest`, `assembleDebug`, probe compiles,
+  extraction-health classification, desktop `compileKotlinJvm` + `jvmTest`),
+  Build APK **36422590089**, test-release **36422590222** (`apk` + `msi`
+  success, including the hosted Windows install-over **2.134.1 → 2.135.1** with
+  the per-user install and userdata/cache sentinels preserved, `buildOnly=true`
+  on the PR merge-preview source; `aab` / `publish` / `release_draft` skipped
+  because a PR cannot publish). The intermediate fix-only head `57febe6` was
+  green on push CI **36422438830**.
+- Zero failed steps on all runs. The only annotations are the standing
+  `ubuntu-latest` → Ubuntu 26 migration notice — no Node-20 deprecation
+  warning, so PR #116's `download-artifact@v7` bump still holds.
+- **Not verified here:** anything on hardware or against the live service. The
+  runner is `ENVIRONMENT_BLOCKED` (no YouTube egress), no real offline
+  broadcast was reachable, and no emulator reproduces a mid-stream 403 — the
+  offline-broadcast shape is pinned against synthetic responses in YouTube's
+  shape, and the retry refund is pinned at policy level while the listener
+  wiring stays reviewed-not-executed. Neither defect was ever user-reported.
+
 ### Changed — playlist pages sit on their own blurred artwork (2026-09-28, PR #117)
 
 - `PlaylistScreen` was the last browse page painting an opaque
