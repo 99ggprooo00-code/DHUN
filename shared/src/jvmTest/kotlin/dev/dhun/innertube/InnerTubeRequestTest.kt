@@ -164,4 +164,45 @@ class InnerTubeRequestTest {
         assertTrue(detail.contains("<url>"))
         assertTrue(!detail.contains("SECRET"))
     }
+
+    /**
+     * `LIVE_STREAM_OFFLINE` is a **content** verdict, not a parsing problem:
+     * the service says the broadcast is off and ships its own reason. Passing
+     * it through as playable used to make `parseStreamInfo` die later with
+     * `Parse("no formats in player response (streamingData empty)")`, so the
+     * wave aggregate reported "the music service sent something DHUN couldn't
+     * read" for a track that is simply not on — reason lost, and Parse reads
+     * as *our* bug (and as something worth retrying).
+     */
+    @Test
+    fun liveStreamOfflineWithoutFormatsReportsUnavailableWithTheServiceReason() {
+        val error = assertFailsWith<DhunException> {
+            checkPlayability(obj("""{"playabilityStatus":{"status":"LIVE_STREAM_OFFLINE",
+              "reason":"This live stream is offline",
+              "errorScreen":{"playerErrorMessageRenderer":{
+                "subreason":{"simpleText":"It will be back at 8:00 PM"}}}}}"""))
+        }.error
+        assertTrue(error is DhunError.Unavailable, "was ${error::class.simpleName}")
+        val detail = error.detailString().orEmpty()
+        assertTrue(detail.contains("status=LIVE_STREAM_OFFLINE"), "detail was: $detail")
+        assertTrue(detail.contains("This live stream is offline"), "detail was: $detail")
+        assertTrue(detail.contains("It will be back at 8:00 PM"), "detail was: $detail")
+    }
+
+    /**
+     * The pass-through half of the same rule: a finished broadcast that still
+     * serves formats is playable, and playability is not the blocker — so the
+     * response must reach the parser untouched rather than being rejected on
+     * its status string alone.
+     */
+    @Test
+    fun liveStreamOfflineThatStillCarriesFormatsIsPassedThrough() {
+        val response = obj(
+            """{"playabilityStatus":{"status":"LIVE_STREAM_OFFLINE","reason":"This live stream is offline"},
+               "streamingData":{"adaptiveFormats":[{"itag":140,"mimeType":"audio/mp4",
+                 "bitrate":128000,"url":"https://gvs.example/stream?itag=140"}]}}""",
+        )
+        val passed = checkPlayability(response)
+        assertTrue(passed["streamingData"] != null)
+    }
 }

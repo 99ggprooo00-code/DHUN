@@ -1,6 +1,36 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Current status (2026-09-28, session `arena/01a0e6c8-dhun` — PR #116 pre-merge).**
+> **Current status (2026-09-28, session `arena/01a0e7ee-dhun` — PR #118 pre-merge).**
+> The release baseline is **`main@5bbb16d`** (PR #117, merged
+> 2026-09-28T10:50:31Z). Post-merge CI green: CI **36412080952**, Build APK
+> **36412080763**, test-release **36412080887** (`apk` + `msi` + `publish`).
+> Rolling `test` targets exactly `5bbb16da5d8cee3dce3d6874425e3e4caa433766`
+> (`target_commitish` read from the release API this session), published
+> **2026-09-28T10:56:10Z**: `dhun-test.apk` **18,367,219 B** (sha256
+> `864d41c4bb8cb02b283a02c716af3da5460786b74b9c646d64872a3c8c92d0de`),
+> `dhun-test.msi` **112,934,912 B**, ProductVersion **2.134.1** (sha256
+> `d0c74087a290a72507c9579c129cbcf8e1bfe88600673bf3446d388034ac0c12`) — both
+> from the publisher annotations on run 36412080887, re-read independently of
+> the PR #117 comment. `.sha256` sidecars exist but the asset host EOFs
+> in-sandbox, so they could not be fetched here. The publish job carries only
+> the standing Ubuntu-26 notice: PR #116's `download-artifact@v7` bump still
+> holds (zero Node-20 annotations). Intermediate baselines: `935e068`
+> (PR #116, merged 2026-09-28T07:16:51Z; APK sha256 `bef638ca…f7a3f`, MSI
+> 2.131.1 sha256 `8c435936…ce00`), `dcdd41b` (PR #115), `edf19e0` (PR #114).
+> **PR #118** (two S5 leftovers: the offline-broadcast verdict + the retry-budget
+> refund) code head `614134b` is green: push CI **36422490521**, PR CI
+> **36422590223** (12/12 steps), Build APK **36422590089**, test-release
+> **36422590222** (`apk` + `msi` incl. the hosted Windows install-over
+> 2.134.1 → 2.135.1 with the userdata/cache sentinels preserved,
+> `buildOnly=true`; `aab` / `publish` / `release_draft` skipped because they are
+> `main`-gated). Its merge republishes again — quote the post-merge release API
+> or the PR #118 comment as the download identity, not this paragraph. Drill:
+> **the 2026-09-28 run fired** — 36412874929 at 10:58:41Z on `5bbb16d`,
+> `ENVIRONMENT_BLOCKED` (see the live evidence log); daily since 09-22, all
+> `ENVIRONMENT_BLOCKED`. This is compile, unit and packaging evidence only. It
+> closes no S3 checklist and signs no soak.
+>
+> **Previous status (2026-09-28, session `arena/01a0e6c8-dhun` — PR #116 pre-merge; retained).**
 > The release baseline is **`main@dcdd41b`** (PR #115, merged
 > 2026-09-28T06:46:14Z). Post-merge CI green: CI **36388115963**, Build APK
 > **36388115954**, test-release **36388116013**. Rolling `test` targets exactly
@@ -198,6 +228,7 @@ for upstream recovery.
 
 ### Rot-drill / extraction-health
 
+- [x] **Scheduled run — 36412874929 (2026-09-28 10:58:41 UTC, `main@5bbb16d`, job 108896993696): `ENVIRONMENT_BLOCKED`.** The first fire on the post-#117 baseline, and the one the PR #117 session had not yet seen when it wrote "had not fired" (checked 10:40/10:50 UTC). Read via the job-steps + `check-runs/<job>/annotations` APIs (log blob download EOFs in-sandbox): steps 1–10 `success` — including the offline + live playback probes, the independent Home-continuation comparison and the classification — both issue steps `skipped`, and `Keep the check non-zero when live health is unverified` failed with **exit 2 by design**. Annotation: `ENVIRONMENT_BLOCKED — inspect the probe log and verify playback outside the GitHub runner`. Steady state; issue #14 correctly untouched. Fire windows observed so far: 09:20–10:58 UTC, i.e. ~5–7h after the `17 4 * * *` cron. Next run executes on whichever `main` exists then (PR #118's merge if it has landed).
 - [x] **Scheduled runs 2026-09-22 → 09-27, all on `main@edf19e0`, all `ENVIRONMENT_BLOCKED`** (annotation `Extraction health is not a production pass — ENVIRONMENT_BLOCKED — inspect the probe log and verify playback outside the GitHub runner`): 35709793101 (09-22 09:20:13Z), 35842385136 (09-23 09:20:47Z), 35980652608 (09-24 09:20:40Z), 36119584587 (09-25 09:38:37Z), 36232608074 (09-26 09:23:04Z), 36311265246 (09-27 10:02:34Z). This is the steady state; issue #14 was correctly left untouched. The runs **retract** the 2026-09-22 "schedule wedged" note: the `17 4 * * *` cron fires ~5h late on this repo, and the 09-22 run appeared after that check. The PR #111 in-place edit did not wedge the registration. First run on `dcdd41b` or later: 2026-09-28's fire.
 - [x] **Scheduled run — 35489268023 (2026-09-20 04:29:25 UTC, `main@6f7fa48`, job 106021243260): `ENVIRONMENT_BLOCKED`.** Read via `check-runs/<job>/annotations` + the job-steps API (log/blob download returns `EOF` in the sandbox): steps 1–10 `success` — offline probe, live probe (under `continue-on-error`), the independent `ytmusicapi` Home comparison, artifact upload, classification — issue steps `skipped`, and step 13 `Keep the check non-zero when live health is unverified` failed with **exit 2 by design**. Annotation: `Extraction health is not a production pass — ENVIRONMENT_BLOCKED — inspect the probe log and verify playback outside the GitHub runner`. Artifact `rot-drill-35489268023` retained 14 days. No live audio bytes were validated on the runner and issue #14 was correctly left untouched. First scheduled run on `main@7304abb`: 2026-09-21 04:17 UTC.
 - [x] **Scheduled run — 35421383687 (2026-09-19 04:28:36 UTC, `main@6f7fa48`): `ENVIRONMENT_BLOCKED`.** Same classification and same failure shape as the 09-20 run; this is the first pair of runs proving the daily cadence is restored on the repaired Home request contract (`6f7fa48`).

@@ -1,18 +1,26 @@
 # 15 — Test-build gate: step-by-step procedure
 
-> **⚠ Digest update (2026-09-28, second pass).** The §1 table now carries the
-> digests of the **`935e068`** publish (PR #116, 2026-09-28T07:21:56Z) — the
-> rolling download at the time this sheet was re-pinned. **This sheet ships in
-> PR #117; when #117 merges, `test` moves again** and every publish changes
-> the MSI hash (its ProductVersion counter advances). The APK can keep the
-> same size and still be a different build. So the definitive comparison for
-> the build you actually download is the **`.sha256` sidecars published beside
-> the assets** or the digests in **the newest merged PR's comment** — the §1
-> table is the fallback, not the source of truth. The 18 checks also now
-> assume the PR #117 build: **step 11 changed** — playlist pages sit on their
-> own blurred artwork instead of staying flat. On a pre-#117 build (for
-> example `935e068`) playlist pages are still flat: that is the old
-> behaviour, not a regression — re-download.
+> **⚠ Digest update (2026-09-28, third pass).** The §1 table now carries the
+> digests of the **`5bbb16d`** publish (PR #117, 2026-09-28T10:56:10Z, MSI
+> ProductVersion **2.134.1**) — read from the publisher's own annotations on
+> test-release run **36412080887**, which is the rolling download `test`
+> serves right now. **This sheet ships in PR #118; when #118 merges, `test`
+> moves again** and every publish changes the MSI hash (its ProductVersion
+> counter advances). The APK can keep the same size and still be a different
+> build — `5bbb16d`'s and `935e068`'s are both 18,367,219 B. So the definitive
+> comparison for the build you actually download is the **`.sha256` sidecars
+> published beside the assets** or the digests in **the newest merged PR's
+> comment** — the §1 table is the fallback, not the source of truth.
+>
+> The 18 checks are unchanged by PR #118 and still assume the PR #117 build:
+> **step 11** is the playlist backdrop (playlist pages sit on their own blurred
+> artwork). On a pre-#117 build (for example `935e068`) playlist pages are
+> still flat: that is the old behaviour, not a regression — re-download.
+> PR #118's two fixes are engine-room and have **no step of their own**: an
+> offline broadcast now reports "This track isn't available right now."
+> instead of "DHUN couldn't read the service" (needs an actually-offline live
+> stream to observe), and a track that has been audible for 10 s gets its
+> automatic-recovery budget back (needs a long session with real 403s).
 
 > **Purpose.** Device-side acceptance for the `test` rolling build. The sheet
 > was written around PR #114's three defects — album artwork on playback,
@@ -21,7 +29,9 @@
 > covers *fill* the player card via Crop, album header covers fall back to
 > the shallowest `thumbnails` array), PR #116 (endless-radio refill race fix,
 > `download-artifact` v7) and PR #117 (playlist pages sit on their own
-> blurred artwork — step 11 below). Always test the **newest** publish;
+> blurred artwork — step 11 below). PR #118 changed two engine-room
+> behaviours (offline-broadcast error text, retry-budget refund) and adds no
+> step: see the banner. Always test the **newest** publish;
 > see the banner above for how to verify which one you have.
 >
 > **How to use it.** Work top to bottom, in order. Tick as you go. Write
@@ -50,8 +60,8 @@ Windows build: `Win + R` → `winver`. Android version: Settings → About phone
 ## 1. Verify the digest (do this BEFORE installing)
 
 > **Why this is step 1 and not optional:** the APK is **18,367,219 B — byte-identical
-> in size to the previous publish.** Size proves nothing. Only the hash proves you
-> have PR #114 and not the old build. This step could not be verified from the
+> in size to the previous two publishes.** Size proves nothing. Only the hash proves you
+> have the current `main` and not an older build. This step could not be verified from the
 > coding sandbox (no network path to GitHub's asset hosts), so it is entirely on you.
 
 **Android / macOS / Linux:**
@@ -65,13 +75,15 @@ Get-FileHash .\dhun-test.msi -Algorithm SHA256
 ```
 
 **Compare against** — latest observed publish when this sheet was re-pinned:
-`test` targeting **`935e068`** (PR #116), published **2026-09-28T07:21:56Z**;
-MSI internal ProductVersion **2.131.1**:
+`test` targeting **`5bbb16d`** (PR #117), published **2026-09-28T10:56:10Z**;
+MSI internal ProductVersion **2.134.1**. Digests are the publisher's own
+annotations on test-release run **36412080887** (`source=5bbb16da5d8…`,
+`buildOnly=false`):
 
 | Asset | Bytes | Expected SHA-256 |
 |---|---|---|
-| `dhun-test.apk` | 18,367,219 | `bef638caf1e407d3622cfaaf2b0fe39414390fc7204958007c0d66a961af7a3f` |
-| `dhun-test.msi` | 112,934,912 | `8c4359362d600e07080dd827d4762212578a75690e897c1564b687114d29ce00` |
+| `dhun-test.apk` | 18,367,219 | `864d41c4bb8cb02b283a02c716af3da5460786b74b9c646d64872a3c8c92d0de` |
+| `dhun-test.msi` | 112,934,912 | `d0c74087a290a72507c9579c129cbcf8e1bfe88600673bf3446d388034ac0c12` |
 
 > If your hash matches **neither** this table **nor** the newest merged PR
 > comment's digests, a newer publish has replaced `test` — do not guess:
