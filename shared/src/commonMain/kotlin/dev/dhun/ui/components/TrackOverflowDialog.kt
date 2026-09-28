@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -204,6 +205,19 @@ internal fun TrackMenuSurface(
     LyricsMaterial(
         artworkUrl = artworkUrl,
         modifier = modifier
+            // LyricsMaterial lays its content out with `fillMaxSize`, and a
+            // Dialog measures that against the *window*: the surface inherited
+            // the full screen height and ran off the bottom of the action list,
+            // so a six-row menu read as a full-height sheet again. Unbounded
+            // height makes `fillMaxSize` a no-op in that dimension (it only
+            // applies to bounded constraints), so the surface takes exactly the
+            // height of its own header + rows.
+            //
+            // `unbounded = true` is required: the default only zeroes the *min*
+            // height and leaves the bounded window max in place, which would
+            // still stretch. The queue row's DropdownMenu shares this surface
+            // and gets the same wrap.
+            .wrapContentHeight(unbounded = true)
             .shadow(
                 DhunSpacing.md,
                 shape,

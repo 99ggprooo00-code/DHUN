@@ -1341,11 +1341,14 @@ private fun ambientScrimBrush(): Brush = Brush.verticalGradient(
  * The sharp artwork, fit to a square card in the upper field.
  *
  * The card is sized by [fittedPlayerArtworkSize], so it respects the width,
- * the *height* and the max-artwork token, and the image inside is drawn with
- * [ContentScale.Fit]: a 16:9 cover or a square avatar is shown whole — never
- * cropped/zoomed — with the blurred backdrop showing through the letterbox
- * bands instead of black bars. Slide + fade on track change, a gentle
- * play-scale, and a fade-out while lyrics-dominant (ADR-002 P6).
+ * the *height* and the max-artwork token. The image fills that square card
+ * with [ContentScale.Crop], Apple-Music style: the source aspect ratio no
+ * longer decides how much of the frame is covered, so a 16:9 cover or a tall
+ * avatar fills it instead of leaving letterbox bands over the blurred
+ * backdrop. A square cover — the overwhelming majority — is unchanged; only
+ * non-square art trades its edges for a filled frame. Slide + fade on track
+ * change, a gentle play-scale, and a fade-out while lyrics-dominant
+ * (ADR-002 P6).
  */
 @Composable
 private fun ArtworkHeroField(
@@ -1408,10 +1411,16 @@ private fun ArtworkHeroField(
                     contentDescription = t?.title,
                     modifier = Modifier.fillMaxSize(),
                     shape = DhunShapes.artwork,
-                    contentScale = ContentScale.Fit,
-                    // Let the blurred bleed show in the free bands: the whole
-                    // cover stays visible and the card still reads as artwork.
-                    placeholderBase = false,
+                    // Crop, not Fit: the card is square and the cover should
+                    // fill it edge to edge. Fit letterboxed any cover that was
+                    // not square, and those bands showed the blurred backdrop
+                    // behind the card — read on device as a dark, blurred
+                    // frame around the artwork.
+                    contentScale = ContentScale.Crop,
+                    // With Crop there are no bands left to reveal, so the
+                    // opaque base is back on: a loading or failed cover reads
+                    // as artwork-shaped rather than a hole over the blur.
+                    placeholderBase = true,
                 )
             }
         }

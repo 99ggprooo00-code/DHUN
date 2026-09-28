@@ -54,6 +54,41 @@ private fun thumbnailsLastUrl(node: JsonObject?): String? {
         val url = last?.str("url")
         if (!url.isNullOrBlank()) return normalizeRemoteUrl(url)
     }
+    // Nothing named above matched. Real browse headers ship their cover under
+    // arrangements this list has never enumerated (album headers in
+    // particular), and the old code returned null there — losing the cover,
+    // the page backdrop, and every row that inherits it, with no error.
+    // Fall back to the shallowest `thumbnails` array anywhere in the header:
+    // same "largest entry" rule, same normalization, and it can only fire
+    // where we previously gave up, so no working page can change behaviour.
+    return firstThumbnailsUrl(node)
+}
+
+/**
+ * Breadth-first search for the shallowest `thumbnails` array in [node],
+ * returning its largest (last) entry's URL.
+ *
+ * Breadth-first, not depth-first, so the array nearest the header root wins:
+ * on a header that carries both a portrait and a cover, the one the page is
+ * actually about sits closest to the top.
+ */
+private fun firstThumbnailsUrl(node: JsonElement): String? {
+    val queue = ArrayDeque<JsonElement>()
+    queue += node
+    while (queue.isNotEmpty()) {
+        when (val current = queue.removeFirst()) {
+            is JsonObject -> {
+                val arr = current["thumbnails"] as? JsonArray
+                if (arr != null) {
+                    val url = (arr.lastOrNull() as? JsonObject)?.str("url")
+                    if (!url.isNullOrBlank()) return normalizeRemoteUrl(url)
+                }
+                for (value in current.values) queue += value
+            }
+            is JsonArray -> for (value in current) queue += value
+            else -> {}
+        }
+    }
     return null
 }
 
