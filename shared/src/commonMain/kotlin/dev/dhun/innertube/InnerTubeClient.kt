@@ -723,11 +723,34 @@ internal fun checkPlayability(root: JsonObject): JsonObject {
     ).distinct()
     val detail = diagnosticText("status=$status; ${reasons.joinToString("; ")}")
     return when (status) {
-        "OK", "LIVE_STREAM_OFFLINE" -> root
+        "OK" -> root
+        // An offline broadcast is a *content* verdict, and the service ships
+        // its own reason for it. Passing the response through as playable
+        // made the parser die later with Parse("no formats in player
+        // response"), which the wave aggregate reported as DHUN failing to
+        // read the service — reason lost, and Parse reads as our bug (and as
+        // something worth retrying). If the response DOES carry formats (a
+        // finished broadcast still serving its VOD), playability is not the
+        // blocker and the response is passed through untouched.
+        "LIVE_STREAM_OFFLINE" ->
+            if (hasAnyFormat(root)) root else throw DhunException(DhunError.Unavailable(detail))
         "LOGIN_REQUIRED" -> throw DhunException(DhunError.AuthRequired(detail))
         "UNPLAYABLE", "ERROR" -> throw DhunException(DhunError.Unavailable(detail))
         else -> throw DhunException(DhunError.Parse(detail))
     }
+}
+
+/**
+ * True when `streamingData` carries at least one format entry for
+ * [parseStreamInfo] to choose from — the shape check behind
+ * [checkPlayability]'s `LIVE_STREAM_OFFLINE` pass-through. Presence only:
+ * whether a format is audio-capable and carries a direct URL is the parser's
+ * judgement, not playability's.
+ */
+internal fun hasAnyFormat(root: JsonObject): Boolean {
+    val streaming = root.obj("streamingData") ?: return false
+    return streaming.arr("adaptiveFormats").orEmpty().isNotEmpty() ||
+        streaming.arr("formats").orEmpty().isNotEmpty()
 }
 
 /**
