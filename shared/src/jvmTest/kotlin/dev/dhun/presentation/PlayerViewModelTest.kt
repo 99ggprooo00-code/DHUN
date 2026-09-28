@@ -19,6 +19,7 @@ import dev.dhun.presentation.player.LyricsUiState
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.player.RelatedUiState
 import dev.dhun.provider.MusicProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -106,6 +107,8 @@ class PlayerViewModelTest {
         val radioPagesByVideo = mutableMapOf<String, DhunResult<dev.dhun.core.RadioQueuePage>>()
         val continuationResults = mutableListOf<DhunResult<dev.dhun.core.RadioQueuePage>>()
         private var continuationIndex = 0
+        /** When set, a continuation fetch suspends here (a network round-trip in flight). */
+        @Volatile var continuationGate: CompletableDeferred<Unit>? = null
 
         override suspend fun search(query: String, filter: SearchFilter) = DhunResult.Success(SearchResults(query))
         override suspend fun searchContinuation(continuationToken: String) = DhunResult.Success(SearchResults(""))
@@ -128,6 +131,7 @@ class PlayerViewModelTest {
         }
         override suspend fun radioQueueContinuation(continuationToken: String): DhunResult<dev.dhun.core.RadioQueuePage> {
             continuationCalls += continuationToken
+            continuationGate?.await()
             if (continuationIndex < continuationResults.size) {
                 return continuationResults[continuationIndex++]
             }
@@ -390,11 +394,16 @@ class PlayerViewModelTest {
         return RadioFixture(player, provider, vm)
     }
 
-    /** Simulates natural playback advancing the engine to [index]. */
+    /**
+     * Simulates natural playback advancing the engine to [index]. Publishes
+     * in the Android engine's order (`AndroidDhunPlayer.refresh`: track,
+     * then index): an index-first publish let a refill launch before the
+     * sounding track moved, bail on the track check, and lose its trigger.
+     */
     private fun FakePlayer.advanceTo(index: Int) {
-        currentQueueIndex.value = index
         val t = queue.value[index]
         currentTrack.value = t
+        currentQueueIndex.value = index
         state.value = PlaybackState.Playing(t)
     }
 
@@ -430,6 +439,84 @@ class PlayerViewModelTest {
             // consumed the page's next token.
             assertEquals(listOf("tok-a"), fixture.provider.continuationCalls)
             assertEquals("tok-2", fixture.vm.radioSession.continuationToken)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    /**
+     * Regression for the flake on push CI 35979756610 (`67068a7`, green on
+     * the same SHA in PR CI): the monitor lagged, and a probe of the
+     * PRE-station queue [a] was judged against the now-active session —
+     * "0 songs left" — so a refill fired above the threshold and consumed
+     * the station's next page. Replayed here deterministically by handing
+     * the gate that stale probe directly.
+     */
+    @Test
+    fun endlessRadioIgnoresAStaleProbeOfThePreStationQueue(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val fixture = startRadioWithTail(scope, token = "tok-a")
+            fixture.provider.continuationResults += DhunResult.Success(
+                dev.dhun.core.RadioQueuePage(
+                    tracks = listOf(track("p2a"), track("p2b"), track("p2c"), track("p2d")),
+                    continuationToken = "tok-2",
+                ),
+            )
+            // The one-song queue from before "Play radio" swapped the station in.
+            fixture.vm.maybeRefillRadio(
+                PlayerViewModel.RefillProbe(listOf(track("a")), index = 0, playing = true),
+            )
+            delay(300)
+            assertTrue(
+                fixture.provider.continuationCalls.isEmpty(),
+                "a stale probe must not refill, got ${fixture.provider.continuationCalls}",
+            )
+            assertEquals("tok-a", fixture.vm.radioSession.continuationToken)
+            assertEquals(listOf("a", "r1", "r2", "r3", "r4", "r5"), fixture.player.queue.value.map { it.id })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    /**
+     * A page fetched for one queue must never be applied to another: the
+     * user changes the queue while the continuation round-trip is in
+     * flight, so the late page is dropped UNCONSUMED and the re-gate
+     * refetches the SAME token for the live queue.
+     */
+    @Test
+    fun endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val fixture = startRadioWithTail(scope, token = "tok-a")
+            val gate = CompletableDeferred<Unit>()
+            fixture.provider.continuationGate = gate
+            fixture.provider.continuationResults += DhunResult.Success(
+                dev.dhun.core.RadioQueuePage(
+                    tracks = listOf(track("r6"), track("r7"), track("r8"), track("r9"), track("r10")),
+                    continuationToken = "tok-2",
+                ),
+            )
+            // 2 songs left on r3: the refill starts and blocks mid round-trip.
+            fixture.player.advanceTo(3)
+            eventually { fixture.provider.continuationCalls.size == 1 }
+            // The queue changes under the in-flight fetch.
+            fixture.player.addToQueue(track("u"))
+            delay(200)
+            gate.complete(Unit)
+            eventually {
+                fixture.player.queue.value.map { it.id } ==
+                    listOf("r3", "r6", "r7", "r8", "r9", "r10")
+            }
+            // Two fetches of the SAME token: the first page was dropped
+            // without consuming the chain, the re-gate fetched it again for
+            // the live queue. Pre-fix the stale page was applied at once
+            // and the chain advanced after a single call.
+            assertEquals(listOf("tok-a", "tok-a"), fixture.provider.continuationCalls)
+            assertEquals("tok-2", fixture.vm.radioSession.continuationToken)
+            assertEquals("r3", fixture.player.currentTrack.value?.id)
+            assertTrue(fixture.player.seeks.isEmpty(), "no seek may happen — never restart")
         } finally {
             scope.cancel()
         }

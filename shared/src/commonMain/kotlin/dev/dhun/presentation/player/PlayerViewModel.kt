@@ -203,15 +203,19 @@ class PlayerViewModel(
         }
     }
 
-    /** One conflated (queue, index, playing) snapshot for the refill gate. */
-    private data class RefillProbe(val queue: List<Track>, val index: Int, val playing: Boolean)
+    /**
+     * One conflated (queue, index, playing) snapshot for the refill gate.
+     * `internal` (not private) so jvmTest can hand the gate a stale probe
+     * deterministically — the race it guards is otherwise timing-only.
+     */
+    internal data class RefillProbe(val queue: List<Track>, val index: Int, val playing: Boolean)
 
     /**
      * Gate for the endless-radio refill. Fires at most one in-flight refill:
      * radio active + queue loaded + currently PLAYING + ≤
      * [RADIO_REFILL_THRESHOLD_SONGS] songs after the current one.
      */
-    private fun maybeRefillRadio(probe: RefillProbe) {
+    internal fun maybeRefillRadio(probe: RefillProbe) {
         // The last LAUNCHED probe: a re-check that lands on the same
         // situation (nothing changed while a refill was in flight) stops
         // the chain instead of spinning.
