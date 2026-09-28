@@ -56,18 +56,23 @@ succeeded; its sole annotation is the standing Ubuntu-26 migration notice.
 
 **Local/pushed state:** checkout was clean at boot, zero commits ahead of
 main; no prior work lost. Assigned branch was not on GitHub (404, not auth
-failure). These six documentation edits are local pending the session commit
-and one PR. Local **29 Python tests passed**, **35 JSON fixtures valid**;
+failure). The six-file handoff update is committed as **`94cc440`**, pushed to the
+assigned branch, and open as **PR #119**. This status follow-up belongs to
+the same PR, not a second work stream. Local **29 Python tests passed**, **35 JSON fixtures valid**;
 `git diff --check` is the whitespace gate. No local Kotlin/PowerShell execution.
-New session-head CI is pending; main's green checks do not certify these edits.
+Session push CI **36426612940** on `94cc440` is in progress at this
+record; PR checks / this status-follow-up head remain pending. Main's green
+checks do not certify these edits. See PR #119's verification comment for
+the final head and completed check results once actually observed.
 
 **Last actual error:** latest extraction drill's `ENVIRONMENT_BLOCKED` (exit 2);
 no current application-test failure found. No JDK locally. The installed CLI
 rejects `gh run list --commit`; using `--branch main` and checking SHAs works.
 
-**Exact next technical step:** commit/push these verified handoff edits on
-`arena/01a0e81a-dhun`, open one working PR, inspect branch/PR CI and packaging
-checks. Record their actual evidence before seeking final checkpoint approval.
+**Exact next technical step:** finish branch/PR CI and packaging checks for
+**PR #119** on `arena/01a0e81a-dhun`; inspect actual failures if any, then
+record final-head run evidence in that PR before seeking final checkpoint
+approval. The documentation handoff is implemented; check completion is pending.
 Then device testing is the next acceptance step, using the verified build
 above (or the freshly verified replacement if `test` moves).
 

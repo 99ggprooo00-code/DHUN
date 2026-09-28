@@ -43,7 +43,9 @@ and recovery listener/device evidence remain open. No new hardware result.
 Read the next scheduled verdict on the new main; do not change extraction or
 ADR-007 on runner gating alone. Ubuntu-26 watch starts 2026-10-19.
 
-**Session lifecycle:** one PR on `arena/01a0e81a-dhun`; no merge/closure or
+**Session lifecycle:** **PR #119**, first commit `94cc440`, is pushed on
+`arena/01a0e81a-dhun`; CI is pending at this documentation snapshot. Final-head
+check evidence will be recorded in the PR before approval. No merge/closure or
 Arena finalization without explicit final checkpoint approval. A future merge
 will republish `test` even for docs-only changes; never pre-claim that release.
 
