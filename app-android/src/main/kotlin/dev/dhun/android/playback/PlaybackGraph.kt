@@ -240,16 +240,34 @@ object PlaybackGraph {
         // AndroidDhunPlayer's threading contract).
         val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
         player.addListener(object : Player.Listener {
-            private val retries = HashMap<String, Int>()
+            private val retryBudget = StreamRetryBudget()
             private var recoveryPosted = false
+
+            // Which track earns its budget back when [budgetReset] fires —
+            // captured at schedule time, never read from the player then, so a
+            // skip during the window cannot refund the wrong track.
+            private var budgetResetId: String? = null
+            private val budgetReset = Runnable {
+                budgetResetId?.let(retryBudget::clear)
+                budgetResetId = null
+            }
+
+            private fun cancelBudgetReset() {
+                mainHandler.removeCallbacks(budgetReset)
+                budgetResetId = null
+            }
+
             override fun onPlayerError(error: PlaybackException) {
+                // A failure inside the window means the track never stayed up:
+                // it keeps the failures it already had.
+                cancelBudgetReset()
                 if (!isRecoverable(error)) {
                     StreamRecoverySignal.end()
                     return
                 }
                 val id = player.currentMediaItem?.mediaId ?: return
-                val count = ((retries[id] ?: 0) + 1).also { retries[id] = it }
-                if (count > MAX_RETRIES) {
+                val attempt = retryBudget.recordFailure(id)
+                if (attempt == null) {
                     StreamRecoverySignal.end()
                     return
                 }
@@ -263,7 +281,7 @@ object PlaybackGraph {
                 StreamRecoverySignal.begin()
                 streamCache.invalidate(id)
                 recoveryPosted = true
-                val backoffMs = RETRY_BACKOFF_MS * (count - 1)
+                val backoffMs = retryBudget.backoffMillisFor(attempt)
                 mainHandler.post {
                     recoveryPosted = false
                     // The user may have skipped while this was queued —
@@ -282,7 +300,18 @@ object PlaybackGraph {
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) StreamRecoverySignal.end()
+                if (!isPlaying) {
+                    cancelBudgetReset()
+                    return
+                }
+                StreamRecoverySignal.end()
+                // Audible again. Refund the retry budget only once it has
+                // STAYED audible (see StreamRetryBudget) — an immediate refund
+                // would let a flapping track re-resolve forever.
+                val id = player.currentMediaItem?.mediaId ?: return
+                cancelBudgetReset()
+                budgetResetId = id
+                mainHandler.postDelayed(budgetReset, StreamRetryBudget.RESET_AFTER_PLAYING_MS)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -339,8 +368,6 @@ object PlaybackGraph {
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
-    private const val MAX_RETRIES = 3
-    private const val RETRY_BACKOFF_MS = 1_500L
     /** Per-segment load retries before the error reaches onPlayerError. */
     private const val SEGMENT_RETRY_COUNT = 5
 
