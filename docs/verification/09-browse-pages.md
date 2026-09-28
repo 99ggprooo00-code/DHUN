@@ -67,6 +67,7 @@ two pages paint; the Phase-09 descriptions above are otherwise unchanged.
 - **Not changed here:** `PlaylistScreen` still paints an opaque background — the
   same defect class, deliberately left out of scope for that session and
   recorded in `.ai/KNOWN_LIMITATIONS.md`.
+  _(Resolved 2026-09-28 by PR #117 — see the next section.)_
 
 
 YouTube is unreachable from the authoring sandbox (egress blocked; only
@@ -87,6 +88,32 @@ synthetic samples:
 **Live re-capture** (per MASTER_PROMPT "fixtures captured for tests") is
 scheduled for the next network-capable session; the daily rot drill will
 flag drift.
+
+## 2026-09-28 — playlist page backdrop (session `arena/01a0e78c-dhun`, PR #117)
+
+The last browse page stops painting an opaque `DhunColors.background`:
+`PlaylistScreen` is transparent and paints `PageArtworkBackdrop` — the same
+wrapper the album / artist pages got on 2026-09-22, so the recipe *and* every
+pinned number (`NowPlayingBackdropPolicy`: list tier, 64dp blur, dim 0.40,
+scrim 0.50/0.32/0.44/0.62) remain the shell's, pointed at the playlist's own
+artwork.
+
+- **Remote (YTM) playlist:** `detail.thumbnailUrl` — the cover the header
+  already shows.
+- **Local playlist:** has no artwork of its own, so it borrows the **first
+  track's** thumbnail — the same art `PlaylistHeader` already renders at the
+  playlist size. Removing/reordering the first track therefore changes the
+  backdrop (the header art changes with it — consistent, not a flicker bug;
+  recorded in `KNOWN_LIMITATIONS`).
+- **Loading / Error / local playlist with no tracks:** no backdrop — the shell
+  backdrop / base colour stays the fallback, matching `AlbumScreen`.
+- **Rows, header layout, rename/delete dialogs, swipe-remove and drag-reorder
+  are unchanged.** The `15-test-build-gate.md` step-11 negative ("playlist
+  pages stay flat") is inverted by this change and updated in the same PR.
+- On-hardware acceptance of the look stays OPEN (sheet step 11); CI cannot
+  see whether a bright playlist cover keeps local-playlist row labels
+  readable (they are plain rows over the shared dim 0.40 + scrim, no extra
+  header veil below the header block).
 
 ## Tests (jvmTest, no network)
 

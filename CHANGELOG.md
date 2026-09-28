@@ -24,6 +24,43 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — playlist pages sit on their own blurred artwork (2026-09-28, PR #117)
+
+- `PlaylistScreen` was the last browse page painting an opaque
+  `DhunColors.background`: a playlist read as a flat colour wash while
+  Home / Search / Library and (since PR #114) the album / artist pages glowed
+  with real artwork. It is now transparent and paints `PageArtworkBackdrop`
+  — the same wrapper on `NowPlayingBackdrop`, so one recipe and one set of
+  pinned numbers (`NowPlayingBackdropPolicy`: list-tier request, 64dp blur,
+  dim 0.40, scrim 0.50/0.32/0.44/0.62) cover the shell, the album/artist
+  pages and now the playlist page.
+- A remote (YTM) playlist uses its own `detail.thumbnailUrl`; a local
+  playlist has no artwork of its own, so it borrows its **first track's**
+  thumbnail — the same art its header already shows. Loading, error and
+  empty local playlists paint no backdrop: no artwork (or a platform that
+  cannot really blur) draws nothing and the shell backdrop / base colour
+  stays the fallback, exactly like the album and artist pages.
+- Rows, header layout, rename/delete dialogs, swipe-remove and drag-reorder
+  are unchanged. The `15-test-build-gate.md` step-11 negative ("playlist
+  pages stay flat") is inverted by this change and updated in the same PR,
+  whose digest table is also re-pinned to the `935e068` publish.
+
+### Verified — PR #117 CI on `06b57d3` (2026-09-28)
+
+- Code head **`06b57d3`** (playlist backdrop + this changelog's entry) was
+  watched to completion and is **green**: push CI **36410248524**, PR CI
+  **36410271539** (all 12 named steps, including `:shared:jvmTest`, the
+  Android Robolectric suite, `assembleDebug`, probe compiles,
+  extraction-health classification, desktop `compileKotlinJvm` + `jvmTest`),
+  Build APK **36410271574**, test-release **36410271536** (`apk` + `msi`
+  success, including the hosted Windows install-over 2.131.1 → 2.132.1 with
+  the per-user install and userdata/cache sentinels preserved;
+  `aab` / `publish` / `release_draft` skipped because a PR cannot publish).
+- Zero failed steps on all four runs. The only annotations are the standing
+  `ubuntu-latest` → Ubuntu 26 migration notice — **no Node-20 deprecation
+  warning on any job**, confirming the `download-artifact` v7 bump of PR #116
+  on a PR-run path as well.
+
 ### Fixed — endless radio: a lagging refill check could replace a new station's first page (2026-09-28, PR #116)
 
 - When "Play radio" swapped the one-song queue `[a]` for the station

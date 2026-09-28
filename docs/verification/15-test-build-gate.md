@@ -1,20 +1,28 @@
 # 15 — Test-build gate: step-by-step procedure
 
-> **⚠ Digest update (2026-09-28).** The digests printed in §1 are for
-> **`edf19e0`**, which is no longer the rolling download. `test` moved to
-> `dcdd41b` (PR #115) on 2026-09-28T06:51:17Z and moves again when PR #116
-> merges. Every publish changes the MSI hash (its ProductVersion counter
-> advances). The APK can keep the same size and still be a different build.
-> So compare against the **`.sha256` sidecars published beside the assets**
-> or the digests in the newest merged PR's comment, not the table in §1. The
-> 18 checks themselves still apply unchanged, and the build now also carries
-> PR #115: the ⋮ menu is only as tall as its rows, and non-square covers
-> *fill* the player card (Crop) instead of showing a blurred band.
+> **⚠ Digest update (2026-09-28, second pass).** The §1 table now carries the
+> digests of the **`935e068`** publish (PR #116, 2026-09-28T07:21:56Z) — the
+> rolling download at the time this sheet was re-pinned. **This sheet ships in
+> PR #117; when #117 merges, `test` moves again** and every publish changes
+> the MSI hash (its ProductVersion counter advances). The APK can keep the
+> same size and still be a different build. So the definitive comparison for
+> the build you actually download is the **`.sha256` sidecars published beside
+> the assets** or the digests in **the newest merged PR's comment** — the §1
+> table is the fallback, not the source of truth. The 18 checks also now
+> assume the PR #117 build: **step 11 changed** — playlist pages sit on their
+> own blurred artwork instead of staying flat. On a pre-#117 build (for
+> example `935e068`) playlist pages are still flat: that is the old
+> behaviour, not a regression — re-download.
 
-> **Purpose.** Device-side acceptance for the `test` rolling build that targets
-> **`edf19e0`** (`edf19e03a6d8c3818c0392ed8e59cc0bf28860cd`, PR #114), published
-> **2026-09-22T06:15:32Z**. This is the gate that closes three defects: album
-> artwork on playback, album/artist page backdrops, and one compact ⋮ menu.
+> **Purpose.** Device-side acceptance for the `test` rolling build. The sheet
+> was written around PR #114's three defects — album artwork on playback,
+> album/artist page backdrops, and one compact ⋮ menu — and now also covers
+> what shipped after it: PR #115 (the ⋮ menu wraps its content, non-square
+> covers *fill* the player card via Crop, album header covers fall back to
+> the shallowest `thumbnails` array), PR #116 (endless-radio refill race fix,
+> `download-artifact` v7) and PR #117 (playlist pages sit on their own
+> blurred artwork — step 11 below). Always test the **newest** publish;
+> see the banner above for how to verify which one you have.
 >
 > **How to use it.** Work top to bottom, in order. Tick as you go. Write
 > something down **only** where the sheet asks you to — a passing step needs a
@@ -56,12 +64,19 @@ sha256sum dhun-test.apk
 Get-FileHash .\dhun-test.msi -Algorithm SHA256
 ```
 
-**Compare against:**
+**Compare against** — latest observed publish when this sheet was re-pinned:
+`test` targeting **`935e068`** (PR #116), published **2026-09-28T07:21:56Z**;
+MSI internal ProductVersion **2.131.1**:
 
-| Asset | Expected SHA-256 |
-|---|---|
-| `dhun-test.apk` | `75ed9fbb4ebdb3a820ec323f49e73505db0d86d96b529f5954fd7756b91204e7` |
-| `dhun-test.msi` | `C95B004F86A6ED47C16E6A534AA2FA02572CF3D3670A3DF38527EE7B2D58F5A3` |
+| Asset | Bytes | Expected SHA-256 |
+|---|---|---|
+| `dhun-test.apk` | 18,367,219 | `bef638caf1e407d3622cfaaf2b0fe39414390fc7204958007c0d66a961af7a3f` |
+| `dhun-test.msi` | 112,934,912 | `8c4359362d600e07080dd827d4762212578a75690e897c1564b687114d29ce00` |
+
+> If your hash matches **neither** this table **nor** the newest merged PR
+> comment's digests, a newer publish has replaced `test` — do not guess:
+> compare against the `.sha256` sidecars, and if still in doubt, report the
+> hash you computed and stop.
 
 **Note down:**
 
@@ -174,10 +189,12 @@ A fail = one line describing what you saw + one screenshot.
 - **Note:** ________________________________
 - **Screenshot:** yes
 
-**Step 11 — negative: playlist pages stay flat**
-- **Do:** open a playlist page; also glance at Home / Search / Library cards.
-- **Expect:** playlist pages are **flat/opaque** — deliberate and recorded, not a regression. Home/Search/Library cards unchanged.
-- ☐ pass (flat, as intended) ☐ fail → ________________________________
+**Step 11 — playlist page backdrop** *(changed by PR #117; was "negative: playlist pages stay flat")*
+- **Do:** open a remote (YTM) playlist page, then one of your local playlists.
+- **Expect:** each page sits on its **own blurred, darkened cover** — remote: the playlist's own cover; local: the **first track's** art (the same art the header shows) — the same treatment as the album/artist pages (step 7), including while nothing is playing. Rows and header layout unchanged; Home/Search/Library cards unchanged.
+- A local playlist with **no tracks** paints no backdrop (shell backdrop / base colour shows through) — that is the designed fallback, not a bug.
+- **Note the playlist you used:** ____________________
+- ☐ pass ☐ fail → ________________________________
 
 ---
 

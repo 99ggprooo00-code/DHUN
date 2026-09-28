@@ -5,9 +5,70 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — PR #116 endless-radio stale-probe fix + download-artifact v7 + post-#115 reconciliation: CI-green, docs before merge, 2026-09-28, session `arena/01a0e6c8-dhun`
+## CURRENT STATE — PR #117 playlist page backdrop + post-#116 re-pins: CI-green, docs before merge, 2026-09-28, session `arena/01a0e78c-dhun`
 
 This section supersedes the statuses below it.
+
+**Baseline.** `main@935e068` — PR #116 merged 2026-09-28T07:16:51Z, post-merge
+CI **36390812448** / Build APK **36390812361** / test-release **36390812362**
+all green (`apk` + `msi` + `publish`), rolling `test` republished
+**2026-09-28T07:21:56Z** at `935e068` (APK 18,367,219 B sha256
+`bef638ca…f7a3f`, MSI 112,934,912 B ProductVersion 2.131.1 sha256
+`8c435936…ce00` — full digests in ROADMAP and the PR #116 comment). PR #112
+closed as superseded. **The v7 bump is proven:** the publish job has zero
+Node-20 deprecation annotations. The section below still says "to finish this
+session: merge PR #116" — done; that is history.
+
+**What PR #117 does.** One code commit, `06b57d3`: `PlaylistScreen` — the last
+browse page painting an opaque `DhunColors.background` — is transparent and
+paints `PageArtworkBackdrop`, the PR #114 wrapper on `NowPlayingBackdrop`
+(one recipe, one set of pinned numbers: list tier, 64dp blur, dim 0.40, scrim
+0.50/0.32/0.44/0.62). Remote playlist: its own `detail.thumbnailUrl`. Local
+playlist: the **first track's** art — the same art its header shows, so
+removing/reordering the first track swaps the backdrop together with the
+header (consistent, recorded in KNOWN_LIMITATIONS). Loading / error / empty
+local playlist: no backdrop, shell backdrop / base colour stays the fallback.
+Rows, header layout, rename/delete dialogs, swipe-remove and drag-reorder are
+unchanged. Plus the docs commit: `15-test-build-gate.md` §1 re-pinned to the
+`935e068` digests (banner + purpose updated; **step 11 inverted** — playlist
+pages glow; on a pre-#117 build they are flat, which is the old behaviour),
+`09-browse-pages.md` dated section, CHANGELOG entry + Verified block,
+KNOWN_LIMITATIONS new section, ROADMAP and this file.
+
+**CI on code head `06b57d3` (all success, watched to completion):** push CI
+**36410248524**, PR CI **36410271539** (all 12 named steps), Build APK
+**36410271574**, test-release **36410271536** (`apk` + `msi` incl. the hosted
+install-over 2.131.1 → 2.132.1 with userdata/cache sentinels preserved).
+Zero failed steps; the only annotations are the standing `ubuntu-latest` →
+Ubuntu 26 notice — no Node-20 warning anywhere.
+
+**Drill watch.** Fired daily 09-22 → 09-27 on `edf19e0` (latest **36311265246**,
+all `ENVIRONMENT_BLOCKED` steady state). The 2026-09-28 run had **not**
+appeared when these docs were written (checked 10:40 UTC; observed window
+09:20–10:02 UTC, ~5h after the cron). ≥12h rule before any wedge claim;
+re-check at merge time and next session.
+
+**To finish this session.** Docs head CI green → `gh pr merge 117 --merge` →
+watch post-merge CI + publish; record the new rolling identity and the publish
+job's annotations in a PR #117 comment. Never pre-claim these.
+
+**Next session.** User device gates on the post-#117 build:
+`docs/verification/15-test-build-gate.md` (18 checks — **step 11 is now the
+playlist backdrop**; digests from the PR #117 comment or the `.sha256`
+sidecars, NOT the §1 table, which prints the `935e068` publish),
+endless-radio 30-min soak, S3/S6 soaks, Windows native column. Agent lane:
+**nothing open** except the Ubuntu 26 runner migration watch (begins
+2026-10-19; no pin before the label exists) and reading the next drill run on
+the new `main`. If the user reports the playlist backdrop misbehaving
+(bright-cover readability, first-track swap), that is the natural next ask.
+
+---
+
+## PREVIOUS STATE — PR #116 endless-radio stale-probe fix + download-artifact v7 + post-#115 reconciliation: CI-green, docs before merge, 2026-09-28, session `arena/01a0e6c8-dhun`
+
+Superseded: PR #116 merged as `935e068` (2026-09-28T07:16:51Z) — post-merge CI
+green, the zero-Node-20 annotation proof, the rolling `test` republish and
+PR #112's closure are recorded in the PR #116 comment and the section above.
 
 **Baseline.** `main@dcdd41b` — PR #115 merged 2026-09-28T06:46:14Z, post-merge CI **36388115963** / Build APK **36388115954** / test-release **36388116013** all green, rolling `test` republished **2026-09-28T06:51:17Z** at `dcdd41b` (APK 18,367,219 B sha256 `9857a3fe…b7ef`, MSI 112,934,912 B ProductVersion 2.128.1 sha256 `69e42993…d2ab` — full digests in ROADMAP). PR #114 had merged as `edf19e0` on 2026-09-22T06:10:44Z (post-merge CI 35693686731 / 35693686689 / 35693686796 green). The section below still says "awaiting merge"; that is history.
 
