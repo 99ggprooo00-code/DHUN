@@ -9,15 +9,19 @@ Builds: the rolling [`test` pre-release](https://github.com/99ggprooo00-code/DHU
 Always re-download after the merge you are qualifying, and note the
 `main@<sha>` you tested.
 
-**Current qualifying build for this round: the newest `test` publish with
-APK 17,948,508 B / MSI 112,861,184 B** (first such publish this round:
-2026-09-21T01:45:26Z, target `main@c4c5d04`; docs-only merges republish at
-a later time with identical bytes — always take the newest) — it carries the
-four Round-2 defect fixes (Android
-downloads #98, radio-restart #99, shuffle #100+#102, lyrics #101). Run the
-numbered defect re-test first: **`.ai/HANDOFF_NEXT_SESSION.md` → "HARDWARE
-RE-TEST SCRIPT"** (Android items 1–9, Windows 10–12), then continue with
-the standing checklist below.
+**Build identity (verified 2026-09-28):** rolling `test` published
+**13:04:52Z**, target and tag **`16ad2e5`** (PR #118); MSI **2.137.1**.
+Use `docs/verification/15-test-build-gate.md` §1 for full SHA and digests,
+and run its **18-check walkthrough first**, then the download/radio/shuffle
+re-test in `.ai/HANDOFF_NEXT_SESSION.md` and the standing checks below.
+If `test` has moved, verify the new release target/tag and SHA-256 sidecars.
+Matching byte sizes do not prove matching bytes, even on docs-only rebuilds.
+
+**Preserve user data:** upgrade-install over the existing app first and check
+playlists, settings and downloads remain. Do not uninstall your daily-use
+installation to prepare this test. Clean-install and destructive uninstall
+acceptance require a disposable device/profile or an explicitly approved backup
+and restore plan. Hosted CI's sentinel tests do not replace device acceptance.
 
 Recording: check each box with `[x]`, device model + OS version, and any
 failure as *expected vs actual*. Paste the filled checklist back to the
@@ -42,16 +46,21 @@ not re-litigated, with scope stated honestly — everything else below is still 
   death, downloads + airplane-mode offline, lyrics, Settings/theme/accent
   persistence, EQ, resume toggle.
 
-## A. Android (clean install)
+## A. Android (upgrade first; clean install separately)
 
-- [ ] Uninstall any existing DHUN, install `dhun-test.apk` fresh.
+- [ ] Upgrade-install `dhun-test.apk`; verify existing playlists/settings/downloads.
+- [ ] Separately, clean-install on a disposable device/profile; record that environment.
 - [ ] Cold start → Home feed loads within ~10 s on Wi-Fi.
 - [ ] Search a song → play → audio starts; MiniPlayer appears; expand to
       FullPlayer; seek, pause/resume, next/previous all respond.
 - [ ] Background: switch apps / lock screen → audio continues; the media
       notification shows correct title/artwork and its buttons work.
-- [ ] Rotation + process death: open an artist page, rotate; force-stop
-      from recents, relaunch → no crash (nav restore is best-effort).
+- [ ] Rotation: open an artist page, rotate → no crash (nav restore best-effort).
+- [ ] Recents dismissal: swipe away, relaunch → no crash; note playback behaviour.
+- [ ] Force-stop via Android Settings → Apps → DHUN, relaunch → no crash.
+- [ ] Process-death restoration: on a test device, background DHUN and reproduce
+      OS process termination; record method and restoration result. Recents
+      dismissal/force-stop alone does not prove this check.
 - [ ] Downloads: download a track → airplane mode → plays from Downloads.
 - [ ] Lyrics tab on a popular track shows synced or plain lyrics.
 - [ ] **Settings (S4):** Library → **Settings** → switch theme to Light
@@ -68,9 +77,12 @@ not re-litigated, with scope stated honestly — everything else below is still 
 - [ ] Resume toggle: Settings → off → play → force-stop → relaunch →
       queue does NOT restore; back on → restores.
 
-## B. Desktop Windows (clean install, needs VLC installed)
+## B. Desktop Windows (upgrade first, needs VLC installed)
 
-- [ ] Uninstall prior DHUN, install `dhun-test.msi` fresh.
+- [ ] Upgrade-install `dhun-test.msi`; verify existing playlists/settings/downloads.
+- [ ] Separately, clean-install on a disposable Windows profile/VM.
+- [ ] On that disposable installation only, verify ordinary uninstall removes
+      test userdata (intentional, unlike upgrade); never use personal data here.
 - [ ] Launch → Home loads; search + play; Space/←/→/Ctrl+←/→ shortcuts work.
 - [ ] Double-launch `DHUN.exe` while running → no second window (the
       existing one surfaces).
@@ -91,7 +103,10 @@ not re-litigated, with scope stated honestly — everything else below is still 
 
 ## C. Sign-off
 
-- [ ] `rot-drill.md` runbook completed on the same `main@<sha>`: GREEN.
+- [ ] Record the scheduled drill SHA/verdict separately from residential playback.
+      `ENVIRONMENT_BLOCKED` is not GREEN or residential failure. Follow
+      `s1-residential-evidence.md` for outside-runner evidence; do not reclassify
+      a blocked runner because playback on a different network passed.
 - [ ] No unchecked failure above, OR every failure pasted to the agent with
       *expected vs actual* + device/OS.
 - [ ] Evidence line appended to `docs/verification/14-release.md`:

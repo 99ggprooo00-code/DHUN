@@ -1,5 +1,92 @@
 # CURRENT ACTIVE TASK
 
+Updated **2026-09-28** · session **`arena/01a0e81a-dhun`** · base/main
+**`16ad2e5`**. User approved verification/follow-up after boot; final merge
+checkpoint is still required. No application code changed.
+
+**Phase/scope:** S3 hardware verification remains active; S5's final two
+logic fixes (#118) are merged and released, not hardware-verified. S1/S2/S4/S5
+completed code is not being restarted. This session reconciles the post-#118
+release and corrects the hardware handoff, not a new feature phase.
+
+**Exact files:** `.ai/ROADMAP.md`, `.ai/HANDOFF_NEXT_SESSION.md`,
+`.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`,
+`docs/verification/15-test-build-gate.md`,
+`docs/runbooks/s3-hardware-checklist.md`. Build identity updated; unsafe
+uninstall-first advice replaced by upgrade-first plus disposable clean tests;
+process-death terminology corrected. Android EQ docs contradiction recorded
+against current wiring; no EQ implementation changes.
+
+**Verified GitHub evidence:**
+PR #118 merged as **`16ad2e5b9fa53c13f26e8c2e3e551c7496481de3`** at
+**2026-09-28T12:59:01Z**. Post-merge CI **36425394319**, Build APK
+**36425394304**, and test-release **36425394409** all completed **success**.
+The release's `target_commitish` and lightweight `test` tag both resolve to
+that full SHA; rolling `test` published **2026-09-28T13:04:52Z**.
+
+| Asset | Bytes | SHA-256 |
+|---|---|---|
+| `dhun-test.apk` | 18,367,219 | `8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` |
+| `dhun-test.msi` | 112,934,912 | `4e28c551db2834c699351b3eb1c4d03c96dc46d536156242203845ee28d46b6e` |
+
+Digests were read from staging-job annotations **108937985529** (APK) and
+**108937985866** (MSI), both `source=16ad2e5b9fa53c13f26e8c2e3e551c7496481de3` and
+`buildOnly=false`; sidecar presence verified through the release API, not
+independent downloads. MSI **ProductVersion 2.137.1**. Hosted Windows upgrade
+**2.134.1 → 2.137.1** preserved userdata/cache sentinels, and ordinary uninstall
+removed disposable test userdata. This does **not** prove app launch, audio,
+visuals or real-machine native integration. The publish job **108940073731**
+succeeded; its sole annotation is the standing Ubuntu-26 migration notice.
+
+**Completion ledger:**
+- **S1:** previously accepted using scheduled drill + residential evidence on
+  `d99060e`. Latest drill **36412874929** on `5bbb16d` is still
+  **ENVIRONMENT_BLOCKED**, confirmed by check-run **108896993696**; it is not
+  GREEN playback proof. No new residential failure evidence.
+- **S2:** cleanup merged (#111 and CI hygiene follow-ups). Only other open PR
+  at boot is #54 (proposed ADR-007 research), parked by user choice.
+- **S4:** code merged (#74); hardware acceptance remains in S3.
+- **S5:** base merged (#74); #118's `57febe6` offline-broadcast classification
+  and `614134b` retry-budget refund merged as `16ad2e5`, CI-verified and now
+  released. Final #118 head `b27553c` also passed push CI **36424431074**,
+  PR CI **36424438273**, APK **36424438277**, test-release **36424438270**.
+- **S3/S6:** OPEN: 18-check walkthrough, downloads/offline, radio and normal
+  playback soaks, Windows native integration, actual recovery/DSP behaviour,
+  signing/release approval. No hardware evidence supplied this session.
+
+**Local/pushed state:** checkout was clean at boot, zero commits ahead of
+main; no prior work lost. Assigned branch was not on GitHub (404, not auth
+failure). The six-file handoff update is committed as **`94cc440`**, pushed to the
+assigned branch, and open as **PR #119**. This status follow-up belongs to
+the same PR, not a second work stream. Local **29 Python tests passed**, **35 JSON fixtures valid**;
+`git diff --check` is the whitespace gate. No local Kotlin/PowerShell execution.
+Session push CI **36426612940** on `94cc440` is in progress at this
+record; PR checks / this status-follow-up head remain pending. Main's green
+checks do not certify these edits. See PR #119's verification comment for
+the final head and completed check results once actually observed.
+
+**Last actual error:** latest extraction drill's `ENVIRONMENT_BLOCKED` (exit 2);
+no current application-test failure found. No JDK locally. The installed CLI
+rejects `gh run list --commit`; using `--branch main` and checking SHAs works.
+
+**Exact next technical step:** finish branch/PR CI and packaging checks for
+**PR #119** on `arena/01a0e81a-dhun`; inspect actual failures if any, then
+record final-head run evidence in that PR before seeking final checkpoint
+approval. The documentation handoff is implemented; check completion is pending.
+Then device testing is the next acceptance step, using the verified build
+above (or the freshly verified replacement if `test` moves).
+
+**Blockers/lifecycle:** S3/S6 require real Android/Windows evidence; no devices
+in sandbox. No agent coding task is justified solely to fill that gap.
+Ubuntu-26 migration watch starts 2026-10-19. Do not merge/close the session PR,
+delete the branch, or invoke Arena finalization until explicitly approved.
+A future docs-only merge also republishes rolling `test` and advances MSI
+identity; its merge/release outcomes are **pending**, never pre-claimed here.
+
+---
+
+## Historical session record — PR #118 pre-merge snapshot (superseded)
+
 Updated **2026-09-28** · session **`arena/01a0e7ee-dhun`** · baseline `main`
 **`5bbb16d`** (PR #117, merged 2026-09-28T10:50:31Z; post-merge CI green —
 verified this session against GitHub, not against the docs). **This session's

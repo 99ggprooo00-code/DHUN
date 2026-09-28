@@ -5,7 +5,53 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — PR #118 two S5 leftovers executed (offline-broadcast verdict + retry-budget refund): CI-green, docs before merge, 2026-09-28, session `arena/01a0e7ee-dhun`
+## CURRENT STATE — post-#118 verified; S3 hardware gates open
+
+2026-09-28 · session `arena/01a0e81a-dhun`. This section supersedes all
+historical merge instructions below. No application changes this session.
+
+PR #118 merged as **`16ad2e5b9fa53c13f26e8c2e3e551c7496481de3`** at
+**2026-09-28T12:59:01Z**. Post-merge CI **36425394319**, Build APK
+**36425394304**, and test-release **36425394409** all completed **success**.
+The release's `target_commitish` and lightweight `test` tag both resolve to
+that full SHA; rolling `test` published **2026-09-28T13:04:52Z**.
+
+| Asset | Bytes | SHA-256 |
+|---|---|---|
+| `dhun-test.apk` | 18,367,219 | `8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` |
+| `dhun-test.msi` | 112,934,912 | `4e28c551db2834c699351b3eb1c4d03c96dc46d536156242203845ee28d46b6e` |
+
+Digests were read from staging-job annotations **108937985529** (APK) and
+**108937985866** (MSI), both `source=16ad2e5b9fa53c13f26e8c2e3e551c7496481de3` and
+`buildOnly=false`; sidecar presence verified through the release API, not
+independent downloads. MSI **ProductVersion 2.137.1**. Hosted Windows upgrade
+**2.134.1 → 2.137.1** preserved userdata/cache sentinels, and ordinary uninstall
+removed disposable test userdata. This does **not** prove app launch, audio,
+visuals or real-machine native integration. The publish job **108940073731**
+succeeded; its sole annotation is the standing Ubuntu-26 migration notice.
+
+**Next:** run `docs/verification/15-test-build-gate.md`'s 18 checks on this
+build (or verify fresh digests if `test` has moved), then the download/radio/
+shuffle checks below and the S3 runbook. Upgrade over existing data first;
+clean install/uninstall belongs on a disposable profile/device. Report device,
+OS, build SHA and PASS/FAIL; do not treat expected results as observations.
+The endless-radio and normal playback 30-minute soaks, Windows native column,
+and recovery listener/device evidence remain open. No new hardware result.
+
+**Drill:** latest run 36412874929 on `5bbb16d` is `ENVIRONMENT_BLOCKED`
+(check-run 108896993696); no residential extraction regression established.
+Read the next scheduled verdict on the new main; do not change extraction or
+ADR-007 on runner gating alone. Ubuntu-26 watch starts 2026-10-19.
+
+**Session lifecycle:** **PR #119**, first commit `94cc440`, is pushed on
+`arena/01a0e81a-dhun`; CI is pending at this documentation snapshot. Final-head
+check evidence will be recorded in the PR before approval. No merge/closure or
+Arena finalization without explicit final checkpoint approval. A future merge
+will republish `test` even for docs-only changes; never pre-claim that release.
+
+---
+
+## HISTORICAL STATE — PR #118 two S5 leftovers executed (offline-broadcast verdict + retry-budget refund): CI-green, docs before merge, 2026-09-28, session `arena/01a0e7ee-dhun`
 
 This section supersedes the statuses below it.
 
