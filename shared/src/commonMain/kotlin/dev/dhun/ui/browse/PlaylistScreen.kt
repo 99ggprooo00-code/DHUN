@@ -52,6 +52,7 @@ import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
+import dev.dhun.design.components.PageArtworkBackdrop
 import dev.dhun.presentation.browse.PlaylistUiState
 import dev.dhun.presentation.browse.PlaylistViewModel
 import dev.dhun.ui.components.DragHandleGrip
@@ -61,6 +62,15 @@ import dev.dhun.ui.components.ReorderableList
  * Playlist page (Phase 09) — remote (YTM) or local (SQLDelight).
  * Remote: header + ordered tracks + play/shuffle.
  * Local: all of that + rename, delete, swipe-remove, drag-reorder.
+ *
+ * The page is transparent and paints its own blurred artwork as the backdrop
+ * ([PageArtworkBackdrop]) — the same treatment the album / artist pages and
+ * Home / Search / Library get — so a playlist reads as its cover instead of a
+ * flat colour wash, including while nothing is playing. A remote playlist
+ * uses its own thumbnail; a local playlist has none of its own, so it borrows
+ * its first track's — the same art its header already shows. No artwork (or a
+ * platform that cannot really blur) draws nothing and leaves the shell
+ * backdrop / base colour as the fallback.
  */
 @Composable
 fun PlaylistScreen(
@@ -76,7 +86,25 @@ fun PlaylistScreen(
 
     LaunchedEffect(deleted) { if (deleted) onDeleted() }
 
-    Box(modifier = modifier.fillMaxSize().background(DhunColors.background)) {
+    // Same rule as the album / artist pages: the page is transparent and
+    // paints its OWN blurred cover as the backdrop, so it glows with the
+    // playlist's artwork instead of a flat colour — including while nothing
+    // is playing (when the shell's now-playing backdrop has nothing to show).
+    // A local playlist has no artwork of its own, so it borrows its first
+    // track's — the same art the header shows. No artwork, or a platform that
+    // cannot really blur, draws nothing here and the shell backdrop / base
+    // colour stays the fallback.
+    val backdropArtwork = when (val s = state) {
+        is PlaylistUiState.Remote -> s.detail.thumbnailUrl
+        is PlaylistUiState.Local -> s.tracks.firstOrNull()?.thumbnailUrl
+        is PlaylistUiState.Loading, is PlaylistUiState.Error -> null
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        PageArtworkBackdrop(
+            artworkUrl = backdropArtwork,
+            modifier = Modifier.fillMaxSize(),
+        )
         when (val s = state) {
             is PlaylistUiState.Loading -> PlaylistSkeleton()
             is PlaylistUiState.Error -> ErrorView(
