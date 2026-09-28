@@ -203,6 +203,36 @@ class OwnClientStreamResolverTest {
         assertTrue(detail.length < 1_800)
     }
 
+    /**
+     * The user-visible half of the offline-broadcast rule. Every identity in
+     * the wave answers `LIVE_STREAM_OFFLINE`; what reaches the UI must be the
+     * content verdict ("This track isn't available right now.") with the
+     * service's own reason in the diagnostics — not the parser's
+     * "no formats in player response", which the aggregate would report as
+     * DHUN failing to read the service.
+     */
+    @Test
+    fun anOfflineBroadcastAcrossAWholeWaveReachesTheUserAsUnavailable() {
+        val response = root(
+            """{"playabilityStatus":{"status":"LIVE_STREAM_OFFLINE","reason":"This live stream is offline"}}""",
+        )
+        val outcomes = LinkedHashMap<String, DhunError>()
+        for (label in listOf("visionos", "tv", "web_remix")) {
+            val thrown = runCatching { dev.dhun.innertube.checkPlayability(response) }
+                .exceptionOrNull() as? DhunException
+                ?: error("LIVE_STREAM_OFFLINE was treated as playable by identity $label")
+            outcomes[label] = thrown.error
+        }
+        val aggregated = aggregateResolveFailures(outcomes)
+        assertTrue(aggregated is DhunError.Unavailable, "was $aggregated")
+        assertEquals("This track isn't available right now.", aggregated.toUserMessage())
+        val detail = aggregated.detailString().orEmpty()
+        for (label in listOf("visionos", "tv", "web_remix")) {
+            assertTrue(detail.contains("$label=UNAVAILABLE"), "detail was: $detail")
+        }
+        assertTrue(detail.contains("This live stream is offline"), "detail was: $detail")
+    }
+
     @Test
     fun dhunResultTypesRoundTrip() {
         val ok: DhunResult<StreamInfo> = DhunResult.Success(
