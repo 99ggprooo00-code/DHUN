@@ -1,5 +1,19 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-09-28 — Endless-radio stale-probe race (the `67068a7` push-CI flake); drill "wedged" was cron latency (`arena/01a0e6c8-dhun`)
+
+**Symptom.** PR #115's head `67068a7` went red on push CI **35979756610**. `:shared:jvmTest` failed with `AssertionError: no refill above the threshold` at `PlayerViewModelTest.kt:408` (`endlessRadioReplacesTailWhenSongsRunLow`). PR CI **35979761707** passed on the **same SHA**, and #115 merged over the red push check. The failure changes with timing, not with code, so it is a race.
+
+**Root cause (in production code, not the test).** The refill monitor is `combine(queue, index, state).distinctUntilChanged().collect { maybeRefillRadio(it) }` running on a multi-threaded scope. `maybeRefillRadio` checks the probe's *snapshot* against the *live* `radioSession.isActive`. `startRadio` does `replaceQueueKeepingCurrent(rest)` and then `radioSession.start(...)`. The September 21 fix already ordered these so a live check can never see an active station over the old queue. But a probe that was **computed** before the swap and **evaluated** after the start is still possible when the collector lags behind the player. That probe is the one-song `[a]`, so remaining = 0, which is at or under the threshold, so the refill fires. `refillRadio`'s post-fetch guard compared only the head id, and `[a]` and `[a, r1..r5]` share head `a`. So in production the fetched page 2 would be applied over page 1. In the test, the fake's empty continuation page made it visible as an unexpected `continuationCalls = [tok-a]`.
+
+**Fix (`cd9d4f3`).** (1) In the gate, after `isActive` (order matters, see the code comment), a probe whose queue or index differs from the live `player.queue` / `currentQueueIndex` is stale and gets dropped. Every change emits, so the up-to-date probe is always still on its way to the collector. (2) `refillRadio` skips the fetch if the queue changed since the gate. After the fetch it requires the **whole** queue to be unchanged, and a mismatched page is dropped **unconsumed**: the token stays, and the existing `finally` re-gate refetches it for the live queue. (3) Test fake: `advanceTo` now publishes track then index, which is `AndroidDhunPlayer.refresh`'s order. Index-first opened a separate window: the refill launched, bailed on the track check, and lost its trigger to `lastRefillProbe`.
+
+**Proof.** Tests first (`c58572a`, with only the visibility of `RefillProbe` / `maybeRefillRadio` changed to `internal`). CI **36389023330** was red on exactly the two new tests: `a stale probe must not refill, got [tok-a]` and `expected:<[tok-a, tok-a]> but was:<[tok-a]>`. Every other test was green. On the fix head `fbf69bb`, push CI **36389230165** and PR CI **36389248363** were green on all 12 steps.
+
+**Drill "wedged" (09-22 entry below) was cron latency.** Run 35709793101 fired at 2026-09-22T09:20:13Z, about 5h after `17 4 * * *` and after the previous session checked. It has fired daily since, with 09:20–10:02 UTC starts, all `ENVIRONMENT_BLOCKED`. Environment trap: GitHub's schedule lag on this repo is hours, not minutes. Wait ≥12h after a cron before diagnosing a non-fire.
+
+**Node 20.** `download-artifact@v6`'s `action.yml` says `using: 'node20'` and v7's says `'node24'` (read via the contents API). The warning was still firing on publish job 108818910798 (`main@dcdd41b`). Bumped to v7 (`fbf69bb`). Proof has to come from the post-merge publish run, because the job is `main`-gated.
+
 ## 2026-09-22 — Album playback had no artwork; album/artist pages had no backdrop; every ⋮ was the old sheet (`arena/01a0c772-dhun`)
 
 **Ask.** Three visual defects, fixed *separately* — explicitly not one polish

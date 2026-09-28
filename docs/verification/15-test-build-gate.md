@@ -1,5 +1,16 @@
 # 15 — Test-build gate: step-by-step procedure
 
+> **⚠ Digest update (2026-09-28).** The digests printed in §1 are for
+> **`edf19e0`**, which is no longer the rolling download. `test` moved to
+> `dcdd41b` (PR #115) on 2026-09-28T06:51:17Z and moves again when PR #116
+> merges. Every publish changes the MSI hash (its ProductVersion counter
+> advances). The APK can keep the same size and still be a different build.
+> So compare against the **`.sha256` sidecars published beside the assets**
+> or the digests in the newest merged PR's comment, not the table in §1. The
+> 18 checks themselves still apply unchanged, and the build now also carries
+> PR #115: the ⋮ menu is only as tall as its rows, and non-square covers
+> *fill* the player card (Crop) instead of showing a blurred band.
+
 > **Purpose.** Device-side acceptance for the `test` rolling build that targets
 > **`edf19e0`** (`edf19e03a6d8c3818c0392ed8e59cc0bf28860cd`, PR #114), published
 > **2026-09-22T06:15:32Z**. This is the gate that closes three defects: album

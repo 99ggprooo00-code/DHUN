@@ -5,9 +5,29 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — PR #114 album artwork / album+artist page backdrops / one compact ⋮ menu: CI-green, awaiting merge, 2026-09-22, session `arena/01a0c772-dhun`
+## CURRENT STATE — PR #116 endless-radio stale-probe fix + download-artifact v7 + post-#115 reconciliation: CI-green, docs before merge, 2026-09-28, session `arena/01a0e6c8-dhun`
 
 This section supersedes the statuses below it.
+
+**Baseline.** `main@dcdd41b` — PR #115 merged 2026-09-28T06:46:14Z, post-merge CI **36388115963** / Build APK **36388115954** / test-release **36388116013** all green, rolling `test` republished **2026-09-28T06:51:17Z** at `dcdd41b` (APK 18,367,219 B sha256 `9857a3fe…b7ef`, MSI 112,934,912 B ProductVersion 2.128.1 sha256 `69e42993…d2ab` — full digests in ROADMAP). PR #114 had merged as `edf19e0` on 2026-09-22T06:10:44Z (post-merge CI 35693686731 / 35693686689 / 35693686796 green). The section below still says "awaiting merge"; that is history.
+
+**Found at boot.** (1) PR #115's head `67068a7` had a **red push CI** (35979756610, `:shared:jvmTest`, `PlayerViewModelTest.endlessRadioReplacesTailWhenSongsRunLow` — "no refill above the threshold") while PR CI passed the same SHA; it merged anyway. (2) The "drill schedule is wedged" claim (item 4 below) was wrong: the schedule fired daily 09-22 → 09-27, ~5h after the cron time, every run `ENVIRONMENT_BLOCKED`. (3) The Node-20 warning on `download-artifact@v6` was still live on `main@dcdd41b`'s publish job.
+
+**What PR #116 does.**
+1. `c58572a` test — two deterministic regressions for the refill race; CI **36389023330** on that commit (no fix) failed on exactly those two tests = mutation proof.
+2. `cd9d4f3` fix — `PlayerViewModel.maybeRefillRadio` drops probes that do not match the live queue + index (read after `isActive`); `refillRadio` requires the whole queue unchanged before and after the fetch and drops a mismatched page unconsumed (same token refetched by the existing re-gate). Production impact of the bug: page 2 of a fresh station could replace page 1 (rare, timing-dependent).
+3. `fbf69bb` ci — `download-artifact@v7` (node24) ×5; supersedes PR #112.
+4. Docs pass (this commit): ROADMAP, this file, KNOWN_LIMITATIONS, DEBUG_LOG, RISK_REGISTER (new cron-latency row), CHANGELOG (incl. the missing entries for PR #115), 14-release ledger, 15-test-build-gate banner.
+
+**CI on code head `fbf69bb` (all success):** push CI **36389230165**, PR CI **36389248363** (12/12 steps), Build APK **36389248349**, test-release **36389248359** (apk + msi incl. hosted install-over).
+
+**To finish this session.** Docs head CI green → `gh pr merge 116 --merge` → watch post-merge CI + publish; record the new rolling identity and the publish job's annotations (expect zero Node-20 warnings) in a PR #116 comment; close PR #112 as superseded. Never pre-claim these.
+
+**Next session.** User device gates on the NEW build: `docs/verification/15-test-build-gate.md` (use the digests from the release `.sha256` sidecars or the PR #116 comment — the hashes printed in that file are `edf19e0`'s), endless-radio 30-min soak, S3/S6 soaks, Windows native column. Agent lane: `PlaylistScreen` `PageArtworkBackdrop` (two-line follow-up), Ubuntu 26 runner migration watch (begins 2026-10-19).
+
+## PREVIOUS STATE — PR #114 album artwork / album+artist page backdrops / one compact ⋮ menu: CI-green, awaiting merge, 2026-09-22, session `arena/01a0c772-dhun`
+
+Superseded: PR #114 merged as `edf19e0` (2026-09-22T06:10:44Z). Item 4's "drill wedged" diagnosis was **wrong** — the schedule fired daily from 09-22 (late, ~09:20 UTC); see the section above. Everything below is unchanged from when it was written.
 
 Session **`arena/01a0c772-dhun`** → `main`, **PR #114**. Code head **`80fe28b`**, watched CI-green, **not merged when this was written**.
 

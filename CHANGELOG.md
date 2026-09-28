@@ -24,6 +24,60 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — endless radio: a lagging refill check could replace a new station's first page (2026-09-28, PR #116)
+
+- When "Play radio" swapped the one-song queue `[a]` for the station
+  `[a, r1…]`, the refill monitor could still evaluate its old `[a]` snapshot
+  after the station went live. That snapshot reads as "no songs left", so the
+  monitor fetched the station's **second** page right away and applied it
+  over the first. The check after the fetch only compared the current song,
+  and both queues share it. The monitor now ignores any snapshot that no
+  longer matches the live queue and position. A page fetched for a queue
+  that has since changed is thrown away without advancing the station, and
+  the same page is fetched again for the current queue.
+- This was also the cause of the intermittent
+  `endlessRadioReplacesTailWhenSongsRunLow` failure (push CI 35979756610 on
+  `67068a7`, green on PR CI for the same SHA). Two new tests replay the race
+  without timing. They failed on CI 36389023330 before the fix and pass after
+  it.
+- No device report of the symptom existed. It needs a timing lag and is rare
+  on Android, where the player view model runs on the main thread.
+
+### Changed — CI: `download-artifact` v6 → v7 (2026-09-28, PR #116)
+
+- v6 still declares `node20` upstream, and the publish job on `main@dcdd41b`
+  still carried the Node-20 deprecation warning. v7 is the `node24` release.
+  Same inputs (`name`, `path`). Supersedes PR #112.
+
+### Fixed — player artwork fills its card; album covers no longer silently lost; compact ⋮ menu wraps its content (2026-09-22/24, PR #115 → `dcdd41b`)
+
+_Recorded retroactively on 2026-09-28: PR #115 merged without a changelog entry._
+
+- **The ⋮ menu is only as tall as its rows** (`9fec2d9`). `LyricsMaterial`
+  lays out with `fillMaxSize`, which a Dialog measures against the window,
+  so the "compact" menu still ran full-height on Android 15.
+  `TrackMenuSurface` now measures with unbounded height. The queue row's
+  anchored menu shares the surface and the fix.
+- **The now-playing card fills with `ContentScale.Crop`** (`67068a7`). With
+  `Fit`, a non-square cover left bands inside the square card, and the
+  blurred backdrop showing through them read as a dark frame. Square covers
+  are unchanged. Non-square covers lose their edges instead.
+- **Album header covers fall back to the shallowest `thumbnails` array in the
+  header** (`67068a7`). `thumbnailsLastUrl` only knew five hardcoded header
+  paths. Any other header lost its cover, its page backdrop and the artwork
+  of every row that inherits it, with no error. The fallback can only fire
+  where the old code returned null.
+- `4df515e` added `docs/verification/15-test-build-gate.md`, the device-side
+  procedure for these fixes.
+- **Released:** post-merge CI 36388115963 / Build APK 36388115954 /
+  test-release 36388116013 all green. Rolling `test` republished
+  2026-09-28T06:51:17Z at `dcdd41b`: APK 18,367,219 B, MSI 112,934,912 B
+  (ProductVersion 2.128.1). PR #114 had merged earlier as `edf19e0`
+  (2026-09-22T06:10:44Z, post-merge CI green).
+- **Not device-verified yet.** `15-test-build-gate.md` is the gate. CI
+  note: PR #115 merged over a red push check on `67068a7`. That was the
+  flake fixed by PR #116 above, not a defect in these UI changes.
+
 ### Verified — PR #114 CI on `80fe28b` (2026-09-22)
 
 - Code head **`80fe28b`** (three fix commits — `cd11056` album cover
