@@ -40,13 +40,20 @@ checked only root `header`; it now also checks normalized two-column tab section
 and unwraps a nested responsive detail header. Synthetic fixtures/tests cover a
 single track inheriting header art, a playlist cover with independent row art,
 and nested detail-header fields. These shapes are plausible but are not the
-user's captured response. PR #120 (`b7d0f01`) is open; PR CI **37319510581**,
-Build APK **37319510440**, and test-release **37319510990** pass. Push run
-**37319187931** had one unrelated 15-second `LibraryViewModelTest` timeout; the
-PR run on the same head is green. For hardware retest, download the `apk`
-artifact from [test-release run 37319510990](https://github.com/99ggprooo00-code/DHUN/actions/runs/37319510990)
-(it contains `dhun-test.apk`, `.sha256`, `.build-info.json`; publish was skipped).
-Direct artifact download returned `EOF` in the sandbox. Test one single
+user's captured response. PR #120 code head `b7d0f01` passed PR CI **37319510581**.
+A docs-only follow-up head `5006595` has latest push CI **37320618809** failing
+at unrelated `LibraryViewModelTest.historyPlaybackQueuesCorrectly` (15-second
+timeout) and PR CI **37320626452** failing at unrelated
+`PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+(expected `tok-2`, got `tok-a`). GitHub rejected reruns with “workflow file may
+be broken.” Build APK **37320626431** and test-release **37320626612** passed;
+test-release's APK and MSI/install-over jobs passed, publish skipped. Download
+the candidate `apk` artifact from
+[test-release run 37320626612](https://github.com/99ggprooo00-code/DHUN/actions/runs/37320626612)
+(`dhun-test.apk`, `.sha256`, `.build-info.json`); its SHA-256 is
+`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`
+(18,367,219 bytes). Artifact provenance source is the PR merge ref for head
+`5006595`; it is build-only and was not published. Test one single
 (cover/row/full player), one other album, one playlist (cover/row) and Home/Search.
 If art still fails, get a representative title/artist or browse ID and inspect
 its sanitized response before another parser change. Step-6 row size/shape and

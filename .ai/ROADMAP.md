@@ -3,7 +3,7 @@
 Updated **2026-10-05** · session **`arena/01a0eb87-dhun`** · base/main
 **`73b88b6`**. PR #119 is merged and post-merge CI is green. Stage S3
 hardware round 1 has partial user-reported results; **S3 acceptance remains
-open**. Candidate page-header parser fix and regression fixtures are committed as `b7d0f01` and PR #120 is open. PR CI/build/test-release all pass; hardware verification is pending.
+open**. Candidate page-header parser fix is commit `b7d0f01`; verification-note follow-up is `5006595`; PR #120 is open. Initial PR CI **37319510581** passed. Latest CI on the docs-only head has unrelated shared-test failures (**37320618809**, push; **37320626452**, PR); APK/MSI build workflows pass. Hardware verification remains pending.
 
 **Phase/status:** S3 hardware verification. S1/S2/S4/S5 code is complete and
 merged; S3/S6 still require real-device evidence. The active gate is
@@ -57,18 +57,27 @@ also looks for header renderers inside two-column tab sections and unwraps a
 nested responsive detail header. New synthetic fixtures/tests cover single
 track fallback, playlist cover with independent row art, and nested detail
 headers. These are synthetic response-shape fixtures, not the user's raw
-payload. PR #120 commit `b7d0f01`: CI **37319510581** passed, including
-`:shared:jvmTest`; Build APK **37319510440** and test-release **37319510990**
-passed (publish skipped). Push CI **37319187931** failed only on an unrelated
-15-second `LibraryViewModelTest.historyPlaybackQueuesCorrectly` timeout; the
-PR rerun on the same head passed. Latest user download likely was current `test`
-v2.137.1, but exact installed bytes/hash are not proven. Use the PR APK artifact
-from run **37319510990** for retest; its staged `.sha256` and build-info are
-included. Direct artifact download in the sandbox returned EOF. The exact
-step-6 row size/shape mismatch remains unknown; do not alter `TrackRow` (64dp,
-no thumbnail stroke) for a page-cover symptom. Verify `Go to album` on a known
-album-linked track, then publish only with freshly verified hashes and re-run
-affected checks. Image/menu design requests remain separate UX choices.
+payload. PR #120 code commit `b7d0f01` passed full CI **37319510581**, including
+`:shared:jvmTest`; the doc-only follow-up head `5006595` has different unrelated
+shared-test failures on its latest runs. Push CI **37320618809** failed at
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly` (15-second timeout); PR CI
+**37320626452** failed at `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+(expected `tok-2`, got `tok-a`). Neither failure is in the parser; rerun was
+rejected with GitHub's “workflow file may be broken” response. Build APK
+**37320626431** passed. Test-release **37320626612** passed APK and MSI, including
+Windows install-over. Its `apk` artifact is the candidate for device retest:
+`dhun-test.apk`, 18,367,219 bytes, SHA-256
+`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`,
+build-only; Actions provenance records merge-ref source
+`959a95096eb8b87f6c8098d98e51e2b8b6172daf` (PR head `5006595`). The checksum
+came from the artifact-staging action annotation; the artifact also carries
+`.sha256`/build-info. Download at
+[run 37320626612](https://github.com/99ggprooo00-code/DHUN/actions/runs/37320626612).
+No rolling release was published. Latest user download still likely maps to
+`test` v2.137.1; exact installed bytes/hash are not proven. The exact step-6 row
+size/shape mismatch remains unknown; do not alter `TrackRow` (64dp, no thumbnail
+stroke) for a page-cover symptom. Verify `Go to album` on a known album-linked
+track. Image/menu design requests remain separate UX choices.
 
 **Completion ledger:**
 - **S1:** CLOSED GREEN 2026-09-20 — scheduled drill + residential evidence on
@@ -84,7 +93,7 @@ affected checks. Image/menu design requests remain separate UX choices.
   signing/release approval and remaining acceptance are still open.
 
 **Current docs updated:** `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`,
-`.ai/DEBUG_LOG.md`, `.ai/HANDOFF_NEXT_SESSION.md`,
+`.ai/DEBUG_LOG.md`, `.ai/HANDOFF_NEXT_SESSION.md`, `CHANGELOG.md`,
 `docs/verification/14-release.md`, `docs/verification/15-test-build-gate.md`,
 `docs/runbooks/s3-hardware-checklist.md`, and the concise checklist at
 `docs/verification/s3-hardware-checklist.md`.
@@ -95,15 +104,16 @@ not an app failure. No JDK locally; CI remains the compiler. Release/log blobs
 can EOF in-sandbox; annotations API is the readout.
 
 **Exact next step:** have the user download the `apk` artifact from PR
-[test-release run 37319510990](https://github.com/99ggprooo00-code/DHUN/actions/runs/37319510990)
-(it includes `dhun-test.apk`, `.sha256`, `.build-info.json`) and retest a single
-release (cover + row + full player), one other album, one playlist cover and row
-art, plus Home/Search. Capture device/OS and the artifact hash. If any page art
-still fails, obtain an exact release title/artist/browse ID and inspect that
-sanitized live response before another parser change. Clarify the step-6 row
-size/shape mismatch and verify `Go to album` on a known album-linked track.
-Do not merge or claim S3 green based on CI alone; hardware acceptance is still
-required. After device evidence and remaining code/docs checks, follow the
+[test-release run 37320626612](https://github.com/99ggprooo00-code/DHUN/actions/runs/37320626612)
+(it includes `dhun-test.apk`, `.sha256`, `.build-info.json`). Verify its SHA-256
+against `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`,
+then retest a single release (cover + row + full player), one other album, one
+playlist cover and row art, plus Home/Search. Capture device/OS and result. If
+any page art still fails, obtain an exact release title/artist/browse ID and
+inspect that sanitized live response before another parser change. Clarify the
+step-6 row size/shape mismatch and verify `Go to album` on a known album-linked
+track. Do not merge or claim S3 green based on CI alone; hardware acceptance is
+still required. After device evidence and remaining code/docs checks, follow the
 merge-last rule and verify post-merge CI in the same turn.
 
 **Blockers/lifecycle:** S3/S6 require Android/Windows hardware; no devices in

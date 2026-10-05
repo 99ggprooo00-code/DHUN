@@ -63,19 +63,25 @@ and nested detail-header fields. They are minimal synthetic response-shape
 cases, **not** the user's captured payload; the parser cause remains a candidate
 until device retest.
 
-Commit `b7d0f01`, PR #120. PR CI **37319510581** passed all steps including
-`:shared:jvmTest` (new parser tests), Android Robolectric/build, probe and Desktop
-tests. Build APK **37319510440** and test-release **37319510990** passed; PR
-publish was skipped. Push CI **37319187931** failed only at unrelated
-`LibraryViewModelTest.historyPlaybackQueuesCorrectly` with a 15-second timeout;
-the PR run on the same head passed. The `apk` artifact from
-[test-release run 37319510990](https://github.com/99ggprooo00-code/DHUN/actions/runs/37319510990)
-contains `dhun-test.apk`, `.sha256` and `.build-info.json` from `b7d0f01`.
-`gh run download` hit blob-host `EOF` in the sandbox; do not claim an APK hash
-here. The user's reported latest `test` build currently maps to target
-`73b88b6`/2.137.1, but exact installed bytes remain unverified. The PR APK must
-be installed for device retest before S3 closes. Local Kotlin tests cannot run
-without JDK; fixture validation passed.
+Parser commit `b7d0f01`, PR #120; doc-only follow-up head `5006595`. The first
+PR CI **37319510581** passed all steps including `:shared:jvmTest` (new parser
+tests), Android Robolectric/build, probe and Desktop tests. On the follow-up
+head, push CI **37320618809** failed at `LibraryViewModelTest.historyPlaybackQueuesCorrectly`
+with a 15-second timeout; PR CI **37320626452** failed at unrelated
+`PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+(expected `tok-2`, got `tok-a`). These failures are outside the parser; GitHub
+rejected a rerun with “workflow file may be broken.” Build APK **37320626431**
+and test-release **37320626612** passed; the latter passed APK and MSI,
+including Windows install-over; publish/AAB were skipped. The `apk` artifact
+from [test-release run 37320626612](https://github.com/99ggprooo00-code/DHUN/actions/runs/37320626612)
+contains `dhun-test.apk`, `.sha256`, `.build-info.json`; Actions annotation gives
+18,367,219 bytes and SHA-256
+`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`. Its
+provenance `sourceSha` is PR merge-ref `959a95096eb8b87f6c8098d98e51e2b8b6172daf`
+for head `5006595`, build-only. User's reported latest rolling `test` build
+maps to target `73b88b6`/2.137.1; exact installed bytes remain unverified. The
+candidate APK must be installed for device retest before S3 closes. Local Kotlin
+tests cannot run without JDK; fixture validation passed.
 
 `TrackRow` currently uses `DhunSpacing.artworkThumb = 64.dp`; `ArtworkImage`
 draws no stroke. The latest report says per-track thumbnails mostly load on
@@ -90,10 +96,13 @@ these builds to test omission. The runbook wording has been corrected; the
 no-manager policy remains unit-tested. `Go to album` remains metadata-dependent
 and should be checked on a known album-linked track.
 
-Application parser code is CI-green but not device-verified. Next have the user
-install the `apk` artifact from test-release run **37319510990** and retest the
-same single (page cover, row, full player), one other album, one playlist (cover
-+ row) and Home/Search. If the payload still fails, request one exact title/
+Parser tests passed in initial PR CI **37319510581**; the latest PR CI
+**37320626452** is red on an unrelated `PlayerViewModelTest`, so latest-head
+full CI is not green. The APK/MSI build is green. Next have the user install the
+`apk` artifact from test-release run **37320626612** (SHA-256
+`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`) and retest
+the same single (page cover, row, full player), one other album, one playlist
+(cover + row) and Home/Search. If art still fails, request one exact title/
 artist or browse ID and capture the sanitized browse response before another
 parser edit. Clarify step 6's expected-versus-actual row size/shape; verify `Go
 to album` on a known album-linked track and complete step 18. Keep menu anchoring

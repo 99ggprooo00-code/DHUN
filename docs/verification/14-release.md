@@ -268,28 +268,37 @@ single representative item and its raw response are not yet available. The
    checks (1, 6, 7, 9, 13 and 18) plus any explicitly accepted UX change; keep
    Windows results and other S3/S6 gates accurately scoped.
 
-**PR #120 candidate verification (2026-10-05):** commit `b7d0f01` is pushed on
-`arena/01a0eb87-dhun`; PR [#120](https://github.com/99ggprooo00-code/DHUN/pull/120)
-remains open. PR CI **37319510581** passed, including `:shared:jvmTest`, Android
-Robolectric/build, probe, and Desktop compile/tests. The first push run
-**37319187931** failed only at unrelated
-`LibraryViewModelTest.historyPlaybackQueuesCorrectly` after its 15-second
-coroutine timeout; PR CI on the same head passed. Build APK **37319510440** and
-test-release **37319510990** both passed; release publishing was correctly
-skipped on the PR. The test-release run's `apk` artifact includes
-`dhun-test.apk`, `.sha256` and `.build-info.json` for device retest:
-[download from Actions](https://github.com/99ggprooo00-code/DHUN/actions/runs/37319510990).
-Direct artifact download in the sandbox returned `EOF`, so no APK-file digest
-was independently read here. The artifact itself is built from `b7d0f01`.
+**PR #120 candidate verification (2026-10-05):** parser commit `b7d0f01` is
+pushed on `arena/01a0eb87-dhun`; PR
+[#120](https://github.com/99ggprooo00-code/DHUN/pull/120) remains open. Initial
+PR CI **37319510581** passed, including `:shared:jvmTest`, Android
+Robolectric/build, probe and Desktop tests. A docs-only follow-up head `5006595`
+triggered push CI **37320618809**, which failed in unrelated
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly` (15-second timeout), and
+PR CI **37320626452**, which failed in unrelated
+`PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+(expected `tok-2`, got `tok-a`). Both failures were in `:shared:jvmTest`, not the
+parser tests; `gh run rerun` was rejected with “workflow file may be broken.”
+Build APK **37320626431** passed. Test-release **37320626612** passed its APK and
+MSI jobs, including Windows install-over; publish and AAB were skipped. The
+`apk` artifact includes `dhun-test.apk`, `.sha256` and `.build-info.json`:
+[download from Actions](https://github.com/99ggprooo00-code/DHUN/actions/runs/37320626612).
+Staging annotation identifies it as build-only, 18,367,219 bytes, SHA-256
+`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`; provenance
+source is merge-ref `959a95096eb8b87f6c8098d98e51e2b8b6172daf` for PR head
+`5006595`. The sandbox could not retrieve the artifact ZIP (EOF), but the digest
+was available from the GitHub Actions annotation. No rolling release was
+published.
 
 **Remaining verification blockers:** no representative user single/album/
 playlist browse ID or raw response has been supplied; the PR APK is not yet
-device-tested; and the step-6 row size/shape mismatch remains unclear. The
-parser change is CI-verified but not a device-confirmed root cause. Have the user
-install the PR artifact and retest a Single's cover/row/full-player art, one
-other album cover, a playlist cover and its rows, and Home/Search art. If the
-symptoms persist, capture the actual sanitized browse response/parsed URLs
-before another parser change.
+device-tested; the step-6 row size/shape mismatch remains unclear; and latest
+full PR CI is red on the unrelated shared test above, even though parser tests
+passed on the initial PR head. The parser change remains a candidate, not a
+device-confirmed root cause. Have the user install the candidate artifact and
+retest a Single's cover/row/full-player art, one other album cover, a playlist
+cover and its rows, and Home/Search art. If symptoms persist, capture the actual
+sanitized browse response/parsed URLs before another parser change.
 
 ## S1 evidence log (residential / on-device)
 
