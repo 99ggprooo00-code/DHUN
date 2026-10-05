@@ -2,6 +2,20 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-05 — S3 hardware round 1 report (partial; identity incomplete)
+
+- User report received 2026-10-05: Android walkthrough failed at steps **1, 6, 7, 9**; steps **2–5, 8, 10–12, 14, 17** were reported pass/observed with qualifications. Notification/lock-screen/widget art was present but considered small. Menu was compact but centered; user prefers it anchored near the originating ⋮. Windows core steps **10–13** were reported pass. Full per-step ledger: `docs/verification/14-release.md`.
+- No device model/OS, actual test date, or computed APK/MSI hashes were supplied. Four inline Android screenshots were later visually reviewed but were not labeled to steps. The user says they downloaded the latest build; `gh release view test` confirms the current `test` tag targets `73b88b6` (2.137.1), but exact installed bytes remain unverified. Latest symptom detail: Home/Search song art loads; on single releases both cover and track art are absent (including Full Player); on other album/playlist pages the page cover fails while per-track images mostly load. A two-column tab-header parser gap is a candidate, not confirmed until CI and device retest. Step 6's exact row size/shape mismatch remains unknown. Steps 13/15 are partial (`Go to album` not found; only five actions tried), step 16 was not understood, and step 18 was not reported. S3 is **not accepted**.
+- Important checksum limitation: the rolling `test` release metadata points to `73b88b6` and confirms asset sizes, but its SHA-256 values could not be independently read in the sandbox. The previous post-#119 gate had incorrectly carried forward #118 hashes; corrected in `docs/verification/15-test-build-gate.md`. Do not compare the `73b88b6` files to those old hashes or infer identity from size.
+- The gate's step-16 wording was inaccurate: current `TrackMenuPolicy` controls `Download` visibility by host `DownloadManager` presence, not by per-track downloadability. Android and Desktop provide a manager; this device-side hide case is not selectable in the shipped builds and is covered by the policy test. The gate now describes the actual rule.
+- A candidate `pageHeader` parser fix now checks the normalized two-column tab sections and unwraps nested responsive detail headers. Synthetic tests cover album-single cover fallback, playlist cover with distinct row art, and nested headers. Kotlin/CI and hardware verification are pending; this is not yet an accepted fix. The centered track dialog is current by design; the requested anchored placement is a separate UX proposal.
+
+## 2026-09-29 — post-#119 verification (`arena/01a0eb87-dhun`)
+
+- PR #119 merged as **`73b88b6`** at **2026-09-28T13:09:32Z**. Post-merge CI **36467187148**, Build APK **36467187128**, and test-release **36467187181** completed successfully on `main@73b88b6`; rolling `test` published **2026-09-28T18:48:23Z** targeting that SHA. The round-1 user report is recorded in the 2026-10-05 section above; no S3/S6 gate is closed by it.
+- Latest extraction-health **36412874929** remains `ENVIRONMENT_BLOCKED`; not green playback proof.
+- Android EQ documentation contradiction persists: code exists (`MainActivity` → Koin `EqualizerSession` → `SettingsScreen`) but audible DSP unverified.
+
 ## 2026-09-28 — post-#118 verification (`arena/01a0e81a-dhun`)
 
 - PR #118 is merged as `16ad2e5`; post-merge CI 36425394319, Build APK

@@ -1,0 +1,69 @@
+{
+  "contents": {
+    "twoColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "musicResponsiveHeaderRenderer": {
+                      "title": {"runs": [{"text": "Sample Playlist"}]},
+                      "subtitle": {
+                        "runs": [
+                          {"text": "Playlist Owner", "navigationEndpoint": {"browseEndpoint": {"browseId": "UC_playlist_owner"}}},
+                          {"text": " • 1 song"}
+                        ]
+                      },
+                      "thumbnail": {
+                        "musicThumbnailRenderer": {
+                          "thumbnail": {
+                            "thumbnails": [
+                              {"url": "https://lh3.googleusercontent.com/sample_playlist=w60-h60-l90-rj", "width": 60, "height": 60},
+                              {"url": "https://lh3.googleusercontent.com/sample_playlist=w544-h544-l90-rj", "width": 544, "height": 544}
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "secondaryContents": {
+        "sectionListRenderer": {
+          "contents": [
+            {
+              "musicPlaylistShelfRenderer": {
+                "contents": [
+                  {
+                    "musicResponsiveListItemRenderer": {
+                      "flexColumns": [
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Row Song"}]}}},
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Row Artist"}, {"text": " • 2:45"}]}}}
+                      ],
+                      "playlistItemData": {"videoId": "playlist_row_track"},
+                      "thumbnail": {
+                        "musicThumbnailRenderer": {
+                          "thumbnail": {
+                            "thumbnails": [
+                              {"url": "https://i.ytimg.com/vi/playlist_row_track/hqdefault.jpg", "width": 120, "height": 90}
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

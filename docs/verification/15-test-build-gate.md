@@ -1,17 +1,35 @@
 # 15 — Test-build gate: step-by-step procedure
 
-> **Verified publish — 2026-09-28.** PR #118 is merged as `16ad2e5`.
-> Post-merge CI **36425394319**, Build APK **36425394304**, and test-release
-> **36425394409** passed. Rolling `test` published **13:04:52Z**, targeting
-> `16ad2e5`; the tag resolves to the same commit. §1 records that build.
-> This is automated build/package evidence, **not hardware acceptance**.
-> Any later main push (including docs-only) replaces `test`: verify the current
-> release target/tag and matching `.sha256` sidecars before installing.
+> **Latest release metadata checked — 2026-10-05.** PR #119 is merged as
+> `73b88b60b647120662812a5d33b233876acad283` (`73b88b6`). Post-merge CI
+> **36467187148**, Build APK **36467187128**, and test-release **36467187181**
+> passed. Rolling `test` published **2026-09-28T18:48:23Z**, targeting `73b88b6`;
+> release metadata confirms that tag/target and the asset names/sizes. This is
+> automated build/package evidence, **not hardware acceptance**.
 >
-> The 18 checks still cover the existing UI fixes (step 11: playlist backdrop).
-> PR #118's offline-broadcast verdict and delayed retry-budget refund have no
-> deterministic manual step here: observe them if a real offline broadcast or
-> long-session recovery is available, otherwise record **not exercised**.
+> **Important digest correction:** the APK/MSI SHA-256 values currently available
+> in the sandbox have **not** been independently verified for `73b88b6`. The
+> `.sha256` asset contents/downloads returned empty/EOF here, and the publish-job
+> check annotations contain no artifact digests. This sheet previously carried
+> forward the **PR #118 (`16ad2e5`) hashes as though they were #119 hashes**; that
+> was not justified. Do not use those values or infer byte identity from equal
+> file sizes. §1 now marks the #119 digests unverified.
+>
+> **S3 hardware round 1 — partial user report received 2026-10-05.** The user
+> reports Android failures at steps **1, 6, 7, 9**; the Windows core steps
+> **10–13** are reported pass. Android step 13 is partial (five actions tried;
+> `Go to album` not found), step 16 was not understood, and step 18 was not
+> reported. Device/OS, exact test date/build hash, and prior build were not supplied. Four
+> inline screenshots were visually reviewed but not labeled to steps: album views
+> show placeholder artwork/generic metadata, while playlist views show row art.
+> The exact step-6 mismatch remains unclear. Tested artifact identity is unconfirmed
+> and **S3 remains open**. Details: `14-release.md`.
+>
+> The 18 checks still cover the UI fixes (step 11: playlist backdrop). PR #118's
+> offline-broadcast verdict and delayed retry-budget refund have no deterministic
+> manual step here: observe them if a real offline broadcast or long-session
+> recovery is available, otherwise record **not exercised**. PR #119 contains
+> release automation/documentation fixes; verify no regression in steps 1–18.
 
 > **Purpose.** Device-side acceptance for the `test` rolling build. The sheet
 > was written around PR #114's three defects — album artwork on playback,
@@ -50,36 +68,46 @@ Windows build: `Win + R` → `winver`. Android version: Settings → About phone
 
 ## 1. Verify the digest (do this BEFORE installing)
 
-> **Why verify hashes:** the observed APK is **18,367,219 B**, the same size
-> as earlier publishes but with a different digest. Equal size is not equal
-> bytes. The sandbox verified job annotations and release metadata, not an
-> independent artifact download; verify your downloaded bytes below.
+> **Why verify hashes:** these files have the same byte sizes as earlier
+> publishes. Equal size is not equal bytes. The sandbox confirmed release
+> metadata but could not retrieve the #119 artifact hashes independently; verify
+> your downloaded bytes against the matching sidecars below.
 
-**Android / macOS / Linux:**
+**Linux:**
 ```sh
-sha256sum dhun-test.apk
+sha256sum -c dhun-test.apk.sha256
 ```
 
-**Windows PowerShell:**
+**macOS:** use `shasum -a 256 dhun-test.apk` and compare with
+`cat dhun-test.apk.sha256`.
+
+**Windows PowerShell** (repeat for both files you downloaded):
 ```powershell
+Get-FileHash .\dhun-test.apk -Algorithm SHA256
+Get-Content .\dhun-test.apk.sha256
 Get-FileHash .\dhun-test.msi -Algorithm SHA256
+Get-Content .\dhun-test.msi.sha256
 ```
 
-**Compare against** — verified publish `test` targeting **`16ad2e5b9fa53c13f26e8c2e3e551c7496481de3`**
-(PR #118), published **2026-09-28T13:04:52Z**; MSI ProductVersion **2.137.1**.
-Digests come from test-release **36425394409** staging-job annotations
-**108937985529** (APK) / **108937985866** (MSI), both `buildOnly=false` and
-`source=16ad2e5b9fa53c13f26e8c2e3e551c7496481de3`. The publish job succeeded.
+**Build identity** — rolling `test` targeting
+**`73b88b60b647120662812a5d33b233876acad283`** (PR #119), published
+**2026-09-28T18:48:23Z**; MSI ProductVersion **2.137.1**. Release metadata
+reports these asset sizes; the current SHA-256 values remain **unverified**.
 
-| Asset | Bytes | Expected SHA-256 |
-|---|---|---|
-| `dhun-test.apk` | 18,367,219 | `8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` |
-| `dhun-test.msi` | 112,934,912 | `4e28c551db2834c699351b3eb1c4d03c96dc46d536156242203845ee28d46b6e` |
+| Asset | Bytes | SHA-256 status |
+|---|---:|---|
+| `dhun-test.apk` | 18,367,219 | **Unverified for `73b88b6` — check the release `.sha256` sidecar** |
+| `dhun-test.msi` | 112,934,912 | **Unverified for `73b88b6` — check the release `.sha256` sidecar** |
 
-> If your hash matches **neither** this table **nor** the newest merged PR
-> comment's digests, a newer publish has replaced `test` — do not guess:
-> compare against the `.sha256` sidecars, and if still in doubt, report the
-> hash you computed and stop.
+The values previously shown here — APK
+`8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` and MSI
+`4e28c551db2834c699351b3eb1c4d03c96dc46d536156242203845ee28d46b6e` — belong
+to the earlier **`16ad2e5`** publish; they are historical only, not expected
+hashes for this build. Matching sizes do not prove matching bytes.
+
+> Compare each computed file hash with its matching `.sha256` sidecar from this
+> same `test` release. If you cannot verify either sidecar/hash pair, stop
+> before installing and report both what you computed and what the sidecar says.
 
 **Note down:**
 
@@ -90,8 +118,8 @@ Digests come from test-release **36425394409** staging-job annotations
 > stop — a mismatch means the publish is not what we think it is, and testing it
 > would invalidate the whole gate.
 
-*(Optional second source: the release also ships `dhun-test.apk.sha256` /
-`.msi.sha256` sidecars. Comparing against those too is cheap.)*
+*The release `.sha256` sidecars are the expected digests for this check; verify
+both artifacts against their matching sidecars.*
 
 ---
 
@@ -205,13 +233,15 @@ A fail = one line describing what you saw + one screenshot.
 
 **Step 12 — shape of the menu**
 - **Do:** tap ⋮ on any list row (Home, Search, Library, album, playlist).
-- **Expect:** a **small frosted card** with the track's own blurred art behind it: header (thumbnail + title + artist), then the actions. **No divider, no Close button.** It wraps its content instead of stretching full-width. Roughly **two-thirds the height** of the old sheet.
+- **Expect:** a **small centered frosted dialog** with the track's own blurred art behind it: header (thumbnail + title + artist), then the actions. **No divider, no Close button.** It wraps its content instead of stretching full-width. Roughly **two-thirds the height** of the old sheet.
+- The menu is centered by the current design. A compact anchored menu emerging near the ⋮ is a separate UX proposal, not a failure of this step.
 - ☐ pass ☐ fail → ________________________________
 
 **Step 13 — the labels**
-- **Expect** exactly these, short, no `(Artist Name)` suffix, no "for offline":
-  `Play next` · `Add to queue` · `Add to playlist` · `Download` · `Go to artist` · `Go to album`
-- ☐ pass ☐ fail → which label was wrong? ____________________
+- **Do:** open ⋮ on a track known to belong to an album (for example, a track row on the album page from step 1).
+- **Expect:** exactly these labels when their metadata/capability is present, short, no `(Artist Name)` suffix, no "for offline": `Play next` · `Add to queue` · `Add to playlist` · `Download` · `Go to artist` · `Go to album`.
+- `Go to album` is conditional: it is absent when the selected track has neither an album name nor an album ID. Use a known album track to verify the label and navigation.
+- ☐ pass ☐ fail ☐ partial (one or more unavailable) → ____________________
 
 **Step 14 — dismissing**
 - **Do:** tap outside. Then reopen and press Back.
@@ -228,18 +258,18 @@ A fail = one line describing what you saw + one screenshot.
 - Failing action, if any: ____________________
 
 **Step 16 — policy unchanged**
-- On a track with **no album** → "Go to album" must be **absent**. ☐ correct ☐ wrong
-- On a **non-downloadable** track → "Download" must be **absent**. ☐ correct ☐ wrong
+- On a track with **no album metadata** (`albumName` and `albumId` both absent) → `Go to album` must be **absent**. On a known album track → it must be present and navigate. ☐ correct ☐ wrong ☐ not tested
+- **Correction to the old instruction:** `Download` is controlled by whether the host supplies a `DownloadManager`, not by a per-track "downloadable" flag. The current Android and Windows builds supply one, so there is no normal device-side "non-downloadable track" to choose; expect `Download` to be present and test it in step 15. The no-manager hidden case is pinned by `TrackMenuPolicyTest`, not manually selectable in these builds. ☐ understood ☐ not applicable on device
 
 **Step 17 — queue dropdown**
 - **Do:** full player → Queue tab → ⋮ on a queue row.
 - **Expect:** an **anchored dropdown right under the button**, same frosted look, exactly three actions — `Move up` / `Move down` / `Remove from queue`. Should feel like the same menu family, not a second design.
 - ☐ pass ☐ fail → ________________________________
 
-**Step 18 — negative: one dialog everywhere**
+**Step 18 — negative: one menu family everywhere**
 - **Do:** open ⋮ from all seven surfaces (Home, Search, Library, album, playlist, full player, queue).
-- **Expect:** **nowhere** does the old centered dialog with a divider and a Close button appear. All seven share one dialog.
-- ☐ pass ☐ fail → which surface still shows the old one? ____________________
+- **Expect:** **nowhere** does the old tall dialog with a divider and a Close button appear. The track menu remains centered in the current design; the queue menu is anchored, but uses the same compact frosted style.
+- ☐ pass ☐ fail ☐ not tested → which surface still shows the old one? ____________________
 
 ---
 

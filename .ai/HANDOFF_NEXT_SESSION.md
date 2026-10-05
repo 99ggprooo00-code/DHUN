@@ -5,49 +5,63 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — post-#118 verified; S3 hardware gates open
+## CURRENT STATE — post-#119 CI green; S3 hardware round 1 partially reported
 
-2026-09-28 · session `arena/01a0e81a-dhun`. This section supersedes all
-historical merge instructions below. No application changes this session.
+Updated **2026-10-05**, session `arena/01a0eb87-dhun`, base `main@73b88b6`.
+PR #119 is merged; post-merge CI **36467187148**, Build APK **36467187128**,
+and test-release **36467187181** passed. Rolling `test` metadata targets
+`73b88b60b647120662812a5d33b233876acad283` and was published
+**2026-09-28T18:48:23Z** (APK 18,367,219 B; MSI 112,934,912 B; ProductVersion
+2.137.1). The build's SHA-256 values have not been independently verified.
+Prior #118 values must not be reused as #119 checksums; see §1 of
+`docs/verification/15-test-build-gate.md`.
 
-PR #118 merged as **`16ad2e5b9fa53c13f26e8c2e3e551c7496481de3`** at
-**2026-09-28T12:59:01Z**. Post-merge CI **36425394319**, Build APK
-**36425394304**, and test-release **36425394409** all completed **success**.
-The release's `target_commitish` and lightweight `test` tag both resolve to
-that full SHA; rolling `test` published **2026-09-28T13:04:52Z**.
+**User hardware report received 2026-10-05 (run date/device metadata absent):**
+Android reports failures at steps 1, 6, 7 and 9; full per-step evidence is in
+`docs/verification/14-release.md`. Artwork was present but small on notification,
+lock-screen and widget surfaces. The compact ⋮ menu passed but user prefers it
+anchored near its source. `Go to album` was not found; only five actions were
+tried; step 16 was misunderstood; step 18 was not reported. Windows core steps
+10–13 were reported pass. Four inline screenshots are now visually reviewed:
+the album pages show generic metadata and placeholder artwork, one with the
+now-playing blur behind it. The user's latest clarification says single-release
+cover and track art both fail, while other album/playlist covers fail and their
+row art mostly loads. Step-6 row size/shape mismatch and screenshot mapping
+remain unknown. This is partial evidence,
+not S3 sign-off. No device/OS, previous build or hashes were provided.
 
-| Asset | Bytes | SHA-256 |
-|---|---|---|
-| `dhun-test.apk` | 18,367,219 | `8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` |
-| `dhun-test.msi` | 112,934,912 | `4e28c551db2834c699351b3eb1c4d03c96dc46d536156242203845ee28d46b6e` |
+**S3 round-2 candidate fix / immediate next step:** the user confirms ordinary
+Home/Search song thumbnails load. On single releases, both page-cover art and
+track art are missing (including in the full-screen player); on other albums and
+playlists, page covers fail while per-track images mostly load. This points
+toward header/row-art parsing, not a global Coil failure. `pageHeader` previously
+checked only root `header`; it now also checks the normalized two-column tab
+sections and unwraps a nested responsive detail header. Synthetic regression
+fixtures/tests cover a single track inheriting header cover art, a playlist
+cover with independent row art, and nested detail-header fields. These shapes
+are plausible but are not the user's captured response. Latest user download is
+believed to be the `test` release v2.137.1; exact APK digest remains unverified.
+Run fixture validation and CI, then retest the generated APK on one single
+(cover/row/full player), one other album, one playlist (cover/row) and Home/Search.
+If any page image still fails, get a representative title/artist or browse ID and
+inspect its sanitized response before another parser change. The step-6 row
+size/shape mismatch remains unknown; do not change `TrackRow` (64dp, no
+thumbnail stroke) from a page-cover symptom. Verify `Go to album` on a known
+album-linked track. After CI, publish with verified hashes and re-run affected
+checks plus step 18. Step 16 has been corrected: `Download` appears when the host
+provides a `DownloadManager` (both shipped hosts do). Menu anchoring and larger/
+dynamic media artwork remain separate UX requests; do not bundle them without
+explicit scope.
 
-Digests were read from staging-job annotations **108937985529** (APK) and
-**108937985866** (MSI), both `source=16ad2e5b9fa53c13f26e8c2e3e551c7496481de3` and
-`buildOnly=false`; sidecar presence verified through the release API, not
-independent downloads. MSI **ProductVersion 2.137.1**. Hosted Windows upgrade
-**2.134.1 → 2.137.1** preserved userdata/cache sentinels, and ordinary uninstall
-removed disposable test userdata. This does **not** prove app launch, audio,
-visuals or real-machine native integration. The publish job **108940073731**
-succeeded; its sole annotation is the standing Ubuntu-26 migration notice.
+**Remaining open:** S3/S6 acceptance, Android/Windows soaks, offline/recovery/DSP
+observations, Windows native integration, release/signing decisions and final
+user approval. The extraction-health drill remains `ENVIRONMENT_BLOCKED` due to
+datacenter IP gating; it is not product failure evidence. No extraction/rot-drill
+changes absent T1/T2. Ubuntu-26 watch begins 2026-10-19.
 
-**Next:** run `docs/verification/15-test-build-gate.md`'s 18 checks on this
-build (or verify fresh digests if `test` has moved), then the download/radio/
-shuffle checks below and the S3 runbook. Upgrade over existing data first;
-clean install/uninstall belongs on a disposable profile/device. Report device,
-OS, build SHA and PASS/FAIL; do not treat expected results as observations.
-The endless-radio and normal playback 30-minute soaks, Windows native column,
-and recovery listener/device evidence remain open. No new hardware result.
-
-**Drill:** latest run 36412874929 on `5bbb16d` is `ENVIRONMENT_BLOCKED`
-(check-run 108896993696); no residential extraction regression established.
-Read the next scheduled verdict on the new main; do not change extraction or
-ADR-007 on runner gating alone. Ubuntu-26 watch starts 2026-10-19.
-
-**Session lifecycle:** **PR #119**, first commit `94cc440`, is pushed on
-`arena/01a0e81a-dhun`; CI is pending at this documentation snapshot. Final-head
-check evidence will be recorded in the PR before approval. No merge/closure or
-Arena finalization without explicit final checkpoint approval. A future merge
-will republish `test` even for docs-only changes; never pre-claim that release.
+**Session constraints:** stay on `arena/01a0eb87-dhun`; no PR merge/closure or
+Arena finalization without explicit approval. Candidate parser code/fixtures
+have been added; CI and device verification remain pending.
 
 ---
 

@@ -1,87 +1,109 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-09-28** · session **`arena/01a0e81a-dhun`** · base/main
-**`16ad2e5`**. User approved verification/follow-up after boot; final merge
-checkpoint is still required. No application code changed.
+Updated **2026-10-05** · session **`arena/01a0eb87-dhun`** · base/main
+**`73b88b6`**. PR #119 is merged and post-merge CI is green. Stage S3
+hardware round 1 has partial user-reported results; **S3 acceptance remains
+open**. A candidate page-header parser fix and regression fixtures have now been added; CI and hardware verification are pending.
 
-**Phase/scope:** S3 hardware verification remains active; S5's final two
-logic fixes (#118) are merged and released, not hardware-verified. S1/S2/S4/S5
-completed code is not being restarted. This session reconciles the post-#118
-release and corrects the hardware handoff, not a new feature phase.
+**Phase/status:** S3 hardware verification. S1/S2/S4/S5 code is complete and
+merged; S3/S6 still require real-device evidence. The active gate is
+`docs/verification/15-test-build-gate.md`, with the broader S3/S6 procedure in
+`docs/runbooks/s3-hardware-checklist.md`.
 
-**Exact files:** `.ai/ROADMAP.md`, `.ai/HANDOFF_NEXT_SESSION.md`,
-`.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`,
-`docs/verification/15-test-build-gate.md`,
-`docs/runbooks/s3-hardware-checklist.md`. Build identity updated; unsafe
-uninstall-first advice replaced by upgrade-first plus disposable clean tests;
-process-death terminology corrected. Android EQ docs contradiction recorded
-against current wiring; no EQ implementation changes.
+**Current rolling `test` metadata:** target/tag
+**`73b88b60b647120662812a5d33b233876acad283`**, published
+**2026-09-28T18:48:23Z**; APK **18,367,219 B**, MSI **112,934,912 B**,
+ProductVersion **2.137.1**. Post-merge CI **36467187148**, Build APK
+**36467187128**, test-release **36467187181** succeeded. The #119 SHA-256
+values are **not independently verified**; previous docs incorrectly reused
+#118 hashes. A device report without computed hashes cannot prove it tested
+these exact bytes. The verification sheet and handoff now state this plainly.
 
-**Verified GitHub evidence:**
-PR #118 merged as **`16ad2e5b9fa53c13f26e8c2e3e551c7496481de3`** at
-**2026-09-28T12:59:01Z**. Post-merge CI **36425394319**, Build APK
-**36425394304**, and test-release **36425394409** all completed **success**.
-The release's `target_commitish` and lightweight `test` tag both resolve to
-that full SHA; rolling `test` published **2026-09-28T13:04:52Z**.
+**Round-1 evidence received 2026-10-05** (execution date not supplied):
+- **Android:** step 1 FAIL; 2–5 reported pass/visible (5a–5c art present but
+  small); step 6 FAIL; 7 FAIL; 8 PASS; 9 FAIL; 10 readable; 11 PASS; 12
+  compact-menu pass with request for anchoring near ⋮; 13/15 partial (`Go to
+  album` not found; only five actions tested); 14 PASS; 16 not understood;
+  17 PASS; 18 not reported. Four inline screenshots were reviewed: album
+  pages show generic metadata/placeholders and one exposes the now-playing blur.
+  The latest report clarifies that single-release cover and track art both fail;
+  other album/playlist page covers fail while row art mostly loads. Step-6 row
+  size/shape mismatch and screenshot mapping remain unknown.
+  Step 10's “album cover not working” note is ambiguous.
+- **Windows:** core steps 10–13 reported PASS; model/build and artifact hash
+  are absent. This does not close the larger Windows-native/soak checks.
+- **Missing evidence:** device models, OS versions, previous builds, execution
+  time, APK/MSI hashes, details for the step-6 mismatch, screenshots for steps 5/10
+  (not shown in the four images), exact album/route/response for steps 1/7/9, and a
+  known-album-track check for `Go to album`.
+- The gate's old step 16 wrongly described `Download` as per-track
+  “downloadability.” Actual policy is host capability: Android/Windows both
+  supply `DownloadManager`; the hide case is unit-tested, not selectable in
+  normal device UI. The manual wording is corrected.
 
-| Asset | Bytes | SHA-256 |
-|---|---|---|
-| `dhun-test.apk` | 18,367,219 | `8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` |
-| `dhun-test.msi` | 112,934,912 | `4e28c551db2834c699351b3eb1c4d03c96dc46d536156242203845ee28d46b6e` |
+**User feedback, not yet a code change:** notification/lock-screen/widget art
+looked too small; user suggested larger art or a dynamically blurred
+current-song backdrop. The compact track menu was accepted as compact but user
+prefers a lower-right/contextual menu from ⋮. Current track menu is centered by
+design; anchoring requires a separate scope decision.
 
-Digests were read from staging-job annotations **108937985529** (APK) and
-**108937985866** (MSI), both `source=16ad2e5b9fa53c13f26e8c2e3e551c7496481de3` and
-`buildOnly=false`; sidecar presence verified through the release API, not
-independent downloads. MSI **ProductVersion 2.137.1**. Hosted Windows upgrade
-**2.134.1 → 2.137.1** preserved userdata/cache sentinels, and ordinary uninstall
-removed disposable test userdata. This does **not** prove app launch, audio,
-visuals or real-machine native integration. The publish job **108940073731**
-succeeded; its sole annotation is the standing Ubuntu-26 migration notice.
+**S3 round-2 candidate fix (recorded in `docs/verification/14-release.md`):**
+the user confirms ordinary Home/Search song thumbnails load. On single releases,
+both page-cover art and track art are missing, including in the full-screen
+player; on other albums/playlists, page covers fail while row thumbnails mostly
+load. This points toward header and album-row fallback parsing rather than a
+global Coil failure. `pageHeader` previously checked only root `header`; it now
+also looks for header renderers inside two-column tab sections and unwraps a
+nested responsive detail header. New synthetic fixtures/tests cover single
+track fallback, playlist cover with independent row art, and nested detail
+headers. These shapes are plausible, not confirmed from the user's raw payload.
+The latest user download is believed to be current `test` v2.137.1; its exact
+APK digest is still unverified. Run CI; then the device must retest the same
+single, cover-only album/playlist, full-screen player, and row art. If still
+failing, capture a representative browse response before another parser change.
+The exact step-6 row size/shape mismatch remains unknown; do not alter `TrackRow`
+(64dp, no thumbnail stroke) for a page-cover symptom. Verify `Go to album` on a
+known album-linked track, then publish only with freshly verified hashes and
+re-run affected checks. Image/menu design requests remain separate UX choices.
 
 **Completion ledger:**
-- **S1:** previously accepted using scheduled drill + residential evidence on
-  `d99060e`. Latest drill **36412874929** on `5bbb16d` is still
-  **ENVIRONMENT_BLOCKED**, confirmed by check-run **108896993696**; it is not
-  GREEN playback proof. No new residential failure evidence.
-- **S2:** cleanup merged (#111 and CI hygiene follow-ups). Only other open PR
-  at boot is #54 (proposed ADR-007 research), parked by user choice.
+- **S1:** CLOSED GREEN 2026-09-20 — scheduled drill + residential evidence on
+  `d99060e` (4 songs, both platforms, same code as probed `6f7fa48`).
+- **S2:** MERGED 2026-09-22 (PR #111 → `7fcadbe`); CI hygiene done; Ubuntu-26
+  watch deferred to 2026-10-19.
 - **S4:** code merged (#74); hardware acceptance remains in S3.
-- **S5:** base merged (#74); #118's `57febe6` offline-broadcast classification
-  and `614134b` retry-budget refund merged as `16ad2e5`, CI-verified and now
-  released. Final #118 head `b27553c` also passed push CI **36424431074**,
-  PR CI **36424438273**, APK **36424438277**, test-release **36424438270**.
-- **S3/S6:** OPEN: 18-check walkthrough, downloads/offline, radio and normal
-  playback soaks, Windows native integration, actual recovery/DSP behaviour,
-  signing/release approval. No hardware evidence supplied this session.
+- **S5:** base merged (#74); #118's offline-broadcast classification and
+  retry-budget refund merged as `16ad2e5`, CI-verified and released.
+- **S3/S6:** OPEN. This is partial user evidence only; failed visuals need
+  symptom-level triage and retest on a digest-verified build. Downloads/offline,
+  radio, normal playback soaks, Windows native integration, recovery/DSP,
+  signing/release approval and remaining acceptance are still open.
 
-**Local/pushed state:** checkout was clean at boot, zero commits ahead of
-main; no prior work lost. Assigned branch was not on GitHub (404, not auth
-failure). The six-file handoff update is committed as **`94cc440`**, pushed to the
-assigned branch, and open as **PR #119**. This status follow-up belongs to
-the same PR, not a second work stream. Local **29 Python tests passed**, **35 JSON fixtures valid**;
-`git diff --check` is the whitespace gate. No local Kotlin/PowerShell execution.
-Session push CI **36426612940** on `94cc440` is in progress at this
-record; PR checks / this status-follow-up head remain pending. Main's green
-checks do not certify these edits. See PR #119's verification comment for
-the final head and completed check results once actually observed.
+**Current docs updated:** `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`,
+`.ai/DEBUG_LOG.md`, `.ai/HANDOFF_NEXT_SESSION.md`,
+`docs/verification/14-release.md`, `docs/verification/15-test-build-gate.md`,
+`docs/runbooks/s3-hardware-checklist.md`, and the concise checklist at
+`docs/verification/s3-hardware-checklist.md`.
 
-**Last actual error:** latest extraction drill's `ENVIRONMENT_BLOCKED` (exit 2);
-no current application-test failure found. No JDK locally. The installed CLI
-rejects `gh run list --commit`; using `--branch main` and checking SHAs works.
+**Last technical/environment limitation:** extraction-health run
+**36412874929** → `ENVIRONMENT_BLOCKED` (steady state, datacenter IP gating),
+not an app failure. No JDK locally; CI remains the compiler. Release/log blobs
+can EOF in-sandbox; annotations API is the readout.
 
-**Exact next technical step:** finish branch/PR CI and packaging checks for
-**PR #119** on `arena/01a0e81a-dhun`; inspect actual failures if any, then
-record final-head run evidence in that PR before seeking final checkpoint
-approval. The documentation handoff is implemented; check completion is pending.
-Then device testing is the next acceptance step, using the verified build
-above (or the freshly verified replacement if `test` moves).
+**Exact next step:** run the fixture validator and push/CI the candidate parser
+change. If CI is green, install the generated APK and have the user retest a
+single release (cover + row + full player), one other album, one playlist cover
+and row art, and the known-good Home/Search images. Collect device/OS and
+verified APK hash if available. If any page art still fails, ask for one exact
+release title/artist/browse ID and inspect that sanitized live response before
+changing parsing again. Clarify the step-6 row size/shape mismatch and verify
+`Go to album` on a known album-linked track. After CI, publish with fresh
+verified hashes and re-run affected checks plus step 18. Do not claim S3 green
+based on CI or the partial report.
 
-**Blockers/lifecycle:** S3/S6 require real Android/Windows evidence; no devices
-in sandbox. No agent coding task is justified solely to fill that gap.
-Ubuntu-26 migration watch starts 2026-10-19. Do not merge/close the session PR,
-delete the branch, or invoke Arena finalization until explicitly approved.
-A future docs-only merge also republishes rolling `test` and advances MSI
-identity; its merge/release outcomes are **pending**, never pre-claimed here.
+**Blockers/lifecycle:** S3/S6 require Android/Windows hardware; no devices in
+sandbox. Ubuntu-26 runner migration begins 2026-10-19. Work stays on
+`arena/01a0eb87-dhun`; no merge/finalization unless explicitly approved.
 
 ---
 

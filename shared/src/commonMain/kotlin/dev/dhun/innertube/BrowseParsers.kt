@@ -228,15 +228,38 @@ private fun parseCarouselCard(twoRow: JsonObject): Any? {
 
 /** page header (any of the header renderer families YTM has shipped). */
 private fun pageHeader(root: JsonObject): JsonObject? {
-    val header = root.obj("header") ?: return null
-    return header.obj("musicImmersiveHeaderRenderer")
-        ?: header.obj("musicVisualHeaderRenderer")
-        ?: header.obj("musicResponsiveHeaderRenderer")
-        ?: header.obj("musicDetailHeaderRenderer")
-        ?: header.obj("musicEditablePlaylistDetailHeaderRenderer")?.firstNotNullOfOrNull {
+    val header = root.obj("header")
+    val rootHeader = header?.obj("musicImmersiveHeaderRenderer")
+        ?: header?.obj("musicVisualHeaderRenderer")
+        ?: header?.obj("musicResponsiveHeaderRenderer")
+        ?: header?.obj("musicDetailHeaderRenderer")
+        ?: header?.obj("musicEditablePlaylistDetailHeaderRenderer")?.firstNotNullOfOrNull {
             (it.value as? JsonObject)?.obj("musicResponsiveHeaderRenderer")
         }
-        ?: header.obj("musicPlaylistHeaderRenderer")
+        ?: header?.obj("musicPlaylistHeaderRenderer")
+
+    if (rootHeader != null) {
+        // Some musicDetailHeaderRenderer responses wrap the fields used by the
+        // page inside musicResponsiveHeaderRenderer; older responses expose
+        // those fields directly on the detail renderer.
+        return rootHeader.obj("musicResponsiveHeaderRenderer") ?: rootHeader
+    }
+
+    // Two-column browse responses can put their page header in the first tab's
+    // sectionListRenderer instead of the top-level `header` object. The same
+    // normalized section walker used by the page parsers finds that renderer;
+    // without this fallback the title falls back to "Album"/"Playlist", the
+    // cover is lost, and album tracks cannot inherit it for player artwork.
+    for (section in browseSectionContents(root)) {
+        section.obj("musicResponsiveHeaderRenderer")?.let { return it }
+        section.obj("musicDetailHeaderRenderer")?.let {
+            return it.obj("musicResponsiveHeaderRenderer") ?: it
+        }
+        section.obj("musicImmersiveHeaderRenderer")?.let { return it }
+        section.obj("musicVisualHeaderRenderer")?.let { return it }
+        section.obj("musicPlaylistHeaderRenderer")?.let { return it }
+    }
+    return null
 }
 
 /** Collect every text run that carries a browse endpoint in a subtree. */
