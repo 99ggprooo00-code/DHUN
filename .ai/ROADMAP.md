@@ -3,7 +3,7 @@
 Updated **2026-10-05** · session **`arena/01a0eb87-dhun`** · base/main
 **`73b88b6`**. PR #119 is merged and post-merge CI is green. Stage S3
 hardware round 1 has partial user-reported results; **S3 acceptance remains
-open**. A candidate page-header parser fix and regression fixtures have now been added; CI and hardware verification are pending.
+open**. Candidate page-header parser fix and regression fixtures are committed as `b7d0f01` and PR #120 is open. PR CI/build/test-release all pass; hardware verification is pending.
 
 **Phase/status:** S3 hardware verification. S1/S2/S4/S5 code is complete and
 merged; S3/S6 still require real-device evidence. The active gate is
@@ -56,15 +56,19 @@ global Coil failure. `pageHeader` previously checked only root `header`; it now
 also looks for header renderers inside two-column tab sections and unwraps a
 nested responsive detail header. New synthetic fixtures/tests cover single
 track fallback, playlist cover with independent row art, and nested detail
-headers. These shapes are plausible, not confirmed from the user's raw payload.
-The latest user download is believed to be current `test` v2.137.1; its exact
-APK digest is still unverified. Run CI; then the device must retest the same
-single, cover-only album/playlist, full-screen player, and row art. If still
-failing, capture a representative browse response before another parser change.
-The exact step-6 row size/shape mismatch remains unknown; do not alter `TrackRow`
-(64dp, no thumbnail stroke) for a page-cover symptom. Verify `Go to album` on a
-known album-linked track, then publish only with freshly verified hashes and
-re-run affected checks. Image/menu design requests remain separate UX choices.
+headers. These are synthetic response-shape fixtures, not the user's raw
+payload. PR #120 commit `b7d0f01`: CI **37319510581** passed, including
+`:shared:jvmTest`; Build APK **37319510440** and test-release **37319510990**
+passed (publish skipped). Push CI **37319187931** failed only on an unrelated
+15-second `LibraryViewModelTest.historyPlaybackQueuesCorrectly` timeout; the
+PR rerun on the same head passed. Latest user download likely was current `test`
+v2.137.1, but exact installed bytes/hash are not proven. Use the PR APK artifact
+from run **37319510990** for retest; its staged `.sha256` and build-info are
+included. Direct artifact download in the sandbox returned EOF. The exact
+step-6 row size/shape mismatch remains unknown; do not alter `TrackRow` (64dp,
+no thumbnail stroke) for a page-cover symptom. Verify `Go to album` on a known
+album-linked track, then publish only with freshly verified hashes and re-run
+affected checks. Image/menu design requests remain separate UX choices.
 
 **Completion ledger:**
 - **S1:** CLOSED GREEN 2026-09-20 — scheduled drill + residential evidence on
@@ -90,16 +94,17 @@ re-run affected checks. Image/menu design requests remain separate UX choices.
 not an app failure. No JDK locally; CI remains the compiler. Release/log blobs
 can EOF in-sandbox; annotations API is the readout.
 
-**Exact next step:** run the fixture validator and push/CI the candidate parser
-change. If CI is green, install the generated APK and have the user retest a
-single release (cover + row + full player), one other album, one playlist cover
-and row art, and the known-good Home/Search images. Collect device/OS and
-verified APK hash if available. If any page art still fails, ask for one exact
-release title/artist/browse ID and inspect that sanitized live response before
-changing parsing again. Clarify the step-6 row size/shape mismatch and verify
-`Go to album` on a known album-linked track. After CI, publish with fresh
-verified hashes and re-run affected checks plus step 18. Do not claim S3 green
-based on CI or the partial report.
+**Exact next step:** have the user download the `apk` artifact from PR
+[test-release run 37319510990](https://github.com/99ggprooo00-code/DHUN/actions/runs/37319510990)
+(it includes `dhun-test.apk`, `.sha256`, `.build-info.json`) and retest a single
+release (cover + row + full player), one other album, one playlist cover and row
+art, plus Home/Search. Capture device/OS and the artifact hash. If any page art
+still fails, obtain an exact release title/artist/browse ID and inspect that
+sanitized live response before another parser change. Clarify the step-6 row
+size/shape mismatch and verify `Go to album` on a known album-linked track.
+Do not merge or claim S3 green based on CI alone; hardware acceptance is still
+required. After device evidence and remaining code/docs checks, follow the
+merge-last rule and verify post-merge CI in the same turn.
 
 **Blockers/lifecycle:** S3/S6 require Android/Windows hardware; no devices in
 sandbox. Ubuntu-26 runner migration begins 2026-10-19. Work stays on

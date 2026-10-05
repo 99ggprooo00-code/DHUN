@@ -51,24 +51,31 @@ come from each track item. Read-only audit found common Coil
 permission. Do not change the global image loader without evidence of a shared
 transport failure.
 
-**Candidate parser fix (2026-10-05; CI/device proof pending).** `pageHeader`
+**Candidate parser fix (2026-10-05; CI-green, hardware unverified).** `pageHeader`
 only looked at `root.header`, while two-column browse payloads can put
 `musicResponsiveHeaderRenderer` inside a tab's `sectionListRenderer.contents`.
 That leaves album/playlist title and cover null; an album whose rows omit their
 own thumbnails then queues tracks without artwork. `pageHeader` now falls back
 to those normalized tab sections and unwraps a nested responsive header inside
-`musicDetailHeaderRenderer`. Tests/fixtures added for a single release with no
-row art (cover inherited into the track), a playlist cover while preserving row
-art, and nested detail-header fields. The new fixtures are minimal synthetic
-response-shape cases, **not** the user's captured payload; this is a candidate
-fix, not a confirmed root cause.
+`musicDetailHeaderRenderer`. Tests/fixtures cover a single release with no row
+art (cover inherited into the track), a playlist cover while preserving row art,
+and nested detail-header fields. They are minimal synthetic response-shape
+cases, **not** the user's captured payload; the parser cause remains a candidate
+until device retest.
 
-User says they downloaded the latest build. `gh release view test` confirms the
-latest `test` release currently targets `73b88b60b647120662812a5d33b233876acad283`
-(2.137.1, published 2026-09-28); the user's exact installed APK/hash is still
-unverified. Local fixture validation can run, but there is no JDK in the
-sandbox, so Kotlin tests must be verified by GitHub CI. Hardware retest remains
-required before closing S3.
+Commit `b7d0f01`, PR #120. PR CI **37319510581** passed all steps including
+`:shared:jvmTest` (new parser tests), Android Robolectric/build, probe and Desktop
+tests. Build APK **37319510440** and test-release **37319510990** passed; PR
+publish was skipped. Push CI **37319187931** failed only at unrelated
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly` with a 15-second timeout;
+the PR run on the same head passed. The `apk` artifact from
+[test-release run 37319510990](https://github.com/99ggprooo00-code/DHUN/actions/runs/37319510990)
+contains `dhun-test.apk`, `.sha256` and `.build-info.json` from `b7d0f01`.
+`gh run download` hit blob-host `EOF` in the sandbox; do not claim an APK hash
+here. The user's reported latest `test` build currently maps to target
+`73b88b6`/2.137.1, but exact installed bytes remain unverified. The PR APK must
+be installed for device retest before S3 closes. Local Kotlin tests cannot run
+without JDK; fixture validation passed.
 
 `TrackRow` currently uses `DhunSpacing.artworkThumb = 64.dp`; `ArtworkImage`
 draws no stroke. The latest report says per-track thumbnails mostly load on
@@ -83,15 +90,14 @@ these builds to test omission. The runbook wording has been corrected; the
 no-manager policy remains unit-tested. `Go to album` remains metadata-dependent
 and should be checked on a known album-linked track.
 
-Application parser code has now changed, but the candidate has not run through
-Kotlin tests/CI or device verification. Next run CI; if green, provide a fresh
-APK from this branch and retest the same single (page cover, row, full player),
-one other album, one playlist (cover + row) and Home/Search. If the payload still
-fails, request one exact title/artist or browse ID and capture the sanitized
-browse response before another parser edit. Clarify step 6's expected-versus-
-actual row size/shape; verify `Go to album` on a known album-linked track and
-complete step 18. Keep menu anchoring as a separate UX decision; the shipped
-track dialog is intentionally centered.
+Application parser code is CI-green but not device-verified. Next have the user
+install the `apk` artifact from test-release run **37319510990** and retest the
+same single (page cover, row, full player), one other album, one playlist (cover
++ row) and Home/Search. If the payload still fails, request one exact title/
+artist or browse ID and capture the sanitized browse response before another
+parser edit. Clarify step 6's expected-versus-actual row size/shape; verify `Go
+to album` on a known album-linked track and complete step 18. Keep menu anchoring
+as a separate UX decision; the shipped track dialog is intentionally centered.
 
 
 ## 2026-09-28 — Post-#118 reconciliation (`arena/01a0e81a-dhun`)

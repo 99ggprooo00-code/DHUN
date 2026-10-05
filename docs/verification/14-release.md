@@ -268,13 +268,28 @@ single representative item and its raw response are not yet available. The
    checks (1, 6, 7, 9, 13 and 18) plus any explicitly accepted UX change; keep
    Windows results and other S3/S6 gates accurately scoped.
 
+**PR #120 candidate verification (2026-10-05):** commit `b7d0f01` is pushed on
+`arena/01a0eb87-dhun`; PR [#120](https://github.com/99ggprooo00-code/DHUN/pull/120)
+remains open. PR CI **37319510581** passed, including `:shared:jvmTest`, Android
+Robolectric/build, probe, and Desktop compile/tests. The first push run
+**37319187931** failed only at unrelated
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly` after its 15-second
+coroutine timeout; PR CI on the same head passed. Build APK **37319510440** and
+test-release **37319510990** both passed; release publishing was correctly
+skipped on the PR. The test-release run's `apk` artifact includes
+`dhun-test.apk`, `.sha256` and `.build-info.json` for device retest:
+[download from Actions](https://github.com/99ggprooo00-code/DHUN/actions/runs/37319510990).
+Direct artifact download in the sandbox returned `EOF`, so no APK-file digest
+was independently read here. The artifact itself is built from `b7d0f01`.
+
 **Remaining verification blockers:** no representative user single/album/
-playlist browse ID or raw response has been supplied; the latest downloaded
-artifact is user-reported but its bytes/hash are unverified; and the step-6 row
-size/shape mismatch remains unclear. The parser change and shape fixtures are a
-candidate fix, not a device-confirmed root cause. Await CI, then retest the
-latest generated APK on the device; if the symptoms persist, capture the actual
-browse response/parsed URLs before another parser change.
+playlist browse ID or raw response has been supplied; the PR APK is not yet
+device-tested; and the step-6 row size/shape mismatch remains unclear. The
+parser change is CI-verified but not a device-confirmed root cause. Have the user
+install the PR artifact and retest a Single's cover/row/full-player art, one
+other album cover, a playlist cover and its rows, and Home/Search art. If the
+symptoms persist, capture the actual sanitized browse response/parsed URLs
+before another parser change.
 
 ## S1 evidence log (residential / on-device)
 

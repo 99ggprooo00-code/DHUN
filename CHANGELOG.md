@@ -24,6 +24,10 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — album and playlist headers in two-column browse pages (2026-10-05, PR #120)
+
+- The browse parser now resolves responsive page headers placed in a two-column tab's section list, and unwraps nested responsive headers inside detail-header renderers. This restores page title/cover extraction for that response shape and lets artwork-less single-release rows inherit the page cover for playback. Parser tests also pin playlist page-cover extraction without replacing per-track artwork. Android hardware retest is still required; see `docs/verification/14-release.md`.
+
 ### Fixed — two S5 leftovers: the offline-broadcast verdict and the never-refunded retry budget (2026-09-28, PR #118)
 
 - **An offline broadcast no longer blames the parser.** `checkPlayability`

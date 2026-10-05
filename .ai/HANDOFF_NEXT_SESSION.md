@@ -28,30 +28,32 @@ now-playing blur behind it. The user's latest clarification says single-release
 cover and track art both fail, while other album/playlist covers fail and their
 row art mostly loads. Step-6 row size/shape mismatch and screenshot mapping
 remain unknown. This is partial evidence,
-not S3 sign-off. No device/OS, previous build or hashes were provided.
+not S3 sign-off. The user says they downloaded the latest `test` build; exact
+installed bytes/hash and device/OS remain unverified.
 
 **S3 round-2 candidate fix / immediate next step:** the user confirms ordinary
 Home/Search song thumbnails load. On single releases, both page-cover art and
 track art are missing (including in the full-screen player); on other albums and
 playlists, page covers fail while per-track images mostly load. This points
 toward header/row-art parsing, not a global Coil failure. `pageHeader` previously
-checked only root `header`; it now also checks the normalized two-column tab
-sections and unwraps a nested responsive detail header. Synthetic regression
-fixtures/tests cover a single track inheriting header cover art, a playlist
-cover with independent row art, and nested detail-header fields. These shapes
-are plausible but are not the user's captured response. Latest user download is
-believed to be the `test` release v2.137.1; exact APK digest remains unverified.
-Run fixture validation and CI, then retest the generated APK on one single
+checked only root `header`; it now also checks normalized two-column tab sections
+and unwraps a nested responsive detail header. Synthetic fixtures/tests cover a
+single track inheriting header art, a playlist cover with independent row art,
+and nested detail-header fields. These shapes are plausible but are not the
+user's captured response. PR #120 (`b7d0f01`) is open; PR CI **37319510581**,
+Build APK **37319510440**, and test-release **37319510990** pass. Push run
+**37319187931** had one unrelated 15-second `LibraryViewModelTest` timeout; the
+PR run on the same head is green. For hardware retest, download the `apk`
+artifact from [test-release run 37319510990](https://github.com/99ggprooo00-code/DHUN/actions/runs/37319510990)
+(it contains `dhun-test.apk`, `.sha256`, `.build-info.json`; publish was skipped).
+Direct artifact download returned `EOF` in the sandbox. Test one single
 (cover/row/full player), one other album, one playlist (cover/row) and Home/Search.
-If any page image still fails, get a representative title/artist or browse ID and
-inspect its sanitized response before another parser change. The step-6 row
-size/shape mismatch remains unknown; do not change `TrackRow` (64dp, no
-thumbnail stroke) from a page-cover symptom. Verify `Go to album` on a known
-album-linked track. After CI, publish with verified hashes and re-run affected
-checks plus step 18. Step 16 has been corrected: `Download` appears when the host
-provides a `DownloadManager` (both shipped hosts do). Menu anchoring and larger/
-dynamic media artwork remain separate UX requests; do not bundle them without
-explicit scope.
+If art still fails, get a representative title/artist or browse ID and inspect
+its sanitized response before another parser change. Step-6 row size/shape and
+`Go to album` checks remain open. After device evidence, update verified hashes,
+complete affected checks plus step 18, and follow merge-last; no merge until
+hardware gates and final approval. Menu anchoring and larger/dynamic media art
+remain separate UX requests; do not bundle without explicit scope.
 
 **Remaining open:** S3/S6 acceptance, Android/Windows soaks, offline/recovery/DSP
 observations, Windows native integration, release/signing decisions and final
@@ -61,7 +63,7 @@ changes absent T1/T2. Ubuntu-26 watch begins 2026-10-19.
 
 **Session constraints:** stay on `arena/01a0eb87-dhun`; no PR merge/closure or
 Arena finalization without explicit approval. Candidate parser code/fixtures
-have been added; CI and device verification remain pending.
+are CI-green in PR #120; device verification remains pending.
 
 ---
 
