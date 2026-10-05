@@ -1,6 +1,28 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Current status (2026-09-28, session `arena/01a0e7ee-dhun` — PR #118 pre-merge).**
+> **Current status (2026-10-05 — S3 hardware round 1).** PR #119 is merged as
+> `73b88b60b647120662812a5d33b233876acad283`; post-merge CI **36467187148**,
+> Build APK **36467187128**, and test-release **36467187181** passed. Rolling
+> `test` metadata points to `73b88b6`, published **2026-09-28T18:48:23Z**
+> (APK 18,367,219 B; MSI 112,934,912 B; ProductVersion 2.137.1). The #119
+> SHA-256 values have **not** been independently verified in this sandbox; the
+> hashes previously repeated from #118 were not established for this build.
+> Do not treat the user's reported install as verified `73b88b6` until its
+> computed hashes are compared with the matching release sidecars.
+>
+> **User-reported S3 results (report received 2026-10-05; execution date not
+> supplied):** Android marked 1, 6, 7, 9 fail; 2–5, 8, 10–12, 14, 17 were
+> reported pass, with qualifications; 13/15 are partial because `Go to album`
+> was not found and only five actions were tried; 16 was not understood; 18
+> was not reported. Windows core loop 10–13 was reported pass. This is partial
+> device evidence, **not S3 acceptance**. Device models, OS versions, prior
+> builds and test hashes were not provided. Four Android screenshots were subsequently embedded and visually reviewed;
+> the exact failed-step mapping remains unknown. Album views show generic metadata
+> and placeholder artwork; playlist views show row art but do not explain the
+> reported row failure. Details and limits are in the report ledger below.
+> S3/S6 soaks, native Windows checks and other release gates remain open.
+
+> **Historical status snapshot (2026-09-28, session `arena/01a0e7ee-dhun` — PR #118 pre-merge).**
 > The release baseline is **`main@5bbb16d`** (PR #117, merged
 > 2026-09-28T10:50:31Z). Post-merge CI green: CI **36412080952**, Build APK
 > **36412080763**, test-release **36412080887** (`apk` + `msi` + `publish`).
@@ -118,6 +140,161 @@
 > non-zero and only `FAIL` opens a rot-drill issue. Raw GitHub log/artifact blobs
 > still return `EOF` in the agent sandbox (annotations API is the readout), and local
 > Gradle cannot run without a JDK.
+
+## S3 hardware round 1 — user report ledger (received 2026-10-05)
+
+**Evidence qualification.** The report did not include the device-run date/time
+in text, Android model/version, Windows build, previously installed build, or
+APK/MSI SHA-256 values. Four Android PNG screenshots were embedded in the
+follow-up message and visually reviewed:
+`Screenshot_2026-10-05-18-13-30-669_dev.dhun.android.png`,
+`Screenshot_2026-10-05-18-14-46-908_dev.dhun.android.png`,
+`Screenshot_2026-10-05-18-10-32-018_dev.dhun.android.png`, and
+`Screenshot_2026-10-05-18-16-02-116_dev.dhun.android.png`. Their filenames
+suggest capture times on 2026-10-05, but timezone and step mapping were not
+specified. Initial screenshot review interpreted two playlist views as showing
+per-track cover thumbnails (one on a plain dark page, one with a blurred backdrop
+while `Parvati` is playing). The user's latest clarification distinguishes the
+failures: single-release pages lose both cover and track art, while other album
+and playlist pages lose only the page-level cover and their row thumbnails mostly
+load. The images alone cannot confirm the loaded state of each tile, explain the
+step-6 size/shape mismatch, or establish which artwork supplies the second
+backdrop. Two album views show the header title/subtitle falling back to `Album`,
+placeholder cover art, and an `Unknown artist` track row. One has no
+active player and a flat dark page; the other has `Nazm Nazm` by Arko playing
+while a blurred background is visible behind the generic album page. These
+images support the reported missing album-page metadata/art symptoms, but do
+not identify the album, route or browse response. None shows steps 5, 10 or the
+⋮ menu. They still do not establish the exact artifact/device configuration.
+
+### Android — 18-step walkthrough
+
+| Step | Reported result | Detail / limitation |
+|---|---|---|
+| 1 | **FAIL** | Album track-row artwork check failed. The album screenshots show placeholder art on the row(s), but the album/route is unidentified and the exact source response is unavailable. |
+| 2 | PASS | Full player artwork reported present. |
+| 3 | PASS | Mini-player artwork reported present. |
+| 4 | PASS | Home/Search/Library shell backdrop reported correct. |
+| 5a | Art present; **small** | Notification shade; attachment-to-step mapping unavailable. Procedure asks for a screenshot. |
+| 5b | Art present; **small** | Lock-screen media surface; attachment-to-step mapping unavailable. |
+| 5c | Art present; **small** | Home-screen widget; attachment-to-step mapping unavailable. User suggested larger thumbnails or a dynamically blurred current-song backdrop; this is UX feedback, not yet a scoped change. |
+| 6 | **FAIL** | Playlist-row appearance check failed, but the row mismatch is still unspecified. The latest clarification says playlist and other-album page covers fail while their per-track row thumbnails mostly load; single-release rows may also lack art. A missing page cover alone does not explain step 6. The expected-versus-actual size/shape result remains missing. |
+| 7 | **FAIL** | Idle album screenshot shows generic `Album` title/subtitle, placeholder cover and row art, and a flat dark page. The album image is absent or failed to load; generic labels are consistent with parser fallbacks when header fields are missing. Exact album/route and response are unknown, so the cause is unconfirmed. |
+| 8 | PASS | Artist-page backdrop/scroll check reported pass. |
+| 9 | **FAIL** | Screenshot shows a generic `Album` page with placeholder art while `Nazm Nazm` by Arko is playing and a blurred image remains behind the page. This is consistent with the page's own artwork being absent/unloaded and the shell's now-playing backdrop showing through; the exact album/route and cause are unknown. |
+| 10 | PASS (readable) | Text on a white/pale-cover case was reported readable; album name and exact location were not supplied. The parenthetical “album cover not working” in the report is ambiguous and is not recorded as a separate confirmed failure. |
+| 11 | PASS (user-reported) | One playlist image is flat/dark; another has a blurred background while `Parvati` is playing. The images do not identify local vs remote or prove whether the blur is the playlist's own art versus the shell fallback. |
+| 12 | PASS with UX request | Compact menu reported present, but centered. User would prefer it anchored near the originating ⋮, toward the lower right. Current centered placement is intentional; anchoring is a separate design change. |
+| 13 | **PARTIAL** | Labels otherwise marked pass, but `Go to album` was not found. Selected track/surface and album metadata were not specified, so absence is not yet classified as a defect or expected policy. |
+| 14 | PASS | Tap-outside and Back dismissal both reported working. |
+| 15 | **PARTIAL** | User reports all five actions they found worked; the sixth was not exercised/located. Exact five-action list was not supplied. |
+| 16 | Not tested | User did not understand the check. The old wording was misleading: `Download` visibility is host-capability based (`DownloadManager` supplied), not per-track “downloadability.” The current Android and Windows builds provide a manager, so the hide case is not selectable in ordinary device testing; the policy is unit-tested. For album policy, check `Go to album` on a known album track (present/navigates) and on a track with no album metadata (absent). See corrected step 16 in `15-test-build-gate.md`. |
+| 17 | PASS | Queue-row anchored dropdown reported pass. |
+| 18 | Not reported | The seven-surface check was left blank; no conclusion recorded. |
+
+**Menu feel / media presentation feedback:** the centered compact menu passed as
+compact, but user requested a lower-right contextual placement. Notification,
+lock-screen and widget artwork were present but considered too small; user
+suggested increasing art size or using a blurred background that follows the
+current song. The four reviewed images do not show notification/lock-screen/widget surfaces, so they cannot assess OS scaling or contrast.
+
+### Windows — four core checks
+
+| Step | Reported result | Detail / limitation |
+|---|---|---|
+| 10 | PASS | Shuffle queue check. |
+| 11 | PASS | Radio check. |
+| 12 | PASS | Playback controls and 10-minute tray check. |
+| 13 | PASS | Download, disconnect network, and offline playback check. |
+
+These are user-reported core-loop passes only; Windows build/device metadata
+is absent and they do not close the separate Windows-native S3/S6 checklist.
+
+**Disposition:** partial S3 evidence; do not mark the gate green. Follow up with
+artifact hashes, device/OS/build details, screenshots and exact actual results
+for Android 1, 6, 7, 9; verify `Go to album` with a known album-linked track;
+and complete step 18. After symptom clarification, triage only the confirmed
+S3 visual defects and re-test on a digest-verified build. The rolling release
+hashes and S3 acceptance remain open.
+
+### S3 round-2 remediation plan
+
+**Follow-up symptom report (2026-10-05):** ordinary song thumbnails on
+Home/Search load. The user reports that on “singles” both the page cover and
+track art fail; tracks played from those pages also lack art in the full-screen
+player. On other album and playlist pages, only the page-level cover fails while
+per-track thumbnails mostly load. Album/playlist pages were opened from Home and
+Search. This distribution points more strongly to missing or unrecognized
+browse-page/track thumbnail data than to a global Coil/network failure, but a
+single representative item and its raw response are not yet available. The
+#119 tested artifact/device identity also remains unknown.
+
+1. **Reproducibility/provenance.** The user installed the PR #120 candidate
+   artifact from run **37322658878** and reports verifying its APK checksum.
+   Device: Android 15 build `SQ3A.240829.003`; exact model and affected titles
+   were not supplied. The older #119 rolling release is not the tested build.
+2. **Research.** `parseAlbumPage` derives the cover with
+   `thumbnailsLastUrl(header)` and passes it to rows as a fallback;
+   `parsePlaylistPage` derives its cover from the header while preserving row
+   art separately. Two-column browse responses can put
+   `musicResponsiveHeaderRenderer` under the tab's section-list contents, while
+   `pageHeader` originally checked only the top-level `header`.
+3. **Candidate fix and retest.** `pageHeader` checks normalized tab sections and
+   unwraps a nested `musicDetailHeaderRenderer.musicResponsiveHeaderRenderer`.
+   Synthetic fixtures cover single-track fallback, playlist cover with
+   independent row art, and nested headers. The user reports the single's page
+   cover/rows/full player, another album cover, playlist cover/rows, and
+   Home/Search thumbnails all work on the candidate. This is targeted device
+   acceptance, not proof of the exact upstream payload/root cause: no user raw
+   browse response was captured. If the symptom returns, inspect that sanitized
+   payload before another parser change. Do not alter Coil or invent fallback
+   art when upstream data is genuinely absent.
+4. **Separate checks.** Step 6's expected playlist rows are 64dp borderless; the
+   user says the row shape seems correct but supplied no measurement. `Go to
+   album` also “seems working,” with no exact track ID/navigation result. Keep
+   their broader checklist entries open/qualified, and keep menu anchoring plus
+   notification/lock-screen/widget art-size preferences as separate UX scope.
+5. **Merge-last.** The target artwork retest and CI/build workflows pass. Commit
+   and push this verification record, wait for all PR checks on that head, then
+   merge PR #120 last and verify post-merge CI/test-release in the same turn.
+   This targeted pass does not close the full S3/S6 hardware checklist.
+
+**PR #120 candidate verification and device retest (2026-10-05):** parser
+commit `b7d0f01` is pushed on `arena/01a0eb87-dhun`; PR
+[#120](https://github.com/99ggprooo00-code/DHUN/pull/120) is open. Initial PR CI
+**37319510581** passed, including `:shared:jvmTest`, Android Robolectric/build,
+probe and Desktop tests. Two intervening docs-only runs on head `5006595` had
+unrelated test failures: push CI **37320618809** timed out in
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly`; PR CI **37320626452**
+failed in `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+(expected `tok-2`, got `tok-a`). Later runs passed on heads `1332005` and
+`edaf4b2`; app-code head `edaf4b2` passed push CI **37322646142**, PR CI
+**37322658661**, Build APK **37322658940**, and test-release **37322658878**.
+The candidate test-release APK/MSI and Windows install-over passed; AAB/publish
+were skipped.
+
+The `apk` artifact from
+[test-release run 37322658878](https://github.com/99ggprooo00-code/DHUN/actions/runs/37322658878)
+contains `dhun-test.apk`, `.sha256` and `.build-info.json`. APK: 18,367,219 bytes,
+SHA-256 `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`.
+The downloaded ZIP is 17,552,363 bytes; this is expected compression, not a
+size mismatch. User reports verifying the APK checksum and installing/testing
+it on Android 15 build `SQ3A.240829.003` (device model not provided). Reported
+PASS: single-release cover, track rows and full-screen player; another album's
+cover; playlist cover/rows; Home/Search thumbnails. User clarified Home/Search
+thumbnails were fine and the now-playing backdrop appears only during playback
+as intended. Playlist step-6 row shape (expected 64dp, borderless) and `Go to
+album` on an album-linked track are reported as “seems working”; exact row
+measurement and album-track ID were not supplied. Record the targeted artwork
+retest as **PASS by user report**; do not call all S3/S6 acceptance complete.
+No user-captured raw browse response exists, so the precise upstream response
+shape/root cause remains unconfirmed even though the candidate fixes the
+observed symptoms. No rolling release was published before merge.
+
+**Remaining verification boundary:** broader 18-step S3/S6 acceptance, Windows
+native/soak results, step 18, exact device model, and other platform evidence
+remain open. This targeted pass and the green PR checks are sufficient to merge
+PR #120 under the user's request; do not claim all S3/S6 gates are closed.
 
 ## S1 evidence log (residential / on-device)
 

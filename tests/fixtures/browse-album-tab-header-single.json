@@ -1,0 +1,64 @@
+{
+  "contents": {
+    "twoColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "musicResponsiveHeaderRenderer": {
+                      "title": {"runs": [{"text": "Example Single Release"}]},
+                      "subtitle": {
+                        "runs": [
+                          {
+                            "text": "Sample Artist",
+                            "navigationEndpoint": {"browseEndpoint": {"browseId": "UC_sample_artist"}}
+                          },
+                          {"text": " • Single • 2026"}
+                        ]
+                      },
+                      "secondSubtitle": {"runs": [{"text": "1 song • 3 minutes"}]},
+                      "thumbnail": {
+                        "musicThumbnailRenderer": {
+                          "thumbnail": {
+                            "thumbnails": [
+                              {"url": "https://lh3.googleusercontent.com/sample_single=w60-h60-l90-rj", "width": 60, "height": 60},
+                              {"url": "https://lh3.googleusercontent.com/sample_single=w544-h544-l90-rj", "width": 544, "height": 544}
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "secondaryContents": {
+        "sectionListRenderer": {
+          "contents": [
+            {
+              "musicShelfRenderer": {
+                "contents": [
+                  {
+                    "musicResponsiveListItemRenderer": {
+                      "flexColumns": [
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Example Track"}]}}},
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Sample Artist", "navigationEndpoint": {"browseEndpoint": {"browseId": "UC_sample_artist"}}}, {"text": " • 3:20"}]}}}
+                      ],
+                      "playlistItemData": {"videoId": "single_track_id"}
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

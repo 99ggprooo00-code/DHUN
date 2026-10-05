@@ -1,5 +1,112 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-05 — S3 hardware report; build digest and UI symptoms unresolved
+
+The user returned a partial Android + Windows report for the round-1 checklist.
+Android marked steps 1, 6, 7 and 9 failed; Windows core steps 10–13 passed by
+user report. Steps 5a–5c showed artwork but it was described as small; the
+compact track menu passed but the user asked for it to open near its ⋮ anchor.
+`Go to album` was not found and only five actions were exercised; step 16 was
+not understood and step 18 was not reported. No device/OS/build metadata or computed hashes accompanied the report. Four
+inline screenshots were subsequently reviewed, though their step mapping is
+unknown. Both album views show generic `Album` metadata and placeholder art; one
+shows `Nazm Nazm` playing behind the page. The latest user clarification says
+single-release cover and track art both fail, while other album/playlist covers
+fail and their per-track row art mostly loads. Exact step-6 size/shape result
+remains unclear. Therefore there is no confirmed build identity or diagnosed
+parser root cause yet.
+See `docs/verification/14-release.md` for the verbatim-scope result ledger.
+
+**Checksum provenance correction.** The post-#119 gate had repeated the
+`16ad2e5` hashes as if verified for `73b88b6`; this was incorrect. The release
+API confirms the `test` target/tag, asset names and sizes, but sandbox sidecar
+fetches were empty/EOF and publish-job annotations contain no artifact hashes.
+The gate, runbook and handoff now mark the `73b88b6` checksums unverified. Do
+not reuse old digests or infer file identity from equal sizes.
+
+**Album screenshot/code correlation (preliminary, not a confirmed root cause).**
+`parseAlbumPage` uses the generic title `Album` when `pageHeader(root)` or its
+`title.runs` is not found; album art comes from `thumbnailsLastUrl(header)`;
+track-row art is the row thumbnail or that header cover; `AlbumScreen` passes
+`detail.thumbnailUrl` to `PageArtworkBackdrop`. If the page header/art URL is
+missing—or the image request fails—the UI shows the observed placeholders, and
+with another track playing the shell's now-playing blur can remain visible
+under the album page. The screenshot's `Album`/`Unknown artist` labels fit that
+fallback path, but could also be genuine incomplete upstream data; no raw browse
+response, album id or source route was supplied. Do not patch the blur layer
+until a real album response proves that valid page art reaches the UI.
+
+**Follow-up symptom report (2026-10-05).** The user confirms ordinary
+Home/Search song thumbnails load. On single releases, both the page cover and
+track art are missing, including when those tracks are opened in the full-screen
+player. On other albums and playlists, only the page-level cover fails while
+per-track thumbnails mostly load. The pages were opened from Home and Search.
+This strongly favors missing/unrecognized browse-page header data (and the
+single page's row fallback) over a global Coil failure, but is not a confirmed
+root cause without one raw affected browse response. `parseAlbumPage` derives
+the header cover with `thumbnailsLastUrl(header)` and passes it as a row
+fallback; `parsePlaylistPage` derives its cover separately while row thumbnails
+come from each track item. Read-only audit found common Coil
+`ArtworkImage`/`AsyncImage`, `coil-network-ktor3`, and Android `INTERNET`
+permission. Do not change the global image loader without evidence of a shared
+transport failure.
+
+**Candidate parser fix (2026-10-05; targeted device retest passed).** `pageHeader`
+previously checked only `root.header`, while two-column browse responses can
+place `musicResponsiveHeaderRenderer` in a tab's `sectionListRenderer.contents`.
+It now falls back to those normalized tab sections and unwraps nested responsive
+detail headers. Tests/fixtures cover a single release with no row art (cover
+inherited into the track), a playlist cover with independent row art, and nested
+detail-header fields. These are synthetic response shapes, not the user's raw
+payload, so the exact upstream cause remains unconfirmed even though the
+candidate fixes the reported device symptoms.
+
+Parser commit `b7d0f01`, PR #120. Initial PR CI **37319510581** passed all steps,
+including the new parser tests. Two intervening docs-only runs on head `5006595`
+had unrelated failures: push CI **37320618809** timed out in
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly`; PR CI **37320626452**
+reported `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+(expected `tok-2`, got `tok-a`). On head `1332005`, push CI **37321440694** and
+PR CI **37321446706** passed. On current pre-merge head `edaf4b2`, push CI
+**37322646142**, PR CI **37322658661**, Build APK **37322658940**, and test-release
+**37322658878** passed. The APK/MSI and MSI install-over jobs passed; AAB/publish
+were skipped. The `apk` artifact contains `dhun-test.apk`, `.sha256`, and
+`.build-info.json`. It is 18,367,219 bytes, SHA-256
+`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`; artifact ZIP
+is 17,552,363 bytes (expected compression). User reports downloading the
+candidate, verifying its checksum, and testing on Android 15 build
+`SQ3A.240829.003` (model not reported): single cover/rows/full player, other
+album cover, playlist cover/rows, and Home/Search thumbnails all work; the
+now-playing backdrop appears during playback only, as expected. Playlist-row
+step 6 (64dp, borderless) and `Go to album` were reported as “seems working,”
+without exact row measurement or album-track ID. Record targeted artwork
+acceptance **PASS by user report**, not full S3/S6 sign-off. No JDK locally;
+fixture validation passed and CI remains the Kotlin verifier.
+
+`TrackRow` currently uses `DhunSpacing.artworkThumb = 64.dp`; `ArtworkImage`
+draws no stroke. The latest report says per-track thumbnails mostly load on
+other albums/playlists; the step-6 expected-versus-actual row size/shape mismatch
+is still not described. Do not change row styling from a page-cover failure.
+
+**Step-16 procedure defect.** Code review of `TrackMenuPolicy` and its test
+showed that `Download` is shown when a host supplies a `DownloadManager`;
+there is no per-track downloadable predicate. Android and Desktop wire a
+manager. Thus a tester cannot choose a special “non-downloadable track” on
+these builds to test omission. The runbook wording has been corrected; the
+no-manager policy remains unit-tested. `Go to album` remains metadata-dependent
+and should be checked on a known album-linked track.
+
+Targeted artwork verification is now reported PASS on the digest-verified
+candidate. The remaining pre-merge work is to commit/push this verification
+record and let checks pass on that docs head, then merge PR #120 as the final
+action and watch post-merge CI/test-release in the same turn. Do not claim all
+S3/S6 accepted: full step 18, exact step-6 measurement, device model, and other
+platform/soak evidence remain incomplete. If symptoms recur after merge, obtain
+the exact affected browse ID and sanitized response before another parser edit.
+Keep menu anchoring and larger/dynamic notification artwork as separate UX
+choices.
+
+
 ## 2026-09-28 — Post-#118 reconciliation (`arena/01a0e81a-dhun`)
 
 Boot inherited a clean checkout at `16ad2e5`, but the roadmap still said

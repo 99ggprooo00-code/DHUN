@@ -13,8 +13,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Parser tests against fixtures captured from LIVE responses (no network in
- * CI). Fixtures live in src/jvmTest/resources — copies of /tests/fixtures.
+ * Parser tests against sanitized live and minimal response-shape fixtures (no
+ * network in CI). Fixtures live in src/jvmTest/resources — copies of /tests/fixtures.
  */
 class ParserFixtureTest {
 
@@ -336,6 +336,81 @@ class ParserFixtureTest {
         assertTrue(playlist.tracks.all { it.artistName.isNotBlank() })
     }
 
+
+    @Test
+    fun albumSingleHeaderInTwoColumnTabSuppliesCoverAndTrackFallback() {
+        // Some two-column browse pages place the responsive page header in the
+        // tab's section list rather than root.header. Singles commonly omit
+        // per-row art, so losing this header also leaves queued tracks without
+        // artwork in the full player.
+        val album = parseAlbumPage(
+            obj(fixture("browse-album-tab-header-single.json")),
+            "MPREb_sample_single",
+        )
+        assertEquals("Example Single Release", album.title)
+        assertEquals("Sample Artist", album.artistName)
+        assertEquals("UC_sample_artist", album.artistId)
+        val cover = assertNotNull(album.thumbnailUrl)
+        assertTrue(cover.contains("sample_single=w544-h544"), "cover: $cover")
+        assertEquals(1, album.tracks.size)
+        assertEquals("single_track_id", album.tracks.single().id)
+        assertEquals(cover, album.tracks.single().thumbnailUrl)
+    }
+
+    @Test
+    fun playlistHeaderInTwoColumnTabSuppliesCoverWithoutOverwritingRowArt() {
+        val playlist = parsePlaylistPage(
+            obj(fixture("browse-playlist-tab-header.json")),
+            "VLPL_sample_playlist",
+        )
+        assertEquals("Sample Playlist", playlist.title)
+        assertEquals("Playlist Owner", playlist.authorName)
+        val cover = assertNotNull(playlist.thumbnailUrl)
+        assertTrue(cover.contains("sample_playlist=w544-h544"), "cover: $cover")
+        assertEquals(1, playlist.tracks.size)
+        assertEquals("playlist_row_track", playlist.tracks.single().id)
+        assertEquals(
+            "https://i.ytimg.com/vi/playlist_row_track/hqdefault.jpg",
+            playlist.tracks.single().thumbnailUrl,
+            "the page cover must not replace real per-row art",
+        )
+    }
+
+    @Test
+    fun nestedResponsiveDetailHeaderIsUnwrapped() {
+        val json = """
+            {
+              "header": {
+                "musicDetailHeaderRenderer": {
+                  "musicResponsiveHeaderRenderer": {
+                    "title": {"runs": [{"text": "Nested Header Single"}]},
+                    "subtitle": {"runs": [{"text": "Nested Artist"}]},
+                    "thumbnail": {
+                      "musicThumbnailRenderer": {
+                        "thumbnail": {
+                          "thumbnails": [{"url": "https://lh3.googleusercontent.com/nested_single.jpg"}]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "contents": {
+                "twoColumnBrowseResultsRenderer": {
+                  "secondaryContents": {
+                    "sectionListRenderer": {
+                      "contents": []
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+        val album = parseAlbumPage(obj(json), "MPREb_nested_single")
+        assertEquals("Nested Header Single", album.title)
+        assertEquals("Nested Artist", album.artistName)
+        assertTrue(album.thumbnailUrl?.contains("nested_single.jpg") == true)
+    }
 
     @Test
     fun radioFixtureFirstEntryIsCurrentTrack() {

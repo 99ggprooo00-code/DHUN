@@ -9,13 +9,16 @@ Builds: the rolling [`test` pre-release](https://github.com/99ggprooo00-code/DHU
 Always re-download after the merge you are qualifying, and note the
 `main@<sha>` you tested.
 
-**Build identity (verified 2026-09-28):** rolling `test` published
-**13:04:52Z**, target and tag **`16ad2e5`** (PR #118); MSI **2.137.1**.
-Use `docs/verification/15-test-build-gate.md` §1 for full SHA and digests,
+**Build identity (release metadata rechecked 2026-10-05):** rolling `test`
+published **2026-09-28T18:48:23Z**, target and tag
+**`73b88b60b647120662812a5d33b233876acad283`** (PR #119); APK **18,367,219 B**,
+MSI **112,934,912 B**, ProductVersion **2.137.1**. Use
+`docs/verification/15-test-build-gate.md` §1 for the digest-verification status,
 and run its **18-check walkthrough first**, then the download/radio/shuffle
-re-test in `.ai/HANDOFF_NEXT_SESSION.md` and the standing checks below.
-If `test` has moved, verify the new release target/tag and SHA-256 sidecars.
-Matching byte sizes do not prove matching bytes, even on docs-only rebuilds.
+re-test in `.ai/HANDOFF_NEXT_SESSION.md` and the standing checks below. The
+#119 SHA-256 values are not yet verified in the sandbox; do not reuse the
+#118 hashes or infer identity from equal byte sizes. If `test` has moved, verify
+the new release target/tag and matching `.sha256` sidecars before installing.
 
 **Preserve user data:** upgrade-install over the existing app first and check
 playlists, settings and downloads remain. Do not uninstall your daily-use
@@ -27,6 +30,21 @@ Recording: check each box with `[x]`, device model + OS version, and any
 failure as *expected vs actual*. Paste the filled checklist back to the
 agent — failures become S3-found functional bugs (the only UI work allowed
 pre-tag besides this list).
+
+## S3 hardware round 1 — partial report received 2026-10-05
+
+The user reports Android failures at steps **1, 6, 7, 9** and pass on the
+Windows core loop (steps 10–13). Android reported artwork on notification,
+lock-screen and widget surfaces but said it looked small; album/artist/page
+backdrop, menu-label and remaining-step detail is recorded in
+`docs/verification/14-release.md`. The compact menu passed visually, with a
+suggestion to anchor it near the originating ⋮. Device/OS, test date, build
+hashes or prior build were not included. Four screenshot attachments were
+listed; the four inline images have now been reviewed but are not mapped to
+specific steps. Album views show placeholder metadata/art; playlist views show
+row thumbnails. Treat this as partial evidence, not S3 sign-off. Do not infer
+the tested bytes
+from the release's matching asset sizes.
 
 ## Partial credit already banked (2026-09-20, `main@d99060e`)
 
