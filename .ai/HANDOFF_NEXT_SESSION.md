@@ -41,19 +41,20 @@ and unwraps a nested responsive detail header. Synthetic fixtures/tests cover a
 single track inheriting header art, a playlist cover with independent row art,
 and nested detail-header fields. These shapes are plausible but are not the
 user's captured response. PR #120 code head `b7d0f01` passed PR CI **37319510581**.
-A docs-only follow-up head `5006595` has latest push CI **37320618809** failing
-at unrelated `LibraryViewModelTest.historyPlaybackQueuesCorrectly` (15-second
-timeout) and PR CI **37320626452** failing at unrelated
-`PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+Two intervening docs-only runs on head `5006595` had unrelated shared-test
+failures: push CI **37320618809** timed out in
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly`; PR CI **37320626452**
+failed at `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
 (expected `tok-2`, got `tok-a`). GitHub rejected reruns with “workflow file may
-be broken.” Build APK **37320626431** and test-release **37320626612** passed;
-test-release's APK and MSI/install-over jobs passed, publish skipped. Download
-the candidate `apk` artifact from
-[test-release run 37320626612](https://github.com/99ggprooo00-code/DHUN/actions/runs/37320626612)
+be broken.” Latest head `1332005` passed push CI **37321440694** and PR CI
+**37321446706**. Build APK **37321446727** and test-release **37321446705**
+passed; test-release's APK and MSI/install-over jobs passed, publish skipped.
+Download the candidate `apk` artifact from
+[test-release run 37321446705](https://github.com/99ggprooo00-code/DHUN/actions/runs/37321446705)
 (`dhun-test.apk`, `.sha256`, `.build-info.json`); its SHA-256 is
 `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`
 (18,367,219 bytes). Artifact provenance source is the PR merge ref for head
-`5006595`; it is build-only and was not published. Test one single
+`1332005`; it is build-only and was not published. Test one single
 (cover/row/full player), one other album, one playlist (cover/row) and Home/Search.
 If art still fails, get a representative title/artist or browse ID and inspect
 its sanitized response before another parser change. Step-6 row size/shape and

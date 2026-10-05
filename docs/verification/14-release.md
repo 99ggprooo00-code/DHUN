@@ -272,29 +272,29 @@ single representative item and its raw response are not yet available. The
 pushed on `arena/01a0eb87-dhun`; PR
 [#120](https://github.com/99ggprooo00-code/DHUN/pull/120) remains open. Initial
 PR CI **37319510581** passed, including `:shared:jvmTest`, Android
-Robolectric/build, probe and Desktop tests. A docs-only follow-up head `5006595`
-triggered push CI **37320618809**, which failed in unrelated
-`LibraryViewModelTest.historyPlaybackQueuesCorrectly` (15-second timeout), and
-PR CI **37320626452**, which failed in unrelated
+Robolectric/build, probe and Desktop tests. Two intervening docs-only runs on
+head `5006595` had unrelated `:shared:jvmTest` failures: push CI **37320618809**
+timed out in `LibraryViewModelTest.historyPlaybackQueuesCorrectly` (15 seconds);
+PR CI **37320626452** failed in
 `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
-(expected `tok-2`, got `tok-a`). Both failures were in `:shared:jvmTest`, not the
-parser tests; `gh run rerun` was rejected with “workflow file may be broken.”
-Build APK **37320626431** passed. Test-release **37320626612** passed its APK and
-MSI jobs, including Windows install-over; publish and AAB were skipped. The
-`apk` artifact includes `dhun-test.apk`, `.sha256` and `.build-info.json`:
-[download from Actions](https://github.com/99ggprooo00-code/DHUN/actions/runs/37320626612).
+(expected `tok-2`, got `tok-a`). GitHub rejected reruns with “workflow file may
+be broken.” The latest head `1332005` passed push CI **37321440694** and PR CI
+**37321446706**. Build APK **37321446727** and test-release **37321446705**
+passed; test-release's APK and MSI/install-over jobs passed, while publish/AAB
+were skipped. The `apk` artifact includes `dhun-test.apk`, `.sha256` and
+`.build-info.json`:
+[download from Actions](https://github.com/99ggprooo00-code/DHUN/actions/runs/37321446705).
 Staging annotation identifies it as build-only, 18,367,219 bytes, SHA-256
 `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`; provenance
-source is merge-ref `959a95096eb8b87f6c8098d98e51e2b8b6172daf` for PR head
-`5006595`. The sandbox could not retrieve the artifact ZIP (EOF), but the digest
+source is merge-ref `07ff545e64ef6d7f7c7b0b2ebc08d65727235a57` for PR head
+`1332005`. The sandbox could not retrieve the artifact ZIP (EOF), but the digest
 was available from the GitHub Actions annotation. No rolling release was
 published.
 
 **Remaining verification blockers:** no representative user single/album/
 playlist browse ID or raw response has been supplied; the PR APK is not yet
-device-tested; the step-6 row size/shape mismatch remains unclear; and latest
-full PR CI is red on the unrelated shared test above, even though parser tests
-passed on the initial PR head. The parser change remains a candidate, not a
+device-tested; and the step-6 row size/shape mismatch remains unclear. The
+latest code head is CI-green, but the parser change remains a candidate, not a
 device-confirmed root cause. Have the user install the candidate artifact and
 retest a Single's cover/row/full-player art, one other album cover, a playlist
 cover and its rows, and Home/Search art. If symptoms persist, capture the actual
