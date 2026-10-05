@@ -5,7 +5,7 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — post-#119 CI green; S3 hardware round 1 partially reported
+## CURRENT STATE — post-#119 CI green; targeted S3 artwork retest passed
 
 Updated **2026-10-05**, session `arena/01a0eb87-dhun`, base `main@73b88b6`.
 PR #119 is merged; post-merge CI **36467187148**, Build APK **36467187128**,
@@ -27,11 +27,11 @@ the album pages show generic metadata and placeholder artwork, one with the
 now-playing blur behind it. The user's latest clarification says single-release
 cover and track art both fail, while other album/playlist covers fail and their
 row art mostly loads. Step-6 row size/shape mismatch and screenshot mapping
-remain unknown. This is partial evidence,
-not S3 sign-off. The user says they downloaded the latest `test` build; exact
-installed bytes/hash and device/OS remain unverified.
+were unknown in this initial report. That report remains partial historical
+evidence; see the round-2 candidate retest below for the digest-verified device
+result.
 
-**S3 round-2 candidate fix / immediate next step:** the user confirms ordinary
+**S3 round-2 candidate fix / device retest result and next step:** the user confirms ordinary
 Home/Search song thumbnails load. On single releases, both page-cover art and
 track art are missing (including in the full-screen player); on other albums and
 playlists, page covers fail while per-track images mostly load. This points
@@ -41,27 +41,26 @@ and unwraps a nested responsive detail header. Synthetic fixtures/tests cover a
 single track inheriting header art, a playlist cover with independent row art,
 and nested detail-header fields. These shapes are plausible but are not the
 user's captured response. PR #120 code head `b7d0f01` passed PR CI **37319510581**.
-Two intervening docs-only runs on head `5006595` had unrelated shared-test
-failures: push CI **37320618809** timed out in
-`LibraryViewModelTest.historyPlaybackQueuesCorrectly`; PR CI **37320626452**
-failed at `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
-(expected `tok-2`, got `tok-a`). GitHub rejected reruns with “workflow file may
-be broken.” Latest head `1332005` passed push CI **37321440694** and PR CI
-**37321446706**. Build APK **37321446727** and test-release **37321446705**
-passed; test-release's APK and MSI/install-over jobs passed, publish skipped.
-Download the candidate `apk` artifact from
-[test-release run 37321446705](https://github.com/99ggprooo00-code/DHUN/actions/runs/37321446705)
-(`dhun-test.apk`, `.sha256`, `.build-info.json`); its SHA-256 is
-`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`
-(18,367,219 bytes). Artifact provenance source is the PR merge ref for head
-`1332005`; it is build-only and was not published. Test one single
-(cover/row/full player), one other album, one playlist (cover/row) and Home/Search.
-If art still fails, get a representative title/artist or browse ID and inspect
-its sanitized response before another parser change. Step-6 row size/shape and
-`Go to album` checks remain open. After device evidence, update verified hashes,
-complete affected checks plus step 18, and follow merge-last; no merge until
-hardware gates and final approval. Menu anchoring and larger/dynamic media art
-remain separate UX requests; do not bundle without explicit scope.
+Two intervening docs-only runs on head `5006595` had unrelated failures in
+`LibraryViewModelTest` (timeout) and `PlayerViewModelTest` (token mismatch); later
+checks passed on heads `1332005` and `edaf4b2`. Latest pre-merge push CI
+**37322646142**, PR CI **37322658661**, Build APK **37322658940**, and
+[test-release 37322658878](https://github.com/99ggprooo00-code/DHUN/actions/runs/37322658878)
+all passed; APK/MSI and Windows install-over passed, publish skipped. The
+candidate `apk` artifact includes `dhun-test.apk`, `.sha256`, `.build-info.json`;
+APK is 18,367,219 bytes with SHA-256
+`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`; ZIP is
+17,552,363 bytes, expected compression. User reports hash verified and device
+retest passed on Android 15 build `SQ3A.240829.003` (device model not reported):
+single cover/rows/full player, other album and playlist cover/rows, Home/Search
+thumbnails all work; playback backdrop appears only while playing as intended.
+Step-6 row appearance and `Go to album` are reported as “seems working,” but no
+precise measurement/track ID was given. This closes the targeted art retest by
+user report, not the full S3/S6 checklist; step 18, device model, and other
+platform/soak gates remain open. No new parser change is warranted absent a
+regression and actual sanitized browse response. Commit/push this record, then
+merge PR #120 last and verify post-merge CI/test-release in the same turn.
+Menu anchoring and larger/dynamic artwork remain separate UX requests.
 
 **Remaining open:** S3/S6 acceptance, Android/Windows soaks, offline/recovery/DSP
 observations, Windows native integration, release/signing decisions and final
@@ -69,9 +68,11 @@ user approval. The extraction-health drill remains `ENVIRONMENT_BLOCKED` due to
 datacenter IP gating; it is not product failure evidence. No extraction/rot-drill
 changes absent T1/T2. Ubuntu-26 watch begins 2026-10-19.
 
-**Session constraints:** stay on `arena/01a0eb87-dhun`; no PR merge/closure or
-Arena finalization without explicit approval. Candidate parser code/fixtures
-are CI-green in PR #120; device verification remains pending.
+**Session constraints:** stay on `arena/01a0eb87-dhun`; merge-last and post-merge
+CI in the same turn. User explicitly authorized merging after verification.
+Candidate parser code/fixtures and targeted Android retest are CI-/device-green by
+user report; broader S3/S6 acceptance remains open. Commit/push the verification
+record, ensure checks pass, then merge PR #120 as the final pre-release action.
 
 ---
 

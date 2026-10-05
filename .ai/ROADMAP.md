@@ -1,9 +1,13 @@
 # CURRENT ACTIVE TASK
 
 Updated **2026-10-05** · session **`arena/01a0eb87-dhun`** · base/main
-**`73b88b6`**. PR #119 is merged and post-merge CI is green. Stage S3
-hardware round 1 has partial user-reported results; **S3 acceptance remains
-open**. Candidate page-header parser fix is commit `b7d0f01`; verification follow-ups are pushed on PR #120, now head `1332005`. Latest push CI **37321440694** and PR CI **37321446706** pass; Build APK **37321446727** and test-release **37321446705** also pass. Intermediate docs-only checks had unrelated flaky shared-test failures; hardware verification remains pending.
+**`73b88b6`**. PR #119 is merged and post-merge CI is green. The candidate
+page-header parser fix (`b7d0f01`) is open as PR #120. Targeted Android device
+retest now reports the single/album/playlist artwork paths working on the
+candidate APK; exact report and build provenance are recorded below. App-code
+head `edaf4b2` passed push/PR CI and APK/MSI build workflows. This verification
+record will be committed/pushed and checked on the final PR head before merge;
+broader S3/S6 acceptance remains open.
 
 **Phase/status:** S3 hardware verification. S1/S2/S4/S5 code is complete and
 merged; S3/S6 still require real-device evidence. The active gate is
@@ -58,27 +62,28 @@ nested responsive detail header. New synthetic fixtures/tests cover single
 track fallback, playlist cover with independent row art, and nested detail
 headers. These are synthetic response-shape fixtures, not the user's raw
 payload. Initial PR CI on code commit `b7d0f01` (**37319510581**) passed,
-including parser tests. An intermediate doc-only head `5006595` saw unrelated
-shared-test failures: push CI **37320618809** timed out in
+including parser tests. Two intermediate docs-only runs on head `5006595` had
+unrelated shared-test failures: push CI **37320618809** timed out in
 `LibraryViewModelTest.historyPlaybackQueuesCorrectly`; PR CI **37320626452**
 reported `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
-(expected `tok-2`, got `tok-a`). Reruns were rejected with “workflow file may be
-broken.” On latest head `1332005`, push CI **37321440694** and PR CI
-**37321446706** both passed. Build APK **37321446727** and test-release
-**37321446705** passed; test-release included APK and MSI/install-over, while
-publish/AAB were skipped. The `apk` artifact is the candidate for device retest:
-`dhun-test.apk`, 18,367,219 bytes, SHA-256
-`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`,
-build-only; Actions provenance records merge-ref source
-`07ff545e64ef6d7f7c7b0b2ebc08d65727235a57` (PR head `1332005`). This checksum
-is reported by the artifact-staging action annotation; the artifact also
-carries `.sha256`/build-info. Download at
-[run 37321446705](https://github.com/99ggprooo00-code/DHUN/actions/runs/37321446705).
-No rolling release was published. Latest user download still likely maps to
-`test` v2.137.1; exact installed bytes/hash are not proven. The exact step-6 row
-size/shape mismatch remains unknown; do not alter `TrackRow` (64dp, no thumbnail
-stroke) for a page-cover symptom. Verify `Go to album` on a known album-linked
-track. Image/menu design requests remain separate UX choices.
+(expected `tok-2`, got `tok-a`). The later head `1332005` and app-code head
+`edaf4b2` both passed push/PR CI; the latter runs are push **37322646142**, PR
+**37322658661**, Build APK **37322658940**, and test-release **37322658878**.
+The test-release APK/MSI and Windows install-over passed; AAB/publish were
+skipped. The build-only `apk` artifact contains `dhun-test.apk` (18,367,219 B,
+SHA-256 `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`) plus
+sidecars; the ZIP archive is 17,552,363 B, so the observed 17 MB vs 18 MB size
+difference is expected compression. The user reports downloading and verifying
+the APK checksum, then device-testing it on Android 15, build
+`SQ3A.240829.003` (device model not supplied). Reported results: single cover,
+track rows, and full player art work; another album and playlist covers/rows
+work; Home/Search thumbnails pass, with the now-playing backdrop only during
+playback (expected). Step-6 playlist row appearance (expected 64dp, borderless)
+and `Go to album` are reported as “seems working,” without measurement or track
+ID. Record the targeted artwork retest as **PASS by user report**, while keeping
+broader S3/S6 acceptance open. No user-captured raw browse response was
+provided, so the exact source payload/root cause remains unconfirmed. Candidate
+artifact: [test-release run 37322658878](https://github.com/99ggprooo00-code/DHUN/actions/runs/37322658878); it was build-only and not published. The user says step-6 playlist rows and `Go to album` seem correct, but did not provide exact row measurements or the tested album-track ID; retain these as qualified user-reported checks. Do not alter `TrackRow` (64dp, borderless) or menu behavior without a concrete failure. Image/menu design requests remain separate UX choices.
 
 **Completion ledger:**
 - **S1:** CLOSED GREEN 2026-09-20 — scheduled drill + residential evidence on
@@ -88,10 +93,11 @@ track. Image/menu design requests remain separate UX choices.
 - **S4:** code merged (#74); hardware acceptance remains in S3.
 - **S5:** base merged (#74); #118's offline-broadcast classification and
   retry-budget refund merged as `16ad2e5`, CI-verified and released.
-- **S3/S6:** OPEN. This is partial user evidence only; failed visuals need
-  symptom-level triage and retest on a digest-verified build. Downloads/offline,
-  radio, normal playback soaks, Windows native integration, recovery/DSP,
-  signing/release approval and remaining acceptance are still open.
+- **S3/S6:** OPEN. Targeted S3 artwork paths pass on the digest-verified PR #120
+  candidate by user report; the user also says the playlist-row shape and
+  `Go to album` checks seem correct. The broader 18-step/device acceptance,
+  Windows native integration, soaks, downloads/offline, radio, recovery/DSP,
+  and signing/release approval remain open. Do not label all S3/S6 closed.
 
 **Current docs updated:** `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`,
 `.ai/DEBUG_LOG.md`, `.ai/HANDOFF_NEXT_SESSION.md`, `CHANGELOG.md`,
@@ -104,18 +110,14 @@ track. Image/menu design requests remain separate UX choices.
 not an app failure. No JDK locally; CI remains the compiler. Release/log blobs
 can EOF in-sandbox; annotations API is the readout.
 
-**Exact next step:** have the user download the `apk` artifact from PR
-[test-release run 37321446705](https://github.com/99ggprooo00-code/DHUN/actions/runs/37321446705)
-(it includes `dhun-test.apk`, `.sha256`, `.build-info.json`). Verify its SHA-256
-against `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`,
-then retest a single release (cover + row + full player), one other album, one
-playlist cover and row art, plus Home/Search. Capture device/OS and result. If
-any page art still fails, obtain an exact release title/artist/browse ID and
-inspect that sanitized live response before another parser change. Clarify the
-step-6 row size/shape mismatch and verify `Go to album` on a known album-linked
-track. Do not merge or claim S3 green based on CI alone; hardware acceptance is
-still required. After device evidence and remaining code/docs checks, follow the
-merge-last rule and verify post-merge CI in the same turn.
+**Exact next step:** record the user’s device result in verification docs,
+commit/push those documentation updates, and wait for CI/build/test-release on
+the final pre-merge head. The candidate APK already passed the targeted artwork
+retest; no further parser edit is warranted without a failing retest and the
+actual sanitized response. Once the documentation commit’s checks pass, merge
+PR #120 as the final pre-release action and verify post-merge CI/test-release in
+the same turn. Leave the broader S3/S6 ledger open for the remaining acceptance
+checks; this targeted pass is not full phase sign-off.
 
 **Blockers/lifecycle:** S3/S6 require Android/Windows hardware; no devices in
 sandbox. Ubuntu-26 runner migration begins 2026-10-19. Work stays on

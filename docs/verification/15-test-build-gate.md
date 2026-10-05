@@ -15,15 +15,24 @@
 > was not justified. Do not use those values or infer byte identity from equal
 > file sizes. §1 now marks the #119 digests unverified.
 >
-> **S3 hardware round 1 — partial user report received 2026-10-05.** The user
-> reports Android failures at steps **1, 6, 7, 9**; the Windows core steps
-> **10–13** are reported pass. Android step 13 is partial (five actions tried;
-> `Go to album` not found), step 16 was not understood, and step 18 was not
-> reported. Device/OS, exact test date/build hash, and prior build were not supplied. Four
-> inline screenshots were visually reviewed but not labeled to steps: album views
-> show placeholder artwork/generic metadata, while playlist views show row art.
-> The exact step-6 mismatch remains unclear. Tested artifact identity is unconfirmed
-> and **S3 remains open**. Details: `14-release.md`.
+> **S3 hardware round 1 — partial initial report, 2026-10-05.** The first
+> report had Android failures at steps **1, 6, 7, 9**; Windows core steps
+> **10–13** were reported pass. Step 13 was partial (`Go to album` not found),
+> step 16 misunderstood, step 18 unreported; device/build identity was absent.
+> Four screenshots were not mapped to steps. The rolling `test` at that point
+> was #119, not the parser candidate. Historical details: `14-release.md`.
+>
+> **PR #120 candidate device retest — user-reported PASS, 2026-10-05.** The user
+> downloaded the build-only `apk` artifact from test-release run **37322658878**,
+> verified its APK checksum, and tested on Android 15 build `SQ3A.240829.003`
+> (device model not supplied). Single cover/rows/full-player art, another album
+> cover, playlist cover/rows, and Home/Search thumbnails work. The now-playing
+> backdrop appears only during playback, as expected. Step-6 row shape and
+> `Go to album` are reported as “seems working.” The artifact ZIP is compressed
+> (~17 MB); the APK inside is 18,367,219 B with SHA-256
+> `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`. This
+> closes the targeted artwork retest, **not** all 18 steps or S3/S6 acceptance.
+> See `14-release.md` for the record and remaining scope.
 >
 > The 18 checks still cover the UI fixes (step 11: playlist backdrop). PR #118's
 > offline-broadcast verdict and delayed retry-budget refund have no deterministic

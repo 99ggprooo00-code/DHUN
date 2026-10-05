@@ -229,76 +229,72 @@ browse-page/track thumbnail data than to a global Coil/network failure, but a
 single representative item and its raw response are not yet available. The
 #119 tested artifact/device identity also remains unknown.
 
-1. **Identify a reproducible sample and verify provenance.** Clarify whether
-   “single” means a release labelled Single or any one-track release. Get one
-   failing single's title/artist (or its browse ID) and one cover-only album or
-   playlist example; confirm the exact Android app/build and device/OS. The #119
-   APK/MSI hashes remain unverified, so this also checks that the report matches
-   the candidate under review.
-2. **Inspect browse data before image styling.** Ordinary Home/Search song
-   thumbnails load and album/playlist row thumbnails mostly load, while page
-   covers and single-page track art fail. `parseAlbumPage` derives the cover
-   with `thumbnailsLastUrl(header)` and passes it to rows as a fallback;
-   `parsePlaylistPage` derives its cover from the header while parsing row art
-   separately. A likely shape gap was found: two-column browse responses can
-   place `musicResponsiveHeaderRenderer` under the tab's section-list contents,
-   but `pageHeader` previously checked only the top-level `header` object.
-3. **Candidate parser fix added; verify before claiming root cause.**
-   `pageHeader` now checks those normalized tab sections and unwraps a nested
-   `musicDetailHeaderRenderer.musicResponsiveHeaderRenderer`. New synthetic,
-   sanitized response-shape fixtures cover a single-release album with no row art
-   (cover inherited by the track/full-player model), a playlist cover with
-   independent row art, and the nested detail-header variant. These tests prove
-   the supported shapes in code, but are not the user's captured response. Do
-   not change Coil or add generic image-loader logging; if the user retest still
-   fails, obtain the actual sanitized browse payload/parsed URLs and inspect the
-   image host only if valid URLs reach the UI but fail to load. Never invent a
-   cover for genuinely missing upstream data.
-4. **Keep step 6 and menu policy separate.** The user says album/playlist
-   per-track thumbnails mostly load; the exact step-6 expected-versus-actual
-   size/shape mismatch is still not known. `TrackRow` currently uses 64dp
-   `artworkThumb` and has no thumbnail stroke; do not change row styling based
-   on a page-cover issue. On a known album-linked track, `Go to album` must
-   appear and navigate; test the no-album omission separately. `Download` is
-   host-manager based, not per-track; its manual instruction is corrected in
-   §15. Keep menu anchoring and media-surface artwork-size/background requests
-   as separate UX changes unless explicitly scoped.
-5. **Retest with provenance.** After targeted tests and CI pass, publish a new
-   rolling `test` build with verified APK/MSI digests. Re-run affected Android
-   checks (1, 6, 7, 9, 13 and 18) plus any explicitly accepted UX change; keep
-   Windows results and other S3/S6 gates accurately scoped.
+1. **Reproducibility/provenance.** The user installed the PR #120 candidate
+   artifact from run **37322658878** and reports verifying its APK checksum.
+   Device: Android 15 build `SQ3A.240829.003`; exact model and affected titles
+   were not supplied. The older #119 rolling release is not the tested build.
+2. **Research.** `parseAlbumPage` derives the cover with
+   `thumbnailsLastUrl(header)` and passes it to rows as a fallback;
+   `parsePlaylistPage` derives its cover from the header while preserving row
+   art separately. Two-column browse responses can put
+   `musicResponsiveHeaderRenderer` under the tab's section-list contents, while
+   `pageHeader` originally checked only the top-level `header`.
+3. **Candidate fix and retest.** `pageHeader` checks normalized tab sections and
+   unwraps a nested `musicDetailHeaderRenderer.musicResponsiveHeaderRenderer`.
+   Synthetic fixtures cover single-track fallback, playlist cover with
+   independent row art, and nested headers. The user reports the single's page
+   cover/rows/full player, another album cover, playlist cover/rows, and
+   Home/Search thumbnails all work on the candidate. This is targeted device
+   acceptance, not proof of the exact upstream payload/root cause: no user raw
+   browse response was captured. If the symptom returns, inspect that sanitized
+   payload before another parser change. Do not alter Coil or invent fallback
+   art when upstream data is genuinely absent.
+4. **Separate checks.** Step 6's expected playlist rows are 64dp borderless; the
+   user says the row shape seems correct but supplied no measurement. `Go to
+   album` also “seems working,” with no exact track ID/navigation result. Keep
+   their broader checklist entries open/qualified, and keep menu anchoring plus
+   notification/lock-screen/widget art-size preferences as separate UX scope.
+5. **Merge-last.** The target artwork retest and CI/build workflows pass. Commit
+   and push this verification record, wait for all PR checks on that head, then
+   merge PR #120 last and verify post-merge CI/test-release in the same turn.
+   This targeted pass does not close the full S3/S6 hardware checklist.
 
-**PR #120 candidate verification (2026-10-05):** parser commit `b7d0f01` is
-pushed on `arena/01a0eb87-dhun`; PR
-[#120](https://github.com/99ggprooo00-code/DHUN/pull/120) remains open. Initial
-PR CI **37319510581** passed, including `:shared:jvmTest`, Android
-Robolectric/build, probe and Desktop tests. Two intervening docs-only runs on
-head `5006595` had unrelated `:shared:jvmTest` failures: push CI **37320618809**
-timed out in `LibraryViewModelTest.historyPlaybackQueuesCorrectly` (15 seconds);
-PR CI **37320626452** failed in
-`PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
-(expected `tok-2`, got `tok-a`). GitHub rejected reruns with “workflow file may
-be broken.” The latest head `1332005` passed push CI **37321440694** and PR CI
-**37321446706**. Build APK **37321446727** and test-release **37321446705**
-passed; test-release's APK and MSI/install-over jobs passed, while publish/AAB
-were skipped. The `apk` artifact includes `dhun-test.apk`, `.sha256` and
-`.build-info.json`:
-[download from Actions](https://github.com/99ggprooo00-code/DHUN/actions/runs/37321446705).
-Staging annotation identifies it as build-only, 18,367,219 bytes, SHA-256
-`c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`; provenance
-source is merge-ref `07ff545e64ef6d7f7c7b0b2ebc08d65727235a57` for PR head
-`1332005`. The sandbox could not retrieve the artifact ZIP (EOF), but the digest
-was available from the GitHub Actions annotation. No rolling release was
-published.
+**PR #120 candidate verification and device retest (2026-10-05):** parser
+commit `b7d0f01` is pushed on `arena/01a0eb87-dhun`; PR
+[#120](https://github.com/99ggprooo00-code/DHUN/pull/120) is open. Initial PR CI
+**37319510581** passed, including `:shared:jvmTest`, Android Robolectric/build,
+probe and Desktop tests. Two intervening docs-only runs on head `5006595` had
+unrelated test failures: push CI **37320618809** timed out in
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly`; PR CI **37320626452**
+failed in `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+(expected `tok-2`, got `tok-a`). Later runs passed on heads `1332005` and
+`edaf4b2`; app-code head `edaf4b2` passed push CI **37322646142**, PR CI
+**37322658661**, Build APK **37322658940**, and test-release **37322658878**.
+The candidate test-release APK/MSI and Windows install-over passed; AAB/publish
+were skipped.
 
-**Remaining verification blockers:** no representative user single/album/
-playlist browse ID or raw response has been supplied; the PR APK is not yet
-device-tested; and the step-6 row size/shape mismatch remains unclear. The
-latest code head is CI-green, but the parser change remains a candidate, not a
-device-confirmed root cause. Have the user install the candidate artifact and
-retest a Single's cover/row/full-player art, one other album cover, a playlist
-cover and its rows, and Home/Search art. If symptoms persist, capture the actual
-sanitized browse response/parsed URLs before another parser change.
+The `apk` artifact from
+[test-release run 37322658878](https://github.com/99ggprooo00-code/DHUN/actions/runs/37322658878)
+contains `dhun-test.apk`, `.sha256` and `.build-info.json`. APK: 18,367,219 bytes,
+SHA-256 `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`.
+The downloaded ZIP is 17,552,363 bytes; this is expected compression, not a
+size mismatch. User reports verifying the APK checksum and installing/testing
+it on Android 15 build `SQ3A.240829.003` (device model not provided). Reported
+PASS: single-release cover, track rows and full-screen player; another album's
+cover; playlist cover/rows; Home/Search thumbnails. User clarified Home/Search
+thumbnails were fine and the now-playing backdrop appears only during playback
+as intended. Playlist step-6 row shape (expected 64dp, borderless) and `Go to
+album` on an album-linked track are reported as “seems working”; exact row
+measurement and album-track ID were not supplied. Record the targeted artwork
+retest as **PASS by user report**; do not call all S3/S6 acceptance complete.
+No user-captured raw browse response exists, so the precise upstream response
+shape/root cause remains unconfirmed even though the candidate fixes the
+observed symptoms. No rolling release was published before merge.
+
+**Remaining verification boundary:** broader 18-step S3/S6 acceptance, Windows
+native/soak results, step 18, exact device model, and other platform evidence
+remain open. This targeted pass and the green PR checks are sufficient to merge
+PR #120 under the user's request; do not claim all S3/S6 gates are closed.
 
 ## S1 evidence log (residential / on-device)
 
