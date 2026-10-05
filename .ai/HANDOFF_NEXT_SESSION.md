@@ -5,7 +5,57 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — post-#119 CI green; targeted S3 artwork retest passed
+## CURRENT STATE — PR #121 open: the playlist picker + queue panel, CI-green, awaiting device retest
+
+Updated **2026-10-06**, session `arena/cf4e91ba-dhun`, base `main@885a092`
+(PR #120 merged). **PR #121** fixes the two surfaces the user reported on the
+digest-verified #120 candidate. The artwork parser is **not** touched — its
+targeted retest passed and is recorded in the historical section below.
+
+**Candidate APK (build-only artifact, not published):** test-release run
+**37389110912**, `apk` job green — `dhun-test.apk` **18,367,219 B**, SHA-256
+**`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`**, source
+`a9e8c9d7` (PR merge ref of head `85e73eb`). Download it from that run's
+Artifacts — the rolling `test` release still targets `885a092` and does **not**
+contain these fixes.
+
+**Green CI after the fix:** PR CI **37389109897**, push CI **37389105839** (all
+9 steps, including `:shared:jvmTest` with the two new suites), Build APK
+**37389110248**. **Real red on record:** PR CI **37388855101** failed on three
+`PlayerPanelDragTest` assertions (two wrong expectations + one helper
+inconsistency); fixed in `85e73eb`.
+
+**Open on this PR — the MSI job:** test-release **37389110912**'s `msi` job
+failed at "Check install-over and userdata on disposable Windows" because
+`check_msi_upgrade.ps1` could not download the rolling `test` baseline
+(`gh release download test …` → non-zero). The installer built (2.148.1,
+SHA-256 `4687747496a20eeb2efbdbdb08ef436bec9f694546588049e58921fb449efe32`) but
+no `msi` artifact was uploaded, so the **Windows retest of these fixes needs a
+green MSI job** (re-run by the docs commit; if it reproduces it is an infra
+download failure, not this diff).
+
+**What to retest (gate `docs/verification/15-test-build-gate.md` §3 "Fix 4"):**
+- Step 19 — ⋮ → Add to playlist: compact frosted family, content-sized list, no
+  Material outlined box / empty slab / Close row.
+- Step 20 — new-playlist field: typing, Done, `Back`, `Create & add`, blank-name
+  error, then `Open` breadcrumb.
+- Step 21 — panel swipe: header strip follows the finger; long drag closes;
+  short drag snaps back; list drags still scroll; ✕ still closes.
+- Step 22 — Library `New playlist` / `Rename` / confirm dialogs: same input, no
+  page bleeding through.
+- Existing steps 1–18 keep the results already recorded (artwork verified; the
+  parser is unchanged) — a Fix-3 sanity glance that the ⋮ menu is still compact
+  is enough.
+
+**Do not:** re-open the parser; change `TrackRow` (64dp borderless); re-center or
+re-anchor the track menu without a user decision; widen the panel swipe over the
+list rows (needs a nested-scroll design and would fight reorder/swipe-remove).
+
+**Merge rule:** merge PR #121 only after the user's retest, then verify
+post-merge CI + test-release in the same turn. Broader S3/S6 (soaks, downloads/
+offline, lyrics, EQ, Windows native column, signing) stays open.
+
+## PREVIOUS STATE — PR #120 artwork parser merged; targeted retest passed (2026-10-05)
 
 Updated **2026-10-05**, session `arena/01a0eb87-dhun`, base `main@73b88b6`.
 PR #119 is merged; post-merge CI **36467187148**, Build APK **36467187128**,

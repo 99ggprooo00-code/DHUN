@@ -1,5 +1,81 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-06 — Full Player's two "old interface" surfaces: the playlist picker and the queue panel's missing swipe (session `arena/cf4e91ba-dhun`, base `main@885a092`, PR #121)
+
+**Report** (user, on the digest-verified PR #120 candidate, Android 15
+`SQ3A.240829.003`; the artwork parsing was confirmed working and is untouched):
+1. Full Player → ⋮ → **Add to playlist** — "still shows the old Material 3
+   interface", plus "an unusually long/oversized box".
+2. Full Player → ≡♪ → **Queue/Related** — "still shows the old interface", and
+   "swiping down to close/toggle the panel does not work as expected".
+
+**Root causes — measured against the code, not guessed.**
+- The picker was the last old-Material surface left in the app: a `GlassCard` at
+  280–400dp with double padding, an M3 `titleLarge` header, a **fixed
+  `dialogListHeight` (180dp) `LazyColumn`** — a mostly empty slab for one or two
+  playlists — an M3 `OutlinedTextField` (56dp of Material chrome with a floating
+  label), and an M3 Close/Cancel row.
+- The panel had **no drag detector anywhere**: `QueueSheetHeader` had no
+  `pointerInput`, so the grab pill was pure decoration; and while the panel is
+  open the player's queue glyph is hidden with the action row it lives in
+  (`actionRowVisible = false` → `alpha 0` + `disabled`), so the only exits were
+  the ✕ and Back. Its surface was also the retired near-black `GlassBottomBar`
+  recipe (`glassBarTop` → `glassStrong`, no artwork) — the one surface left
+  outside the artwork-veiled family the dock, ⋮ menus, dialogs and page
+  backdrops had moved to.
+
+**Fixes.**
+- `AddToPlaylistDialog` rebuilt on the shared menu pieces: `TrackMenuSurface` +
+  `TrackMenuHeader` + `MenuActionRow` (name, "N tracks" supporting line, trailing
+  "Open"), `AddToPlaylistPolicy.listMaxHeight` (content-sized, ≤4 rows, never
+  above the old 180dp box) and `DhunTextField` instead of M3's outlined field.
+  Callbacks, create-and-add flow, blank-name error and dismissal unchanged.
+- `MenuActionRow` gained `supportingText` + `trailingLabel`/`onTrailingClick`; a
+  plain menu row keeps the exact fixed 44dp height it had.
+- New `design/components/DhunTextField.kt`; new `LyricsArtworkSheet` (opaque
+  base + elevation + lyrics veil over the track's blurred artwork), which the
+  panel now paints. `GlassBottomBar` had no call sites left and was deleted.
+- Panel drag: `detectVerticalDragGestures` on the header strip →
+  `panelDragOffsetPx` (follows the finger, clamped `[0, travel]`, a non-finite
+  current offset collapses to rest) → `panelDragTranslations(motion, drag)` adds
+  the same pixels to the sheet's **and** the player's offsets, so the measured
+  seam stays closed; release commits past `panelDismissThresholdPx`
+  (0.28 × travel, floored at one touch target, capped at travel) through
+  `shouldDismissPanel`, otherwise a fast tween snaps the offset back to 0.
+  `rememberUpdatedState` keeps the gesture coroutine's callbacks (and its frozen
+  `travelPx`) current.
+- Same defect class, fixed alongside: `CreatePlaylistDialog`, `RenameDialog`,
+  `DeleteSelectedConfirmDialog`, the clear-downloads and clear-history dialogs
+  drop `OutlinedTextField` for `DhunTextField`, and all six dialog `GlassCard`s
+  pass `opaqueBase = true` — the rule GlassCard's own KDoc states for dialogs.
+
+**First red, and what it was (real CI, not a guess).** PR CI **37388855101**
+failed in `:shared:jvmTest` on three `PlayerPanelDragTest` assertions
+("expected 30.0, got 5.0"; "expected 100.0, got 28.0"; "expected 0.0, got 50.0").
+Two were wrong test expectations and one was a helper inconsistency: an upward
+delta must follow the finger back toward rest (clamped at 0) rather than be
+ignored; a dismissal threshold with no touch-target floor is governed by the
+0.28 fraction; and a non-finite *current* offset must collapse to rest in
+`panelDragOffsetPx` instead of being treated as 0 and then advanced by the
+frame's delta (a NaN translation would blank the panel). Fixed in `85e73eb`.
+
+**Evidence / verification posture.** No JDK and no device in the sandbox, so CI
+is the compiler and the user's device is the acceptance. Green after the fix:
+PR CI **37389109897** and push CI **37389105839** (all 9 steps, including
+`:shared:jvmTest` with the new tests), Build APK **37389110248**. Candidate APK
+(build-only artifact, **not** published): test-release run **37389110912**,
+`apk` job green — `dhun-test.apk` 18,367,219 B, SHA-256
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, source =
+PR merge ref `a9e8c9d7` of head `85e73eb`. The same run's `msi` job **failed at
+"Check install-over and userdata on disposable Windows"**: `check_msi_upgrade.ps1`
+could not download the rolling `test` baseline (`gh release download test …`
+→ non-zero), so no `msi` artifact was uploaded even though the installer built
+(ProductVersion 2.148.1, SHA-256
+`4687747496a20eeb2efbdbdb08ef436bec9f694546588049e58921fb449efe32`). Treated as a
+download/infra failure and re-run by the docs commit; the Windows half of the
+retest needs a green MSI job. No visual or gesture acceptance is claimed here —
+see `docs/verification/15-test-build-gate.md` §3 "Fix 4".
+
 ## 2026-10-05 — S3 hardware report; build digest and UI symptoms unresolved
 
 The user returned a partial Android + Windows report for the round-1 checklist.

@@ -1,130 +1,110 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-10-05** · session **`arena/01a0eb87-dhun`** · base/main
-**`73b88b6`**. PR #119 is merged and post-merge CI is green. The candidate
-page-header parser fix (`b7d0f01`) is open as PR #120. Targeted Android device
-retest now reports the single/album/playlist artwork paths working on the
-candidate APK; exact report and build provenance are recorded below. App-code
-head `edaf4b2` passed push/PR CI and APK/MSI build workflows. This verification
-record will be committed/pushed and checked on the final PR head before merge;
-broader S3/S6 acceptance remains open.
+Updated **2026-10-06** · session **`arena/cf4e91ba-dhun`** · base/main
+**`885a092`**. PR #120 is merged (browse page-header parser) and its post-merge
+CI is green; the user's digest-verified Android 15 retest confirmed the artwork
+paths work, so **the parser is not touched again in this session**. This session
+answers the two *new* Full Player reports — ⋮ → Add to playlist, and the
+Queue/Related panel — as **PR #121** on `arena/cf4e91ba-dhun`.
 
-**Phase/status:** S3 hardware verification. S1/S2/S4/S5 code is complete and
-merged; S3/S6 still require real-device evidence. The active gate is
-`docs/verification/15-test-build-gate.md`, with the broader S3/S6 procedure in
-`docs/runbooks/s3-hardware-checklist.md`.
+**Phase/status:** S3 hardware verification (second slice). Active gate:
+`docs/verification/15-test-build-gate.md` — §3 "Fix 4" (steps 19–22, added this
+session); broader procedure: `docs/runbooks/s3-hardware-checklist.md`.
 
-**Current rolling `test` metadata:** target/tag
-**`73b88b60b647120662812a5d33b233876acad283`**, published
-**2026-09-28T18:48:23Z**; APK **18,367,219 B**, MSI **112,934,912 B**,
-ProductVersion **2.137.1**. Post-merge CI **36467187148**, Build APK
-**36467187128**, test-release **36467187181** succeeded. The #119 SHA-256
-values are **not independently verified**; previous docs incorrectly reused
-#118 hashes. A device report without computed hashes cannot prove it tested
-these exact bytes. The verification sheet and handoff now state this plainly.
+**What this session changed (code CI-green; device retest pending):**
+- **⋮ → Add to playlist** was the last old-Material dialog in the app: a
+  `GlassCard` with double padding, an M3 `titleLarge` header, a **fixed 180dp
+  `LazyColumn`** (a mostly empty slab for one or two playlists), an M3
+  `OutlinedTextField`, and an M3 Close/Cancel row. Rebuilt on the shared menu
+  family — `TrackMenuSurface`, `TrackMenuHeader`, `MenuActionRow` (name +
+  "N tracks" + trailing "Open") — content-sized by `AddToPlaylistPolicy`
+  (≤4 rows, never the old fixed box) and asking for its name through the new
+  `DhunTextField`. Behaviour, callbacks and dismissal are unchanged.
+- **≡♪ → Queue/Related** had **no drag detector anywhere**: the grab pill was
+  decoration, and while the panel is open the player's queue glyph is hidden
+  with the action row it lives in, so the only exits were the ✕ and Back.
+  Swiping the header strip down now moves the panel under the finger and
+  dismisses past `0.28 × travel` (floored at one touch target, capped at the
+  travel); the drag is folded into the same transition, so the measured seam
+  between player and panel stays closed. The panel also stopped painting the
+  retired near-black `GlassBottomBar` slab — it uses the artwork-veiled
+  `LyricsArtworkSheet`, and `GlassBottomBar` (no call sites left) is deleted.
+- Adjacent, same defect class: `CreatePlaylistDialog`, `RenameDialog` and the
+  three Library confirm dialogs use `DhunTextField` and
+  `GlassCard(opaqueBase = true)` (the rule `GlassCard`'s own docs state).
+- New tests: `PlayerPanelDragTest` (seam invariance across progress × drag,
+  clamp semantics, threshold share/floor/cap, zero-travel = no gesture) and
+  `AddToPlaylistPolicyTest` (the picker reserves nothing for rows it does not
+  have). Both run in CI's `:shared:jvmTest`.
 
-**Round-1 evidence received 2026-10-05** (execution date not supplied):
-- **Android:** step 1 FAIL; 2–5 reported pass/visible (5a–5c art present but
-  small); step 6 FAIL; 7 FAIL; 8 PASS; 9 FAIL; 10 readable; 11 PASS; 12
-  compact-menu pass with request for anchoring near ⋮; 13/15 partial (`Go to
-  album` not found; only five actions tested); 14 PASS; 16 not understood;
-  17 PASS; 18 not reported. Four inline screenshots were reviewed: album
-  pages show generic metadata/placeholders and one exposes the now-playing blur.
-  The latest report clarifies that single-release cover and track art both fail;
-  other album/playlist page covers fail while row art mostly loads. Step-6 row
-  size/shape mismatch and screenshot mapping remain unknown.
-  Step 10's “album cover not working” note is ambiguous.
-- **Windows:** core steps 10–13 reported PASS; model/build and artifact hash
-  are absent. This does not close the larger Windows-native/soak checks.
-- **Missing evidence:** device models, OS versions, previous builds, execution
-  time, APK/MSI hashes, details for the step-6 mismatch, screenshots for steps 5/10
-  (not shown in the four images), exact album/route/response for steps 1/7/9, and a
-  known-album-track check for `Go to album`.
-- The gate's old step 16 wrongly described `Download` as per-track
-  “downloadability.” Actual policy is host capability: Android/Windows both
-  supply `DownloadManager`; the hide case is unit-tested, not selectable in
-  normal device UI. The manual wording is corrected.
+**Evidence (verified against GitHub this session):**
+- Commits `f9454a8` (code) → `85e73eb` (test-semantics fix after a real red).
+- **Green:** PR CI **37389109897** and push CI **37389105839** — all 9 steps,
+  including `:shared:jvmTest` with the new tests; Build APK **37389110248**.
+- **Real red, on record:** PR CI **37388855101** failed in `:shared:jvmTest` on
+  three `PlayerPanelDragTest` assertions (two wrong expectations, one helper
+  inconsistency about a non-finite current offset). Fixed in `85e73eb`; no
+  blind retry, and nothing is claimed green that did not run.
+- **Candidate APK** (build-only artifact, **not published**): test-release run
+  **37389110912**, `apk` job green — `dhun-test.apk` 18,367,219 B, SHA-256
+  `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, source =
+  PR merge ref `a9e8c9d7` of head `85e73eb`.
+- **MSI job red in the same run:** `check_msi_upgrade.ps1` could not download
+  the rolling `test` baseline (`gh release download test …` → non-zero), so
+  "Check install-over and userdata on disposable Windows" failed and **no `msi`
+  artifact was uploaded**. The MSI itself built (ProductVersion 2.148.1,
+  SHA-256 `4687747496a20eeb2efbdbdb08ef436bec9f694546588049e58921fb449efe32`).
+  It is re-run by the docs commit; if it reproduces, it is a download/infra
+  failure, not this diff — and the Windows half of the retest would need it.
+- Rolling `test` still targets `885a092` (published 2026-10-05T16:56:46Z; APK
+  18,367,219 B, MSI 112,934,912 B). PR runs are `buildOnly`, so this PR changes
+  no published asset.
 
-**User feedback, not yet a code change:** notification/lock-screen/widget art
-looked too small; user suggested larger art or a dynamically blurred
-current-song backdrop. The compact track menu was accepted as compact but user
-prefers a lower-right/contextual menu from ⋮. Current track menu is centered by
-design; anchoring requires a separate scope decision.
+**Exact next step:** push the docs commit, confirm CI + the retried test-release
+run, then hand the candidate APK's digest to the user for the targeted retest
+(gate steps 19–22, plus a Fix-3 sanity check that the ⋮ menu is still compact).
+**Merge only after that retest**, then verify post-merge CI/test-release in the
+same turn.
 
-**S3 round-2 candidate fix (recorded in `docs/verification/14-release.md`):**
-the user confirms ordinary Home/Search song thumbnails load. On single releases,
-both page-cover art and track art are missing, including in the full-screen
-player; on other albums/playlists, page covers fail while row thumbnails mostly
-load. This points toward header and album-row fallback parsing rather than a
-global Coil failure. `pageHeader` previously checked only root `header`; it now
-also looks for header renderers inside two-column tab sections and unwraps a
-nested responsive detail header. New synthetic fixtures/tests cover single
-track fallback, playlist cover with independent row art, and nested detail
-headers. These are synthetic response-shape fixtures, not the user's raw
-payload. Initial PR CI on code commit `b7d0f01` (**37319510581**) passed,
-including parser tests. Two intermediate docs-only runs on head `5006595` had
-unrelated shared-test failures: push CI **37320618809** timed out in
-`LibraryViewModelTest.historyPlaybackQueuesCorrectly`; PR CI **37320626452**
-reported `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
-(expected `tok-2`, got `tok-a`). The later head `1332005` and app-code head
-`edaf4b2` both passed push/PR CI; the latter runs are push **37322646142**, PR
-**37322658661**, Build APK **37322658940**, and test-release **37322658878**.
-The test-release APK/MSI and Windows install-over passed; AAB/publish were
-skipped. The build-only `apk` artifact contains `dhun-test.apk` (18,367,219 B,
-SHA-256 `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`) plus
-sidecars; the ZIP archive is 17,552,363 B, so the observed 17 MB vs 18 MB size
-difference is expected compression. The user reports downloading and verifying
-the APK checksum, then device-testing it on Android 15, build
-`SQ3A.240829.003` (device model not supplied). Reported results: single cover,
-track rows, and full player art work; another album and playlist covers/rows
-work; Home/Search thumbnails pass, with the now-playing backdrop only during
-playback (expected). Step-6 playlist row appearance (expected 64dp, borderless)
-and `Go to album` are reported as “seems working,” without measurement or track
-ID. Record the targeted artwork retest as **PASS by user report**, while keeping
-broader S3/S6 acceptance open. No user-captured raw browse response was
-provided, so the exact source payload/root cause remains unconfirmed. Candidate
-artifact: [test-release run 37322658878](https://github.com/99ggprooo00-code/DHUN/actions/runs/37322658878); it was build-only and not published. The user says step-6 playlist rows and `Go to album` seem correct, but did not provide exact row measurements or the tested album-track ID; retain these as qualified user-reported checks. Do not alter `TrackRow` (64dp, borderless) or menu behavior without a concrete failure. Image/menu design requests remain separate UX choices.
-
-**Completion ledger:**
-- **S1:** CLOSED GREEN 2026-09-20 — scheduled drill + residential evidence on
-  `d99060e` (4 songs, both platforms, same code as probed `6f7fa48`).
-- **S2:** MERGED 2026-09-22 (PR #111 → `7fcadbe`); CI hygiene done; Ubuntu-26
-  watch deferred to 2026-10-19.
-- **S4:** code merged (#74); hardware acceptance remains in S3.
-- **S5:** base merged (#74); #118's offline-broadcast classification and
-  retry-budget refund merged as `16ad2e5`, CI-verified and released.
-- **S3/S6:** OPEN. Targeted S3 artwork paths pass on the digest-verified PR #120
-  candidate by user report; the user also says the playlist-row shape and
-  `Go to album` checks seem correct. The broader 18-step/device acceptance,
-  Windows native integration, soaks, downloads/offline, radio, recovery/DSP,
-  and signing/release approval remain open. Do not label all S3/S6 closed.
-
-**Current docs updated:** `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`,
-`.ai/DEBUG_LOG.md`, `.ai/HANDOFF_NEXT_SESSION.md`, `CHANGELOG.md`,
-`docs/verification/14-release.md`, `docs/verification/15-test-build-gate.md`,
-`docs/runbooks/s3-hardware-checklist.md`, and the concise checklist at
-`docs/verification/s3-hardware-checklist.md`.
-
-**Last technical/environment limitation:** extraction-health run
-**36412874929** → `ENVIRONMENT_BLOCKED` (steady state, datacenter IP gating),
-not an app failure. No JDK locally; CI remains the compiler. Release/log blobs
-can EOF in-sandbox; annotations API is the readout.
-
-**Exact next step:** record the user’s device result in verification docs,
-commit/push those documentation updates, and wait for CI/build/test-release on
-the final pre-merge head. The candidate APK already passed the targeted artwork
-retest; no further parser edit is warranted without a failing retest and the
-actual sanitized response. Once the documentation commit’s checks pass, merge
-PR #120 as the final pre-release action and verify post-merge CI/test-release in
-the same turn. Leave the broader S3/S6 ledger open for the remaining acceptance
-checks; this targeted pass is not full phase sign-off.
-
-**Blockers/lifecycle:** S3/S6 require Android/Windows hardware; no devices in
-sandbox. Ubuntu-26 runner migration begins 2026-10-19. Work stays on
-`arena/01a0eb87-dhun`; no merge/finalization unless explicitly approved.
+**Completion ledger (unchanged by this session):**
+- **S1:** CLOSED GREEN 2026-09-20 (daily drill restored + residential playback
+  evidence on `d99060e`; T1 disproven).
+- **S2:** MERGED 2026-09-22 (PR #111 → `7fcadbe`); Ubuntu-26 watch 2026-10-19.
+- **S4/S5:** code merged (PR #74; #118); hardware acceptance rides in S3.
+- **S3/S6:** OPEN. The artwork retest closed only the artwork slice of S3. Still
+  open: these two surfaces until retested, notification/lock-screen/widget
+  controls, downloads/offline, lyrics, Settings/theme persistence, Android EQ,
+  the Windows native column (tray/media keys/SMTC/jump lists/upgrade), 30-minute
+  soaks, clean-target installs, signing decisions.
+- **Blockers:** no Android/Windows device and no JDK in the sandbox — CI is the
+  compiler and the user's device retest is the acceptance.
+- **Lifecycle:** work stays on `arena/cf4e91ba-dhun`; no merge or finalization
+  until the user says so.
 
 ---
 
+## Historical session record — PR #120 (merged as `885a092`, 2026-10-05, session `arena/01a0eb87-dhun`)
+
+Superseded by the block above; kept for evidence identity.
+- The fix: `pageHeader` also looks for header renderers inside two-column tab
+  sections and unwraps a nested responsive detail header, so single releases and
+  album/playlist page covers resolve (parser tests + synthetic fixtures;
+  `b7d0f01` code head).
+- Targeted Android retest **PASS by user report** on Android 15 build
+  `SQ3A.240829.003` (device model not supplied): single-release cover, track
+  rows, full-player art, another album + playlist covers/rows, and Home/Search
+  thumbnails all work. Step-6 row shape and `Go to album` reported as "seems
+  working", without measurement or a tested album-track id — retain as qualified.
+- The user verified the candidate APK's checksum before testing: 18,367,219 B,
+  SHA-256 `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`
+  (build-only artifact of run 37322658878). Two docs-only heads had unrelated
+  shared-test flakes (`LibraryViewModelTest` timeout 37320618809,
+  `PlayerViewModelTest` token mismatch 37320626452); they did not recur.
+- No raw browse payload was captured, so the exact response shape behind the
+  artwork bug remains unconfirmed — the synthetic fixtures are plausible, not
+  proven. **Do not re-open the parser without a failing retest + that payload.**
+
+---
 ## Historical session record — PR #118 pre-merge snapshot (superseded)
 
 Updated **2026-09-28** · session **`arena/01a0e7ee-dhun`** · baseline `main`

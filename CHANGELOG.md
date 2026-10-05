@@ -24,6 +24,27 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — the Full Player playlist picker and queue panel (2026-10-06, PR #121)
+
+- **Add to playlist** (Full Player → ⋮) leaves the old Material look: it draws
+  into the same compact frosted family as the ⋮ menu (track artwork behind a
+  veil, thumbnail/title/artist header, one row per playlist with its track count
+  and an `Open` breadcrumb), its list is sized to the playlists it actually has
+  instead of a fixed 180dp box, and the name field is the app's own input rather
+  than Material 3's outlined field. Behaviour is unchanged.
+- **Queue/Related** (Full Player → ≡♪) now sits on the track's blurred artwork
+  instead of the retired near-black `GlassBottomBar` slab (that component is
+  removed), and its header strip is a working grab handle: dragging it down moves
+  the panel under the finger — the player composition moves with it, so the seam
+  never opens — and releasing past ~28% of the panel's travel closes it, while a
+  shorter drag snaps back. The ✕, the list's own scrolling/reorder/swipe-remove,
+  and Back are unaffected.
+- The Library playlist dialogs (`New playlist`, `Rename`, delete/clear confirms)
+  use the same input and no longer let the page read through their text.
+- New pure-logic tests: panel-drag geometry/threshold decisions and the picker's
+  content-sizing policy. Note: this changes nothing about artwork parsing (PR
+  #120), the 64dp borderless track rows, or the centered track menu.
+
 ### Fixed — album and playlist headers in two-column browse pages (2026-10-05, PR #120)
 
 - The browse parser now resolves responsive page headers placed in a two-column tab's section list, and unwraps nested responsive headers inside detail-header renderers. This restores page title/cover extraction for that response shape and lets artwork-less single-release rows inherit the page cover for playback. Parser tests also pin playlist page-cover extraction without replacing per-track artwork. The targeted Android candidate retest is reported as passing; broader S3/S6 acceptance remains open. See `docs/verification/14-release.md`.

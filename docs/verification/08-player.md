@@ -50,7 +50,11 @@ physical run on Android + desktop, like Phases 03/04/05 checklists).
 - [ ] Android: blurred artwork bg visibly real (Pixel, API 31+); scrim below on <API31
 - [ ] 16 visual/interaction checks executed with screenshots
 - [ ] Rapid 10× skip stress — no state inconsistency / crash
-- [ ] Queue drag/swipe/tap on touch (Android) and mouse (desktop)
+- [ ] Queue drag/swipe/tap on touch (Android) and mouse (desktop) — *the panel
+  now also has a **swipe-down-to-close** gesture on its header strip (PR #121,
+  2026-10-06): drag follows the finger, release past 28% of the travel closes,
+  short drags snap back. Pure geometry/threshold tests exist
+  (`PlayerPanelDragTest`); the on-device feel is still unverified.*
 - [ ] Desktop: volume slider drives vlcj; blur over artwork (Skiko)
 - [ ] BACK collapses FullPlayer; app never finishes while expanded
 

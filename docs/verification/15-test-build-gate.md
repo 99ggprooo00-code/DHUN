@@ -40,6 +40,23 @@
 > recovery is available, otherwise record **not exercised**. PR #119 contains
 > release automation/documentation fixes; verify no regression in steps 1–18.
 
+> **PR #121 candidate (2026-10-06) — the two Full Player surfaces.** The user
+> reported (on the digest-verified #120 candidate): ⋮ → **Add to playlist** was
+> "still the old Material 3 interface" with "an unusually long/oversized box",
+> and ≡♪ → **Queue/Related** "still shows the old interface" and does not close
+> on a downward swipe. Both are fixed on branch `arena/cf4e91ba-dhun` (PR #121):
+> the picker is rebuilt on the compact frost-through-artwork menu family with a
+> content-sized list and the DHUN input, and the panel's header strip is now a
+> working grab handle (plus the panel stopped painting the retired near-black
+> slab). Candidate APK: test-release run **37389110912**, `apk` job green —
+> `dhun-test.apk` 18,367,219 B, SHA-256
+> `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, source
+> `a9e8c9d7` (PR merge ref of head `85e73eb`). It is a **build-only artifact**:
+> download it from that run's Artifacts, not from the rolling release. CI is
+> green (PR CI **37389109897**, Build APK **37389110248**); nothing here is
+> device-verified yet. **For this retest, run steps 19–22 below and keep the
+> steps 1–18 results you already have** (the parser is untouched).
+
 > **Purpose.** Device-side acceptance for the `test` rolling build. The sheet
 > was written around PR #114's three defects — album artwork on playback,
 > album/artist page backdrops, and one compact ⋮ menu — and now also covers
@@ -144,7 +161,7 @@ both artifacts against their matching sidecars.*
 
 ---
 
-## 3. The walkthrough — 18 steps
+## 3. The walkthrough — 18 steps (plus steps 19–22 for the PR #121 slice)
 
 For each step: **do** the action, check the **expect**, tick **pass** or **fail**.
 A fail = one line describing what you saw + one screenshot.
@@ -282,6 +299,55 @@ A fail = one line describing what you saw + one screenshot.
 
 ---
 
+### Fix 4 — the two Full Player surfaces (PR #121 candidate)
+
+**Step 19 — the playlist picker (look)**
+- **Do:** play any track → ⋮ → `Add to playlist`.
+- **Expect:** the **same compact frosted family as the ⋮ menu** (track's blurred
+  artwork behind it, thumbnail + title + artist header), one caption line, then
+  one row per playlist with the name and `N tracks` under it and a small `Open`
+  at the right, then a `New playlist` row. **No** Material-style outlined box, no
+  giant empty list area, no Close/Cancel button row. The card is roughly the ⋮
+  menu's width and only as tall as what it holds — with one playlist it should be
+  visibly *shorter* than before, and it must never look like a full-height slab.
+- ☐ pass ☐ fail → what it looked like: ____________________
+- **Screenshot on fail** (this is the step the "oversized box" report was about).
+
+**Step 20 — the playlist picker (behaves)**
+- **Do:** in that picker, tap `New playlist`; type a name; use the keyboard's
+  Done action (or `Create & add`).
+- **Expect:** the text appears in a single-line rounded field with an accent
+  caret; the name box grows only as tall as one line; `Back` returns to the
+  list; `Create & add` creates the playlist, adds the track and closes the
+  dialog; an empty name shows `Name cannot be empty` under the field instead of
+  creating anything. Then reopen the picker: the new playlist is listed with the
+  track count and its `Open` breadcrumb goes to the playlist page.
+- ☐ pass ☐ fail → ____________________
+
+**Step 21 — the panel's swipe (the gesture report)**
+- **Do:** full player → the queue glyph (≡♪). Then, using the **grab pill / title
+  band at the top of the panel** (not the list), drag downward slowly and release
+  after a long drag. Reopen, and drag a short distance (≈20dp) and release.
+  Finally reopen and drag down on the **list rows** themselves.
+- **Expect:** while the finger is down the whole panel follows it, with the
+  player content moving down by the same amount (no gap ever opens between the
+  panel and the player above it); releasing after a long drag closes the panel;
+  a short drag snaps it back open; dragging on the list rows scrolls the list
+  instead (it does **not** close the panel). Reopen once more and close with the
+  ✕ in the panel header, to confirm the old exit still works.
+- ☐ follows the finger ☐ commits on a long drag ☐ snaps back on a short drag
+  ☐ list drag still scrolls ☐ ✕ still closes → failures: ____________________
+
+**Step 22 — same defect class, the Library/playlist dialogs**
+- **Do:** Library → Playlists → `+ New playlist`; and rename a local playlist
+  (⋮ on the playlist → `Rename`).
+- **Expect:** the name field is the same DHUN box as step 20 (no Material
+  outlined field), and neither dialog lets the page underneath read through its
+  text (the card is opaque). The delete/clear confirm dialogs too.
+- ☐ pass ☐ fail → ____________________
+
+---
+
 ## 4. The judgment call CI can't make
 
 **Does the menu feel compact in the hand?**
@@ -307,6 +373,7 @@ DIGEST: apk <hash or n/a>  -> MATCH / MISMATCH
         msi <hash or n/a>  -> MATCH / MISMATCH
 
 STEPS 1-18: pass / fail -> <list the failing numbers only>
+STEPS 19-22: pass / fail -> <list the failing numbers only>
   (e.g. "all pass except 5")
 
 STEP 5  (Android only):

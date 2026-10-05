@@ -2,6 +2,37 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-06 — the playlist picker / queue-panel fixes are CI-green but not yet seen on a device (session `arena/cf4e91ba-dhun`, PR #121)
+
+- **The panel's dismiss swipe is scoped to the header strip** (grab pill + title
+  band, ≈60dp). Dragging down over the queue *list* does not dismiss the panel:
+  those rows own their vertical scroll plus swipe-to-remove and
+  long-press-to-reorder, and a whole-sheet detector would fight all three. If
+  drag-anywhere-to-close is wanted, that is a separate change needing a
+  nested-scroll connection.
+- While the panel is open the player's queue/shuffle/repeat/lyrics row stays
+  hidden by design (`actionRowVisible = false`), so the queue glyph cannot close
+  the panel. The exits are now: swipe the header down, the ✕, and Back. Kept as
+  designed (that row's measured space is what the sheet geometry is derived
+  from) and documented in `QueueSheetHeader`.
+- The track ⋮ menu is still **centered**; anchoring it near its source ⋮ remains
+  a separate UX decision (round-1 report; gate step 12 records it as "not a
+  failure of this step").
+- `SearchScreen`'s in-page search field is still an M3 `OutlinedTextField`
+  (styled via `OutlinedTextFieldDefaults`). It is a page-level search bar, not a
+  dialog field, and was deliberately left alone.
+- `DhunTextField` is a `BasicTextField` wrapper: it carries the app's visual
+  language and IME Done handling, but no M3 text-field semantics/autofill
+  extras. Revisit if a real form ever needs them.
+- **Retest pending:** the picker's look and size, the panel's swipe, and the five
+  Library/playlist dialogs' opacity are proven only by CI compilation and the
+  new pure-logic tests. Device acceptance is the user's retest of the candidate
+  APK (gate §3 "Fix 4").
+- The candidate MSI for this slice does not exist yet: the `msi` job of
+  test-release run 37389110912 failed its install-over check on a baseline
+  download (`gh release download test …` → non-zero), so no `msi` artifact was
+  uploaded. Windows retest of these fixes must wait for a green MSI job.
+
 ## 2026-10-05 — S3 hardware round 1 report (partial; identity incomplete)
 
 - User report received 2026-10-05: Android walkthrough failed at steps **1, 6, 7, 9**; steps **2–5, 8, 10–12, 14, 17** were reported pass/observed with qualifications. Notification/lock-screen/widget art was present but considered small. Menu was compact but centered; user prefers it anchored near the originating ⋮. Windows core steps **10–13** were reported pass. Full per-step ledger: `docs/verification/14-release.md`.
