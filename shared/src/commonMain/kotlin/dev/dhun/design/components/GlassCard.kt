@@ -119,43 +119,6 @@ fun GlassCard(
 }
 
 /**
- * Docked chrome (MiniPlayer, bottom nav): stronger frosted scrim so transport
- * stays legible over Home/library content and ambient washes.
- *
- * [opaqueBase] paints an opaque `surface` under the glass — the same rule
- * [GlassCard] applies to dialogs and sheets. A **sheet of rows** over artwork
- * needs it: the strongest glass token is still ~72% translucent, which left
- * the FullPlayer queue unreadable on a real device.
- */
-@Composable
-fun GlassBottomBar(
-    modifier: Modifier = Modifier,
-    shape: Shape = DhunShapes.glass,
-    opaqueBase: Boolean = false,
-    content: @Composable BoxScope.() -> Unit,
-) {
-    Box(
-        modifier = modifier
-            .shadow(DhunSpacing.md, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.4f))
-            .clip(shape)
-            .then(
-                if (opaqueBase) Modifier.background(DhunColors.surface, shape) else Modifier,
-            )
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        DhunColors.glassBarTop,
-                        DhunColors.glassStrong,
-                    ),
-                ),
-                shape,
-            )
-            .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), shape),
-        content = content,
-    )
-}
-
-/**
  * The continuous bottom dock: the MiniPlayer and the navigation bar in ONE
  * clipped sheet. The artwork is blurred once per track (the lyrics-card
  * pipeline, [LyricsArtworkLayer]). This surface does **not** paint the old

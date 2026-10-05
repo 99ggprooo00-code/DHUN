@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +44,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
 import dev.dhun.design.components.DhunTextButton
@@ -459,7 +459,13 @@ private fun RenameDialog(
 ) {
     var name by remember(current) { mutableStateOf(current) }
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            // A dialog floats over a dimmed page — the opaque base is what
+            // keeps the list underneath from reading through its text.
+            opaqueBase = true,
+        ) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text(
                     "Rename playlist",
@@ -467,11 +473,9 @@ private fun RenameDialog(
                     color = DhunColors.textPrimary,
                 )
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
-                OutlinedTextField(
+                DhunTextField(
                     value = name,
                     onValueChange = { name = it },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -491,7 +495,13 @@ private fun DeleteConfirmDialog(
     onConfirm: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            // A dialog floats over a dimmed page — the opaque base is what
+            // keeps the list underneath from reading through its text.
+            opaqueBase = true,
+        ) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text(
                     "Delete \"$playlistName\"?",

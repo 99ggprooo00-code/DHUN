@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -61,6 +62,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -113,7 +115,7 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.dhunMouseDragScroll
-import dev.dhun.design.components.GlassBottomBar
+import dev.dhun.design.components.LyricsArtworkSheet
 import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.fittedPlayerArtworkSize
@@ -123,6 +125,8 @@ import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.design.usesCompactPlayerControls
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.player.SkipDirection
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * FullPlayer — the immersive, full-screen Now Playing view.
@@ -284,9 +288,41 @@ fun FullPlayer(
         label = "relatedSheetProgress",
     ) { open -> if (open) 1f else 0f }
 
+    // ---- swipe-down to close the panel ------------------------------------
+    // The panel's grab pill used to be decoration: nothing on the sheet
+    // answered a downward drag, so the only ways out were the ✕ in the header
+    // and Back — and the device report says exactly that ("swiping down to
+    // close/toggle the panel does not work as expected"). The pill is a
+    // promise; this is the code that keeps it.
+    //
+    // One extra number, and it is the same motion: while the finger is down the
+    // panel is offset by [sheetDragPx] on top of the transition's own offset
+    // (clamped to the travel it mirrors — the panel can be dragged down only as
+    // far as it has to travel). On release the offset either decays to zero
+    // (snap back) or the panel closes, with the offset decaying over the very
+    // same tween the closing transition runs, so releasing past the threshold
+    // reads as one continuous movement rather than a jump.
+    var sheetDragPx by remember { mutableFloatStateOf(0f) }
+    val dragScope = rememberCoroutineScope()
+    var dragSettleJob by remember { mutableStateOf<Job?>(null) }
+    /** Ends a drag: [dismiss] commits the close, otherwise the panel snaps back. */
+    val settleSheetDrag: (dismiss: Boolean, travelPx: Float) -> Unit = { dismiss, travelPx ->
+        dragSettleJob?.cancel()
+        if (dismiss) panelOpen = false
+        dragSettleJob = dragScope.launch {
+            val spec = if (dismiss) DhunAnimations.mediumTween<Float>() else DhunAnimations.fastTween<Float>()
+            animate(
+                initialValue = sheetDragPx,
+                targetValue = 0f,
+                animationSpec = spec,
+            ) { value, _ -> sheetDragPx = value }
+        }
+    }
+
     // Chrome height feeds the related sheet geometry (same coordinate space —
     // both live inside the safe-drawing box below).
     val chromeHeightPx = remember { mutableIntStateOf(0) }
+    val touchTargetPx = with(LocalDensity.current) { DhunSpacing.touchTarget.toPx() }
 
     Box(
         modifier = modifier
@@ -360,6 +396,32 @@ fun FullPlayer(
                     travelPx = travelPx,
                 )
                 val relatedMotion = relatedSheet.motion
+                // The panel's finger-following half. A downward drag on the
+                // sheet's grab strip moves *both* halves — the sheet and the
+                // player composition — by the same pixels, so the seam that the
+                // open transition keeps closed stays closed while the user drags
+                // it back down (see [panelDragTranslations]).
+                val draggedMotion = panelDragTranslations(relatedMotion, sheetDragPx)
+                // The panel's drag callbacks need the *frozen* travel this
+                // composition is using, so they are built here rather than
+                // beside the drag state above.
+                val onSheetDragStart: () -> Unit = {
+                    dragSettleJob?.cancel()
+                    dragSettleJob = null
+                }
+                val onSheetDrag: (Float) -> Unit = { deltaPx ->
+                    sheetDragPx = panelDragOffsetPx(sheetDragPx, deltaPx, travelPx)
+                }
+                val onSheetDragEnd: () -> Unit = {
+                    settleSheetDrag(
+                        shouldDismissPanel(
+                            dragPx = sheetDragPx,
+                            thresholdPx = panelDismissThresholdPx(travelPx, touchTargetPx),
+                        ),
+                        travelPx,
+                    )
+                }
+                val onSheetDragCancel: () -> Unit = { settleSheetDrag(false, travelPx) }
                 // The player rises by travel · progress — the sheet's own
                 // travel, from the same progress. The rise is paid for in two
                 // halves on purpose: this layout inset, which the weighted
@@ -413,7 +475,7 @@ fun FullPlayer(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = playerRiseDp)
-                        .graphicsLayer { translationY = relatedMotion.playerOffsetY },
+                        .graphicsLayer { translationY = draggedMotion.playerOffsetY },
                 ) {
                     when (layoutMode) {
                         FullPlayerLayoutMode.Stacked -> {
@@ -519,8 +581,13 @@ fun FullPlayer(
                         onSelectTab = onPanelTabSelect,
                         onClose = onQueueToggle,
                         accent = accent,
+                        artworkUrl = current?.thumbnailUrl,
                         sheetHeight = travelDp,
-                        motion = relatedMotion,
+                        motion = draggedMotion,
+                        onDragStart = onSheetDragStart,
+                        onDrag = onSheetDrag,
+                        onDragEnd = onSheetDragEnd,
+                        onDragCancel = onSheetDragCancel,
                     )
                 }
             }
@@ -1172,6 +1239,69 @@ internal fun relatedSheetMotion(progress: Float, travelPx: Float): RelatedSheetM
 }
 
 /**
+ * Folds a finger's downward drag on the panel into the transition's two
+ * offsets — **the same amount on both halves**, which is the whole point.
+ *
+ * The open transition keeps the player's lower boundary on the sheet's top edge
+ * (`height − travel · progress` on both sides, see [relatedSheetMotion]). Adding
+ * `d` to both offsets moves that shared boundary down by `d`: the panel follows
+ * the finger and the player composition descends with it, so a half-dragged
+ * panel is a *half-closed* panel, with the seam still closed. Moving only the
+ * sheet would open a gap of `d` between the panel and the player — the exact
+ * defect the measured travel exists to prevent.
+ *
+ * Upward and non-finite input is a no-op: a panel at rest is at rest.
+ */
+internal fun panelDragTranslations(motion: RelatedSheetMotion, dragPx: Float): RelatedSheetMotion {
+    val drag = if (dragPx.isFinite()) dragPx.coerceAtLeast(0f) else 0f
+    if (drag == 0f) return motion
+    return motion.copy(
+        playerOffsetY = motion.playerOffsetY + drag,
+        sheetOffsetY = motion.sheetOffsetY + drag,
+    )
+}
+
+/**
+ * The panel's drag offset after a finger movement of [deltaPx] from
+ * [currentPx]: downward only, and never further than the travel the panel has
+ * ([travelPx]) — pulling past the bottom edge would peel the sheet off the
+ * screen instead of closing it.
+ */
+internal fun panelDragOffsetPx(currentPx: Float, deltaPx: Float, travelPx: Float): Float {
+    val travel = if (travelPx.isFinite() && travelPx > 0f) travelPx else 0f
+    val current = if (currentPx.isFinite()) currentPx.coerceIn(0f, travel) else 0f
+    val delta = if (deltaPx.isFinite()) deltaPx else 0f
+    return (current + delta).coerceIn(0f, travel)
+}
+
+/**
+ * The drag distance that commits a dismissal on release: a fraction of the
+ * panel's own travel, floored at one touch target and never more than the travel
+ * itself — so the gesture is a steady ~28% of the panel on a tall phone, is
+ * still reachable with a thumb when the panel is short, and can never demand a
+ * drag longer than the panel has room for.
+ *
+ * Zero travel (an unmeasured viewport, or a panel with nowhere to go) yields
+ * zero, which [shouldDismissPanel] reads as "no dismissal" rather than
+ * "dismiss on any touch".
+ */
+internal fun panelDismissThresholdPx(travelPx: Float, touchTargetPx: Float): Float {
+    if (!travelPx.isFinite() || travelPx <= 0f) return 0f
+    val floor = if (touchTargetPx.isFinite() && touchTargetPx > 0f) touchTargetPx else 0f
+    return (travelPx * PANEL_DISMISS_TRAVEL_FRACTION).coerceIn(minOf(floor, travelPx), travelPx)
+}
+
+/** Share of the panel's travel that has to be pulled down before release closes it. */
+internal const val PANEL_DISMISS_TRAVEL_FRACTION = 0.28f
+
+/**
+ * Downward drags past [thresholdPx] close the panel; short drags, upward drags
+ * and a degenerate threshold (nothing to travel) snap back.
+ */
+internal fun shouldDismissPanel(dragPx: Float, thresholdPx: Float): Boolean =
+    dragPx.isFinite() && thresholdPx.isFinite() && thresholdPx > 0f && dragPx >= thresholdPx
+
+/**
  * Everything else the transition needs beyond the two offsets, from the same
  * single progress.
  *
@@ -1754,11 +1884,14 @@ private fun ImmersivePlayButton(
  * motion reads as a panel rising and a player getting out of the way rather
  * than a wash of glass appearing over a still player. Its width is capped to
  * the player content budget so a wide window gets readable rows rather than one
- * stretched line, and the glass keeps the opaque base + rounded top corners the
- * rows need to stay legible over artwork.
+ * stretched line, and the material keeps the opaque base + rounded top corners
+ * the rows need to stay legible over artwork.
  *
- * Closing is the same numbers run backwards, driven by the ✕ in the header
- * (the queue glyph that opened this is hidden while the panel is up).
+ * Closing is the same numbers run backwards, and there are three ways to ask
+ * for it: **swipe the header strip down** ([onDrag] moves the panel under the
+ * finger, [onDragEnd] commits or snaps back), the ✕ in the header, or Back. The
+ * queue glyph that opened the panel is hidden with the action row while it is
+ * up, so none of the exits may depend on it.
  */
 @Composable
 private fun QueueSheet(
@@ -1767,8 +1900,14 @@ private fun QueueSheet(
     onSelectTab: (Int) -> Unit,
     onClose: () -> Unit,
     accent: Color,
+    /** The playing track's raw thumbnail URL — the panel's own blurred artwork. */
+    artworkUrl: String?,
     sheetHeight: Dp,
     motion: RelatedSheetMotion,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -1788,16 +1927,23 @@ private fun QueueSheet(
                 .height(sheetHeight)
                 .graphicsLayer { translationY = motion.sheetOffsetY },
         ) {
-            GlassBottomBar(
+            // The artwork-veiled sheet material, not the old near-black
+            // `GlassBottomBar` slab: the panel now belongs to the same family
+            // as the dock, the ⋮ menus and the page backdrops.
+            LyricsArtworkSheet(
+                artworkUrl = artworkUrl,
                 modifier = Modifier.fillMaxSize(),
-                // This is now a bottom sheet: rounded top corners, flush lower edge.
+                // This is a bottom sheet: rounded top corners, flush lower edge.
                 shape = DhunShapes.bottomSheet,
-                opaqueBase = true,
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     QueueSheetHeader(
                         title = if (selectedTab == 2) "Related" else "Up next",
                         onClose = onClose,
+                        onDragStart = onDragStart,
+                        onDrag = onDrag,
+                        onDragEnd = onDragEnd,
+                        onDragCancel = onDragCancel,
                     )
                     PanelTabRow(
                         selectedTab = selectedTab,
@@ -1819,13 +1965,53 @@ private fun QueueSheet(
 }
 
 /**
- * Sheet header: grab pill, what the sheet holds, and a 48dp close target —
- * the queue glyph below only *toggles*, so the sheet needs its own visible way
- * out on both touch and mouse.
+ * Sheet header: grab pill, what the sheet holds, and a 48dp close target.
+ *
+ * The pill is a working grab handle, not a picture of one: dragging this
+ * strip down moves the whole panel under the finger ([onDrag] → the offset the
+ * transition reads), and releasing past
+ * [panelDismissThresholdPx] closes it ([onDragEnd]). The ✕ stays as the
+ * discoverable, accessibility-friendly exit — while the panel is open the
+ * player's own queue glyph is hidden with the rest of the action row it lives
+ * in, so a visible way out must not depend on it.
+ *
+ * The drag is deliberately scoped to this strip. The list below keeps its own
+ * vertical scrolling plus its swipe-to-remove and long-press-to-reorder
+ * gestures; a dismiss detector wrapped around the *rows* would fight all three.
  */
 @Composable
-private fun QueueSheetHeader(title: String, onClose: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.sm)) {
+private fun QueueSheetHeader(
+    title: String,
+    onClose: () -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
+) {
+    // The gesture coroutine is keyed on nothing and must keep working across
+    // recompositions, so it reads the callbacks through updated state rather
+    // than capturing the first ones (and the first `travelPx` they closed over).
+    val currentDragStart by rememberUpdatedState(onDragStart)
+    val currentDrag by rememberUpdatedState(onDrag)
+    val currentDragEnd by rememberUpdatedState(onDragEnd)
+    val currentDragCancel by rememberUpdatedState(onDragCancel)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = DhunSpacing.sm)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = { currentDragStart() },
+                    onDragEnd = { currentDragEnd() },
+                    onDragCancel = { currentDragCancel() },
+                ) { change, dragAmount ->
+                    // Owning the gesture is what lets the panel follow the
+                    // finger; the header has nothing else that pans vertically.
+                    change.consume()
+                    currentDrag(dragAmount)
+                }
+            },
+    ) {
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
