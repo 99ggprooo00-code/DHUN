@@ -71,9 +71,27 @@ PR merge ref `a9e8c9d7` of head `85e73eb`. The same run's `msi` job **failed at
 could not download the rolling `test` baseline (`gh release download test …`
 → non-zero), so no `msi` artifact was uploaded even though the installer built
 (ProductVersion 2.148.1, SHA-256
-`4687747496a20eeb2efbdbdb08ef436bec9f694546588049e58921fb449efe32`). Treated as a
-download/infra failure and re-run by the docs commit; the Windows half of the
-retest needs a green MSI job. No visual or gesture acceptance is claimed here —
+`4687747496a20eeb2efbdbdb08ef436bec9f694546588049e58921fb449efe32`).
+
+**Diagnosed, not hand-waved, and it reproduced.** The docs head's test-release
+run (`37390031054`) failed in exactly the same place, so this is deterministic,
+not flaky. Root cause: the rolling `test` release is currently a **Draft**
+(`draft=true`; `created 2026-10-05T16:49:03Z`, `published 2026-10-05T16:56:46Z`),
+and the `msi` job runs with `contents: read` — a draft release is not readable
+by a token without push access, so `gh release download test` fails before the
+install-over check gets a baseline. The state was **not** produced by the
+workflow: `.github/workflows/test-release.yml` at `885a092` (the commit that ran
+it) is byte-identical to this branch's, it creates the rolling release with
+`--prerelease`, and the repo event feed holds exactly one `ReleaseEvent
+published tag=test` at 16:56:46Z; only the `v0.1.0` `release_draft` job uses
+`--draft`. So the draft flag was applied out of band, after that publish. The
+discriminator: the very same install-over step **passed** at 16:55:24Z in push
+run `37343725414` — i.e. against the previous, *published* baseline; it has
+failed every time since. A branch run cannot repair it (`publish` is gated on
+`refs/heads/main`), and this session did not touch release state; the fix is to
+republish the rolling `test` release, after which the check runs unchanged.
+Until then **no Windows candidate exists for this slice**, and the Windows half
+of the retest must wait. No visual or gesture acceptance is claimed here —
 see `docs/verification/15-test-build-gate.md` §3 "Fix 4".
 
 ## 2026-10-05 — S3 hardware report; build digest and UI symptoms unresolved

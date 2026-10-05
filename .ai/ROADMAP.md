@@ -49,22 +49,44 @@ session); broader procedure: `docs/runbooks/s3-hardware-checklist.md`.
   **37389110912**, `apk` job green — `dhun-test.apk` 18,367,219 B, SHA-256
   `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, source =
   PR merge ref `a9e8c9d7` of head `85e73eb`.
-- **MSI job red in the same run:** `check_msi_upgrade.ps1` could not download
-  the rolling `test` baseline (`gh release download test …` → non-zero), so
-  "Check install-over and userdata on disposable Windows" failed and **no `msi`
-  artifact was uploaded**. The MSI itself built (ProductVersion 2.148.1,
-  SHA-256 `4687747496a20eeb2efbdbdb08ef436bec9f694546588049e58921fb449efe32`).
-  It is re-run by the docs commit; if it reproduces, it is a download/infra
-  failure, not this diff — and the Windows half of the retest would need it.
-- Rolling `test` still targets `885a092` (published 2026-10-05T16:56:46Z; APK
-  18,367,219 B, MSI 112,934,912 B). PR runs are `buildOnly`, so this PR changes
-  no published asset.
+- **MSI job red in both runs (`37389110912`, reproduced in the docs head's
+  `37390031054`):** it fails at `scripts/check_msi_upgrade.ps1:40`, whose
+  `gh release download test …` cannot read the baseline. **Cause identified, and
+  it is release state, not this diff:** the rolling `test` release is currently
+  a **Draft** (`draft=true`; `created 16:49:03Z`, `published 16:56:46Z`), while
+  the `msi` job's token is `contents: read` — a draft release is only visible to
+  push-capable tokens, so the download exits non-zero before the check can run.
+  The repo's workflow never does this (it creates `test` with `--prerelease`;
+  the file at `885a092` is byte-identical to this branch's, and the event log
+  holds exactly one `published` event, 16:56:46Z) and no workflow can draft it —
+  so the draft flag was set out of band, after that publish. Proof it is the
+  state and not the check: the same step **passed** at 16:55:24Z in push run
+  **37343725414**, against the *published* baseline. Note a branch run can never
+  fix it — the `publish` job is `main`-gated (`refs/heads/main`) — so restoring
+  the baseline means republishing the rolling release (an owner action; this
+  session deliberately did not touch release state). The MSI itself built fine
+  (2.149.1, SHA-256
+  `6e34042319feed49d4bc9f4f64bd9dc5950774de7b781d12bbdf65252dd1fdf2`), it was
+  just never uploaded. Consequence: **no Windows candidate for this slice**, and
+  the install-over gate is unrunnable until the release is published again.
+- Rolling `test` still targets `885a092` (APK 18,367,219 B, MSI 112,934,912 B).
+  PR runs are `buildOnly`, so this PR changes no published asset. Its four
+  assets are the PR #120 artifacts, digest-verified by the user.
 
-**Exact next step:** push the docs commit, confirm CI + the retried test-release
-run, then hand the candidate APK's digest to the user for the targeted retest
-(gate steps 19–22, plus a Fix-3 sanity check that the ⋮ menu is still compact).
+**Docs head and its CI (verified):** `564b890`, pushed. Green: push CI
+**37390026600**, PR CI **37390030215** (9/9 steps, `:shared:jvmTest`), Build APK
+**37390030691** (`debug-apk`, 17,560,782 B), and the docs head's test-release
+**37390031054** — `apk` green, `msi` red as above. The docs-only delta rebuilds
+to a **byte-identical APK**: `dhun-test.apk` 18,367,219 B, SHA-256
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` (same digest
+as `37389110912`, now from source `e9e0d178`), so the digest already handed over
+is still the candidate.
+
+**Exact next step:** hand the user the digest and the Fix-4 steps 19–22 for the
+targeted retest, plus a Fix-3 sanity glance that the ⋮ menu is still compact.
 **Merge only after that retest**, then verify post-merge CI/test-release in the
-same turn.
+same turn — and expect the post-merge run's `msi` job to stay red until the
+rolling release is published again.
 
 **Completion ledger (unchanged by this session):**
 - **S1:** CLOSED GREEN 2026-09-20 (daily drill restored + residential playback

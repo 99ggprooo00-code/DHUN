@@ -56,6 +56,16 @@
 > green (PR CI **37389109897**, Build APK **37389110248**); nothing here is
 > device-verified yet. **For this retest, run steps 19–22 below and keep the
 > steps 1–18 results you already have** (the parser is untouched).
+>
+> **No candidate MSI this round.** The `msi` job fails in both test-release runs
+> (the `apk` job is the one that is green) at `check_msi_upgrade.ps1`'s baseline
+> download: the rolling `test` release is currently a **Draft** and the job's
+> read-scoped token cannot read a draft. The installer itself builds and stages
+> (`dhun-test.msi` 112,947,200 B, ProductVersion 2.149.1, SHA-256
+> `6e34042319feed49d4bc9f4f64bd9dc5950774de7b781d12bbdf65252dd1fdf2`) — it is
+> simply not uploadable while the check can't fetch its baseline. So the Windows
+> column of this gate cannot be exercised against this candidate until the
+> rolling release is published again; the Android steps below are unaffected.
 
 > **Purpose.** Device-side acceptance for the `test` rolling build. The sheet
 > was written around PR #114's three defects — album artwork on playback,

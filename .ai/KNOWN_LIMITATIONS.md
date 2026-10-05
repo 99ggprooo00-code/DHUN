@@ -28,10 +28,16 @@ Updated every phase. Nothing hidden.
   Library/playlist dialogs' opacity are proven only by CI compilation and the
   new pure-logic tests. Device acceptance is the user's retest of the candidate
   APK (gate §3 "Fix 4").
-- The candidate MSI for this slice does not exist yet: the `msi` job of
-  test-release run 37389110912 failed its install-over check on a baseline
-  download (`gh release download test …` → non-zero), so no `msi` artifact was
-  uploaded. Windows retest of these fixes must wait for a green MSI job.
+- The candidate MSI for this slice does not exist: the `msi` job fails in both
+  test-release runs (37389110912, and 37390031054 for the docs head) at the
+  install-over check's baseline download (`gh release download test …` →
+  non-zero), so nothing is uploaded. Diagnosed: the rolling `test` release is
+  currently a **Draft**, which the job's `contents: read` token cannot read; the
+  same step passed on 2026-10-05T16:55:24Z against the previously *published*
+  baseline, and the workflow itself never drafts `test` (`--prerelease` only).
+  It is release state set out of band, not a defect in these fixes and not
+  fixable from a branch (`publish` is main-gated). Windows retest of these fixes
+  waits until the rolling release is published again.
 
 ## 2026-10-05 — S3 hardware round 1 report (partial; identity incomplete)
 
