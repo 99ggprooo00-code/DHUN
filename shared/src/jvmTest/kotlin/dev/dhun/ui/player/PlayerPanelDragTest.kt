@@ -25,8 +25,10 @@ import kotlin.test.assertTrue
  * 1. the seam between the player's lower boundary and the panel's top edge stays
  *    closed while the finger is down ([panelDragTranslations] moves **both**
  *    halves by the same pixels — moving only the sheet would open a gap of `d`);
- * 2. the offset is downward-only and clamped to the panel's own travel, so the
- *    sheet can never be peeled off the screen;
+ * 2. the offset follows the finger both ways but is clamped to `[0, travel]` —
+ *    back up to rest, and never far enough down to peel the sheet off the
+ *    screen — and a non-finite value collapses to rest instead of blanking the
+ *    panel's translation;
  * 3. the release threshold is a share of that travel, floored at one touch
  *    target and never longer than the panel — and a panel with no travel has no
  *    dismissal gesture at all (any-touch-closes would be a bug, not a feature).
@@ -97,25 +99,44 @@ class PlayerPanelDragTest {
     /* -------- 2. the offset: downward only, clamped to the travel ---------- */
 
     @Test
-    fun theOffsetAccumulatesDownwardOnlyAndStopsAtThePanelsOwnTravel() {
+    fun theOffsetFollowsTheFingerAndStopsAtRestAndAtThePanelsOwnTravel() {
         // A finger pulling down accumulates 1:1…
         assertClose(expected = 40f, actual = panelDragOffsetPx(currentPx = 0f, deltaPx = 40f, travelPx = 600f))
         assertClose(expected = 100f, actual = panelDragOffsetPx(currentPx = 60f, deltaPx = 40f, travelPx = 600f))
         // …never past the panel's travel…
         assertClose(expected = 600f, actual = panelDragOffsetPx(currentPx = 580f, deltaPx = 200f, travelPx = 600f))
         assertClose(expected = 600f, actual = panelDragOffsetPx(currentPx = 600f, deltaPx = 10f, travelPx = 600f))
-        // …and never upward: pulling up at any amount leaves the panel where it is.
+        // …and never above rest: dragging back up raises the panel again, and a
+        // 25px upward movement from a 30px offset leaves 5px, not a negative one.
         assertClose(expected = 0f, actual = panelDragOffsetPx(currentPx = 0f, deltaPx = -50f, travelPx = 600f))
-        assertClose(expected = 30f, actual = panelDragOffsetPx(currentPx = 30f, deltaPx = -25f, travelPx = 600f))
+        assertClose(expected = 5f, actual = panelDragOffsetPx(currentPx = 30f, deltaPx = -25f, travelPx = 600f))
+        assertClose(expected = 0f, actual = panelDragOffsetPx(currentPx = 30f, deltaPx = -60f, travelPx = 600f))
     }
 
     @Test
-    fun degenerateTravelAndGarbageInputsCollapseToARestingPanel() {
+    fun aDroppedFrameKeepsTheOffsetInsteadOfInventingMovement() {
+        assertClose(
+            expected = 50f,
+            actual = panelDragOffsetPx(currentPx = 50f, deltaPx = Float.NaN, travelPx = 600f),
+            message = "a non-finite delta is ignored for that frame",
+        )
+    }
+
+    @Test
+    fun anUnmeasurablePanelCannotBeDraggedAtAll() {
         assertClose(expected = 0f, actual = panelDragOffsetPx(50f, 50f, travelPx = 0f), message = "no travel, no drag")
         assertClose(expected = 0f, actual = panelDragOffsetPx(50f, 50f, travelPx = Float.NaN))
-        assertClose(expected = 0f, actual = panelDragOffsetPx(Float.NaN, 50f, travelPx = 600f))
-        assertClose(expected = 0f, actual = panelDragOffsetPx(50f, Float.NaN, travelPx = 600f))
         assertClose(expected = 0f, actual = panelDragOffsetPx(-100f, -100f, travelPx = -600f))
+    }
+
+    @Test
+    fun aCorruptCurrentOffsetCollapsesToRestRatherThanToANaNTranslation() {
+        // `sheetDragPx` is only ever written from clamped values and animations,
+        // so this cannot happen in practice — but if it did, a NaN translation
+        // would blank the panel. Rest is the only safe answer, and the next
+        // frame's delta drags again from there.
+        assertClose(expected = 0f, actual = panelDragOffsetPx(Float.NaN, 50f, travelPx = 600f))
+        assertClose(expected = 0f, actual = panelDragOffsetPx(Float.NEGATIVE_INFINITY, 50f, travelPx = 600f))
     }
 
     /* -------- 3. the release threshold ------------------------------------ */
@@ -135,7 +156,8 @@ class PlayerPanelDragTest {
         // Travel shorter than the floor: the threshold is the travel itself, and
         // never more than it — the panel cannot demand a drag it has no room for.
         assertClose(expected = 100f, actual = panelDismissThresholdPx(100f, touchTarget))
-        assertClose(expected = 100f, actual = panelDismissThresholdPx(100f, touchTargetPx = 0f))
+        // No floor at all (never the case on a real density): the fraction governs.
+        assertClose(expected = 100f * PANEL_DISMISS_TRAVEL_FRACTION, actual = panelDismissThresholdPx(100f, touchTargetPx = 0f))
     }
 
     @Test

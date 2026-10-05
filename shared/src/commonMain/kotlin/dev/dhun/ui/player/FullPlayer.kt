@@ -1263,13 +1263,24 @@ internal fun panelDragTranslations(motion: RelatedSheetMotion, dragPx: Float): R
 
 /**
  * The panel's drag offset after a finger movement of [deltaPx] from
- * [currentPx]: downward only, and never further than the travel the panel has
- * ([travelPx]) — pulling past the bottom edge would peel the sheet off the
- * screen instead of closing it.
+ * [currentPx].
+ *
+ * Three rules, each of which a real finger will exercise:
+ * - **it follows the finger both ways, but never above rest** — dragging down
+ *   then back up returns toward 0, and the offset never goes negative (the panel
+ *   cannot be pushed higher than open);
+ * - **it stops at the panel's own travel** ([travelPx]) — pulling further down
+ *   would peel the sheet off the bottom edge instead of closing it;
+ * - **garbage collapses to rest**: an unmeasurable travel or a non-finite
+ *   current offset means there is nothing to drag from, so the answer is 0
+ *   rather than a NaN that would blank the panel's translation. A non-finite
+ *   *delta* is simply dropped for that frame.
  */
 internal fun panelDragOffsetPx(currentPx: Float, deltaPx: Float, travelPx: Float): Float {
     val travel = if (travelPx.isFinite() && travelPx > 0f) travelPx else 0f
-    val current = if (currentPx.isFinite()) currentPx.coerceIn(0f, travel) else 0f
+    if (travel == 0f) return 0f
+    if (!currentPx.isFinite()) return 0f
+    val current = currentPx.coerceIn(0f, travel)
     val delta = if (deltaPx.isFinite()) deltaPx else 0f
     return (current + delta).coerceIn(0f, travel)
 }
