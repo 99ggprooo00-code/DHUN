@@ -54,14 +54,35 @@ red on record:** none on this head — the red this PR removes is the 10-run `ms
 failure streak documented above, and the skipped check above is explicitly *not*
 a pass.
 
-**Exact next step:** merge PR #122, then verify post-merge in the same turn (CI,
-Build APK, test-release on the new `main`): expect `apk` ✅, `msi` ✅ **with the
-SKIPPED warning** (the baseline is still the draft) and **`publish` running** —
-the deadlock is gone — and the rolling `test` release back to
-`isDraft=false`/prerelease, target = the new `main` SHA, with all four fresh
-assets. Then one more `main` push (the next docs commit) so the `msi` job finally
-runs the **full** install-over path against the readable baseline — expect
-`MSI upgrade smoke PASS` with the sentinels preserved and **no** skip warning.
+**Post-merge verification (done, `5e664c1f` = PR #122's merge):** CI
+**37406381107** ✅ (9/9), Build APK **37406381126** ✅, test-release
+**37406381117** ✅ — `apk` ✅, `msi` ✅ **with the SKIPPED warning** and
+**`publish` running for the first time since 2026-10-05T16:56Z**. `test` is a
+**published pre-release** again: `isDraft=false`, `isPrerelease=true`, published
+2026-10-06T02:58:13Z, target `5e664c1f…`, four fresh assets (APK 18,367,219 B
+sha256 `21a5fe86…` — byte-identical to the PR #120/#121 candidates; MSI 2.160.1,
+112,947,200 B, sha256 `74109a13…`; digests from the run's provenance notices,
+release-asset downloads EOF in-sandbox, sidecars not independently fetched).
+
+**Full install-over path (verified, PR head `a7c4fb0`, test-release
+`37407043857`):** **no skip warning**, `MSI upgrade smoke PASS::Hosted Windows:
+2.160.1 -> 2.161.1; per-user install and userdata/cache sentinels preserved.
+Baseline SHA256=74109a13…` — the baseline digest **is** the published release's
+MSI digest — plus the future-upgrade guard and uninstall smoke. `publish` is
+main-gated, so that PR run proves the check only.
+
+**Real red on record (this head):** PR CI **37407043852** failed `:shared:jvmTest`
+on `LibraryViewModelTest.historyPlaybackQueuesCorrectly`
+(`TimeoutCancellationException: Timed out waiting for 15000 ms`) while **push CI
+`37407039477` was 9/9 green on the identical SHA** — the documented flake class,
+fourth occurrence, docs-only diff. `gh run rerun` is refused; the successor
+commit is the re-trigger.
+
+**Exact next step:** merge the docs PR, then record the `main`-push run (with
+`buildOnly=false`): it must repeat the full install-over PASS with a **new** MSI
+ProductVersion/digest and `publish` replacing the release again — the release's
+four assets will move to that publish. If the skip warning reappears, check the
+release's `isDraft` state first.
 
 **Completion ledger (updated by this session):**
 - **S1:** CLOSED GREEN 2026-09-20 (daily drill restored + residential playback

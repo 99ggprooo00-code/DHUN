@@ -51,26 +51,31 @@
 > slab). Candidate APK: test-release run **37389110912**, `apk` job green —
 > `dhun-test.apk` 18,367,219 B, SHA-256
 > `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, source
-> `a9e8c9d7` (PR merge ref of head `85e73eb`). It is a **build-only artifact**:
-> download it from that run's Artifacts, not from the rolling release. CI is
-> green (PR CI **37389109897**, Build APK **37389110248**); nothing here is
-> device-verified yet. **For this retest, run steps 19–22 below and keep the
+> `a9e8c9d7` (PR merge ref of head `85e73eb`). It was a **build-only artifact**,
+> but the rolling `test` release now carries a **byte-identical** APK (same
+> 18,367,219 B, same digest — verified from the post-merge run's provenance
+> notice), so the candidate is downloadable from
+> <https://github.com/99ggprooo00-code/DHUN/releases/tag/test>. CI is green (PR CI
+> **37389109897**, Build APK **37389110248**); nothing here is device-verified
+> yet. **For this retest, run steps 19–22 below and keep the
 > steps 1–18 results you already have** (the parser is untouched).
 >
-> **MSI candidate: fixed — the rolling release is being repaired (PR #122,
-> 2026-10-06).** The `msi` job has been red in **every** test-release run since
-> 2026-10-05T16:56:46Z: the rolling `test` release is a **Draft** and the job's
-> read-scoped token cannot read it — and because `publish` has
-> `needs: [apk, msi]`, the one job that could republish the release was skipped
-> with it (run **37403248318**: `msi` failed → `publish` skipped). PR #122 makes
-> an unreadable baseline a *skip* (`MSI install-over SKIPPED` — build-verified
-> only, never a pass), so the MSI uploads and `publish` runs, and `publish` now
-> re-asserts `--draft=false` and proves `isDraft` is `false`. **After PR #122
-> merges**, the rolling release is the Windows candidate: download its
-> `dhun-test.msi` (verify the sidecar), install over your existing build, and run
-> the Windows column below. Read the `msi` job's annotations first:
-> `MSI upgrade smoke PASS` means the sentinel checks really ran;
-> `MSI install-over SKIPPED` means they did not.
+> **The rolling release carries installation files again (PR #122 merged as
+> `5e664c1`, 2026-10-06).** The `msi` job had been red in **every** test-release
+> run since 2026-10-05T16:56:46Z: the rolling `test` release was a **Draft** and
+> the job's read-scoped token cannot read one — and because `publish` has
+> `needs: [apk, msi]`, the only job that could republish the release was skipped
+> with it (run **37403248318**: `msi` failed → `publish` skipped). PR #122 grades
+> an unreadable baseline into a *skip* (`MSI install-over SKIPPED` —
+> build-verified only, never a pass) and has `publish` re-assert `--draft=false`
+> and prove `isDraft` is `false`. The post-merge run **37406381117** republished
+> `test` as a **published pre-release** (target `5e664c1`, four assets) — so the
+> Windows column below is runnable again: download `dhun-test.msi` from the
+> release, verify its `.sha256` sidecar, install over the existing build. Read the
+> `msi` job's annotations first: `MSI upgrade smoke PASS` means the sentinel
+> checks really ran; `MSI install-over SKIPPED` means they did not. (In the
+> repair run itself they did **not** — the baseline was still the draft when it
+> checked — and that skip is announced on the job.)
 
 > **Purpose.** Device-side acceptance for the `test` rolling build. The sheet
 > was written around PR #114's three defects — album artwork on playback,
@@ -130,23 +135,26 @@ Get-FileHash .\dhun-test.msi -Algorithm SHA256
 Get-Content .\dhun-test.msi.sha256
 ```
 
-**Build identity** — the rolling `test` release is **currently invisible
-(draft)** and PR #122 repairs it; the last content it served was built by
-test-release run **37343725414** (merge `885a092…`, assets uploaded
-2026-10-05T16:56:42Z, MSI ProductVersion **2.146.1**). The digests below come from
-that run's own provenance notices — the sandbox cannot download release assets
-(Azure-blob EOF), so they are **not** independently re-verified here. After
-PR #122's post-merge publish, take the digests from that run's notices/sidecars —
-**the MSI hash changes on every publish** (its ProductVersion counter advances).
+**Build identity** — rolling `test` is a **published pre-release** again:
+published **2026-10-06T02:58:13Z**, target
+**`5e664c1f57fb7d2b55de7f016fe2df60db7f196e`** (merge of PR #122), assets uploaded
+02:58:10Z, MSI ProductVersion **2.160.1**. The digests below come from that run's
+provenance notices (test-release **37406381117**) — the sandbox cannot download
+release assets (Azure-blob EOF), so they are **not** independently re-verified
+here; verify your own download against the release `.sha256` sidecar. **The MSI
+hash changes on every publish** (its ProductVersion counter advances); the APK
+hash does not unless the app code changes.
 
-| Asset | Bytes | SHA-256 (from run 37343725414's provenance notices) |
+| Asset | Bytes | SHA-256 (from run 37406381117's provenance notices) |
 |---|---:|---|
-| `dhun-test.apk` | 18,367,219 | `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458` |
-| `dhun-test.msi` | 112,934,912 | `b569e769917840f4ea2c1d6814f950b03197295ed28becf1fdb6ca8c2d3bc650` (2.146.1) |
+| `dhun-test.apk` | 18,367,219 | `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` |
+| `dhun-test.msi` | 112,947,200 | `74109a1359d2b7388930bf69e8d35c012331f3c8baf2f41f856cc7fe8b57d6c6` (2.160.1) |
 
-The APK digest equals the PR #120 candidate's: that rebuild was byte-identical,
-which is why the same value recurs across heads. It is evidence of reproducibility,
-not of a new build.
+The APK digest equals the PR #120 candidate's `c351341e…` **and** the PR #121
+candidate's `21a5fe86…`: those heads' only deltas were docs and CI scripts, so the
+APK rebuilt byte-identically — that is reproducibility evidence, and it means the
+release APK is the same bytes as the retest candidate. The MSI digest is new
+every publish.
 
 The values previously shown here — APK
 `8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` and MSI

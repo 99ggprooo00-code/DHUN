@@ -55,6 +55,29 @@ the PowerShell parse (push CI **37405077637**, PR CI **37405088698**, Build APK
 `buildOnly=true`) — the exact behaviour the fix intends, and the reason that run
 must never be quoted as an upgrade pass.
 
+**Post-merge outcome (merged as `5e664c1f`).** CI **37406381107**, Build APK
+**37406381126**, test-release **37406381117** — all green. The `msi` job skipped
+again (the baseline was still the draft at check time, announced on the job) and
+**`publish` ran** for the first time since 2026-10-05T16:56Z, deleting and
+recreating `test` as a **published pre-release**: `isDraft=false`,
+`isPrerelease=true`, published 2026-10-06T02:58:13Z, target `5e664c1f…`, four
+assets (APK 18,367,219 B `21a5fe86…`; MSI 2.160.1 112,947,200 B `74109a13…`).
+That closes the outage. The **full** install-over path then ran for real on the
+PR head `a7c4fb0` (test-release **37407043857**, `buildOnly=true`): **no skip**,
+`MSI upgrade smoke PASS::Hosted Windows: 2.160.1 -> 2.161.1` with both sentinels
+preserved, baseline SHA256 `74109a13…` — exactly the published release's MSI
+digest — plus the future-upgrade guard and the uninstall smoke.
+
+**One red to keep on record, and it is not this diff:** PR CI **37407043852** on
+the same head failed `:shared:jvmTest` on
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly`
+(`TimeoutCancellationException: Timed out waiting for 15000 ms`,
+`LibraryViewModelTest.kt:82`) while **push CI `37407039477` was 9/9 green on the
+identical SHA**. That is the known flaky-test class documented in
+`KNOWN_LIMITATIONS.md` (fourth occurrence; `gh run rerun` is refused, so a
+successor commit is the re-trigger). Merge basis: the identical-SHA green push
+CI plus the documented flake, not a retry-until-green.
+
 ## 2026-10-06 — sandbox trap: the checkout's `.git` is reverted between turns (`arena/cf4e91ba-dhun`)
 
 **Symptom.** Twice in this session the workspace came back with `HEAD` at the

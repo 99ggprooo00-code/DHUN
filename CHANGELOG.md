@@ -64,13 +64,33 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   be able to mutate a release.
 - New contract tests in `scripts/test_build_workflow.py` (31 total): the publish
   re-assert, and "an unreadable baseline skips — and the skip is never a pass".
-- **Verified on CI (code head `6a6dd83`):** all 9 CI steps green, including
-  `PowerShell packaging helper syntax` — the first parse of the `.ps1` change
-  (push CI **37405077637**, PR CI **37405088698**; Build APK **37405088832**).
-  `test-release` **37405088686** exercises the skip path for real: the `msi` job
-  is green **with** `MSI install-over SKIPPED` and the staged 2.158.1 MSI is
-  build-verified only — an announced skip, explicitly not a pass. The post-merge
-  runs and the repaired release's digests are recorded in
+- **Verified on CI (code head `6a6dd83`, merged as `5e664c1f`):** all 9 CI steps
+  green, including `PowerShell packaging helper syntax` — the first parse of the
+  `.ps1` change (push CI **37405077637**, PR CI **37405088698**; Build APK
+  **37405088832**). `test-release` **37405088686** exercises the skip path for
+  real: the `msi` job is green **with** `MSI install-over SKIPPED` and the staged
+  2.158.1 MSI is build-verified only — an announced skip, explicitly not a pass.
+- **Post-merge verified:** CI **37406381107**, Build APK **37406381126** and
+  test-release **37406381117** are green on `5e664c1f`. In that run the `msi` job
+  skipped (announced — the baseline was still the draft when it checked) and
+  **`publish` ran for the first time since 2026-10-05T16:56Z**, leaving `test` a
+  **published pre-release** again: `isDraft=false`, `isPrerelease=true`, published
+  2026-10-06T02:58:13Z, target `5e664c1f…`, all four assets (APK 18,367,219 B,
+  sha256 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
+  2.160.1, 112,947,200 B, sha256
+  `74109a1359d2b7388930bf69e8d35c012331f3c8baf2f41f856cc7fe8b57d6c6` — both from
+  the run's provenance notices; release-asset downloads EOF in-sandbox, so the
+  sidecars were not independently fetched).
+- **First full install-over run after the repair** — `test-release`
+  **37407043857** (PR, `buildOnly=true`, head `a7c4fb0`): **no skip**, and the
+  check passed against the now-readable published baseline:
+  `MSI upgrade smoke PASS::Hosted Windows: 2.160.1 -> 2.161.1; per-user install
+  and userdata/cache sentinels preserved. Baseline SHA256=74109a1359d2b738…`
+  — that baseline digest **is** the published release's MSI digest, so the check
+  really did upgrade *the release's* build. The future-upgrade guard and the
+  uninstall smoke also passed in the same run. `publish` stays main-gated, so
+  this run proves the check only; the `main`-push equivalents (with
+  `buildOnly=false` and the publish) are recorded in
   `.ai/HANDOFF_NEXT_SESSION.md`.
 
 ### Changed — the Full Player playlist picker and queue panel (2026-10-06, PR #121)

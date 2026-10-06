@@ -23,6 +23,13 @@ Updated every phase. Nothing hidden.
   (no `pwsh` in the development sandbox); CI is its first and only parse.
 - **Still open from PR #121 (unchanged):** the picker/panel/`DhunTextField`
   surfaces are live on `main` without the device retest of gate steps 19–22.
+- **Post-merge status (2026-10-06, `5e664c1f`):** the deadlock is closed — run
+  **37406381117** republished `test` as a published pre-release
+  (`isDraft=false`, target `5e664c1f…`, four assets; APK 18,367,219 B
+  `21a5fe86…`, MSI 2.160.1 112,947,200 B `74109a13…` from the run's provenance
+  notices). The **first** full install-over run against the readable baseline is
+  the next `main` push; until a run reports `MSI upgrade smoke PASS` (and no skip
+  warning), the Windows upgrade column has no fresh CI evidence.
 
 ## 2026-10-06 — the playlist picker / queue-panel fixes are CI-green but not yet seen on a device (session `arena/cf4e91ba-dhun`, PR #121)
 
@@ -69,6 +76,16 @@ Updated every phase. Nothing hidden.
   diff, and **not** repaired here — do not read a green PR run as proof that it
   is gone. `gh run rerun` is refused on these branch runs, so a successor commit
   is the only way to re-trigger (and it may flake again).
+- **Fourth occurrence, and it hit this session's docs head (2026-10-06, head
+  `a7c4fb0`, PR #123):** PR CI **37407043852** failed `:shared:jvmTest` on
+  `LibraryViewModelTest.historyPlaybackQueuesCorrectly` —
+  `kotlinx.coroutines.TimeoutCancellationException: Timed out waiting for
+  15000 ms` (`LibraryViewModelTest.kt:82`) — while **push CI `37407039477` was
+  9/9 green on the identical SHA** (same one-head-two-verdicts pattern; the same
+  test timed out before, in `37320618809`). The diff was docs-only. `gh run
+  rerun 37407043852 --failed` is refused ("run … cannot be rerun; its workflow
+  file may be broken"), so the re-trigger is the successor commit — recorded,
+  not hidden.
 
 ## 2026-10-05 — S3 hardware round 1 report (partial; identity incomplete)
 
