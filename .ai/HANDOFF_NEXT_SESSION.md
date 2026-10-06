@@ -21,11 +21,12 @@ contain these fixes.
 
 **Green CI after the fix:** PR CI **37389109897**, push CI **37389105839** (all
 9 steps, including `:shared:jvmTest` with the two new suites), Build APK
-**37389110248**. Docs heads followed (`37390026600`/`37390030215`/`37390030691`,
-then `37390996715`/`37391002255`/`37391002430`). **Final head `83ea001`**:
-push CI **37392433619**, PR CI **37392436952** (9/9 each), Build APK
-**37392437020**, test-release **37392436941** (`apk` green; `msi` red as below).
-The flake on the intermediate head `e837d30` did not recur on `83ea001`. **Real red on record:** PR CI **37388855101** failed on three
+**37389110248**. Docs heads followed (`37390026600`/`37390030215`/`37390030691`, then
+`37390996715`/`37391002255`/`37391002430`, then `37392433619`/`37392436952`/
+`37392437020`). **Head at the time of writing `332704d`** (docs-comment tail):
+push CI **37398610382**, PR CI **37398614025** (9/9 each), Build APK
+**37398613949**, test-release **37398613971** (`apk` green; `msi` red as below).
+The flake on the intermediate head `e837d30` did not recur on the later heads. **Real red on record:** PR CI **37388855101** failed on three
 `PlayerPanelDragTest` assertions (two wrong expectations + one helper
 inconsistency); fixed in `85e73eb`.
 
@@ -38,8 +39,9 @@ the same SHA — the endless-radio probe race, second time on a docs-only head
 (see `KNOWN_LIMITATIONS.md` / `DEBUG_LOG.md`). Not caused by this diff and not
 fixed here; do not read a green PR run as proof it is gone.
 
-**Candidate APK digest is stable:** the docs-only deltas rebuilt to a
-byte-identical APK — every test-release run since `85e73eb` reports
+**Candidate APK digest is stable:** the docs-only deltas (including the
+docs-comment tail `332704d`) rebuilt to a byte-identical APK — every
+test-release run since `85e73eb` reports
 `dhun-test.apk` 18,367,219 B, SHA-256
 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, just with a
 new `source` merge ref (`a9e8c9d7` → `e9e0d178` → `5a2130d1`). Latest: run
