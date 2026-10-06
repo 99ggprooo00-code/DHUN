@@ -21,18 +21,39 @@ contain these fixes.
 
 **Green CI after the fix:** PR CI **37389109897**, push CI **37389105839** (all
 9 steps, including `:shared:jvmTest` with the two new suites), Build APK
-**37389110248**. **Real red on record:** PR CI **37388855101** failed on three
+**37389110248**. Then the docs heads: push CI **37390026600**, PR CI
+**37390030215**, Build APK **37390030691**, and the final docs head `f0e58df` →
+push CI **37390996715**, PR CI **37391002255**, Build APK **37391002430** (9/9
+each). **Real red on record:** PR CI **37388855101** failed on three
 `PlayerPanelDragTest` assertions (two wrong expectations + one helper
 inconsistency); fixed in `85e73eb`.
 
-**Open on this PR — the MSI job:** test-release **37389110912**'s `msi` job
-failed at "Check install-over and userdata on disposable Windows" because
-`check_msi_upgrade.ps1` could not download the rolling `test` baseline
-(`gh release download test …` → non-zero). The installer built (2.148.1,
-SHA-256 `4687747496a20eeb2efbdbdb08ef436bec9f694546588049e58921fb449efe32`) but
-no `msi` artifact was uploaded, so the **Windows retest of these fixes needs a
-green MSI job** (re-run by the docs commit; if it reproduces it is an infra
-download failure, not this diff).
+**Candidate APK digest is stable:** the docs-only deltas rebuilt to a
+byte-identical APK — every test-release run since `85e73eb` reports
+`dhun-test.apk` 18,367,219 B, SHA-256
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, just with a
+new `source` merge ref (`a9e8c9d7` → `e9e0d178` → `5a2130d1`). Latest: run
+**37391002169**, `apk` job green (artifact `apk`, 17,561,449 B). Take it from the
+run's Artifacts — the rolling release does **not** carry these fixes.
+
+**Open on this PR — the MSI job (diagnosed, third reproduction):** every
+test-release run fails `msi` at "Check install-over and userdata on disposable
+Windows", where `check_msi_upgrade.ps1:40` cannot download the rolling `test`
+baseline. **Cause: the rolling `test` release is currently a Draft**
+(`draft=true`, `published 2026-10-05T16:56:46Z`) and the job's `contents: read`
+token cannot read a draft release. The workflow never drafts `test` — the file
+at `885a092` is byte-identical to this branch's, it creates the release with
+`--prerelease`, only the v0.1.0 `release_draft` job uses `--draft`, and the repo
+event feed holds exactly one `ReleaseEvent published tag=test` (16:56:46Z) — so
+the flag was set out of band after that publish. Proof: the same step **passed**
+at 16:55:24Z in push run **37343725414** against the previous, *published*
+baseline. A branch run cannot repair it (the `publish` job is main-gated), and
+this session did not touch release state. The installer itself builds and stages
+(2.149.1, SHA-256
+`6e34042319feed49d4bc9f4f64bd9dc5950774de7b781d12bbdf65252dd1fdf2`) — it is just
+never uploaded. **The Windows retest of these fixes therefore has no candidate
+until the rolling release is published again**; expect the post-merge run's `msi`
+job to stay red until then.
 
 **What to retest (gate `docs/verification/15-test-build-gate.md` §3 "Fix 4"):**
 - Step 19 — ⋮ → Add to playlist: compact frosted family, content-sized list, no
