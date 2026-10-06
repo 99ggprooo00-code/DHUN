@@ -136,28 +136,33 @@ Get-FileHash .\dhun-test.msi -Algorithm SHA256
 Get-Content .\dhun-test.msi.sha256
 ```
 
-**Build identity** — rolling `test` is a **published pre-release**:
-published **2026-10-06T03:20:40Z**, target
-**`a9204c59fdc2a44e132ad903df2d556e9c63530c`**, assets uploaded 03:20:35Z, MSI
-ProductVersion **2.163.1** (test-release **37408148220**, the first `main` push
-after the repair — its `msi` job ran the **full** install-over check with no
-skip). The digests below come from that run's provenance notices — the sandbox
-cannot download release assets (Azure-blob EOF), so they are **not**
-independently re-verified here; verify your own download against the release
-`.sha256` sidecar. **The release is replaced on every `main` push and the MSI hash
-moves with it** (its ProductVersion counter advances); the APK hash moves only
-when the app code changes.
+**Build identity** — rolling `test` is a **published pre-release**. The publish
+this sheet was last written against: **2026-10-06T03:36:23Z**, target
+**`cdedc93cde5b695774b4334e61522e4d7e285e90`**, assets uploaded 03:36:17Z, MSI
+ProductVersion **2.166.1** (test-release **37409397281**, whose `msi` job ran the
+**full** install-over check with no skip). The digests below come from that run's
+provenance notices — the sandbox cannot download release assets (Azure-blob EOF),
+so they are **not** independently re-verified here.
 
-| Asset | Bytes | SHA-256 (from run 37408148220's provenance notices) |
+> **The `.sha256` sidecar on the release is authoritative — not this table.** The
+> `test` tag is replaced on **every** `main` push, and each publish advances the
+> MSI ProductVersion and therefore the MSI digest (the APK digest moves only when
+> app code changes). If the sidecar names a **newer** ProductVersion than the one
+> below, you are simply looking at a newer publish: take the sidecar's value, note
+> the version you tested, and continue. Only a mismatch **at the same
+> ProductVersion** is the stop condition in step 1.
+
+| Asset | Bytes | SHA-256 (from run 37409397281's provenance notices) |
 |---|---:|---|
 | `dhun-test.apk` | 18,367,219 | `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` |
-| `dhun-test.msi` | 112,947,200 | `12745f81394a357c266c8453903e70aa78c2f7b29450d97e5c8348dfc45f5f8e` (2.163.1) |
+| `dhun-test.msi` | 112,947,200 | `070efac6ad75e30a20a091c39ff3468a80ea50ce097832ab5f170af548c81c56` (2.166.1) |
 
-The APK digest equals the PR #120 candidate's `c351341e…` **and** the PR #121
-candidate's `21a5fe86…`: those heads' only deltas were docs and CI scripts, so the
-APK rebuilt byte-identically — that is reproducibility evidence, and it means the
-release APK is the same bytes as the retest candidate. The MSI digest is new
-every publish.
+The APK digest matches the PR #121 retest candidate and the PR #120 candidate
+before it: those heads' only deltas were docs and CI scripts, so the APK rebuilt
+byte-identically — that is reproducibility evidence, and it means the release APK
+is the same bytes as the candidate steps 19–22 were written for. The MSI digest is
+new on every publish (2.146.1 → 2.160.1 → 2.163.1 → 2.166.1 across this session's
+publishes).
 
 The values previously shown here — APK
 `8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` and MSI
