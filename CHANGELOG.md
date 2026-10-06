@@ -25,6 +25,33 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 ## [Unreleased]
 
 
+### Testing — the two recurring shared-test flakes are root-caused (2026-10-06, PR #125)
+
+No user-visible change; test infrastructure only.
+
+- `LibraryViewModelTest.historyPlaybackQueuesCorrectly` (runs 35309124090,
+  37320618809, 37407043852) waited for `historyEntries` and then read the
+  **asynchronously derived** `groupedHistory`; when it was still empty the
+  `if (day != null)` guard silently skipped the day-play block, which made the
+  following `prepareCalls >= 2` wait unsatisfiable — a benign race turned into
+  a guaranteed 15 s timeout. The derived state is now waited for, the day-play
+  path is unconditional, and the test pins that the day path queued the day's
+  own tracks.
+- `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+  (run 37320626452, `expected:<tok-2> but was:<tok-a>`) read the continuation
+  token in the gap between the queue swap and the token consumption;
+  `RadioFixture.awaitContinuationToken(token)` waits for the consumption, and
+  the three sibling radio tests use it too.
+- Both files' `eventually` helpers now take a `label` (evaluated only on
+  expiry) and fail through `kotlin.test.fail`, so the only CI readout this
+  project can access — the check-run annotation — names the wait and the state
+  it was stuck on instead of printing `Timed out waiting for 15000 ms`.
+- Evidence: push CI **37408908111** (12/12 steps on `df0504f`), PR CI
+  **37408920918**, Build APK **37408921035**, test-release **37408920959**;
+  `docs/verification/16-ci-flake-hygiene.md`. Green CI proves the known-bad
+  interleavings are gone — **not** that races can never recur; repetition
+  across the next unrelated PRs is the acceptance.
+
 ### Fixed — a draft rolling release can no longer wedge the test release (2026-10-06, PR #122)
 
 - **The state that triggered it:** the rolling `test` release is a **Draft**

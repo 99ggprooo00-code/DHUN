@@ -27,11 +27,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 class PlayerViewModelTest {
 
@@ -145,8 +146,40 @@ class PlayerViewModelTest {
         override suspend fun playlistPage(browseId: String): DhunResult<PlaylistDetail> = DhunResult.Failure(DhunError.Unavailable())
     }
 
-    private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {
-        withTimeout(timeoutMs) { while (!check()) delay(10) }
+    /**
+     * Async assertion deadline (the 15 s default's history is documented in
+     * `LibraryViewModelTest.eventually` — 5 s was too tight under GitHub
+     * Actions load). [label] is evaluated only on expiry so the failure names
+     * the wait and the state it was stuck on; the check-run annotation is the
+     * only CI readout available to this project.
+     */
+    private suspend fun eventually(
+        timeoutMs: Long = 15_000,
+        label: () -> String = { "unlabelled wait" },
+        check: suspend () -> Boolean,
+    ) {
+        val satisfied = withTimeoutOrNull(timeoutMs) {
+            while (!check()) delay(10)
+            true
+        } ?: false
+        if (!satisfied) fail("eventually(${timeoutMs}ms) timed out: ${label()}")
+    }
+
+    /**
+     * Waits for the station chain to advance to [token].
+     *
+     * A refill publishes two facts, in this order: the swapped queue, then the
+     * consumption of the page's continuation token. These tests poll for the
+     * queue, so reading `radioSession.continuationToken` the instant the queue
+     * matched could observe the *pre-advance* token — exactly the documented
+     * flake `expected:<tok-2> but was:<tok-a>` (run 37320626452). Waiting for
+     * the consumption is the same assertion, just not racing it.
+     */
+    private suspend fun RadioFixture.awaitContinuationToken(token: String) {
+        eventually(label = {
+            "continuationToken == $token (was ${vm.radioSession.continuationToken}, " +
+                "continuationCalls=${provider.continuationCalls})"
+        }) { vm.radioSession.continuationToken == token }
     }
 
     private fun newVm(
@@ -438,7 +471,7 @@ class PlayerViewModelTest {
             // The refill walked the CONTINUATION chain (not a re-seed) and
             // consumed the page's next token.
             assertEquals(listOf("tok-a"), fixture.provider.continuationCalls)
-            assertEquals("tok-2", fixture.vm.radioSession.continuationToken)
+            fixture.awaitContinuationToken("tok-2")
         } finally {
             scope.cancel()
         }
@@ -514,7 +547,7 @@ class PlayerViewModelTest {
             // the live queue. Pre-fix the stale page was applied at once
             // and the chain advanced after a single call.
             assertEquals(listOf("tok-a", "tok-a"), fixture.provider.continuationCalls)
-            assertEquals("tok-2", fixture.vm.radioSession.continuationToken)
+            fixture.awaitContinuationToken("tok-2")
             assertEquals("r3", fixture.player.currentTrack.value?.id)
             assertTrue(fixture.player.seeks.isEmpty(), "no seek may happen — never restart")
         } finally {
@@ -552,7 +585,7 @@ class PlayerViewModelTest {
             // out of the refilled tail — no self-replay), and the page's
             // token now chains the station.
             assertTrue("r4" in fixture.provider.radioPageCalls, "re-seed must target the playing track")
-            assertEquals("tok-s", fixture.vm.radioSession.continuationToken)
+            fixture.awaitContinuationToken("tok-s")
         } finally {
             scope.cancel()
         }
@@ -598,7 +631,7 @@ class PlayerViewModelTest {
                 "expected the failure, the retry, and at most one guard probe, got ${fixture.provider.continuationCalls}",
             )
             assertEquals(listOf("tok-a", "tok-a"), fixture.provider.continuationCalls.take(2))
-            assertEquals("tok-2", fixture.vm.radioSession.continuationToken)
+            fixture.awaitContinuationToken("tok-2")
         } finally {
             scope.cancel()
         }

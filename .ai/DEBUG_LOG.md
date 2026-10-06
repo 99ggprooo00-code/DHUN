@@ -1,5 +1,87 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-06 — the two recurring shared-test flakes, root-caused at last: a test waited for one state and read its sibling (session `arena/cf69112a-dhun`, base `main@a9204c59`, PR #125, commit `df0504f`)
+
+**Why this lane, this session.** Boot found the S3 hardware round still
+user-gated (no device in the sandbox) while two flakes kept turning unrelated
+docs/service PRs red and burning whole runs. They had been carried as
+"known flake class — load/timing" since 2026-09-18, with a 5 s → 15 s timeout
+bump as the only mitigation. That bump made failures *slower*, not rarer,
+which was the clue: the symptom was a **timeout that could never succeed**,
+not a slow flow.
+
+**The class.** Both flakes are the same defect: a test `eventually`-waits for
+one piece of state, then immediately reads a *sibling* piece that the
+production code publishes as a **separate step**. Neither is a product bug —
+the end state is always reached; the tests just refused to wait for it.
+
+**Flake 1 — `LibraryViewModelTest.historyPlaybackQueuesCorrectly`**
+(runs **37320618809**, **37407043852**, and push CI **35309124090** on
+2026-09-18):
+- `LibraryViewModel.groupedHistory` is **derived asynchronously** — a
+  `scope.launch { combine(historyEntries, _offsetMs).collect { _groupedHistory
+  .value = it } }` (`LibraryViewModel.kt:281-285`). `eventually {
+  vm.historyEntries.value.size == 3 }` therefore returned while the derived
+  flow could still hold its **initial `emptyList()`**.
+- The test then did `val day = vm.groupedHistory.value.firstOrNull()` and
+  `if (day != null) { vm.playHistoryDay(...) ... }` — a **silent skip**. And
+  because `playHistoryEntry` (below it) queues the whole visible history with
+  exactly **one** `prepareQueue` call, the following
+  `eventually { player.prepareCalls >= 2 }` could **never** be satisfied once
+  the day-play was skipped.
+- Net effect: a coin-flip scheduler race became a **guaranteed 15 s timeout**
+  — which is exactly why it looked like a load flake and why raising the
+  timeout only moved the failure later. Same-SHA green/red splits
+  (`37407039477` push green vs `37407043852` PR red) are the expected shape.
+- **Fix (`df0504f`):** wait for the derived state (labelled), then read
+  `first()` unconditionally — the day-play path is now mandatory coverage, and
+  the test additionally pins `day.entries.size == player.lastPrepared.size`
+  (the single-entry path queues all history, so this distinguishes which path
+  ran). The `if (day != null)` guard existed only to dodge the race.
+
+**Flake 2 — `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`**
+(run **37320626452**):
+- `ComparisonFailure: expected:<tok-2> but was:<tok-a>` at
+  `PlayerViewModelTest.kt:517`. A refill publishes **two facts in sequence**:
+  the swapped queue, then the consumption of the page's continuation token.
+  The test polled the queue and read `radioSession.continuationToken` inside
+  that gap, so it sometimes observed the *pre-advance* token.
+- **Fix (`df0504f`):** `RadioFixture.awaitContinuationToken(token)` waits for
+  the consumption itself — the same assertion, just not racing it. Applied
+  also to the three siblings that read an advanced token after a queue wait
+  (`endlessRadioReplacesTailWhenSongsRunLow`,
+  `endlessRadioReseedsWhenTheTokenIsGone`,
+  `endlessRadioLeavesQueueAloneWhenRefillFails`).
+
+**Diagnostics — the durable half.** `LibraryViewModelTest` and
+`PlayerViewModelTest` now have
+`eventually(timeoutMs, label: () -> String, check)`, where the label is
+evaluated **only on expiry** and the failure goes through `kotlin.test.fail`.
+The check-run annotation (the only CI readout this sandbox can reach — job
+logs/blobs are not downloadable, see the `build.gradle.kts` test listener)
+now reads
+`eventually(15000ms) timed out: playHistoryEntry to prepare a second queue
+(calls=1, lastPrepared=0)` instead of a bare
+`Timed out waiting for 15000 ms`. The stack frame still points at the helper,
+which is precisely why the message has to carry the identity and the state.
+
+**Verification (GitHub, not local).** Push CI **37408908111** on `df0504f`:
+**12/12 steps success**, including `Unit tests — shared domain` (the edited
+files compiled and executed) with the Android Robolectric and Desktop JVM
+suites green beside it. PR CI **37408920918**, Build APK **37408921035**,
+test-release **37408920959** — all green, same head. Local, JDK-free gates:
+`python3 -m unittest discover -s scripts` **31 OK**,
+`scripts/validate_fixtures.py` **PASS: 39 files**, plus a string/comment-aware
+delimiter check on both edited files against untouched controls.
+
+**Honesty boundary.** Green CI **cannot prove the absence of a race**. What is
+proven: the known-bad interleaving is gone, a silently-skipped coverage path
+is now mandatory, and a recurrence will name the exact wait and the state it
+was stuck on. The other four `eventually` copies (`BrowseViewModelTest`,
+`HomeViewModelTest`, `LibraryDownloadsViewModelTest`, `SearchViewModelTest`)
+still time out with the bare message — deliberately untouched this session
+(blast radius), recorded in `KNOWN_LIMITATIONS.md`.
+
 ## 2026-10-06 — the `msi` job wedged the rolling release: a Draft baseline + `needs: [apk, msi]` (session `arena/95fb0f92-dhun`, base `main@5c8bd67`, PR #122)
 
 **Symptom.** Every test-release run after 2026-10-05T16:56:46Z is red: the `msi`
