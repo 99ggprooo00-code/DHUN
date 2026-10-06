@@ -1,5 +1,149 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-06 — sandbox trap: the checkout's `.git` is reverted between turns (`arena/cf4e91ba-dhun`)
+
+**Symptom.** Twice in this session the workspace came back with `HEAD` at the
+original shallow merge commit (`885a092`) and the branch refs as they were before
+any of this session's commits — while the *worktree* files still held the full
+edits. `git log` showed only `885a092`; `git cat-file -t <session commit>` said
+"Not a valid object name".
+
+**What it is.** The sandbox snapshots the worktree but not the local `.git`
+(`.git/config` is excluded from snapshots by design, and this environment also
+appears to restore the base clone). The remote branch was never affected —
+every commit had been pushed.
+
+**What to do.** Treat `origin/<branch>` as the source of truth. To re-attach:
+`git fetch --depth=50 origin <branch>`, `git add -A`, confirm
+`git diff --cached origin/<branch>` is **empty** (that is the proof the worktree
+still matches the pushed head before the ref moves), then
+`git checkout -B <branch> origin/<branch>`. Do **not** assume local commits
+survive a turn boundary, and do not `git reset`/re-clone.
+
+## 2026-10-06 — Full Player's two "old interface" surfaces: the playlist picker and the queue panel's missing swipe (session `arena/cf4e91ba-dhun`, base `main@885a092`, PR #121)
+
+**Report** (user, on the digest-verified PR #120 candidate, Android 15
+`SQ3A.240829.003`; the artwork parsing was confirmed working and is untouched):
+1. Full Player → ⋮ → **Add to playlist** — "still shows the old Material 3
+   interface", plus "an unusually long/oversized box".
+2. Full Player → ≡♪ → **Queue/Related** — "still shows the old interface", and
+   "swiping down to close/toggle the panel does not work as expected".
+
+**Root causes — measured against the code, not guessed.**
+- The picker was the last old-Material surface left in the app: a `GlassCard` at
+  280–400dp with double padding, an M3 `titleLarge` header, a **fixed
+  `dialogListHeight` (180dp) `LazyColumn`** — a mostly empty slab for one or two
+  playlists — an M3 `OutlinedTextField` (56dp of Material chrome with a floating
+  label), and an M3 Close/Cancel row.
+- The panel had **no drag detector anywhere**: `QueueSheetHeader` had no
+  `pointerInput`, so the grab pill was pure decoration; and while the panel is
+  open the player's queue glyph is hidden with the action row it lives in
+  (`actionRowVisible = false` → `alpha 0` + `disabled`), so the only exits were
+  the ✕ and Back. Its surface was also the retired near-black `GlassBottomBar`
+  recipe (`glassBarTop` → `glassStrong`, no artwork) — the one surface left
+  outside the artwork-veiled family the dock, ⋮ menus, dialogs and page
+  backdrops had moved to.
+
+**Fixes.**
+- `AddToPlaylistDialog` rebuilt on the shared menu pieces: `TrackMenuSurface` +
+  `TrackMenuHeader` + `MenuActionRow` (name, "N tracks" supporting line, trailing
+  "Open"), `AddToPlaylistPolicy.listMaxHeight` (content-sized, ≤4 rows, never
+  above the old 180dp box) and `DhunTextField` instead of M3's outlined field.
+  Callbacks, create-and-add flow, blank-name error and dismissal unchanged.
+- `MenuActionRow` gained `supportingText` + `trailingLabel`/`onTrailingClick`; a
+  plain menu row keeps the exact fixed 44dp height it had.
+- New `design/components/DhunTextField.kt`; new `LyricsArtworkSheet` (opaque
+  base + elevation + lyrics veil over the track's blurred artwork), which the
+  panel now paints. `GlassBottomBar` had no call sites left and was deleted.
+- Panel drag: `detectVerticalDragGestures` on the header strip →
+  `panelDragOffsetPx` (follows the finger, clamped `[0, travel]`, a non-finite
+  current offset collapses to rest) → `panelDragTranslations(motion, drag)` adds
+  the same pixels to the sheet's **and** the player's offsets, so the measured
+  seam stays closed; release commits past `panelDismissThresholdPx`
+  (0.28 × travel, floored at one touch target, capped at travel) through
+  `shouldDismissPanel`, otherwise a fast tween snaps the offset back to 0.
+  `rememberUpdatedState` keeps the gesture coroutine's callbacks (and its frozen
+  `travelPx`) current.
+- Same defect class, fixed alongside: `CreatePlaylistDialog`, `RenameDialog`,
+  `DeleteSelectedConfirmDialog`, the clear-downloads and clear-history dialogs
+  drop `OutlinedTextField` for `DhunTextField`, and all six dialog `GlassCard`s
+  pass `opaqueBase = true` — the rule GlassCard's own KDoc states for dialogs.
+
+**First red, and what it was (real CI, not a guess).** PR CI **37388855101**
+failed in `:shared:jvmTest` on three `PlayerPanelDragTest` assertions
+("expected 30.0, got 5.0"; "expected 100.0, got 28.0"; "expected 0.0, got 50.0").
+Two were wrong test expectations and one was a helper inconsistency: an upward
+delta must follow the finger back toward rest (clamped at 0) rather than be
+ignored; a dismissal threshold with no touch-target floor is governed by the
+0.28 fraction; and a non-finite *current* offset must collapse to rest in
+`panelDragOffsetPx` instead of being treated as 0 and then advanced by the
+frame's delta (a NaN translation would blank the panel). Fixed in `85e73eb`.
+
+**Push-CI flake on the last docs head (recorded, not hidden).** The final
+docs-only commit `e837d30` touched `.ai/HANDOFF_NEXT_SESSION.md` and nothing else.
+Its **push** CI **37391667937** went red in step 6 (`:shared:jvmTest`) on
+`PlayerViewModelTest.kt:517`
+`endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch` —
+`expected:<tok-2> but was:<tok-a>` — while its **PR** CI **37391672515** passed
+9/9 on the *same SHA*. This is the endless-radio probe race family (see the
+2026-09-28 entry) and it is the second time this exact test has flaked on a
+docs-only head (the first was run 37320626452). It is not attributable to this
+diff — docs only, same-SHA PR CI green — and it is **not** claimed fixed here.
+`gh run rerun` is refused for these runs in the sandbox ("cannot be rerun; its
+workflow file may be broken"), so the successor docs commit is what re-triggers
+CI. A future session that touches the radio probe logic should treat this test's
+timing as unproven.
+
+**Evidence / verification posture.** No JDK and no device in the sandbox, so CI
+is the compiler and the user's device is the acceptance. Green after the fix:
+PR CI **37389109897** and push CI **37389105839** (all 9 steps, including
+`:shared:jvmTest` with the new tests), Build APK **37389110248**. Candidate APK
+(build-only artifact, **not** published): test-release run **37389110912**,
+`apk` job green — `dhun-test.apk` 18,367,219 B, SHA-256
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, source =
+PR merge ref `a9e8c9d7` of head `85e73eb`. The same run's `msi` job **failed at
+"Check install-over and userdata on disposable Windows"**: `check_msi_upgrade.ps1`
+could not download the rolling `test` baseline (`gh release download test …`
+→ non-zero), so no `msi` artifact was uploaded even though the installer built
+(ProductVersion 2.148.1, SHA-256
+`4687747496a20eeb2efbdbdb08ef436bec9f694546588049e58921fb449efe32`).
+
+**Diagnosed, not hand-waved, and it reproduced.** The docs head's test-release
+run (`37390031054`) failed in exactly the same place, so this is deterministic,
+not flaky. Root cause: the rolling `test` release is currently a **Draft**
+(`draft=true`; `created 2026-10-05T16:49:03Z`, `published 2026-10-05T16:56:46Z`),
+and the `msi` job runs with `contents: read` — a draft release is not readable
+by a token without push access, so `gh release download test` fails before the
+install-over check gets a baseline. This is the documented draft-release
+behaviour, not a hunch: the REST releases docs state that *"Only users with push
+access will receive listings for draft releases"*
+(<https://docs.github.com/en/rest/releases/releases>), and the release-asset
+endpoints likewise require push access for a draft
+(<https://docs.github.com/en/rest/releases/assets>) — the `msi` job runs under
+the workflow's `contents: read`, so `gh release download test` cannot resolve a
+draft and exits non-zero. The public record matches that reading exactly: the
+same install-over step **passed** at 16:55:24Z in push run `37343725414`, when
+the tag still resolved to the previously *published* baseline (MSI 2.137.1), and
+it has failed in every run since the 16:56:46Z (re)create. An analogous real
+case — a `contents: read` verifier seeing "release not found" for a draft and
+being fixed by granting write — is `lustoykov/hallvi#199`.
+
+What is **verifiable**: the current state is `draft=true`; and no workflow in
+this repo drafts `test` (`test-release.yml` at `885a092`, the commit that ran
+it, is byte-identical to this branch's, creates the release with `--prerelease`,
+and only the `v0.1.0` `release_draft` job passes `--draft`; the event feed holds
+exactly one `published` event). What is **not** fully reconstructible is the
+history: the record's `created_at` (16:49:03Z) predates the 16:56:46Z publish
+event while that publish's assets were uploaded at 16:56:42Z, so the exact
+sequence that left the flag set is unclear from the API alone. It does not
+change the actionable fact: a read-scoped token cannot read a draft, a branch
+run cannot repair it (`publish` is gated on `refs/heads/main`), and the
+install-over gate cannot run until the rolling release is published again (or
+the job is deliberately granted `contents: write`). This session did not touch
+release state. Until then **no Windows candidate exists for this slice**, and
+the Windows half of the retest must wait. No visual or gesture acceptance is claimed here —
+see `docs/verification/15-test-build-gate.md` §3 "Fix 4".
+
 ## 2026-10-05 — S3 hardware report; build digest and UI symptoms unresolved
 
 The user returned a partial Android + Windows report for the round-1 checklist.

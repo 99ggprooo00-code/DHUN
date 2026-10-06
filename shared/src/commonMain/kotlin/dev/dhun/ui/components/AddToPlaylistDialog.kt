@@ -1,20 +1,15 @@
 package dev.dhun.ui.components
 
-import dev.dhun.design.DhunTypographyTokens
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -25,21 +20,49 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
-import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
-import dev.dhun.design.DhunIconView
-import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunButton
-import dev.dhun.design.components.DhunOutlinedButton
+import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunTextButton
-import dev.dhun.design.components.GlassCard
 import kotlinx.coroutines.launch
 
+/**
+ * Local-playlist picker for one track.
+ *
+ * **This is part of the ⋮ menu family, not a second dialog system.** It used to
+ * be the last old-Material surface left in the app: a `GlassCard` at 280–400dp
+ * with double padding, an M3 `titleLarge` header, a **fixed 180dp-tall** list box
+ * (empty space under two playlists, a scroll box for a two-row list), an M3
+ * `OutlinedTextField` for the new-playlist name, and a Close/Cancel button row —
+ * none of which matched the compact frosted menus the rest of the app moved to.
+ * The device report ("still the old Material 3 interface… an unusually
+ * long/oversized box") is that surface.
+ *
+ * What it draws now, using the shared pieces rather than new ones:
+ *
+ * - [TrackMenuSurface] — the track's own blurred artwork under the lyrics veil,
+ *   on an opaque base, sized to its content (the surface that fixed the same
+ *   stretch bug for the ⋮ menu);
+ * - [TrackMenuHeader] — the identical "which track is this" header as the ⋮
+ *   menu, so the two surfaces read as one family;
+ * - one caption line saying what this surface does, then one [MenuActionRow] per
+ *   playlist (name + track count + the "Open" breadcrumb) and an "New playlist"
+ *   row — no divider, no Close button, no M3 button row;
+ * - a **content-sized** picker list ([AddToPlaylistPolicy.listMaxHeight]): it
+ *   reserves nothing for rows that do not exist, and scrolls only past four;
+ * - a DHUN-styled single-line input instead of M3's outlined field.
+ *
+ * Behaviour is unchanged: same repository calls, same "create & add" flow, same
+ * blank-name error, same `onAdded` / `onOpenPlaylist` callbacks, and tap-outside
+ * / Back still dismisses.
+ */
 @Composable
 fun AddToPlaylistDialog(
     track: Track,
@@ -55,157 +78,162 @@ fun AddToPlaylistDialog(
     var newPlaylistName by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
 
+    val addToPlaylist: (String, String) -> Unit = { playlistId, name ->
+        scope.launch {
+            playlistRepository.addTrack(playlistId, track)
+            onAdded(name)
+            onDismiss()
+        }
+    }
+    val createAndAdd: () -> Unit = {
+        val name = newPlaylistName.trim()
+        if (name.isBlank()) {
+            errorText = "Name cannot be empty"
+        } else {
+            scope.launch {
+                val playlist = playlistRepository.create(name)
+                playlistRepository.addTrack(playlist.id, track)
+                onAdded(playlist.name)
+                onDismiss()
+            }
+        }
+    }
+
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(
+        TrackMenuSurface(
+            artworkUrl = track.thumbnailUrl,
             modifier = Modifier
-                .widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogWideMaxWidth)
-                .padding(DhunSpacing.md),
-            // Soft sheet: large radius + faint edge so it melts into the
-            // dark glass instead of drawing a hard boundary.
-            shape = DhunShapes.extraLarge,
-            borderColor = DhunColors.border,
-            // Floating over a scrim — needs a base or the page reads through.
-            opaqueBase = true,
+                // A dialog window clips at its content bounds, so the surface
+                // keeps a margin for its own shadow. The width budget comes
+                // after it: the same menu ceiling as the ⋮ menu.
+                .padding(DhunSpacing.sm)
+                .widthIn(
+                    min = DhunSpacing.menuMinWidth,
+                    max = DhunSpacing.menuMaxWidth,
+                ),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(DhunSpacing.lg),
-            ) {
-                Text(
-                    text = if (isCreatingNew) "New Playlist" else "Add to Playlist",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = DhunColors.textPrimary,
-                )
-                Spacer(modifier = Modifier.height(DhunSpacing.xs))
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = DhunColors.textTertiary,
-                    maxLines = 1,
-                )
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
+            TrackMenuHeader(track = track)
+            Text(
+                text = if (isCreatingNew) "New playlist" else "Add to playlist",
+                style = MaterialTheme.typography.labelSmall,
+                color = DhunColors.accent,
+                modifier = Modifier.padding(
+                    start = DhunSpacing.mdPlus,
+                    end = DhunSpacing.mdPlus,
+                    bottom = DhunSpacing.xs,
+                ),
+            )
 
-                if (isCreatingNew) {
-                    OutlinedTextField(
-                        value = newPlaylistName,
-                        onValueChange = {
-                            newPlaylistName = it
-                            errorText = null
-                        },
-                        label = { Text("Playlist name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+            if (isCreatingNew) {
+                DhunTextField(
+                    value = newPlaylistName,
+                    onValueChange = {
+                        newPlaylistName = it
+                        errorText = null
+                    },
+                    modifier = Modifier.padding(horizontal = DhunSpacing.mdPlus),
+                    placeholder = "Playlist name",
+                    isError = errorText != null,
+                    onSubmit = createAndAdd,
+                )
+                errorText?.let {
+                    Text(
+                        text = it,
+                        color = DhunColors.error,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(
+                            start = DhunSpacing.mdPlus,
+                            top = DhunSpacing.xs,
+                        ),
                     )
-                    errorText?.let {
-                        Text(
-                            text = it,
-                            color = DhunColors.error,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(top = DhunSpacing.xs),
-                        )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = DhunSpacing.mdPlus, vertical = DhunSpacing.smPlus),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    DhunTextButton(onClick = { isCreatingNew = false }) {
+                        Text("Back")
                     }
-                    Spacer(modifier = Modifier.height(DhunSpacing.lg))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        DhunTextButton(onClick = { isCreatingNew = false }) {
-                            Text("Back")
-                        }
-                        Spacer(modifier = Modifier.size(DhunSpacing.sm))
-                        DhunButton(
-                            onClick = {
-                                val name = newPlaylistName.trim()
-                                if (name.isBlank()) {
-                                    errorText = "Name cannot be empty"
-                                    return@DhunButton
-                                }
-                                scope.launch {
-                                    val playlist = playlistRepository.create(name)
-                                    playlistRepository.addTrack(playlist.id, track)
-                                    onAdded(playlist.name)
-                                    onDismiss()
-                                }
-                            },
-                        ) {
-                            Text("Create & Add")
-                        }
+                    Spacer(modifier = Modifier.size(DhunSpacing.sm))
+                    DhunButton(onClick = createAndAdd) {
+                        Text("Create & add")
                     }
+                }
+            } else {
+                if (playlists.isEmpty()) {
+                    Text(
+                        text = "No playlists yet — create one below.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.textTertiary,
+                        modifier = Modifier.padding(
+                            horizontal = DhunSpacing.mdPlus,
+                            vertical = DhunSpacing.sm,
+                        ),
+                    )
                 } else {
-                    if (playlists.isEmpty()) {
-                        Text(
-                            text = "No playlists found. Create one below!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = DhunColors.textSecondary,
-                            modifier = Modifier.padding(vertical = DhunSpacing.md),
-                        )
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(DhunSpacing.dialogListHeight),
-                        ) {
-                            items(playlists, key = { it.id }) { playlist ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            scope.launch {
-                                                playlistRepository.addTrack(playlist.id, track)
-                                                onAdded(playlist.name)
-                                                onDismiss()
-                                            }
-                                        }
-                                        .padding(vertical = DhunSpacing.sm),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    DhunIconView(
-                                        icon = DhunIcon.QueueMusic,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .padding(end = DhunSpacing.md)
-                                            .size(DhunSpacing.iconSize),
-                                        tint = DhunColors.accent,
-                                    )
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = playlist.name,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = DhunColors.textPrimary,
-                                        )
-                                        Text(
-                                            text = "${playlist.trackCount} tracks",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = DhunColors.textTertiary,
-                                        )
-                                    }
-                                    if (onOpenPlaylist != null) {
-                                        DhunTextButton(
-                                            onClick = { onOpenPlaylist(playlist.id) },
-                                        ) {
-                                            Text("Open", fontSize = DhunTypographyTokens.bodySmall.fontSize)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(DhunSpacing.md))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // Sized to the rows it actually has: the old sheet
+                            // reserved a fixed 180dp box whether it held one
+                            // playlist or ten.
+                            .heightIn(max = AddToPlaylistPolicy.listMaxHeight(playlists.size)),
                     ) {
-                        DhunOutlinedButton(onClick = { isCreatingNew = true }) {
-                            Text("+ New Playlist")
-                        }
-                        DhunTextButton(onClick = onDismiss) {
-                            Text("Cancel")
+                        items(playlists, key = { it.id }) { playlist ->
+                            // Local copy: the breadcrumb needs a smart-castable
+                            // reference to build its click lambda.
+                            val openPlaylist = onOpenPlaylist
+                            MenuActionRow(
+                                label = playlist.name,
+                                icon = DhunIcon.QueueMusic,
+                                supportingText = "${playlist.trackCount} tracks",
+                                onClick = { addToPlaylist(playlist.id, playlist.name) },
+                                trailingLabel = if (openPlaylist != null) "Open" else null,
+                                onTrailingClick = openPlaylist?.let { open -> { open(playlist.id) } },
+                            )
                         }
                     }
                 }
+                MenuActionRow(
+                    label = "New playlist",
+                    icon = DhunIcon.Add,
+                    onClick = { isCreatingNew = true },
+                )
             }
         }
+    }
+}
+
+/**
+ * The picker's height budget, as numbers — so the "it reserved a box it did not
+ * need" defect stays fixed in CI instead of in a screenshot.
+ *
+ * The list is measured to its rows up to [VISIBLE_ROWS]; past that it scrolls.
+ * The row height is the menu row's, because these rows *are* menu rows.
+ */
+internal object AddToPlaylistPolicy {
+
+    /** Playlists visible before the picker starts scrolling. */
+    const val VISIBLE_ROWS = 4
+
+    /**
+     * Tallest the picker list may be for [rowCount] playlists.
+     *
+     * Zero playlists means no list at all (`0.dp`) — the empty case draws a
+     * sentence, not an empty box. The result never exceeds
+     * [DhunSpacing.dialogListHeight], the fixed box this replaced.
+     */
+    fun listMaxHeight(
+        rowCount: Int,
+        rowHeight: Dp = DhunSpacing.menuRowHeight,
+        ceiling: Dp = DhunSpacing.dialogListHeight,
+    ): Dp {
+        if (rowCount <= 0) return 0.dp
+        if (!rowHeight.value.isFinite() || rowHeight <= 0.dp) return 0.dp
+        val rows = rowCount.coerceAtMost(VISIBLE_ROWS)
+        return (rowHeight * rows).coerceAtMost(if (ceiling > 0.dp) ceiling else rowHeight * rows)
     }
 }

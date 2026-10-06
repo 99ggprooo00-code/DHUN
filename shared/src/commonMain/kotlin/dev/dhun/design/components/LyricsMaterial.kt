@@ -169,6 +169,56 @@ fun LyricsMaterial(
 }
 
 /**
+ * The **blur-backed sheet** cut of the lyrics-card material: the same
+ * once-per-track blurred artwork and lyrics veil as [LyricsMaterial], but over
+ * an **opaque** base and with an elevation shadow — for a surface that carries
+ * rows and rises over the player (the FullPlayer Queue/Related panel).
+ *
+ * Why the opaque base: this panel used to be `GlassBottomBar(opaqueBase = true)`,
+ * the near-black `glassBarTop` → `glassStrong` slab with no artwork at all. That
+ * is the one surface left outside the artwork-veiled family the dock, the ⋮
+ * menus and the page backdrops moved to ([LyricsMaterial] / [AcrylicSurface]), so
+ * opening the queue read as a slice of the old interface. The lyrics veil alone
+ * (≈42–62% over the page) is not enough for a sheet of rows floating over sharp
+ * player chrome, so the base stays: rows keep their contrast even on a bright
+ * cover.
+ *
+ * The shape is the caller's ([DhunShapes.bottomSheet] for the panel): rounded
+ * top corners, flush lower edge.
+ */
+@Composable
+fun LyricsArtworkSheet(
+    artworkUrl: String?,
+    modifier: Modifier = Modifier,
+    shape: Shape = DhunShapes.bottomSheet,
+    drawBorder: Boolean = true,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .shadow(
+                DhunSpacing.md,
+                shape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = 0.4f),
+            )
+            .clip(shape)
+            .background(DhunColors.surface, shape)
+            .then(
+                if (drawBorder) {
+                    Modifier.border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), shape)
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize())
+        Box(modifier = Modifier.matchParentSize().lyricsVeil())
+        Box(modifier = Modifier.fillMaxSize(), content = content)
+    }
+}
+
+/**
  * Floating mini-player card (rail / two-pane). The phone dock paints the
  * artwork once for the whole bar and only veils the mini-player row with
  * [acrylicGlass]; this surface is the same recipe when the row is on its own.

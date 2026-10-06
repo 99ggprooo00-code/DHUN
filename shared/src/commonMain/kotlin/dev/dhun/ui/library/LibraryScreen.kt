@@ -24,7 +24,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,6 +54,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
 import dev.dhun.design.components.DhunTextButton
@@ -643,16 +643,24 @@ private fun CreatePlaylistDialog(
     var creating by remember { mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            // A dialog floats over a dimmed page — the opaque base is what
+            // keeps the list underneath from reading through its text.
+            opaqueBase = true,
+        ) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text("New playlist", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
-                OutlinedTextField(
+                // The DHUN input, not Material 3's outlined field: the same
+                // control the Add to playlist sheet uses, and the same defect
+                // class this file used to share with it (an M3 box inside a
+                // glass card). See `DhunTextField`.
+                DhunTextField(
                     value = name,
                     onValueChange = { name = it },
-                    singleLine = true,
-                    placeholder = { Text("My playlist") },
-                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = "My playlist",
                 )
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -1300,7 +1308,13 @@ private fun DownloadRow(
 @Composable
 private fun DeleteSelectedConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit, count: Int) {
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            // A dialog floats over a dimmed page — the opaque base is what
+            // keeps the list underneath from reading through its text.
+            opaqueBase = true,
+        ) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text("Delete $count download${if (count == 1) "" else "s"}?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.sm))
@@ -1319,7 +1333,13 @@ private fun DeleteSelectedConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> 
 @Composable
 private fun ClearDownloadsConfirmDialog(count: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            // A dialog floats over a dimmed page — the opaque base is what
+            // keeps the list underneath from reading through its text.
+            opaqueBase = true,
+        ) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text("Clear all downloads?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.sm))
@@ -1477,7 +1497,13 @@ private fun HistoryRow(
 @Composable
 private fun ClearHistoryConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth), shape = DhunShapes.large) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            // A dialog floats over a dimmed page — the opaque base is what
+            // keeps the list underneath from reading through its text.
+            opaqueBase = true,
+        ) {
             Column(modifier = Modifier.padding(DhunSpacing.lg)) {
                 Text("Clear history?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.sm))

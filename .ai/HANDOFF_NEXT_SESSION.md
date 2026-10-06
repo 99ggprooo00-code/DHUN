@@ -5,7 +5,98 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — post-#119 CI green; targeted S3 artwork retest passed
+## CURRENT STATE — PR #121 open: the playlist picker + queue panel, CI-green, awaiting device retest
+
+Updated **2026-10-06**, session `arena/cf4e91ba-dhun`, base `main@885a092`
+(PR #120 merged). **PR #121** fixes the two surfaces the user reported on the
+digest-verified #120 candidate. The artwork parser is **not** touched — its
+targeted retest passed and is recorded in the historical section below.
+
+**Candidate APK (build-only artifact, not published):** test-release run
+**37389110912**, `apk` job green — `dhun-test.apk` **18,367,219 B**, SHA-256
+**`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`**, source
+`a9e8c9d7` (PR merge ref of head `85e73eb`). Download it from that run's
+Artifacts — the rolling `test` release still targets `885a092` and does **not**
+contain these fixes.
+
+**Green CI after the fix:** PR CI **37389109897**, push CI **37389105839** (all
+9 steps, including `:shared:jvmTest` with the two new suites), Build APK
+**37389110248**. Docs heads followed (`37390026600`/`37390030215`/`37390030691`, then
+`37390996715`/`37391002255`/`37391002430`, then `37392433619`/`37392436952`/
+`37392437020`, then the docs-comment heads `37398610382`/`37398614025`/
+`37398613949`/`37398613971`). Every head in the slice has run the same four
+workflows: `build-and-test` and `build` pass 9/9, `apk` passes, `msi` fails for
+the draft-release reason below, and `aab`/`publish`/`release_draft` skip because
+they are `main`-gated. The flake on the intermediate head `e837d30` did not
+recur on any later head.
+
+**Merge basis.** PR #121 merges on the user's explicit instruction
+(2026-10-06: verify everything, then merge). The device retest of steps 19–22
+had **not** happened when this line was written, so the picker and panel remain
+**unverified on hardware** and the S3 artwork slice stays open in the ledger —
+merging this PR does not close it. **Real red on record:** PR CI **37388855101** failed on three
+`PlayerPanelDragTest` assertions (two wrong expectations + one helper
+inconsistency); fixed in `85e73eb`.
+
+**One flaky red, recorded (did not recur on `83ea001`):** the docs-only head
+`e837d30` had push CI
+**37391667937** red in step 6 on
+`PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+(`expected:<tok-2> but was:<tok-a>`) while PR CI **37391672515** was 9/9 green on
+the same SHA — the endless-radio probe race, second time on a docs-only head
+(see `KNOWN_LIMITATIONS.md` / `DEBUG_LOG.md`). Not caused by this diff and not
+fixed here; do not read a green PR run as proof it is gone.
+
+**Candidate APK digest is stable:** the docs-only deltas (including the
+docs-comment tail `332704d`) rebuilt to a byte-identical APK — every
+test-release run since `85e73eb` reports
+`dhun-test.apk` 18,367,219 B, SHA-256
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, just with a
+new `source` merge ref (`a9e8c9d7` → `e9e0d178` → `5a2130d1`). Latest: run
+**37391002169**, `apk` job green (artifact `apk`, 17,561,449 B). Take it from the
+run's Artifacts — the rolling release does **not** carry these fixes.
+
+**Open on this PR — the MSI job (diagnosed, third reproduction):** every
+test-release run fails `msi` at "Check install-over and userdata on disposable
+Windows", where `check_msi_upgrade.ps1:40` cannot download the rolling `test`
+baseline. **Cause: the rolling `test` release is currently a Draft**
+(`draft=true`, `published 2026-10-05T16:56:46Z`) and the job's `contents: read`
+token cannot read a draft release. The workflow never drafts `test` — the file
+at `885a092` is byte-identical to this branch's, it creates the release with
+`--prerelease`, only the v0.1.0 `release_draft` job uses `--draft`, and the repo
+event feed holds exactly one `ReleaseEvent published tag=test` (16:56:46Z) — so
+the flag was set out of band after that publish. Proof: the same step **passed**
+at 16:55:24Z in push run **37343725414** against the previous, *published*
+baseline. A branch run cannot repair it (the `publish` job is main-gated), and
+this session did not touch release state. The installer itself builds and stages
+(2.149.1, SHA-256
+`6e34042319feed49d4bc9f4f64bd9dc5950774de7b781d12bbdf65252dd1fdf2`) — it is just
+never uploaded. **The Windows retest of these fixes therefore has no candidate
+until the rolling release is published again**; expect the post-merge run's `msi`
+job to stay red until then.
+
+**What to retest (gate `docs/verification/15-test-build-gate.md` §3 "Fix 4"):**
+- Step 19 — ⋮ → Add to playlist: compact frosted family, content-sized list, no
+  Material outlined box / empty slab / Close row.
+- Step 20 — new-playlist field: typing, Done, `Back`, `Create & add`, blank-name
+  error, then `Open` breadcrumb.
+- Step 21 — panel swipe: header strip follows the finger; long drag closes;
+  short drag snaps back; list drags still scroll; ✕ still closes.
+- Step 22 — Library `New playlist` / `Rename` / confirm dialogs: same input, no
+  page bleeding through.
+- Existing steps 1–18 keep the results already recorded (artwork verified; the
+  parser is unchanged) — a Fix-3 sanity glance that the ⋮ menu is still compact
+  is enough.
+
+**Do not:** re-open the parser; change `TrackRow` (64dp borderless); re-center or
+re-anchor the track menu without a user decision; widen the panel swipe over the
+list rows (needs a nested-scroll design and would fight reorder/swipe-remove).
+
+**Merge rule:** merge PR #121 only after the user's retest, then verify
+post-merge CI + test-release in the same turn. Broader S3/S6 (soaks, downloads/
+offline, lyrics, EQ, Windows native column, signing) stays open.
+
+## PREVIOUS STATE — PR #120 artwork parser merged; targeted retest passed (2026-10-05)
 
 Updated **2026-10-05**, session `arena/01a0eb87-dhun`, base `main@73b88b6`.
 PR #119 is merged; post-merge CI **36467187148**, Build APK **36467187128**,

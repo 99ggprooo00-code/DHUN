@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -28,8 +29,10 @@ import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
+import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.LyricsMaterial
 import dev.dhun.player.DhunPlayer
 
@@ -282,6 +285,12 @@ internal fun TrackMenuHeader(track: Track) {
  *
  * [destructive] is the queue's "Remove from queue"; [enabled] greys out a row
  * that cannot run (the first row's "Move up", the last row's "Move down").
+ *
+ * [supportingText] and the [trailingLabel]/[onTrailingClick] pair are used by
+ * the playlist picker only — the same row, with the playlist's track count
+ * under its name and the "Open" breadcrumb at the end. A row with either one
+ * is measured to its content (`heightIn`, never a stretched box); a plain menu
+ * row keeps the exact fixed 44dp height the ⋮ menu is sized by.
  */
 @Composable
 internal fun MenuActionRow(
@@ -291,6 +300,9 @@ internal fun MenuActionRow(
     icon: DhunIcon? = null,
     enabled: Boolean = true,
     destructive: Boolean = false,
+    supportingText: String? = null,
+    trailingLabel: String? = null,
+    onTrailingClick: (() -> Unit)? = null,
 ) {
     val labelColor = when {
         !enabled -> DhunColors.textDisabled
@@ -302,12 +314,20 @@ internal fun MenuActionRow(
         destructive -> DhunColors.error
         else -> DhunColors.textSecondary
     }
+    val hasTrailing = trailingLabel != null && onTrailingClick != null
+    val wrapsContent = supportingText != null || hasTrailing
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(DhunSpacing.menuRowHeight)
+            .then(
+                if (wrapsContent) {
+                    Modifier.heightIn(min = DhunSpacing.menuRowHeight)
+                } else {
+                    Modifier.height(DhunSpacing.menuRowHeight)
+                },
+            )
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = DhunSpacing.mdPlus),
+            .padding(horizontal = DhunSpacing.mdPlus, vertical = if (wrapsContent) DhunSpacing.xs else DhunSpacing.zero),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
@@ -319,12 +339,35 @@ internal fun MenuActionRow(
                 tint = iconColor,
             )
         }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = labelColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(
+            // A trailing affordance needs the label column to take the room
+            // left over, or "Open" would sit right beside the name instead of
+            // at the end of the row.
+            modifier = if (hasTrailing) Modifier.weight(1f) else Modifier,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = labelColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (supportingText != null) {
+                Text(
+                    text = supportingText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DhunColors.textTertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        val trailingText = trailingLabel
+        val trailingClick = onTrailingClick
+        if (trailingText != null && trailingClick != null) {
+            DhunTextButton(onClick = trailingClick) {
+                Text(text = trailingText, fontSize = DhunTypographyTokens.bodySmall.fontSize)
+            }
+        }
     }
 }

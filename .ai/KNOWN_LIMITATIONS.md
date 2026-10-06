@@ -2,6 +2,58 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-06 — the playlist picker / queue-panel fixes are CI-green but not yet seen on a device (session `arena/cf4e91ba-dhun`, PR #121)
+
+- **The panel's dismiss swipe is scoped to the header strip** (grab pill + title
+  band, ≈60dp). Dragging down over the queue *list* does not dismiss the panel:
+  those rows own their vertical scroll plus swipe-to-remove and
+  long-press-to-reorder, and a whole-sheet detector would fight all three. If
+  drag-anywhere-to-close is wanted, that is a separate change needing a
+  nested-scroll connection.
+- While the panel is open the player's queue/shuffle/repeat/lyrics row stays
+  hidden by design (`actionRowVisible = false`), so the queue glyph cannot close
+  the panel. The exits are now: swipe the header down, the ✕, and Back. Kept as
+  designed (that row's measured space is what the sheet geometry is derived
+  from) and documented in `QueueSheetHeader`.
+- The track ⋮ menu is still **centered**; anchoring it near its source ⋮ remains
+  a separate UX decision (round-1 report; gate step 12 records it as "not a
+  failure of this step").
+- `SearchScreen`'s in-page search field is still an M3 `OutlinedTextField`
+  (styled via `OutlinedTextFieldDefaults`). It is a page-level search bar, not a
+  dialog field, and was deliberately left alone.
+- `DhunTextField` is a `BasicTextField` wrapper: it carries the app's visual
+  language and IME Done handling, but no M3 text-field semantics/autofill
+  extras. Revisit if a real form ever needs them.
+- **Retest pending, including after the merge:** the picker's look and size, the
+  panel's swipe, and the five Library/playlist dialogs' opacity are proven only
+  by CI compilation and the new pure-logic tests. PR #121 merged on the user's
+  2026-10-06 instruction without that retest, so **these surfaces are live on
+  `main` unverified on hardware** — the acceptance remains the retest of the
+  candidate APK against gate §3 "Fix 4" (steps 19–22).
+- The candidate MSI for this slice does not exist: the `msi` job fails in both
+  test-release runs (37389110912, and 37390031054 for the docs head) at the
+  install-over check's baseline download (`gh release download test …` →
+  non-zero), so nothing is uploaded. Diagnosed: the rolling `test` release is
+  currently a **Draft**, which the job's `contents: read` token cannot read; the
+  same step passed on 2026-10-05T16:55:24Z against the previously *published*
+  baseline, and the workflow itself never drafts `test` (`--prerelease` only;
+  only the `v0.1.0` job passes `--draft`). GitHub documents that drafts are only
+  visible to callers with push access, which is why a read-scoped job cannot
+  resolve them. It is release state, not a defect in these fixes, and not fixable
+  from a branch (`publish` is main-gated): the Windows retest waits until the
+  rolling release is published again, or the job is deliberately granted
+  `contents: write`.
+
+- **A known flaky shared test can turn a docs-only head red.** Push CI
+  **37391667937** (head `e837d30`, docs only) failed `:shared:jvmTest` on
+  `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+  (`expected:<tok-2> but was:<tok-a>`) while PR CI **37391672515** passed 9/9 on
+  the same SHA. Second occurrence on a docs-only head (first: 37320626452). It is
+  a timing race in the endless-radio probe tests, unrelated to this session's
+  diff, and **not** repaired here — do not read a green PR run as proof that it
+  is gone. `gh run rerun` is refused on these branch runs, so a successor commit
+  is the only way to re-trigger (and it may flake again).
+
 ## 2026-10-05 — S3 hardware round 1 report (partial; identity incomplete)
 
 - User report received 2026-10-05: Android walkthrough failed at steps **1, 6, 7, 9**; steps **2–5, 8, 10–12, 14, 17** were reported pass/observed with qualifications. Notification/lock-screen/widget art was present but considered small. Menu was compact but centered; user prefers it anchored near the originating ⋮. Windows core steps **10–13** were reported pass. Full per-step ledger: `docs/verification/14-release.md`.
