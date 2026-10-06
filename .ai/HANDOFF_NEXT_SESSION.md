@@ -21,14 +21,16 @@ contain these fixes.
 
 **Green CI after the fix:** PR CI **37389109897**, push CI **37389105839** (all
 9 steps, including `:shared:jvmTest` with the two new suites), Build APK
-**37389110248**. Then the docs heads: push CI **37390026600**, PR CI
-**37390030215**, Build APK **37390030691**, and the final docs head `f0e58df` →
-push CI **37390996715**, PR CI **37391002255**, Build APK **37391002430** (9/9
-each). **Real red on record:** PR CI **37388855101** failed on three
+**37389110248**. Docs heads followed (`37390026600`/`37390030215`/`37390030691`,
+then `37390996715`/`37391002255`/`37391002430`). **Final head `83ea001`**:
+push CI **37392433619**, PR CI **37392436952** (9/9 each), Build APK
+**37392437020**, test-release **37392436941** (`apk` green; `msi` red as below).
+The flake on the intermediate head `e837d30` did not recur on `83ea001`. **Real red on record:** PR CI **37388855101** failed on three
 `PlayerPanelDragTest` assertions (two wrong expectations + one helper
 inconsistency); fixed in `85e73eb`.
 
-**One flaky red, recorded:** the docs-only head `e837d30` had push CI
+**One flaky red, recorded (did not recur on `83ea001`):** the docs-only head
+`e837d30` had push CI
 **37391667937** red in step 6 on
 `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
 (`expected:<tok-2> but was:<tok-a>`) while PR CI **37391672515** was 9/9 green on
