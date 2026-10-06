@@ -89,9 +89,20 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   — that baseline digest **is** the published release's MSI digest, so the check
   really did upgrade *the release's* build. The future-upgrade guard and the
   uninstall smoke also passed in the same run. `publish` stays main-gated, so
-  this run proves the check only; the `main`-push equivalents (with
-  `buildOnly=false` and the publish) are recorded in
-  `.ai/HANDOFF_NEXT_SESSION.md`.
+  this run proves the check only.
+- **`main`-push equivalent (recorded):** CI **37408148211**, Build APK
+  **37408148184** and test-release **37408148220** are green on `a9204c5` (the
+  docs merge). The `msi` job ran the full path with `buildOnly=false` —
+  `MSI upgrade smoke PASS::Hosted Windows: 2.160.1 -> 2.163.1`, sentinels
+  preserved, baseline SHA256 `74109a13…` (the previous publish's MSI) — plus the
+  future-upgrade guard and uninstall smokes, and **no skip warning**; `publish`
+  replaced the release again (published 2026-10-06T03:20:40Z, target `a9204c5…`,
+  four assets). Digests of that publish, from its provenance notices: APK
+  18,367,219 B `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`
+  (unchanged — no app-code delta); MSI 112,947,200 B, ProductVersion 2.163.1,
+  `12745f81394a357c266c8453903e70aa78c2f7b29450d97e5c8348dfc45f5f8e`. The
+  release is replaced on **every** `main` push, so verify a download against its
+  own `.sha256` sidecar; the APK digest only moves when app code changes.
 
 ### Changed — the Full Player playlist picker and queue panel (2026-10-06, PR #121)
 

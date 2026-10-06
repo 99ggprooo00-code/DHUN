@@ -78,11 +78,20 @@ on `LibraryViewModelTest.historyPlaybackQueuesCorrectly`
 fourth occurrence, docs-only diff. `gh run rerun` is refused; the successor
 commit is the re-trigger.
 
-**Exact next step:** merge the docs PR, then record the `main`-push run (with
-`buildOnly=false`): it must repeat the full install-over PASS with a **new** MSI
-ProductVersion/digest and `publish` replacing the release again — the release's
-four assets will move to that publish. If the skip warning reappears, check the
-release's `isDraft` state first.
+**`main`-push run (verified, `a9204c5` = the docs merge):** CI **37408148211** ✅,
+Build APK **37408148184** ✅, test-release **37408148220** ✅ — `msi` ran the full
+install-over with `buildOnly=false` (`2.160.1 -> 2.163.1`, sentinels preserved,
+baseline `74109a13…`), `publish` replaced the release (published
+2026-10-06T03:20:40Z, target `a9204c5…`, four assets; MSI 2.163.1 `12745f81…`,
+APK `21a5fe86…`). **The release ask is met and the release path is working as
+before.** Every later `main` push re-runs this and moves the MSI digest.
+
+**What is left (not this session's scope):** the device retest of gate steps
+19–22 on the published APK (`dhun-test.apk`, 18,367,219 B,
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` — the release
+asset is byte-identical to the build-only candidate), and the broader S3/S6 list
+below. No further release-plumbing work is pending; if `MSI install-over
+SKIPPED` ever appears again, check the release's `isDraft` state first.
 
 **Completion ledger (updated by this session):**
 - **S1:** CLOSED GREEN 2026-09-20 (daily drill restored + residential playback
