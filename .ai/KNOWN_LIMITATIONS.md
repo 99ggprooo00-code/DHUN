@@ -2,6 +2,28 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-06 — a green `msi` job no longer proves the install-over smoke ran (PR #122, session `arena/95fb0f92-dhun`)
+
+- **A skipped install-over has no upgrade evidence.** If the rolling `test`
+  baseline is unreadable to the `msi` job's read-scoped token (absent, still a
+  draft, mid-replace), `scripts/check_msi_upgrade.ps1` now exits 0 with
+  `::warning title=MSI install-over SKIPPED::` and `installOver = "skipped: …"`
+  in `out/installer-check/result.json`. The MSI in that run is **build-verified
+  only**: no in-place upgrade, no userdata/cache sentinel preservation, no
+  future-upgrade guard, no uninstall check. Read the job's annotations before
+  quoting a green `msi` job, and never call such a run a pass.
+- The grading trades a hard red for a visible skip on purpose: the red was what
+  wedged the release (`publish` needs `msi`), while a *false positive* stays
+  impossible because the skip never claims a pass.
+- The `publish` re-assert (`gh release edit test --draft=false`) is a guard, not
+  a proof: the release can still be re-drafted out of band. If `test` goes
+  invisible a third time, suspect release state first — the `publish` job's
+  `isDraft` check is where it surfaces.
+- The PowerShell change is verified by CI's `check_powershell_syntax.ps1` only
+  (no `pwsh` in the development sandbox); CI is its first and only parse.
+- **Still open from PR #121 (unchanged):** the picker/panel/`DhunTextField`
+  surfaces are live on `main` without the device retest of gate steps 19–22.
+
 ## 2026-10-06 — the playlist picker / queue-panel fixes are CI-green but not yet seen on a device (session `arena/cf4e91ba-dhun`, PR #121)
 
 - **The panel's dismiss swipe is scoped to the header strip** (grab pill + title
@@ -30,19 +52,13 @@ Updated every phase. Nothing hidden.
   2026-10-06 instruction without that retest, so **these surfaces are live on
   `main` unverified on hardware** — the acceptance remains the retest of the
   candidate APK against gate §3 "Fix 4" (steps 19–22).
-- The candidate MSI for this slice does not exist: the `msi` job fails in both
-  test-release runs (37389110912, and 37390031054 for the docs head) at the
-  install-over check's baseline download (`gh release download test …` →
-  non-zero), so nothing is uploaded. Diagnosed: the rolling `test` release is
-  currently a **Draft**, which the job's `contents: read` token cannot read; the
-  same step passed on 2026-10-05T16:55:24Z against the previously *published*
-  baseline, and the workflow itself never drafts `test` (`--prerelease` only;
-  only the `v0.1.0` job passes `--draft`). GitHub documents that drafts are only
-  visible to callers with push access, which is why a read-scoped job cannot
-  resolve them. It is release state, not a defect in these fixes, and not fixable
-  from a branch (`publish` is main-gated): the Windows retest waits until the
-  rolling release is published again, or the job is deliberately granted
-  `contents: write`.
+- The candidate MSI for the PR #121 slice was never uploaded (the `msi` job's
+  red) — but that red is now fixed. **PR #122** grades the install-over
+  baseline fetch into a *skip* and has `publish` re-assert readability, so from
+  its post-merge publish the rolling `test` release is the Windows candidate:
+  download its `dhun-test.msi`, verify the sidecar, install over the existing
+  build. Read the `msi` job's annotations first — `MSI upgrade smoke PASS` means
+  the sentinel checks really ran; `MSI install-over SKIPPED` means they did not.
 
 - **A known flaky shared test can turn a docs-only head red.** Push CI
   **37391667937** (head `e837d30`, docs only) failed `:shared:jvmTest` on

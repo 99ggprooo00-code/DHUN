@@ -5,7 +5,68 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
-## CURRENT STATE — PR #121 open: the playlist picker + queue panel, CI-green, awaiting device retest
+## CURRENT STATE — PR #122: the MSI/release deadlock is fixed, and the rolling release carries installation files again (2026-10-06, session `arena/95fb0f92-dhun`)
+
+Updated **2026-10-06**, base `main@5c8bd67` (merge of PR #121). **PR #122** fixes
+the release deadlock that made every test-release run red since
+2026-10-05T16:56:46Z and that hid the rolling release from the public page.
+
+**What was wrong — both halves, verified against GitHub, not inherited:**
+- *State:* the rolling `test` release is a **Draft** (`draft=true`, target
+  `885a092`, four assets present, `published_at` 2026-10-05T16:56:46Z). GitHub
+  lists draft releases only to callers with push access, so the `msi` job's
+  `contents: read` token cannot resolve `gh release download test`: the
+  install-over step fails with *"Could not download the published MSI
+  baseline/checksum"*. Every run since the 16:56:46Z (re)create is red on it —
+  **10 failures + 1 concurrency cancel, 0 successes**, latest **37403248318**
+  (`5c8bd67`) — while the same step **passed 2026-10-05T16:55:24Z in run
+  37343725414** against the previous, *published* baseline (MSI 2.140.1 →
+  2.146.1, sentinels preserved). The flag's exact history is not reconstructible
+  from the API; treat it as out of band. **This is the user's report too:** a
+  draft is invisible on the public Releases page, which reads as "no installation
+  files". They are not gone; they are invisible.
+- *Design (the real defect):* `publish` has `needs: [apk, msi]`. The red `msi`
+  job therefore skipped the only job that republishes the release *and* the only
+  `contents: write` job (run **37403248318**: `msi` failed → `publish` skipped),
+  so the outage could not repair itself and no branch run could fix it.
+
+**The fix (PR #122):** `scripts/check_msi_upgrade.ps1` grades the baseline fetch —
+unreadable ⇒ `::warning title=MSI install-over SKIPPED::` + notice +
+`installOver = "skipped: <reason>"` + `exit 0`, so the MSI uploads and `publish`
+runs; `publish` re-asserts `--draft=false` and verifies `isDraft` before
+succeeding; two contract tests pin both; `msi` keeps `contents: read`. **A skipped
+install-over is build-verified only — never a pass.** Contradictory fetches still
+fail. Release-asset downloads EOF in-sandbox, so digests come from run notices.
+
+**Evidence this session:** the PR #122 CI runs, the post-merge CI / Build APK /
+test-release runs, and the repaired release's four asset digests are recorded in
+the docs commit that lands with the merge — read them there rather than trusting
+this line.
+
+**What to retest (unchanged, still open — gate `docs/verification/15-test-build-gate.md` §3 "Fix 4", steps 19–22):**
+- Step 19 — the picker's look: compact frosted family, content-sized list, no
+  oversized Material box.
+- Step 20 — the picker's behaviour: typing, keyboard Done, `Back`, `Create & add`,
+  blank-name error, `Open` breadcrumb.
+- Step 21 — the panel swipe: follows the finger, long drag closes, short drag
+  snaps back, list drags still scroll, ✕ still closes.
+- Step 22 — Library `New playlist` / `Rename` / confirm dialogs: same input, no
+  page bleeding through.
+- Candidate: the rolling `test` release after PR #122's post-merge publish
+  (`dhun-test.apk`; verify the `.sha256` sidecar against the run's provenance
+  notice before installing — the repair publish may rebuild a byte-identical APK
+  to the PR #121 candidate
+  `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, but the
+  MSI digest changes on every publish).
+- **PR #121 merged unverified on hardware; the S3 slice stays open.**
+
+**Do not:** re-open the parser; change `TrackRow` (64dp borderless); re-center the
+track menu; widen the panel swipe over the list rows; grant the `msi` job
+`contents: write`; re-clone or `git clean` the sandbox worktree (DEBUG_LOG
+2026-10-06 — it re-clones between turns and this time the worktree did **not**
+carry the pending edits).
+
+## PREVIOUS STATE — PR #121 merged as `5c8bd67`: the playlist picker + queue panel (2026-10-06)
 
 Updated **2026-10-06**, session `arena/cf4e91ba-dhun`, base `main@885a092`
 (PR #120 merged). **PR #121** fixes the two surfaces the user reported on the

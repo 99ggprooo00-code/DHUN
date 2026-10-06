@@ -1,114 +1,86 @@
 # CURRENT ACTIVE TASK
 
-Updated **2026-10-06** · session **`arena/cf4e91ba-dhun`** · base/main
-**`885a092`**. PR #120 is merged (browse page-header parser) and its post-merge
-CI is green; the user's digest-verified Android 15 retest confirmed the artwork
-paths work, so **the parser is not touched again in this session**. This session
-answers the two *new* Full Player reports — ⋮ → Add to playlist, and the
-Queue/Related panel — as **PR #121** on `arena/cf4e91ba-dhun`.
+Updated **2026-10-06** · session **`arena/95fb0f92-dhun`** · base/main
+**`5c8bd67`** (merge of PR #121 — the Full Player playlist picker + queue panel).
+The PR #121 device retest (gate steps 19–22) is **still open**: those surfaces are
+live on `main` unverified on hardware.
 
-**Phase/status:** S3 hardware verification (second slice). Active gate:
-`docs/verification/15-test-build-gate.md` — §3 "Fix 4" (steps 19–22, added this
-session); broader procedure: `docs/runbooks/s3-hardware-checklist.md`.
+**Phase/status:** S3 hardware verification (second slice) plus release plumbing.
+Active gate: `docs/verification/15-test-build-gate.md`; broader procedure:
+`docs/runbooks/s3-hardware-checklist.md`.
 
-**What this session changed (code CI-green; device retest pending):**
-- **⋮ → Add to playlist** was the last old-Material dialog in the app: a
-  `GlassCard` with double padding, an M3 `titleLarge` header, a **fixed 180dp
-  `LazyColumn`** (a mostly empty slab for one or two playlists), an M3
-  `OutlinedTextField`, and an M3 Close/Cancel row. Rebuilt on the shared menu
-  family — `TrackMenuSurface`, `TrackMenuHeader`, `MenuActionRow` (name +
-  "N tracks" + trailing "Open") — content-sized by `AddToPlaylistPolicy`
-  (≤4 rows, never the old fixed box) and asking for its name through the new
-  `DhunTextField`. Behaviour, callbacks and dismissal are unchanged.
-- **≡♪ → Queue/Related** had **no drag detector anywhere**: the grab pill was
-  decoration, and while the panel is open the player's queue glyph is hidden
-  with the action row it lives in, so the only exits were the ✕ and Back.
-  Swiping the header strip down now moves the panel under the finger and
-  dismisses past `0.28 × travel` (floored at one touch target, capped at the
-  travel); the drag is folded into the same transition, so the measured seam
-  between player and panel stays closed. The panel also stopped painting the
-  retired near-black `GlassBottomBar` slab — it uses the artwork-veiled
-  `LyricsArtworkSheet`, and `GlassBottomBar` (no call sites left) is deleted.
-- Adjacent, same defect class: `CreatePlaylistDialog`, `RenameDialog` and the
-  three Library confirm dialogs use `DhunTextField` and
-  `GlassCard(opaqueBase = true)` (the rule `GlassCard`'s own docs state).
-- New tests: `PlayerPanelDragTest` (seam invariance across progress × drag,
-  clamp semantics, threshold share/floor/cap, zero-travel = no gesture) and
-  `AddToPlaylistPolicyTest` (the picker reserves nothing for rows it does not
-  have). Both run in CI's `:shared:jvmTest`.
+**What this session changes — PR #122, the MSI/release deadlock:**
+- **State (the trigger):** the rolling `test` release is a **Draft**
+  (`draft=true`, target `885a092`, four assets, `published_at`
+  2026-10-05T16:56:46Z). GitHub lists drafts only to callers with push access, so
+  the `msi` job's `contents: read` token cannot resolve `gh release download
+  test`; the install-over step dies with *"Could not download the published MSI
+  baseline/checksum"* (annotation on the post-merge run **37403248318**,
+  `5c8bd67`). Every test-release run after the 16:56:46Z (re)create failed the
+  same way — **10 failures + 1 concurrency cancel, 0 successes** (`37389110912`
+  … `37403248318`) — while the same step **passed at 2026-10-05T16:55:24Z in run
+  `37343725414`** against the previous, *published* baseline. User-visible half:
+  the rolling release is absent from the public Releases page, which reads as
+  "no installation files". They are not gone; they are invisible.
+- **Design (the real defect):** `publish` has `needs: [apk, msi]`, so the red
+  `msi` job also skipped the only job that republishes the release **and** the
+  only `contents: write` job. Run **37403248318**: `msi` failed → `publish`
+  skipped. A release-state problem became an outage no push could break.
+- **Fix:** `scripts/check_msi_upgrade.ps1` grades the baseline fetch — unreadable
+  (absent / still a draft / mid-replace) ⇒ `::warning title=MSI install-over
+  SKIPPED::` + notice + `installOver = "skipped: <reason>"` in `result.json` +
+  `exit 0`, so the MSI still builds, stages and uploads and `publish` can run.
+  **A skipped run is build-verified only — never a pass.** A fetch that succeeds
+  and then contradicts itself (checksum mismatch, upgrade-identity mismatch,
+  not-newer version) still fails the run. `publish` now re-asserts readability
+  after creating the release (`gh release edit test --draft=false --prerelease
+  --target "$GITHUB_SHA"`) and fails unless `isDraft` is provably `false`. `msi`
+  keeps `contents: read` (deliberate; a contract test pins it).
+- Two new contract tests in `scripts/test_build_workflow.py` (31 tests total).
+  Local gates: unittest **31 OK**, `validate_fixtures.py` **PASS: 39 files**.
 
-**Evidence (verified against GitHub this session):**
-- Commits `f9454a8` (code) → `85e73eb` (test-semantics fix after a real red).
-- **Green:** PR CI **37389109897** and push CI **37389105839** — all 9 steps,
-  including `:shared:jvmTest` with the new tests; Build APK **37389110248**.
-- **Real red, on record:** PR CI **37388855101** failed in `:shared:jvmTest` on
-  three `PlayerPanelDragTest` assertions (two wrong expectations, one helper
-  inconsistency about a non-finite current offset). Fixed in `85e73eb`; no
-  blind retry, and nothing is claimed green that did not run.
-- **Candidate APK** (build-only artifact, **not published**): test-release run
-  **37389110912**, `apk` job green — `dhun-test.apk` 18,367,219 B, SHA-256
-  `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, source =
-  PR merge ref `a9e8c9d7` of head `85e73eb`.
-- **MSI job red in both runs (`37389110912`, reproduced in the docs head's
-  `37390031054`):** it fails at `scripts/check_msi_upgrade.ps1:40`, whose
-  `gh release download test …` cannot read the baseline. **Cause identified, and
-  it is release state, not this diff:** the rolling `test` release is currently
-  a **Draft** (`draft=true`; `created 16:49:03Z`, `published 16:56:46Z`), while
-  the `msi` job's token is `contents: read` — a draft release is only visible to
-  push-capable tokens, so the download exits non-zero before the check can run.
-  Documented rule: drafts are only visible to callers with **push access**
-  (GitHub REST releases/assets docs), and the `msi` job runs under
-  `contents: read`. The workflow itself never drafts `test` (`--prerelease`;
-  only the `v0.1.0` job passes `--draft`). Proof it is the state and not the
-  check: the same step **passed** at 16:55:24Z in push run **37343725414**,
-  against the previously *published* baseline (MSI 2.137.1), and has failed in
-  every run since the 16:56:46Z (re)create. The exact sequence that left the
-  flag set is not reconstructible from the API, and does not matter for the
-  action: publish the rolling release again (or grant the job write access). Note a branch run can never
-  fix it — the `publish` job is `main`-gated (`refs/heads/main`) — so restoring
-  the baseline means republishing the rolling release (an owner action; this
-  session deliberately did not touch release state). The MSI itself built fine
-  (2.149.1, SHA-256
-  `6e34042319feed49d4bc9f4f64bd9dc5950774de7b781d12bbdf65252dd1fdf2`), it was
-  just never uploaded. Consequence: **no Windows candidate for this slice**, and
-  the install-over gate is unrunnable until the release is published again.
-- Rolling `test` still targets `885a092` (APK 18,367,219 B, MSI 112,934,912 B).
-  PR runs are `buildOnly`, so this PR changes no published asset. Its four
-  assets are the PR #120 artifacts, digest-verified by the user.
+**Evidence (this session, verified against GitHub):** _CI run ids are appended in
+the docs commit that follows this head; they are the only missing piece here._
 
-**Docs head and its CI (verified):** `564b890`, pushed. Green: push CI
-**37390026600**, PR CI **37390030215** (9/9 steps, `:shared:jvmTest`), Build APK
-**37390030691** (`debug-apk`, 17,560,782 B), and the docs head's test-release
-**37390031054** — `apk` green, `msi` red as above. The docs-only delta rebuilds
-to a **byte-identical APK**: `dhun-test.apk` 18,367,219 B, SHA-256
-`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` (same digest
-as `37389110912`, now from source `e9e0d178`), so the digest already handed over
-is still the candidate.
+**Exact next step:** _the merge of PR #122, its post-merge verification (CI, Build
+APK, test-release), and the release proof — recorded in the docs commit, not
+here._
 
-**Exact next step:** the merge. The user's 2026-10-06 instruction was to verify
-everything and then merge; verification is complete (all code checks green, the
-diff reviewed, the docs reconciled) and the merge runs as this block lands —
-`gh pr merge 121 --merge`, the repo's convention. **The device retest of gate
-steps 19–22 had not happened at merge time**, so those two surfaces stay
-unverified on hardware and the S3 ledger line above is not closed by this merge.
-After merging: verify post-merge CI and the test-release job in the same turn,
-and expect the post-merge run's `msi` job to stay red until the rolling release
-is published again (or the job is granted `contents: write`).
-
-**Completion ledger (unchanged by this session):**
+**Completion ledger (updated by this session):**
 - **S1:** CLOSED GREEN 2026-09-20 (daily drill restored + residential playback
   evidence on `d99060e`; T1 disproven).
 - **S2:** MERGED 2026-09-22 (PR #111 → `7fcadbe`); Ubuntu-26 watch 2026-10-19.
 - **S4/S5:** code merged (PR #74; #118); hardware acceptance rides in S3.
-- **S3/S6:** OPEN. The artwork retest closed only the artwork slice of S3. Still
-  open: these two surfaces until retested, notification/lock-screen/widget
-  controls, downloads/offline, lyrics, Settings/theme persistence, Android EQ,
-  the Windows native column (tray/media keys/SMTC/jump lists/upgrade), 30-minute
-  soaks, clean-target installs, signing decisions.
-- **Blockers:** no Android/Windows device and no JDK in the sandbox — CI is the
-  compiler and the user's device retest is the acceptance.
-- **Lifecycle:** work stays on `arena/cf4e91ba-dhun`; no merge or finalization
-  until the user says so.
+- **S3/S6:** OPEN. The artwork retest closed only the artwork slice. Still open:
+  the PR #121 picker/panel/Library-dialog surfaces (gate steps 19–22) until
+  retested, notification/lock-screen/widget controls, downloads/offline, lyrics,
+  Settings/theme persistence, Android EQ, the Windows native column
+  (tray/media keys/SMTC/jump lists/upgrade), 30-minute soaks, clean-target
+  installs, signing decisions.
+- **Release plumbing (this session):** the rolling `test` release must be a
+  **published prerelease**; PR #122 repairs it and adds the workflow guard.
+- **Blockers:** no Android/Windows device and no JDK/pwsh in the sandbox — CI is
+  the compiler and the user's device retest is the acceptance.
+- **Lifecycle:** work stays on `arena/95fb0f92-dhun`; merge only when everything
+  is verified (the user's standing instruction).
+
+---
+
+## Historical session record — PR #121 (merged as `5c8bd67`, 2026-10-06, session `arena/cf4e91ba-dhun`)
+
+- The fix: the ⋮ → **Add to playlist** picker was rebuilt on the compact menu
+  family (content-sized list via `AddToPlaylistPolicy`, `DhunTextField`); the
+  Queue/Related panel got a real header-strip drag (seamless — the player moves
+  with it — threshold `0.28 × travel`, floor one touch target) and stopped
+  painting the retired near-black `GlassBottomBar`; the Library/playlist dialogs
+  moved to `DhunTextField` + opaque `GlassCard`.
+- **Real red on record:** PR CI `37388855101` failed three `PlayerPanelDragTest`
+  assertions (two wrong expectations + one helper inconsistency), fixed in
+  `85e73eb`. Candidate APK: 18,367,219 B, SHA-256
+  `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` (run
+  `37389110912`, build-only artifact).
+- **Merged without the device retest** on the user's instruction; gate steps
+  19–22 remain unverified on hardware.
 
 ---
 

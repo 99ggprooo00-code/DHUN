@@ -24,6 +24,47 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+
+### Fixed — a draft rolling release can no longer wedge the test release (2026-10-06, PR #122)
+
+- **The state that triggered it:** the rolling `test` release is a **Draft**
+  (`draft=true`, target `885a092`, four assets uploaded 2026-10-05T16:56:42Z).
+  GitHub lists draft releases only to callers with **push access**, so the `msi`
+  job's `contents: read` token cannot resolve `gh release download test`: the
+  install-over step fails with *"Could not download the published MSI
+  baseline/checksum"* (annotation on run **37403248318**, `5c8bd67`). The same
+  step **passed** at 2026-10-05T16:55:24Z in run **37343725414** against the
+  previous, *published* baseline, and **every** test-release run after the
+  16:56:46Z (re)create failed the same way — 10 failures and 1 concurrency
+  cancel, 0 successes (`37389110912` … `37403248318`). That is also the
+  user-visible half: the rolling release is missing from the public Releases
+  page, which reads as "the installation files are gone". They are not gone —
+  they are invisible.
+- **The design defect:** `publish` has `needs: [apk, msi]`, so the failing `msi`
+  job also skipped the only job that republishes the release *and* the only job
+  with `contents: write` — the one thing that could have made the release
+  readable again. Run **37403248318**: `msi` failed, `publish` skipped. A
+  release-state problem became an outage no push could break.
+- `scripts/check_msi_upgrade.ps1` now **grades** the baseline fetch: a release
+  the job cannot read (absent, still a draft, or being replaced mid-run) is a
+  **SKIP**, not a failure — `::warning title=MSI install-over SKIPPED::`, a
+  notice, `installOver = "skipped: <reason>"` in `out/installer-check/result.json`
+  and `exit 0`. The MSI still builds, stages and uploads, so `publish` can run
+  and repair the release. **The trade-off is deliberate: a skipped run's MSI is
+  build-verified only — never report it as an install-over pass.** A fetch that
+  succeeds and then contradicts itself (checksum mismatch, upgrade-identity
+  mismatch, not-newer version) still fails the run, so the skip cannot hide a bad
+  baseline.
+- The `publish` job **re-asserts readability** after creating the release
+  (`gh release edit test --draft=false --prerelease --target "$GITHUB_SHA"`) and
+  then fails the run unless `isDraft` is provably `false`, so the rolling release
+  cannot silently go dark again.
+- The `msi` job keeps `contents: read`; it is deliberately **not** widened to
+  `contents: write`. A contract test pins that a read-scoped build job must never
+  be able to mutate a release.
+- New contract tests in `scripts/test_build_workflow.py` (31 total): the publish
+  re-assert, and "an unreadable baseline skips — and the skip is never a pass".
+
 ### Changed — the Full Player playlist picker and queue panel (2026-10-06, PR #121)
 
 - **Add to playlist** (Full Player → ⋮) leaves the old Material look: it draws

@@ -251,6 +251,17 @@ jobs:
             --notes "Rolling UNVERIFIED development build of main. dhun-test.apk = Android, dhun-test.msi = Windows (playback needs a VLC install). Nothing here is stable, signed for stores, or recommended for daily-driver devices. Install only where that is acceptable. Current open checks: docs/verification/03-android-skeleton.md, docs/verification/12-desktop-native.md" \
             --prerelease
 
+          # A draft release is listed only to callers with push access, so a
+          # draft `test` release is invisible on the public Releases page AND
+          # unresolvable by the msi job's contents:read baseline fetch. Re-assert
+          # readability here, then prove it rather than assume it.
+          gh release edit test --draft=false --prerelease --target "$GITHUB_SHA"
+          gh release view test --json tagName,isDraft,isPrerelease,targetCommitish --jq '{tagName,isDraft,isPrerelease,targetCommitish}'
+          if [ "$(gh release view test --json isDraft --jq '.isDraft')" != "false" ]; then
+            echo "::error::The rolling test release is still a draft; read-scoped jobs cannot fetch its assets and the public Releases page will not list it"
+            exit 1
+          fi
+
   release_draft:
     # v0.1.0 DRAFT release — the approved release-prep deliverable. Drafts are
     # private and deletable; this job NEVER publishes and requires an explicit

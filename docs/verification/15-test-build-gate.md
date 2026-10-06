@@ -57,15 +57,20 @@
 > device-verified yet. **For this retest, run steps 19–22 below and keep the
 > steps 1–18 results you already have** (the parser is untouched).
 >
-> **No candidate MSI this round.** The `msi` job fails in both test-release runs
-> (the `apk` job is the one that is green) at `check_msi_upgrade.ps1`'s baseline
-> download: the rolling `test` release is currently a **Draft** and the job's
-> read-scoped token cannot read a draft. The installer itself builds and stages
-> (`dhun-test.msi` 112,947,200 B, ProductVersion 2.149.1, SHA-256
-> `6e34042319feed49d4bc9f4f64bd9dc5950774de7b781d12bbdf65252dd1fdf2`) — it is
-> simply not uploadable while the check can't fetch its baseline. So the Windows
-> column of this gate cannot be exercised against this candidate until the
-> rolling release is published again; the Android steps below are unaffected.
+> **MSI candidate: fixed — the rolling release is being repaired (PR #122,
+> 2026-10-06).** The `msi` job has been red in **every** test-release run since
+> 2026-10-05T16:56:46Z: the rolling `test` release is a **Draft** and the job's
+> read-scoped token cannot read it — and because `publish` has
+> `needs: [apk, msi]`, the one job that could republish the release was skipped
+> with it (run **37403248318**: `msi` failed → `publish` skipped). PR #122 makes
+> an unreadable baseline a *skip* (`MSI install-over SKIPPED` — build-verified
+> only, never a pass), so the MSI uploads and `publish` runs, and `publish` now
+> re-asserts `--draft=false` and proves `isDraft` is `false`. **After PR #122
+> merges**, the rolling release is the Windows candidate: download its
+> `dhun-test.msi` (verify the sidecar), install over your existing build, and run
+> the Windows column below. Read the `msi` job's annotations first:
+> `MSI upgrade smoke PASS` means the sentinel checks really ran;
+> `MSI install-over SKIPPED` means they did not.
 
 > **Purpose.** Device-side acceptance for the `test` rolling build. The sheet
 > was written around PR #114's three defects — album artwork on playback,
@@ -125,21 +130,30 @@ Get-FileHash .\dhun-test.msi -Algorithm SHA256
 Get-Content .\dhun-test.msi.sha256
 ```
 
-**Build identity** — rolling `test` targeting
-**`73b88b60b647120662812a5d33b233876acad283`** (PR #119), published
-**2026-09-28T18:48:23Z**; MSI ProductVersion **2.137.1**. Release metadata
-reports these asset sizes; the current SHA-256 values remain **unverified**.
+**Build identity** — the rolling `test` release is **currently invisible
+(draft)** and PR #122 repairs it; the last content it served was built by
+test-release run **37343725414** (merge `885a092…`, assets uploaded
+2026-10-05T16:56:42Z, MSI ProductVersion **2.146.1**). The digests below come from
+that run's own provenance notices — the sandbox cannot download release assets
+(Azure-blob EOF), so they are **not** independently re-verified here. After
+PR #122's post-merge publish, take the digests from that run's notices/sidecars —
+**the MSI hash changes on every publish** (its ProductVersion counter advances).
 
-| Asset | Bytes | SHA-256 status |
+| Asset | Bytes | SHA-256 (from run 37343725414's provenance notices) |
 |---|---:|---|
-| `dhun-test.apk` | 18,367,219 | **Unverified for `73b88b6` — check the release `.sha256` sidecar** |
-| `dhun-test.msi` | 112,934,912 | **Unverified for `73b88b6` — check the release `.sha256` sidecar** |
+| `dhun-test.apk` | 18,367,219 | `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458` |
+| `dhun-test.msi` | 112,934,912 | `b569e769917840f4ea2c1d6814f950b03197295ed28becf1fdb6ca8c2d3bc650` (2.146.1) |
+
+The APK digest equals the PR #120 candidate's: that rebuild was byte-identical,
+which is why the same value recurs across heads. It is evidence of reproducibility,
+not of a new build.
 
 The values previously shown here — APK
 `8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` and MSI
 `4e28c551db2834c699351b3eb1c4d03c96dc46d536156242203845ee28d46b6e` — belong
-to the earlier **`16ad2e5`** publish; they are historical only, not expected
-hashes for this build. Matching sizes do not prove matching bytes.
+to the earlier **`16ad2e5`** publish; they are historical only. Matching sizes do
+not prove matching bytes, and an unchanged APK digest does not mean the MSI one
+is unchanged.
 
 > Compare each computed file hash with its matching `.sha256` sidecar from this
 > same `test` release. If you cannot verify either sidecar/hash pair, stop
