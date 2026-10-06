@@ -24,10 +24,12 @@ Updated every phase. Nothing hidden.
 - `DhunTextField` is a `BasicTextField` wrapper: it carries the app's visual
   language and IME Done handling, but no M3 text-field semantics/autofill
   extras. Revisit if a real form ever needs them.
-- **Retest pending:** the picker's look and size, the panel's swipe, and the five
-  Library/playlist dialogs' opacity are proven only by CI compilation and the
-  new pure-logic tests. Device acceptance is the user's retest of the candidate
-  APK (gate §3 "Fix 4").
+- **Retest pending, including after the merge:** the picker's look and size, the
+  panel's swipe, and the five Library/playlist dialogs' opacity are proven only
+  by CI compilation and the new pure-logic tests. PR #121 merged on the user's
+  2026-10-06 instruction without that retest, so **these surfaces are live on
+  `main` unverified on hardware** — the acceptance remains the retest of the
+  candidate APK against gate §3 "Fix 4" (steps 19–22).
 - The candidate MSI for this slice does not exist: the `msi` job fails in both
   test-release runs (37389110912, and 37390031054 for the docs head) at the
   install-over check's baseline download (`gh release download test …` →

@@ -85,11 +85,15 @@ to a **byte-identical APK**: `dhun-test.apk` 18,367,219 B, SHA-256
 as `37389110912`, now from source `e9e0d178`), so the digest already handed over
 is still the candidate.
 
-**Exact next step:** hand the user the digest and the Fix-4 steps 19–22 for the
-targeted retest, plus a Fix-3 sanity glance that the ⋮ menu is still compact.
-**Merge only after that retest**, then verify post-merge CI/test-release in the
-same turn — and expect the post-merge run's `msi` job to stay red until the
-rolling release is published again.
+**Exact next step:** the merge. The user's 2026-10-06 instruction was to verify
+everything and then merge; verification is complete (all code checks green, the
+diff reviewed, the docs reconciled) and the merge runs as this block lands —
+`gh pr merge 121 --merge`, the repo's convention. **The device retest of gate
+steps 19–22 had not happened at merge time**, so those two surfaces stay
+unverified on hardware and the S3 ledger line above is not closed by this merge.
+After merging: verify post-merge CI and the test-release job in the same turn,
+and expect the post-merge run's `msi` job to stay red until the rolling release
+is published again (or the job is granted `contents: write`).
 
 **Completion ledger (unchanged by this session):**
 - **S1:** CLOSED GREEN 2026-09-20 (daily drill restored + residential playback

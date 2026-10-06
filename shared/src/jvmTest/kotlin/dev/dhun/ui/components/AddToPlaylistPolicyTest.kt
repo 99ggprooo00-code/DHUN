@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  * playlists existed, so one or two playlists sat in a mostly empty slab, and the
  * one text field was an M3 `OutlinedTextField`, which is 56dp of Material chrome
  * with a floating label. Both are now content-sized (see [AddToPlaylistPolicy]
- * and the `PlaylistNameField` in `AddToPlaylistDialog`), which is exactly the
+ * and the `DhunTextField` in `AddToPlaylistDialog`), which is exactly the
  * class of defect this test keeps fixed: it asserts *reserved* height as a
  * function of row count, with no device involved.
  */

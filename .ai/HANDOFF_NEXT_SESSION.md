@@ -23,10 +23,18 @@ contain these fixes.
 9 steps, including `:shared:jvmTest` with the two new suites), Build APK
 **37389110248**. Docs heads followed (`37390026600`/`37390030215`/`37390030691`, then
 `37390996715`/`37391002255`/`37391002430`, then `37392433619`/`37392436952`/
-`37392437020`). **Head at the time of writing `332704d`** (docs-comment tail):
-push CI **37398610382**, PR CI **37398614025** (9/9 each), Build APK
-**37398613949**, test-release **37398613971** (`apk` green; `msi` red as below).
-The flake on the intermediate head `e837d30` did not recur on the later heads. **Real red on record:** PR CI **37388855101** failed on three
+`37392437020`, then the docs-comment heads `37398610382`/`37398614025`/
+`37398613949`/`37398613971`). Every head in the slice has run the same four
+workflows: `build-and-test` and `build` pass 9/9, `apk` passes, `msi` fails for
+the draft-release reason below, and `aab`/`publish`/`release_draft` skip because
+they are `main`-gated. The flake on the intermediate head `e837d30` did not
+recur on any later head.
+
+**Merge basis.** PR #121 merges on the user's explicit instruction
+(2026-10-06: verify everything, then merge). The device retest of steps 19–22
+had **not** happened when this line was written, so the picker and panel remain
+**unverified on hardware** and the S3 artwork slice stays open in the ledger —
+merging this PR does not close it. **Real red on record:** PR CI **37388855101** failed on three
 `PlayerPanelDragTest` assertions (two wrong expectations + one helper
 inconsistency); fixed in `85e73eb`.
 

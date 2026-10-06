@@ -1,5 +1,25 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-06 — sandbox trap: the checkout's `.git` is reverted between turns (`arena/cf4e91ba-dhun`)
+
+**Symptom.** Twice in this session the workspace came back with `HEAD` at the
+original shallow merge commit (`885a092`) and the branch refs as they were before
+any of this session's commits — while the *worktree* files still held the full
+edits. `git log` showed only `885a092`; `git cat-file -t <session commit>` said
+"Not a valid object name".
+
+**What it is.** The sandbox snapshots the worktree but not the local `.git`
+(`.git/config` is excluded from snapshots by design, and this environment also
+appears to restore the base clone). The remote branch was never affected —
+every commit had been pushed.
+
+**What to do.** Treat `origin/<branch>` as the source of truth. To re-attach:
+`git fetch --depth=50 origin <branch>`, `git add -A`, confirm
+`git diff --cached origin/<branch>` is **empty** (that is the proof the worktree
+still matches the pushed head before the ref moves), then
+`git checkout -B <branch> origin/<branch>`. Do **not** assume local commits
+survive a turn boundary, and do not `git reset`/re-clone.
+
 ## 2026-10-06 — Full Player's two "old interface" surfaces: the playlist picker and the queue panel's missing swipe (session `arena/cf4e91ba-dhun`, base `main@885a092`, PR #121)
 
 **Report** (user, on the digest-verified PR #120 candidate, Android 15
