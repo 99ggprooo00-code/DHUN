@@ -21,11 +21,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
+import kotlin.test.fail
 
 class LibraryViewModelTest {
 
@@ -77,9 +78,26 @@ class LibraryViewModelTest {
      * Async assertion deadline. 15s default: 5s was too tight on loaded CI
      * runners (run 33950689637 flake — in-memory driver + polling under
      * GitHub Actions load); a genuine stuck flow still fails within 15s.
+     *
+     * [label] is evaluated only when the deadline expires, so it carries the
+     * observed state into the failure. That is the whole readout this project
+     * gets from CI: the check-run annotation produced by `build.gradle.kts` is
+     * the only artifact readable from the development sandbox (job logs and
+     * artifact blobs cannot be downloaded there), and a bare
+     * "Timed out waiting for 15000 ms" used to name neither the wait nor the
+     * state it was stuck on — see the 2026-10-06 flake record in
+     * `.ai/DEBUG_LOG.md`.
      */
-    private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {
-        withTimeout(timeoutMs) { while (!check()) delay(20) }
+    private suspend fun eventually(
+        timeoutMs: Long = 15_000,
+        label: () -> String = { "unlabelled wait" },
+        check: suspend () -> Boolean,
+    ) {
+        val satisfied = withTimeoutOrNull(timeoutMs) {
+            while (!check()) delay(20)
+            true
+        } ?: false
+        if (!satisfied) fail("eventually(${timeoutMs}ms) timed out: ${label()}")
     }
 
     @Test
@@ -217,27 +235,55 @@ class LibraryViewModelTest {
             data.history.recordPlay(track("hx1"), PlayContext.SEARCH)
             data.history.recordPlay(track("hx2"), PlayContext.HOME)
             data.history.recordPlay(track("hx3"), PlayContext.PLAYLIST)
-            eventually { vm.historyEntries.value.size == 3 }
-
-            // Play a history day — should prepareQueue with HISTORY context (persistance is null so just queue)
-            val day = vm.groupedHistory.value.firstOrNull()
-            if (day != null) {
-                vm.playHistoryDay(day, 0)
-                eventually { player.prepareCalls >= 1 }
-                assertTrue(player.lastPrepared.isNotEmpty())
+            eventually(label = { "3 history entries (was ${vm.historyEntries.value.size})" }) {
+                vm.historyEntries.value.size == 3
             }
+
+            // Grouped days are derived ASYNCHRONOUSLY (LibraryViewModel's
+            // combine-collector on the VM scope), so the instant
+            // `historyEntries` holds the rows, `groupedHistory` can still be
+            // its initial emptyList(). Reading `firstOrNull()` inside that
+            // window silently skipped the day-play block below, and because
+            // `playHistoryEntry` only ever issues ONE prepare call, the
+            // `prepareCalls >= 2` wait could then never be satisfied: a benign
+            // scheduler race amplified into a 15 s timeout (runs 37320618809
+            // and 37407043852 — the recurring flake, finally root-caused).
+            // Wait for the derived state instead, and fail loudly if it never
+            // arrives rather than skipping the coverage.
+            eventually(label = {
+                val days = vm.groupedHistory.value
+                "grouped history to mirror ${vm.historyEntries.value.size} entries " +
+                    "(days=${days.size}, firstDayEntries=${days.firstOrNull()?.entries?.size})"
+            }) { vm.groupedHistory.value.isNotEmpty() }
+
+            // Play a history day — should prepareQueue with HISTORY context
+            // (persistence is null in this test, so only the queue is set).
+            val day = vm.groupedHistory.value.first()
+            vm.playHistoryDay(day, 0)
+            eventually(label = { "playHistoryDay to prepare a queue (calls=${player.prepareCalls})" }) {
+                player.prepareCalls >= 1
+            }
+            // The day path queues exactly the day's tracks (the single-entry
+            // path below queues the whole visible history, so this pins which
+            // one ran).
+            assertEquals(day.entries.size, player.lastPrepared.size)
 
             // Play single history entry
             val entry = vm.historyEntries.value.first()
             vm.playHistoryEntry(entry)
-            eventually { player.prepareCalls >= 2 }
+            eventually(label = {
+                "playHistoryEntry to prepare a second queue (calls=${player.prepareCalls}, " +
+                    "lastPrepared=${player.lastPrepared.size})"
+            }) { player.prepareCalls >= 2 }
             assertTrue(player.lastPrepared.any { it.id == entry.track.id })
 
             // Verify that LibraryViewModel exposes HistoryDay grouping with offset handling
             val plus2Offset = 2 * 3_600_000L
             vm.refreshHistoryGrouping(plus2Offset)
-            // After offset change, grouping should be recomputed (still non-empty)
-            eventually { vm.groupedHistory.value.isNotEmpty() }
+            // After the offset change, grouping should be recomputed (still non-empty)
+            eventually(label = { "grouping to survive the +2h offset (days=${vm.groupedHistory.value.size})" }) {
+                vm.groupedHistory.value.isNotEmpty()
+            }
         } finally {
             scope.cancel()
         }
