@@ -64,13 +64,30 @@ release's own build*, plus the future-upgrade guard and uninstall smoke. The
 `main`-push equivalent (with `buildOnly=false` and `publish` replacing the
 release) is the merge of this docs PR; expect a *new* MSI digest afterwards.
 
-**One red on record (not this diff):** PR CI **37407043852** on the same head
-failed `:shared:jvmTest` on `LibraryViewModelTest.historyPlaybackQueuesCorrectly`
+**One red on record (not this diff):** PR CI **37407043852** on the head
+`a7c4fb0` failed `:shared:jvmTest` on
+`LibraryViewModelTest.historyPlaybackQueuesCorrectly`
 (`TimeoutCancellationException: Timed out waiting for 15000 ms`) while **push CI
 `37407039477` was 9/9 green on the identical SHA** — the documented flaky-test
-class (fourth occurrence). `gh run rerun` is refused, so the successor commit is
-the re-trigger; merge basis is the identical-SHA green push CI, not a retry
+class (fourth occurrence). `gh run rerun` is refused, so the successor commit was
+the re-trigger; merge basis was the identical-SHA green push CI, not a retry
 loop.
+
+**Second `main` push (`a9204c5`, the docs merge) — release path re-verified:**
+CI **37408148211** ✅, Build APK **37408148184** ✅, test-release **37408148220** ✅.
+The `msi` job ran the **full** install-over with `buildOnly=false`:
+`MSI upgrade smoke PASS::Hosted Windows: 2.160.1 -> 2.163.1; per-user install and
+userdata/cache sentinels preserved. Baseline SHA256=74109a13…` (the previous
+publish's MSI) + future-upgrade guard + uninstall smoke, **no skip warning**; and
+`publish` replaced the release again — published 2026-10-06T03:20:40Z, target
+`a9204c5…`, four assets. Digests of that publish: APK 18,367,219 B
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` (unchanged —
+no app-code delta since PR #121), MSI 112,947,200 B, ProductVersion 2.163.1,
+`12745f81394a357c266c8453903e70aa78c2f7b29450d97e5c8348dfc45f5f8e`. Release-asset
+downloads still EOF in-sandbox; these come from the run's provenance notices.
+**Every later `main` push re-publishes and moves the MSI digest** — verify a
+download against the release's own sidecar, never a digest quoted from an older
+publish.
 
 **What to retest (unchanged, still open — gate `docs/verification/15-test-build-gate.md` §3 "Fix 4", steps 19–22):**
 - Step 19 — the picker's look: compact frosted family, content-sized list, no

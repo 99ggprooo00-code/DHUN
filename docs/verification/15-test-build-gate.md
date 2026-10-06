@@ -73,9 +73,10 @@
 > Windows column below is runnable again: download `dhun-test.msi` from the
 > release, verify its `.sha256` sidecar, install over the existing build. Read the
 > `msi` job's annotations first: `MSI upgrade smoke PASS` means the sentinel
-> checks really ran; `MSI install-over SKIPPED` means they did not. (In the
-> repair run itself they did **not** — the baseline was still the draft when it
-> checked — and that skip is announced on the job.)
+> checks really ran; `MSI install-over SKIPPED` means they did not. (The repair
+> run **37406381117** itself skipped — the baseline was still the draft when it
+> checked — and announced that on the job. The next `main` push, **37408148220**,
+> ran the full check: `2.160.1 -> 2.163.1`, both sentinels preserved, no skip.)
 
 > **Purpose.** Device-side acceptance for the `test` rolling build. The sheet
 > was written around PR #114's three defects — album artwork on playback,
@@ -135,20 +136,22 @@ Get-FileHash .\dhun-test.msi -Algorithm SHA256
 Get-Content .\dhun-test.msi.sha256
 ```
 
-**Build identity** — rolling `test` is a **published pre-release** again:
-published **2026-10-06T02:58:13Z**, target
-**`5e664c1f57fb7d2b55de7f016fe2df60db7f196e`** (merge of PR #122), assets uploaded
-02:58:10Z, MSI ProductVersion **2.160.1**. The digests below come from that run's
-provenance notices (test-release **37406381117**) — the sandbox cannot download
-release assets (Azure-blob EOF), so they are **not** independently re-verified
-here; verify your own download against the release `.sha256` sidecar. **The MSI
-hash changes on every publish** (its ProductVersion counter advances); the APK
-hash does not unless the app code changes.
+**Build identity** — rolling `test` is a **published pre-release**:
+published **2026-10-06T03:20:40Z**, target
+**`a9204c59fdc2a44e132ad903df2d556e9c63530c`**, assets uploaded 03:20:35Z, MSI
+ProductVersion **2.163.1** (test-release **37408148220**, the first `main` push
+after the repair — its `msi` job ran the **full** install-over check with no
+skip). The digests below come from that run's provenance notices — the sandbox
+cannot download release assets (Azure-blob EOF), so they are **not**
+independently re-verified here; verify your own download against the release
+`.sha256` sidecar. **The release is replaced on every `main` push and the MSI hash
+moves with it** (its ProductVersion counter advances); the APK hash moves only
+when the app code changes.
 
-| Asset | Bytes | SHA-256 (from run 37406381117's provenance notices) |
+| Asset | Bytes | SHA-256 (from run 37408148220's provenance notices) |
 |---|---:|---|
 | `dhun-test.apk` | 18,367,219 | `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` |
-| `dhun-test.msi` | 112,947,200 | `74109a1359d2b7388930bf69e8d35c012331f3c8baf2f41f856cc7fe8b57d6c6` (2.160.1) |
+| `dhun-test.msi` | 112,947,200 | `12745f81394a357c266c8453903e70aa78c2f7b29450d97e5c8348dfc45f5f8e` (2.163.1) |
 
 The APK digest equals the PR #120 candidate's `c351341e…` **and** the PR #121
 candidate's `21a5fe86…`: those heads' only deltas were docs and CI scripts, so the

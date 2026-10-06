@@ -78,6 +78,16 @@ identical SHA**. That is the known flaky-test class documented in
 successor commit is the re-trigger). Merge basis: the identical-SHA green push
 CI plus the documented flake, not a retry-until-green.
 
+**Second `main` push — the release path re-verified end to end.** On `a9204c5`
+(the docs merge), CI **37408148211** / Build APK **37408148184** / test-release
+**37408148220** are green; the `msi` job ran the full install-over with
+`buildOnly=false` (`2.160.1 -> 2.163.1`, sentinels preserved, baseline SHA256
+`74109a13…` = the previous publish's MSI), `publish` replaced the release
+(published 2026-10-06T03:20:40Z, target `a9204c5…`, four assets; MSI 2.163.1
+`12745f81…`, APK still `21a5fe86…`). **Nothing is skipped on these runs**, so a
+`MSI install-over SKIPPED` warning from now on means the release went dark
+again — that is the signal to check `isDraft` first, not the app code.
+
 ## 2026-10-06 — sandbox trap: the checkout's `.git` is reverted between turns (`arena/cf4e91ba-dhun`)
 
 **Symptom.** Twice in this session the workspace came back with `HEAD` at the
