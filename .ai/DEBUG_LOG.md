@@ -48,6 +48,13 @@ future-upgrade guard, no uninstall. Do not "fix" the deadlock by granting the
 check matches the original's profile — a smoke check, not a parse). Release-asset
 downloads still EOF in-sandbox (Azure blob), so digests come from run notices.
 
+**Verified on CI afterwards.** Code head `6a6dd83`: all 9 steps green including
+the PowerShell parse (push CI **37405077637**, PR CI **37405088698**, Build APK
+**37405088832**). The skip path ran for real in `test-release` **37405088686**
+(`msi` green with `MSI install-over SKIPPED`, candidate MSI 2.158.1 staged,
+`buildOnly=true`) — the exact behaviour the fix intends, and the reason that run
+must never be quoted as an upgrade pass.
+
 ## 2026-10-06 — sandbox trap: the checkout's `.git` is reverted between turns (`arena/cf4e91ba-dhun`)
 
 **Symptom.** Twice in this session the workspace came back with `HEAD` at the

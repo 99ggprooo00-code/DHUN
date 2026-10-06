@@ -38,10 +38,16 @@ succeeding; two contract tests pin both; `msi` keeps `contents: read`. **A skipp
 install-over is build-verified only — never a pass.** Contradictory fetches still
 fail. Release-asset downloads EOF in-sandbox, so digests come from run notices.
 
-**Evidence this session:** the PR #122 CI runs, the post-merge CI / Build APK /
-test-release runs, and the repaired release's four asset digests are recorded in
-the docs commit that lands with the merge — read them there rather than trusting
-this line.
+**Evidence this session (code head `6a6dd83`, PR #122).** CI green on **all 9
+steps**, including `PowerShell packaging helper syntax` — the first parse of the
+`.ps1` change: push CI **37405077637**, PR CI **37405088698**; Build APK
+**37405088832**. `test-release` **37405088686** (PR, artifacts-only) proves the
+new skip path end to end: `apk` ✅, **`msi` ✅** with
+`::warning title=MSI install-over SKIPPED::` (candidate MSI 2.158.1,
+112,947,200 B, sha256 `3290e053…`, `buildOnly=true`) — the upgrade checks did not
+run and are not claimed; `publish`/`aab`/`release_draft` skipped (main-gated on a
+PR). The post-merge runs and the repaired release's four fresh asset digests are
+recorded in the docs commit that follows the merge — read them there.
 
 **What to retest (unchanged, still open — gate `docs/verification/15-test-build-gate.md` §3 "Fix 4", steps 19–22):**
 - Step 19 — the picker's look: compact frosted family, content-sized list, no

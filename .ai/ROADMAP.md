@@ -39,12 +39,29 @@ Active gate: `docs/verification/15-test-build-gate.md`; broader procedure:
 - Two new contract tests in `scripts/test_build_workflow.py` (31 tests total).
   Local gates: unittest **31 OK**, `validate_fixtures.py` **PASS: 39 files**.
 
-**Evidence (this session, verified against GitHub):** _CI run ids are appended in
-the docs commit that follows this head; they are the only missing piece here._
+**Evidence (this session, verified against GitHub):** code head **`6a6dd83`**
+(PR #122; this docs head follows, and its own runs are watched before merge).
+**Green, all 9 CI steps — including `PowerShell packaging helper syntax`, the
+first parse of the `.ps1` change:** push CI **37405077637**, PR CI
+**37405088698**; Build APK **37405088832**. `test-release` **37405088686** (PR,
+artifacts-only) is the skip path exercised for real: `apk` ✅ and **`msi` ✅** with
+`::warning title=MSI install-over SKIPPED::` — the candidate MSI built and staged
+(2.158.1, 112,947,200 B, sha256
+`3290e053ff76d85c6de3ab279ff418f7c295a5e6a351741cda5924d433aad2d6`,
+`buildOnly=true`) while the upgrade/sentinel/uninstall checks did **not** run, as
+announced; `aab`/`publish`/`release_draft` skipped (main-gated on a PR). **Real
+red on record:** none on this head — the red this PR removes is the 10-run `msi`
+failure streak documented above, and the skipped check above is explicitly *not*
+a pass.
 
-**Exact next step:** _the merge of PR #122, its post-merge verification (CI, Build
-APK, test-release), and the release proof — recorded in the docs commit, not
-here._
+**Exact next step:** merge PR #122, then verify post-merge in the same turn (CI,
+Build APK, test-release on the new `main`): expect `apk` ✅, `msi` ✅ **with the
+SKIPPED warning** (the baseline is still the draft) and **`publish` running** —
+the deadlock is gone — and the rolling `test` release back to
+`isDraft=false`/prerelease, target = the new `main` SHA, with all four fresh
+assets. Then one more `main` push (the next docs commit) so the `msi` job finally
+runs the **full** install-over path against the readable baseline — expect
+`MSI upgrade smoke PASS` with the sentinels preserved and **no** skip warning.
 
 **Completion ledger (updated by this session):**
 - **S1:** CLOSED GREEN 2026-09-20 (daily drill restored + residential playback

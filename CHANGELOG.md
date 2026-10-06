@@ -64,6 +64,14 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   be able to mutate a release.
 - New contract tests in `scripts/test_build_workflow.py` (31 total): the publish
   re-assert, and "an unreadable baseline skips — and the skip is never a pass".
+- **Verified on CI (code head `6a6dd83`):** all 9 CI steps green, including
+  `PowerShell packaging helper syntax` — the first parse of the `.ps1` change
+  (push CI **37405077637**, PR CI **37405088698**; Build APK **37405088832**).
+  `test-release` **37405088686** exercises the skip path for real: the `msi` job
+  is green **with** `MSI install-over SKIPPED` and the staged 2.158.1 MSI is
+  build-verified only — an announced skip, explicitly not a pass. The post-merge
+  runs and the repaired release's digests are recorded in
+  `.ai/HANDOFF_NEXT_SESSION.md`.
 
 ### Changed — the Full Player playlist picker and queue panel (2026-10-06, PR #121)
 
