@@ -55,10 +55,22 @@ to the PR #120/#121 candidates), MSI ProductVersion 2.160.1, 112,947,200 B, sha2
 `74109a1359d2b7388930bf69e8d35c012331f3c8baf2f41f856cc7fe8b57d6c6`. Digests come
 from the run's provenance notices: `gh release download` still EOFs in-sandbox
 (the Azure-blob limitation), so the sidecars were **not** independently fetched.
-**One thing is deliberately not claimed yet:** the first `msi` job to run the
-**full** install-over path (no skip) is the next `main` push (the docs commit
-carrying this record) — expect `MSI upgrade smoke PASS::Hosted Windows: <old> ->
-<new>` with the sentinels preserved, and no skip warning.
+**The full path has since run (PR head `a7c4fb0`, test-release `37407043857`,
+`buildOnly=true`):** no skip warning, and
+`MSI upgrade smoke PASS::Hosted Windows: 2.160.1 -> 2.161.1; per-user install and
+userdata/cache sentinels preserved. Baseline SHA256=74109a1359d2b738…` — that
+baseline digest is the published release's MSI, so the check upgraded *the
+release's own build*, plus the future-upgrade guard and uninstall smoke. The
+`main`-push equivalent (with `buildOnly=false` and `publish` replacing the
+release) is the merge of this docs PR; expect a *new* MSI digest afterwards.
+
+**One red on record (not this diff):** PR CI **37407043852** on the same head
+failed `:shared:jvmTest` on `LibraryViewModelTest.historyPlaybackQueuesCorrectly`
+(`TimeoutCancellationException: Timed out waiting for 15000 ms`) while **push CI
+`37407039477` was 9/9 green on the identical SHA** — the documented flaky-test
+class (fourth occurrence). `gh run rerun` is refused, so the successor commit is
+the re-trigger; merge basis is the identical-SHA green push CI, not a retry
+loop.
 
 **What to retest (unchanged, still open — gate `docs/verification/15-test-build-gate.md` §3 "Fix 4", steps 19–22):**
 - Step 19 — the picker's look: compact frosted family, content-sized list, no

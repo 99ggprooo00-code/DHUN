@@ -76,6 +76,16 @@ Updated every phase. Nothing hidden.
   diff, and **not** repaired here — do not read a green PR run as proof that it
   is gone. `gh run rerun` is refused on these branch runs, so a successor commit
   is the only way to re-trigger (and it may flake again).
+- **Fourth occurrence, and it hit this session's docs head (2026-10-06, head
+  `a7c4fb0`, PR #123):** PR CI **37407043852** failed `:shared:jvmTest` on
+  `LibraryViewModelTest.historyPlaybackQueuesCorrectly` —
+  `kotlinx.coroutines.TimeoutCancellationException: Timed out waiting for
+  15000 ms` (`LibraryViewModelTest.kt:82`) — while **push CI `37407039477` was
+  9/9 green on the identical SHA** (same one-head-two-verdicts pattern; the same
+  test timed out before, in `37320618809`). The diff was docs-only. `gh run
+  rerun 37407043852 --failed` is refused ("run … cannot be rerun; its workflow
+  file may be broken"), so the re-trigger is the successor commit — recorded,
+  not hidden.
 
 ## 2026-10-05 — S3 hardware round 1 report (partial; identity incomplete)
 

@@ -80,8 +80,17 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   2.160.1, 112,947,200 B, sha256
   `74109a1359d2b7388930bf69e8d35c012331f3c8baf2f41f856cc7fe8b57d6c6` — both from
   the run's provenance notices; release-asset downloads EOF in-sandbox, so the
-  sidecars were not independently fetched). The **full** install-over path
-  (no skip) runs on the next `main` push and is recorded in
+  sidecars were not independently fetched).
+- **First full install-over run after the repair** — `test-release`
+  **37407043857** (PR, `buildOnly=true`, head `a7c4fb0`): **no skip**, and the
+  check passed against the now-readable published baseline:
+  `MSI upgrade smoke PASS::Hosted Windows: 2.160.1 -> 2.161.1; per-user install
+  and userdata/cache sentinels preserved. Baseline SHA256=74109a1359d2b738…`
+  — that baseline digest **is** the published release's MSI digest, so the check
+  really did upgrade *the release's* build. The future-upgrade guard and the
+  uninstall smoke also passed in the same run. `publish` stays main-gated, so
+  this run proves the check only; the `main`-push equivalents (with
+  `buildOnly=false` and the publish) are recorded in
   `.ai/HANDOFF_NEXT_SESSION.md`.
 
 ### Changed — the Full Player playlist picker and queue panel (2026-10-06, PR #121)
