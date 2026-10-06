@@ -53,6 +53,17 @@ and fixed here.
 - ✅ **PR CI `37408920918`**, **Build APK `37408921035`**,
   **test-release `37408920959`** (PR path: `apk` only; `msi`/`publish` are
   `main`-gated) — all green on the same head.
+- ✅ **Repetition so far:** the fixed suite has now run green on **four**
+  workflow executions (two pushes × push/PR CI) — `:shared:jvmTest` green in all
+  of them with **zero failure annotations**. Still a small sample: the real
+  acceptance is the next several unrelated PRs/pushes.
+- ✅ **Docs head `cd90532`** (this file's commit): push CI **37409605873**
+  (12/12 steps), PR CI **37409609823**, Build APK **37409609694**,
+  test-release **37409609710** — all green, no failure annotations. A final
+  docs-only successor records these lines; its own runs are the merge gate and
+  are watched to completion before the merge ask.
+- ✅ **PR #125 state:** `MERGEABLE` / `CLEAN`; `aab`, `publish` and
+  `release_draft` are `SKIPPED` on the PR path by design (main-gated).
 - ✅ **Local, JDK-free gates:** `python3 -m unittest discover -s scripts`
   **31 OK**; `scripts/validate_fixtures.py` **PASS: 39 files**; plus a
   string/comment-aware delimiter check on both edited files against untouched
