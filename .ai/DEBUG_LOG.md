@@ -55,6 +55,17 @@ the PowerShell parse (push CI **37405077637**, PR CI **37405088698**, Build APK
 `buildOnly=true`) — the exact behaviour the fix intends, and the reason that run
 must never be quoted as an upgrade pass.
 
+**Post-merge outcome (merged as `5e664c1f`).** CI **37406381107**, Build APK
+**37406381126**, test-release **37406381117** — all green. The `msi` job skipped
+again (the baseline was still the draft at check time, announced on the job) and
+**`publish` ran** for the first time since 2026-10-05T16:56Z, deleting and
+recreating `test` as a **published pre-release**: `isDraft=false`,
+`isPrerelease=true`, published 2026-10-06T02:58:13Z, target `5e664c1f…`, four
+assets (APK 18,367,219 B `21a5fe86…`; MSI 2.160.1 112,947,200 B `74109a13…`).
+That closes the outage. The **full** install-over path (readable baseline, no
+skip) is expected on the next `main` push; if it does not appear, the thing to
+check is the `msi` job's annotations, not this diff.
+
 ## 2026-10-06 — sandbox trap: the checkout's `.git` is reverted between turns (`arena/cf4e91ba-dhun`)
 
 **Symptom.** Twice in this session the workspace came back with `HEAD` at the

@@ -38,16 +38,27 @@ succeeding; two contract tests pin both; `msi` keeps `contents: read`. **A skipp
 install-over is build-verified only — never a pass.** Contradictory fetches still
 fail. Release-asset downloads EOF in-sandbox, so digests come from run notices.
 
-**Evidence this session (code head `6a6dd83`, PR #122).** CI green on **all 9
-steps**, including `PowerShell packaging helper syntax` — the first parse of the
-`.ps1` change: push CI **37405077637**, PR CI **37405088698**; Build APK
-**37405088832**. `test-release` **37405088686** (PR, artifacts-only) proves the
-new skip path end to end: `apk` ✅, **`msi` ✅** with
-`::warning title=MSI install-over SKIPPED::` (candidate MSI 2.158.1,
-112,947,200 B, sha256 `3290e053…`, `buildOnly=true`) — the upgrade checks did not
-run and are not claimed; `publish`/`aab`/`release_draft` skipped (main-gated on a
-PR). The post-merge runs and the repaired release's four fresh asset digests are
-recorded in the docs commit that follows the merge — read them there.
+**Evidence this session (verified against GitHub).** Code head `6a6dd83`: CI
+green on **all 9 steps**, including `PowerShell packaging helper syntax` — the
+first parse of the `.ps1` change (push CI **37405077637**, PR CI **37405088698**;
+Build APK **37405088832**); `test-release` **37405088686** proved the skip path
+end to end (`msi` green **with** `MSI install-over SKIPPED`, candidate MSI 2.158.1
+staged, `buildOnly=true` — not a pass, announced as such). **PR #122 merged as
+`5e664c1f`**; post-merge CI **37406381107** ✅, Build APK **37406381126** ✅,
+test-release **37406381117** ✅ — `apk` ✅, `msi` ✅ with the SKIPPED warning (the
+baseline was still the draft at check time), **`publish` ✅ and ran for the first
+time since 2026-10-05T16:56Z**, leaving `test` a **published pre-release**:
+`isDraft=false`, `isPrerelease=true`, published 2026-10-06T02:58:13Z, target
+`5e664c1f…`, four fresh assets — APK 18,367,219 B sha256
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` (byte-identical
+to the PR #120/#121 candidates), MSI ProductVersion 2.160.1, 112,947,200 B, sha256
+`74109a1359d2b7388930bf69e8d35c012331f3c8baf2f41f856cc7fe8b57d6c6`. Digests come
+from the run's provenance notices: `gh release download` still EOFs in-sandbox
+(the Azure-blob limitation), so the sidecars were **not** independently fetched.
+**One thing is deliberately not claimed yet:** the first `msi` job to run the
+**full** install-over path (no skip) is the next `main` push (the docs commit
+carrying this record) — expect `MSI upgrade smoke PASS::Hosted Windows: <old> ->
+<new>` with the sentinels preserved, and no skip warning.
 
 **What to retest (unchanged, still open — gate `docs/verification/15-test-build-gate.md` §3 "Fix 4", steps 19–22):**
 - Step 19 — the picker's look: compact frosted family, content-sized list, no

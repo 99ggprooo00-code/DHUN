@@ -23,6 +23,13 @@ Updated every phase. Nothing hidden.
   (no `pwsh` in the development sandbox); CI is its first and only parse.
 - **Still open from PR #121 (unchanged):** the picker/panel/`DhunTextField`
   surfaces are live on `main` without the device retest of gate steps 19–22.
+- **Post-merge status (2026-10-06, `5e664c1f`):** the deadlock is closed — run
+  **37406381117** republished `test` as a published pre-release
+  (`isDraft=false`, target `5e664c1f…`, four assets; APK 18,367,219 B
+  `21a5fe86…`, MSI 2.160.1 112,947,200 B `74109a13…` from the run's provenance
+  notices). The **first** full install-over run against the readable baseline is
+  the next `main` push; until a run reports `MSI upgrade smoke PASS` (and no skip
+  warning), the Windows upgrade column has no fresh CI evidence.
 
 ## 2026-10-06 — the playlist picker / queue-panel fixes are CI-green but not yet seen on a device (session `arena/cf4e91ba-dhun`, PR #121)
 
