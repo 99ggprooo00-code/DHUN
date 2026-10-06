@@ -94,19 +94,34 @@ not flaky. Root cause: the rolling `test` release is currently a **Draft**
 (`draft=true`; `created 2026-10-05T16:49:03Z`, `published 2026-10-05T16:56:46Z`),
 and the `msi` job runs with `contents: read` — a draft release is not readable
 by a token without push access, so `gh release download test` fails before the
-install-over check gets a baseline. The state was **not** produced by the
-workflow: `.github/workflows/test-release.yml` at `885a092` (the commit that ran
-it) is byte-identical to this branch's, it creates the rolling release with
-`--prerelease`, and the repo event feed holds exactly one `ReleaseEvent
-published tag=test` at 16:56:46Z; only the `v0.1.0` `release_draft` job uses
-`--draft`. So the draft flag was applied out of band, after that publish. The
-discriminator: the very same install-over step **passed** at 16:55:24Z in push
-run `37343725414` — i.e. against the previous, *published* baseline; it has
-failed every time since. A branch run cannot repair it (`publish` is gated on
-`refs/heads/main`), and this session did not touch release state; the fix is to
-republish the rolling `test` release, after which the check runs unchanged.
-Until then **no Windows candidate exists for this slice**, and the Windows half
-of the retest must wait. No visual or gesture acceptance is claimed here —
+install-over check gets a baseline. This is the documented draft-release
+behaviour, not a hunch: the REST releases docs state that *"Only users with push
+access will receive listings for draft releases"*
+(<https://docs.github.com/en/rest/releases/releases>), and the release-asset
+endpoints likewise require push access for a draft
+(<https://docs.github.com/en/rest/releases/assets>) — the `msi` job runs under
+the workflow's `contents: read`, so `gh release download test` cannot resolve a
+draft and exits non-zero. The public record matches that reading exactly: the
+same install-over step **passed** at 16:55:24Z in push run `37343725414`, when
+the tag still resolved to the previously *published* baseline (MSI 2.137.1), and
+it has failed in every run since the 16:56:46Z (re)create. An analogous real
+case — a `contents: read` verifier seeing "release not found" for a draft and
+being fixed by granting write — is `lustoykov/hallvi#199`.
+
+What is **verifiable**: the current state is `draft=true`; and no workflow in
+this repo drafts `test` (`test-release.yml` at `885a092`, the commit that ran
+it, is byte-identical to this branch's, creates the release with `--prerelease`,
+and only the `v0.1.0` `release_draft` job passes `--draft`; the event feed holds
+exactly one `published` event). What is **not** fully reconstructible is the
+history: the record's `created_at` (16:49:03Z) predates the 16:56:46Z publish
+event while that publish's assets were uploaded at 16:56:42Z, so the exact
+sequence that left the flag set is unclear from the API alone. It does not
+change the actionable fact: a read-scoped token cannot read a draft, a branch
+run cannot repair it (`publish` is gated on `refs/heads/main`), and the
+install-over gate cannot run until the rolling release is published again (or
+the job is deliberately granted `contents: write`). This session did not touch
+release state. Until then **no Windows candidate exists for this slice**, and
+the Windows half of the retest must wait. No visual or gesture acceptance is claimed here —
 see `docs/verification/15-test-build-gate.md` §3 "Fix 4".
 
 ## 2026-10-05 — S3 hardware report; build digest and UI symptoms unresolved

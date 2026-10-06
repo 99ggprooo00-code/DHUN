@@ -56,12 +56,15 @@ session); broader procedure: `docs/runbooks/s3-hardware-checklist.md`.
   a **Draft** (`draft=true`; `created 16:49:03Z`, `published 16:56:46Z`), while
   the `msi` job's token is `contents: read` — a draft release is only visible to
   push-capable tokens, so the download exits non-zero before the check can run.
-  The repo's workflow never does this (it creates `test` with `--prerelease`;
-  the file at `885a092` is byte-identical to this branch's, and the event log
-  holds exactly one `published` event, 16:56:46Z) and no workflow can draft it —
-  so the draft flag was set out of band, after that publish. Proof it is the
-  state and not the check: the same step **passed** at 16:55:24Z in push run
-  **37343725414**, against the *published* baseline. Note a branch run can never
+  Documented rule: drafts are only visible to callers with **push access**
+  (GitHub REST releases/assets docs), and the `msi` job runs under
+  `contents: read`. The workflow itself never drafts `test` (`--prerelease`;
+  only the `v0.1.0` job passes `--draft`). Proof it is the state and not the
+  check: the same step **passed** at 16:55:24Z in push run **37343725414**,
+  against the previously *published* baseline (MSI 2.137.1), and has failed in
+  every run since the 16:56:46Z (re)create. The exact sequence that left the
+  flag set is not reconstructible from the API, and does not matter for the
+  action: publish the rolling release again (or grant the job write access). Note a branch run can never
   fix it — the `publish` job is `main`-gated (`refs/heads/main`) — so restoring
   the baseline means republishing the rolling release (an owner action; this
   session deliberately did not touch release state). The MSI itself built fine

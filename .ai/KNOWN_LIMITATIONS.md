@@ -34,10 +34,13 @@ Updated every phase. Nothing hidden.
   non-zero), so nothing is uploaded. Diagnosed: the rolling `test` release is
   currently a **Draft**, which the job's `contents: read` token cannot read; the
   same step passed on 2026-10-05T16:55:24Z against the previously *published*
-  baseline, and the workflow itself never drafts `test` (`--prerelease` only).
-  It is release state set out of band, not a defect in these fixes and not
-  fixable from a branch (`publish` is main-gated). Windows retest of these fixes
-  waits until the rolling release is published again.
+  baseline, and the workflow itself never drafts `test` (`--prerelease` only;
+  only the `v0.1.0` job passes `--draft`). GitHub documents that drafts are only
+  visible to callers with push access, which is why a read-scoped job cannot
+  resolve them. It is release state, not a defect in these fixes, and not fixable
+  from a branch (`publish` is main-gated): the Windows retest waits until the
+  rolling release is published again, or the job is deliberately granted
+  `contents: write`.
 
 - **A known flaky shared test can turn a docs-only head red.** Push CI
   **37391667937** (head `e837d30`, docs only) failed `:shared:jvmTest` on
