@@ -28,6 +28,14 @@ each). **Real red on record:** PR CI **37388855101** failed on three
 `PlayerPanelDragTest` assertions (two wrong expectations + one helper
 inconsistency); fixed in `85e73eb`.
 
+**One flaky red, recorded:** the docs-only head `e837d30` had push CI
+**37391667937** red in step 6 on
+`PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+(`expected:<tok-2> but was:<tok-a>`) while PR CI **37391672515** was 9/9 green on
+the same SHA — the endless-radio probe race, second time on a docs-only head
+(see `KNOWN_LIMITATIONS.md` / `DEBUG_LOG.md`). Not caused by this diff and not
+fixed here; do not read a green PR run as proof it is gone.
+
 **Candidate APK digest is stable:** the docs-only deltas rebuilt to a
 byte-identical APK — every test-release run since `85e73eb` reports
 `dhun-test.apk` 18,367,219 B, SHA-256

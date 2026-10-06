@@ -59,6 +59,21 @@ ignored; a dismissal threshold with no touch-target floor is governed by the
 `panelDragOffsetPx` instead of being treated as 0 and then advanced by the
 frame's delta (a NaN translation would blank the panel). Fixed in `85e73eb`.
 
+**Push-CI flake on the last docs head (recorded, not hidden).** The final
+docs-only commit `e837d30` touched `.ai/HANDOFF_NEXT_SESSION.md` and nothing else.
+Its **push** CI **37391667937** went red in step 6 (`:shared:jvmTest`) on
+`PlayerViewModelTest.kt:517`
+`endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch` —
+`expected:<tok-2> but was:<tok-a>` — while its **PR** CI **37391672515** passed
+9/9 on the *same SHA*. This is the endless-radio probe race family (see the
+2026-09-28 entry) and it is the second time this exact test has flaked on a
+docs-only head (the first was run 37320626452). It is not attributable to this
+diff — docs only, same-SHA PR CI green — and it is **not** claimed fixed here.
+`gh run rerun` is refused for these runs in the sandbox ("cannot be rerun; its
+workflow file may be broken"), so the successor docs commit is what re-triggers
+CI. A future session that touches the radio probe logic should treat this test's
+timing as unproven.
+
 **Evidence / verification posture.** No JDK and no device in the sandbox, so CI
 is the compiler and the user's device is the acceptance. Green after the fix:
 PR CI **37389109897** and push CI **37389105839** (all 9 steps, including

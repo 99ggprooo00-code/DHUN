@@ -39,6 +39,16 @@ Updated every phase. Nothing hidden.
   fixable from a branch (`publish` is main-gated). Windows retest of these fixes
   waits until the rolling release is published again.
 
+- **A known flaky shared test can turn a docs-only head red.** Push CI
+  **37391667937** (head `e837d30`, docs only) failed `:shared:jvmTest` on
+  `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+  (`expected:<tok-2> but was:<tok-a>`) while PR CI **37391672515** passed 9/9 on
+  the same SHA. Second occurrence on a docs-only head (first: 37320626452). It is
+  a timing race in the endless-radio probe tests, unrelated to this session's
+  diff, and **not** repaired here — do not read a green PR run as proof that it
+  is gone. `gh run rerun` is refused on these branch runs, so a successor commit
+  is the only way to re-trigger (and it may flake again).
+
 ## 2026-10-05 — S3 hardware round 1 report (partial; identity incomplete)
 
 - User report received 2026-10-05: Android walkthrough failed at steps **1, 6, 7, 9**; steps **2–5, 8, 10–12, 14, 17** were reported pass/observed with qualifications. Notification/lock-screen/widget art was present but considered small. Menu was compact but centered; user prefers it anchored near the originating ⋮. Windows core steps **10–13** were reported pass. Full per-step ledger: `docs/verification/14-release.md`.
