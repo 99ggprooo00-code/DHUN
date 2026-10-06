@@ -1,5 +1,60 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-06 — the `msi` job wedged the rolling release: a Draft baseline + `needs: [apk, msi]` (session `arena/95fb0f92-dhun`, base `main@5c8bd67`, PR #122)
+
+**Symptom.** Every test-release run after 2026-10-05T16:56:46Z is red: the `msi`
+job fails at *Check install-over and userdata on disposable Windows* with the
+annotation `MSI install-over :: Could not download the published MSI
+baseline/checksum` (post-merge run **37403248318** on `5c8bd67`), and the
+`publish` job — the only thing that replaces the rolling `test` release — never
+runs. The user reports the rolling release has no installation files on the
+Releases page.
+
+**Two causes, one of them a design defect.**
+1. *State:* the rolling `test` release is a **Draft** (`draft=true`, target
+   `885a092`, all four assets present, `published_at` 2026-10-05T16:56:46Z).
+   GitHub lists draft releases only to callers with push access, so the `msi`
+   job's `contents: read` token cannot resolve `gh release download test`. The
+   assets were uploaded by run **37343725414** (APK 18,367,219 B, sha256
+   `c351341e…`; MSI 2.146.1, 112,934,912 B, sha256 `b569e769…`), whose
+   install-over step **passed at 16:55:24Z** against the previous, published
+   baseline (2.140.1 → 2.146.1, sentinels preserved). The same step has failed in
+   every run since the 16:56:46Z (re)create: **10 failures, 1 concurrency cancel,
+   0 successes**. The exact sequence that left `draft=true` is not reconstructible
+   from the API (the record's `created_at` predates its `published_at`; the event
+   feed holds one `ReleaseEvent published tag=test`), and it does not matter for
+   the fix: the release must be readable again, job or not.
+2. *Design (the real defect):* `publish` has `needs: [apk, msi]`, so a red `msi`
+   job skipped the only job with `contents: write` — the only actor that could
+   republish the release. The outage could not repair itself, and no branch run
+   could fix it (`publish` is `main`-gated). This is the part worth remembering:
+   the *symptom* was release state, the *defect* was the dependency shape.
+
+**Fix.** `check_msi_upgrade.ps1` grades the baseline fetch: unreadable
+(absent / draft / mid-replace) ⇒ `::warning title=MSI install-over SKIPPED::` +
+notice + `installOver = "skipped: <reason>"` in `result.json` + `exit 0`, so the
+MSI still uploads and `publish` runs; `publish` then re-asserts readability
+(`gh release edit test --draft=false --prerelease --target "$GITHUB_SHA"`) and
+fails the run unless `isDraft` is provably `false`. `msi` keeps `contents: read`
+(deliberate; a contract test forbids widening it).
+
+**Never do.** Do not describe a skipped run as an upgrade pass: on that path
+nothing was installed — no in-place upgrade, no sentinel checks, no
+future-upgrade guard, no uninstall. Do not "fix" the deadlock by granting the
+`msi` job write access. Do not re-clone or `git clean` the sandbox worktree.
+
+**Not verified at write time.** The PowerShell edit is parsed only by CI's
+`check_powershell_syntax.ps1` (no pwsh in the sandbox; a local brace/paren depth
+check matches the original's profile — a smoke check, not a parse). Release-asset
+downloads still EOF in-sandbox (Azure blob), so digests come from run notices.
+
+**Verified on CI afterwards.** Code head `6a6dd83`: all 9 steps green including
+the PowerShell parse (push CI **37405077637**, PR CI **37405088698**, Build APK
+**37405088832**). The skip path ran for real in `test-release` **37405088686**
+(`msi` green with `MSI install-over SKIPPED`, candidate MSI 2.158.1 staged,
+`buildOnly=true`) — the exact behaviour the fix intends, and the reason that run
+must never be quoted as an upgrade pass.
+
 ## 2026-10-06 — sandbox trap: the checkout's `.git` is reverted between turns (`arena/cf4e91ba-dhun`)
 
 **Symptom.** Twice in this session the workspace came back with `HEAD` at the

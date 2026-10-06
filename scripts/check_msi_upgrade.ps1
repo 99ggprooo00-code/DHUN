@@ -36,8 +36,48 @@ function Invoke-MsiCheck {
 }
 
 # Read-only download of the existing rolling baseline; never change a release.
+# Grade this fetch instead of trusting it. A release this job's read-scoped token
+# cannot see (absent, still a draft, or being replaced mid-run) is a
+# release-state problem, not a defect in the candidate: the MSI still builds,
+# stages and uploads, and the publish job -- the workflow's only contents:write --
+# can still repair the release. That is a SKIP, never a pass: on this path the
+# candidate is build-verified only and the install-over path is NOT verified.
+# A fetch that succeeds and then contradicts itself (checksum mismatch,
+# mismatched upgrade identity, not-newer version) still fails the run below.
 gh release download test --repo $env:GITHUB_REPOSITORY --pattern dhun-test.msi --pattern dhun-test.msi.sha256 --dir $baselineDir
-if ($LASTEXITCODE -ne 0) { throw 'Could not download the published MSI baseline/checksum' }
+$downloadExit = $LASTEXITCODE
+$baselineReason = $null
+if ($downloadExit -ne 0) {
+    $baselineReason = "gh release download test exited $downloadExit (the release is absent, still a draft, or being replaced)"
+} elseif (-not (Test-Path -LiteralPath $baseline) -or -not (Test-Path -LiteralPath (Join-Path $baselineDir 'dhun-test.msi.sha256'))) {
+    $baselineReason = 'gh release download test reported success but the baseline MSI/checksum is missing'
+} elseif ([string]::IsNullOrWhiteSpace((Get-Content -LiteralPath (Join-Path $baselineDir 'dhun-test.msi.sha256') -Raw))) {
+    $baselineReason = 'the published baseline checksum sidecar is empty'
+}
+if ($baselineReason) {
+    $releaseState = 'not readable by this read-scoped token'
+    try {
+        $seen = (gh release view test --repo $env:GITHUB_REPOSITORY --json tagName,isDraft,publishedAt 2>$null | Out-String).Trim()
+        if ($seen) { $releaseState = $seen }
+    } catch { }
+    Write-Host "::warning title=MSI install-over SKIPPED::${baselineReason}. Rolling-release state as seen here: ${releaseState}. The candidate MSI is build-verified only - the in-place upgrade, sentinel preservation, future-upgrade guard and uninstall checks did NOT run."
+    Write-Host '::notice title=MSI install-over NOT RUN (build-verified only)::No readable baseline, so no install or uninstall was attempted. Never report this run as an install-over pass.'
+    @{
+        sourceSha = $env:GITHUB_SHA
+        baselineVersion = 'unavailable (baseline not readable)'
+        baselineSha256 = 'unavailable (baseline not readable)'
+        candidateVersion = 'unavailable (check skipped before reading)'
+        perUserInstall = 'not tested'
+        installOver = "skipped: $baselineReason"
+        userdataSentinel = 'not tested'
+        cacheSentinel = 'not tested'
+        futureUpgradeRemoval = 'not tested'
+        uninstallCleanup = 'not tested'
+        appLaunch = 'not tested'
+        audioAndVisuals = 'not tested'
+    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $logs 'result.json') -Encoding utf8
+    exit 0
+}
 $expectedHash = ((Get-Content -LiteralPath (Join-Path $baselineDir 'dhun-test.msi.sha256') -Raw).Trim() -split '\s+')[0]
 $baselineHash = (Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($baselineHash -ne $expectedHash.ToLowerInvariant()) { throw 'Published baseline MSI checksum did not match' }

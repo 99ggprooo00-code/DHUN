@@ -70,6 +70,31 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertNotIn("contents: write", before_publish)
         self.assertIn("    permissions:\n      contents: write", self.publish)
 
+    def test_publish_reasserts_the_rolling_release_is_readable(self):
+        # GitHub lists draft releases only to callers with push access. The msi
+        # job runs on contents:read and the public Releases page has no push
+        # token either, so publishing is not done until isDraft is provably false.
+        self.assertIn("gh release edit test --draft=false --prerelease", self.publish)
+        self.assertIn("\"$(gh release view test --json isDraft --jq '.isDraft')\" != \"false\"", self.publish)
+        self.assertLess(
+            self.publish.index("gh release create test"),
+            self.publish.index("gh release edit test --draft=false"),
+        )
+
+    def test_unreadable_baseline_skips_the_install_over_check_instead_of_wedging(self):
+        smoke = (WORKFLOW.parents[2] / "scripts/check_msi_upgrade.ps1").read_text()
+        # The skip is announced once, as a warning, and never as a pass.
+        self.assertEqual(1, smoke.count("MSI install-over SKIPPED"))
+        self.assertIn("::warning title=MSI install-over SKIPPED::", smoke)
+        self.assertIn('installOver = "skipped: $baselineReason"', smoke)
+        self.assertIn("exit 0", smoke)
+        self.assertNotIn("Could not download the published MSI baseline/checksum", smoke)
+        # A fetch that succeeds and then contradicts itself must still fail the
+        # run: skipping covers unreadable release state, not bad baselines.
+        self.assertIn("throw 'Published baseline MSI checksum did not match'", smoke)
+        self.assertIn("throw 'Candidate and baseline do not share an upgrade identity'", smoke)
+        self.assertIn("do not attempt a downgrade", smoke)
+
     def test_branch_build_cannot_cancel_the_main_release_group(self):
         self.assertIn("github.ref == 'refs/heads/main' && 'test-release' || format('test-build-{0}', github.ref)", self.text)
 
