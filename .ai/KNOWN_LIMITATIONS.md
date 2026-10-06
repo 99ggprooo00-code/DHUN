@@ -2,6 +2,43 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-06 — the flake fix is a race removal; green CI is not proof of absence (PR #125, session `arena/cf69112a-dhun`)
+
+- **What is proven:** `:shared:jvmTest` compiles and passes with the fixed
+  tests on push CI **37408908111** (12/12 steps on `df0504f`) and PR CI
+  **37408920918** — the two edited files ran, and the tests that used to fail
+  intermittently now cannot fail on the paths they were racing (the day-play
+  block is mandatory; the token read waits for the consumption).
+- **What is not proven:** that the flakes never return. A race cannot be
+  disproven by a green run; the real signal is *repetition* — the next several
+  unrelated PRs/merges must stay free of
+  `LibraryViewModelTest.historyPlaybackQueuesCorrectly` and the
+  `endlessRadio` token comparisons. If either returns, the failure now names
+  the wait and the state it was stuck on (see below), which is the diagnostic
+  this repo previously lacked.
+- **The labelled `eventually` covers two files only.** `LibraryViewModelTest`
+  and `PlayerViewModelTest` carry the `label: () -> String` variant;
+  `BrowseViewModelTest`, `HomeViewModelTest`,
+  `LibraryDownloadsViewModelTest` and `SearchViewModelTest` still have the
+  bare `eventually` (`Timed out waiting for 15000 ms`, no state). Deliberately
+  not unified this session — a six-file refactor to remove a *diagnostic*
+  limitation was not worth the blast radius on an unverifiable-locally
+  toolchain. Follow-up, not a defect.
+- **The failure frame still points at the helper.** The CI annotation's
+  `@ file:line` is the first `dev.dhun` frame — `eventually`'s own line, not
+  the call site. That is unavoidable without reflective stack surgery, and is
+  why the label carries the identity instead.
+- **`fail(...)` replaces `TimeoutCancellationException`.** A stuck wait now
+  fails as `java.lang.AssertionError: eventually(15000ms) timed out: …`
+  instead of a cancellation exception. Any tooling that pattern-matched on
+  `TimeoutCancellationException` in these two files must look for the message
+  instead (none was found in this repo).
+- **No hardware dimension.** A test-only diff has none by construction; the
+  S3 hardware round (gate steps 19–22 from PR #121, notification/lock-screen/
+  widget controls, downloads/offline, lyrics, settings/theme persistence,
+  Android EQ, the Windows native column, 30-minute soaks, clean-target
+  installs, signing) is unchanged and still user-gated.
+
 ## 2026-10-06 — a green `msi` job no longer proves the install-over smoke ran (PR #122, session `arena/95fb0f92-dhun`)
 
 - **A skipped install-over has no upgrade evidence.** If the rolling `test`

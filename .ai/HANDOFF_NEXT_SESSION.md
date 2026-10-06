@@ -5,6 +5,55 @@ thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
 never committed by the earlier session — its content survived in the session
 message and is transcribed verbatim below, now in-repo).
 
+## CURRENT STATE — PR #125: the two recurring shared-test flakes are root-caused (2026-10-06, session `arena/cf69112a-dhun`, base `main@a9204c59`)
+
+**What this session did.** The S3 hardware round is user-gated, so it took the
+hardware-free lane: the two `:shared:jvmTest` flakes carried since 2026-09-18
+as "load/timing" are now root-caused and de-raced. Both are one class — a wait
+on one state followed by a read of a *sibling* state that production publishes
+separately:
+- `LibraryViewModelTest.historyPlaybackQueuesCorrectly` (runs **35309124090**,
+  **37320618809**, **37407043852**): `groupedHistory` is derived
+  **asynchronously**, so `if (day != null)` silently skipped the day-play
+  block, after which `prepareCalls >= 2` could never become true — a coin-flip
+  race amplified into a guaranteed 15 s timeout. Now the derived state is
+  waited for and the day path is unconditional.
+- `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
+  (run **37320626452**, `expected:<tok-2> but was:<tok-a>`): the token was read
+  between the queue swap and the token consumption. Now
+  `RadioFixture.awaitContinuationToken(token)` waits for it (and the three
+  sibling radio tests use it).
+- Both `eventually` helpers now take a `label` (evaluated only on expiry) and
+  fail through `kotlin.test.fail`: the check-run annotation — the only CI
+  readout this sandbox can reach — reads
+  `eventually(15000ms) timed out: <label + live state>`.
+
+**Evidence.** Push CI **37408908111** on `df0504f` — **12/12 steps** incl.
+`Unit tests — shared domain`; PR CI **37408920918**, Build APK **37408921035**,
+test-release **37408920959** — all green. Local JDK-free gates: 31 unittest OK,
+`validate_fixtures.py` PASS 39. Sheet:
+`docs/verification/16-ci-flake-hygiene.md`. **PR #125 is open, CI-green,
+awaiting the user's merge authorization.**
+
+**The `main`-push verification of the previous session's repair (on
+`a9204c59`).** Run **37408148220**: `msi` ✅ with the **full install-over path,
+no skip** (`PASS::Hosted Windows: 2.160.1 -> 2.163.1`, sentinels preserved,
+baseline SHA256 `74109a13…`) + future-upgrade guard + uninstall smoke, and
+**`publish` ✅** replaced the rolling release; CI **37408148211** 9/9, Build APK
+**37408148184**. `test` is a published pre-release again (target `a9204c59…`,
+four assets, MSI 2.163.1 sha256 `12745f81394a357c266c8453903e70aa78c2f7b29450d97e5c8348dfc45f5f8e`,
+APK 18,367,219 B sha256 `21a5fe86…`). PR #124 (previous session, docs-only)
+carries the same record.
+
+**Next session's exact first step.** Merge #125 once authorized; if #124 lands
+first, merge `origin/main` into `arena/cf69112a-dhun` and keep exactly one
+current ROADMAP block (its record below the new one). Then: watch repetition —
+the two test names must stay absent from every subsequent run. The user-gated
+S3 items are unchanged: gate steps 19–22 (PR #121 surfaces), notification/
+lock-screen/widget controls, downloads/offline, lyrics, settings/theme
+persistence, Android EQ, the Windows native column, 30-minute soaks,
+clean-target installs.
+
 ## CURRENT STATE — PR #122: the MSI/release deadlock is fixed, and the rolling release carries installation files again (2026-10-06, session `arena/95fb0f92-dhun`)
 
 Updated **2026-10-06**, base `main@5c8bd67` (merge of PR #121). **PR #122** fixes
