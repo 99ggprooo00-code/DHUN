@@ -1,26 +1,51 @@
 # 15 — Test-build gate: step-by-step procedure
 
-> **Latest release metadata checked — 2026-10-05.** PR #119 is merged as
-> `73b88b60b647120662812a5d33b233876acad283` (`73b88b6`). Post-merge CI
-> **36467187148**, Build APK **36467187128**, and test-release **36467187181**
-> passed. Rolling `test` published **2026-09-28T18:48:23Z**, targeting `73b88b6`;
-> release metadata confirms that tag/target and the asset names/sizes. This is
-> automated build/package evidence, **not hardware acceptance**.
+> **Current release metadata checked — 2026-10-07.** PR #125 merged as
+> `b1dba0c0cec9c5cde7f910f04405b7fe81a25b0e`; post-merge CI **37411494455**,
+> Build APK **37411494443**, and test-release **37411494399** passed. The MSI
+> install-over smoke fully ran `2.170.1 → 2.171.1`, preserving userdata/cache
+> sentinels, with the future-upgrade guard and uninstall smoke passing (no skip).
+> Current main `f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5` changes only the README
+> after that merge. Current CI **37548884056**, Build APK **37548884107**, and
+> test-release **37548884077** passed; the published `test` release targets
+> `f0225f4`, timestamp **2026-10-06T23:56:54Z**. Publisher provenance gives APK
+> **18,367,219 B**, SHA-256
+> `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
+> **112,947,200 B**, ProductVersion **2.172.1**, SHA-256
+> `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. Latest
+> MSI job ran the full `2.171.1 → 2.172.1` install-over (`buildOnly=false`),
+> sentinel preservation, future-upgrade guard and uninstall smoke. The release
+> asset downloads return EOF in the sandbox; verify the exact device files
+> against the current release `.sha256` sidecars.
 >
-> **Important digest correction:** the APK/MSI SHA-256 values currently available
-> in the sandbox have **not** been independently verified for `73b88b6`. The
-> `.sha256` asset contents/downloads returned empty/EOF here, and the publish-job
-> check annotations contain no artifact digests. This sheet previously carried
-> forward the **PR #118 (`16ad2e5`) hashes as though they were #119 hashes**; that
-> was not justified. Do not use those values or infer byte identity from equal
-> file sizes. §1 now marks the #119 digests unverified.
+> **S3 hardware report round 2 — partial, received 2026-10-07.** Android:
+> Redmi Note 12 4G / Android 15; the reported APK hash `21a5fe86…9cc2c`
+> matches current provenance (and is byte-identical to the APK at `b1dba0c`).
+> General playback/library/download, lyrics/settings and steps 19–22 were
+> reported working. `Go to album` was not found; HTTP 403 was not tested;
+> offline streaming reportedly buffered for a long time without clear error
+> feedback, then recovered when the network returned. Keep those points open or
+> partial, not a full S3 pass. Lyrics work; defer the user's future lyrics idea.
 >
-> **S3 hardware round 1 — partial initial report, 2026-10-05.** The first
-> report had Android failures at steps **1, 6, 7, 9**; Windows core steps
-> **10–13** were reported pass. Step 13 was partial (`Go to album` not found),
-> step 16 misunderstood, step 18 unreported; device/build identity was absent.
-> Four screenshots were not mapped to steps. The rolling `test` at that point
-> was #119, not the parser candidate. Historical details: `14-release.md`.
+> Windows: Windows 11 was reported, exact build and VLC version were not
+> supplied. The reported hash `c27175…3fe17d6` is the current `f0225f4` MSI
+> 2.172.1; the report also calls its test based on `b1dba0c`, whose MSI was
+> 2.171.1 SHA-256
+> `353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`. Its
+> pre/post-upgrade timing is unclear, so record artifact sequence as ambiguous.
+> The user reports missing DHUN Jump List tasks, Space not responding, and a
+> player filling the window so Home/Search/Playlists are blocked.
+>
+> **Triage — no product fix is confirmed.** Expanded `FullPlayer` intentionally
+> fills the desktop window and covers the shell; docked `MiniPlayer` is a
+> separate fixed-height **72 dp** row. `Escape` collapses the expanded player
+> first. The report does not say whether the dock remained after collapse; test
+> that distinction before changing layout. Space's window-level handler sees
+> only unconsumed keys, so retest outside text fields/buttons. Jump List is
+> packaged-only; capture the `jump list:` startup-log lines before changing
+> native code. Exact device steps are in `docs/runbooks/s3-hardware-checklist.md`.
+> S3 remains **OPEN**; this is user-reported partial evidence, not acceptance.
+> The execution date/time and exact Windows build are not recorded.
 >
 > **PR #120 candidate device retest — user-reported PASS, 2026-10-05.** The user
 > downloaded the build-only `apk` artifact from test-release run **37322658878**,
@@ -116,9 +141,10 @@ Windows build: `Win + R` → `winver`. Android version: Settings → About phone
 ## 1. Verify the digest (do this BEFORE installing)
 
 > **Why verify hashes:** these files have the same byte sizes as earlier
-> publishes. Equal size is not equal bytes. The sandbox confirmed release
-> metadata but could not retrieve the #119 artifact hashes independently; verify
-> your downloaded bytes against the matching sidecars below.
+> publishes. Equal size is not equal bytes. The hashes below come from the
+> publisher's provenance annotations; release asset blobs themselves return
+> EOF in the sandbox. Verify your downloaded bytes against the matching live
+> `.sha256` sidecars before installing.
 
 **Linux:**
 ```sh
@@ -136,58 +162,31 @@ Get-FileHash .\dhun-test.msi -Algorithm SHA256
 Get-Content .\dhun-test.msi.sha256
 ```
 
-**Build identity** — rolling `test` is a **published pre-release**. The publish
-this sheet was last written against: **2026-10-06T03:36:23Z**, target
-**`cdedc93cde5b695774b4334e61522e4d7e285e90`**, assets uploaded 03:36:17Z, MSI
-ProductVersion **2.166.1** (test-release **37409397281**, whose `msi` job ran the
-**full** install-over check with no skip). The digests below come from that run's
-provenance notices — the sandbox cannot download release assets (Azure-blob EOF),
-so they are **not** independently re-verified here.
+**Build identity — current rolling `test` (last rechecked 2026-10-07).** The
+published pre-release targets `f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5`,
+was published **2026-10-06T23:56:54Z**, and was produced by test-release run
+**37548884077**. These hashes are from publisher provenance annotations, not a
+substitute for the release's sidecars:
 
-> **The `.sha256` sidecar on the release is authoritative — not this table.** The
-> `test` tag is replaced on **every** `main` push, and each publish advances the
-> MSI ProductVersion and therefore the MSI digest (the APK digest moves only when
-> app code changes). If the sidecar names a **newer** ProductVersion than the one
-> below, you are simply looking at a newer publish: take the sidecar's value, note
-> the version you tested, and continue. Only a mismatch **at the same
-> ProductVersion** is the stop condition in step 1.
+| Asset | Bytes | Product version | SHA-256 (publisher provenance) |
+|---|---:|---|---|
+| `dhun-test.apk` | 18,367,219 | APK | `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` |
+| `dhun-test.msi` | 112,947,200 | 2.172.1 | `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6` |
 
-| Asset | Bytes | SHA-256 (from run 37409397281's provenance notices) |
-|---|---:|---|
-| `dhun-test.apk` | 18,367,219 | `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` |
-| `dhun-test.msi` | 112,947,200 | `070efac6ad75e30a20a091c39ff3468a80ea50ce097832ab5f170af548c81c56` (2.166.1) |
+The latest MSI run checked the full upgrade from 2.171.1 (baseline SHA-256
+`353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`) to
+2.172.1, with userdata/cache sentinels preserved, the future-upgrade guard and
+uninstall smoke passing, and `buildOnly=false`. The MSI published from
+`b1dba0c` was 2.171.1 with that baseline hash; the latest 2.172.1 MSI belongs to
+`f0225f4`. The APK hash is unchanged between the two because the `f0225f4`
+commit changes only the README after `b1dba0c`.
 
-The APK digest matches the PR #121 retest candidate and the PR #120 candidate
-before it: those heads' only deltas were docs and CI scripts, so the APK rebuilt
-byte-identically — that is reproducibility evidence, and it means the release APK
-is the same bytes as the candidate steps 19–22 were written for. The MSI digest is
-new on every publish (2.146.1 → 2.160.1 → 2.163.1 → 2.166.1 across this session's
-publishes).
-
-The values previously shown here — APK
-`8276e0298c0df6d22084e07d8ff3477ab22550e586d4daa41de43e60aa8de770` and MSI
-`4e28c551db2834c699351b3eb1c4d03c96dc46d536156242203845ee28d46b6e` — belong
-to the earlier **`16ad2e5`** publish; they are historical only. Matching sizes do
-not prove matching bytes, and an unchanged APK digest does not mean the MSI one
-is unchanged.
-
-> Compare each computed file hash with its matching `.sha256` sidecar from this
-> same `test` release. If you cannot verify either sidecar/hash pair, stop
-> before installing and report both what you computed and what the sidecar says.
-
-**Note down:**
-
-- Computed hash: ______________________________________
-- Match? ☐ yes ☐ **NO**
-
-> 🛑 **STOP if it does not match. Do not install.** Tell me the computed hash and
-> stop — a mismatch means the publish is not what we think it is, and testing it
-> would invalidate the whole gate.
-
-*The release `.sha256` sidecars are the expected digests for this check; verify
-both artifacts against their matching sidecars.*
-
----
+> **The `.sha256` sidecar on the current release is authoritative for your
+> download.** The `test` tag is replaced on every `main` push. If it moves after
+> this check, verify the target and compare your downloaded file to that new
+> release's matching sidecar. Do not infer identity from equal byte sizes or a
+> digest from an older publish. If you cannot verify both sidecars, stop before
+> installing and report the computed and expected hashes.
 
 ## 2. Install over the top
 
@@ -415,6 +414,13 @@ DIGEST: apk <hash or n/a>  -> MATCH / MISMATCH
 STEPS 1-18: pass / fail -> <list the failing numbers only>
 STEPS 19-22: pass / fail -> <list the failing numbers only>
   (e.g. "all pass except 5")
+
+WINDOWS FOLLOW-UP (if tested):
+  winver build / VLC version:
+  Installed DHUN version; pre-upgrade MSI SHA / post-upgrade MSI SHA:
+  FullPlayer collapse (Escape/button) -> pages interactive? dock is 72 dp?
+  Space outside text focus -> works? Search still types spaces?
+  Jump List tasks after playback -> shown/missing; attach `jump list:` log lines
 
 STEP 5  (Android only):
   5a notification: art / blank

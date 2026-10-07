@@ -1,27 +1,70 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Current status (2026-10-05 — S3 hardware round 1).** PR #119 is merged as
-> `73b88b60b647120662812a5d33b233876acad283`; post-merge CI **36467187148**,
-> Build APK **36467187128**, and test-release **36467187181** passed. Rolling
-> `test` metadata points to `73b88b6`, published **2026-09-28T18:48:23Z**
-> (APK 18,367,219 B; MSI 112,934,912 B; ProductVersion 2.137.1). The #119
-> SHA-256 values have **not** been independently verified in this sandbox; the
-> hashes previously repeated from #118 were not established for this build.
-> Do not treat the user's reported install as verified `73b88b6` until its
-> computed hashes are compared with the matching release sidecars.
+> **Current status (2026-10-07 — S3 hardware report round 2, partial).** PR #125
+> merged as `b1dba0c0cec9c5cde7f910f04405b7fe81a25b0e` at
+> 2026-10-06T03:58:26Z. Post-merge CI **37411494455**, Build APK
+> **37411494443**, and test-release **37411494399** passed; the MSI job ran the
+> full `2.170.1 → 2.171.1` install-over with userdata/cache sentinels preserved,
+> future-upgrade guard and uninstall smoke passing (no skip).
 >
-> **User-reported S3 results (report received 2026-10-05; execution date not
-> supplied):** Android marked 1, 6, 7, 9 fail; 2–5, 8, 10–12, 14, 17 were
-> reported pass, with qualifications; 13/15 are partial because `Go to album`
-> was not found and only five actions were tried; 16 was not understood; 18
-> was not reported. Windows core loop 10–13 was reported pass. This is partial
-> device evidence, **not S3 acceptance**. Device models, OS versions, prior
-> builds and test hashes were not provided. Four Android screenshots were subsequently embedded and visually reviewed;
-> the exact failed-step mapping remains unknown. Album views show generic metadata
-> and placeholder artwork; playlist views show row art but do not explain the
-> reported row failure. Details and limits are in the report ledger below.
-> S3/S6 soaks, native Windows checks and other release gates remain open.
-
+> Latest main is `f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5`, a README-only
+> change after the PR #125 merge. CI **37548884056**, Build APK **37548884107**,
+> and test-release **37548884077** passed. The rolling `test` release is a
+> published pre-release targeting `f0225f4`, published
+> **2026-10-06T23:56:54Z**. Provenance annotations identify `dhun-test.apk`
+> **18,367,219 B**, SHA-256
+> `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, and
+> `dhun-test.msi` **112,947,200 B**, ProductVersion **2.172.1**, SHA-256
+> `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`.
+> Release-asset blob downloads still return EOF in this sandbox; the release's
+> `.sha256` sidecars remain authoritative for device files. The preceding
+> `b1dba0c` test-release MSI was ProductVersion **2.171.1**, SHA-256
+> `353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`.
+>
+> **User-reported S3 round 2 (received 2026-10-07; execution date not supplied).**
+> Android: Redmi Note 12 4G / Android 15; reported APK hash
+> `21a5fe86…9cc2c` matches the current release provenance and is byte-identical
+> to the `b1dba0c` APK. General playback/library/download, lyrics/settings, and
+> steps 19–22 were reported as working. `Go to album` was not found, the HTTP
+> 403 case was not tested, and offline streaming reportedly buffered for a long
+> time without clear error feedback before recovering after network restoration.
+> Keep those last items open/partial; downloaded-track offline playback and
+> online streaming recovery are separate checks. The lyrics feature works and
+> the user's future lyrics idea is deferred, not part of this session.
+>
+> Windows: Windows 11 was reported, but the exact OS build and VLC version were
+> not supplied. The report mentions missing DHUN Jump List tasks (only standard
+> shell pin/unpin/close items), Space not responding, and a player surface that
+> fills the window and blocks Home/Search/Playlists; other desktop core playback
+> checks were reported as working. The reported MSI hash
+> `c27175…3fe17d6` identifies the current `f0225f4` MSI 2.172.1, while the
+> report describes its test as based on `b1dba0c` (whose MSI is 2.171.1,
+> `353cfa…88244020`). Because the report does not label the hash as pre- or
+> post-upgrade, the exact Windows install sequence remains ambiguous. The
+> `f0225f4` change after `b1dba0c` is README-only; this does not remove the
+> need to record the package/version accurately.
+>
+> **Layout triage — no code fix is confirmed.** Source inspection shows the
+> expanded `FullPlayer` intentionally uses the full desktop window and covers
+> the underlying shell. The docked `MiniPlayer` is a separate fixed-height
+> **72 dp** row. `Escape` follows the shared back contract and collapses the
+> expanded player first. The report does not record an explicit post-collapse
+> check, so it may describe expected FullPlayer behavior rather than a defect
+> in the docked MiniPlayer. Retest after collapse before touching layout code.
+> The Space handler is window-scoped and receives only keys the focused child
+> did not consume; test it outside text fields/buttons. Jump List integration is
+> packaged-only; capture the `jump list:` startup-log lines before modifying the
+> native COM path. Exact steps and evidence fields are in
+> `docs/runbooks/s3-hardware-checklist.md` and `15-test-build-gate.md`.
+>
+> **Disposition: S3 remains OPEN.** These are useful partial device results, not
+> release sign-off. Do not infer that the missing Jump List, Space behavior, or
+> full-window report is fixed or rooted. The scheduled extraction-health run
+> **37455619019** separately classified `ENVIRONMENT_BLOCKED` because the hosted
+> runner could not verify live health; this is not production playback proof and
+> is distinct from the green CI/build/test-release workflows. No product source
+> was changed for this report.
+>
 > **Historical status snapshot (2026-09-28, session `arena/01a0e7ee-dhun` — PR #118 pre-merge).**
 > The release baseline is **`main@5bbb16d`** (PR #117, merged
 > 2026-09-28T10:50:31Z). Post-merge CI green: CI **36412080952**, Build APK

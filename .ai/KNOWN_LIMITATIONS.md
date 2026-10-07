@@ -2,6 +2,56 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-07 — PR #125 is merged; initial flake surveillance is clean, S3 is still open
+
+- **PR #125 closure is verified:** merged as `b1dba0c`; post-merge CI
+  **37411494455**, Build APK **37411494443**, and test-release **37411494399**
+  passed. The full hosted MSI install-over was `2.170.1 → 2.171.1`, with both
+  userdata/cache sentinels preserved, future-upgrade guard and uninstall smoke
+  passing; there was no install-over skip.
+- The two repaired test names are absent from the observed post-merge CI on
+  `b1dba0c` and later main CI **37548884056** on `f0225f4`. This is useful
+  repetition evidence, not a claim that races can never recur.
+- Current main CI **37548884056**, Build APK **37548884107**, and test-release
+  **37548884077** passed. The rolling release targets `f0225f4`; its APK hash
+  is `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c` and
+  its MSI is 2.172.1, hash
+  `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`.
+  These values come from publisher provenance; verify device downloads against
+  the release sidecars.
+- The separate scheduled extraction-health run **37455619019** remains a
+  non-green `ENVIRONMENT_BLOCKED` runner result (“live health is unverified”);
+  it is not a CI, packaging or device-playback pass/fail.
+
+### S3 hardware report received 2026-10-07 — provisional, not sign-off
+
+- Android reported device: Redmi Note 12 4G / Android 15. APK
+  `21a5fe86…9cc2c` matches the current release provenance and the byte-identical
+  APK on `b1dba0c`. The user reports steps 19–22 and the general playback,
+  library/download, lyrics and settings checks as working. `Go to album` was
+  not found, HTTP 403 was not tested, and offline streaming produced long
+  buffering without a clear error before recovery after network restoration;
+  keep those items open/partial. Lyrics are working and must not be changed
+  until the user's future idea is explicitly requested.
+- Windows reported: Windows 11 (exact build and VLC version not supplied),
+  missing DHUN Jump List tasks, Space not responding, and a player surface
+  covering the window. The reported MSI hash
+  `c27175…3fe17d6` is the current `f0225f4` 2.172.1 package; `b1dba0c`'s
+  2.171.1 MSI was `353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`.
+  Since the report calls the test “based on b1dba0c” but does not label when
+  the hash was captured, record the Windows artifact sequence as ambiguous.
+- Static layout trace: `FullPlayer` intentionally fills the desktop window and
+  covers the shell; the separate docked `MiniPlayer` is a 72 dp row. `Escape`
+  collapses the expanded player first. No code change is warranted until a
+  device retest shows the *docked* player still blocking Home/Search/Playlists
+  after collapse. For Space, retest with focus outside text fields/buttons; the
+  window handler intentionally receives only unconsumed keys. For Jump List,
+  inspect `jump list:` diagnostics in `dhun-startup.log` before modifying COM
+  integration. Exact runbook: `docs/runbooks/s3-hardware-checklist.md` and
+  `docs/verification/15-test-build-gate.md`.
+- No current physical-device evidence closes the remaining S3 gate; keep it
+  user-gated, and do not claim the Windows reports are fixed or explained.
+
 ## 2026-10-06 — the flake fix is a race removal; green CI is not proof of absence (PR #125, session `arena/cf69112a-dhun`)
 
 - **What is proven:** `:shared:jvmTest` compiles and passes with the fixed

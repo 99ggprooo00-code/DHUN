@@ -1,129 +1,109 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/cf69112a-dhun` — the two recurring shared-test flakes are root-caused and de-raced (2026-10-06)
+## Session `arena/094f77e7-dhun` — reconcile PR #125 and qualify the S3 hardware report (2026-10-07)
 
-Updated **2026-10-06** · session **`arena/cf69112a-dhun`** · base `main@a9204c59`
-(the merge of PR #123) · one working PR: **#125** (test-only) · code head
-**`df0504f59838f37e48155d56d0c0d9a6ca0d4df0`**.
+Updated **2026-10-07** · fixed work branch **`arena/094f77e7-dhun`** · current
+`main@f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5` (README-only change after the
+PR #125 merge at `b1dba0c0cec9c5cde7f910f04405b7fe81a25b0e`). The branch was
+fast-forwarded to current `main`; the pre-documentation worktree was clean.
 
-**Phase/status.** The S3 hardware round is still **user-gated** (no device in
-the sandbox), so this session took the lane that is provable without hardware:
-**S5 CI hygiene**. Two flakes have been re-running red on unrelated PRs since
-2026-09-18; both are the **same defect class** — a test waits for one piece of
-state and then reads a *sibling* piece that production publishes as a separate
-step. Neither is a product bug, and the existing mitigation (a 5 s → 15 s
-timeout bump) made failures *slower, not rarer*.
+### Completed upstream phase — PR #125 / S5 flake repair
 
-**Last real error: none open.** The most recent red anywhere is PR CI
-**37407043852** (`LibraryViewModelTest.historyPlaybackQueuesCorrectly`,
-`TimeoutCancellationException: Timed out waiting for 15000 ms`) — root-caused
-and fixed here.
+- PR **#125** merged at **2026-10-06T03:58:26Z** as `b1dba0c`.
+- Post-merge CI **37411494455**, Build APK **37411494443**, and test-release
+  **37411494399** passed. The Windows MSI step ran the full install-over path,
+  `2.170.1 → 2.171.1`, preserving userdata/cache sentinels; the future-upgrade
+  guard and uninstall smoke also passed, with no skip.
+- The two formerly flaky `:shared:jvmTest` names remain absent in the observed
+  post-merge CI on `b1dba0c` and the later `f0225f4` main CI **37548884056**.
+  This is initial repetition evidence, not proof that a race can never recur.
+- Latest main CI **37548884056**, Build APK **37548884107**, and test-release
+  **37548884077** are green. The rolling `test` release is published against
+  `f0225f4` (2026-10-06T23:56:54Z): APK SHA-256
+  `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
+  **2.172.1**, SHA-256
+  `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`.
+  Release-asset download in the sandbox still returns EOF; hashes above are
+  from GitHub artifact-provenance annotations, while the downloaded release's
+  `.sha256` sidecars remain the device-side authority.
+- Separate signal: scheduled extraction-health run **37455619019** failed as
+  **`ENVIRONMENT_BLOCKED`** (“live health is unverified” on the hosted runner).
+  It is not the CI/build/test-release gate and is not evidence of a playback
+  regression; keep the residential playback evidence separate.
 
-**Root causes (each traced to a recorded run, not inferred):**
-- `LibraryViewModelTest.historyPlaybackQueuesCorrectly` — runs **37320618809**,
-  **37407043852**, and push CI **35309124090** (2026-09-18).
-  `LibraryViewModel.groupedHistory` is fed by an **async** `combine`-collector
-  (`LibraryViewModel.kt:281-285`), so when
-  `eventually { historyEntries.size == 3 }` returned, the derived flow could
-  still hold its initial `emptyList()`; the `if (day != null)` guard then
-  **silently skipped** the day-play block, and since `playHistoryEntry` issues
-  exactly ONE `prepareQueue` call, the following `prepareCalls >= 2` wait could
-  never be satisfied. A coin-flip race became a guaranteed 15 s timeout. Now:
-  the derived state is waited for (labelled), the day-play path is
-  unconditional, and it pins that the day path queued the day's own tracks.
-- `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
-  — run **37320626452**, `ComparisonFailure: expected:<tok-2> but was:<tok-a>`
-  @ `PlayerViewModelTest.kt:517`. A refill publishes the swapped queue **then**
-  consumes the page token; the test polled the queue and read
-  `radioSession.continuationToken` in the gap. Now:
-  `RadioFixture.awaitContinuationToken(token)`, applied to the three sibling
-  radio tests that read an advanced token after a queue wait.
-- **Diagnostics (the durable half):** both `eventually` helpers take
-  `label: () -> String`, evaluated **only on expiry**, and fail via
-  `kotlin.test.fail` — the check-run annotation (the only CI readout this
-  sandbox can reach) now reads
-  `eventually(15000ms) timed out: <label + live state>` instead of a bare
-  `Timed out waiting for 15000 ms`.
+### S3 — user report received 2026-10-07; status remains OPEN
 
-**Evidence — GitHub-verified, not local-only:**
-- ✅ **Push CI `37408908111`** on `df0504f`: **12/12 steps success**, incl.
-  `Unit tests — shared domain (queue, parsers, resolvers)` — the edited files
-  compiled and **ran**; `Unit tests — Android (Robolectric)` and
-  `Unit tests — Desktop (JVM)` green beside them.
-- ✅ **PR CI `37408920918`**, **Build APK `37408921035`**,
-  **test-release `37408920959`** (PR path: `apk` only; `msi`/`publish` are
-  `main`-gated) — all green on the same head.
-- ✅ **Repetition so far:** the fixed suite has now run green on **four**
-  workflow executions (two pushes × push/PR CI) — `:shared:jvmTest` green in all
-  of them with **zero failure annotations**. Still a small sample: the real
-  acceptance is the next several unrelated PRs/pushes.
-- ✅ **Docs head `cd90532`** (this file's commit): push CI **37409605873**
-  (12/12 steps), PR CI **37409609823**, Build APK **37409609694**,
-  test-release **37409609710** — all green, no failure annotations. A final
-  docs-only successor records these lines; its own runs are the merge gate and
-  are watched to completion before the merge ask.
-- ✅ **PR #125 state:** `MERGEABLE` / `CLEAN`; `aab`, `publish` and
-  `release_draft` are `SKIPPED` on the PR path by design (main-gated).
-- ✅ **Local, JDK-free gates:** `python3 -m unittest discover -s scripts`
-  **31 OK**; `scripts/validate_fixtures.py` **PASS: 39 files**; plus a
-  string/comment-aware delimiter check on both edited files against untouched
-  controls.
-- 📄 Evidence sheet: `docs/verification/16-ci-flake-hygiene.md`.
+**Android:** Redmi Note 12 4G / Android 15 was reported. The supplied APK hash
+`21a5fe86…9cc2c` matches the current `f0225f4` release provenance and the
+byte-identical APK produced at `b1dba0c`. The user reports the broader playback,
+library/download, lyrics/settings, and steps 19–22 checks as working. Do not
+upgrade that to full S3 acceptance: `Go to album` was not found; the HTTP 403
+path was not exercised; offline streaming recovery had long buffering and no
+clear error message before working again after the network returned. Treat that
+error-feedback result as **partial**, not a clean offline pass. Lyrics are
+working; the user's future lyrics idea is explicitly out of scope until asked.
 
-**Post-merge verification of the previous session's repair (`main` push on
-`a9204c59`) — recorded by PR #124 and re-observed directly here:**
-- ✅ **test-release `37408148220`**: `apk` ✅ and **`msi` ✅ with the FULL
-  install-over path, no skip** — `MSI upgrade smoke PASS::Hosted Windows:
-  2.160.1 -> 2.163.1; per-user install and userdata/cache sentinels preserved.
-  Baseline SHA256=74109a13…` (that baseline is the previously published MSI's
-  digest), plus the future-upgrade guard and uninstall smoke PASS;
-  **`publish` ✅ replaced the rolling release again**.
-- ✅ CI **37408148211** (9/9) and Build APK **37408148184**.
-- ✅ Rolling `test` is a **published pre-release** again
-  (`isDraft=false`, `isPrerelease=true`, published 2026-10-06T03:20:40Z,
-  target `a9204c59…`), four fresh assets: **APK 18,367,219 B sha256
-  `21a5fe86…`** (byte-identical to the PR #120/#121 candidates) and **MSI
-  ProductVersion 2.163.1, 112,947,200 B, sha256
-  `12745f81394a357c266c8453903e70aa78c2f7b29450d97e5c8348dfc45f5f8e`**
-  (`buildOnly=false`). Digests come from the run's provenance notices —
-  release-asset downloads still EOF in-sandbox.
+**Windows:** Windows 11 was reported, but the exact build and VLC version were
+not recorded. The report describes a large/full-window player that blocks Home,
+Search and Playlists, missing DHUN Jump List tasks (only standard shell pin /
+unpin / close items visible), and a Space shortcut that did not respond. The
+reported MSI hash `c27175…3fe17d6` identifies the **current `f0225f4` MSI
+2.172.1**. The user also describes the test as based on `b1dba0c`; that merge's
+MSI was **2.171.1**, SHA-256
+`353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`. The
+report does not label the hash as pre- or post-upgrade, so the exact Windows
+install sequence is not yet bound to one artifact. `f0225f4` changed only the
+README after `b1dba0c`, so app source is identical, but installer identity and
+version still need to be recorded honestly.
 
-**Step ledger for this phase:**
-- ✅ GitHub verified: the test-only change compiles and passes on push + PR CI;
-  the PR #122/#123 release plumbing is proven end-to-end on `main` (full
-  install-over, `publish`, readable published release).
-- 🟡 partial: the flake fix has one green run per workflow — a race removal is
-  confirmed by *repetition*, so the next several unrelated PRs/pushes are the
-  real signal; the other four `eventually` copies
-  (`Browse`/`Home`/`LibraryDownloads`/`Search`) still print a bare timeout
-  message by design.
-- 🔴 missing: hardware evidence for this change (impossible for a test-only
-  diff), and any measurement of the flakes' former frequency (the record is
-  the three+one occurrences cited above).
-- ⏳ awaiting verification (user-gated, unchanged): the PR #121
-  picker/panel/Library-dialog surfaces (gate steps 19–22), notification/
-  lock-screen/widget controls, downloads/offline, lyrics, Settings/theme
-  persistence, Android EQ, the Windows native column (tray/media keys/SMTC/
-  jump lists/upgrade), 30-minute soaks, clean-target installs, signing.
-- ⚠️ architectural risk: none introduced — the diff is confined to two
-  `shared/src/jvmTest` files; no production code, ADR, or shared API changed.
+**Layout triage (no product fix justified yet):** source inspection confirms
+that the expanded `FullPlayer` intentionally fills the desktop window and
+covers the underlying shell; the docked `MiniPlayer` is a separate **72 dp**
+row. On Windows, `Escape` calls the shared back contract and collapses the
+expanded player first. Therefore the report could describe the expected
+expanded `FullPlayer`, or a real defect if the docked player still covers the
+shell after collapse. No screenshot or explicit post-collapse reproduction is
+recorded. Do not change layout until the device check distinguishes those
+states. The Space shortcut is a window `onKeyEvent` handler and receives only
+keys not consumed by the focused child; retest outside text fields/buttons.
+Jump List registration is packaged-only and logs its COM result/failure to
+`dhun-startup.log`; collect those lines before changing native code.
 
-**Exact next step:** PR #125 is CI-green and **awaiting the user's merge
-authorization**. Before merging, reconcile with **PR #124** (open, branch
-`arena/95fb0f92-dhun`, docs-only): it rewrites the top of this file with the
-same `main`-push evidence, so if it lands first, merge `origin/main` into
-`arena/cf69112a-dhun` and keep exactly **one** current block (their record
-below mine, as history). After merging #125: record the `main`-push runs for
-its merge commit, then confirm the two test names stay absent from every
-subsequent run — that repetition, not the green run, is the acceptance.
+### Current work and exact next step
 
-**Blockers:** no Android/Windows device; no JDK; no egress for toolchain
-downloads (`api.adoptium.net`, `repo1.maven.org`, `services.gradle.org` all
-refused — re-verified this session). CI is the compiler; the user's device
-retest is the acceptance.
+1. Reconcile this active task and the S3 evidence/runbook/release identity docs;
+   keep all findings qualified and preserve the PR #125 post-merge evidence.
+2. Run the JDK-free repository gates and `git diff --check`; push this
+   documentation-only update on `arena/094f77e7-dhun` and wait for PR CI/build
+   checks, but **leave the PR unmerged** while the user-only S3 hardware retest
+   is outstanding. A green docs PR is not device verification.
+3. Physical retest runbook: use the latest `test` release and verify both
+   sidecars; record Windows `winver`, MSI version, pre/post hashes and VLC
+   version. On Windows, expand FullPlayer, then press Escape or click its
+   collapse control; verify Home/Search/Playlists are interactive and the
+   docked player is only the 72 dp row. If it still blocks after collapse,
+   capture a full-window screenshot plus display scale/resolution. Test Space
+   with focus outside inputs/buttons, then confirm spaces still type in Search.
+   Play a track, wait at least two seconds, right-click the running/pinned DHUN
+   taskbar icon and capture the Jump List; if tasks are absent, include only the
+   `jump list:` lines from `<install-dir>/userdata/dhun-startup.log` (or
+   `%TEMP%/dhun-startup.log` fallback). On Android, try `Go to album` on a
+   known album-linked track, and record an uncached-stream offline attempt's
+   elapsed time/message separately from a downloaded-track offline pass.
+4. Only after a reproducible docked-layout or native-shortcut defect is
+   isolated: make the narrow product fix, add a focused regression test, run CI,
+   and repeat the relevant device check. Keep the overall S3 gate open until
+   unresolved checks are actually verified.
 
-**Lifecycle:** work stays on `arena/cf69112a-dhun`; one PR for the session
-(#125); merge only when verified (the user's standing instruction).
+**Blockers:** no Android/Windows hardware or JDK in this sandbox; the remaining
+layout/Jump List/key confirmation is user-device-only. The sandbox cannot fetch
+release-asset bytes, but current hashes are available from workflow provenance
+annotations. **No product source has been changed in this phase.**
+
+**Lifecycle:** operate only on `arena/094f77e7-dhun`; never infer S3 sign-off
+from green CI, packaging, or another user's report. Keep the session PR open
+until the physical S3 retest and any confirmed product fix are verified; only
+then merge after the final CI run and documentation review.
 
 ---
 
