@@ -64,11 +64,13 @@ DHUN taskbar icon; if app tasks remain absent, attach a screenshot and the
 known album-linked track and record streaming-offline feedback separately from
 playing a downloaded file offline.
 
-**Merge gate:** stage the documentation PR and let all required CI/build
-checks run, but keep it **unmerged** until the physical S3 retest is complete.
-If hardware confirms a docked-layout, key or Jump List defect, add a focused
-product fix and regression test, repeat that device check, update the evidence,
-and merge only after the final verification. Full history below is retained.
+**Merge gate:** documentation is pushed in draft **PR #127**
+(<https://github.com/99ggprooo00-code/DHUN/pull/127>); local JDK-free checks
+passed. Consult the live PR for required CI/build results, but keep it
+**unmerged** until the physical S3 retest is complete. If hardware confirms a
+docked-layout, key or Jump List defect, add a focused product fix and regression
+test, repeat that device check, update the evidence, and merge only after the
+final verification. Full history below is retained.
 
 ## HISTORICAL STATE — PR #125: shared-test flake fix (merged 2026-10-06, session `arena/cf69112a-dhun`)
 

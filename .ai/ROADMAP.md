@@ -69,31 +69,30 @@ keys not consumed by the focused child; retest outside text fields/buttons.
 Jump List registration is packaged-only and logs its COM result/failure to
 `dhun-startup.log`; collect those lines before changing native code.
 
-### Current work and exact next step
+### Current state and exact next step
 
-1. Reconcile this active task and the S3 evidence/runbook/release identity docs;
-   keep all findings qualified and preserve the PR #125 post-merge evidence.
-2. Run the JDK-free repository gates and `git diff --check`; push this
-   documentation-only update on `arena/094f77e7-dhun` and wait for PR CI/build
-   checks, but **leave the PR unmerged** while the user-only S3 hardware retest
-   is outstanding. A green docs PR is not device verification.
-3. Physical retest runbook: use the latest `test` release and verify both
-   sidecars; record Windows `winver`, MSI version, pre/post hashes and VLC
-   version. On Windows, expand FullPlayer, then press Escape or click its
-   collapse control; verify Home/Search/Playlists are interactive and the
-   docked player is only the 72 dp row. If it still blocks after collapse,
-   capture a full-window screenshot plus display scale/resolution. Test Space
-   with focus outside inputs/buttons, then confirm spaces still type in Search.
-   Play a track, wait at least two seconds, right-click the running/pinned DHUN
-   taskbar icon and capture the Jump List; if tasks are absent, include only the
-   `jump list:` lines from `<install-dir>/userdata/dhun-startup.log` (or
-   `%TEMP%/dhun-startup.log` fallback). On Android, try `Go to album` on a
-   known album-linked track, and record an uncached-stream offline attempt's
-   elapsed time/message separately from a downloaded-track offline pass.
-4. Only after a reproducible docked-layout or native-shortcut defect is
-   isolated: make the narrow product fix, add a focused regression test, run CI,
-   and repeat the relevant device check. Keep the overall S3 gate open until
-   unresolved checks are actually verified.
+- The documentation-only update is pushed on `arena/094f77e7-dhun` and open as
+  **draft PR #127**: <https://github.com/99ggprooo00-code/DHUN/pull/127>.
+  Local JDK-free tests and documentation checks passed; consult the live PR for
+  required GitHub check status. No product source was changed.
+- **Keep PR #127 unmerged** while the user-only S3 hardware retest remains
+  outstanding. A green docs PR is not device verification and does not close S3.
+- Physical retest: use the latest `test` release and verify both sidecars;
+  record Windows `winver`, MSI version, pre/post hashes and VLC version. Expand
+  FullPlayer, then press Escape or click Collapse; verify Home/Search/Playlists
+  are interactive and the docked player is only the 72 dp row. If it still
+  blocks after collapse, capture the full window plus display scale/resolution.
+  Test Space outside inputs/buttons, then confirm spaces still type in Search.
+  Play a track, wait two seconds, right-click the running/pinned DHUN icon; if
+  tasks are absent, include `jump list:` lines from
+  `<install-dir>/userdata/dhun-startup.log` (or `%TEMP%/dhun-startup.log`). On
+  Android, try `Go to album` on a known album-linked track and record an
+  uncached-stream offline attempt separately from downloaded-track playback.
+  Full steps: `docs/runbooks/s3-hardware-checklist.md`.
+- If hardware confirms a docked-layout or native-shortcut defect, make the
+  narrow product fix with a focused regression test, rerun CI, update the
+  documentation and repeat that device check. Keep S3 open until all remaining
+  checks are actually verified.
 
 **Blockers:** no Android/Windows hardware or JDK in this sandbox; the remaining
 layout/Jump List/key confirmation is user-device-only. The sandbox cannot fetch
