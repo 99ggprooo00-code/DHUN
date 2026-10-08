@@ -481,9 +481,19 @@ function forcedColorsReport() {
   for (const element of document.querySelectorAll(".mock .device")) {
     decorations.push({ element: element.className, style: read(element) });
   }
+  // Whether the page's own CSS answers the preference at all. Counted here
+  // rather than asserted in Node because the sheet ships inlined (`base.njk`
+  // carries exactly one <style>), so the page can answer this about itself —
+  // and a count of zero must not be *prose* in the reporter: the sentence
+  // "this site declares no prefers-contrast rules" lived here until 2026-10-08
+  // and stayed after the sheet gained a block (record 27).
+  const prefersContrastRules = [...document.querySelectorAll("style")].filter((sheet) =>
+    /@media[^{]*prefers-contrast/.test(sheet.textContent || ""),
+  ).length;
   return {
     active: window.matchMedia("(forced-colors: active)").matches,
     contrastMore: window.matchMedia("(prefers-contrast: more)").matches,
+    prefersContrastRules,
     controls,
     decorations,
   };
@@ -1024,6 +1034,10 @@ async function checkTabStops(browser, route = "/") {
  * if `forced-colors` did not apply, the boundary test below would pass on
  * ordinary dark-mode CSS and report a false green. So the page's own
  * `matchMedia` result is asserted first, and a mismatch is a failure.
+ *
+ * Under `prefers-contrast: more` the measurement is taken twice — once with the
+ * preference on, once in a default context — because a lone number here has
+ * nothing to be right or wrong against.
  */
 async function checkPreferences(browser) {
   const modes = [
@@ -1080,11 +1094,40 @@ async function checkPreferences(browser) {
       } else {
         const results = await page.evaluate(contrastReport);
         const worst = results.reduce((min, r) => Math.min(min, r.ratio), Infinity);
-        record(
-          `contrast ${route} (prefers-contrast: more)`,
-          `${results.length} text nodes measured, lowest ratio ${worst}:1 — this site declares no ` +
-            `prefers-contrast rules, so the number is the same as the default scheme by design`,
-        );
+        // The same measurement with the preference *unset*, in its own context, so
+        // the number above is compared with something instead of described. Until
+        // this build the branch printed "this site declares no prefers-contrast
+        // rules, so the number is the same as the default scheme by design" — true
+        // when written, false the moment the sheet gained a block, and exactly the
+        // kind of stale prose a measurement should replace (record 27).
+        //
+        // The assertion is one-directional on purpose: a preference that asks for
+        // *more* contrast may never leave a text node worse off than the default
+        // ladder, but "strictly better" would depend on which token the worst node
+        // happens to use, which this reporter does not know.
+        const baselineContext = await browser.newContext({
+          viewport: { width: 1280, height: 800 },
+          colorScheme: "dark",
+        });
+        const baselinePage = await baselineContext.newPage();
+        await baselinePage.goto(url(route), { waitUntil: "load" });
+        const baseline = await baselinePage.evaluate(contrastReport);
+        await baselineContext.close();
+        const baselineWorst = baseline.reduce((min, r) => Math.min(min, r.ratio), Infinity);
+        if (worst < baselineWorst - 0.005) {
+          fail(
+            `contrast ${route} (prefers-contrast: more)`,
+            `lowest ratio ${worst}:1 is below the default scheme's ${baselineWorst}:1 — asking ` +
+              `for more contrast made the page worse`,
+          );
+        } else {
+          record(
+            `contrast ${route} (prefers-contrast: more)`,
+            `${results.length} text node(s) measured, lowest ratio ${worst}:1 against ` +
+              `${baselineWorst}:1 with the preference unset; the page's own CSS carries ` +
+              `${report.prefersContrastRules} prefers-contrast block(s)`,
+          );
+        }
       }
 
       const results = await new AxeBuilder({ page }).analyze();

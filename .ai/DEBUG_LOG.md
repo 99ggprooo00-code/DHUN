@@ -4287,3 +4287,29 @@ the mutation now produces
 Both mistakes are the same shape: a check that reads the wrong text is a check that
 cannot fail.
 
+## 2026-10-08 · A reporter's prose is a claim, and it goes stale like any other (session `arena/af3e7f66-dhun`)
+
+`website/tests/browser.mjs` measured text contrast under the emulated
+`prefers-contrast: more` and printed "this site declares no `prefers-contrast`
+rules, so the number is the same as the default scheme by design". True when it
+was written; false one commit later, when `tokens.css` gained exactly such a
+block — and the check still passed, because nothing in it depended on the
+sentence being true. A `grep -rn prefers-contrast` over the tree (done while
+writing the record for the block) is what surfaced it: the string appeared in the
+reporter, in `.ai/KNOWN_LIMITATIONS.md` and in verification record 22, each
+asserting a state of the world rather than a measurement.
+
+The fix is the same shape in all three places: replace the claim with the number
+it was standing in for. The reporter now counts the page's own
+`@media…prefers-contrast` blocks inside the page and measures the same route a
+second time with the preference *unset*, so the recorded line is
+`lowest ratio X:1 against Y:1 with the preference unset; the page's own CSS
+carries N prefers-contrast block(s)` — and a ratio that ever comes out *below*
+the default's is a `fail`, not a notice. The living document
+(`KNOWN_LIMITATIONS.md`) says what is now true; the historical record (22) keeps
+its sentence and carries a dated supersede note, because a record is evidence of
+what was believed then, not a wiki.
+
+**Lesson.** When a commit changes the world a check describes, grep the check for
+its prose. Assertions fail loudly when they go stale; sentences do not.
+

@@ -37,7 +37,11 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   exists, resolves in both schemes, and strictly raises contrast to at least 7:1
   against each surface; a block that restates the defaults, hard-codes one
   scheme's colour, or points at a missing token fails the build. Measured cost:
-  +80 B per route.
+  +80 B per route. The `browser` job's own increased-contrast measurement now
+  takes the same reading twice — with the emulated preference on and in a default
+  context — and fails if the preference ever leaves a text node worse off; its old
+  sentence claiming the site "declares no `prefers-contrast` rules" was true when
+  written and false one commit later, which is why the numbers replaced it.
 
 ### Fixed — the served-site smoke check reports sizes in bytes (2026-10-08, session `arena/af3e7f66-dhun`)
 

@@ -22,11 +22,13 @@
   no control border is drawn for an `<a>`) and their *effect* is asserted only in
   the `browser` job. If Chromium disagrees, that job goes red on this head and
   that is the intended loop — the static rules cannot see it.
-- **`prefers-contrast: more` changes nothing on this site.** It is emulated, the
-  page is asserted to see it, its text contrast is measured and printed — and
-  there are no `prefers-contrast` rules, by decision: the scheme already meets AA.
-  The measurement is recorded so the claim stays honest, not because a
-  high-contrast rendering exists.
+- **`prefers-contrast: more` has no rendering that a human has looked at.** Since
+  2026-10-08 the sheet does answer it (`tokens.css`: both secondary rungs become
+  the primary text colour), the page is asserted to see the emulated preference,
+  and the `browser` job measures the text contrast twice — with the preference on
+  and in a default context — failing if the preference ever leaves a node *worse*
+  off. No engine has rendered this for a person: the numbers are computed from
+  declared tokens and from Chromium's emulation (records 27 and 28).
 - **`og:image` is deliberately absent.** No image exists in the repository, an
   SVG `og:image` is not rendered by the major crawlers, and a generated PNG would
   be fabricated imagery. Cards therefore render as text-only previews.
