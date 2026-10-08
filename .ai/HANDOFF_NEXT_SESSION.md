@@ -1,3 +1,90 @@
+# HANDOFF — PR #135 merged; rolling release verified; website W0 awaits user decisions
+
+Updated **2026-10-08**, session `arena/ae65f1a5-dhun`. Fixed session branch:
+`arena/ae65f1a5-dhun`. Base and GitHub `main`:
+`8a8d6c5adc536f34c8b677c9b20e5245747ed2e9` (PR #135 merge). This session
+recovered post-merge evidence and recreated/extended the stranded website plan;
+it did not implement a site or web player.
+
+## Current state
+
+- **PR #135 is merged and post-merge green.** CI **37772063324**,
+  test-release **37772063364**, Build APK **37772063380**, Pages
+  **37772062338** all concluded success on `main@8a8d6c5`. CI's AAB compile and
+  both API-24 `NewApi` lint steps succeeded. `aab` and `release_draft` in
+  test-release skipped as expected.
+- **Rolling `test` is published at the merge** (2026-10-08T11:50:38Z,
+  `draft=false`, prerelease): universal APK 18,405,859 B
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+  arm64 18,355,786 B `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  v7a 18,352,944 B `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`;
+  MSI **2.210.1**, 112,971,776 B,
+  `8a2383475947f8b9f5557d584cf0d6f0d34cec489aee3d3a40ab543d8618e298`.
+  The APKs are unchanged; splits differ from universal. Hosted MSI upgrade
+  `2.202.1 → 2.210.1` passed with sentinels, but no playback/visual test ran.
+- **Extraction-health 37769870656 is classified from its annotation, not
+  folklore.** It says `ENVIRONMENT_BLOCKED — inspect the probe log and verify
+  playback outside the GitHub runner`; the deliberate final non-zero step makes
+  the run red. This is not a production pass and does not trigger extraction
+  work.
+- **S3 remains open.** Round 4 (Android landscape + Windows fullscreen docked
+  mini-player) and round 5 (API 24–25 icon/launch/search/play/background) are
+  user-only. S6 remains blocked on S3.
+- **AAB staging remains user-only.** One `test-release` dispatch with
+  `build_only=true`, `build_release_candidate=true` must exercise the `aab`
+  job's `stage_artifact.py` path. The automatic CI gate compiles only.
+
+## Website research and corrected Pages diagnosis
+
+Read **`.ai/WEBSITE_PLAN.md`** before any web work. It is the durable W0–W6
+research/plan and includes Volta plus eight comparable projects. No scaffold is
+approved.
+
+- Broken advertised URL:
+  `https://99ggprooo00.github.io/DHUN/` (README line 2) → 404.
+- Actual canonical Pages URL:
+  `https://99ggprooo00-code.github.io/DHUN/` → live, rendering the README.
+- Pages API: legacy source `main:/`, status `built`; build 1269157028 and run
+  37772062338 succeeded. The failure is the missing `-code` in the advertised
+  hostname, **not** an empty artifact or bad Pages source.
+- Repository still has zero raster/vector image files. Assets are a gated
+  dependency; live music artwork/lyrics cannot be committed without rights.
+- Option A static marketing/download site does not contradict accepted app
+  architecture. Option B browser player does and requires a new ADR before code.
+
+## Next actions — in order
+
+1. Get the user's W0 decisions: A vs B; S3 screenshots vs labelled CSS mockups;
+   tone/notice prominence; github.io vs custom domain; English-only vs i18n;
+   correct/remove/defer README line 2.
+2. Do **not** scaffold while W0 is open. If B is selected, write the ADR and
+   stop for explicit approval.
+3. Keep S3 device rounds ahead of optional site implementation. Use the exact
+   current hashes above and record device/OS/hash.
+4. User-only: dispatch the AAB release-candidate staging path once.
+5. If Option A is approved, follow `.ai/WEBSITE_PLAN.md`: approved README action,
+   licence-safe assets/claim ledger, then an isolated static-site workflow. A
+   website failure must never redden app CI.
+
+## Do not
+
+- Do not merge/close PR #54 or implement ADR-007.
+- Do not touch extraction/probe semantics, FullPlayer (ADR-002), lyrics, or ABI
+  splits.
+- Do not call CI, hosted MSI smoke, a static lint gate or a marketing site
+  hardware acceptance.
+- Do not copy Volta claims/assets or claim Web/iOS/sync/import/lossless quality.
+- Do not use third-party APK sites as official distribution evidence.
+
+**Environment:** no local JDK/Gradle/Android SDK/display. Local executable gate:
+`python3 -m unittest discover -s scripts -p 'test_*.py'` (47 tests). Actions log
+archives and release bodies remain blocked; REST annotations and asset digests
+are the evidence source.
+
+---
+
+# HISTORICAL — PR #135 before merge (superseded by the handoff above)
+
 # HANDOFF — PR #135: the API-24 lint gate now covers both Android modules; S3 rounds 4 and 5 open
 
 Updated **2026-10-08**, session `arena/8be68e2c-dhun`. `main` =

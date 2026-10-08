@@ -1,8 +1,9 @@
 # 18 — App Bundle path: `:app-android:bundleDebug` is now a merge gate (S6)
 
-> **Status: CI-verified on PR #135 head `59ac12f`. Compilation only — the AAB is
-> still not install-verified and not Play-uploadable.** S6's "clean-target
-> install of APK + AAB + MSI" stays open.
+> **Status: merged and post-merge CI-verified on
+> `main@8a8d6c5adc536f34c8b677c9b20e5245747ed2e9`. Compilation only — the AAB
+> is still not staged by the release job, install-verified or Play-uploadable.**
+> S6's "clean-target install of APK + AAB + MSI" stays open.
 
 ## The gap this closes
 
@@ -67,6 +68,21 @@ Same commit, the other three workflows: CI push **37769514613** ✅, Build APK
 So: **`:app-android:bundleDebug` succeeds with the `splits { abi }` block
 present**, under AGP 8.7.2 / Gradle 8.14.2 / JDK 17. The open question is
 answered and now stays answered on every PR and every push to `main`.
+
+## Post-merge close-out
+
+PR #135 merged at 2026-10-08T11:44:32Z as
+`8a8d6c5adc536f34c8b677c9b20e5245747ed2e9`. CI push **37772063324** succeeded;
+its `Android App Bundle compiles (S6 AAB gate)` step is green. Build APK
+**37772063380** and test-release **37772063364** also succeeded, but neither
+result changes the boundary of this gate: the automatic test-release event
+skipped its `aab` job as designed.
+
+The dispatch-only staging path therefore remains **unexercised**. A user must
+run `test-release` once with `build_only=true` and
+`build_release_candidate=true`; that is what executes `stage_artifact.py` over
+the bundle. Even a green dispatch will be staging evidence, not the still-open
+bundletool/device install required by S6.
 
 ## What this does NOT prove
 

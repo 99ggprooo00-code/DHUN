@@ -1,21 +1,84 @@
 # S3 Hardware Verification Checklist
 
-> **Purpose:** Device-side acceptance for the rolling `test` build. Release metadata
-> currently points to the PR #127 merge commit `1a88ee380df5f68f1769213dddc133eec04ee9fd`,
-> published **2026-10-08**. APK: 18,383,603 bytes; MSI: 112,963,584
-> bytes; ProductVersion **2.178.1**.
+> **Purpose:** Device-side acceptance for the current rolling `test` build at
+> `main@8a8d6c5adc536f34c8b677c9b20e5245747ed2e9`, published
+> **2026-10-08T11:50:38Z**. Universal APK: **18,405,859 B**; MSI:
+> **112,971,776 B**, ProductVersion **2.210.1**.
 >
-> **Digest status:** The MSI SHA-256 `0c67d2bf2c870e4209757da6296ca8bb0c68a5c921f17d4679b1096366e1d721`
-> has been successfully verified by the user. The Android APK SHA-256 `75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`
-> still needs user hardware verification.
+> **Required current digests:** universal APK
+> `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+> MSI `8a2383475947f8b9f5557d584cf0d6f0d34cec489aee3d3a40ab543d8618e298`.
+> The arm64 and v7a split APKs are different files; use universal unless the
+> report explicitly records a split filename and its matching release digest.
 >
-> **Rule:** Upgrade in place; do not uninstall existing data. Screenshot every
-> FAIL. Follow `15-test-build-gate.md` §1 and verify each downloaded file against
-> its matching release `.sha256` sidecar **before** installing.
+> **Rule:** Upgrade in place for round 4; do not uninstall existing data.
+> Round 5 may use a clean API 24–25 device, but must record model, OS/API level,
+> APK filename and installed SHA-256. Screenshot every FAIL. Follow
+> `15-test-build-gate.md` §1 and verify each downloaded file against its matching
+> release `.sha256` sidecar **before** installing.
 
 ---
 
-## 0. Environment Record
+## 0. Active environment record — rounds 4 and 5
+
+| Field | Round 4 Android | Round 4 Windows | Round 5 Android API 24–25 |
+|---|---|---|---|
+| Device model | | | |
+| OS version / API | | | |
+| Previous build | | | n/a / __________ |
+| Installed filename | `dhun-test.apk` | `dhun-test.msi` | `dhun-test.apk` |
+| Installed SHA-256 | `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97` | `8a2383475947f8b9f5557d584cf0d6f0d34cec489aee3d3a40ab543d8618e298` | `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97` |
+| Date + local time | | | |
+
+## Round 4 — mini-player docking in constrained layouts (OPEN)
+
+The mini-player must remain a **compact docked bar**; it must not expand into or
+be covered by the full player. **Home, Search and Library must all remain
+visible and reachable above the docked bar.** Do not modify the FullPlayer
+surface itself — it remains governed by ADR-002.
+
+| Platform | Setup and action | Pass condition | Result |
+|---|---|---|---|
+| Android | Start playback, return to the shell, rotate to landscape; visit Home, Search and Library | One compact docked mini-player bar; all three destinations visible above it; no ghost/duplicate content after animation settles | ☐ pass ☐ fail → __________ |
+| Windows | Start playback, maximize/fullscreen the desktop window; visit Home, Search and Library | One compact docked mini-player bar; all three destinations visible above it; no overlap or unreachable navigation | ☐ pass ☐ fail → __________ |
+
+For any failure, capture the whole window/screen after layout animation has
+settled and record resolution, scale, and orientation.
+
+## Round 5 — API 24–25 hardware floor (OPEN)
+
+Run this on an Android 7.0/API 24 or Android 7.1/API 25 hardware device. CI's
+`NewApi` lint gate is static evidence only and cannot pass this round.
+
+| # | Action | Pass condition | Result |
+|---|---|---|---|
+| 1 | Install the verified universal APK | Install succeeds; recorded SHA matches | ☐ pass ☐ fail → __________ |
+| 2 | Inspect launcher, then cold-launch | DHUN icon renders (not blank/default); app reaches Home without crash | ☐ pass ☐ fail → __________ |
+| 3 | Open Search and submit a query | Results load without crash | ☐ pass ☐ fail → __________ |
+| 4 | Play a result | Audio starts; mini/full player state updates | ☐ pass ☐ fail → __________ |
+| 5 | Leave DHUN / lock the device while playing | Audio continues in background; notification/media control remains usable | ☐ pass ☐ fail → __________ |
+
+A report without **device model + Android version/API + installed APK SHA-256**
+is exploratory evidence only and cannot close round 5.
+
+### Active-round report template
+
+```text
+ROUND: 4 Android / 4 Windows / 5 API-floor
+DEVICE: <model>
+OS: <Android version + API, or Windows build>
+RESOLUTION / SCALE / ORIENTATION: <round 4>
+PREVIOUS BUILD: <version or n/a>
+FILE: <filename>
+SHA-256: <full hash> -> MATCH / MISMATCH
+RESULT: pass / fail
+FAILED CHECK(S): <row/step and exact symptom>
+SCREENSHOTS: <filenames/links, required for failure>
+```
+
+---
+
+## Historical round-2 environment record
 
 | Field | Android | Windows |
 |---|---|---|
@@ -109,7 +172,7 @@ playlist views show row art. Full per-step record: `docs/verification/14-release
 
 ---
 
-## C. Remaining S3/S6 Gates (not in this run)
+## C. Remaining S3/S6 gates beyond active rounds 4 and 5
 
 - 30-minute soaks (Android unrestricted battery + Desktop libVLC), zero crashes
 - Rotation / process death / Recents swipe / Force-stop (separate checks)
@@ -122,9 +185,9 @@ playlist views show row art. Full per-step record: `docs/verification/14-release
 
 ---
 
-## Reporting
+## Historical rounds 1–2 reporting template
 
-Copy the block below, fill in, and send back:
+Copy the block below only when reconstructing those historical steps:
 
 ```
 PLATFORM: Android <model>, Android <version>  /  Windows <build>

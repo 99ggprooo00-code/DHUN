@@ -1,5 +1,60 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — the “successful Pages deploy but advertised URL 404s” incident was a hostname mismatch, not an empty deployment (session `arena/ae65f1a5-dhun`)
+
+**Symptom inherited.** README line 2 links
+`https://99ggprooo00.github.io/DHUN/`, which returns GitHub's “There isn't a
+GitHub Pages site here.” The auto-created `pages-build-deployment` workflow was
+green, so the previous session left two hypotheses: branch-source with no index,
+or an Actions source publishing an empty artifact.
+
+**The missing check.** The repository is `99ggprooo00-code/DHUN`; the assumed
+Pages hostname dropped the `-code` suffix from the owner. The Pages API is the
+authority and reports:
+
+```text
+html_url = https://99ggprooo00-code.github.io/DHUN/
+build_type = legacy
+source = main:/
+status = built
+```
+
+Fetching that canonical URL works and renders the root README through GitHub's
+legacy Jekyll build. Post-PR-#135 Pages run **37772062338** succeeded on
+`main@8a8d6c5`; Pages build **1269157028** is `built` with no error. Therefore
+the successful workflow was honest: it deployed to the URL GitHub configured.
+The 404 was the wrong hostname on the project's front door.
+
+**Residual issue, deliberately not auto-fixed.** The live canonical page is an
+engineering README, not the requested product site, and the user explicitly
+reserved the README-line disposition as a decision. `.ai/WEBSITE_PLAN.md`
+records correction/removal/defer as W0 options. No README, Pages setting,
+workflow or site scaffold changed in this diagnosis.
+
+**Workflow noise found while reading the actual annotation.** The legacy Pages
+build uses `actions/upload-artifact@v4`, which GitHub now warns targets deprecated
+Node 20 and is being forced onto Node 24. The deploy is still green. A future
+approved site workflow should use current Pages actions rather than attempting
+to edit the auto-created workflow.
+
+## 2026-10-08 — the unread post-merge verdicts for PR #135 were all green; extraction-health was classified from its warning annotation
+
+PR #135 merged as `8a8d6c5` at 11:44:32Z. Runs left queued/in progress by the
+previous session all completed: CI **37772063324**, test-release
+**37772063364**, Build APK **37772063380** and Pages **37772062338** succeeded.
+The rolling publish kept all APK bytes/digests and produced MSI 2.210.1
+(112,971,776 B,
+`8a2383475947f8b9f5557d584cf0d6f0d34cec489aee3d3a40ab543d8618e298`).
+The hosted upgrade annotation proves `2.202.1 → 2.210.1` and sentinel checks,
+not playback.
+
+Scheduled extraction-health **37769870656** was not re-labelled from its red
+conclusion alone. Its job warning says exactly: `ENVIRONMENT_BLOCKED — inspect
+the probe log and verify playback outside the GitHub runner.` The final
+keep-non-zero step then failed deliberately. That is the evidence for the
+runner classification, while the warning title — “Extraction health is not a
+production pass” — prevents treating it as live playback acceptance.
+
 ## 2026-10-08 — the API-24 lint gate covered one of the two Android modules (session `arena/8be68e2c-dhun`, base `main@6f1e6ba`, PR #135)
 
 **The gap.** PR #134 added `Android Lint — API 24 floor (NewApi)` running

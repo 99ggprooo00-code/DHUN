@@ -1,6 +1,129 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/8be68e2c-dhun` — release-path gates the sandbox can actually check: `shared` API-24 lint + the S6 App Bundle (2026-10-08)
+## Session `arena/ae65f1a5-dhun` — reconcile PR #135, verify the rolling release, and plan (not build) the DHUN website (2026-10-08)
+
+Updated **2026-10-08** · fixed session branch `arena/ae65f1a5-dhun` · base and
+actual GitHub `main` **`8a8d6c5adc536f34c8b677c9b20e5245747ed2e9`** (PR #135,
+merged 2026-10-08T11:44:32Z by `99ggprooo00-code`). The working tree was clean
+at boot; this session branch had no remote ref and no PR before the documentation
+work began. The only open repository PR is #54 (ADR-007 research; unchanged and
+out of scope).
+
+### Phase and scope
+
+**Stage S3 stays open and user-gated.** The first lane was evidence recovery:
+read the post-merge runs the previous session left queued, read the rolling
+`test` release, and inspect the exact extraction-health annotation before
+repeating its classification. The second lane is the requested DHUN web
+presence, **research and plan only**. No website, web target, Pages workflow or
+README link change is authorized yet; W0 has consequential user decisions.
+
+### PR #135 post-merge verdict — now read, not expected
+
+| Item | State | Evidence |
+|---|---|---|
+| PR #135 merge | ✅ **GitHub verified** | merged as `8a8d6c5adc536f34c8b677c9b20e5245747ed2e9` at 2026-10-08T11:44:32Z; merged by `99ggprooo00-code` |
+| CI | ✅ **success** | run **37772063324**, `main@8a8d6c5`, completed 11:53:25Z; App Bundle step 9, app `NewApi` step 10 and shared `NewApi` step 11 all succeeded |
+| test-release | ✅ **success** | run **37772063364**; `apk`, `msi`, `publish` succeeded; `aab` and `release_draft` skipped as expected on a push |
+| Build APK | ✅ **success** | run **37772063380**, completed 11:50:04Z |
+| Pages legacy build/deploy | ✅ **success, with warning** | run **37772062338**; build/deploy/report jobs succeeded. Build annotation warns the auto-created workflow still uses `actions/upload-artifact@v4` on forced Node 24 after Node 20 deprecation |
+| Hosted MSI upgrade | ✅ **packaging-only pass** | `2.202.1 → 2.210.1`; userdata/cache sentinels preserved; future-upgrade and uninstall smoke passed; the annotation explicitly says no app playback/visual acceptance |
+
+### Rolling `test` release at `8a8d6c5`
+
+Published pre-release (`draft=false`, `prerelease=true`) at
+**2026-10-08T11:50:38Z**, `target_commitish=8a8d6c5…`, release id 406771613.
+GitHub asset digest and test-release provenance agree:
+
+| Asset | Bytes | SHA-256 |
+|---|---:|---|
+| `dhun-test.apk` (universal) | **18,405,859** | **`9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`** |
+| `dhun-test-arm64-v8a.apk` | **18,355,786** | **`23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`** |
+| `dhun-test-armeabi-v7a.apk` | **18,352,944** | **`7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`** |
+| `dhun-test.msi` (**2.210.1**) | **112,971,776** | **`8a2383475947f8b9f5557d584cf0d6f0d34cec489aee3d3a40ab543d8618e298`** |
+
+The expectation was correct only after verification: all three APK digests and
+sizes are unchanged from the previous publish because PR #135 changed no app
+code. The MSI advanced from 2.202.1 to **2.210.1**, so its digest changed.
+The ABI APKs remain different from the universal; do not remove the split.
+
+### Extraction-health classification — annotation read
+
+Scheduled run **37769870656** (`main@6f1e6ba`, 2026-10-08T11:24:49Z) concluded
+`failure` because step 13 deliberately kept the check non-zero. Job
+**113286519680** carries the warning annotation:
+
+> **Extraction health is not a production pass** — `ENVIRONMENT_BLOCKED —
+> inspect the probe log and verify playback outside the GitHub runner.`
+
+Steps 6–10 (live/offline probes, independent Home comparison, upload,
+classification and limitation report) succeeded; issue open/close steps were
+skipped; the final non-zero step failed. This is direct classifier evidence for
+`ENVIRONMENT_BLOCKED`, not an inferred steady state and not a production pass.
+Residential evidence from S1 remains the separate product signal. No T1/T2
+trigger is met and extraction semantics stay untouched.
+
+### Web-presence research — central findings
+
+The durable research and gated plan are in **`.ai/WEBSITE_PLAN.md`**. W2 covers
+Spotube, RiMusic, InnerTune, ViMusic, OuterTune, Harmony Music, Moosync and Echo
+Music with canonical URLs, screenshots, distribution paths and risk framing.
+No implementation has started.
+
+The earlier Pages diagnosis was wrong in an important way:
+
+- advertised README URL `https://99ggprooo00.github.io/DHUN/` → **404**;
+- Pages API canonical URL `https://99ggprooo00-code.github.io/DHUN/` → **live**,
+  serving the root README through legacy Pages (`main:/`);
+- post-merge Pages build **1269157028** / run **37772062338** succeeded.
+
+So Pages is not an empty-artifact black hole. The broken front-door link omits
+`-code` from the owner name. The canonical site is nevertheless only a rendered
+engineering README, not the requested public experience. README disposition is
+left to the user as instructed.
+
+### Current gates
+
+| Gate | State | Next evidence |
+|---|---|---|
+| S3 round 4 | 🔴 **missing, user-only** | Android landscape + Windows fullscreen: compact docked mini-player, Home/Search/Library visible and usable above it |
+| S3 round 5 | 🔴 **missing, user-only** | API 24–25 device: icon, launch, search, play, background audio; record model, OS and installed universal APK digest `9665b75f…` |
+| S6 | ⏳ **blocked on S3** | no release acceptance until both rounds and remaining S6 gates close |
+| Dispatch-only AAB staging | 🔴 **agent-blocked, user-only** | one `test-release` dispatch with `build_only=true`, `build_release_candidate=true`; inspect staged `app-android-debug.aab` |
+| Website W0 | ⏳ **awaiting user decision** | Option A marketing site vs Option B web player (B requires a new ADR), assets, tone, URL/i18n and README action |
+
+### Exact next actions
+
+1. Record the user's W0 website decisions. Do not scaffold before that. Option B
+   stops at a new ADR until explicitly approved.
+2. Keep S3 first in the device lane. Use the current rolling assets above for
+   rounds 4 and 5; screenshots may serve W3 only if the user chooses that asset
+   path and their content/licence is safe.
+3. User-only: dispatch the release-candidate AAB path once; the automatic bundle
+   compile gate does not execute `stage_artifact.py`.
+4. After W0, execute only the approved next stage in `.ai/WEBSITE_PLAN.md`.
+   The recommended Option-A order is W1 link disposition → W3 legal assets → W4
+   isolated static-site workflow. Site work never closes S3/S6.
+
+### Blockers and boundaries
+
+- No JDK / Gradle / Android SDK / display locally; CI is the Kotlin verifier.
+- Locally runnable gate remains
+  `python3 -m unittest discover -s scripts -p 'test_*.py'` (**47 tests**).
+- Action log archives and release asset bodies remain unavailable here;
+  check-run annotations and GitHub asset `digest` fields are the evidence used.
+- Do not touch extraction/probe semantics, ADR-002 FullPlayer, lyrics or ABI
+  splits. Never implement ADR-007 without explicit approval.
+
+---
+
+## Previous session — `arena/8be68e2c-dhun`: release-path gates — **MERGED as PR #135 and post-merge verified**
+
+> Superseded by the active block above. PR #135's former “awaiting merge
+> authorization” state is closed: merge `8a8d6c5`, post-merge runs and rolling
+> release are recorded above.
+
+### Historical session detail — `arena/8be68e2c-dhun` (written before merge)
 
 Updated **2026-10-08** · session branch `arena/8be68e2c-dhun` · base
 **`main@6f1e6ba730e590cca693c4735a558556cd8378ae`** (PR #134 merged
@@ -107,10 +230,9 @@ build` so a shared compile break keeps its honest step name. Evidence:
    **37766214968** green, 14/14 steps; docs head `f027dfc` green on all four
    workflows; and `59ac12f` (the S6 bundle gate) green on all four
    (**37769519510** / **37769514613** / **37769519324** / **37769519439**).
-   **The only remaining gate for PR #135 is the user's merge authorization.**
-   After merge: record the post-merge runs and the republished rolling `test`
-   digests — the APK digest should **not** move (no app code changed), the MSI
-   ProductVersion will.
+   **DONE after this block was written:** PR #135 merged as `8a8d6c5`; the
+   post-merge runs and rolling-release digests are recorded in the active block
+   above. The APK did not move; MSI advanced to 2.210.1.
 5. ~~Give the App Bundle a merge gate.~~ **DONE** — step 9 of CI. The remaining
    AAB work is **user-only**: one `workflow_dispatch` of `test-release` with
    `build_only=true`, `build_release_candidate=true` to exercise the `aab` job's
