@@ -24,6 +24,11 @@ Updated every phase. Nothing hidden.
   of absence; the lint gate is the proof.
 - **Three APKs stay.** The user decided to keep universal + `arm64-v8a` +
   `armeabi-v7a`, with no single-APK change until device evidence exists.
+- **The gate was proven, not assumed.** A deliberate unguarded API-26 call
+  (`74341d0`) turned the `NewApi` step red in all three CI runs. Reverted in
+  `20efd8b`. The first commit (`18ff436`) broke configuration for every Gradle
+  job because the `lint` block was at the wrong nesting level. That was fixed
+  in `107151f`. Future DSL changes need a Gradle run before they are pushed.
 
 ## 2026-10-08 — session `arena/688214aa-dhun`: minSdk 24 is compiled, not device-proven; the three APKs may be identical
 
