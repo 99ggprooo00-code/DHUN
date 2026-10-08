@@ -51,7 +51,7 @@ call then crashes on API 24–25 at runtime. Nothing in CI checked for it.
 | `NewApi` lint gate, real config | ✅ **CI-green** on code head `107151f` | CI pull_request **37755824901** + push **37755820899** — `Android Lint — API 24 floor (NewApi)` step **success**; Build APK **37755825185** ✅; test-release **37755824840** ✅ (`apk` + `msi` success) |
 | Mutation proof (gate goes red on a violation) | ✅ **proven** | Probe commit `74341d0` (unguarded `NotificationChannel`, API 26): CI pull_request **37757080119** and push **37757074153** / **37757075795** all **failed** on the `Android Lint — API 24 floor (NewApi)` step. Revert `20efd8b` restores the tree; its CI run is recorded in the PR comment |
 | First attempt `18ff436` | ❌ **red, fixed in `107151f`** | The `lint { }` block was placed at the top level of `app-android/build.gradle.kts`, which has no `lint` extension. Gradle failed configuration for the whole multi-project build, so every Gradle job went red (`Build APK`, `test-release` apk/msi, `CI` shared jvmTest). Lesson: check DSL nesting before pushing; a configuration error looks like a test failure on unrelated steps |
-| PR #133 (docs for the published release) | 🟡 open, mergeable, CI green, **not merged** (no merge approval) | `gh pr view 133` |
+| PR #133 (docs for the published release) | ✅ **merged** `0454a62` on 2026-10-08T09:18:29Z by the repo owner's account (not by this agent). `git merge-tree` of `main` with this branch is clean | `gh pr view 133` |
 | API 24–25 device (icon, launch, play, background audio) | 🔴 **not verified** | S3 round 5 — user device |
 | Mini-player docked on a device | 🔴 **not verified** | S3 round 4 — user device |
 
@@ -60,7 +60,7 @@ call then crashes on API 24–25 at runtime. Nothing in CI checked for it.
 1. ~~Audit, gate, docs.~~ **DONE** — PR **#134** (`arena/dd43b627-dhun`, base `main@1ee85b0`).
 2. ~~Push, open the PR, watch CI.~~ **DONE** — green on `107151f`. The first attempt (`18ff436`) was a configuration error and is fixed (ledger above).
 3. ~~Mutation proof, then revert.~~ **DONE** — `74341d0` red on the NewApi step; `20efd8b` reverts it.
-4. **Ask the user for merge approval** for PR #134 and, separately, PR #133. Neither is merged.
+4. **Ask the user for merge approval** for PR #134. PR #133 is already merged (`0454a62`).
 5. Hardware (user): `docs/runbooks/s3-hardware-checklist.md` against the rolling
    `test` APK `9665b75f…` (universal) and MSI `af326695…`. Round 4 is landscape + Windows
    fullscreen. Round 5 is an API 24–25 device: launcher icon renders, app launches,
