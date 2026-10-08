@@ -83,7 +83,13 @@ function readModule(name) {
 }
 
 export default function (eleventyConfig) {
-  eleventyConfig.addPassthroughCopy({ "src/assets": "assets" });
+  // No `addPassthroughCopy`: the site ships no separate asset files. The one
+  // asset it has (`src/assets/dhun-favicon.svg`) is inlined into every page as
+  // a `data:` URI by `src/_data/favicon.js`, which is why each route is a
+  // single request. A file added to `src/assets/` without a consumer therefore
+  // does *not* ship — deliberately: the quality checker fails on any built file
+  // no page references (`unreferenced_file_violations`), so shipping one by
+  // passthrough would be a red test rather than a silent extra request.
 
   // Per-page stylesheet: composed from the modules the page declares. Emitted
   // unminified — `tools/minify.mjs` minifies `<style>` blocks with the same

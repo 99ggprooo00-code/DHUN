@@ -20,7 +20,10 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="{{ ogTitle or title }}">
 <meta name="twitter:description" content="{{ description }}">
-<link rel="icon" href="/assets/dhun-favicon.svg" type="image/svg+xml">
+{#- The icon is inlined as a `data:` URI (src/_data/favicon.js), so a route
+    makes exactly one request: this document. A rule decodes it back out of the
+    built page and compares it with src/assets/dhun-favicon.svg. -#}
+<link rel="icon" href="{{ favicon.dataUri }}" type="image/svg+xml">
 {#- One request per route: the stylesheet the page needs is inlined here from
     the modules its front matter declares (see eleventy.config.js). -#}
 <style>{{ cssModules | inlineCss | safe }}</style>

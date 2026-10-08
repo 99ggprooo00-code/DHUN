@@ -22,6 +22,10 @@ import unittest
 SCRIPTS = pathlib.Path(__file__).resolve().parent
 REPORTER = SCRIPTS / "report_lighthouse.py"
 
+sys.path.insert(0, str(SCRIPTS))
+
+import report_lighthouse as reporter  # noqa: E402
+
 
 def report(
     performance: float = 1.0,
@@ -107,3 +111,86 @@ class Reporter(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SubresourcesAreNamed(unittest.TestCase):
+    """A request count is not evidence; the reporter must name the requests.
+
+    On the merged head every route reported `requests=2` for a whole session and
+    `network-dependency-tree-insight: 3 item(s)`, which no one could act on: the
+    one extra subresource was never named in the only channel that is readable
+    from this repository. These tests pin the naming.
+    """
+
+    def run_reporter(self, *reports: dict) -> tuple[int, str]:
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = []
+            for index, payload in enumerate(reports):
+                path = pathlib.Path(tmp, f"report-{index}.json")
+                path.write_text(json.dumps(payload), encoding="utf-8")
+                paths.append(str(path))
+            completed = subprocess.run(
+                [sys.executable, str(REPORTER), "/ui/", *paths],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        return completed.returncode, completed.stdout + completed.stderr
+
+    def test_a_single_request_is_reported_as_the_document_only(self):
+        payload = report()
+        payload["audits"]["network-requests"]["details"]["items"] = [
+            {"url": "http://127.0.0.1:8080/ui/", "resourceType": "document", "transferSize": 55000}
+        ]
+        code, output = self.run_reporter(payload)
+        self.assertEqual(code, 0, output)
+        self.assertIn("requests=1", output)
+        self.assertIn("subresources: none", output)
+
+    def test_an_extra_subresource_is_named(self):
+        payload = report()
+        payload["audits"]["network-requests"]["details"]["items"] = [
+            {"url": "http://127.0.0.1:8080/ui/", "resourceType": "document", "transferSize": 55000},
+            {
+                "url": "http://127.0.0.1:8080/assets/dhun-favicon.svg",
+                "resourceType": "other",
+                "transferSize": 512,
+            },
+        ]
+        code, output = self.run_reporter(payload)
+        self.assertEqual(code, 0, output)
+        self.assertIn("requests=2", output)
+        self.assertIn("dhun-favicon.svg (512 B, other)", output)
+
+    def test_dependency_tree_items_are_reported_by_url(self):
+        payload = report()
+        payload["audits"]["network-dependency-tree-insight"] = {
+            "details": {
+                "items": [
+                    {"url": "http://127.0.0.1:8080/ui/", "type": "document"},
+                    {"url": "http://127.0.0.1:8080/assets/dhun-favicon.svg", "type": "other"},
+                ]
+            }
+        }
+        code, output = self.run_reporter(payload)
+        self.assertEqual(code, 0, output)
+        self.assertIn("network-dependency-tree-insight: ", output)
+        self.assertIn("dhun-favicon.svg", output)
+        self.assertNotIn("3 item(s)", output)
+
+    def test_an_item_without_a_url_still_says_so(self):
+        """The insight's shape is not a stable API: an unparseable item must
+        report itself, not vanish into a count."""
+        payload = report()
+        payload["audits"]["network-dependency-tree-insight"] = {
+            "details": {"items": [{"chain": {"depth": 2}}]}
+        }
+        code, output = self.run_reporter(payload)
+        self.assertEqual(code, 0, output)
+        self.assertIn("no url field", output)
+
+    def test_urls_are_found_however_the_item_is_nested(self):
+        urls = reporter._urls_in(
+            [{"tree": {"nodes": [{"request": {"url": "a"}}, {"url": "b"}]}}, {"url": "a"}]
+        )
+        self.assertEqual(urls, ["a", "b"])

@@ -24,6 +24,7 @@ Run directly for a report:  python3 scripts/website_quality.py [dist-dir]
 
 from __future__ import annotations
 
+import base64
 import html
 import json
 import pathlib
@@ -287,6 +288,13 @@ def javascript_violations(dist: pathlib.Path) -> list[str]:
 def _resolve_internal(dist: pathlib.Path, reference: str) -> bool:
     if reference.startswith("#") or reference.startswith("mailto:"):
         return True
+    # A `data:` URI is not a file reference: there is nothing to resolve. Its
+    # *contents* are asserted where the site depends on them —
+    # `favicon_violations` decodes the inlined icon and compares it with its
+    # source file — so this branch cannot be used to smuggle a dead asset past
+    # the link check.
+    if reference.startswith("data:"):
+        return True
     path = reference.split("#", 1)[0].split("?", 1)[0]
     if not path.startswith("/"):
         return True  # relative links are not used by this site's markup
@@ -306,6 +314,10 @@ def link_violations(dist: pathlib.Path) -> list[str]:
             re.I,
         ):
             reference = match.group(1)
+            if reference.startswith("data:"):
+                # Inlined bytes, not a URL to fetch. `favicon_violations` is the
+                # rule that reads the bytes back out.
+                continue
             if reference.startswith(("http://", "https://")):
                 if not reference.startswith(ALLOWED_EXTERNAL_ORIGINS):
                     violations.append(
@@ -603,6 +615,137 @@ def metadata_violations(dist: pathlib.Path) -> list[str]:
             violations.append(f"{route}: missing twitter:card")
         if '<link rel="icon"' not in markup:
             violations.append(f"{route}: missing favicon link")
+    return violations
+
+
+# --------------------------------------------------------------------------
+# One request per route.
+# --------------------------------------------------------------------------
+
+# The tab icon is inlined as a `data:` URI by `website/src/_data/favicon.js`, so
+# a route is exactly one HTTP request — the document that carries everything.
+# Lighthouse measured `requests=2` on the merged head (run 37808955045
+# annotations) for exactly this reason. Both halves are asserted: the URI must
+# decode back to the source SVG (folding the whitespace the encoder folds), and
+# no page may keep the old file reference alive, which would silently restore
+# the second request.
+ICON_LINK = re.compile(r"<link\b[^>]*\brel=\"icon\"[^>]*>", re.I)
+ICON_HREF = re.compile(r"\bhref=\"([^\"]+)\"", re.I)
+DATA_SVG_ICON = re.compile(r"^data:image/svg\+xml;base64,([A-Za-z0-9+/]+={0,2})$")
+FAVICON_SOURCE = SOURCE_DIR / "assets" / "dhun-favicon.svg"
+REMOVED_ICON_PATH = "/assets/dhun-favicon.svg"
+
+
+def _compact_svg(svg: str) -> str:
+    """Fold the whitespace the encoder folds, so both sides compare equal.
+
+    Only whitespace *between tags* is removed — the document has no text nodes,
+    so no glyph spacing can change — and the encoder in `favicon.js` does the
+    same thing. The two definitions are compared against each other by this
+    rule, so a divergence is a red test rather than a guess.
+    """
+    return re.sub(r">\s+<", "><", svg).strip()
+
+
+def favicon_violations(dist: pathlib.Path) -> list[str]:
+    """The icon is inlined, it is the icon it claims to be, and it costs no request."""
+    if not FAVICON_SOURCE.is_file():
+        return [
+            f"{FAVICON_SOURCE.relative_to(REPO_ROOT)} is missing, so the inlined "
+            f"icon cannot be compared with its source"
+        ]
+    expected = _compact_svg(FAVICON_SOURCE.read_text(encoding="utf-8"))
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        tags = ICON_LINK.findall(markup)
+        if len(tags) != 1:
+            violations.append(
+                f"{route}: expected exactly one <link rel=\"icon\">, found {len(tags)}"
+            )
+            continue
+        tag = tags[0]
+        href = ICON_HREF.search(tag)
+        if not href:
+            violations.append(f"{route}: the icon link has no href: {tag[:60]}")
+            continue
+        value = href.group(1)
+        match = DATA_SVG_ICON.match(value)
+        if match is None:
+            violations.append(
+                f"{route}: the icon is not an inlined data: URI ({value[:60]}…) — "
+                f"a separate file is a second HTTP request on every visit"
+            )
+        else:
+            try:
+                decoded = base64.b64decode(match.group(1), validate=True).decode("utf-8")
+            except (ValueError, UnicodeDecodeError) as error:
+                violations.append(f"{route}: the inlined icon is not base64 UTF-8: {error}")
+            else:
+                if decoded != expected:
+                    violations.append(
+                        f"{route}: the inlined icon has drifted from "
+                        f"{FAVICON_SOURCE.name} ({len(decoded)} B decoded vs "
+                        f"{len(expected)} B expected)"
+                    )
+            if 'type="image/svg+xml"' not in tag:
+                violations.append(f"{route}: the inlined icon lost its type attribute: {tag[:60]}")
+        if REMOVED_ICON_PATH in markup:
+            violations.append(
+                f"{route}: still references {REMOVED_ICON_PATH}; the icon must not be "
+                f"fetched as a file as well as inlined"
+            )
+    return violations
+
+
+def _referenced_paths(dist: pathlib.Path) -> set[str]:
+    """Every site-root path a page (or robots.txt) names as a resource."""
+    referenced: set[str] = set()
+    for path in page_paths(dist).values():
+        markup = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"\b(?:href|src)=\"([^\"]+)\"", markup, re.I):
+            reference = match.group(1)
+            if reference.startswith("/") and not reference.startswith("//"):
+                referenced.add(reference.split("#", 1)[0].split("?", 1)[0])
+        for match in re.finditer(r"url\((['\"]?)([^)'\"]+)\1\)", markup):
+            reference = match.group(2)
+            if reference.startswith("/") and not reference.startswith("//"):
+                referenced.add(reference.split("#", 1)[0].split("?", 1)[0])
+    robots = dist / "robots.txt"
+    if robots.is_file():
+        for match in re.finditer(r"^\s*Sitemap:\s*(\S+)", robots.read_text(encoding="utf-8"), re.M):
+            reference = match.group(1)
+            if reference.startswith(CANONICAL_ORIGIN):
+                referenced.add("/" + reference[len(CANONICAL_ORIGIN) :].lstrip("/"))
+    return referenced
+
+
+def unreferenced_file_violations(dist: pathlib.Path) -> list[str]:
+    """Nothing ships that no page names.
+
+    This is the rule that keeps "one request per route" true over time: an
+    asset copied into `dist/` but referenced by no page is either dead weight in
+    the deploy or — if a page *should* have referenced it — a broken page. The
+    three route documents, `404.html`, `robots.txt` and `sitemap.xml` are
+    artifacts in their own right (the routes *are* what they deliver, the 404 is
+    served by the host, the crawl files are the crawl contract), so they are not
+    "referenced" by anything and are exempt.
+    """
+    referenced = _referenced_paths(dist)
+    route_files = set(page_paths(dist).values())
+    violations: list[str] = []
+    for file in _files(dist):
+        if file in route_files:
+            continue
+        relative = file.relative_to(dist).as_posix()
+        if relative in ("robots.txt", "sitemap.xml"):
+            continue
+        if f"/{relative}" in referenced:
+            continue
+        violations.append(
+            f"{relative} ships but no page references it — remove it, or reference it "
+            f"from the page that needs it"
+        )
     return violations
 
 
@@ -909,6 +1052,8 @@ CHECKS = (
     ("no client-side JavaScript", javascript_violations),
     ("internal links resolve", link_violations),
     ("mockups are labelled", mockup_violations),
+    ("icon is inlined and true to its source", favicon_violations),
+    ("nothing ships unreferenced", unreferenced_file_violations),
     ("accessibility floor", accessibility_violations),
     ("page metadata", metadata_violations),
     ("crawlability", crawlability_violations),

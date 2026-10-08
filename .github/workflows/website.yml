@@ -18,6 +18,8 @@ on:
       - "scripts/test_website_claims.py"
       - "scripts/test_website_quality.py"
       - "scripts/test_website_smoke.py"
+      - "scripts/report_lighthouse.py"
+      - "scripts/test_report_lighthouse.py"
       - "scripts/test_website_workflow.py"
       - ".github/workflows/website.yml"
   pull_request:
@@ -29,6 +31,8 @@ on:
       - "scripts/test_website_claims.py"
       - "scripts/test_website_quality.py"
       - "scripts/test_website_smoke.py"
+      - "scripts/report_lighthouse.py"
+      - "scripts/test_report_lighthouse.py"
       - "scripts/test_website_workflow.py"
       - ".github/workflows/website.yml"
   workflow_dispatch:

@@ -12,12 +12,14 @@ test — and then the whole set runs against the committed build in
 HTML, not about source files looking plausible.
 """
 
+import base64
 import re
 import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from tempfile import mkdtemp as tmpdir
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -691,3 +693,108 @@ class SitemapScope(DistCopyMixin):
         )
         violations = quality.crawlability_violations(dist)
         self.assertTrue(any("/blog/" in v for v in violations), violations)
+
+
+class InlinedIcon(DistCopyMixin):
+    """One request per route: the icon is inlined, and it is the right bytes.
+
+    Lighthouse measured `requests=2` per route on the merged head (run
+    37808955045); the second request was this icon. The rule has two halves and
+    both are exercised here, because either one failing silently puts the
+    request back or changes what the browser draws.
+    """
+
+    @staticmethod
+    def data_uri(body: bytes) -> str:
+        return "data:image/svg+xml;base64," + base64.b64encode(body).decode("ascii")
+
+    def site(self, markup: str, **extra: str) -> Path:
+        """A tmp dist whose every page is `markup`; no separate icon file ships."""
+        root = Path(tmpdir())
+        files = {
+            "index.html": markup,
+            "features/index.html": markup,
+            "ui/index.html": markup,
+            "robots.txt": "Sitemap: https://99ggprooo00-code.github.io/DHUN/sitemap.xml\n",
+            "sitemap.xml": "<urlset></urlset>",
+            "404.html": markup,
+        }
+        files.update(extra)
+        return write_tree(root, files)
+
+    def page_with(self, icon_tag: str) -> str:
+        return minimal_site()["index.html"].replace(
+            '<link rel="icon" href="/assets/favicon.svg">', icon_tag
+        )
+
+    def test_the_real_build_inlines_the_icon(self):
+        self.assertEqual(quality.favicon_violations(DIST), [])
+
+    def test_a_separate_icon_file_fails(self):
+        markup = self.page_with('<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">')
+        violations = quality.favicon_violations(self.site(markup))
+        self.assertTrue(
+            any("second HTTP request" in v for v in violations), violations
+        )
+
+    def test_drifted_icon_bytes_fail(self):
+        body = b'<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'
+        markup = self.page_with(f'<link rel="icon" href="{self.data_uri(body)}" type="image/svg+xml">')
+        violations = quality.favicon_violations(self.site(markup))
+        self.assertTrue(any("drifted from dhun-favicon.svg" in v for v in violations), violations)
+
+    def test_a_missing_icon_link_fails(self):
+        markup = minimal_site()["index.html"].replace(
+            '<link rel="icon" href="/assets/favicon.svg">', ""
+        )
+        violations = quality.favicon_violations(self.site(markup))
+        self.assertTrue(any("exactly one" in v for v in violations), violations)
+
+    def test_a_leftover_file_reference_fails(self):
+        source = quality._compact_svg(quality.FAVICON_SOURCE.read_text(encoding="utf-8"))
+        markup = self.page_with(
+            f'<link rel="icon" href="{self.data_uri(source.encode("utf-8"))}" type="image/svg+xml">'
+        ).replace("<h1>t</h1>", '<h1>t</h1><a href="/assets/dhun-favicon.svg">icon</a>')
+        violations = quality.favicon_violations(self.site(markup))
+        self.assertTrue(any("must not be fetched as a file" in v for v in violations), violations)
+
+    def test_the_exact_current_encoding_passes(self):
+        source = quality._compact_svg(quality.FAVICON_SOURCE.read_text(encoding="utf-8"))
+        markup = self.page_with(
+            f'<link rel="icon" href="{self.data_uri(source.encode("utf-8"))}" type="image/svg+xml">'
+        )
+        self.assertEqual(quality.favicon_violations(self.site(markup)), [])
+
+
+class NothingShipsUnreferenced(DistCopyMixin):
+    """An asset no page names is dead weight in the deploy, or a broken page."""
+
+    def test_the_real_build_references_everything_it_ships(self):
+        self.assertEqual(quality.unreferenced_file_violations(DIST), [])
+
+    def test_an_unreferenced_file_fails(self):
+        dist = self.copy_dist()
+        (dist / "assets").mkdir(exist_ok=True)
+        (dist / "assets" / "leftover.svg").write_text("<svg/>", encoding="utf-8")
+        violations = quality.unreferenced_file_violations(dist)
+        self.assertTrue(any("leftover.svg" in v for v in violations), violations)
+
+    def test_a_referenced_file_passes(self):
+        dist = self.copy_dist()
+        (dist / "assets").mkdir(exist_ok=True)
+        (dist / "assets" / "print.css").write_text("@media print{}", encoding="utf-8")
+        page = dist / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                "</head>", '<link rel="stylesheet" href="/assets/print.css"></head>', 1
+            ),
+            encoding="utf-8",
+        )
+        self.assertEqual(quality.unreferenced_file_violations(dist), [])
+
+    def test_crawl_files_and_the_404_are_exempt(self):
+        dist = self.copy_dist()
+        self.assertEqual(quality.unreferenced_file_violations(dist), [])
+        self.assertTrue((dist / "robots.txt").is_file())
+        self.assertTrue((dist / "sitemap.xml").is_file())
+        self.assertTrue((dist / "404.html").is_file())

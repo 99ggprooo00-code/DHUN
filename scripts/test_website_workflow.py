@@ -105,8 +105,31 @@ class Triggers(WorkflowText):
             "scripts/test_website_claims.py",
             "scripts/test_website_quality.py",
             "scripts/test_website_smoke.py",
+            "scripts/report_lighthouse.py",
+            "scripts/test_report_lighthouse.py",
         ):
             self.assertIn(f'"{path}"', self.text, f"{path} does not trigger the site workflow")
+
+    def test_every_script_the_workflow_runs_also_triggers_it(self):
+        """Derived, not listed: a script the workflow *runs* but does not watch
+        is a check that can be changed without ever running.
+
+        `scripts/report_lighthouse.py` was exactly that — the Lighthouse job
+        calls it on every run, and the `paths:` filters did not name it, so an
+        edit to the only reader of the Lighthouse reports could land without the
+        workflow that uses it ever starting. Each path must appear at least
+        twice (the `push` and `pull_request` filters), which is asserted rather
+        than assumed.
+        """
+        used = sorted(set(re.findall(r"scripts/[a-z_]+\.py", self.text)))
+        self.assertTrue(used, "the workflow references no scripts at all")
+        for path in used:
+            self.assertGreaterEqual(
+                self.text.count(f'"{path}"'),
+                2,
+                f"{path} is used by {WORKFLOW.name} but does not trigger it on both "
+                f"push and pull_request",
+            )
 
     def test_app_workflows_are_not_touched_by_this_file(self):
         """The site workflow must stay the only site-owned workflow."""
