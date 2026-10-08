@@ -39,6 +39,17 @@ jobs:
       - name: Android debug build
         run: ./gradlew :app-android:assembleDebug --no-daemon
 
+      # S6 requires a clean-target install of APK + AAB + MSI. The AAB is only
+      # ever built by test-release.yml's `aab` job, which is
+      # `workflow_dispatch`-gated — and the maintenance agent's token gets
+      # HTTP 403 on dispatch (verified: `gh workflow run test-release.yml` →
+      # "Resource not accessible by integration"). So `:app-android:bundleDebug`
+      # had NO automated coverage, while PR #131 added a `splits { abi }` block
+      # to this module after that job last ran. A bundle path that only breaks
+      # at release time is the worst place to discover it.
+      - name: "Android App Bundle compiles (S6 AAB gate)"
+        run: ./gradlew :app-android:bundleDebug --no-daemon
+
       # minSdk is 24 (Android 7.0). Nothing else in CI compiles against that
       # floor: assembleDebug happily links API-26+ calls that crash on API 24-25.
       # NewApi (scoped in app-android/build.gradle.kts) fails the build on them.

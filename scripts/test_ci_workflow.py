@@ -18,6 +18,13 @@ had `abortOnError = false`, so a run there could not fail either. Both
 Android modules must have a named NewApi step AND a lint block that scopes
 to NewApi with abortOnError on — a step naming a task whose gate is off is
 green theater, which is the exact failure mode this file exists to catch.
+
+The same "exists but never executes" shape applies to the App Bundle. Stage
+S6 requires a clean-installed AAB, yet the only job that builds one
+(test-release.yml `aab`) is `workflow_dispatch`-gated, and the maintenance
+agent's token gets HTTP 403 on dispatch. ci.yml must therefore name
+`:app-android:bundleDebug` itself, or the bundle path stays unverified until
+release day.
 """
 
 import re
@@ -62,6 +69,25 @@ class CiWorkflowTest(unittest.TestCase):
             test_at,
             "the desktop suite must run after the compile step so a compile "
             "break fails Desktop compiles, not Unit tests",
+        )
+
+    def test_app_bundle_path_is_a_named_step(self):
+        # S6 needs a clean-installed AAB, but test-release.yml's `aab` job is
+        # workflow_dispatch-gated and the maintenance agent's token gets 403 on
+        # dispatch — so without this step `:app-android:bundleDebug` has no
+        # automated coverage at all, and it now builds alongside a
+        # `splits { abi }` block (PR #131) it has never been exercised against.
+        self.assertIn("./gradlew :app-android:bundleDebug", self.text)
+        self.assertIn("Android App Bundle compiles (S6 AAB gate)", self.text)
+
+    def test_app_bundle_step_runs_after_the_apk_build(self):
+        assemble_at = self.text.index("./gradlew :app-android:assembleDebug")
+        bundle_at = self.text.index("./gradlew :app-android:bundleDebug")
+        self.assertLess(
+            assemble_at,
+            bundle_at,
+            "the APK build must come first so a shared compile break fails "
+            "'Android debug build' and not the bundle step",
         )
 
     def test_api24_newapi_gate_is_a_named_step_for_the_app_module(self):
