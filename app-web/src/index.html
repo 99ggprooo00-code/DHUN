@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-dhun-theme="dark" data-dhun-accent="brand">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>DHUN — browser preview</title>
+    <meta name="description" content="The DHUN interface running in a browser. Engineering preview: audio playback is not proven from this origin." />
+    <!-- ADR-008 boundary 4: this is an engineering preview, not a product
+         surface. It stays out of search until playback is proven. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="dark light" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https:; connect-src 'self' https://music.youtube.com https://lrclib.net; base-uri 'none'; form-action 'none'"
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23161616'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%23BB86FC' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%23BB86FC'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./css/tokens.css" />
+    <link rel="stylesheet" href="./css/app.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>
+      <p style="padding: 24px; font-family: system-ui, sans-serif">
+        DHUN's browser preview needs JavaScript: the interface is rendered client-side, and no part of
+        it is a static document.
+      </p>
+    </noscript>
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
