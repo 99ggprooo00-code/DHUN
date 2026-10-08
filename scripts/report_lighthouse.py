@@ -9,7 +9,20 @@ API does return.
 Gates (`.ai/WEBSITE_PLAN.md` Part A §10): accessibility >= 0.95 and
 performance >= 0.90. SEO and best-practices are reported, not gated.
 
-Usage: python3 scripts/report_lighthouse.py <route> <report.json>
+A score alone is not evidence: "96 → 94 → 78" cannot be diagnosed from a number,
+and the report JSON lives in an artifact this environment cannot retrieve. So the
+metrics the score is computed from (FCP, LCP, TBT, CLS, Speed Index, total byte
+weight and request count) and the largest measured savings are annotated too —
+readable from the API, comparable run to run.
+
+When several reports are given for one route, every run's score is annotated and
+the **gate uses the median**. A single Lighthouse sample on a shared runner
+swings by double digits (this repository has seen `/` score 96, 94 and 78 for
+pages that differ by 64 bytes), so one sample is not a measurement of the page.
+Median-of-three is not a looser gate: the same threshold applies to a number that
+is actually about the site.
+
+Usage: python3 scripts/report_lighthouse.py <route> <report.json> [<report2.json> …]
 """
 
 from __future__ import annotations
@@ -21,12 +34,51 @@ CATEGORIES = ("performance", "accessibility", "best-practices", "seo")
 GATES = {"accessibility": 0.95, "performance": 0.90}
 
 
-def main(argv: list[str]) -> int:
-    route, path = argv[1], argv[2]
+def load_scores(path: str) -> dict[str, float | None]:
     with open(path, encoding="utf-8") as handle:
         report = json.load(handle)
     categories = report.get("categories", {})
-    scores = {key: categories.get(key, {}).get("score") for key in CATEGORIES}
+    return {key: categories.get(key, {}).get("score") for key in CATEGORIES}
+
+
+def median(values: list[float]) -> float:
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def main(argv: list[str]) -> int:
+    route, paths = argv[1], argv[2:]
+    if not paths:
+        print("usage: report_lighthouse.py <route> <report.json> [<report2.json> …]")
+        return 2
+    runs = [load_scores(path) for path in paths]
+    reports = []
+    for path in paths:
+        with open(path, encoding="utf-8") as handle:
+            reports.append(json.load(handle))
+
+    # The run whose performance score is the median: its audits and metrics are
+    # the ones annotated in full, so a failure is described by a real run.
+    perf = [run.get("performance") for run in runs if run.get("performance") is not None]
+    if perf:
+        target = median(perf)
+        index = min(range(len(runs)), key=lambda i: abs((runs[i].get("performance") or 0) - target))
+    else:
+        index = 0
+    report = reports[index]
+    scores = runs[index]
+
+    if len(runs) > 1:
+        per_run = " · ".join(
+            f"run {n + 1}: {runs[n].get('performance') * 100:.0f}"
+            for n in range(len(runs))
+            if runs[n].get("performance") is not None
+        )
+        print(f"::notice title=Lighthouse {route} samples::{per_run} (gate uses the median)")
+
     summary = " · ".join(
         f"{key}={value * 100:.0f}" for key, value in scores.items() if value is not None
     )
@@ -35,6 +87,57 @@ def main(argv: list[str]) -> int:
     if not summary:
         print(f"::error title=Lighthouse {route}::the report contained no category scores")
         return 1
+
+    # The numbers behind the score: what actually moved between runs.
+    metrics = {
+        "FCP": ("first-contentful-paint", "ms"),
+        "LCP": ("largest-contentful-paint", "ms"),
+        "TBT": ("total-blocking-time", "ms"),
+        "CLS": ("cumulative-layout-shift", ""),
+        "SI": ("speed-index", "ms"),
+    }
+    measured = []
+    for label, (audit_id, unit) in metrics.items():
+        audit = report.get("audits", {}).get(audit_id, {})
+        value = audit.get("numericValue")
+        if value is None:
+            continue
+        measured.append(f"{label}={value:.0f}{unit}" if unit else f"{label}={value:.3f}")
+    weight = report.get("audits", {}).get("total-byte-weight", {}).get("numericValue")
+    requests = report.get("audits", {}).get("network-requests", {}).get("details", {}).get("items", [])
+    if weight is not None:
+        measured.append(f"bytes={weight / 1000:.1f}kB")
+    if requests:
+        measured.append(f"requests={len(requests)}")
+    if measured:
+        print(f"::notice title=Lighthouse {route} metrics::" + " · ".join(measured))
+        print(f"{route} metrics: " + " · ".join(measured))
+
+    # The largest measured savings, so the next run can confirm an improvement
+    # instead of asserting one.
+    savings = []
+    for audit_id, audit in report.get("audits", {}).items():
+        overall = audit.get("details", {}).get("overallSavingsMs")
+        if overall and overall > 0:
+            savings.append((overall, audit_id, (audit.get("title") or "").strip()))
+    for overall, audit_id, title in sorted(savings, reverse=True)[:4]:
+        print(
+            f"::notice title=Lighthouse {route} opportunity::"
+            f"{audit_id} — {title} (about {overall:.0f} ms)"
+        )
+
+    # Insights that carry no score but say whether the page still blocks on
+    # requests; these are the ones Tier A set out to remove.
+    for audit_id in ("render-blocking-resources", "network-dependency-tree-insight", "unused-css-rules"):
+        audit = report.get("audits", {}).get(audit_id, {})
+        if not audit:
+            continue
+        items = audit.get("details", {}).get("items", [])
+        state = "none" if not items else f"{len(items)} item(s)"
+        print(
+            f"::notice title=Lighthouse {route} insight::{audit_id} — "
+            f"{(audit.get('displayValue') or state)}"
+        )
 
     # Name the audits that failed, so the failure is actionable from the
     # annotations alone.

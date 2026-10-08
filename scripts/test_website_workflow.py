@@ -43,6 +43,58 @@ class WorkflowText(unittest.TestCase):
         return match.group(1)
 
 
+def block_scalar_regions(lines: list[str]) -> set[int]:
+    """Indices of lines that are the *content* of a `|` or `>` block scalar.
+
+    Content inside `run: |` is shell, not YAML, so a colon there is fine and
+    must not be reported. A block scalar starts on a `key: |` line and ends
+    when indentation drops back to the key's own level.
+    """
+    inside: set[int] = set()
+    key_indent: int | None = None
+    for number, line in enumerate(lines):
+        if key_indent is not None:
+            if line.strip() and (len(line) - len(line.lstrip())) <= key_indent:
+                key_indent = None
+            else:
+                inside.add(number)
+                continue
+        stripped = line.rstrip("\n")
+        if re.search(r":\s*[|>][-+]?\s*$", stripped):
+            key_indent = len(line) - len(line.lstrip())
+    return inside
+
+
+def yaml_hygiene_violations(text: str) -> list[str]:
+    """Unquoted `: ` inside a plain scalar — invalid YAML, invisible as text.
+
+    GitHub Actions says nothing until the run is rejected, and the repository
+    deliberately carries no YAML parser (no Python one is available in the
+    environment where these checks run). This is the one YAML mistake a text
+    edit actually makes — a job or step name like
+    `name: Measurements (Playwright: viewports)` — so it is caught here by
+    rule instead of by a red run on main.
+    """
+    lines = text.splitlines()
+    skipped = block_scalar_regions(lines)
+    violations: list[str] = []
+    for number, line in enumerate(lines, 1):
+        if number - 1 in skipped:
+            continue
+        match = re.match(r"^(\s*)(-\s+)?([A-Za-z_][A-Za-z0-9_-]*):\s+(\S.*)$", line)
+        if not match:
+            continue
+        value = match.group(4).strip()
+        if value[:1] in ("\"", "'", "|", ">", "{", "["):
+            continue
+        if ": " in value or value.endswith(":"):
+            violations.append(
+                f"line {number}: {match.group(3)}: {value!r} — an unquoted ': ' in a YAML "
+                f"scalar is a parse error; quote the value"
+            )
+    return violations
+
+
 class Triggers(WorkflowText):
     def test_site_scripts_trigger_the_workflow(self):
         for path in (
@@ -85,12 +137,17 @@ class BuildJob(WorkflowText):
 
 class BrowserJob(WorkflowText):
     def test_pinned_chromium_is_installed(self):
-        self.assertRegex(self.job("a11y"), r"playwright install --with-deps chromium")
+        self.assertRegex(self.job("browser"), r"playwright install --with-deps chromium")
 
     def test_browser_measurements_run(self):
-        job = self.job("a11y")
+        job = self.job("browser")
         self.assertIn("node tests/browser.mjs", job)
         self.assertIn("SITE_BASE", job)
+
+    def test_browser_evidence_does_not_depend_on_the_lighthouse_job(self):
+        """A noisy score must never hide the browser measurements."""
+        self.assertRegex(self.job("browser"), r"needs:\s*\[?build\]?")
+        self.assertNotRegex(self.job("browser"), r"needs:\s*\[?lighthouse")
 
     def test_axe_cli_is_retired(self):
         """`@axe-core/cli` never produced a report; axe runs inside the browser job.
@@ -101,12 +158,20 @@ class BrowserJob(WorkflowText):
         self.assertNotRegex(self.text, r"npx[^\n]*@axe-core/cli")
 
     def test_screenshots_are_uploaded_as_artifacts(self):
-        job = self.job("a11y")
+        job = self.job("browser")
         self.assertIn("browser-evidence", job)
         self.assertIn("website/tests/screenshots", job)
 
-    def test_lighthouse_still_reports(self):
-        self.assertIn("scripts/report_lighthouse.py", self.job("a11y"))
+class LighthouseJob(WorkflowText):
+    def test_lighthouse_takes_three_samples_and_reports_each(self):
+        job = self.job("lighthouse")
+        self.assertIn("for sample in 1 2 3", job)
+        self.assertIn("scripts/report_lighthouse.py", job)
+
+    def test_lighthouse_is_its_own_job(self):
+        """Separate runners: neither measurement can starve the other."""
+        self.assertRegex(self.job("lighthouse"), r"needs:\s*\[?build\]?")
+        self.assertNotIn("browser-evidence", self.job("lighthouse"))
 
 
 class ServedJob(WorkflowText):
@@ -143,3 +208,20 @@ class SiteOwnedScriptsExist(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class YamlHygiene(WorkflowText):
+    def test_the_committed_workflow_is_valid_yaml_by_this_rule(self):
+        self.assertEqual(yaml_hygiene_violations(self.text), [])
+
+    def test_an_unquoted_colon_in_a_scalar_is_caught(self):
+        broken = self.text.replace(
+            'name: Browser measurements',
+            'name: Measurements (Playwright: viewports)',
+            1,
+        )
+        self.assertTrue(yaml_hygiene_violations(broken), "the rule missed an unquoted ': '")
+
+    def test_shell_inside_run_blocks_is_not_treated_as_yaml(self):
+        text = 'jobs:\n  a:\n    steps:\n      - run: |\n          echo "x: y"\n'
+        self.assertEqual(yaml_hygiene_violations(text), [])
