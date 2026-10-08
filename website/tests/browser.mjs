@@ -464,9 +464,16 @@ function forcedColorsReport() {
   }
   // Recorded, not gated: an aria-hidden decoration losing its frame under
   // forced colours is a degradation to report, not an accessibility defect.
+  //
+  // The raw styles are gathered here and the rule is applied in Node, because
+  // this function is serialized into the page: a reference to anything imported
+  // from `./rules.mjs` is a ReferenceError *inside the page*, which rejects the
+  // evaluate() call and — before the guard below existed — killed the whole run
+  // with no annotation, no screenshots and only "Process completed with exit
+  // code 1" to show for it (website run 37814413312, 2026-10-08).
   const decorations = [];
   for (const element of document.querySelectorAll(".mock .device")) {
-    decorations.push({ forcedColorsBoundaryMissing: forcedColorsBoundaryMissing(read(element)) });
+    decorations.push({ element: element.className, style: read(element) });
   }
   return {
     active: window.matchMedia("(forced-colors: active)").matches,
@@ -924,7 +931,7 @@ async function checkPreferences(browser) {
           record(
             `forced colors ${route}`,
             `${report.controls.length} control(s) keep a boundary; ` +
-              `${report.decorations.filter((d) => d.forcedColorsBoundaryMissing).length}/${report.decorations.length} ` +
+              `${report.decorations.filter((d) => forcedColorsBoundaryMissing(d.style)).length}/${report.decorations.length} ` +
               `decorative mockup frame(s) lose theirs`,
           );
         }
@@ -1071,27 +1078,55 @@ async function captureScreenshots(browser) {
 // run
 // ---------------------------------------------------------------------------
 
-const browser = await chromium.launch();
-try {
-  await checkViewports(browser);
-  await checkKeyboard(browser);
-  await checkStructure(browser);
-  await checkTabStops(browser);
-  await checkContrast(browser);
-  await checkReducedMotion(browser);
-  await checkPreferences(browser);
-  await checkPrint(browser);
-  await checkAxe(browser);
-  await captureScreenshots(browser);
-} finally {
-  await browser.close();
+// Every check runs through the guard. A thrown error used to end the process
+// before `emitAnnotations()` ran, so the only trace in the readable channel was
+// "Process completed with exit code 1" — no route, no viewport, no message. A
+// crash is a finding like any other: it is recorded, annotated, and the run
+// continues to the next check, because a broken tab walk must not hide the
+// contrast measurement behind it.
+async function guard(name, run) {
+  try {
+    await run();
+  } catch (error) {
+    const where = (error && error.stack ? error.stack.split("\n").slice(0, 3).join(" | ") : String(error))
+      .replace(/\s+/g, " ")
+      .slice(0, 400);
+    fail(`${name} crashed`, `${error && error.message ? error.message : error} — ${where}`);
+  }
 }
 
-console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
-console.error(measurements.map((line) => `  · ${line}`).join("\n"));
-if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
-emitAnnotations();
-if (failures.length) {
-  console.error(failures.map((line) => `  - ${line}`).join("\n"));
-  process.exitCode = 1;
+const CHECKS = [
+  ["viewports", () => checkViewports(browser)],
+  ["keyboard", () => checkKeyboard(browser)],
+  ["structure", () => checkStructure(browser)],
+  ["tab stops", () => checkTabStops(browser)],
+  ["contrast", () => checkContrast(browser)],
+  ["reduced motion", () => checkReducedMotion(browser)],
+  ["preferences", () => checkPreferences(browser)],
+  ["print", () => checkPrint(browser)],
+  ["axe", () => checkAxe(browser)],
+  ["screenshots", () => captureScreenshots(browser)],
+];
+
+let browser;
+try {
+  browser = await chromium.launch();
+  for (const [name, run] of CHECKS) {
+    await guard(name, run);
+  }
+} catch (error) {
+  fail("browser launch", `${error && error.message ? error.message : error}`);
+} finally {
+  if (browser) await browser.close();
+  // The summary and the annotations are emitted even when a check above threw:
+  // the annotations are the only channel this repository can read from CI, so
+  // losing them is losing the evidence itself.
+  console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
+  console.error(measurements.map((line) => `  · ${line}`).join("\n"));
+  if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
+  emitAnnotations();
+  if (failures.length) {
+    console.error(failures.map((line) => `  - ${line}`).join("\n"));
+    process.exitCode = 1;
+  }
 }

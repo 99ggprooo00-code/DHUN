@@ -279,6 +279,98 @@ class PublishingRunbook(unittest.TestCase):
             self.assertIn("legacy", section.lower())
 
 
+class BrowserHarnessSurvivesAndDiagnoses(unittest.TestCase):
+    """The browser harness must never die silently in CI.
+
+    On 2026-10-08 the first run of the new browser checks (website run
+    37814413312) failed with nothing in the readable channel but "Process
+    completed with exit code 1": `forcedColorsReport`, a function serialized
+    *into the page* by `page.evaluate`, called `forcedColorsBoundaryMissing`,
+    which is imported from `./rules.mjs` in Node scope and therefore undefined
+    inside the page — a ReferenceError in the page rejected the evaluate, the
+    script threw before it annotated anything, and no screenshots were written
+    either. Two rules prevent the repeat, and both are asserted here.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.src = (REPO_ROOT / "website" / "tests" / "browser.mjs").read_text(encoding="utf-8")
+
+    # -- helpers -----------------------------------------------------------
+
+    @staticmethod
+    def imported_rules(src: str) -> set[str]:
+        """Names imported from ./rules.mjs — Node scope, not page scope."""
+        match = re.search(r"import\s*\{([^}]*)\}\s*from\s*[\"']\./rules\.mjs[\"']", src)
+        assert match, "browser.mjs no longer imports ./rules.mjs — update this guard"
+        return {name.strip() for name in match.group(1).split(",") if name.strip()}
+
+    @staticmethod
+    def evaluate_by_name(src: str) -> set[str]:
+        return set(re.findall(r"page\.evaluate\(\s*(\w+)\s*\)", src))
+
+    @staticmethod
+    def body_of(src: str, name: str) -> str:
+        """A top-level function body, by its closing brace at column zero."""
+        start = src.index(f"function {name}(")
+        end = src.index("\n}", start)
+        return src[start:end]
+
+    @staticmethod
+    def strip_comments(text: str) -> str:
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        return re.sub(r"//[^\n]*", "", text)
+
+    # -- the two rules -----------------------------------------------------
+
+    def test_functions_serialised_into_the_page_are_self_contained(self):
+        """A page function may only use page scope: no imports, no closures."""
+        imported = self.imported_rules(self.src)
+        checked = 0
+        for name in sorted(self.evaluate_by_name(self.src)):
+            body = self.strip_comments(self.body_of(self.src, name))
+            for symbol in sorted(imported):
+                self.assertNotIn(
+                    symbol,
+                    body,
+                    f"{name} is passed to page.evaluate by name and references {symbol!r}, "
+                    f"which exists only in Node scope: the page throws ReferenceError and the "
+                    f"whole run dies before any annotation. Return the raw values and apply "
+                    f"the rule in Node.",
+                )
+            checked += 1
+        self.assertGreaterEqual(checked, 5, "no page functions found — this guard went stale")
+
+    def test_every_check_runs_behind_the_crash_guard(self):
+        checks = re.findall(r"^async function (check\w+)\(", self.src, re.M)
+        self.assertGreaterEqual(len(checks), 5, "no check functions found — this guard went stale")
+        block = self.src[self.src.index("const CHECKS = [") : self.src.index("let browser;")]
+        for name in checks:
+            self.assertIn(
+                f"() => {name}(browser)",
+                block,
+                f"{name} is defined but never runs: a check that is not in CHECKS is not a check",
+            )
+
+    def test_the_guard_records_and_the_annotations_always_run(self):
+        guard = self.body_of(self.src, "guard")
+        self.assertRegex(guard, r"catch\s*\(error\)")
+        self.assertIn("fail(", guard, "a crash must be recorded as a failure, not thrown away")
+        finally_block = self.src[self.src.index("} finally {") :]
+        self.assertIn(
+            "emitAnnotations();",
+            finally_block,
+            "the annotations must be emitted from the finally block: Actions log archives are "
+            "unreadable from this environment, so dropping them drops the evidence",
+        )
+
+    def test_the_page_gathers_and_rules_decide(self):
+        """The architecture the crash broke: gather in the page, decide in Node."""
+        rules = (REPO_ROOT / "website" / "tests" / "rules.mjs").read_text(encoding="utf-8")
+        for symbol in self.imported_rules(self.src):
+            self.assertIn(f"export function {symbol}", rules, f"{symbol} is imported but not exported")
+
+
 class SiteOwnedScriptsExist(unittest.TestCase):
     def test_every_referenced_site_script_exists(self):
         text = WORKFLOW.read_text(encoding="utf-8")

@@ -1,6 +1,6 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
-## 2026-10-08 — six defects found by asking who would actually see the failure (session `arena/37ec95ed-dhun`)
+## 2026-10-08 — seven defects found by asking who would actually see the failure (session `arena/37ec95ed-dhun`)
 
 The session's own rule was "a rule that cannot be made to fail is not a rule", so
 every new check was mutated before it was trusted. Five defects were in the
@@ -42,6 +42,27 @@ test, and `test_website_workflow.py` gained a derived rule — every
 pull_request). Mutation: removing one path from the filter fails with "is used by
 website.yml but does not trigger it on both push and pull_request".
 Lesson: hand-maintained lists drift; derive the list from the thing it describes.
+
+**7. The first real browser run died silently, and only CI could have shown it.**
+Run **37814413312** (head `89834c0`) was the first execution of the new browser
+checks. Result: `Browser measurements` **failure** — and in the only readable
+channel, one annotation: "Process completed with exit code 1". No route, no
+viewport, no message, no screenshots (the artifact step warned that
+`website/tests/screenshots` did not exist). Cause, found by static analysis
+rather than by a log — Actions log archives are unreadable here: the page-facing
+function `forcedColorsReport`, serialized *into the page* by
+`page.evaluate(forcedColorsReport)`, called `forcedColorsBoundaryMissing(...)` —
+a function **imported from `./rules.mjs` in Node scope**, which does not exist in
+the page. `ReferenceError` in the page → `evaluate` rejects → the script threw
+before `emitAnnotations()` → exit 1, nothing said. The very architecture this
+session adopted (gather in the page, decide in Node) was violated in one line,
+and a crash was mistaken for a result. Two fixes, both mutation-proved: the page
+function now returns the raw styles and Node applies the rule, and the runner
+guards every check (`guard(name, run)` recording a crash as a failure) and emits
+the summary and annotations from a `finally` block even when something throws. A
+static rule in `scripts/test_website_workflow.py` now fails if any function
+passed to `page.evaluate` by name references an import — the class of bug, not
+just the instance.
 
 **6. Everything knew the canonical URL was not the site; nobody was told.**
 `README.md` line 2 advertised <https://99ggprooo00-code.github.io/DHUN/> as the

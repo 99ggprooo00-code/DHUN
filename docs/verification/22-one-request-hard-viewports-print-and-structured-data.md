@@ -154,12 +154,42 @@ Consequences, stated plainly:
 
 ## CI evidence
 
-**Read at the finish sequence; the numbers are in the PR #140 comment, which is
-the record of what the runs on this head actually said.** The first run of the
-`browser` and `lighthouse` jobs on this branch (head `89834c0`) began after the
-final push; its annotations are the only browser evidence for the viewports,
-forced colours, print and focus work described above. Until they are read, every
-browser statement in this file is *built*, not *measured*. What was on record
+Read from CI annotations this session (head `89834c0`, website run
+**37814413312**; the first time any commit of this branch executed in a browser):
+
+| Job | Result | What the annotations said |
+|---|---|---|
+| `build` | **success** | `Drift check: website/dist matches a fresh build of website/src.` |
+| `lighthouse` | **success** | `/` 100/100/100/100 (samples 98·100·100) · `/features/` 100/100/100/100 · `/ui/` 100/100/100/100 — medians of three |
+| `browser` | **failure** | one annotation: `Process completed with exit code 1`; no screenshots written |
+| `deploy`, `served` | skipped | `build_type: legacy` (see the publishing section above) |
+
+The one-request goal is now **measured, not architectural**: every route reports
+`requests=1` with `subresources: http://127.0.0.1:8080/…/ (Document)` as the only
+entry, `network-dependency-tree-insight` resolving to that same URL, and
+`unused-css-rules: none`. Bytes 53.7 kB (`/`) / 55.1 kB (`/features/`) / 56.3 kB
+(`/ui/`), FCP=LCP 1027/1001/1032 ms, TBT 0 ms, CLS 0.000. The reporter's new
+naming is what makes this readable at all — the previous run said
+`network-dependency-tree-insight: 3 item(s)` and nothing else.
+
+**The `browser` failure is a defect this session shipped and CI caught**, and the
+diagnosis is worth the space: `forcedColorsReport`, a function serialized into the
+page by `page.evaluate`, called `forcedColorsBoundaryMissing` — imported from
+`./rules.mjs`, therefore undefined *inside the page*. A `ReferenceError` in the
+page rejected the evaluate, the script threw before `emitAnnotations()` ran, and
+the readable channel carried nothing but the exit code. Two fixes: the page
+function returns raw styles and Node applies the rule (the architecture this file
+already claims), and every check now runs behind a guard that records a crash as
+a failure and emits the annotations from a `finally` block. `scripts/test_website_workflow.py`
+gained four tests, mutation-proved by reintroducing the exact bug, dropping a
+check from the runner, removing the guard's recording, and moving
+`emitAnnotations()` out of the `finally` — each red, then restored.
+
+**Still not measured on this head:** the nine viewports, forced colours,
+increased contrast, print and the tab walk. Their rules are proven without a
+browser (`node --test`, 9 cases) and the crash that hid them is fixed; the run on
+the fix commit is the first one that can report them. The PR comment carries what
+that run said. What was on record
 before this session's head existed (run `37808955045`, the merged head `c6414f4`,
 quoted because it is what this session is measured against):
 
@@ -168,7 +198,7 @@ quoted because it is what this session is measured against):
 | Lighthouse, median of three | `/` 100/100/100/100 (samples 96·100·100) · `/features/` and `/ui/` 100/100/100/100 | **not verified** — pending the run on this head |
 | Requests per route | **2** (`network-dependency-tree-insight: 3 item(s)` on every route) | **not verified** — expected 1 |
 | Bytes | 52.6 / 54.0 / 55.2 kB | **not verified** |
-| Browser job | success: axe 0 violations (6 scans), contrast ≥ 5.71:1 dark / 4.6:1 light, targets ≥ 44 px, skip link + Enter verified, 51 icons render | **not verified** — this head adds ~1.5 kB of HTML and three viewports |
+| Browser job | success on `c6414f4`: axe 0 violations (6 scans), contrast ≥ 5.71:1 dark / 4.6:1 light, targets ≥ 44 px, skip link + Enter verified, 51 icons render | **failure on `89834c0`**, diagnosed and fixed here — a page function called a Node-scope import; the fix commit's run is the first that can carry these measurements |
 | `pages-build-deployment` | **failure** (legacy Jekyll source, `status: errored`) | unchanged by this work; switching the Pages source remains a one-line repository setting the agent token cannot change (HTTP 403) |
 
 ## What is not verified

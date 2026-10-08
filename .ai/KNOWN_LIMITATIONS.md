@@ -2,11 +2,15 @@
 
 ## 2026-10-08 — session `arena/37ec95ed-dhun`: what one request, print and High Contrast still do not prove
 
-- **The single-request claim is architecture, and the number behind it is a CI
-  annotation.** The rule proves the page carries no separate subresource
-  reference, and `requests=2 → 1` can only be confirmed by the Lighthouse job's
-  next run on this head (`subresources: none — the document only`). Until that
-  annotation is read, "one request" is a static fact, not a measured one.
+- **The single-request claim is now measured, not just architectural.**
+  Lighthouse run **37814413312** (head `89834c0`) reports `requests=1` on all
+  three routes with `subresources: http://127.0.0.1:8080/… (Document)` as the only
+  entry and `unused-css-rules: none`, at 53.7/55.1/56.3 kB. What is still *not*
+  measured: the browser job's nine-viewport, forced-colours, print and tab-walk
+  results on a green head — the first execution of those checks **failed**, in
+  the harness rather than in the site (a page function calling a Node-scope
+  import, so the script died before annotating), and the fix commit's run is the
+  first that can report them.
 - **A `data:` URI favicon is a trade.** A client that does not render SVG
   favicons now shows no tab icon, where previously it fetched a file it also
   could not render (or rendered as a fallback). No browser in this environment
