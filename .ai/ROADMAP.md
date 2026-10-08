@@ -1,10 +1,13 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/b4449fdd-dhun` — S3 round 4: dock the rail-layout mini-player so it stops covering Home/Search/Library (2026-10-08)
+## Session `arena/b4449fdd-dhun` — mini-player dock fix MERGED; next task: lower-Android-version releases (2026-10-08)
 
-Updated **2026-10-08** · session branch `arena/b4449fdd-dhun` · base
-`main@9f88b6e` (merge of PR #129). **PR #130** open
-(`arena/b4449fdd-dhun` → `main`), head `3803ecf`.
+Updated **2026-10-08** · session branch `arena/b4449fdd-dhun` · **PR #130 MERGED**
+as `4607e07076e038f4290045f3f23f5f7fd082a058` (2026-10-08T07:06:09Z); `main` =
+`4607e07`. Post-merge verified; the rolling `test` release was republished with
+the fix. **New active task (this session): provide a lower-Android-version build
+alongside the APK + MSI on every release** — see the NEXT ACTIVE TASK block at the
+bottom of this section.
 
 ### Phase and scope
 
@@ -61,8 +64,9 @@ full-screen `FullPlayer` overlay and ADR-002 are untouched.
 | Rolling `test` release republished at the merge | ✅ **GitHub verified** | published **2026-10-08T06:01:08Z**, `targetCommitish=9f88b6e`, `isDraft=false`, prerelease; APK **18,383,603 B** sha256 **`aa6d027a…`**; MSI **2.185.1** **112,967,680 B** sha256 **`86b1184c…`**; both `.sha256` sidecars present |
 | MSI hosted upgrade on `9f88b6e` | ✅ **GitHub verified (hosted, not hardware)** | `2.182.1 → 2.185.1`, baseline `aa3ff19c…` (prior release MSI), sentinels preserved; uninstall + future-upgrade guards PASS |
 | `extraction-health` scheduled drill | 🟡 **ENVIRONMENT_BLOCKED (accepted steady state)** | every recent run (…37611927562, 37455619019, 37303751722, 37195912826) = `ENVIRONMENT_BLOCKED` (runner datacenter IPs gated by YouTube; residential unaffected). **Not** a resolver regression |
-| **This session's fix** `6ef48e9` (head `3803ecf`, PR #130) | ✅ **GitHub verified** | push CI **37739138881** 12/12, PR CI **37739165969** 12/12, Build APK **37739165966**, test-release **37739165959** — `apk`+`msi` green with the full install-over `2.186.1 → 2.187.1` (no skip, sentinels preserved, uninstall + future-upgrade guards PASS) |
-| PR #130 candidate artifacts (buildOnly, **not published**) | 🟡 **PR-path only** | APK **18,383,603 B** sha256 **`590bd34a…`** (differs from the release's `aa6d027a…` — app code changed); MSI **2.187.1** **112,971,776 B** sha256 **`0f9691a4…`**. These become the published digests only after merge to `main` |
+| **This session's fix** `6ef48e9` (PR #130) | ✅ **merged** | merged as `4607e07` (2026-10-08T07:06:09Z); heads `3803ecf`/`361c406` green on all four workflows (CI 37739138881 / 37739165969 / 37740037738, Build APK 37739165966 / 37740037714, test-release 37739165959 / 37740037779 — real install-over `2.186.1 → 2.187.1`, no skip) |
+| Post-merge CI / APK / test-release on `4607e07` | ✅ **GitHub verified** | CI **37741393880**, Build APK **37741393815**, test-release **37741393816** (`publish` ran) — all success |
+| Rolling `test` release republished with the fix | ✅ **GitHub verified** | published **2026-10-08T07:11:13Z**, `targetCommitish=4607e07`, `buildOnly=false`; APK **18,383,603 B** sha256 **`590bd34a…`**; MSI **2.189.1** **112,971,776 B** sha256 **`ad036ffc…`**; MSI install-over `2.186.1 → 2.189.1`, sentinels preserved |
 | Mini-player docked (no longer covers content) on a device | 🔴 **not verified** | S3 round-4 retest on Redmi Note 12 4G / Android 15 **landscape** and Windows 11 **fullscreen** vs the republished rolling `test` |
 
 ### Last real error on record
@@ -102,6 +106,25 @@ load-bearing part).
   user.
 - **S3 stays OPEN** until the user retests the republished rolling `test`. Green
   CI is not hardware acceptance.
+
+### NEXT ACTIVE TASK — lower-Android-version releases (user request, 2026-10-08)
+
+**Request:** on every release, alongside the APK + MSI, also ship a build for
+**lower Android versions**. Current Android config: `minSdk = 26` (Android 8.0),
+`compileSdk/targetSdk = 35`, one universal APK, no ABI splits; the release APK is
+`assembleDebug` copied to `dhun-test.apk` by `test-release.yml`.
+
+**Feasibility (source-checked):** every Android dependency supports **minSdk 21**
+— Media3 1.5.1, Compose BOM 2024.12.01, activity-compose 1.9.3, core-ktx 1.15,
+lifecycle 2.8.7, Koin 4.0.2. So Android 5.0+ is reachable from a library standpoint.
+Residual risk: app code using API-26+ features without `@RequiresApi` guards, and
+runtime on API 21–25 being a hardware gate (no old device in-sandbox).
+
+**Open decisions (asking the user):** the target `minSdk` (21 vs 24), and whether
+to lower the single APK's `minSdk` for everyone vs. ship an additional
+lower-`minSdk` APK beside the current one. The desktop MSI is unaffected.
+
+**Status:** 🔴 not started — awaiting the target/approach decision.
 
 ---
 
