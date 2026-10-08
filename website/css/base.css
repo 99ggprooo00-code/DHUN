@@ -215,3 +215,48 @@ p code, li code {
     scroll-behavior: auto !important;
   }
 }
+
+/* Windows High Contrast (`forced-colors: active`) repaints the page with the
+   OS palette: author backgrounds, gradients and shadows are removed, and a
+   `transparent` border stays transparent. `.btn` is an <a>, so the engine does
+   not draw the control border it would draw for a real <button> — the primary
+   action would render as plain text. The browser job measures exactly this
+   (`forced colors` in website/tests/browser.mjs, decision logic in
+   website/tests/rules.mjs), and `website_quality.py`
+   (`forced_colors_violations`) fails the build if this block disappears. */
+@media (forced-colors: active) {
+  .btn { border-color: CanvasText; }
+  .badges li,
+  .card,
+  .tile { border-color: CanvasText; }
+}
+
+/* Print. The site is dark by default and browsers do not print background
+   colours, so without this block a reader gets white text on white paper — the
+   printed sheet would be blank. Print is a real output path (someone prints the
+   page and hands it to someone else), so the palette is redefined for paper and
+   the three `data-caveat` disclosures stay visible; the browser job asserts both
+   under `emulateMedia({ media: "print" })` (`print` checks in
+   website/tests/browser.mjs), and `website_quality.py`
+   (`print_style_violations`) fails the build if a page ships no print block. */
+@media print {
+  :root {
+    --bg: #ffffff; --surface: #ffffff; --surface-variant: #f4f2ef;
+    --surface-elevated: #ffffff; --surface-highest: #ece8e3; --surface-card: #ffffff;
+    --glass: rgba(255, 255, 255, 1); --glass-strong: rgba(255, 255, 255, 1);
+    --glass-bar-top: rgba(255, 255, 255, 1);
+    --hairline: rgba(0, 0, 0, 0.22); --hairline-strong: rgba(0, 0, 0, 0.42);
+    --text: #000000; --text-2: #1f1c19; --text-3: #3d3934; --text-4: #5c5751;
+    --accent: #5b3f96; --on-accent: #ffffff;
+    --accent-container: #ece3ff; --on-accent-container: #21005d;
+    --warning: #6f4100;
+  }
+  body { background: #ffffff; color: #000000; }
+  /* The recreation is aria-hidden decoration and costs a page of ink. Its
+     labelled figcaption stays; the drawing does not. */
+  .mock .device { display: none; }
+  /* Backgrounds do not print, so a filled control loses its shape. */
+  .btn { border-color: currentColor; }
+  .site-header { position: static; }
+  .card, .stats li, .platforms li { break-inside: avoid; }
+}

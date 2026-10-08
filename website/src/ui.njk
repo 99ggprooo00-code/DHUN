@@ -88,7 +88,7 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
           {%- endfor %}
         </ul>
         {%- if surface.note %}
-        <p class="traceable">{{ surface.note }} <a href="{{ surface.href }}">Open that page</a></p>
+        <p class="traceable">{{ surface.note }} <a href="{{ surface.href }}">Open the {{ surface.hrefLabel }}</a></p>
         {%- endif %}
       </div>
       {%- if surface.mockFile %}

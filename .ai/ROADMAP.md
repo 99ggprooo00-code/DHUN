@@ -1,5 +1,127 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/37ec95ed-dhun` — one request per route, a browser matrix that includes the hard viewports, print, and metadata that is asserted rather than assumed (2026-10-08)
+
+Updated **2026-10-08** · fixed session branch `arena/37ec95ed-dhun` · branch point
+and GitHub `main` at boot **`c6414f4ac9c3bb8e12337ab04d7b46b61dcb5cb4`** (PR #139
+merge). Working tree clean at boot. The only other pre-existing open PR is **#54**
+(ADR-007 research, out of scope, untouched). No PR existed for this branch at
+boot (`gh pr list --head arena/37ec95ed-dhun` → `[]`), so this session opens its own.
+
+### Recon (this session, every line read from a tool output)
+
+| Fact | State | Evidence |
+|---|---|---|
+| Branch / tree | `arena/37ec95ed-dhun`, clean at boot | `git status --short`, `git branch --show-current` |
+| Clone | **shallow** (`git rev-list --count HEAD` → 1) — history-archaeology claims cannot be made from here; the GitHub API is the record | `git rev-parse --is-shallow-repository` |
+| Script suite | **178 tests green** in 0.410 s | `python3 -m unittest discover -s scripts -p 'test_*.py'` → `Ran 178 tests … OK` |
+| Site build | `minified: saved 43198 bytes`, 5 files in 0.10 s | `npm run build` in `website/`, Node v22.22.3, `npm ci` 145 packages |
+| Minification proof | `OK: every built file matches a fresh unminified build ignoring whitespace (43282 bytes saved by minification).` | `node tools/verify-minify.mjs` |
+| Drift, local | a fresh build leaves `git status --short -- website/dist` **empty** | local |
+| Honesty contract | `OK: 4 built page(s) pass the honesty contract (8 forbidden-claim rules, 3 required caveats, 5 digest rules).` | `scripts/website_claims.py website/dist` |
+| Quality gates | `OK: 18 quality checks pass on website/dist.` | `scripts/website_quality.py website/dist` |
+| Markup validity | no output (0 problems) | `npx html-validate "dist/**/*.html"`, pinned 11.16.2 |
+| Route weights, uncompressed | `/` 51,748 B · `/features/` 53,075 B · `/ui/` 54,319 B (inlined CSS 21,847 / 21,847 / 24,898) | `website/budget-baseline.json` |
+| Pages | `build_type=legacy`, `source=main:/`, `https_enforced=true`, **`status=errored`** | `gh api repos/99ggprooo00-code/DHUN/pages` |
+| Canonical URL from the sandbox | **unreachable** — `curl` → `OpenSSL SSL_connect: SSL_ERROR_SYSCALL` (this sandbox's egress allowlist is github.com/npm/pypi only), so nothing about the *served* site can be verified here at all | `curl https://99ggprooo00-code.github.io/DHUN/` |
+| Rolling `test` release | republished `2026-10-08T16:32:43Z`, 8 assets | `gh release view test` |
+| Last CI on `main` (`c6414f4`) | CI · Build APK · test-release · website **all success**; `pages-build-deployment` **failure** (legacy Jekyll) | `gh run list --branch main` |
+
+**What the merged head's own CI said** (read from check-run annotations, run
+`37808955045`, the previous session's fixes now measured):
+
+| Measurement | Value |
+|---|---|
+| Lighthouse, median of three | `/` 96·100·100·100 → **100/100/100/100**; `/features/` and `/ui/` **100/100/100/100** |
+| Lighthouse metrics | FCP 1012→999→1052 ms · LCP ~1052 ms · TBT 0 ms · CLS 0.000 · **52.6 / 54.0 / 55.2 kB · requests = 2** |
+| Remaining insight | `network-dependency-tree-insight: 3 item(s)` on **every** route; `render-blocking-resources` and `unused-css-rules` clean |
+| Browser job | **success** — axe 6 scans 0 violations; contrast lowest **5.71:1** dark / **4.6:1** light; touch targets smallest standalone **44 px**; skip link + Enter-to-`<main>` verified; 51 icons render |
+
+### What this session changes, and why each is a floor rather than a ceiling
+
+1. **One request per route, for real.** `requests=2` is the HTML plus the
+   `/assets/dhun-favicon.svg` link. The icon becomes a build-time `data:` URI read
+   from the same source file, so the second request goes away — and a rule
+   asserts the inlined byte-identical SVG has not drifted from
+   `website/src/assets/dhun-favicon.svg`. The lingering
+   `network-dependency-tree-insight` items are **named in the annotation**
+   (reporter change) rather than counted, so the next run says what they are.
+2. **The hard viewports, measured.** 280 px (fold-class), 844×390 landscape, a
+   real 200 %-zoom layout viewport, `forced-colors: active` and
+   `prefers-contrast: more` — plus checks nobody had: `:focus-visible` on *every*
+   interactive element (not just one nav link), duplicate link text pointing at
+   different targets, and heading order as **rendered**.
+3. **Print.** No `@media print` rule exists anywhere (`grep` → 0 matches). A print
+   stylesheet plus a machine rule that it exists, plus a browser check that
+   printing loses none of the three honesty caveats.
+4. **Metadata that is asserted, not assumed.** JSON-LD `SoftwareApplication`
+   with no ratings and no offers, `theme-color` for both schemes asserted
+   per route, and `data:`-only-favicon asserted. `og:image` is **refused with a
+   written reason** (see the verification record) rather than faked.
+5. **Cheap checks the suite can hold in pure Python, no Node, no network:**
+   sitemap well-formedness, "an attribute that names a file must name a file
+   that exists", and a local dist-vs-source check for the inlined CSS that
+   catches a hand-edited `dist` without a Node rebuild.
+6. **Content depth** only where the fact lives in the tree, with a citation
+   comment, inside the three-route limit.
+
+Every rule added or adapted is mutation-proven in this session (break → red with
+the right message → revert → green), and no existing rule is deleted, skipped,
+loosened or renamed away.
+
+### Blockers and boundaries
+
+- No browser, no display, no JDK: **every browser number comes from CI**; no
+  responsive, a11y, Lighthouse or axe fact may be quoted from this machine.
+- The sandbox cannot reach `*.github.io`, so the served site is **not verified
+  here** — that is what `scripts/website_smoke.py` in the `served` job is for,
+  and it still skips while Pages stays `legacy`.
+- Do not touch any Gradle file, `settings.gradle.kts`, `shared/`,
+  `app-android/`, `app-desktop/`, `tools/`, `web-spike/`, or the four app
+  workflows. A site failure must remain incapable of reddening app CI.
+- No player, no PWA, no `app.`-style property, no backend, exactly three routes,
+  English only, no new third-party runtime asset, no client-side JavaScript.
+
+### Outcome (this session, 2026-10-08) — PR #140
+
+All six work items landed, each with its mutation proof; the full evidence table is
+`docs/verification/22-one-request-hard-viewports-print-and-structured-data.md`.
+
+| Item | Result | Evidence read this session |
+|---|---|---|
+| One request per route | Icon is a build-time `data:` URI (638 B base64), the passthrough copy is gone, `favicon_violations` + `unreferenced_file_violations` gate it | `minified: saved 49454 bytes`; weights `/` 53,554 · `/features/` 54,881 · `/ui/` 56,125 B; `requests=1` is for the next Lighthouse run to confirm |
+| Reporter names requests | `subresources:` line per route + dependency-tree items resolved to URLs | 10 reporter tests (`Ran 10 tests … OK` in that module) |
+| Hard viewports + new checks | 280×653, 844×390, 640×512@200 %, forced colours, increased contrast, print, Tab walk, rendered headings, link text | `# pass 9` / `# fail 0` (`node --test`), wired into the build job |
+| Print + High Contrast CSS | Both blocks ship per route and are asserted by `print_style_violations` / `forced_colors_violations`; the print palette is checked at 4.5:1 locally | mutation: white-on-white print ramp `exit=1 :: 1.00:1` |
+| Structured data | One honest `SoftwareApplication` block; banned-key list; theme-color per scheme; og:url = canonical; `og:image` refused with a reason | mutation: invented `aggregateRating` `exit=1` |
+| Cheap Python checks | sitemap parsed as XML; every path attribute resolves; dist-vs-source CSS drift | `OK: 26 quality checks pass`; `Ran 232 tests in 0.672s` |
+| Content depth | **parked** — the remaining candidate ("what the app never sends") cannot be stated honestly from this tree; the *existing* telemetry claim was made machine-checked instead | `.ai/WEBSITE_PLAN.md` amendment, item C |
+
+**Three of my new rules passed their first mutation and were wrong** (the
+forced-colours rule read a union of pages, the print rule only checked that tokens
+were mentioned, the tab walk fed `focusChanged` its own output). Each was fixed and
+the failure is written up in `.ai/DEBUG_LOG.md` — the mutations are in the
+verification record, not just the fixes.
+
+**Not verified:** every browser-dependent measurement on this head (CI is the only
+channel), the served URL (this sandbox cannot reach `*.github.io`), and the Pages
+source switch (user-only; `status: errored` under `build_type: legacy`).
+
+### Exact next actions for the next session
+
+1. Read the CI runs for the merged head of PR #140 (`website` → `build`, `browser`,
+   `lighthouse`) and confirm `subresources: none — the document only` and
+   `requests=1`; if the browser job is red, the annotation names the route,
+   viewport and element.
+2. If the Pages source has been switched to GitHub Actions by then, the `served`
+   job stops skipping — that is the first real check of the public URL in this
+   workstream's history.
+3. The §9 screenshot backlog is unchanged (6 shipped, 2 planned); a real capture
+   is still the only thing that replaces a mockup.
+
+---
+
+
 ## Session `arena/9b791057-dhun` — make the site measurably faster, move its responsive/a11y claims from argued to browser-measured, then rebuild it as a product site (2026-10-08)
 
 Updated **2026-10-08** · fixed session branch `arena/9b791057-dhun` · branch point
@@ -187,11 +309,18 @@ Truthfulness is enforced by tests, not prose:
 
 ### Exact next actions
 
+0. **Switch the Pages source (human, 30 seconds).** <https://99ggprooo00-code.github.io/DHUN/>
+   serves Jekyll's rendering of the root `README.md`, not the site, because the
+   repository is configured `build_type: legacy`, source `main:/`
+   (`gh api repos/99ggprooo00-code/DHUN/pages` → `status: errored`; the API
+   refuses the change with HTTP 403 "Resource not accessible by integration").
+   **Settings → Pages → Build and deployment → Source → GitHub Actions** — then
+   the next `main` push publishes `website/dist` and the `served` job stops being
+   skipped. Full runbook: `docs/runbooks/publishing-the-site.md`. Every `website`
+   run now reports the current `build_type` in its summary, so this is visible
+   without reading a doc.
 1. **Read what this session could not**: the post-merge `website.yml` run and
-   `https://99ggprooo00-code.github.io/DHUN/`. If the Pages source is still
-   `legacy`, apply Settings → Pages → Source → **GitHub Actions** (or the
-   one-line API call recorded in PR #138's final comment) and re-run the
-   workflow.
+   `https://99ggprooo00-code.github.io/DHUN/`.
 2. **S3 rounds 4 and 5 stay the release lane.** They are user-only, unaffected
    by the site, and they are the source of the screenshots that replace the
    mockups.

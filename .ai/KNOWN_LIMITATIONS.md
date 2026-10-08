@@ -1,5 +1,67 @@
 # KNOWN_LIMITATIONS
 
+## 2026-10-08 — session `arena/37ec95ed-dhun`: what one request, print and High Contrast still do not prove
+
+- **The single-request claim is now measured, not just architectural.**
+  Lighthouse run **37814413312** (head `89834c0`) reports `requests=1` on all
+  three routes with `subresources: http://127.0.0.1:8080/… (Document)` as the only
+  entry and `unused-css-rules: none`, at 53.7/55.1/56.3 kB. What is still *not*
+  measured: the browser job's nine-viewport, forced-colours, print and tab-walk
+  results on a green head — the first execution of those checks **failed**, in
+  the harness rather than in the site (a page function calling a Node-scope
+  import, so the script died before annotating), and the fix commit's run is the
+  first that can report them.
+- **A `data:` URI favicon is a trade.** A client that does not render SVG
+  favicons now shows no tab icon, where previously it fetched a file it also
+  could not render (or rendered as a fallback). No browser in this environment
+  can settle that; the alternative cost is losing one request per route.
+- **Print and forced-colours rendering is CI-measured, never eyeballed.** No
+  browser and no Windows machine exist here, so `forced-colors: active` and
+  `@media print` were written from the documented behaviour of the engines
+  (backgrounds and gradients dropped; a `transparent` border stays transparent;
+  no control border is drawn for an `<a>`) and their *effect* is asserted only in
+  the `browser` job. If Chromium disagrees, that job goes red on this head and
+  that is the intended loop — the static rules cannot see it.
+- **`prefers-contrast: more` changes nothing on this site.** It is emulated, the
+  page is asserted to see it, its text contrast is measured and printed — and
+  there are no `prefers-contrast` rules, by decision: the scheme already meets AA.
+  The measurement is recorded so the claim stays honest, not because a
+  high-contrast rendering exists.
+- **`og:image` is deliberately absent.** No image exists in the repository, an
+  SVG `og:image` is not rendered by the major crawlers, and a generated PNG would
+  be fabricated imagery. Cards therefore render as text-only previews.
+- **The canonical URL serves the repository README, not the site, and nothing
+  here can change that.** Re-read 2026-10-08: `build_type: legacy`, source
+  `main:/`, `status: errored`; the Pages build for `505c3d5` failed with "Page
+  build failed." and the one for `c6414f4` is still `building` with a 0 ms
+  duration, so the bytes a visitor gets are the last *successful* legacy build's
+  README rendering. `PUT /repos/99ggprooo00-code/DHUN/pages` returns HTTP 403
+  ("Resource not accessible by integration") to the token this workstream
+  authenticates with, and `gh auth status` confirms it is a GitHub App token, not
+  a PAT — the setting is a human action. What is now true: every `website` run
+  reports the `build_type` and the fix on every trigger (summary + warning),
+  `docs/runbooks/publishing-the-site.md` records the switch and its verification,
+  and the README no longer calls that URL the marketing site. What is still
+  missing: a served-site check — `scripts/website_smoke.py` cannot run until the
+  source is `workflow`, so the `served` job remains a *skip*, not a pass, and no
+  byte on the public origin has ever been verified from this workstream.
+- **A link checker for external URLs was not added.** The site's outbound links
+  point at `github.com/...` and `grouplens`-free paths; a network-dependent test
+  is not allowed in the Python-only suite, and CI annotations cannot carry a
+  per-URL report without crowding the cap. Parked with a reason rather than
+  half-built.
+- **Nine viewports in one engine is still not a device.** No Firefox, no WebKit,
+  no screen reader, no touch hardware, no real Windows High Contrast session, and
+  a 200 %-zoom *emulation* is a layout-viewport approximation, not a browser's
+  own zoom implementation.
+- **No lint guards the browser harness against dead code.** `tests/browser.mjs`
+  is executed by CI but never parsed by anything local except `node --check`
+  (syntax only), so two helpers left over from the focus-ring refactor survived a
+  whole session and were found by a four-line script this session, not by a gate.
+  A "no top-level helper is referenced only once" rule is cheap and would have to
+  be mutation-proved like the others; parked here with that reasoning rather than
+  half-added at the end of the session.
+
 ## 2026-10-08 — session `arena/9b791057-dhun`: the site is a product site now, and its interface page has never been rendered
 
 - **`/ui/` is unverified in a browser.** The page was built, gated by 18 static

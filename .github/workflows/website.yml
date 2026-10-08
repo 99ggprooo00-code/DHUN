@@ -18,6 +18,8 @@ on:
       - "scripts/test_website_claims.py"
       - "scripts/test_website_quality.py"
       - "scripts/test_website_smoke.py"
+      - "scripts/report_lighthouse.py"
+      - "scripts/test_report_lighthouse.py"
       - "scripts/test_website_workflow.py"
       - ".github/workflows/website.yml"
   pull_request:
@@ -29,6 +31,8 @@ on:
       - "scripts/test_website_claims.py"
       - "scripts/test_website_quality.py"
       - "scripts/test_website_smoke.py"
+      - "scripts/report_lighthouse.py"
+      - "scripts/test_report_lighthouse.py"
       - "scripts/test_website_workflow.py"
       - ".github/workflows/website.yml"
   workflow_dispatch:
@@ -46,6 +50,50 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      # Where the canonical URL actually points is read on *every* run, and it is
+      # the first thing this job does, so the answer survives a later failure.
+      # The deploy job below discovers the Pages source too and skips its publish
+      # steps with a warning — correct behaviour, but it only ever runs on a push
+      # to main, and the reader who needs this fact first is the one looking at a
+      # pull request or at the URL itself.
+      #
+      # While `build_type` is `legacy`, the branch source publishes Jekyll's
+      # rendering of the root README.md at the canonical URL, not this site. The
+      # one fix needs a token with Pages write access, which this automation does
+      # not have (PUT /repos/{owner}/{repo}/pages -> HTTP 403 "Resource not
+      # accessible by integration"), so it is reported, never faked as a site
+      # failure: a build that is green here must stay green.
+      - name: Report where the canonical URL actually points
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          html_url="$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .html_url 2>/dev/null || true)"
+          build_type="$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type 2>/dev/null || true)"
+          if [ -z "$build_type" ]; then
+            build_type="unreadable"
+          fi
+          if [ -z "$html_url" ]; then
+            html_url="(Pages not readable from this token)"
+          fi
+          case "$build_type" in
+            workflow) points="this workflow publishes the site there on a push to main" ;;
+            legacy) points="the **branch** source publishes it: Jekyll renders the repository README.md at that URL, not this site" ;;
+            *) points="the Pages source could not be read here (\`$build_type\`)" ;;
+          esac
+          {
+            echo "### Where the canonical URL points"
+            echo ""
+            echo "- $html_url — Pages \`build_type: $build_type\`: $points."
+            echo "- This run builds and checks \`website/dist\`. It publishes only on a push to \`main\` *and* when the Pages source is \`workflow\`."
+            echo "- If it still says \`legacy\`: **Settings → Pages → Build and deployment → Source → GitHub Actions**. A token without Pages write access cannot do it. See \`docs/runbooks/publishing-the-site.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$build_type" = "workflow" ]; then
+            echo "::notice title=Pages source::build_type=workflow — the site publishes from this workflow on a push to main."
+          else
+            echo "::warning title=The canonical URL is not this site yet::Pages build_type is '$build_type', so $html_url serves the branch source (Jekyll rendering the root README.md), not the site this run builds and checks. The fix needs Pages write access: Settings -> Pages -> Build and deployment -> Source -> GitHub Actions. See docs/runbooks/publishing-the-site.md."
+          fi
 
       - uses: actions/setup-node@v7
         with:
@@ -70,6 +118,15 @@ jobs:
       - name: Prove minification is lossless
         working-directory: website
         run: node tools/verify-minify.mjs
+
+      # The decision logic behind the browser job's checks, mutation-proven
+      # (a must-pass and a must-fail case per rule). It needs Node and nothing
+      # else — no browser, no server, no network — so it runs here, in the job
+      # that already has Node, and a broken rule fails on the cheap runner
+      # instead of waiting for a browser to be installed.
+      - name: Rule logic for the browser checks (node --test, no browser)
+        working-directory: website
+        run: npm run test:rules
 
       # The committed mirror in website/dist/ is what app CI's step 1 checks.
       # If a rebuild changes it, one of the two is stale and the PR must fix it.

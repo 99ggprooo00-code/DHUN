@@ -12,12 +12,14 @@ test — and then the whole set runs against the committed build in
 HTML, not about source files looking plausible.
 """
 
+import base64
 import re
 import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from tempfile import mkdtemp as tmpdir
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -411,7 +413,18 @@ class BuiltSite(unittest.TestCase):
                 r"<link[^>]*rel=\"stylesheet\"",
                 f"{route} links a stylesheet, which costs a render-blocking request",
             )
-            self.assertNotRegex(markup, r"<script", f"{route} ships a script tag")
+            # The one `<script>` allowed is the JSON-LD data block: it has no
+            # `src`, nothing evaluates it, and `javascript_violations` parses it
+            # as JSON so it cannot carry code. Every other script tag is still a
+            # failure here, `src` included.
+            self.assertNotRegex(
+                markup,
+                r"<script(?![^>]*type=\"application/ld\+json\")",
+                f"{route} ships a script tag that is not a JSON-LD data block",
+            )
+            self.assertNotRegex(
+                markup, r"<script[^>]*\bsrc=", f"{route} fetches a script"
+            )
 
     def test_inlined_css_is_minified(self):
         css = quality.site_stylesheet(DIST)
@@ -691,3 +704,413 @@ class SitemapScope(DistCopyMixin):
         )
         violations = quality.crawlability_violations(dist)
         self.assertTrue(any("/blog/" in v for v in violations), violations)
+
+
+class InlinedIcon(DistCopyMixin):
+    """One request per route: the icon is inlined, and it is the right bytes.
+
+    Lighthouse measured `requests=2` per route on the merged head (run
+    37808955045); the second request was this icon. The rule has two halves and
+    both are exercised here, because either one failing silently puts the
+    request back or changes what the browser draws.
+    """
+
+    @staticmethod
+    def data_uri(body: bytes) -> str:
+        return "data:image/svg+xml;base64," + base64.b64encode(body).decode("ascii")
+
+    def site(self, markup: str, **extra: str) -> Path:
+        """A tmp dist whose every page is `markup`; no separate icon file ships."""
+        root = Path(tmpdir())
+        files = {
+            "index.html": markup,
+            "features/index.html": markup,
+            "ui/index.html": markup,
+            "robots.txt": "Sitemap: https://99ggprooo00-code.github.io/DHUN/sitemap.xml\n",
+            "sitemap.xml": "<urlset></urlset>",
+            "404.html": markup,
+        }
+        files.update(extra)
+        return write_tree(root, files)
+
+    def page_with(self, icon_tag: str) -> str:
+        return minimal_site()["index.html"].replace(
+            '<link rel="icon" href="/assets/favicon.svg">', icon_tag
+        )
+
+    def test_the_real_build_inlines_the_icon(self):
+        self.assertEqual(quality.favicon_violations(DIST), [])
+
+    def test_a_separate_icon_file_fails(self):
+        markup = self.page_with('<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">')
+        violations = quality.favicon_violations(self.site(markup))
+        self.assertTrue(
+            any("second HTTP request" in v for v in violations), violations
+        )
+
+    def test_drifted_icon_bytes_fail(self):
+        body = b'<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'
+        markup = self.page_with(f'<link rel="icon" href="{self.data_uri(body)}" type="image/svg+xml">')
+        violations = quality.favicon_violations(self.site(markup))
+        self.assertTrue(any("drifted from dhun-favicon.svg" in v for v in violations), violations)
+
+    def test_a_missing_icon_link_fails(self):
+        markup = minimal_site()["index.html"].replace(
+            '<link rel="icon" href="/assets/favicon.svg">', ""
+        )
+        violations = quality.favicon_violations(self.site(markup))
+        self.assertTrue(any("exactly one" in v for v in violations), violations)
+
+    def test_a_leftover_file_reference_fails(self):
+        source = quality._compact_svg(quality.FAVICON_SOURCE.read_text(encoding="utf-8"))
+        markup = self.page_with(
+            f'<link rel="icon" href="{self.data_uri(source.encode("utf-8"))}" type="image/svg+xml">'
+        ).replace("<h1>t</h1>", '<h1>t</h1><a href="/assets/dhun-favicon.svg">icon</a>')
+        violations = quality.favicon_violations(self.site(markup))
+        self.assertTrue(any("must not be fetched as a file" in v for v in violations), violations)
+
+    def test_the_exact_current_encoding_passes(self):
+        source = quality._compact_svg(quality.FAVICON_SOURCE.read_text(encoding="utf-8"))
+        markup = self.page_with(
+            f'<link rel="icon" href="{self.data_uri(source.encode("utf-8"))}" type="image/svg+xml">'
+        )
+        self.assertEqual(quality.favicon_violations(self.site(markup)), [])
+
+
+class NothingShipsUnreferenced(DistCopyMixin):
+    """An asset no page names is dead weight in the deploy, or a broken page."""
+
+    def test_the_real_build_references_everything_it_ships(self):
+        self.assertEqual(quality.unreferenced_file_violations(DIST), [])
+
+    def test_an_unreferenced_file_fails(self):
+        dist = self.copy_dist()
+        (dist / "assets").mkdir(exist_ok=True)
+        (dist / "assets" / "leftover.svg").write_text("<svg/>", encoding="utf-8")
+        violations = quality.unreferenced_file_violations(dist)
+        self.assertTrue(any("leftover.svg" in v for v in violations), violations)
+
+    def test_a_referenced_file_passes(self):
+        dist = self.copy_dist()
+        (dist / "assets").mkdir(exist_ok=True)
+        (dist / "assets" / "print.css").write_text("@media print{}", encoding="utf-8")
+        page = dist / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                "</head>", '<link rel="stylesheet" href="/assets/print.css"></head>', 1
+            ),
+            encoding="utf-8",
+        )
+        self.assertEqual(quality.unreferenced_file_violations(dist), [])
+
+    def test_crawl_files_and_the_404_are_exempt(self):
+        dist = self.copy_dist()
+        self.assertEqual(quality.unreferenced_file_violations(dist), [])
+        self.assertTrue((dist / "robots.txt").is_file())
+        self.assertTrue((dist / "sitemap.xml").is_file())
+        self.assertTrue((dist / "404.html").is_file())
+
+
+class StyleBlocksForOtherOutputs(DistCopyMixin):
+    """Print and forced-colours rules: the mechanism each browser check measures.
+
+    The browser job measures *effects* (`print` and `forced colors` in
+    `website/tests/browser.mjs`). Neither can run without a browser, so the
+    mechanism those measurements depend on is asserted here, per route, in the
+    cheap Python-only suite — and both rules are mutation-proven below.
+    """
+
+    PRINT = "@media print { :root { --text: #000000; --bg: #ffffff; } .mock .device { display: none; } }"
+    FORCED = "@media (forced-colors: active) { .btn { border-color: CanvasText; } }"
+
+    def page(self, css: str, body: str = '<p><a class="btn" href="/">Go</a></p>') -> str:
+        return (
+            '<!DOCTYPE html><html lang="en"><head><meta name="viewport" content="width=device-width">'
+            f"<style>{css}</style></head><body><header><nav>m</nav></header>"
+            '<a class="skip-link" href="#main">s</a><main id="main"><h1>t</h1>'
+            f"{body}</main><footer>f</footer></body></html>"
+        )
+
+    def site(self, css: str) -> Path:
+        return write_tree(
+            Path(tmpdir()),
+            {rel: self.page(css) for rel in ("index.html", "features/index.html", "ui/index.html")},
+        )
+
+    def test_the_real_site_ships_both_blocks(self):
+        self.assertEqual(quality.print_style_violations(DIST), [])
+        self.assertEqual(quality.forced_colors_violations(DIST), [])
+
+    def test_a_page_without_a_print_block_fails(self):
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        start = markup.index("@media print{")
+        end = markup.index("}}", start) + 2
+        page.write_text(markup.replace(markup[start:end], ""), encoding="utf-8")
+        violations = quality.print_style_violations(dist)
+        self.assertTrue(any("/ui/" in v and "@media print" in v for v in violations), violations)
+
+    def test_a_print_block_without_paper_tokens_or_device_hiding_fails(self):
+        css = "@media print { .card { break-inside: avoid; } }"
+        violations = quality.print_style_violations(self.site(css))
+        self.assertTrue(any("--text" in v for v in violations), violations)
+        self.assertTrue(any(".device" in v or "mockup" in v for v in violations), violations)
+
+    def test_a_print_block_with_tokens_and_device_hiding_passes(self):
+        self.assertEqual(quality.print_style_violations(self.site(self.PRINT + self.FORCED)), [])
+
+    def test_a_print_palette_that_cannot_be_read_on_paper_fails(self):
+        """The mutation that proved the first version too shallow: a print block
+        with `--text:#ffffff` on a white `--bg` passed it, because the rule only
+        checked that the tokens were *mentioned*. It now computes the ratio."""
+        css = self.PRINT.replace("--text: #000000", "--text: #ffffff") + self.FORCED
+        violations = quality.print_style_violations(self.site(css))
+        self.assertTrue(any("unreadable" in v for v in violations), violations)
+
+    def test_a_page_without_a_forced_colours_block_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        start = markup.index("@media (forced-colors:active){")
+        end = markup.index("}}", start) + 2
+        page.write_text(markup.replace(markup[start:end], ""), encoding="utf-8")
+        violations = quality.forced_colors_violations(dist)
+        self.assertTrue(
+            any("/features/" in v and "forced-colors" in v for v in violations), violations
+        )
+
+    def test_a_forced_colours_block_that_forgets_the_button_fails(self):
+        css = self.PRINT + "@media (forced-colors: active) { .card { border-color: CanvasText; } }"
+        violations = quality.forced_colors_violations(self.site(css))
+        self.assertTrue(any(".btn" in v for v in violations), violations)
+
+
+class StructuredData(DistCopyMixin):
+    """One `SoftwareApplication` block, and only claims the repository supports.
+
+    Structured data is the part of a page a machine repeats without the caveats
+    around it, so an over-claim travels furthest from here — a rating, a
+    version, an offer or a download URL would each be repeated as fact.
+    """
+
+    JSON_LD = (
+        '<script type="application/ld+json">'
+        '{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DHUN",'
+        '"isAccessibleForFree":true,"license":"https://github.com/99ggprooo00-code/DHUN/blob/main/LICENSE",'
+        '"url":"https://99ggprooo00-code.github.io/DHUN/",'
+        '"codeRepository":"https://github.com/99ggprooo00-code/DHUN"}'
+        "</script>"
+    )
+
+    def page(self, block: str = None) -> str:
+        return minimal_site()["index.html"].replace("</head>", f"{block if block is not None else self.JSON_LD}</head>")
+
+    def site(self, block: str = None) -> Path:
+        markup = self.page(block)
+        return write_tree(
+            Path(tmpdir()),
+            {
+                "index.html": markup,
+                "features/index.html": markup,
+                "ui/index.html": markup,
+                "404.html": markup,
+                "robots.txt": "Sitemap: https://99ggprooo00-code.github.io/DHUN/sitemap.xml\n",
+                "sitemap.xml": "<urlset></urlset>",
+            },
+        )
+
+    def test_the_real_site_is_clean(self):
+        self.assertEqual(quality.structured_data_violations(DIST), [])
+
+    def test_an_invented_rating_fails(self):
+        block = self.JSON_LD.replace(
+            '"isAccessibleForFree":true',
+            '"aggregateRating":{"ratingValue":"4.9"},"isAccessibleForFree":true',
+        )
+        violations = quality.structured_data_violations(self.site(block))
+        self.assertTrue(any("aggregateRating" in v for v in violations), violations)
+
+    def test_an_invented_version_or_offer_fails(self):
+        for key, value in (("softwareVersion", '"9.9.9"'), ("offers", '"free"')):
+            block = self.JSON_LD.replace('"name":"DHUN"', f'"name":"DHUN","{key}":{value}')
+            violations = quality.structured_data_violations(self.site(block))
+            self.assertTrue(any(key in v for v in violations), (key, violations))
+
+    def test_the_wrong_type_fails(self):
+        block = self.JSON_LD.replace("SoftwareApplication", "WebSite")
+        violations = quality.structured_data_violations(self.site(block))
+        self.assertTrue(any("@type" in v for v in violations), violations)
+
+    def test_a_block_without_a_licence_fails(self):
+        block = self.JSON_LD.replace('"license":"https://github.com/99ggprooo00-code/DHUN/blob/main/LICENSE",', "")
+        violations = quality.structured_data_violations(self.site(block))
+        self.assertTrue(any("licence" in v for v in violations), violations)
+
+    def test_a_missing_block_fails(self):
+        violations = quality.structured_data_violations(self.site(""))
+        self.assertTrue(any("exactly one JSON-LD block" in v for v in violations), violations)
+
+
+class NoJavaScriptStillHolds(unittest.TestCase):
+    """The JSON-LD exception must not become a hole in the no-JS rule."""
+
+    def page(self, head: str) -> dict[str, str]:
+        markup = minimal_site()["index.html"].replace("</head>", f"{head}</head>")
+        files = minimal_site()
+        files["index.html"] = markup
+        return files
+
+    def test_json_ld_alone_is_not_client_side_javascript(self):
+        block = (
+            '<script type="application/ld+json">{"@type":"SoftwareApplication"}</script>'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), self.page(block))
+            self.assertEqual(quality.javascript_violations(root), [])
+
+    def test_json_ld_that_is_not_json_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(
+                Path(tmp),
+                self.page('<script type="application/ld+json">{oops}</script>'),
+            )
+            self.assertTrue(
+                any("not valid JSON" in v for v in quality.javascript_violations(root))
+            )
+
+    def test_a_typed_script_tag_is_still_a_violation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(
+                Path(tmp),
+                self.page('<script type="text/javascript">x()</script>'),
+            )
+            self.assertTrue(quality.javascript_violations(root))
+
+    def test_an_inline_event_handler_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            files = minimal_site()
+            files["index.html"] = files["index.html"].replace(
+                "<h1>t</h1>", '<h1 onclick="run()">t</h1>'
+            )
+            root = write_tree(Path(tmp), files)
+            violations = quality.javascript_violations(root)
+            self.assertTrue(any("event handler" in v for v in violations), violations)
+
+
+class MetadataConsistency(DistCopyMixin):
+    def test_the_real_site_passes(self):
+        self.assertEqual(quality.metadata_violations(DIST), [])
+
+    def test_a_page_missing_a_theme_colour_fails(self):
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace('media="(prefers-color-scheme: light)"', 'media="print"'),
+            encoding="utf-8",
+        )
+        violations = quality.metadata_violations(dist)
+        self.assertTrue(any("light-scheme theme-color" in v for v in violations), violations)
+
+    def test_og_url_that_disagrees_with_the_canonical_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                'property="og:url" content="https://99ggprooo00-code.github.io/DHUN/features/"',
+                'property="og:url" content="https://example.com/features/"',
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.metadata_violations(dist)
+        self.assertTrue(any("og:url should be" in v for v in violations), violations)
+
+
+class SitemapWellFormedness(DistCopyMixin):
+    """A regex can find a `<loc>` inside malformed XML; a parser cannot."""
+
+    def test_the_real_sitemap_parses(self):
+        self.assertEqual(quality.sitemap_violations(DIST), [])
+
+    def test_an_unclosed_urlset_fails(self):
+        dist = self.copy_dist()
+        sitemap = dist / "sitemap.xml"
+        sitemap.write_text(sitemap.read_text(encoding="utf-8").replace("</urlset>", ""), encoding="utf-8")
+        violations = quality.sitemap_violations(dist)
+        self.assertTrue(any("not well-formed" in v for v in violations), violations)
+
+    def test_a_duplicate_url_fails(self):
+        dist = self.copy_dist()
+        sitemap = dist / "sitemap.xml"
+        sitemap.write_text(
+            sitemap.read_text(encoding="utf-8").replace(
+                "</urlset>", "<url><loc>https://99ggprooo00-code.github.io/DHUN/</loc></url></urlset>"
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.sitemap_violations(dist)
+        self.assertTrue(any("twice" in v for v in violations), violations)
+
+    def test_an_off_origin_url_fails(self):
+        dist = self.copy_dist()
+        sitemap = dist / "sitemap.xml"
+        sitemap.write_text(
+            sitemap.read_text(encoding="utf-8").replace(
+                "</urlset>", "<url><loc>https://example.com/</loc></url></urlset>"
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.sitemap_violations(dist)
+        self.assertTrue(any("not under" in v for v in violations), violations)
+
+
+class ReferencedFilesExist(DistCopyMixin):
+    """Every attribute naming a site path must name a file the build ships."""
+
+    def test_the_real_site_resolves_every_attribute(self):
+        self.assertEqual(quality.asset_reference_violations(DIST), [])
+
+    def test_a_poster_naming_a_missing_file_fails(self):
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                "<h1", '<video poster="/assets/missing.jpg"></video><h1', 1
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.asset_reference_violations(dist)
+        self.assertTrue(any("missing.jpg" in v for v in violations), violations)
+
+    def test_a_data_uri_is_not_a_file_reference(self):
+        dist = self.copy_dist()
+        self.assertEqual(quality.asset_reference_violations(dist), [])
+
+
+class DistMatchesItsSources(DistCopyMixin):
+    """The cheap, Node-free half of the workflow's drift check."""
+
+    def test_the_committed_build_matches_the_sources(self):
+        self.assertEqual(quality.dist_source_drift_violations(DIST), [])
+
+    def test_a_hand_edited_page_fails(self):
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace("--accent:#bb86fc", "--accent:#ff0000"),
+            encoding="utf-8",
+        )
+        violations = quality.dist_source_drift_violations(dist)
+        self.assertTrue(any("/ui/" in v for v in violations), violations)
+
+    def test_a_page_carrying_a_module_it_did_not_declare_fails(self):
+        dist = self.copy_dist()
+        page = dist / "404.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                "</style>", ".token-swatch{color:red}</style>", 1
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.dist_source_drift_violations(dist)
+        self.assertTrue(any("/404.html" in v for v in violations), violations)

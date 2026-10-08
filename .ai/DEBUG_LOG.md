@@ -1,5 +1,97 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — seven defects found by asking who would actually see the failure (session `arena/37ec95ed-dhun`)
+
+The session's own rule was "a rule that cannot be made to fail is not a rule", so
+every new check was mutated before it was trusted. Five defects were in the
+plumbing (three in code I had just written, one in a workflow filter, one in my
+own hand-written numbers). The sixth was reported by the person who owns the
+repository, looking at the public URL.
+
+**1. `forced_colors_violations` read the union of all pages' CSS and passed a
+per-page deletion.** `site_stylesheet()` joins the inlined CSS of every route for
+rules that ask "does the site define X". Deleting the `@media (forced-colors:
+active)` block from `index.html` alone left the other two copies in the union, so
+the rule stayed green: a mutation that *should* have failed. Fix: the rule now
+iterates `page_paths()` and reads `page_stylesheet(dist, route)` — each page's own
+`<style>` — so a single route losing the block is a red test. Lesson: a rule over
+a *union* of pages cannot see a per-page omission; ask which page you mean.
+
+**2. `print_style_violations` only checked that the tokens were *mentioned*.**
+`--text:#ffffff` on a white `--bg` passed — a sheet that prints blank. Fix: the
+rule parses the print block's `--text`/`--bg` and computes the WCAG ratio with the
+same maths the token rule uses (`1.00:1, below the 4.5:1 floor` when mutated).
+Lesson: "the mechanism exists" and "the mechanism works" are two rules; the cheap
+one belongs in Python, the expensive one in the browser job.
+
+**3. `checkTabStops` passed already-computed signatures to `focusChanged`.**
+`focusChanged(before, after)` computes `focusSignature()` itself, so handing it two
+strings produced `"undefined|undefined|undefined…"` on both sides and the rule
+could never fire. Caught while re-reading the new code, before any push. Fix: the
+in-page probe returns a style *record* and the pure rule does the folding — the
+page and the rule now share one definition instead of two.
+Lesson: a pure function that takes the *input* of a comparison must not be fed the
+comparison's output; the type names were the clue and the tests did not cover the
+call site, only the function.
+
+**4. `scripts/report_lighthouse.py` was used by `website.yml` but missing from
+both `paths:` filters.** A change to the only reader of the Lighthouse reports
+could not start the workflow that runs it. Fix: both filters list it *and* its
+test, and `test_website_workflow.py` gained a derived rule — every
+`scripts/*.py` the workflow runs must appear at least twice (push and
+pull_request). Mutation: removing one path from the filter fails with "is used by
+website.yml but does not trigger it on both push and pull_request".
+Lesson: hand-maintained lists drift; derive the list from the thing it describes.
+
+**7. The first real browser run died silently, and only CI could have shown it.**
+Run **37814413312** (head `89834c0`) was the first execution of the new browser
+checks. Result: `Browser measurements` **failure** — and in the only readable
+channel, one annotation: "Process completed with exit code 1". No route, no
+viewport, no message, no screenshots (the artifact step warned that
+`website/tests/screenshots` did not exist). Cause, found by static analysis
+rather than by a log — Actions log archives are unreadable here: the page-facing
+function `forcedColorsReport`, serialized *into the page* by
+`page.evaluate(forcedColorsReport)`, called `forcedColorsBoundaryMissing(...)` —
+a function **imported from `./rules.mjs` in Node scope**, which does not exist in
+the page. `ReferenceError` in the page → `evaluate` rejects → the script threw
+before `emitAnnotations()` → exit 1, nothing said. The very architecture this
+session adopted (gather in the page, decide in Node) was violated in one line,
+and a crash was mistaken for a result. Two fixes, both mutation-proved: the page
+function now returns the raw styles and Node applies the rule, and the runner
+guards every check (`guard(name, run)` recording a crash as a failure) and emits
+the summary and annotations from a `finally` block even when something throws. A
+static rule in `scripts/test_website_workflow.py` now fails if any function
+passed to `page.evaluate` by name references an import — the class of bug, not
+just the instance.
+
+**6. Everything knew the canonical URL was not the site; nobody was told.**
+`README.md` line 2 advertised <https://99ggprooo00-code.github.io/DHUN/> as the
+marketing site while Pages is configured `build_type: legacy` / `main:/`, so
+Jekyll renders the repository README there (`status: errored`; the API answers
+HTTP 403 to the token here). The plan and the limitations file said so; the
+deploy job even printed a `::warning::` naming the fix — but that job only runs
+on a push to `main`, so a pull request, a run summary and every visitor saw
+nothing, and the README went on promising a site that is not there. **A correct
+warning nobody reads is a defect of discoverability, not a pass.** Fix: the
+`build` job now reports `build_type`, the URL and the exact setting on every
+trigger (summary + warning), `docs/runbooks/publishing-the-site.md` records the
+switch and its verification, the README says plainly what that URL serves today,
+and six tests fail if any of that regresses — including one that fails if the
+warning is ever upgraded to an error, because a setting an agent cannot change
+must not redden a build that is otherwise green.
+
+**5. Two commit messages carried test counts I had not read.** `6240fa6` claims
+"178 → 194 (10 icon/inlining + 6 reporter naming + 1 derived trigger rule)" — the
+breakdown adds to 15, and `48f5cd9` claims "215 → 231" while the suite reported
+225 (`Ran 225 tests`). The totals in those messages came from the tool; the
+parentheticals did not. Both are corrected here rather than rewritten: history is
+append-only in this project, and a wrong number in a commit message is a
+documented slip, not a silent one. Measured counts after this session's work:
+**`Ran 232 tests in 0.672s` → OK** on the Python-only suite (178 at boot), plus
+**`# pass 9` / `# fail 0`** for `website/tests/rules.test.mjs` under `node --test`.
+Lesson: every digit in a commit message is evidence and follows the same rule as a
+number in a doc — read it from a tool output or do not write it.
+
 ## 2026-10-08 — the site denied a feature the app ships, and the config silently dropped a stylesheet (session `arena/9b791057-dhun`)
 
 Two defects that only a *product* site can have: one was the copy lying about the

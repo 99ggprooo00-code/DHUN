@@ -19,7 +19,9 @@ because it looked helpful, a caveat deleted because it spoiled the hero).
 """
 
 import re
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -221,3 +223,91 @@ class BuiltOutput(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CopyCheckedAgainstTheCode(unittest.TestCase):
+    """`no telemetry, no crash reporting, no advertising SDK` is a claim about the
+    *app*, so it is checked against the dependency graph the builds resolve.
+
+    All four combinations are exercised against synthetic trees: the fixtures are
+    temporary directories, because the repository's own Gradle files are outside
+    this workstream and must never be edited to prove a rule — not even
+    temporarily.
+    """
+
+    CLAIM = page("<p>DHUN has no telemetry, no crash reporting, no advertising SDK.</p>")
+    QUIET = page("<p>DHUN plays music.</p>")
+
+    def tree(self, *files: str) -> Path:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        for relative in files or ("shared/build.gradle.kts",):
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("dependencies {\n}\n", encoding="utf-8")
+        return root
+
+    def write(self, root: Path, relative: str, content: str) -> None:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    def test_the_real_repository_passes(self):
+        pages = claims.load_built_pages(DIST)
+        self.assertTrue(pages, "no built pages — build the site first")
+        self.assertEqual(claims.telemetry_claim_violations(pages), [])
+
+    def test_a_telemetry_sdk_under_the_claim_fails(self):
+        root = self.tree()
+        self.write(
+            root,
+            "app-android/build.gradle.kts",
+            'implementation("com.google.firebase:firebase-analytics:22.0.0")\n',
+        )
+        violations = claims.telemetry_claim_violations({"/features/": self.CLAIM}, root)
+        self.assertTrue(any("Firebase Analytics" in v for v in violations), violations)
+        self.assertTrue(any("firebase-analytics" in v for v in violations), violations)
+
+    def test_crash_reporting_under_the_claim_fails(self):
+        root = self.tree()
+        self.write(root, "gradle/libs.versions.toml", 'sentry = "io.sentry:sentry-android:7.0.0"\n')
+        violations = claims.telemetry_claim_violations({"/": self.CLAIM}, root)
+        self.assertTrue(any("Sentry" in v for v in violations), violations)
+
+    def test_an_analytics_kotlin_dependency_fails(self):
+        root = self.tree()
+        self.write(root, "shared/build.gradle.kts", 'implementation("com.segment.analytics.kotlin:android:1.0.0")\n')
+        violations = claims.telemetry_claim_violations({"/": self.CLAIM}, root)
+        self.assertTrue(any("Segment" in v for v in violations), violations)
+
+    def test_a_clean_tree_under_the_claim_passes(self):
+        root = self.tree()
+        self.write(
+            root,
+            "shared/build.gradle.kts",
+            'implementation("io.ktor:ktor-client-core:3.1.3")\nimplementation("app.cash.sqldelight:runtime:2.1.0")\n',
+        )
+        self.assertEqual(claims.telemetry_claim_violations({"/": self.CLAIM}, root), [])
+
+    def test_without_the_claim_the_rule_is_silent(self):
+        """The rule guards the claim, not the code: a page that stops claiming
+        this is `forbidden_claim_violations`' business, not this rule's."""
+        root = self.tree()
+        self.write(
+            root, "app-android/build.gradle.kts", 'implementation("com.google.firebase:firebase-analytics:22.0.0")\n'
+        )
+        self.assertEqual(claims.telemetry_claim_violations({"/": self.QUIET}, root), [])
+
+    def test_the_claim_is_read_from_the_built_pages_not_only_their_prose(self):
+        """The claim ships in the `<meta name="description">` on `/`, which is
+        not visible prose; reading only the text would miss it and leave the
+        claim unchecked."""
+        claim_in_meta = (
+            '<!DOCTYPE html><html lang="en"><head>'
+            '<meta name="description" content="No sign-in, no cookies, no ads and no telemetry.">'
+            "</head><body><p>DHUN plays music.</p></body></html>"
+        )
+        root = self.tree()
+        self.write(root, "app-android/build.gradle.kts", 'implementation("io.sentry:sentry-android:7.0.0")\n')
+        violations = claims.telemetry_claim_violations({"/": claim_in_meta}, root)
+        self.assertTrue(any("Sentry" in v for v in violations), violations)

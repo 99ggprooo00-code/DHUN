@@ -18,15 +18,25 @@
  *     or under 24×24 where it does (WCAG 2.5.8);
  *   - the skip link not taking focus first, not becoming visible, or Enter not
  *     moving focus into <main>;
- *   - the primary navigation unreachable by Tab, or focused without a visible
- *     outline;
+ *   - the primary navigation unreachable by Tab, or *any* Tab stop that shows no
+ *     visible change when it takes focus (the ring is not one element's job);
+ *   - a heading level skipped in the rendered document (h2 → h4);
+ *   - one link text naming two different destinations (WCAG 2.4.4);
  *   - any console error, page error, or same-origin 4xx/5xx response;
  *   - rendered contrast below 4.5:1 for body text / 3:1 for large text and
  *     non-text affordances, in `prefers-color-scheme: dark` and `light`;
  *   - a transition or animation longer than 5 ms under
  *     `prefers-reduced-motion: reduce`;
  *   - an `<svg class="i">` that renders no geometry (the sprite safety net);
+ *   - a button-shaped link that loses its boundary under
+ *     `forced-colors: active` (Windows High Contrast), or an emulated
+ *     preference the page cannot see (a vacuous check is a failure here);
+ *   - a `data-caveat` disclosure that disappears when the page is printed;
  *   - an axe-core violation of serious or critical impact.
+ *
+ * The *decisions* above are pure functions in `tests/rules.mjs`, exercised by
+ * `tests/rules.test.mjs` under `node --test` in the build job — the half of this
+ * file that can be mutation-proven without a browser.
  *
  * What it does NOT claim: anything about browsers other than Chromium, anything
  * about a device, and anything about the deployed URL — that is
@@ -38,15 +48,40 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+import {
+  caveatsHiddenInPrint,
+  duplicateLinkTargets,
+  focusChanged,
+  forcedColorsBoundaryMissing,
+  headingOrderProblem,
+  targetProblem,
+} from "./rules.mjs";
+
 const BASE = process.env.SITE_BASE || "http://127.0.0.1:8080";
 const ROUTES = ["/", "/features/", "/ui/"];
+
+// `touch` marks the viewports where a touch-target floor applies: phones in
+// either orientation, plus the fold-class cover screen. A 200 %-zoom layout
+// viewport (640×512 — see below) is a desktop pointer context and is not held
+// to a touch floor.
 const VIEWPORTS = [
-  { name: "320x568", width: 320, height: 568 },
-  { name: "360x800", width: 360, height: 800 },
-  { name: "390x844", width: 390, height: 844 },
-  { name: "768x1024", width: 768, height: 1024 },
-  { name: "1280x800", width: 1280, height: 800 },
-  { name: "1440x900", width: 1440, height: 900 },
+  { name: "280x653", width: 280, height: 653, touch: true },
+  { name: "320x568", width: 320, height: 568, touch: true },
+  { name: "360x800", width: 360, height: 800, touch: true },
+  { name: "390x844", width: 390, height: 844, touch: true },
+  // Landscape phone: 844×390 is an iPhone-class landscape viewport, and it is
+  // the case a portrait-only matrix cannot see — the sticky header, the hero
+  // split and the mockups all lay out differently when the viewport is wider
+  // than it is tall.
+  { name: "844x390-landscape", width: 844, height: 390, touch: true },
+  { name: "768x1024", width: 768, height: 1024, touch: true },
+  { name: "1280x800", width: 1280, height: 800, touch: false },
+  { name: "1440x900", width: 1440, height: 900, touch: false },
+  // 200 % zoom, honestly emulated: a 1280×1024 window at 200 % browser zoom
+  // lays out in a 640×512 CSS-pixel viewport, which is what WCAG 1.4.4 asks
+  // about. `deviceScaleFactor` would not do this — it changes the pixels per
+  // CSS pixel, not the layout viewport the CSS sees.
+  { name: "zoom200-640x512", width: 640, height: 512, touch: false },
 ];
 const SCHEMES = ["dark", "light"];
 const SHOTS = fileURLToPath(new URL("./screenshots/", import.meta.url));
@@ -102,6 +137,15 @@ const clip = (text, limit = 4000) => (text.length > limit ? `${text.slice(0, lim
 // measurement is a bug in this file, not a display detail.
 const ANNOTATION_CAP = 8;
 
+// The carry annotation holds everything the cap pushed out, so it is clipped far
+// more generously than a single category: with the viewport matrix, forced
+// colours, increased contrast and print added, more than half of the
+// measurements can land here, and a truncated carry is the same silent loss the
+// cap exists to prevent. GitHub accepts annotation messages of tens of KB; a
+// category is clipped at 4 KB because it is one finding, and the leftover pile
+// at 24 KB because it is many.
+const CARRY_CLIP = 24000;
+
 function emitReport(grouped, level, label) {
   const entries = [...grouped.entries()];
   for (const [key, items] of entries.slice(0, ANNOTATION_CAP)) {
@@ -113,7 +157,7 @@ function emitReport(grouped, level, label) {
     annotate(
       level,
       `${rest.length} more categor(y|ies) — ${suppressed.length} ${label}(s)`,
-      clip(suppressed.join(" || ")),
+      clip(suppressed.join(" || "), CARRY_CLIP),
     );
   }
 }
@@ -293,6 +337,7 @@ function overflowReport() {
       spilling.push({
         element: element.tagName.toLowerCase(),
         className: String(element.className || "").slice(0, 60),
+        text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40),
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,
       });
@@ -361,6 +406,99 @@ function motionReport() {
   };
 }
 
+/** Rendered heading levels and every link's text → destination, for `rules.mjs`. */
+function structureReport() {
+  const headings = [];
+  for (const element of document.querySelectorAll("h1, h2, h3, h4, h5, h6")) {
+    if (element.closest('[aria-hidden="true"]')) continue;
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    if (rect.width <= 0 || rect.height <= 0) continue;
+    if (style.display === "none" || style.visibility === "hidden") continue;
+    headings.push({ level: Number(element.tagName.slice(1)), text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40) });
+  }
+  const links = [];
+  for (const element of document.querySelectorAll("a[href]")) {
+    // An aria-hidden subtree is not read out; its link text cannot confuse
+    // anyone. The mockups live there by design.
+    if (element.closest('[aria-hidden="true"]')) continue;
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    if (rect.width <= 0 || rect.height <= 0) continue;
+    if (style.display === "none" || style.visibility === "hidden") continue;
+    links.push({ text: element.textContent || "", href: element.getAttribute("href") || "" });
+  }
+  return { headings, links };
+}
+
+/** Controls that must keep a boundary when the OS forces the colour palette. */
+function forcedColorsReport() {
+  const read = (element) => {
+    const style = getComputedStyle(element);
+    return {
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+      outlineColor: style.outlineColor,
+      borderTopStyle: style.borderTopStyle,
+      borderTopWidth: style.borderTopWidth,
+      borderTopColor: style.borderTopColor,
+      borderRightStyle: style.borderRightStyle,
+      borderRightWidth: style.borderRightWidth,
+      borderRightColor: style.borderRightColor,
+      borderBottomStyle: style.borderBottomStyle,
+      borderBottomWidth: style.borderBottomWidth,
+      borderBottomColor: style.borderBottomColor,
+      borderLeftStyle: style.borderLeftStyle,
+      borderLeftWidth: style.borderLeftWidth,
+      borderLeftColor: style.borderLeftColor,
+    };
+  };
+  const controls = [];
+  for (const element of document.querySelectorAll("a.btn, button")) {
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue;
+    controls.push({
+      element: `${element.tagName.toLowerCase()}.${String(element.className || "").split(/\s+/)[0]}`,
+      text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24),
+      style: read(element),
+    });
+  }
+  // Recorded, not gated: an aria-hidden decoration losing its frame under
+  // forced colours is a degradation to report, not an accessibility defect.
+  //
+  // The raw styles are gathered here and the rule is applied in Node, because
+  // this function is serialized into the page: a reference to anything imported
+  // from `./rules.mjs` is a ReferenceError *inside the page*, which rejects the
+  // evaluate() call and — before the guard below existed — killed the whole run
+  // with no annotation, no screenshots and only "Process completed with exit
+  // code 1" to show for it (website run 37814413312, 2026-10-08).
+  const decorations = [];
+  for (const element of document.querySelectorAll(".mock .device")) {
+    decorations.push({ element: element.className, style: read(element) });
+  }
+  return {
+    active: window.matchMedia("(forced-colors: active)").matches,
+    contrastMore: window.matchMedia("(prefers-contrast: more)").matches,
+    controls,
+    decorations,
+  };
+}
+
+/** Every `data-caveat` disclosure, and whether print still renders it. */
+function caveatReport() {
+  const caveats = [];
+  for (const element of document.querySelectorAll("[data-caveat]")) {
+    const style = getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    caveats.push({
+      key: element.getAttribute("data-caveat"),
+      visible: style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity) > 0,
+      height: Math.round(rect.height),
+    });
+  }
+  return caveats;
+}
+
 function focusSnapshot() {
   const element = document.activeElement;
   if (!element) return null;
@@ -424,7 +562,7 @@ async function checkViewports(browser) {
           `overflow ${route} @ ${viewport.name}`,
           `content wider than its box: ` +
             overflow.spilling
-              .map((o) => `${o.element}.${o.className} ${o.scrollWidth}>${o.clientWidth}`)
+              .map((o) => `${o.element}.${o.className} “${o.text}” ${o.scrollWidth}>${o.clientWidth}`)
               .join(", "),
         );
       }
@@ -441,18 +579,19 @@ async function checkViewports(browser) {
         }
         record("icons rendered", `${icons.count} icons, smallest bounding box ${icons.smallest} user units`);
       }
-      if (viewport.width <= 768) {
+      if (viewport.touch) {
         const targets = await page.evaluate(targetReport);
-        const tooSmall = targets.filter(
-          (t) => (t.standalone && (t.width < 44 || t.height < 44)) || (!t.standalone && (t.width < 24 && t.height < 24)),
-        );
+        const tooSmall = targets
+          .map((target) => ({ target, problem: targetProblem(target) }))
+          .filter((entry) => entry.problem);
         if (tooSmall.length) {
           fail(
             `touch targets ${route} @ ${viewport.name}`,
             tooSmall
               .map(
-                (t) =>
-                  `${t.element} “${t.text}” is ${t.width}×${t.height} (${t.standalone ? "44" : "24"} px floor)`,
+                ({ target, problem }) =>
+                  `${target.element} “${target.text}” is ${target.width}×${target.height} ` +
+                  `(${problem.floor} px floor)`,
               )
               .join(" | "),
           );
@@ -598,6 +737,289 @@ async function checkReducedMotion(browser) {
   await context.close();
 }
 
+/**
+ * Rendered structure: heading order and link-text uniqueness.
+ *
+ * `website_quality.py` already asserts heading order and one `h1` in the *built
+ * HTML*. This is the rendered document instead: an element hidden by CSS is not
+ * part of the outline a screen reader walks, and an `aria-hidden` subtree is not
+ * read at all — two ways the static rule and the real page can disagree.
+ */
+async function checkStructure(browser) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  for (const route of ROUTES) {
+    const page = await context.newPage();
+    await page.goto(url(route), { waitUntil: "load" });
+    const { headings, links } = await page.evaluate(structureReport);
+
+    const problem = headingOrderProblem(headings.map((heading) => heading.level));
+    if (problem) {
+      const rendered = headings.map((heading) => `h${heading.level} “${heading.text}”`).join(" → ");
+      fail(`heading order ${route}`, `${problem}. Rendered outline: ${rendered}`);
+    } else {
+      record(
+        `headings ${route}`,
+        `${headings.length} rendered heading(s), no skipped level: ` +
+          headings.map((heading) => `h${heading.level}`).join(" → "),
+      );
+    }
+
+    const duplicates = duplicateLinkTargets(links);
+    if (duplicates.length) {
+      fail(`link text ${route}`, `${duplicates.length} text(s) name more than one destination: ${duplicates.join(" | ")}`);
+    } else {
+      const distinct = new Set(links.map((link) => link.href)).size;
+      record(`link text ${route}`, `${links.length} rendered link(s), ${distinct} destination(s), no text reused for two`);
+    }
+    await page.close();
+  }
+  await context.close();
+}
+
+/**
+ * Every tab stop, not just the first one.
+ *
+ * The previous version checked that the primary navigation was reachable and
+ * had a ring. That is one element out of twenty-odd. This walks the whole
+ * document with Tab, compares each stop's style with the same element's
+ * *unfocused* style (recorded before the walk, so the walk is never interrupted
+ * by a blur), and fails on: an element that cannot be reached at all, and an
+ * element that takes focus without any visible change.
+ */
+async function checkTabStops(browser, route = "/") {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  await page.goto(url(route), { waitUntil: "load" });
+
+  const probes = await page.evaluate(() => {
+    const focusable = "a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex=\"-1\"])";
+    const found = [];
+    for (const element of document.querySelectorAll(focusable)) {
+      if (element.closest('[aria-hidden="true"]')) continue;
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      if (style.display === "none" || style.visibility === "hidden") continue;
+      element.dataset.dhunProbe = String(found.length);
+      found.push((element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24));
+    }
+    return found;
+  });
+
+  // The unfocused style of every probe, recorded before the walk: blurring an
+  // element mid-walk would move focus and make the walk test its own
+  // side-effects instead of the page. The comparison itself is
+  // `focusChanged()` in rules.mjs — this file gathers, that file decides.
+  const idle = await page.evaluate(() => {
+    const read = (style) => ({
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+      outlineColor: style.outlineColor,
+      boxShadow: style.boxShadow,
+      borderColor: style.borderColor,
+    });
+    const map = {};
+    for (const element of document.querySelectorAll("[data-dhun-probe]")) {
+      map[element.dataset.dhunProbe] = read(getComputedStyle(element));
+    }
+    return map;
+  });
+
+  const visited = new Set();
+  const noRing = [];
+  for (let press = 0; press < probes.length + 8; press += 1) {
+    await page.keyboard.press("Tab");
+    const stop = await page.evaluate(() => {
+      const element = document.activeElement;
+      if (!element || element === document.body) return null;
+      const style = getComputedStyle(element);
+      return {
+        key: element.dataset?.dhunProbe ?? null,
+        tag: element.tagName.toLowerCase(),
+        text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24),
+        style: {
+          outlineStyle: style.outlineStyle,
+          outlineWidth: style.outlineWidth,
+          outlineColor: style.outlineColor,
+          boxShadow: style.boxShadow,
+          borderColor: style.borderColor,
+        },
+      };
+    });
+    if (!stop) break;
+    if (stop.key === null) {
+      fail(`tab stops ${route}`, `focus left the probed set: ${stop.tag} “${stop.text}”`);
+      break;
+    }
+    if (visited.has(stop.key)) break; // wrapped around to the start: the walk is done
+    visited.add(stop.key);
+    if (!focusChanged(idle[stop.key], stop.style)) {
+      noRing.push(`${stop.tag} “${stop.text}”`);
+    }
+  }
+
+  const unreachable = probes.filter((_text, index) => !visited.has(String(index)));
+  if (unreachable.length) {
+    fail(
+      `tab stops ${route}`,
+      `${unreachable.length} visibly focusable element(s) never took focus: ` +
+        unreachable.slice(0, 5).map((text) => `“${text}”`).join(", "),
+    );
+  }
+  if (noRing.length) {
+    fail(`focus ring ${route}`, `${noRing.length} tab stop(s) show no visible change when focused: ${noRing.slice(0, 6).join(", ")}`);
+  }
+  if (!unreachable.length && !noRing.length) {
+    record(`focus ring ${route}`, `${visited.size} tab stop(s) visited, every one shows a visible change when focused`);
+  }
+  await context.close();
+}
+
+/**
+ * Forced colours and increased contrast, emulated — and the check that the
+ * emulation took effect.
+ *
+ * A check that cannot tell whether its own condition is active proves nothing:
+ * if `forced-colors` did not apply, the boundary test below would pass on
+ * ordinary dark-mode CSS and report a false green. So the page's own
+ * `matchMedia` result is asserted first, and a mismatch is a failure.
+ */
+async function checkPreferences(browser) {
+  const modes = [
+    { name: "forced-colors", options: { forcedColors: "active" }, probe: "active" },
+    { name: "prefers-contrast-more", options: { contrast: "more" }, probe: "contrastMore" },
+  ];
+  for (const mode of modes) {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      colorScheme: "dark",
+      ...mode.options,
+    });
+    for (const route of ROUTES) {
+      const page = await context.newPage();
+      await page.goto(url(route), { waitUntil: "load" });
+      const report = await page.evaluate(forcedColorsReport);
+      if (!report[mode.probe]) {
+        fail(
+          `${mode.name} ${route}`,
+          `the emulated preference is not visible to the page (matchMedia ${mode.probe}=false) — ` +
+            `every result below would be a false green`,
+        );
+        await page.close();
+        continue;
+      }
+
+      const overflow = await page.evaluate(overflowReport);
+      if (overflow.scrollWidth > overflow.innerWidth + 1 || overflow.offenders.length || overflow.spilling.length) {
+        fail(
+          `overflow ${route} @ ${mode.name}`,
+          `scrollWidth ${overflow.scrollWidth} > ${overflow.innerWidth}; ` +
+            `${overflow.offenders.length} offender(s), ${overflow.spilling.length} spilling`,
+        );
+      }
+
+      if (mode.name === "forced-colors") {
+        const missing = report.controls.filter((control) =>
+          forcedColorsBoundaryMissing(control.style),
+        );
+        if (missing.length) {
+          fail(
+            `forced colors ${route}`,
+            `${missing.length}/${report.controls.length} control(s) have no visible boundary when ` +
+              `colours are forced: ${missing.slice(0, 5).map((c) => `${c.element} “${c.text}”`).join(", ")}`,
+          );
+        } else {
+          record(
+            `forced colors ${route}`,
+            `${report.controls.length} control(s) keep a boundary; ` +
+              `${report.decorations.filter((d) => forcedColorsBoundaryMissing(d.style)).length}/${report.decorations.length} ` +
+              `decorative mockup frame(s) lose theirs`,
+          );
+        }
+      } else {
+        const results = await page.evaluate(contrastReport);
+        const worst = results.reduce((min, r) => Math.min(min, r.ratio), Infinity);
+        record(
+          `contrast ${route} (prefers-contrast: more)`,
+          `${results.length} text nodes measured, lowest ratio ${worst}:1 — this site declares no ` +
+            `prefers-contrast rules, so the number is the same as the default scheme by design`,
+        );
+      }
+
+      const results = await new AxeBuilder({ page }).analyze();
+      const serious = results.violations.filter((v) => ["serious", "critical"].includes(v.impact));
+      if (serious.length) {
+        fail(
+          `axe ${route} (${mode.name})`,
+          serious.map((v) => `${v.id} (${v.impact}, ${v.nodes.length} node(s))`).join(", "),
+        );
+      } else {
+        record(
+          `axe ${route} (${mode.name})`,
+          `${results.violations.length} violation(s), ${results.passes.length} passes`,
+        );
+      }
+      await page.close();
+    }
+    await context.close();
+  }
+}
+
+/**
+ * Print: the disclosures must survive the rendering path nobody looks at.
+ *
+ * `data-caveat` elements are the site's own honesty device — the same hook
+ * `scripts/website_claims.py` asserts in the built HTML. They are checked here
+ * in the print media, because a reader can print the page and the printed copy
+ * is what someone else reads.
+ */
+async function checkPrint(browser) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  for (const route of ROUTES) {
+    const page = await context.newPage();
+    await page.goto(url(route), { waitUntil: "load" });
+    await page.emulateMedia({ media: "print" });
+    const caveats = await page.evaluate(caveatReport);
+    const hidden = caveatsHiddenInPrint(caveats);
+    if (hidden.length) {
+      fail(
+        `print ${route}`,
+        `${hidden.length} data-caveat disclosure(s) do not render in print: ${hidden.join(", ")}`,
+      );
+    } else if (caveats.length) {
+      record(`print ${route}`, `${caveats.length} data-caveat disclosure(s) still rendered in print`);
+    } else {
+      record(`print ${route}`, "no data-caveat disclosure on this route");
+    }
+
+    // Print is a rendering path, not a colour scheme: browsers drop background
+    // colours on paper, so a dark-themed page with no print rules prints white
+    // text on white paper — legible on screen, blank on paper. Same floors as
+    // the screen measurement, measured through the same code.
+    const contrast = await page.evaluate(contrastReport);
+    const violations = contrast.filter((entry) => entry.ratio < entry.required - 0.005);
+    const worst = contrast.reduce((min, entry) => Math.min(min, entry.ratio), Infinity);
+    if (violations.length) {
+      fail(
+        `print contrast ${route}`,
+        `${violations.length} of ${contrast.length} text node(s) would print below the floor ` +
+          `(lowest ${worst}:1): ` +
+          violations
+            .slice(0, 5)
+            .map((entry) => `${entry.element} “${entry.text}” ${entry.ratio}:1 < ${entry.required}:1`)
+            .join(" | "),
+      );
+    } else {
+      record(
+        `print contrast ${route}`,
+        `${contrast.length} text nodes measured on paper, lowest ratio ${worst}:1`,
+      );
+    }
+    await page.close();
+  }
+  await context.close();
+}
+
 async function checkAxe(browser) {
   for (const scheme of SCHEMES) {
     const context = await browser.newContext({
@@ -657,23 +1079,55 @@ async function captureScreenshots(browser) {
 // run
 // ---------------------------------------------------------------------------
 
-const browser = await chromium.launch();
-try {
-  await checkViewports(browser);
-  await checkKeyboard(browser);
-  await checkContrast(browser);
-  await checkReducedMotion(browser);
-  await checkAxe(browser);
-  await captureScreenshots(browser);
-} finally {
-  await browser.close();
+// Every check runs through the guard. A thrown error used to end the process
+// before `emitAnnotations()` ran, so the only trace in the readable channel was
+// "Process completed with exit code 1" — no route, no viewport, no message. A
+// crash is a finding like any other: it is recorded, annotated, and the run
+// continues to the next check, because a broken tab walk must not hide the
+// contrast measurement behind it.
+async function guard(name, run) {
+  try {
+    await run();
+  } catch (error) {
+    const where = (error && error.stack ? error.stack.split("\n").slice(0, 3).join(" | ") : String(error))
+      .replace(/\s+/g, " ")
+      .slice(0, 400);
+    fail(`${name} crashed`, `${error && error.message ? error.message : error} — ${where}`);
+  }
 }
 
-console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
-console.error(measurements.map((line) => `  · ${line}`).join("\n"));
-if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
-emitAnnotations();
-if (failures.length) {
-  console.error(failures.map((line) => `  - ${line}`).join("\n"));
-  process.exitCode = 1;
+const CHECKS = [
+  ["viewports", () => checkViewports(browser)],
+  ["keyboard", () => checkKeyboard(browser)],
+  ["structure", () => checkStructure(browser)],
+  ["tab stops", () => checkTabStops(browser)],
+  ["contrast", () => checkContrast(browser)],
+  ["reduced motion", () => checkReducedMotion(browser)],
+  ["preferences", () => checkPreferences(browser)],
+  ["print", () => checkPrint(browser)],
+  ["axe", () => checkAxe(browser)],
+  ["screenshots", () => captureScreenshots(browser)],
+];
+
+let browser;
+try {
+  browser = await chromium.launch();
+  for (const [name, run] of CHECKS) {
+    await guard(name, run);
+  }
+} catch (error) {
+  fail("browser launch", `${error && error.message ? error.message : error}`);
+} finally {
+  if (browser) await browser.close();
+  // The summary and the annotations are emitted even when a check above threw:
+  // the annotations are the only channel this repository can read from CI, so
+  // losing them is losing the evidence itself.
+  console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
+  console.error(measurements.map((line) => `  · ${line}`).join("\n"));
+  if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
+  emitAnnotations();
+  if (failures.length) {
+    console.error(failures.map((line) => `  - ${line}`).join("\n"));
+    process.exitCode = 1;
+  }
 }

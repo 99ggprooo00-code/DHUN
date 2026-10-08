@@ -236,6 +236,7 @@ export default {
         ],
         note: "Drawn on the home page.",
         href: "/",
+        hrefLabel: "home page",
       },
       {
         id: "search",
@@ -265,6 +266,7 @@ export default {
         ],
         note: "Drawn on the features page.",
         href: "/features/",
+        hrefLabel: "features page",
       },
       {
         id: "settings",

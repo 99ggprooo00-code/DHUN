@@ -20,7 +20,20 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="{{ ogTitle or title }}">
 <meta name="twitter:description" content="{{ description }}">
-<link rel="icon" href="/assets/dhun-favicon.svg" type="image/svg+xml">
+{#- The icon is inlined as a `data:` URI (src/_data/favicon.js), so a route
+    makes exactly one request: this document. A rule decodes it back out of the
+    built page and compares it with src/assets/dhun-favicon.svg. -#}
+{#- Structured data: what the software is, in the one shape a machine reads.
+    No `aggregateRating`, no `offers`, no `softwareVersion`, no download URL:
+    nothing here that the repository cannot support (no stable release exists,
+    so there is no version to name) and nothing that points at a build — the
+    site is not a distribution channel. `structured_data_violations` in
+    scripts/website_quality.py asserts every one of those omissions, so this
+    comment cannot drift from the JSON below it. -#}
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DHUN","applicationCategory":"MultimediaApplication","operatingSystem":"Android 7.0+, Windows","isAccessibleForFree":true,"license":"{{ site.licence }}","url":"{{ site.url }}/","codeRepository":"{{ site.repo }}"}
+</script>
+<link rel="icon" href="{{ favicon.dataUri }}" type="image/svg+xml">
 {#- One request per route: the stylesheet the page needs is inlined here from
     the modules its front matter declares (see eleventy.config.js). -#}
 <style>{{ cssModules | inlineCss | safe }}</style>

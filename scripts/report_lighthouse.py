@@ -41,6 +41,34 @@ def load_scores(path: str) -> dict[str, float | None]:
     return {key: categories.get(key, {}).get("score") for key in CATEGORIES}
 
 
+def _urls_in(node: object, limit: int = 6) -> list[str]:
+    """Every URL mentioned anywhere in a Lighthouse details structure.
+
+    The insight's item shape is not part of Lighthouse's stable public API, and
+    a reporter that pattern-matched one version's keys would silently report
+    nothing when it changed — the same defect as the count it replaces. So this
+    walks whatever it is given and collects `url`/`request`/`resourceUrl` string
+    fields, in document order, de-duplicated, capped so one annotation stays
+    readable.
+    """
+    found: list[str] = []
+    stack: list[object] = [node]
+    while stack:
+        current = stack.pop(0)
+        if isinstance(current, dict):
+            for key, value in current.items():
+                if key in ("url", "request", "resourceUrl") and isinstance(value, str) and value:
+                    if value not in found:
+                        found.append(value)
+                else:
+                    stack.append(value)
+        elif isinstance(current, list):
+            stack.extend(current)
+        if len(found) >= limit:
+            break
+    return found[:limit]
+
+
 def median(values: list[float]) -> float:
     ordered = sorted(values)
     middle = len(ordered) // 2
@@ -112,6 +140,20 @@ def main(argv: list[str]) -> int:
         combined.append(" · ".join(measured))
         print(f"{route} metrics: " + " · ".join(measured))
 
+    # A request *count* is not evidence: `requests=2` was on every route for a
+    # whole session because one extra subresource was never named. So the
+    # subresources are listed by URL (with their transfer size), and "none" is
+    # stated explicitly rather than left to be inferred from a number.
+    extras = []
+    for item in requests:
+        url = item.get("url") or ""
+        if not url or item.get("resourceType") == "document":
+            continue
+        size = item.get("transferSize") or item.get("resourceSize") or 0
+        extras.append(f"{url.rsplit('/', 1)[-1] or url} ({size} B, {item.get('resourceType') or '?'})")
+    combined.append("subresources: " + (", ".join(extras) if extras else "none — the document only"))
+    print(f"{route} subresources: " + (", ".join(extras) if extras else "none"))
+
     # The largest measured savings, so the next run can confirm an improvement
     # instead of asserting one.
     savings = []
@@ -129,8 +171,20 @@ def main(argv: list[str]) -> int:
         if not audit:
             continue
         items = audit.get("details", {}).get("items", [])
-        state = "none" if not items else f"{len(items)} item(s)"
-        combined.append(f"{audit_id}: {audit.get('displayValue') or state}")
+        if audit_id == "network-dependency-tree-insight" and items:
+            # "3 item(s)" cannot be acted on. The insight's own items carry the
+            # URLs (in a shape that has moved between Lighthouse versions), so
+            # every `url`/`request` field found anywhere in the details is
+            # collected rather than guessed at, and the whole structure still
+            # goes to stdout for a human with log access.
+            combined.append(
+                "network-dependency-tree-insight: "
+                + ("; ".join(_urls_in(items)) or f"{len(items)} item(s), no url field")
+            )
+            print(f"{route} dependency tree detail: {json.dumps(items)[:1800]}")
+        else:
+            state = "none" if not items else f"{len(items)} item(s)"
+            combined.append(f"{audit_id}: {audit.get('displayValue') or state}")
 
     # Name the audits that failed, so the failure is actionable from the
     # annotations alone.

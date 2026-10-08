@@ -88,6 +88,17 @@
 }
 .inventory th, .inventory td {
   text-align: left; padding: var(--sp-3); border-top: 1px solid var(--hairline);
+  /* Every cell breaks anywhere, not only the `code` ones: the browser job
+     measured one `td` whose content was 94 px wide in an 89 px box at 280 px
+     (website run 37815441964), and a cell whose content cannot break is a cell
+     that overflows whatever the column widths say. */
+  overflow-wrap: anywhere;
+}
+@media (max-width: 400px) {
+  /* The narrowest phone class: the same measurement, fixed where it broke, by
+     giving every column back the padding the overflow was made of. */
+  .inventory { font-size: 0.85rem; }
+  .inventory th, .inventory td { padding: var(--sp-2); }
 }
 .inventory thead th { border-top: 0; color: var(--text-2); font-size: 0.85rem; }
 .inventory tbody tr:nth-child(odd) { background: var(--surface-card); }

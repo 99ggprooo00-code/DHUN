@@ -24,11 +24,13 @@ Run directly for a report:  python3 scripts/website_quality.py [dist-dir]
 
 from __future__ import annotations
 
+import base64
 import html
 import json
 import pathlib
 import re
 import sys
+import xml.etree.ElementTree as ElementTree
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_DIST = REPO_ROOT / "website" / "dist"
@@ -87,8 +89,9 @@ STALE_FACT_PATTERNS = (
     (re.compile(r"\bbuild \d{3,}\b", re.I), "build number"),
 )
 STALE_FACT_ALLOWLIST: frozenset[str] = frozenset()
+REPOSITORY_URL = "https://github.com/99ggprooo00-code/DHUN"
 ALLOWED_EXTERNAL_ORIGINS = (
-    "https://github.com/99ggprooo00-code/DHUN",
+    REPOSITORY_URL,
     "https://99ggprooo00-code.github.io/DHUN",
 )
 # The site's routes. /download/ was removed by decision (the site is not a
@@ -272,20 +275,52 @@ def weight_violations(dist: pathlib.Path) -> list[str]:
 
 
 def javascript_violations(dist: pathlib.Path) -> list[str]:
-    """The site ships no client-side JavaScript at all."""
+    """The site ships no client-side JavaScript at all.
+
+    JSON-LD is the one exception, and it is not JavaScript: it is a `<script>`
+    of type `application/ld+json` whose body is data that no engine evaluates.
+    It is admitted by *type* — the body is parsed as JSON below, so a `<script>`
+    that is anything else is still a violation, including one that claims the
+    JSON-LD type and carries code. `on*` event-handler attributes are banned
+    here too: they are the other way to run script without a `<script>` tag, and
+    a rule about "no client-side JavaScript" that only looked for tags would miss
+    them.
+    """
     violations: list[str] = []
     scripts = [p for p in _files(dist) if p.suffix in {".js", ".mjs", ".cjs"}]
     for path in scripts:
         violations.append(f"{path.relative_to(dist)}: the site ships no client-side JavaScript")
     for route, path in page_paths(dist).items():
         markup = path.read_text(encoding="utf-8")
-        for match in re.finditer(r"<script\b[^>]*>", markup, re.I):
+        for match in re.finditer(r"<script\b([^>]*)>", markup, re.I):
+            attributes = match.group(1)
+            if re.search(r'\btype\s*=\s*"application/ld\+json"', attributes, re.I):
+                continue
             violations.append(f"{route}: inline <script> tag found: {match.group(0)[:70]}")
+        for match in re.finditer(r"<script\b[^>]*\btype=\"application/ld\+json\"[^>]*>(.*?)</script>", markup, re.I | re.S):
+            try:
+                json.loads(match.group(1).strip())
+            except ValueError as error:
+                violations.append(
+                    f"{route}: the JSON-LD block is not valid JSON ({error}) — it is "
+                    f"treated as data, so it has to be data"
+                )
+        for match in re.finditer(r"<[a-z][a-z0-9]*\b[^>]*?(\son[a-z]+)\s*=", markup, re.I):
+            violations.append(
+                f"{route}: inline event handler attribute found: {match.group(1).strip()}"
+            )
     return violations
 
 
 def _resolve_internal(dist: pathlib.Path, reference: str) -> bool:
     if reference.startswith("#") or reference.startswith("mailto:"):
+        return True
+    # A `data:` URI is not a file reference: there is nothing to resolve. Its
+    # *contents* are asserted where the site depends on them —
+    # `favicon_violations` decodes the inlined icon and compares it with its
+    # source file — so this branch cannot be used to smuggle a dead asset past
+    # the link check.
+    if reference.startswith("data:"):
         return True
     path = reference.split("#", 1)[0].split("?", 1)[0]
     if not path.startswith("/"):
@@ -306,6 +341,10 @@ def link_violations(dist: pathlib.Path) -> list[str]:
             re.I,
         ):
             reference = match.group(1)
+            if reference.startswith("data:"):
+                # Inlined bytes, not a URL to fetch. `favicon_violations` is the
+                # rule that reads the bytes back out.
+                continue
             if reference.startswith(("http://", "https://")):
                 if not reference.startswith(ALLOWED_EXTERNAL_ORIGINS):
                     violations.append(
@@ -582,6 +621,86 @@ def accessibility_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+# Keys that must never appear in the site's structured data. Each one is a claim
+# this repository cannot support: no stable release exists, so there is no
+# version; the project has never collected a rating; and an `offers`/`price` or
+# download URL would turn a description into an advertisement or a distribution
+# channel (see `distribution_boundary_violations`).
+STRUCTURED_DATA_BANNED = (
+    "aggregateRating",
+    "review",
+    "ratingValue",
+    "offers",
+    "price",
+    "softwareVersion",
+    "datePublished",
+    "dateModified",
+    "downloadUrl",
+    "installUrl",
+    "fileSize",
+)
+
+
+def structured_data_violations(dist: pathlib.Path) -> list[str]:
+    """One honest `SoftwareApplication` block per route, and nothing more.
+
+    Structured data is the part of a page a machine repeats without a human
+    reading the surrounding caveats, so it is where an over-claim travels
+    furthest. The facts below are the ones the repository supports (free,
+    GPL-3.0, Android 7.0+ and Windows, no sign-in); everything that would need a
+    release, a rating or a store is asserted *absent* rather than merely
+    unmentioned.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        blocks = re.findall(
+            r"<script\b[^>]*\btype=\"application/ld\+json\"[^>]*>(.*?)</script>",
+            markup,
+            re.I | re.S,
+        )
+        if len(blocks) != 1:
+            violations.append(
+                f"{route}: expected exactly one JSON-LD block, found {len(blocks)}"
+            )
+            continue
+        try:
+            data = json.loads(blocks[0].strip())
+        except ValueError as error:
+            violations.append(f"{route}: JSON-LD is not valid JSON ({error})")
+            continue
+        if data.get("@type") != "SoftwareApplication":
+            violations.append(
+                f"{route}: JSON-LD @type is {data.get('@type')!r}, expected 'SoftwareApplication'"
+            )
+        for key in STRUCTURED_DATA_BANNED:
+            if key in data:
+                violations.append(
+                    f"{route}: JSON-LD claims '{key}', which this repository cannot "
+                    f"support (no stable release, no ratings, no store listings)"
+                )
+        if data.get("isAccessibleForFree") is not True:
+            violations.append(
+                f"{route}: JSON-LD does not state isAccessibleForFree, and the app is GPL-3.0"
+            )
+        # The repository's own LICENSE file, which the footer links and
+        # `footer_licence_violations` asserts — reused here rather than
+        # re-spelled, so the two cannot disagree.
+        expected_licence = f"{REPOSITORY_URL}/blob/main/LICENSE"
+        if data.get("license") != expected_licence:
+            violations.append(
+                f"{route}: JSON-LD licence is {data.get('license')!r}, expected the "
+                f"repository's own LICENSE file ({expected_licence})"
+            )
+        if data.get("url") != f"{CANONICAL_ORIGIN}/":
+            violations.append(
+                f"{route}: JSON-LD url is {data.get('url')!r}, expected the canonical origin"
+            )
+        if data.get("codeRepository") not in ALLOWED_EXTERNAL_ORIGINS:
+            violations.append(f"{route}: JSON-LD codeRepository is not the repository itself")
+    return violations
+
+
 def metadata_violations(dist: pathlib.Path) -> list[str]:
     violations: list[str] = []
     for route in ROUTES:
@@ -603,7 +722,270 @@ def metadata_violations(dist: pathlib.Path) -> list[str]:
             violations.append(f"{route}: missing twitter:card")
         if '<link rel="icon"' not in markup:
             violations.append(f"{route}: missing favicon link")
+        # The browser chrome takes its colour from these; both schemes are
+        # asserted because a page with only the dark one shows the wrong bar in
+        # a light-mode browser.
+        for scheme, value in (("dark", "#161616"), ("light", "#F6F4F1")):
+            needed = f'<meta name="theme-color" content="{value}" media="(prefers-color-scheme: {scheme})">'
+            if needed not in markup:
+                violations.append(
+                    f"{route}: missing the {scheme}-scheme theme-color ({value})"
+                )
+        # og:url and the canonical URL are the same fact in two vocabularies; a
+        # page whose canonical moved without its og:url following says two
+        # different things about where it lives.
+        og_url = re.search(r'<meta[^>]*property="og:url"[^>]*content="([^"]+)"', markup, re.I)
+        if not og_url or og_url.group(1) != expected:
+            violations.append(
+                f"{route}: og:url should be {expected} (it is "
+                f"{og_url.group(1) if og_url else 'absent'})"
+            )
     return violations
+
+
+# --------------------------------------------------------------------------
+# One request per route.
+# --------------------------------------------------------------------------
+
+# The tab icon is inlined as a `data:` URI by `website/src/_data/favicon.js`, so
+# a route is exactly one HTTP request — the document that carries everything.
+# Lighthouse measured `requests=2` on the merged head (run 37808955045
+# annotations) for exactly this reason. Both halves are asserted: the URI must
+# decode back to the source SVG (folding the whitespace the encoder folds), and
+# no page may keep the old file reference alive, which would silently restore
+# the second request.
+ICON_LINK = re.compile(r"<link\b[^>]*\brel=\"icon\"[^>]*>", re.I)
+ICON_HREF = re.compile(r"\bhref=\"([^\"]+)\"", re.I)
+DATA_SVG_ICON = re.compile(r"^data:image/svg\+xml;base64,([A-Za-z0-9+/]+={0,2})$")
+FAVICON_SOURCE = SOURCE_DIR / "assets" / "dhun-favicon.svg"
+REMOVED_ICON_PATH = "/assets/dhun-favicon.svg"
+
+
+def _compact_svg(svg: str) -> str:
+    """Fold the whitespace the encoder folds, so both sides compare equal.
+
+    Only whitespace *between tags* is removed — the document has no text nodes,
+    so no glyph spacing can change — and the encoder in `favicon.js` does the
+    same thing. The two definitions are compared against each other by this
+    rule, so a divergence is a red test rather than a guess.
+    """
+    return re.sub(r">\s+<", "><", svg).strip()
+
+
+def favicon_violations(dist: pathlib.Path) -> list[str]:
+    """The icon is inlined, it is the icon it claims to be, and it costs no request."""
+    if not FAVICON_SOURCE.is_file():
+        return [
+            f"{FAVICON_SOURCE.relative_to(REPO_ROOT)} is missing, so the inlined "
+            f"icon cannot be compared with its source"
+        ]
+    expected = _compact_svg(FAVICON_SOURCE.read_text(encoding="utf-8"))
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        tags = ICON_LINK.findall(markup)
+        if len(tags) != 1:
+            violations.append(
+                f"{route}: expected exactly one <link rel=\"icon\">, found {len(tags)}"
+            )
+            continue
+        tag = tags[0]
+        href = ICON_HREF.search(tag)
+        if not href:
+            violations.append(f"{route}: the icon link has no href: {tag[:60]}")
+            continue
+        value = href.group(1)
+        match = DATA_SVG_ICON.match(value)
+        if match is None:
+            violations.append(
+                f"{route}: the icon is not an inlined data: URI ({value[:60]}…) — "
+                f"a separate file is a second HTTP request on every visit"
+            )
+        else:
+            try:
+                decoded = base64.b64decode(match.group(1), validate=True).decode("utf-8")
+            except (ValueError, UnicodeDecodeError) as error:
+                violations.append(f"{route}: the inlined icon is not base64 UTF-8: {error}")
+            else:
+                if decoded != expected:
+                    violations.append(
+                        f"{route}: the inlined icon has drifted from "
+                        f"{FAVICON_SOURCE.name} ({len(decoded)} B decoded vs "
+                        f"{len(expected)} B expected)"
+                    )
+            if 'type="image/svg+xml"' not in tag:
+                violations.append(f"{route}: the inlined icon lost its type attribute: {tag[:60]}")
+        if REMOVED_ICON_PATH in markup:
+            violations.append(
+                f"{route}: still references {REMOVED_ICON_PATH}; the icon must not be "
+                f"fetched as a file as well as inlined"
+            )
+    return violations
+
+
+def _referenced_paths(dist: pathlib.Path) -> set[str]:
+    """Every site-root path a page (or robots.txt) names as a resource."""
+    referenced: set[str] = set()
+    for path in page_paths(dist).values():
+        markup = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"\b(?:href|src)=\"([^\"]+)\"", markup, re.I):
+            reference = match.group(1)
+            if reference.startswith("/") and not reference.startswith("//"):
+                referenced.add(reference.split("#", 1)[0].split("?", 1)[0])
+        for match in re.finditer(r"url\((['\"]?)([^)'\"]+)\1\)", markup):
+            reference = match.group(2)
+            if reference.startswith("/") and not reference.startswith("//"):
+                referenced.add(reference.split("#", 1)[0].split("?", 1)[0])
+    robots = dist / "robots.txt"
+    if robots.is_file():
+        for match in re.finditer(r"^\s*Sitemap:\s*(\S+)", robots.read_text(encoding="utf-8"), re.M):
+            reference = match.group(1)
+            if reference.startswith(CANONICAL_ORIGIN):
+                referenced.add("/" + reference[len(CANONICAL_ORIGIN) :].lstrip("/"))
+    return referenced
+
+
+def unreferenced_file_violations(dist: pathlib.Path) -> list[str]:
+    """Nothing ships that no page names.
+
+    This is the rule that keeps "one request per route" true over time: an
+    asset copied into `dist/` but referenced by no page is either dead weight in
+    the deploy or — if a page *should* have referenced it — a broken page. The
+    three route documents, `404.html`, `robots.txt` and `sitemap.xml` are
+    artifacts in their own right (the routes *are* what they deliver, the 404 is
+    served by the host, the crawl files are the crawl contract), so they are not
+    "referenced" by anything and are exempt.
+    """
+    referenced = _referenced_paths(dist)
+    route_files = set(page_paths(dist).values())
+    violations: list[str] = []
+    for file in _files(dist):
+        if file in route_files:
+            continue
+        relative = file.relative_to(dist).as_posix()
+        if relative in ("robots.txt", "sitemap.xml"):
+            continue
+        if f"/{relative}" in referenced:
+            continue
+        violations.append(
+            f"{relative} ships but no page references it — remove it, or reference it "
+            f"from the page that needs it"
+        )
+    return violations
+
+
+def _parse_xml_locations(content: str) -> list[str]:
+    """`<loc>` values via the XML parser, not a regex.
+
+    The crawlability rule compares sets of URLs with a regex, which is enough to
+    answer "is this route listed" but says nothing about whether the document is
+    *well-formed* — an unclosed `<url>` or a stray ampersand is a malformed
+    sitemap that Search Console rejects, and a regex reads straight past it.
+    """
+    root = ElementTree.fromstring(content)
+    namespace = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+    return [(element.text or "").strip() for element in root.iter(f"{namespace}loc")]
+
+
+def sitemap_violations(dist: pathlib.Path) -> list[str]:
+    """`sitemap.xml` must be a well-formed sitemap, not XML-shaped text."""
+    sitemap = dist / "sitemap.xml"
+    if not sitemap.is_file():
+        return ["sitemap.xml is missing from the built site"]
+    content = sitemap.read_text(encoding="utf-8")
+    try:
+        locations = _parse_xml_locations(content)
+    except ElementTree.ParseError as error:
+        return [f"sitemap.xml is not well-formed XML: {error}"]
+    violations: list[str] = []
+    if not locations:
+        violations.append("sitemap.xml has no <loc> entries")
+    for location in locations:
+        if not location.startswith(f"{CANONICAL_ORIGIN}/"):
+            violations.append(
+                f"sitemap.xml lists {location}, which is not under {CANONICAL_ORIGIN}/"
+            )
+    if len(locations) != len(set(locations)):
+        duplicates = sorted({url for url in locations if locations.count(url) > 1})
+        violations.append(f"sitemap.xml lists the same URL twice: {', '.join(duplicates)}")
+    return violations
+
+
+def asset_reference_violations(dist: pathlib.Path) -> list[str]:
+    """Any attribute that names a file must name a file that exists.
+
+    `link_violations` reads `href`/`src` on the four element types that carry
+    them. This is the general case: *every* attribute whose value is a
+    site-root path is resolved, so a `poster`, a `srcset` candidate or an
+    attribute nobody has invented yet cannot point at a file the build does not
+    ship. A `data:` URI is inlined bytes, not a file — `favicon_violations`
+    reads those back out.
+    """
+    violations: list[str] = []
+    attribute = re.compile(r"\b([a-z-]+)=\"(/[^\"]*)\"", re.I)
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for match in attribute.finditer(markup):
+            reference = match.group(2)
+            if not _resolve_internal(dist, reference):
+                violations.append(
+                    f"{route}: {match.group(1)}=\"{reference}\" names a file the build "
+                    f"does not ship"
+                )
+    return violations
+
+
+def dist_source_drift_violations(dist: pathlib.Path) -> list[str]:
+    """The committed CSS must be exactly what the sources compose — locally.
+
+    The workflow's drift check rebuilds the site and diffs; that needs Node, so
+    it cannot run in the Python-only suite. This is the cheap half of the same
+    check, and it is the half a hand-edit trips: each page's inlined CSS must
+    equal the modules *that page's own front matter declares*, whitespace and
+    comments folded. A page that ships a module it did not declare, or a `dist`
+    edited by hand, fails here without a browser or a build step.
+    """
+    front_matter = re.compile(r"^cssModules:\s*\[([^\]]*)\]", re.M)
+    modules = re.compile(r'"([a-z0-9-]+)"')
+    routes = {
+        "index.njk": "/",
+        "features.njk": "/features/",
+        "ui.njk": "/ui/",
+        "404.njk": "/404.html",
+    }
+    violations: list[str] = []
+    for source_name, route in routes.items():
+        source = SOURCE_DIR / source_name
+        if not source.is_file():
+            violations.append(f"{source_name} is missing from the sources")
+            continue
+        declared = modules.findall(front_matter.search(source.read_text(encoding="utf-8")).group(1)) if front_matter.search(source.read_text(encoding="utf-8")) else []
+        if not declared:
+            violations.append(f"{source_name}: no cssModules declared")
+            continue
+        expected = "\n".join(
+            (SOURCE_DIR.parent / "css" / f"{name}.css").read_text(encoding="utf-8").strip()
+            for name in declared
+        )
+        built = page_stylesheet(dist, route)
+        if _fold_css(expected) != _fold_css(built):
+            violations.append(
+                f"{route}: the committed CSS is not the composition of "
+                f"{', '.join(declared)} — the build is stale, or dist was edited by hand"
+            )
+    return violations
+
+
+def _fold_css(css: str) -> str:
+    """Fold every difference minification is allowed to introduce.
+
+    Same normalisation `website/tools/verify-minify.mjs` applies — comments and
+    whitespace removed, `;}` collapsed — so the two checks agree about what
+    "unchanged" means. Comments go first: a comment removed by compaction would
+    change a selector's bytes otherwise.
+    """
+    without_comments = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return _compact(without_comments).replace(";}", "}")
 
 
 def crawlability_violations(dist: pathlib.Path) -> list[str]:
@@ -639,6 +1021,104 @@ def crawlability_violations(dist: pathlib.Path) -> list[str]:
                 violations.append(f"robots.txt scopes {path}, but the site has exactly three routes")
     if not (dist / "404.html").is_file():
         violations.append("404.html is missing from the built site")
+    return violations
+
+
+def print_style_violations(dist: pathlib.Path) -> list[str]:
+    """Every route carries a print block that makes paper legible.
+
+    The site has no background colours on paper (browsers drop them) and a dark
+    default palette, so a page without print rules prints white-on-white. The
+    *effect* is measured in the browser job — caveats still rendered, print-media
+    contrast still above the floors — and this rule keeps the block those
+    measurements depend on from being deleted or from shipping on two routes out
+    of three.
+    """
+    violations: list[str] = []
+    marker = "@mediaprint"
+    for route, path in page_paths(dist).items():
+        compact = _compact(page_stylesheet(dist, route))
+        if marker not in compact:
+            violations.append(
+                f"{route}: no `@media print` block ships in this page's own CSS, so "
+                f"the printed sheet is white text on white paper"
+            )
+            continue
+        block = compact.split(marker, 1)[1][:3000]
+        for token in ("--text:", "--bg:"):
+            if token not in block:
+                violations.append(
+                    f"{route}: the @media print block does not redefine {token.rstrip(':')} "
+                    f"for paper"
+                )
+        if ".device" not in block:
+            violations.append(
+                f"{route}: the @media print block does not hide the decorative mockup "
+                f"drawing, so printing spends a page of ink on a recreation"
+            )
+        # The paper palette is checked for the one thing that makes the block
+        # worth having: the printed text must be readable against the printed
+        # background. Without this, `--text:#ffffff` on a white `--bg` shipped
+        # green here and could only be caught by a browser run — a mutation that
+        # proved the rule was too shallow (2026-10-08), now computed locally with
+        # the same WCAG maths the token rule uses.
+        tokens = dict(re.findall(r"(--[a-z0-9-]+):([^;}]+)", block))
+        if "--text" in tokens and "--bg" in tokens:
+            foreground = _colour(tokens["--text"], tokens["--bg"])
+            background = _colour(tokens["--bg"])
+            if foreground is None or background is None:
+                violations.append(
+                    f"{route}: cannot resolve the print palette ({tokens['--text']} on "
+                    f"{tokens['--bg']})"
+                )
+            else:
+                lighter, darker = sorted(
+                    (_relative_luminance(foreground), _relative_luminance(background)),
+                    reverse=True,
+                )
+                ratio = (lighter + 0.05) / (darker + 0.05)
+                if ratio < 4.5:
+                    violations.append(
+                        f"{route}: print --text on --bg is {ratio:.2f}:1, below the 4.5:1 "
+                        f"floor — the sheet would be unreadable"
+                    )
+    return violations
+
+
+def forced_colors_violations(dist: pathlib.Path) -> list[str]:
+    """The site must say what it looks like when the OS picks the colours.
+
+    `forced-colors: active` is Windows High Contrast. Chromium removes author
+    backgrounds there, and an `<a>` styled as a button gets no control border
+    (a real `<button>` does), so without an explicit rule the site's primary
+    action renders as plain text. The *effect* is measured in a real browser —
+    the `forced colors` check in `website/tests/browser.mjs`, whose decision
+    logic is mutation-proven without a browser in `website/tests/rules.mjs` —
+    and this rule keeps the mechanism it measures from being deleted.
+    """
+    marker = "@media(forced-colors:active)"
+    violations: list[str] = []
+    # Per route, not over the union of every page's CSS. The first version of
+    # this rule read `site_stylesheet()`, which concatenates all three routes, so
+    # deleting the block from one page still passed — a mutation that has to be
+    # run to be believed, and it failed to fire (see the session's verification
+    # record). A route ships its own <style>, so it is checked on its own.
+    for route, path in page_paths(dist).items():
+        compact = _compact(page_stylesheet(dist, route))
+        if marker not in compact:
+            violations.append(
+                f"{route}: no `@media (forced-colors: active)` block ships in this "
+                f"page's own CSS: Windows High Contrast would draw its buttons as "
+                f"plain text"
+            )
+            continue
+        block = compact.split(marker, 1)[1].split("}}", 1)[0][:400]
+        markup = path.read_text(encoding="utf-8")
+        if 'class="btn' in markup and ".btn" not in block:
+            violations.append(
+                f"{route}: @media (forced-colors: active) does not mention .btn, so "
+                f"the control border the forced-colors check measures is not restored"
+            )
     return violations
 
 
@@ -909,10 +1389,18 @@ CHECKS = (
     ("no client-side JavaScript", javascript_violations),
     ("internal links resolve", link_violations),
     ("mockups are labelled", mockup_violations),
+    ("icon is inlined and true to its source", favicon_violations),
+    ("nothing ships unreferenced", unreferenced_file_violations),
     ("accessibility floor", accessibility_violations),
     ("page metadata", metadata_violations),
+    ("structured data", structured_data_violations),
     ("crawlability", crawlability_violations),
+    ("sitemap well-formedness", sitemap_violations),
+    ("referenced files exist", asset_reference_violations),
+    ("dist matches its sources", dist_source_drift_violations),
     ("responsive rules", responsive_violations),
+    ("print stylesheet", print_style_violations),
+    ("forced-colours fallback", forced_colors_violations),
     ("token contrast", contrast_violations),
     ("licence notice", footer_licence_violations),
     ("class coverage", css_coverage_violations),

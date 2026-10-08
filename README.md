@@ -26,9 +26,20 @@ Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 
 ## Website
 
-<https://99ggprooo00-code.github.io/DHUN/> is a static marketing site for the
-applications above: three routes (`/`, `/features/`, `/ui/`), no client-side
-JavaScript, no analytics and no third-party runtime asset.
+`website/dist/` is a static marketing site for the applications above: three
+routes (`/`, `/features/`, `/ui/`), no client-side JavaScript, no analytics and
+no third-party runtime asset.
+
+**Where it is served — read this before trusting the URL.** Its canonical URL is
+<https://99ggprooo00-code.github.io/DHUN/>, but as of 2026-10-08 that URL does
+**not** serve this site: Pages is configured `build_type: legacy` / source
+`main:/`, so Jekyll renders *this README* there instead. The site itself is
+built, checked and committed — publishing is one repository setting away, and
+the automation cannot change it (`PUT .../pages` → HTTP 403). Every `website`
+workflow run reports the current `build_type` in its summary and as a warning.
+**Fix: Settings → Pages → Build and deployment → Source → GitHub Actions** — the
+full runbook, with what to check afterwards, is
+`docs/runbooks/publishing-the-site.md`.
 
 **It is not a distribution channel.** The site describes the software and shows
 its interface; it does not hand out builds, digests, sizes or installation
@@ -43,19 +54,30 @@ fails the build if a page ever links an artifact directly.
 - Its claims are enforced by tests, not by review: forbidden claims (iOS, a web
   player, sync, import, FLAC or any bitrate, store channels, unshipped
   platforms), required front-page caveats (rolling unverified build, borrowed
-  time, open hardware gates) and a ban on baked digests or byte sizes — the
-  rolling `test` assets change on every push. See
+  time, open hardware gates), a ban on baked digests or byte sizes (the rolling
+  `test` assets change on every push), and — since 2026-10-08 — a check that the
+  site's "no telemetry, no crash reporting, no advertising SDK" claim is true of
+  the dependency graph the Gradle builds actually resolve. See
   `scripts/website_claims.py`, `scripts/website_quality.py` and
-  `docs/verification/20-marketing-site.md`.
+  `docs/verification/22-one-request-hard-viewports-print-and-structured-data.md`.
 - The repository contains **no screenshots**; every visual on the site is a
   labelled CSS recreation of the real UI (six of them, on `/` and `/features/`
   and `/ui/`), and `.ai/WEBSITE_PLAN.md` §9 lists the captures that should
   replace them. The `/ui/` page also states the app's design tokens, read from
   `shared/src/commonMain/kotlin/dev/dhun/design/`.
-- Browser-measured, not argued: Playwright checks six viewports (320–1440 px)
-  for overflow, touch targets, focus, contrast and reduced motion in the
-  `browser` job, and Lighthouse gates the median of three samples per route in
-  the `lighthouse` job.
+- Browser-measured, not argued: Playwright checks nine viewports — 280 px, the
+  four phone widths, an 844×390 landscape phone, tablet and desktop, plus a
+  640×512 layout viewport (a 1280×1024 window at 200 % zoom) — for overflow,
+  touch targets, every tab stop's focus ring, rendered headings, link text,
+  contrast in dark and light, `forced-colors: active`, `prefers-contrast: more`,
+  print and reduced motion, in the `browser` job. The decisions behind those
+  checks are pure functions in `website/tests/rules.mjs`, mutation-proven by
+  `node --test` in the build job, where no browser is needed. Lighthouse gates
+  the median of three samples per route in the `lighthouse` job.
+- **One request per route.** The stylesheet and the tab icon are inlined (the
+  icon as a `data:` URI built from `website/src/assets/dhun-favicon.svg`), so a
+  visit fetches exactly one document; a rule asserts the inlined icon is still
+  the source file, and another fails on any built file no page references.
 
 ## License
 

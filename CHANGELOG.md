@@ -24,6 +24,68 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — the canonical URL is not the site yet, and now every run says so (2026-10-08, session `arena/37ec95ed-dhun`)
+
+- **A silence, fixed.** GitHub Pages is configured `build_type: legacy` with the
+  branch source `main:/`, so <https://99ggprooo00-code.github.io/DHUN/> serves
+  Jekyll's rendering of the repository `README.md`, not `website/dist/`. The
+  deploy job has always detected this and skipped its publish steps — correct,
+  but it only runs on a push to `main`, and the README presented the URL as the
+  marketing site. Now the `build` job reports `build_type`, the URL it actually
+  serves and the one fix on **every** trigger, in the run summary and as a
+  warning; `docs/runbooks/publishing-the-site.md` records the setting, the
+  verification steps and the two things deliberately not done (no copy of the
+  site at the repository root, no `_config.yml`). Switching the source needs
+  Pages write access, which this automation does not have.
+- **Tested, not asserted:** `scripts/test_website_workflow.py` fails if the
+  build job stops reporting the Pages source, if the warning is ever upgraded to
+  an error (a setting an agent cannot change must not redden a green build), if
+  the deploy job stops owning the publish gate, if the runbook disappears, or if
+  the README again offers that URL as the site without saying what gates it.
+
+
+### Changed — one request per route, the hard viewports measured, and print (2026-10-08, session `arena/37ec95ed-dhun`)
+
+- **Every route is now a single HTTP request.** The tab icon is inlined as a
+  `data:` URI built from `website/src/assets/dhun-favicon.svg` and the
+  passthrough copy that shipped it as a file is gone; the merged head's own
+  Lighthouse annotations reported `requests=2` on all three routes (run
+  37808955045). A rule decodes the URI out of every built page and compares it
+  with the source SVG, and a new rule fails on any built file no page references.
+- **The Lighthouse reporter names what is left.** `report_lighthouse.py` now
+  annotates every subresource by URL with its transfer size (and says "none"
+  explicitly) and resolves the dependency-tree insight's items to URLs, because
+  `network-dependency-tree-insight: 3 item(s)` is a count nobody can act on.
+- **The browser matrix includes the viewports nobody had measured:** 280 px,
+  844×390 landscape, and a 640×512 layout viewport (a 1280×1024 window at 200 %
+  zoom, WCAG 1.4.4). New checks: rendered heading order, link text naming two
+  destinations, a Tab walk that asserts *every* tab stop takes focus and shows a
+  visible change, `forced-colors: active` and `prefers-contrast: more` (each
+  asserting the emulation is visible to the page first), and print.
+- **Windows High Contrast and print have CSS for the first time.** Chromium draws
+  no control border for an `<a>` styled as a button under `forced-colors: active`,
+  and `.btn`'s `1px solid transparent` stays transparent — so `.btn` gets
+  `border-color: CanvasText` there. The `@media print` block is a defect fix:
+  browsers drop background colours, so the dark theme printed white text on
+  white paper.
+- **Structured data, honest by construction.** One `SoftwareApplication` JSON-LD
+  block per route with no rating, no offer, no version and no download URL —
+  each of those is asserted absent, because structured data is the part of a page
+  a machine repeats without the caveats around it.
+- **New rules, mutation-proven:** sitemap well-formedness (parsed as XML, not
+  matched with a regex), every attribute naming a site path must name a built
+  file, each page's inlined CSS must equal the modules its own front matter
+  declares (the Node-free half of the drift check), print and forced-colours
+  blocks must ship per route, and `javascript_violations` — adapted to admit a
+  JSON-LD `<script>` by type after parsing it as JSON — gained an inline `on*`
+  handler check it never had.
+- **A workflow defect fixed:** `scripts/report_lighthouse.py` and its test were
+  used by `website.yml` but missing from its `paths:` filters, so the only reader
+  of the Lighthouse reports could change without the workflow that runs it
+  starting. `test_website_workflow.py` now derives that rule instead of listing
+  paths by hand.
+
+
 ### Changed — the marketing site is now a product site, not a download page (2026-10-08, session `arena/9b791057-dhun`)
 
 - **`/download/` is gone and `/ui/` takes its place.** By direction, the website
