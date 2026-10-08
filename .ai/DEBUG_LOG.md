@@ -1,5 +1,59 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — the API-24 lint gate covered one of the two Android modules (session `arena/8be68e2c-dhun`, base `main@6f1e6ba`, PR #135)
+
+**The gap.** PR #134 added `Android Lint — API 24 floor (NewApi)` running
+`:app-android:lintDebug`, and mutation-proved it. Its `KNOWN_LIMITATIONS` entry
+then hedged the obvious follow-up question: *"`shared/src/androidMain` is
+analysed only through `:app-android` lint over its library classes. That is an
+expectation, not a checked fact."*
+
+**The expectation is false.** Android Lint analyses the module it runs in. AGP
+does not lint a module's library dependencies unless `lint.checkDependencies` is
+set, and this repo never sets it. So the 7 expect/actual Android files under
+`shared/src/androidMain` — `AndroidConnectivityMonitor`, `BlurSupport`,
+`DownloadHttpClient`, `DatabaseDriverFactory`, `StorageSpace`, `CurrentOffset`,
+`Clock` — were entirely outside the floor gate. Second, independent gap:
+`shared/build.gradle.kts` had `lint { abortOnError = false }`, so even if
+something had run `:shared` lint, it could not have failed the build.
+
+**Fix (`46583a4`).** `shared` now has `lint { checkOnly += setOf("NewApi");
+abortOnError = true; checkReleaseBuilds = false }`, and `ci.yml` runs
+`:shared:lintDebug` as its own named step after the app-module one (so a red
+floor violation names the module that broke). `scripts/test_ci_workflow.py` grew
+39 → 45 tests pinning both steps *and* both Gradle lint blocks, because a
+workflow step naming a task whose gate is switched off is green theater.
+
+**Why a green lint run is not evidence.** Lint that analyses nothing exits 0
+too. The proof is the probe: commit `5f74af3` added
+`shared/src/androidMain/kotlin/dev/dhun/LintMutationProbe.kt` with an unguarded
+`android.app.NotificationChannel(...)` (API 26 vs floor 24). CI pull_request
+**37765481344** failed **step 10 only** — steps 1–9 success, 11–14 skipped —
+with, verbatim:
+
+```
+Lint found 1 errors, 0 warnings. First failure:
+/home/runner/work/DHUN/DHUN/shared/src/androidMain/kotlin/dev/dhun/LintMutationProbe.kt:18:
+Error: Call requires API level 26 (current min is 24): android.app.NotificationChannel() [NewApi]
+Execution failed for task ':shared:lintDebug'.
+```
+
+One message, four facts: `:shared:lintDebug` exists on a KMP
+`com.android.library` module under AGP 8.7.2 / Kotlin 2.1.20; it analyses
+`shared/src/androidMain`; it reads this module's `minSdk` as 24; and
+`abortOnError = true` really aborts. Build APK **37765481328** and test-release
+**37765481508** stayed green, so the failure was the gate and nothing else.
+Reverted in `a66b342`; `git diff --stat 46583a4 a66b342` is empty.
+
+**Environment note that shaped the work.** There is no JDK, Gradle or Android SDK
+in the maintenance sandbox (`java` is absent from PATH; the SDK host is outside
+the network allowlist), so nothing Gradle-shaped can be checked locally. The one
+locally runnable gate is `python3 -m unittest discover -s scripts -p
+'test_*.py'` — CI step 1 — which is exactly why the contract tests were put
+there. Actions **log archives** are still unreachable
+(`results-receiver.actions.githubusercontent.com` → EOF), but check-run
+**annotations** are reachable over REST and carried the lint message above.
+
 ## 2026-10-08 — lower-Android commits `5151774` / `b5c349a` were not recoverable (session `arena/688214aa-dhun`)
 
 **What was claimed.** The previous session committed `minSdk` 26 → 24, legacy

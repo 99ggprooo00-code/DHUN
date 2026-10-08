@@ -60,10 +60,12 @@ block had `abortOnError = false`, so even a run there could not have failed.
 |---|---|---|
 | PR #134 `NewApi` gate for `:app-android` | ✅ **merged and published** | merge `6f1e6ba` (2026-10-08T09:53:02Z); post-merge CI **37759720823**, Build APK **37759720747**, test-release **37759720804** (`msi` 113252913512, `apk` 113252913644, `publish` 113255119265; `aab`/`release_draft` skipped) |
 | Rolling `test` at the merge | ✅ **GitHub verified** | published **2026-10-08T09:59:21Z**, `targetCommitish=6f1e6ba`, `isDraft=false`, prerelease. APK **18,405,859 B** `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97` (**unchanged** from `1ee85b0` — PR #134 changed no app code); arm64-v8a **18,355,786 B** `23903dd6…`; armeabi-v7a **18,352,944 B** `7e4f80ad…`. MSI **2.202.1** **112,971,776 B** `45e9ab72f365cfdfa87fe632ec17fd733ba67344c2df024b79eadd92566eb0d1`, upgrade `2.196.1 → 2.202.1` vs baseline `b914108483b171020b67bad2e886fa614ef8091e020ddf4c49161198a36e34eb`, sentinels preserved, uninstall + future-upgrade smokes PASS |
-| `shared/src/androidMain` covered by the floor gate | ⏳ **pushed, awaiting CI** | this session's change; CI verdict recorded below once the run finishes |
+| `shared/src/androidMain` covered by the floor gate | ✅ **CI-green** on code head `46583a4` | CI pull_request **37764256149** — 14/14 steps, step 10 `Android Lint — shared androidMain API 24 floor (NewApi)` **success**; push CI **37764251898** ✅; Build APK **37764255902** ✅; test-release **37764255892** ✅ |
 | Contract tests locally mutation-proven | ✅ done | Removing the `:shared` lint step + `checkOnly`/`abortOnError` from `shared/build.gradle.kts` turns **3** of the new tests red (`FAILED (failures=2, errors=1)`); restoring them returns **45/45 OK** via `python3 -m unittest discover -s scripts -p 'test_*.py'` (the same command CI step 1 runs) |
-| `:shared:lintDebug` exists and analyses `androidMain` | ⏳ **awaiting CI** | No JDK/Gradle/Android SDK in the sandbox (`java` is not installed; `dl.google.com` is not reachable), so the task's existence and its source coverage can only be proven by the CI run. If the task does not exist, `settings.gradle.kts`'s `buildFinished` hook emits the Gradle cause chain as a check annotation |
-| Mutation proof (shared gate goes red on a violation) | ⏳ **pending** | unguarded API>24 call in `shared/src/androidMain` → the new step must fail; revert → green |
+| `:shared:lintDebug` exists and analyses `androidMain` | ✅ **proven by the probe, not assumed** | The probe failure names the file path *inside* `shared/src/androidMain` and reports `current min is 24`, then aborts task `:shared:lintDebug`. A task that did not exist, or a lint run that analysed nothing, cannot produce that message |
+| Mutation proof (shared gate goes red on a violation) | ✅ **proven** | Probe commit `5f74af3` (new file `shared/src/androidMain/kotlin/dev/dhun/LintMutationProbe.kt`, unguarded `NotificationChannel` = API 26): CI pull_request **37765481344** failed on **step 10 only** (steps 1–9 success, 11–14 skipped); push **37765475775** failed. Annotation from job **113271981287**: `Lint found 1 errors, 0 warnings … LintMutationProbe.kt:18: Error: Call requires API level 26 (current min is 24): android.app.NotificationChannel() [NewApi]` … `Execution failed for task ':shared:lintDebug'`. Build APK **37765481328** and test-release **37765481508** stayed **green** — the probe compiles, and lint is not part of `assembleDebug` — so the failure was isolated to the gate. Revert `a66b342`; `git diff --stat 46583a4 a66b342` is **empty** |
+| Revert head `a66b342` | ✅ **CI-green, 14/14 steps** | CI pull_request **37766214968** — step 10 `Android Lint — shared androidMain API 24 floor (NewApi)` **success**; push CI **37766211053**. `git diff --stat 46583a4 a66b342` empty, so this is the exact pre-probe tree |
+| Verification doc | ✅ written from CI output | `docs/verification/17-api24-floor-gate.md` — both halves of the gate, the probe transcript, and what the gate does *not* prove |
 | `extraction-health` scheduled drill | 🟡 **ENVIRONMENT_BLOCKED (accepted steady state)** | run **37611927562** (2026-10-07T11:07:12Z, `main@f0225f4`) failed on step `Keep the check non-zero when live health is unverified` — runner datacenter gating, not an extraction regression |
 | API 24–25 device (icon, launch, play, background audio) | 🔴 **not verified** | S3 round 5 — user device, against the rolling `test` universal APK `9665b75f…` |
 | Mini-player docked on a device | 🔴 **not verified** | S3 round 4 — user device |
@@ -72,15 +74,18 @@ block had `abortOnError = false`, so even a run there could not have failed.
 
 1. ~~Find the hole, fix it, pin it.~~ **DONE** (code above; 45/45 local
    contract tests, mutation-proven locally).
-2. Push `arena/8be68e2c-dhun`, open the one working PR, watch CI / Build APK /
-   test-release. **Read the actual verdict** for
-   `Android Lint — shared androidMain API 24 floor (NewApi)`; if `:shared:lintDebug`
-   does not exist or does not see `androidMain`, the fallback is
-   `lint { checkDependencies = true }` on `:app-android` — record which
-   mechanism actually works rather than assuming.
-3. Mutation-prove the shared gate (unguarded API-26 call in
-   `shared/src/androidMain`), then revert. Both runs go in the ledger.
-4. Ask the user for merge approval.
+2. ~~Push, open the PR, watch CI.~~ **DONE** — PR **#135**
+   (`arena/8be68e2c-dhun`, base `main@6f1e6ba`), green on `46583a4`.
+   `:shared:lintDebug` exists and runs; no `checkDependencies` fallback was
+   needed. Evidence: `docs/verification/17-api24-floor-gate.md`.
+3. ~~Mutation-prove the shared gate, then revert.~~ **DONE** — `5f74af3` red on
+   step 10 only, naming the probe file inside `shared/src/androidMain`;
+   `a66b342` reverts it and the tree is byte-identical to `46583a4`.
+4. ~~Confirm the revert head is green.~~ **DONE** — CI pull_request
+   **37766214968** green, 14/14 steps. **Remaining: ask the user for merge
+   approval** for PR #135, then record the post-merge runs and the republished
+   rolling `test` digests. (The APK digest should **not** move — this PR changes
+   no app code, only CI, Gradle config and a Python contract test.)
 5. Hardware (user): `docs/runbooks/s3-hardware-checklist.md` against the rolling
    `test` APK `9665b75f…` (universal) and MSI `45e9ab72…` (**2.202.1**). Round 4
    is landscape + Windows fullscreen. Round 5 is an API 24–25 device.

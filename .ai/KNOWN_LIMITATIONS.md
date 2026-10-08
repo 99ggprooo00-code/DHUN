@@ -2,6 +2,45 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — session `arena/8be68e2c-dhun`: both Android modules are now lint-gated at API 24; a static gate is still not a device
+
+- **What changed.** `:shared` now runs Android Lint's `NewApi` rule as an error
+  (`checkOnly`, `abortOnError`, `checkReleaseBuilds = false`), as its own CI step
+  `Android Lint — shared androidMain API 24 floor (NewApi)`. Before this,
+  `shared/src/androidMain` was outside the API-24 floor gate entirely: Android
+  Lint analyses the module it runs in, AGP does not lint a module's library
+  dependencies without `checkDependencies` (not set here), and `:shared`'s own
+  lint block had `abortOnError = false`.
+- **This corrects the previous entry's hedge.** The `arena/dd43b627-dhun` block
+  below says shared coverage "is an expectation, not a checked fact". It is now
+  a checked fact, and the expectation as written was wrong — `:app-android` lint
+  was *not* covering `shared`. Proven, not assumed: probe `5f74af3` reddened
+  exactly that step with
+  `LintMutationProbe.kt:18: Error: Call requires API level 26 (current min is 24) …
+  Execution failed for task ':shared:lintDebug'`, reverted in `a66b342`. See
+  `docs/verification/17-api24-floor-gate.md`.
+- **What it still does not prove.** `NewApi` is static. It cannot see a
+  reflection call, a manifest attribute, or a resource that inflates differently
+  on API 24–25. It says nothing about an actual Android 7.0/7.1 device. **S3
+  round 5 stays open and user-gated.**
+- **`commonMain` is not lint-covered — by design.** Lint sees `androidMain`;
+  `commonMain` cannot reference Android APIs at all because the KMP compiler
+  rejects it. Do not "fix" that by adding Android source dirs to lint.
+- **`checkDependencies` was deliberately not enabled.** The per-module lint task
+  is the mechanism that was proven. Turning on `checkDependencies` would also
+  pull third-party analysis into the app-module run, slowing it and widening the
+  red surface for code this repo does not own.
+- **The contract is only as good as CI step 1.** `scripts/test_ci_workflow.py`
+  (39 → 45 tests) pins both lint steps and both Gradle lint blocks, plus that
+  both modules keep `minSdk = 24` — the merged manifest enforces the *higher* of
+  the two, so a one-sided bump would silently raise the real floor while the
+  gate keeps checking 24. It is mutation-proven locally (3 tests go red when the
+  shared step and its `checkOnly`/`abortOnError` pair are removed).
+- **Lint is not in `assembleDebug`.** `Build APK` and `test-release` do not run
+  it; only `ci.yml` does. A red floor violation therefore blocks the CI job, not
+  artifact production — the same separation that already applied to
+  `:app-android`.
+
 ## 2026-10-08 — session `arena/dd43b627-dhun`: the API-24 floor is now lint-gated in CI; it is still not device-proven
 
 - **What changed.** `minSdk 24` used to be checked only by compilation, and
@@ -13,10 +52,13 @@ Updated every phase. Nothing hidden.
   runtime behaviour (a reflection call, a missing manifest attribute, a
   resource that inflates differently), and it does not check behaviour on a
   real API 24–25 device. Those remain S3 round 5, user-only.
-- **Lint coverage of `shared`.** `shared/src/androidMain` is analysed only
+- **Lint coverage of `shared`.** ~~`shared/src/androidMain` is analysed only
   through `:app-android` lint over its library classes. That is an expectation,
-  not a checked fact, until CI's lint output shows it. The mutation proof in
-  the ROADMAP ledger checks the app-module path.
+  not a checked fact, until CI's lint output shows it.~~ **SUPERSEDED
+  2026-10-08 by the `arena/8be68e2c-dhun` entry above — and the expectation was
+  wrong.** `:app-android` lint was *not* covering `shared`: AGP does not lint a
+  module's library dependencies without `checkDependencies`. `:shared` now has
+  its own `NewApi` gate and CI step, mutation-proven on probe `5f74af3`.
 - **Static audit result.** A grep of app and shared for API>24 calls found no
   unguarded call. Checked: `NotificationChannel`, `ShortcutManager`,
   `BrowseParsers.removeFirst` (on Kotlin `ArrayDeque`, safe), `java.time`,
