@@ -111,6 +111,10 @@
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
 }
 .mini-actions { display: inline-flex; align-items: center; gap: 0.55em; font-size: 0.95em; flex: none; }
+/* Browser-measured: a row's text is nowrap, so without this the flex item could
+   not shrink below its min-content and `ul.rows` overflowed its 98 px box. */
+.row-text { min-width: 0; }
+.row-title, .row-sub { overflow: hidden; text-overflow: ellipsis; }
 .progress {
   position: absolute; left: 0.7em; right: 0.7em; bottom: 0.32em;
   height: 0.22em; border-radius: var(--r-full); background: var(--surface-highest);
@@ -217,10 +221,10 @@
   border-radius: var(--r-xs); color: var(--text-3);
   background: var(--surface-highest);
 }
-/* Browser-measured: --error (#d5798a) is 3.99:1 on --surface-highest, under the
-   4.5:1 text floor for the window's close glyph. This is the same ramp, lightened
-   until it passes: 5.83:1. */
-.winbtn--close { color: #ec9fae; }
+/* Browser-measured, both schemes: the window's close glyph uses
+   --error-readable, which is the lightened dark ramp (5.83:1) in dark and the
+   app's --error in light (5.21:1). A literal here would fail one of the two. */
+.winbtn--close { color: var(--error-readable); }
 .window-body { display: grid; grid-template-columns: 4.6em 1fr 8.5em; min-height: 15em; }
 .navbar {
   display: flex; flex-direction: column; gap: 0.35em; padding: 0.6em 0.4em;

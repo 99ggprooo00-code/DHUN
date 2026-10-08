@@ -76,6 +76,10 @@
 .error-page { text-align: center; padding: var(--sp-12) 0; }
 .error-code { font-size: clamp(3rem, 12vw, 6rem); font-weight: 700; letter-spacing: -0.03em; margin: 0; color: var(--accent); }
 .traceable { font-size: 0.82rem; color: var(--text-3); }
+/* Browser-measured: catalogue sources are long unbroken paths, and `anywhere`
+   (unlike `break-word`) also reduces min-content width — which is what the
+   card, the wrap and the page were overflowing by at 320 and 360 px. */
+.traceable { overflow-wrap: anywhere; }
 .feature-why {
   margin-top: var(--sp-3); padding-left: var(--sp-4);
   border-left: 3px solid var(--accent); color: var(--text-2); font-size: 0.95rem;

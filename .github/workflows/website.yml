@@ -224,7 +224,7 @@ jobs:
         run: |
           mkdir -p reports
           failed=0
-          for route in "/" "/features/" "/download/"; do
+          for route in "/" "/features/" "/ui/"; do
             name=$(echo "$route" | tr -c 'a-zA-Z0-9' '_')
             reports=""
             for sample in 1 2 3; do

@@ -45,6 +45,10 @@
   --warning: #ffb74d;
   --success: #4caf50;
   --error: #d5798a;
+  /* Text-safe error. The app's --error is 3.99:1 on --surface-highest in dark
+     (measured by the browser job), so dark uses the same ramp lightened to
+     5.83:1; light passes with the pure token (5.21:1 on #e9e5e0). */
+  --error-readable: #ec9fae;
 
   /* Shapes — DhunShapes */
   --r-xs: 4px;
@@ -99,6 +103,7 @@
     --warning: #8a5300;
     --success: #1b7a3d;
     --error: #b00020;
+    --error-readable: var(--error);
     --shadow: 0 18px 48px rgba(26, 23, 20, 0.14);
   }
 }
