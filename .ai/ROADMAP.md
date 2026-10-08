@@ -1,6 +1,85 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/688214aa-dhun` — lower-Android release: minSdk 24 + three APKs (2026-10-08)
+## Session `arena/dd43b627-dhun` — API-24 floor gate: Android Lint `NewApi` in CI (2026-10-08)
+
+Updated **2026-10-08** · session branch `arena/dd43b627-dhun` · base
+`main@1ee85b0` (PR #131 merged 2026-10-08T08:43:18Z; the lower-Android release is
+**shipped**, see the ledger in the previous-session block below).
+
+### Phase and scope
+
+**Stage S3 — agent lane, no device.** The user decided: **keep three APKs**
+(universal + `arm64-v8a` + `armeabi-v7a`). The one-universal-APK question is
+closed as "leave it". Measured sizes (rolling `test`, 1ee85b0): universal
+18,405,859 B; arm64 18,355,786 B; armeabi-v7a 18,352,944 B. The per-ABI pair
+averages 18,354,365 B, about 0.28% below universal.
+
+The gap this session closes: `minSdk = 24` is only proven by *compilation*.
+`assembleDebug` will link an API-26+ framework call without complaint, and that
+call then crashes on API 24–25 at runtime. Nothing in CI checked for it.
+
+### Plan (executed in this order)
+
+1. **Static audit** (no JDK or Gradle in the sandbox; CI is the only compiler).
+   Searched `app-android/src` and `shared/src/{commonMain,androidMain}` for
+   framework and Java APIs above 24. Findings:
+   - `NotificationChannel` (API 26) is used in `DhunDownloadService` and
+     `DhunPlaybackService`, both behind an `SDK_INT < O` early return. Safe.
+   - `ShortcutManager` is reached only through `ShortcutManagerCompat`. Safe.
+   - `BrowseParsers.kt` `removeFirst()` is on Kotlin `ArrayDeque`, not on
+     `java.util.List`. Safe. The known API-35 `List.removeFirst` trap is absent.
+   - No `java.time`, `java.nio.file`, or `Base64` in app/shared Android code.
+   - Blur is API 31+ behind `SDK_INT >= S`, with the dark fallback.
+   A grep cannot prove absence, so the audit leads to step 2 and does not replace it.
+2. **Gate.** `app-android/build.gradle.kts`: `lint { checkOnly += "NewApi";
+   abortOnError = true; checkReleaseBuilds = false }`. `ci.yml`: new step
+   `Android Lint — API 24 floor (NewApi)` runs `:app-android:lintDebug`.
+   `checkOnly` keeps the gate to that one rule, so unrelated warnings can't
+   turn it red.
+3. **Verify in CI** on the PR head, then **mutation-prove** the gate (rule 5):
+   a deliberately unguarded API-28 call must turn the step red, and the
+   revert must turn it green again. Both runs are recorded in the ledger.
+4. **Docs ride in the PR.** Ledger below is filled from GitHub evidence, not from
+   local claims.
+
+### Status ledger
+
+| Item | State | Evidence |
+|---|---|---|
+| minSdk 24 + three APKs | ✅ **merged and published** | PR #131 → `1ee85b0`; rolling `test` at `1ee85b0` (see previous-session block) |
+| Static API>24 audit | ✅ done (no unguarded call found by grep) | this block, step 1 |
+| `NewApi` lint gate on the PR head | ⏳ pending CI | — |
+| Mutation proof (gate goes red on a violation) | ⏳ pending CI | — |
+| PR #133 (docs for the published release) | 🟡 open, mergeable, CI green, **not merged** (no merge approval) | `gh pr view 133` |
+| API 24–25 device (icon, launch, play, background audio) | 🔴 **not verified** | S3 round 5 — user device |
+| Mini-player docked on a device | 🔴 **not verified** | S3 round 4 — user device |
+
+### Exact next technical step
+
+1. ~~Audit, gate, docs.~~ **In this PR.**
+2. Push, open the PR from `arena/dd43b627-dhun`, watch CI.
+3. Mutation proof on a throwaway commit, then revert.
+4. **Ask the user for merge approval** (PR #133 and this PR are separate decisions).
+5. Hardware (user): `docs/runbooks/s3-hardware-checklist.md` against the rolling
+   `test` APK `9665b75f…` (universal) and MSI `af326695…`. Round 4 is landscape + Windows
+   fullscreen. Round 5 is an API 24–25 device: launcher icon renders, app launches,
+   searches, plays, and keeps background audio. Report the device model, OS, and
+   the APK SHA-256 installed.
+
+### Blockers
+
+- No JDK / Gradle / Android SDK / display in the sandbox. CI is the Kotlin verifier.
+  Lint on `shared/src/androidMain` relies on lint analysing project library modules.
+  CI logs are the proof for that.
+- **S3 stays OPEN** until rounds 4 and 5 are reported. S6 stays blocked on S3.
+- Only the user can run the device rounds. The agent cannot do them.
+
+---
+
+## Previous session — `arena/688214aa-dhun`: lower-Android release, minSdk 24 + three APKs (2026-10-08) — **MERGED (PR #131) and published**
+
+> **Historical record; superseded by the block above.** Its "ask for merge
+> authorization" step is **DONE** (PR #131 → `1ee85b0`).
 
 Updated **2026-10-08** · session branch `arena/688214aa-dhun` · base
 `main@4607e07076e038f4290045f3f23f5f7fd082a058` (merge of PR #130).

@@ -2,6 +2,29 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — session `arena/dd43b627-dhun`: the API-24 floor is now lint-gated in CI; it is still not device-proven
+
+- **What changed.** `minSdk 24` used to be checked only by compilation, and
+  `assembleDebug` links API-26+ calls without complaint. CI now runs
+  `:app-android:lintDebug` with Android Lint's `NewApi` rule as an error
+  (`checkOnly`, `abortOnError`). A call above API 24 without an `SDK_INT` guard
+  now fails the build.
+- **What it does not prove.** The gate covers `NewApi` only. It does not check
+  runtime behaviour (a reflection call, a missing manifest attribute, a
+  resource that inflates differently), and it does not check behaviour on a
+  real API 24–25 device. Those remain S3 round 5, user-only.
+- **Lint coverage of `shared`.** `shared/src/androidMain` is analysed only
+  through `:app-android` lint over its library classes. That is an expectation,
+  not a checked fact, until CI's lint output shows it. The mutation proof in
+  the ROADMAP ledger checks the app-module path.
+- **Static audit result.** A grep of app and shared for API>24 calls found no
+  unguarded call. Checked: `NotificationChannel`, `ShortcutManager`,
+  `BrowseParsers.removeFirst` (on Kotlin `ArrayDeque`, safe), `java.time`,
+  `java.nio.file`, `Base64`, and blur (API 31+ with fallback). Grep is not proof
+  of absence; the lint gate is the proof.
+- **Three APKs stay.** The user decided to keep universal + `arm64-v8a` +
+  `armeabi-v7a`, with no single-APK change until device evidence exists.
+
 ## 2026-10-08 — session `arena/688214aa-dhun`: minSdk 24 is compiled, not device-proven; the three APKs may be identical
 
 - **minSdk 24 is a manifest + resource change, not a hardware pass.** API 24–25

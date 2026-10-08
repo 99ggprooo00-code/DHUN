@@ -98,6 +98,18 @@ kotlin {
     jvmToolchain(17)
 }
 
+// API-floor gate for minSdk 24 (CURRENT ACTIVE TASK, session arena/dd43b627).
+// Android Lint's NewApi check is the only static tool that knows which framework
+// call needs API > 24 (for example NotificationChannel, API 26, or
+// View.setOutlineSpotShadowColor, API 28). checkOnly keeps the gate to that one
+// rule, so unrelated lint warnings cannot turn the build red. It runs in CI as
+// `./gradlew :app-android:lintDebug`; it is not part of assembleDebug.
+lint {
+    checkOnly += setOf("NewApi")
+    abortOnError = true
+    checkReleaseBuilds = false
+}
+
 dependencies {
     implementation(project(":shared"))
     // shared's InnerTubeClient exposes Ktor types in its public signature
