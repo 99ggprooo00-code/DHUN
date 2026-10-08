@@ -1,5 +1,117 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/b4449fdd-dhun` — S3 round 4: dock the rail-layout mini-player so it stops covering Home/Search/Library (2026-10-08)
+
+Updated **2026-10-08** · session branch `arena/b4449fdd-dhun` · base
+`main@9f88b6e` (merge of PR #129). **No session PR open yet** — the branch is
+`main` + the one fix below; a single working PR is opened when it is pushed.
+
+### Phase and scope
+
+**Stage S3 — hardware verification (user + agent).** The prior session's slice
+(PR #129, the Search-Enter verification-integrity fix) is **merged and
+post-merge verified** (ledger below). This session's slice is the **next S3
+round-4 defect the user reported from hardware**: in Android **landscape** and
+Windows **fullscreen**, the mini-player **covers the entire Home/Search/Library
+content**. The full-screen player is correct/stable (ADR-002) and is **not**
+touched; only the collapsed mini-player's placement changes.
+
+### The defect, root-caused from source (not inherited)
+
+- **Trigger:** both reported configs — Android landscape and a maximized Windows
+  window — have width ≥ **840dp** (`DhunSpacing.navigationRailBreakpoint`), so
+  `DhunShellPolicy.layoutAt` returns **TwoPane** (rail + content). Portrait phone
+  / windowed desktop stay **SinglePane**.
+- **The bug:** in the shell's `panes == null || detailRoute == null` branch
+  (`DhunAppShell.kt`), the tab content (`ShellMasterPane`) and the `MiniPlayer`
+  were **two children of one `Box`**, the mini-player with
+  `Modifier.align(Alignment.BottomCenter)` — a **floating card painted on top of**
+  the Home/Search/Library list, with no content padding to reserve room. On the
+  short landscape height the fixed-height bar reads as covering the whole screen.
+- **Why only this branch:** SinglePane docks the mini-player in the `GlassDock`
+  bottom bar (Scaffold `innerPadding` pushes content above it); `ShellTwoPane`
+  docks it as a `Column` child of the master. This no-detail-route TwoPane branch
+  was the **only** one that floated it.
+- **The MiniPlayer itself is bounded** (`DhunSpacing.miniPlayerHeight` row inside
+  an `AcrylicSurface` that wraps content height) — it never grows in place; the
+  defect is purely its **floating placement over the content**.
+
+### The fix (commit `6ef48e9`)
+
+Restructure that one branch from `Box` to a **`Column`**: tab content in a
+`Box(Modifier.weight(1f))`, the `MiniPlayer` a **docked bottom bar** (its
+`.align(...)` removed — it is a `Column` child now) that reserves its own height
+and can never overlay the list. Matches SinglePane and `ShellTwoPane`. The
+full-screen `FullPlayer` overlay and ADR-002 are untouched.
+
+- File: `shared/src/commonMain/kotlin/dev/dhun/ui/shell/DhunAppShell.kt`.
+- **No new unit test:** the repo has no Compose UI-test harness (`createComposeRule`
+  unused repo-wide) and this is a pure layout-structure change — the honest gate
+  is CI compile (shared + Android + desktop) + the **hardware retest** below,
+  consistent with the project rule that visual acceptance is device-gated.
+
+### Status ledger (GitHub evidence)
+
+| Item | State | Evidence |
+|---|---|---|
+| PR #129 (`arena/19a284df-dhun`) Search-Enter verification fix | ✅ **merged** | merge commit `9f88b6ebf837d23c8217aa1d637618d65a2249d2`, 2026-10-08T05:56:11Z |
+| Post-merge CI on `main@9f88b6e` | ✅ **GitHub verified** | CI **37734902276** — 12/12 steps success |
+| Post-merge Build APK on `9f88b6e` | ✅ **GitHub verified** | **37734902281** success |
+| Post-merge test-release on `9f88b6e` | ✅ **GitHub verified** | **37734902315** — `apk` ✅ `msi` ✅ `publish` ✅; `aab`/`release_draft` skipped (main-gated) |
+| Rolling `test` release republished at the merge | ✅ **GitHub verified** | published **2026-10-08T06:01:08Z**, `targetCommitish=9f88b6e`, `isDraft=false`, prerelease; APK **18,383,603 B** sha256 **`aa6d027a…`**; MSI **2.185.1** **112,967,680 B** sha256 **`86b1184c…`**; both `.sha256` sidecars present |
+| MSI hosted upgrade on `9f88b6e` | ✅ **GitHub verified (hosted, not hardware)** | `2.182.1 → 2.185.1`, baseline `aa3ff19c…` (prior release MSI), sentinels preserved; uninstall + future-upgrade guards PASS |
+| `extraction-health` scheduled drill | 🟡 **ENVIRONMENT_BLOCKED (accepted steady state)** | every recent run (…37611927562, 37455619019, 37303751722, 37195912826) = `ENVIRONMENT_BLOCKED` (runner datacenter IPs gated by YouTube; residential unaffected). **Not** a resolver regression |
+| **This session's fix** `6ef48e9` | ⏳ **awaiting CI** | pushed to `arena/b4449fdd-dhun`; CI / Build APK / test-release watched after push |
+| Mini-player docked (no longer covers content) on a device | 🔴 **not verified** | S3 round-4 retest on Redmi Note 12 4G / Android 15 **landscape** and Windows 11 **fullscreen** vs the republished rolling `test` |
+
+### Last real error on record
+
+**None this session.** No CI failure yet on `6ef48e9` (runs pending). The most
+recent real reds remain PR #128's branch history (`38536d5`, `bcd43f3` — Compose
+receiver-scope errors during the rail restructure). That class is relevant here
+because this fix also moves a composable between layout containers — which is
+exactly why CI, not local reading, is the gate (the `.align` removal is the
+load-bearing part).
+
+### Exact next technical step
+
+1. Push `arena/b4449fdd-dhun`, open the one working PR, watch CI / Build APK /
+   test-release on the head; fix any red root-cause.
+2. Update the `6ef48e9` ledger row to ✅ with the run IDs.
+3. **Then ask for merge authorization.** After merge, verify post-merge runs and
+   the **new** rolling-release digests (merge bumps the MSI ProductVersion past
+   2.185.1; APK digest changes only if app code changed).
+4. Hand the user the S3 round-4 retest (`docs/runbooks/s3-hardware-checklist.md`):
+   - **Android (Redmi Note 12 4G / Android 15), landscape:** play a song,
+     collapse the full player to Home — the mini-player must be a **compact
+     bottom bar** and the Home/Search/Library list fully visible/scrollable
+     **above** it, never covered.
+   - **Windows 11, fullscreen/maximized:** same — mini-player docked at the
+     bottom, tab content fully usable above it; the full-screen player still
+     opens full-bleed on expand (unchanged).
+
+### Blockers
+
+- **No JDK / Android SDK / display / Windows taskbar in the sandbox** — CI is the
+  Kotlin verifier; the user's devices are the acceptance gate. Release asset
+  downloads are blocked in-sandbox, so sidecar digests must be confirmed by the
+  user.
+- **S3 stays OPEN** until the user retests the republished rolling `test`. Green
+  CI is not hardware acceptance.
+
+---
+
+## Previous session — PR #129 (`arena/19a284df-dhun`): the Search-Enter verification-integrity fix — **MERGED and post-merge verified**
+
+> **Historical record; superseded by the block above.** Its "merge authorization
+> is the only remaining gate" step is **DONE**: PR #129 merged as `9f88b6e`
+> (2026-10-08T05:56:11Z); post-merge CI **37734902276** (12/12), Build APK
+> **37734902281**, test-release **37734902315** (`publish` ran); the rolling
+> `test` release was republished at `9f88b6e` (2026-10-08T06:01:08Z). The APK
+> digest is unchanged from the PR head (`aa6d027a…`) because app code did not
+> change between the final head and the merge; only the MSI moved (2.184.1 →
+> **2.185.1**, sha256 `86b1184c…`).
+
 ## Session `arena/19a284df-dhun` — S3 round 3: the Enter fix is wired into the UI and its test is real (2026-10-08)
 
 Updated **2026-10-08** · session branch `arena/19a284df-dhun` · PR **#129**

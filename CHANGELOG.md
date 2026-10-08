@@ -25,6 +25,20 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 ## [Unreleased]
 
 
+### Fixed — the rail-layout mini-player is docked, not floating over the tab content (2026-10-08, session `arena/b4449fdd-dhun`, commit `6ef48e9`)
+
+- **The gap:** on Android **landscape** and Windows **fullscreen** (both ≥ 840dp →
+  the TwoPane/rail layout), the mini-player was a floating card painted over the
+  Home/Search/Library list; on the short landscape height it read as covering the
+  whole screen. Reported from hardware; the full-screen player (ADR-002) is
+  unaffected and untouched.
+- `DhunAppShell`'s no-detail-route TwoPane branch now lays the master out as a
+  `Column` — tab content in a weighted `Box`, the mini-player a **docked bottom
+  bar** that reserves its own height — matching the SinglePane `GlassDock` and the
+  `ShellTwoPane` master column. It was the only branch that floated the mini-player.
+- Verified by CI compile (shared + Android + desktop); the visual result is the
+  S3 round-4 device retest (no Compose UI-test harness exists in the repo).
+
 ### Fixed — the search Enter rule is now the code the UI runs, and its test is real (2026-10-08, PR #129)
 
 - **The gap:** PR #128 fixed *"Enter in the search field does nothing"* with an

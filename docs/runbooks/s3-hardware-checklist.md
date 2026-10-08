@@ -10,15 +10,15 @@ Always re-download after the merge you are qualifying, and note the
 `main@<sha>` you tested.
 
 **Build identity (rechecked 2026-10-08):** rolling `test` is a published
-pre-release targeting **`ca6d00684f3cf00fed101273e449bebc2fb76a05`** (PR #128,
-merged 2026-10-08T05:12:57Z), published **2026-10-08T05:19:05Z** from
-test-release run **37731260236**. CI **37731260148** (12/12 steps) and Build
-APK **37731260114** also passed on that SHA. Current artifacts: APK
+pre-release targeting **`9f88b6ebf837d23c8217aa1d637618d65a2249d2`** (PR #129,
+merged 2026-10-08T05:56:11Z), published **2026-10-08T06:01:08Z** from
+test-release run **37734902315**. CI **37734902276** (12/12 steps) and Build
+APK **37734902281** also passed on that SHA. Current artifacts: APK
 **18,383,603 B**, provenance SHA-256
-`ff454398bbfb16139b64ef13c9339ef192461b41453eaa8d62a55e9490142b07`; MSI
-**112,967,680 B**, ProductVersion **2.182.1**, provenance SHA-256
-`aa3ff19c2e3c1102cca17ecd7f0129c4e4a5b689af99f8a1761794d1fd454db7`. The MSI
-run completed the full `2.178.1 → 2.182.1` install-over (sentinels preserved,
+`aa6d027ac1c6737563271ab37026ac36f79ac23ebb6ca66df4d2b1d91dc3e6a8`; MSI
+**112,967,680 B**, ProductVersion **2.185.1**, provenance SHA-256
+`86b1184c7bdffed98f87d6043ebe1452cece876fbdaaf55e2aa0b2413f3570ba`. The MSI
+run completed the full `2.182.1 → 2.185.1` install-over (sentinels preserved,
 future-upgrade guard and uninstall smoke passed, **no skip**). Those values come
 from GitHub publisher annotations — the asset blobs and the `.sha256` sidecars
 are not downloadable in the maintenance sandbox, so **verify the release's own
@@ -52,6 +52,27 @@ Recording: check each box with `[x]`, device model + OS version, and any
 failure as *expected vs actual*. Paste the filled checklist back to the
 agent — failures become S3-found functional bugs (the only UI work allowed
 pre-tag besides this list).
+
+## S3 hardware round 4 — mini-player docked in landscape / fullscreen (retest against a build carrying `6ef48e9`)
+
+**Not yet on a device.** Targets the mini-player-covers-content defect fixed by
+commit `6ef48e9` (session `arena/b4449fdd-dhun`). **Re-download the rolling
+`test` only after `6ef48e9` is merged to `main`** and the release is republished
+— the `9f88b6e` artifacts above do **not** contain this fix. Record the new
+`main@<sha>` and the APK/MSI digests you install.
+
+1. **Android (Redmi Note 12 4G / Android 15), LANDSCAPE:** start a track, expand
+   the full player, then collapse it back to Home. The mini-player must be a
+   **compact bottom bar**; the Home/Search/Library list must be **fully visible
+   and scrollable above it**, never covered. Switch to Search and Library and
+   confirm the same.
+2. **Windows 11, FULLSCREEN / maximized:** same sequence — mini-player docked at
+   the bottom, tab content fully usable above it. Confirm the full-screen player
+   still opens full-bleed on expand (unchanged) and Ctrl+F / Escape / Jump List
+   still behave.
+3. Record `winver`, the installed MSI ProductVersion + SHA-256, and the APK
+   SHA-256 you tested. Any residual coverage of the list is a new defect — file
+   it, do not sign off.
 
 ## S3 hardware round 2 — user report received 2026-10-07 (partial; not sign-off)
 

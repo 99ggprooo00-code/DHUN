@@ -1,7 +1,50 @@
-# HANDOFF — the search-Enter rule is wired and really tested; S3 still user-gated
+# HANDOFF — the rail-layout mini-player is docked (no longer covers content); S3 round-4 retest open
 
-Updated **2026-10-08**, session `arena/19a284df-dhun` (PR **#129**, draft, head
-`643298a8f9bc959860fe098c15c4a6a9288ff1ea`).
+Updated **2026-10-08**, session `arena/b4449fdd-dhun` (branch = `main@9f88b6e` +
+commit `6ef48e9`; one working PR opened on push). PR **#129** is **merged**.
+
+## Current state
+
+- **`main` = `9f88b6ebf837d23c8217aa1d637618d65a2249d2`** (PR #129 merged
+  2026-10-08T05:56:11Z). Post-merge on `9f88b6e`: CI **37734902276** (12/12),
+  Build APK **37734902281**, test-release **37734902315** (`apk`+`msi`+`publish`
+  green; `aab`/`release_draft` skipped, main-gated). Rolling `test` republished
+  **2026-10-08T06:01:08Z** at `9f88b6e`: APK **18,383,603 B** `aa6d027a…`
+  (unchanged from the PR head — no app-code change between final head and merge),
+  MSI **2.185.1** **112,967,680 B** `86b1184c…`; both `.sha256` sidecars present.
+- **This session's fix (`6ef48e9`):** in the ≥840dp TwoPane branch with no detail
+  route (Android landscape, Windows fullscreen), the mini-player was a floating
+  card over the Home/Search/Library list. It is now a **docked bottom bar** in a
+  `Column` (content in a weighted `Box`, mini-player reserves its own height),
+  matching SinglePane and `ShellTwoPane`. The full-screen `FullPlayer` (ADR-002)
+  is untouched. File: `shared/.../ui/shell/DhunAppShell.kt`.
+
+## Next actions — single agent, sequential
+
+1. Push `arena/b4449fdd-dhun`, open the one working PR, watch CI / Build APK /
+   test-release on `6ef48e9`; fix any red (Box→Column can hit the PR #128
+   `Modifier.align` scope trap).
+2. Update the ROADMAP ledger row for `6ef48e9` to ✅ with the run IDs.
+3. **Ask for merge authorization**; after merge verify post-merge runs + the new
+   rolling-release digests (MSI ProductVersion moves past 2.185.1).
+4. **S3 round-4 retest (open, user-gated):** Android **landscape** and Windows
+   **fullscreen** — collapse the full player to Home; the mini-player must be a
+   compact bottom bar with the Home/Search/Library list fully visible/scrollable
+   above it (never covered); the full-screen player still opens full-bleed.
+5. Keep S3 open until retested. Green CI ≠ hardware acceptance. Do not modify the
+   full-screen player or lyrics.
+
+**Blockers:** no JDK/Android SDK/display/Windows taskbar in-sandbox; release
+sidecars not downloadable in-sandbox (user confirms digests). CI is the only
+Kotlin verifier.
+
+---
+
+## HISTORICAL — PR #129 (`arena/19a284df-dhun`): the search-Enter rule is wired and really tested; S3 still user-gated
+
+Updated **2026-10-08**, session `arena/19a284df-dhun` (PR **#129**, head
+`643298a8f9bc959860fe098c15c4a6a9288ff1ea`) — **MERGED as `9f88b6e`**
+(2026-10-08T05:56:11Z), post-merge verified.
 
 ## Current state — both round-2 PRs are merged and the rolling release carries them
 
