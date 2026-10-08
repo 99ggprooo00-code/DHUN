@@ -107,3 +107,24 @@
     --shadow: 0 18px 48px rgba(26, 23, 20, 0.14);
   }
 }
+
+/* `prefers-contrast: more` — the operating system's "increase contrast"
+   setting, which a visitor turns on because the normal ladder is not enough.
+   The secondary rungs are the ones that need it. Measured from this file's own
+   tokens: in the light set `--text-3` is 4.83:1 on `--bg` and 4.71:1 on the
+   variant surface (above the 4.5:1 body floor this sheet was built to, below the
+   7:1 a reader asking for more contrast wants); in the dark set it is 7.47:1 on
+   `--bg` but 6.71:1 on the variant surface. Both secondary rungs therefore
+   become the primary text colour — 18.10:1 on `--bg` in the dark set, 16.26:1 in
+   the light set — and because the value is a reference rather than a colour, the
+   same declaration raises both schemes.
+   `high_contrast_violations` (scripts/website_quality.py) asserts that this
+   block exists, that it resolves in both schemes, and that every token it
+   redefines strictly raises its contrast against each surface to at least 7:1. */
+@media (prefers-contrast: more) {
+  :root {
+    --text-2: var(--text);
+    --text-3: var(--text);
+  }
+}
+

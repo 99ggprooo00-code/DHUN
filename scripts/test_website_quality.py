@@ -821,6 +821,8 @@ class StyleBlocksForOtherOutputs(DistCopyMixin):
     """
 
     PRINT = "@media print { :root { --text: #000000; --bg: #ffffff; } .mock .device { display: none; } }"
+    # A page that draws a mockup, in the markup shapes the site really uses.
+    DRAWING = '<div class="mock"><div class="device">drawing</div></div>' 
     FORCED = "@media (forced-colors: active) { .btn { border-color: CanvasText; } }"
 
     def page(self, css: str, body: str = '<p><a class="btn" href="/">Go</a></p>') -> str:
@@ -831,10 +833,11 @@ class StyleBlocksForOtherOutputs(DistCopyMixin):
             f"{body}</main><footer>f</footer></body></html>"
         )
 
-    def site(self, css: str) -> Path:
+    def site(self, css: str, body: str | None = None) -> Path:
+        page = self.page(css) if body is None else self.page(css, body)
         return write_tree(
             Path(tmpdir()),
-            {rel: self.page(css) for rel in ("index.html", "features/index.html", "ui/index.html")},
+            {rel: page for rel in ("index.html", "features/index.html", "ui/index.html")},
         )
 
     def test_the_real_site_ships_both_blocks(self):
@@ -853,9 +856,39 @@ class StyleBlocksForOtherOutputs(DistCopyMixin):
 
     def test_a_print_block_without_paper_tokens_or_device_hiding_fails(self):
         css = "@media print { .card { break-inside: avoid; } }"
-        violations = quality.print_style_violations(self.site(css))
+        violations = quality.print_style_violations(self.site(css, body=self.DRAWING))
         self.assertTrue(any("--text" in v for v in violations), violations)
         self.assertTrue(any(".device" in v or "mockup" in v for v in violations), violations)
+
+    def test_device_hiding_is_required_only_of_a_page_that_draws_one(self):
+        """Changed 2026-10-08 with the per-route CSS pruner.
+
+        The rule used to demand the drawing-hiding declaration of *every* route,
+        which was vacuous on `/404.html` and impossible once the
+        unprunable-anywhere `.mock .device` rule stopped shipping there. It is now
+        conditional on the markup: a page that draws a mockup must hide it, a page
+        that draws nothing is not asked to hide nothing.
+        """
+        css = "@media print { :root { --text: #000000; --bg: #ffffff; } }" + self.FORCED
+        self.assertEqual(quality.print_style_violations(self.site(css)), [])
+        drawn = quality.print_style_violations(self.site(css, body=self.DRAWING))
+        self.assertTrue(any("mockup" in v or ".device" in v for v in drawn), drawn)
+
+    def test_a_rule_after_the_block_cannot_satisfy_it(self):
+        """The false pass mutation found on 2026-10-08.
+
+        The rule used to read 3000 characters after the `@media print` marker, so
+        a `.device` rule *following* the block satisfied a check about the block.
+        Brace matching reads the block itself, and this test is the regression:
+        the same sheet fails when the hiding rule lives after the block.
+        """
+        css = (
+            "@media print { :root { --text: #000000; --bg: #ffffff; } }"
+            + self.FORCED
+            + ".mock .device { display: none; }"
+        )
+        violations = quality.print_style_violations(self.site(css, body=self.DRAWING))
+        self.assertTrue(any("mockup" in v or ".device" in v for v in violations), violations)
 
     def test_a_print_block_with_tokens_and_device_hiding_passes(self):
         self.assertEqual(quality.print_style_violations(self.site(self.PRINT + self.FORCED)), [])
@@ -1087,6 +1120,138 @@ class ReferencedFilesExist(DistCopyMixin):
         self.assertEqual(quality.asset_reference_violations(dist), [])
 
 
+class CssPruningPredicate(unittest.TestCase):
+    """The Python mirror of `website/tools/prune-css.mjs`, unit by unit.
+
+    The pruner decides which rules a route ships, and this is the same decision
+    expressed in Python so app CI can check the committed build without Node.
+    Two implementations of one predicate is a real risk, so each half of the
+    predicate is pinned here with the case that distinguishes it.
+    """
+
+    def test_a_selector_with_no_class_can_always_match(self):
+        self.assertTrue(quality._rule_can_match("body", set()))
+        self.assertTrue(quality._rule_can_match("a:hover", set()))
+        self.assertTrue(quality._rule_can_match("*", set()))
+
+    def test_a_selector_with_a_used_class_can_match(self):
+        self.assertTrue(quality._rule_can_match(".card", {"card"}))
+        self.assertTrue(quality._rule_can_match(".card .title", {"title"}))
+        self.assertFalse(quality._rule_can_match(".card .title", {"other"}))
+
+    def test_a_class_inside_not_is_negative_and_keeps_the_rule(self):
+        self.assertTrue(quality._rule_can_match("a:not(.btn)", set()))
+        self.assertEqual(quality.positive_classes("a:not(.btn)"), set())
+        self.assertEqual(quality.positive_classes(":is(.a, .b)"), {"a", "b"})
+
+    def test_a_condition_group_is_pruned_inside_and_dropped_when_empty(self):
+        css = "@media print { .used { a: b; } .unused { c: d; } }"
+        pruned = quality.prune_source_css(css, {"used"})
+        self.assertIn(".used", pruned)
+        self.assertNotIn(".unused", pruned)
+        self.assertEqual(quality.prune_source_css(css, set()), "")
+
+    def test_pruning_the_real_css_for_one_page_leaves_a_prefix_of_its_rules(self):
+        """Every rule the pruner keeps must be one of the source's own rules."""
+        css = (quality.SOURCE_DIR.parent / "css" / "base.css").read_text(encoding="utf-8")
+        pruned = quality.prune_source_css(css, {"btn", "site-header"})
+        self.assertLess(len(pruned), len(css))
+        for unit in quality.css_units(quality.without_css_comments(pruned)):
+            if unit["kind"] == "rule":
+                self.assertTrue(
+                    quality._rule_can_match(unit["prelude"], {"btn", "site-header"}),
+                    unit["prelude"],
+                )
+
+
+class CurrentPageIsMarked(DistCopyMixin):
+    """`aria-current` on the page the visitor is on, and not on the 404.
+
+    The rendered half of this (does the marker *look* different, does it survive
+    Windows High Contrast) is a browser measurement; these are the mutations that
+    need no browser.
+    """
+
+    def test_the_committed_site_marks_each_destination_once(self):
+        self.assertEqual(quality.navigation_state_violations(DIST), [])
+
+    def test_a_page_without_a_marker_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(' aria-current="page"', "", 1),
+            encoding="utf-8",
+        )
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(
+            any("/features/" in v and "exactly one" in v for v in violations), violations
+        )
+
+    def test_a_marker_on_two_links_fails(self):
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                '<a class="wordmark" href="/"', '<a aria-current="page" class="wordmark" href="/"', 1
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(any("/ui/" in v and "found 2" in v for v in violations), violations)
+
+    def test_a_marker_pointing_at_another_route_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        start = markup.index('<a href="/features/" aria-current="page"')
+        page.write_text(
+            markup.replace(markup[start : start + 35], '<a href="/ui/" aria-current="page"', 1),
+            encoding="utf-8",
+        )
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(any("/features/" in v and "/ui/" in v for v in violations), violations)
+
+    def test_a_marker_on_the_404_fails(self):
+        dist = self.copy_dist()
+        page = dist / "404.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                '<a class="btn btn--primary" href="/ui/"',
+                '<a class="btn btn--primary" aria-current="page" href="/ui/"',
+                1,
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(any("/404.html" in v for v in violations), violations)
+
+    def test_a_marker_with_no_visible_style_fails(self):
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        # Drop every rule that styles the marker, wherever the pruner kept it.
+        for prelude, body in re.findall(r'([^{}]*\[aria-current="page"\][^{}]*)\{([^{}]*)\}', markup):
+            markup = markup.replace(prelude + "{" + body + "}", "", 1)
+        page.write_text(markup, encoding="utf-8")
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(
+            any("/: " in v and "no rule in this page" in v for v in violations), violations
+        )
+
+    def test_a_background_only_marker_fails(self):
+        """Forced colours drops author backgrounds, so a pill alone is not a marker."""
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        # Keep only the pill: remove the rule whose body carries the underline.
+        for prelude, body in re.findall(r'([^{}]*\[aria-current="page"\][^{}]*)\{([^{}]*)\}', markup):
+            if "text-decoration" in body:
+                markup = markup.replace(prelude + "{" + body + "}", "", 1)
+        page.write_text(markup, encoding="utf-8")
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(any("/ui/" in v and "High Contrast" in v for v in violations), violations)
+
+
 class DistMatchesItsSources(DistCopyMixin):
     """The cheap, Node-free half of the workflow's drift check."""
 
@@ -1103,6 +1268,28 @@ class DistMatchesItsSources(DistCopyMixin):
         violations = quality.dist_source_drift_violations(dist)
         self.assertTrue(any("/ui/" in v for v in violations), violations)
 
+    def test_a_reordered_sheet_fails(self):
+        """Order is part of the contract: the cascade depends on it."""
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        matches = list(re.finditer(r"\.(-?[A-Za-z_][\w-]*)\{[^{}]*\}", markup))
+        pair = next(
+            (first, second)
+            for first, second in zip(matches, matches[1:])
+            if second.start() == first.end() and first.group(1) != second.group(1)
+        )
+        first, second = pair
+        page.write_text(
+            markup[: first.start()] + second.group(0) + first.group(0) + markup[second.end() :],
+            encoding="utf-8",
+        )
+        violations = quality.dist_source_drift_violations(dist)
+        self.assertTrue(
+            any("/: the committed CSS is not the pruned composition" in v for v in violations),
+            violations,
+        )
+
     def test_a_page_carrying_a_module_it_did_not_declare_fails(self):
         dist = self.copy_dist()
         page = dist / "404.html"
@@ -1114,3 +1301,172 @@ class DistMatchesItsSources(DistCopyMixin):
         )
         violations = quality.dist_source_drift_violations(dist)
         self.assertTrue(any("/404.html" in v for v in violations), violations)
+
+
+class AnchorLandings(DistCopyMixin):
+    """In-page jumps land on something, and below the sticky header.
+
+    The header is sticky and, on a narrow viewport, two or three rows tall;
+    nothing else in the gate table notices that a jump lands behind it. The
+    browser half of the landing measurement is `website/tests/browser.mjs`; these
+    are the mutations that need no browser.
+    """
+
+    def test_the_committed_site_lands_its_jumps_below_the_header(self):
+        self.assertEqual(quality.anchor_landing_violations(DIST), [])
+
+    def mutate(self, relative: str, old: str, new: str) -> list[str]:
+        dist = self.copy_dist()
+        page = dist / relative
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn(old, markup)
+        page.write_text(markup.replace(old, new, 1), encoding="utf-8")
+        return quality.anchor_landing_violations(dist)
+
+    def test_a_missing_anchor_target_fails(self):
+        violations = self.mutate("index.html", 'id="fn-a"', 'id="fn-renamed"')
+        self.assertTrue(
+            any("#fn-a" in v and "no element on the page has" in v for v in violations),
+            violations,
+        )
+
+    def test_a_page_without_scroll_padding_fails(self):
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        # Both the base declaration and the narrow-viewport override.
+        markup = markup.replace(":root{scroll-padding-top:12rem}", "", 1)
+        markup = markup.replace(":root{scroll-padding-top:7rem}", "", 1)
+        page.write_text(markup, encoding="utf-8")
+        violations = quality.anchor_landing_violations(dist)
+        self.assertTrue(
+            any(v.startswith("/:") and "no scroll-padding-top" in v for v in violations),
+            violations,
+        )
+
+    def test_padding_only_inside_a_conditional_group_fails(self):
+        """A `@media`-only declaration is not a base: it is absent at other widths."""
+        violations = self.mutate(
+            "ui/index.html", ":root{scroll-padding-top:12rem}", ".wrap{scroll-padding-top:12rem}"
+        )
+        self.assertTrue(
+            any(
+                "/ui/" in v and "only inside a conditional group" in v for v in violations
+            ),
+            violations,
+        )
+
+    def test_a_base_padding_below_the_three_row_case_fails(self):
+        """Below 480px the navigation itself can wrap: 8rem is too little."""
+        violations = self.mutate(
+            "index.html", "scroll-padding-top:12rem", "scroll-padding-top:8rem"
+        )
+        self.assertTrue(
+            any(
+                v.startswith("/:") and "128px" in v and "164px" in v and "three rows" in v
+                for v in violations
+            ),
+            violations,
+        )
+
+    def test_padding_smaller_than_the_two_row_header_fails(self):
+        violations = self.mutate(
+            "features/index.html", "scroll-padding-top:7rem", "scroll-padding-top:4rem"
+        )
+        self.assertTrue(
+            any(
+                "/features/" in v and "64px" in v and "104px" in v and "two rows" in v
+                for v in violations
+            ),
+            violations,
+        )
+
+    def test_padding_written_off_the_root_selector_does_not_count(self):
+        dist = self.copy_dist()
+        page = dist / "404.html"
+        markup = page.read_text(encoding="utf-8")
+        markup = markup.replace(":root{scroll-padding-top:12rem}", ".wrap{scroll-padding-top:12rem}", 1)
+        markup = markup.replace(":root{scroll-padding-top:7rem}", ".wrap{scroll-padding-top:7rem}", 1)
+        page.write_text(markup, encoding="utf-8")
+        violations = quality.anchor_landing_violations(dist)
+        self.assertTrue(
+            any("/404.html" in v and "no scroll-padding-top" in v for v in violations),
+            violations,
+        )
+
+    def test_a_page_with_no_in_page_anchors_is_exempt(self):
+        """Nothing to land means nothing to pad — the rule must not demand it."""
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn('href="#main"', markup)
+        markup = markup.replace('href="#main"', 'href="/"', 1)
+        markup = markup.replace(":root{scroll-padding-top:12rem}", "", 1)
+        markup = markup.replace(":root{scroll-padding-top:7rem}", "", 1)
+        page.write_text(markup, encoding="utf-8")
+        self.assertEqual(quality.anchor_landing_violations(dist), [])
+
+
+class HighContrastPreference(DistCopyMixin):
+    """A visitor who asks the OS for more contrast gets more contrast.
+
+    The block raising the secondary text rungs is checked against the page's own
+    tokens in both colour schemes. The browser job cannot emulate
+    `prefers-contrast: more` on every engine, so this is the local half; the
+    numbers it uses are re-derived from the sheet rather than restated here.
+    """
+
+    BLOCK = "@media (prefers-contrast:more){:root{--text-2:var(--text);--text-3:var(--text)}}"
+
+    def test_the_committed_site_raises_contrast_when_asked(self):
+        self.assertEqual(quality.high_contrast_violations(DIST), [])
+
+    def mutate(self, relative: str, new: str) -> list[str]:
+        dist = self.copy_dist()
+        page = dist / relative
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn(self.BLOCK, markup)
+        page.write_text(markup.replace(self.BLOCK, new, 1), encoding="utf-8")
+        return quality.high_contrast_violations(dist)
+
+    def test_a_page_without_the_block_fails(self):
+        violations = self.mutate("index.html", "")
+        self.assertTrue(
+            any(v.startswith("/:") and "no @media (prefers-contrast: more) block" in v for v in violations),
+            violations,
+        )
+
+    def test_a_literal_colour_in_the_block_fails(self):
+        """A literal is one scheme's colour: it cannot improve both."""
+        violations = self.mutate(
+            "features/index.html",
+            "@media (prefers-contrast:more){:root{--text-2:var(--text);--text-3:#3d3934}}",
+        )
+        self.assertTrue(
+            any(
+                "/features/" in v and "#3d3934" in v and "cannot resolve" in v
+                for v in violations
+            ),
+            violations,
+        )
+
+    def test_a_block_that_restates_the_default_fails(self):
+        violations = self.mutate(
+            "ui/index.html", "@media (prefers-contrast:more){:root{--text-3:var(--text-3)}}"
+        )
+        self.assertTrue(
+            any(
+                "/ui/" in v and ("no better than the default" in v or "short of the 7:1" in v)
+                for v in violations
+            ),
+            violations,
+        )
+
+    def test_a_reference_to_an_undefined_token_fails(self):
+        violations = self.mutate(
+            "404.html", "@media (prefers-contrast:more){:root{--text-3:var(--text-missing)}}"
+        )
+        self.assertTrue(
+            any("/404.html" in v and "--text-missing" in v and "does not define" in v for v in violations),
+            violations,
+        )

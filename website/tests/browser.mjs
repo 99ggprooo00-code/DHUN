@@ -22,6 +22,8 @@
  *     visible change when it takes focus (the ring is not one element's job);
  *   - a heading level skipped in the rendered document (h2 → h4);
  *   - one link text naming two different destinations (WCAG 2.4.4);
+ *   - an in-page jump (the skip link's `#main`, a footnote) that lands its target
+ *     behind the sticky header, or past the bottom of the viewport;
  *   - any console error, page error, or same-origin 4xx/5xx response;
  *   - rendered contrast below 4.5:1 for body text / 3:1 for large text and
  *     non-text affordances, in `prefers-color-scheme: dark` and `light`;
@@ -49,7 +51,10 @@ import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 import {
+  anchorLandingProblem,
   caveatsHiddenInPrint,
+  currentPageProblem,
+  markerPerceivable,
   duplicateLinkTargets,
   focusChanged,
   forcedColorsBoundaryMissing,
@@ -476,11 +481,71 @@ function forcedColorsReport() {
   for (const element of document.querySelectorAll(".mock .device")) {
     decorations.push({ element: element.className, style: read(element) });
   }
+  // Whether the page's own CSS answers the preference at all. Counted here
+  // rather than asserted in Node because the sheet ships inlined (`base.njk`
+  // carries exactly one <style>), so the page can answer this about itself —
+  // and a count of zero must not be *prose* in the reporter: the sentence
+  // "this site declares no prefers-contrast rules" lived here until 2026-10-08
+  // and stayed after the sheet gained a block (record 27).
+  const prefersContrastRules = [...document.querySelectorAll("style")].filter((sheet) =>
+    /@media[^{]*prefers-contrast/.test(sheet.textContent || ""),
+  ).length;
   return {
     active: window.matchMedia("(forced-colors: active)").matches,
     contrastMore: window.matchMedia("(prefers-contrast: more)").matches,
+    prefersContrastRules,
     controls,
     decorations,
+  };
+}
+
+/**
+ * The link that says "you are here", and how it renders.
+ *
+ * Self-contained on purpose: this function is serialized into the page, so a
+ * reference to anything imported in Node scope is a ReferenceError *inside the
+ * page* (see the note in `forcedColorsReport`). It gathers; `rules.mjs` decides.
+ */
+function currentPageReport() {
+  const fields = [
+    "color",
+    "backgroundColor",
+    "textDecorationLine",
+    "textDecorationColor",
+    "textUnderlineOffset",
+    "borderTopStyle",
+    "borderTopWidth",
+    "borderRightStyle",
+    "borderRightWidth",
+    "borderBottomStyle",
+    "borderBottomWidth",
+    "borderLeftStyle",
+    "borderLeftWidth",
+    "outlineStyle",
+    "outlineWidth",
+  ];
+  const snapshot = (element) => {
+    const computed = getComputedStyle(element);
+    const picked = {};
+    for (const field of fields) picked[field] = computed[field];
+    return {
+      element: `${element.tagName.toLowerCase()}.${String(element.className || "").split(/\s+/)[0]}`,
+      href: element.getAttribute("href"),
+      text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24),
+      style: picked,
+      signature: fields.map((field) => picked[field]).join("|"),
+    };
+  };
+  const markers = [...document.querySelectorAll('[aria-current="page"]')].map(snapshot);
+  const nav = document.querySelector(".site-nav");
+  const siblings = nav
+    ? [...nav.querySelectorAll("a")].filter((link) => link.getAttribute("aria-current") !== "page")
+    : [];
+  return {
+    forcedColorsActive: window.matchMedia("(forced-colors: active)").matches,
+    markers,
+    siblings: siblings.map((link) => snapshot(link).signature),
+    siblingElements: siblings.map((link) => snapshot(link).element),
   };
 }
 
@@ -678,6 +743,92 @@ async function checkKeyboard(browser) {
     );
   }
   await context.close();
+}
+
+/**
+ * The current page is marked — and the mark survives Windows High Contrast.
+ *
+ * Three parts, same as the static rule in `scripts/website_quality.py`: exactly
+ * one marker, pointing at this route, and *visible* — a mark that renders
+ * identically to the links that are not current tells a sighted visitor nothing.
+ * The forced-colours pass is the one only a browser can make: that mode drops
+ * author backgrounds, so the filled pill disappears and the underline is what
+ * remains.
+ */
+async function checkCurrentPage(browser) {
+  const mostCommon = (values) => {
+    const counts = new Map();
+    for (const value of values) counts.set(value, (counts.get(value) || 0) + 1);
+    let best = null;
+    let bestCount = 0;
+    for (const [value, count] of counts) {
+      if (count > bestCount) {
+        best = value;
+        bestCount = count;
+      }
+    }
+    return best;
+  };
+
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: "dark" });
+  for (const route of ROUTES) {
+    const page = await context.newPage();
+    await page.goto(url(route), { waitUntil: "load" });
+    const report = await page.evaluate(currentPageReport);
+    const problem = currentPageProblem(route, report.markers, mostCommon(report.siblings));
+    if (problem) {
+      fail(`current page ${route}`, problem);
+    } else {
+      const [marker] = report.markers;
+      record(
+        `current page ${route}`,
+        `marked by ${marker.element} “${marker.text}” → ${marker.href}; ` +
+          `${report.siblings.length} other nav link(s) (${report.siblingElements.join(", ")}) render differently`,
+      );
+    }
+    await page.close();
+  }
+  await context.close();
+
+  const forced = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    colorScheme: "dark",
+    forcedColors: "active",
+  });
+  for (const route of ROUTES) {
+    const page = await forced.newPage();
+    await page.goto(url(route), { waitUntil: "load" });
+    const report = await page.evaluate(currentPageReport);
+    if (!report.forcedColorsActive) {
+      fail(
+        `current page ${route} (forced colours)`,
+        "the emulated preference is not visible to the page (matchMedia forced-colors=false) — " +
+          "every result below would be a false green",
+      );
+      await page.close();
+      continue;
+    }
+    const [marker] = report.markers;
+    if (!marker) {
+      fail(`current page ${route} (forced colours)`, "no aria-current marker in the DOM");
+    } else if (!markerPerceivable(marker.style)) {
+      fail(
+        `current page ${route} (forced colours)`,
+        `${marker.element} “${marker.text}” loses its mark when the OS picks the colours: ` +
+          `text-decoration ${marker.style.textDecorationLine}, border ` +
+          `${marker.style.borderBottomStyle} ${marker.style.borderBottomWidth}, outline ` +
+          `${marker.style.outlineStyle} ${marker.style.outlineWidth}`,
+      );
+    } else {
+      record(
+        `current page ${route} (forced colours)`,
+        `${marker.element} keeps its mark (text-decoration ${marker.style.textDecorationLine}) ` +
+          `after the background is repainted`,
+      );
+    }
+    await page.close();
+  }
+  await forced.close();
 }
 
 async function checkContrast(browser) {
@@ -883,6 +1034,10 @@ async function checkTabStops(browser, route = "/") {
  * if `forced-colors` did not apply, the boundary test below would pass on
  * ordinary dark-mode CSS and report a false green. So the page's own
  * `matchMedia` result is asserted first, and a mismatch is a failure.
+ *
+ * Under `prefers-contrast: more` the measurement is taken twice — once with the
+ * preference on, once in a default context — because a lone number here has
+ * nothing to be right or wrong against.
  */
 async function checkPreferences(browser) {
   const modes = [
@@ -939,11 +1094,40 @@ async function checkPreferences(browser) {
       } else {
         const results = await page.evaluate(contrastReport);
         const worst = results.reduce((min, r) => Math.min(min, r.ratio), Infinity);
-        record(
-          `contrast ${route} (prefers-contrast: more)`,
-          `${results.length} text nodes measured, lowest ratio ${worst}:1 — this site declares no ` +
-            `prefers-contrast rules, so the number is the same as the default scheme by design`,
-        );
+        // The same measurement with the preference *unset*, in its own context, so
+        // the number above is compared with something instead of described. Until
+        // this build the branch printed "this site declares no prefers-contrast
+        // rules, so the number is the same as the default scheme by design" — true
+        // when written, false the moment the sheet gained a block, and exactly the
+        // kind of stale prose a measurement should replace (record 27).
+        //
+        // The assertion is one-directional on purpose: a preference that asks for
+        // *more* contrast may never leave a text node worse off than the default
+        // ladder, but "strictly better" would depend on which token the worst node
+        // happens to use, which this reporter does not know.
+        const baselineContext = await browser.newContext({
+          viewport: { width: 1280, height: 800 },
+          colorScheme: "dark",
+        });
+        const baselinePage = await baselineContext.newPage();
+        await baselinePage.goto(url(route), { waitUntil: "load" });
+        const baseline = await baselinePage.evaluate(contrastReport);
+        await baselineContext.close();
+        const baselineWorst = baseline.reduce((min, r) => Math.min(min, r.ratio), Infinity);
+        if (worst < baselineWorst - 0.005) {
+          fail(
+            `contrast ${route} (prefers-contrast: more)`,
+            `lowest ratio ${worst}:1 is below the default scheme's ${baselineWorst}:1 — asking ` +
+              `for more contrast made the page worse`,
+          );
+        } else {
+          record(
+            `contrast ${route} (prefers-contrast: more)`,
+            `${results.length} text node(s) measured, lowest ratio ${worst}:1 against ` +
+              `${baselineWorst}:1 with the preference unset; the page's own CSS carries ` +
+              `${report.prefersContrastRules} prefers-contrast block(s)`,
+          );
+        }
       }
 
       const results = await new AxeBuilder({ page }).analyze();
@@ -973,6 +1157,99 @@ async function checkPreferences(browser) {
  * in the print media, because a reader can print the page and the printed copy
  * is what someone else reads.
  */
+/**
+ * In-page jumps land on their target, below the sticky header.
+ *
+ * Two failure modes that no static check can see: the header is `position:
+ * sticky`, so a fragment jump can leave the target's first line behind it (the
+ * skip link and the footnote links are the only in-page jumps today), and a page
+ * padded past a short target can scroll it off the bottom. The page functions
+ * below are self-contained because `page.evaluate` serialises them into the page.
+ */
+async function checkAnchorLanding(browser) {
+  // 280×653 is the smallest display class the site supports (Galaxy Fold cover
+  // screen) and the width where the navigation itself can wrap, making the header
+  // three rows; 380×800 is the ordinary phone width, where it is two.
+  const cases = [
+    { name: "1280×800", viewport: { width: 1280, height: 800 } },
+    { name: "380×800 (header wraps to two rows)", viewport: { width: 380, height: 800 } },
+    { name: "280×653 (navigation can wrap too)", viewport: { width: 280, height: 653 } },
+  ];
+  for (const testCase of cases) {
+    const context = await browser.newContext({
+      viewport: testCase.viewport,
+      colorScheme: "dark",
+    });
+    for (const route of ROUTES) {
+      const page = await context.newPage();
+      await page.goto(url(route), { waitUntil: "load" });
+      const hashes = await page.evaluate(inPageHashes);
+      if (!hashes.length) {
+        record(`anchors ${route} @ ${testCase.name}`, "no in-page anchors");
+        await page.close();
+        continue;
+      }
+      for (const hash of hashes) {
+        const metrics = await page.evaluate(landingReport, hash);
+        const problem = anchorLandingProblem({
+          hash,
+          viewportHeight: testCase.viewport.height,
+          ...metrics,
+        });
+        if (problem) {
+          fail(`anchors ${route} @ ${testCase.name}`, problem);
+        } else {
+          record(
+            `anchors ${route} @ ${testCase.name}`,
+            `#${hash} lands at ${Math.round(metrics.targetTop)}px, clear of the header ` +
+              `bottom at ${Math.round(metrics.headerBottom)}px ` +
+              `(scroll-padding-top ${Math.round(metrics.scrollPaddingTop)}px)`,
+          );
+        }
+      }
+      await page.close();
+    }
+    await context.close();
+  }
+}
+
+function inPageHashes() {
+  const hashes = new Set();
+  for (const link of document.querySelectorAll("a[href^='#']")) {
+    const hash = (link.getAttribute("href") || "").slice(1);
+    if (hash) hashes.add(hash);
+  }
+  return [...hashes];
+}
+
+function landingReport(hash) {
+  return new Promise((resolve) => {
+    const target = document.getElementById(hash);
+    if (!target) {
+      resolve({ targetTop: Number.NaN, headerBottom: Number.NaN });
+      return;
+    }
+    window.scrollTo(0, 0);
+    window.location.hash = hash;
+    let frames = 0;
+    const measure = () => {
+      if (++frames < 6) {
+        window.requestAnimationFrame(measure);
+        return;
+      }
+      const header = document.querySelector(".site-header");
+      resolve({
+        targetTop: target.getBoundingClientRect().top,
+        headerBottom: header ? header.getBoundingClientRect().bottom : 0,
+        scrollPaddingTop: Number.parseFloat(
+          window.getComputedStyle(document.documentElement).scrollPaddingTop,
+        ),
+      });
+    };
+    window.requestAnimationFrame(measure);
+  });
+}
+
 async function checkPrint(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   for (const route of ROUTES) {
@@ -1101,6 +1378,8 @@ const CHECKS = [
   ["keyboard", () => checkKeyboard(browser)],
   ["structure", () => checkStructure(browser)],
   ["tab stops", () => checkTabStops(browser)],
+  ["current page", () => checkCurrentPage(browser)],
+  ["anchor landings", () => checkAnchorLanding(browser)],
   ["contrast", () => checkContrast(browser)],
   ["reduced motion", () => checkReducedMotion(browser)],
   ["preferences", () => checkPreferences(browser)],

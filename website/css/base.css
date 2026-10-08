@@ -100,7 +100,44 @@ hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--sp-8) 0; }
   border-radius: var(--r-full);
 }
 .site-nav a:hover { color: var(--text); background: var(--surface-variant); }
+/* The page the visitor is on, marked twice over: a filled pill for mouse and
+   sighted keyboard users, and an underline that survives Windows High Contrast
+   — where the engine drops the background but keeps text decoration. Asserted by
+   `navigation_state_violations` (scripts/website_quality.py) and measured in a
+   real browser, including in forced colours, by website/tests/browser.mjs. */
+.site-nav a[aria-current="page"] {
+  color: var(--text); background: var(--surface-variant);
+}
+.site-nav a[aria-current="page"],
+.wordmark[aria-current="page"] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 0.35em;
+}
 .ext { font-size: 0.8em; opacity: 0.8; }
+
+/* --------------------------------------------------------- anchor landings -- */
+
+/* The header sticks to the top, so anything the browser scrolls to — the skip
+   link's `#main`, the footnote links, any future table of contents — would
+   otherwise land with its first line behind the header. `scroll-padding-top`
+   moves the scrollport's top edge down for every jump and for the focus scroll
+   of the skip link.
+
+   Two heights, read off this stylesheet. Up to 479px the navigation itself can
+   wrap, so the header is the wordmark row plus up to two nav lines: 3 * 44px of
+   targets and 2 * 16px of gaps = 164px, and 12rem (192px) covers it. From 480px
+   the header is at most two rows — a 44px row plus a 44px row = 104px — and 7rem
+   (112px) covers that with 8px of slack. Both are in `rem` so a visitor who
+   raises the browser's default font size gets a proportionally larger offset
+   rather than less of it. `anchor_landing_violations` re-derives the two-row
+   floor from this page's own `--target` and `--sp-4` and refuses any declaration
+   below it; the browser check `anchors land below the header` measures the real
+   header height at 280x653, 380x800 and 1280x800 instead of trusting the
+   arithmetic. */
+:root { scroll-padding-top: 12rem; }
+@media (min-width: 480px) { :root { scroll-padding-top: 7rem; } }
 
 /* ------------------------------------------------------------------ hero -- */
 .hero { padding: var(--sp-8) 0 var(--sp-6); }

@@ -220,6 +220,9 @@ quoted because it is what this session is measured against):
 - **`prefers-contrast: more` has no rendering of its own** — the site declares no
   such rules; the check records that the preference reaches the page and measures
   the unchanged contrast, which is the honest version of that claim.
+  *(Superseded 2026-10-08, record 27: the sheet now declares a `prefers-contrast`
+  block, so the unchanged-contrast sentence was replaced by a comparison against
+  the default scheme — see record 28. The finding below is left as written.)*
 
 ## Decisions taken (each with its reversal cost)
 

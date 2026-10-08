@@ -113,6 +113,7 @@ CONTRAST_PAIRS = (
     ("--text-3", "--bg", 4.5),
     ("--accent", "--bg", 4.5),
     ("--text", "--surface", 4.5),
+    ("--text", "--surface-variant", 4.5),  # the current-page pill in the nav
     ("--text-2", "--surface", 4.5),
     ("--text-3", "--surface", 4.5),
     ("--accent", "--surface", 4.5),
@@ -621,6 +622,371 @@ def accessibility_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def navigation_state_violations(dist: pathlib.Path) -> list[str]:
+    """Each destination says which page the visitor is on — and the 404 does not.
+
+    `/`, `/features/` and `/ui/` are the site's three destinations, and the header
+    marks the one being read with `aria-current="page"` (the wordmark on `/`, the
+    matching nav item elsewhere). What this asserts is the *effect*, in three
+    parts: exactly one marker per destination; the marked link points at that
+    destination; and the page's own stylesheet draws the marker in a way that
+    survives Windows High Contrast, where the engine drops author backgrounds —
+    so a marker that is only a background colour is not a marker. The rendered
+    versions of the same three parts are measured in a browser by
+    `website/tests/browser.mjs` (`current page`), whose decision logic is
+    mutation-proven without one in `website/tests/rules.mjs`.
+
+    `/404.html` is not a destination: marking a nav item current there would tell
+    a screen-reader user they are somewhere they are not, so the rule asserts no
+    marker at all on that page. (It also asserts the page is `noindex`, see
+    `crawlability_violations`.)
+    """
+    violations: list[str] = []
+    current = re.compile(r"<a\b([^>]*\baria-current=\"page\"[^>]*)>", re.I)
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        markers = current.findall(markup)
+        if route == "/404.html":
+            if markers:
+                violations.append(
+                    "/404.html: marks a nav item as the current page, but a 404 is not one "
+                    "of the site's destinations"
+                )
+            continue
+        if len(markers) != 1:
+            violations.append(
+                f"{route}: expected exactly one aria-current=\"page\", found {len(markers)}"
+            )
+            continue
+        href = re.search(r'href="([^"]+)"', markers[0])
+        if not href or href.group(1) != route:
+            violations.append(
+                f"{route}: the current-page marker points at "
+                f"{href.group(1) if href else 'no href'}, not at this route"
+            )
+        css = page_stylesheet(dist, route)
+        marker_rules = [
+            body
+            for prelude, body in re.findall(r"([^{}]*)\{([^{}]*)\}", css)
+            if '[aria-current="page"]' in prelude or "[aria-current='page']" in prelude
+        ]
+        if not marker_rules:
+            violations.append(
+                f"{route}: no rule in this page's own CSS styles [aria-current=\"page\"] — "
+                f"the current page is indistinguishable from the others"
+            )
+            continue
+        # The marker must not be a background colour alone: forced colours drops
+        # it, and the underline or border is what remains.
+        if not any(
+            re.search(r"(text-decoration|border|outline)", body) for body in marker_rules
+        ):
+            violations.append(
+                f"{route}: the current-page marker is a colour or background only, which "
+                f"Windows High Contrast removes; give it a decoration or a frame"
+            )
+    return violations
+
+
+# The sticky header covers the top of the viewport, so a jump to an in-page
+# anchor lands with its target behind the header unless the scrollport is padded.
+# `_LENGTHS` resolves the two token spellings this site allows; the value of the
+# 44px target token and the 16px row gap are read from the page's own `:root`
+# block rather than trusted as constants, so changing either token moves the
+# floor. 1rem = 16px because nothing in this site sets the root font size.
+def _length_px(value: str) -> float | None:
+    """Resolve a CSS length this site can write: px, rem, or bare zero."""
+    match = re.fullmatch(r"\s*(-?\d*\.?\d+)\s*(px|rem)?\s*", value or "")
+    if not match:
+        return None
+    number = float(match.group(1))
+    if match.group(2) == "rem":
+        return number * 16.0
+    return number
+
+
+def anchor_landing_violations(dist: pathlib.Path) -> list[str]:
+    """Every in-page jump lands somewhere real, and below the sticky header.
+
+    Two failure modes, both invisible until a visitor clicks: a link to an anchor
+    `id` that no longer exists (usually a renamed section), and a jump whose
+    target scrolls to the very top of the page and hides behind the sticky header
+    — the skip link's `#main` is on every page and the footnote links are on `/`,
+    and on a narrow viewport the header is two rows tall. The second is asserted
+    against the header's *own* declarations: if the page's stylesheet makes the
+    header stick to the top and the page has an in-page anchor, the page must pad
+    the scrollport (`scroll-padding-top` on `:root`/`html`) by at least two rows
+    at the target floor plus the row gap, re-derived here from the page's own
+    `--target` and `--sp-4`. If the header is not sticky, no padding is required
+    and none is demanded.
+
+    Sprite `<use href="#i-play">` references are not navigations and are checked
+    by `sprite_violations`; only `<a href="#…">` counts here. The rendered half of
+    the landing measurement — the target's real position under the real header, at
+    two viewport widths — is `website/tests/browser.mjs` (`anchors land below the
+    header`), decided by mutation-proven logic in `website/tests/rules.mjs`.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        anchors = [
+            href
+            for tag in re.findall(r"<a\b[^>]*>", markup, re.I)
+            for href in re.findall(r'href="#([^"]+)"', tag)
+        ]
+        if not anchors:
+            continue
+        ids = set(re.findall(r'\bid="([^"]+)"', markup))
+        for anchor in dict.fromkeys(anchors):
+            if anchor not in ids:
+                violations.append(
+                    f"{route}: links to #{anchor}, which no element on the page has "
+                    f"— the jump goes nowhere"
+                )
+        css = page_stylesheet(dist, route)
+        # Where the value takes effect, not merely where it is written: the
+        # scrollport belongs to the root element, so the padding and the two
+        # tokens the floor is re-derived from must be declared on `:root`/`html`,
+        # and the padding must hold at *every* viewport — a declaration that only
+        # applies inside a `@media` block is not a base, and an override that is
+        # smaller than the two-row floor is a hole at that width.
+        declarations, overrides = _root_declarations(css_units(css))
+        header = re.search(r"<header\b[^>]*>", markup, re.I)
+        header_classes = (
+            re.findall(r'class="([^"]*)"', header.group(0)) if header else []
+        )
+        sticky = False
+        for prelude, body in re.findall(r"([^{}]*)\{([^{}]*)\}", css):
+            if not any(f".{cls}" in prelude for group in header_classes for cls in group.split()):
+                continue
+            if "position:sticky" in _compact(body) or "position:fixed" in _compact(body):
+                sticky = True
+        if not sticky:
+            continue
+        if "scroll-padding-top" not in declarations:
+            if "scroll-padding-top" in overrides:
+                violations.append(
+                    f"{route}: scroll-padding-top is declared only inside a conditional "
+                    f"group, so it does not apply at every viewport — and the header sticks "
+                    f"at every viewport"
+                )
+            else:
+                violations.append(
+                    f"{route}: the header sticks to the top and the page jumps to in-page "
+                    f"anchors, but no scroll-padding-top is declared, so the target's first "
+                    f"line lands behind the header"
+                )
+            continue
+        declared = _length_px(declarations["scroll-padding-top"])
+        smallest = min(
+            [
+                value
+                for value in (
+                    [_length_px(declarations["scroll-padding-top"])]
+                    + [_length_px(value) for value in overrides.values()]
+                )
+                if value is not None
+            ]
+            or [None]
+        )
+        target = _length_px(declarations.get("--target", ""))
+        gap = _length_px(declarations.get("--sp-4", ""))
+        if target is None or gap is None:
+            violations.append(
+                f"{route}: cannot re-derive the header's height: --target "
+                f"({declarations.get('--target', 'missing')}) or --sp-4 "
+                f"({declarations.get('--sp-4', 'missing')}) is not a px or rem length"
+            )
+            continue
+        floor = 2 * target + gap
+        narrow_floor = 3 * target + 2 * gap
+        if declared is None:
+            violations.append(
+                f"{route}: scroll-padding-top is "
+                f"{declarations['scroll-padding-top']!r}, which is not a px or rem length "
+                f"this rule can check against the {floor:g}px two-row header"
+            )
+            continue
+        if smallest is not None and smallest < floor:
+            violations.append(
+                f"{route}: scroll-padding-top falls to {smallest:g}px at some viewport, but "
+                f"the header is two rows ({target:g}px + {gap:g}px + {target:g}px = "
+                f"{floor:g}px) on a narrow one, so in-page jumps land partly behind it"
+            )
+        if declared < narrow_floor:
+            violations.append(
+                f"{route}: the base scroll-padding-top is {declared:g}px, but below 480px the "
+                f"navigation itself can wrap, making the header three rows "
+                f"({target:g}px + {gap:g}px + {target:g}px + {gap:g}px + {target:g}px = "
+                f"{narrow_floor:g}px), so a jump there lands behind it"
+            )
+    return violations
+
+
+def _root_declarations(units: list[dict]) -> tuple[dict[str, str], dict[str, str]]:
+    """Declarations written on the root element: (unconditional, conditional).
+
+    `units` is `css_units(css)`. A custom property or `scroll-padding-top` read
+    from a rule inside `@media`/`@supports`/`@container`/`@layer` only applies
+    where that condition holds, so the two are kept apart: the base is what holds
+    at every viewport, and the overrides are what a narrow (or wide) viewport gets
+    instead.
+    """
+    base: dict[str, str] = {}
+    conditional: dict[str, str] = {}
+    for unit in units:
+        if unit["kind"] == "at":
+            nested, _ = _root_declarations(unit["children"])
+            conditional.update(nested)
+            continue
+        if unit["kind"] != "rule":
+            continue
+        prelude = unit["prelude"]
+        if ":root" not in prelude and not re.search(r"(?:^|[,\s])html(?:[,\s]|$)", prelude):
+            continue
+        for part in unit["body"].split(";"):
+            if ":" in part:
+                prop, _, value = part.partition(":")
+                base[prop.strip()] = value.strip()
+    return base, conditional
+
+
+def high_contrast_violations(dist: pathlib.Path) -> list[str]:
+    """A visitor who asks for more contrast gets more contrast, in both schemes.
+
+    The sheet's contrast rule checks the *default* ladder against the 4.5:1 body
+    floor. A reader who turns on the operating system's "increase contrast"
+    setting is asking for more than that, so `website/css/tokens.css` carries a
+    `@media (prefers-contrast: more)` block raising the secondary text rungs. This
+    rule asserts that block exists, that it redefines something *readable*, and
+    that every token it redefines (a) resolves against the same token in both the
+    dark and the light scheme, (b) strictly raises the contrast against each
+    surface the token is used on, and (c) lands at or above 7:1 — a block that
+    restates the defaults, or that picks a lower-contrast colour, is worse than
+    none, because it claims to have helped.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        css = page_stylesheet(dist, route)
+        pressed = _at_rule_block(css, "prefers-contrast:more") or _at_rule_block(
+            css, "prefers-contrast: more"
+        )
+        if not pressed:
+            violations.append(
+                f"{route}: no @media (prefers-contrast: more) block ships, so a visitor who "
+                f"asks the operating system for more contrast gets the default ladder"
+            )
+            continue
+        # `[^;}]+` and not `[^;]+`: the minifier drops the final semicolon, and a
+        # parser that needs one silently ignores the last declaration in a block —
+        # which is how a literal low-contrast colour in this block first went
+        # unnoticed (2026-10-08).
+        redefined = dict(re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;}]+)", pressed))
+        if not redefined:
+            violations.append(
+                f"{route}: the @media (prefers-contrast: more) block redefines nothing"
+            )
+            continue
+        schemes = {
+            "dark": _parse_scheme_tokens(css),
+            "light": _parse_scheme_tokens(css, light=True),
+        }
+        if not schemes["dark"]:
+            violations.append(f"{route}: cannot find the default :root token block")
+            continue
+        for name, value in sorted(redefined.items()):
+            reference = re.fullmatch(r"var\((--[a-z0-9-]+)\)", value.strip())
+            if reference is None:
+                violations.append(
+                    f"{route}: {name} in the high-contrast block is {value.strip()!r}, which this "
+                    f"rule cannot resolve — use `var(--…)` so both colour schemes get the "
+                    f"improved contrast"
+                )
+                continue
+            source = reference.group(1)
+            undefined = [
+                scheme
+                for scheme, tokens in sorted(schemes.items())
+                if tokens and source not in tokens
+            ]
+            if undefined:
+                violations.append(
+                    f"{route}: {name} in the high-contrast block refers to {source}, which the "
+                    f"{' and '.join(undefined)} scheme does not define"
+                )
+                continue
+            for surface in ("--bg", "--surface", "--surface-variant"):
+                for scheme, tokens in sorted(schemes.items()):
+                    if not tokens or name not in tokens or surface not in tokens:
+                        continue
+                    before = _contrast_ratio(tokens[name], tokens[surface], tokens)
+                    after = _contrast_ratio(tokens[source], tokens[surface], tokens)
+                    if before is None or after is None:
+                        violations.append(
+                            f"{route}: cannot resolve {name} or {surface} in the {scheme} scheme"
+                        )
+                        continue
+                    if after < 7.0:
+                        violations.append(
+                            f"{route}: {name} in the high-contrast block reaches only "
+                            f"{after:.2f}:1 on {surface} in the {scheme} scheme, short of the "
+                            f"7:1 a visitor asking for more contrast expects"
+                        )
+                    elif after <= before:
+                        violations.append(
+                            f"{route}: {name} in the high-contrast block is {after:.2f}:1 on "
+                            f"{surface} in the {scheme} scheme, no better than the default "
+                            f"{before:.2f}:1 — the block claims an improvement it does not make"
+                        )
+    return violations
+
+
+def _parse_scheme_tokens(css: str, light: bool = False) -> dict[str, str]:
+    """The `:root` tokens of one colour scheme, from the page's own CSS.
+
+    Scope matters, not position: the default map is every `:root` rule that is not
+    inside a conditional group, and the light map adds the ones inside
+    `@media (prefers-color-scheme: light)`. Reading "every `:root` block after the
+    first" was wrong — the sheet also carries a *print* palette and a forced-colours
+    palette, and folding those in made the default look like paper, which is how a
+    comparison against the high-contrast block can pass while measuring the wrong
+    thing (found by reading the debug output on 2026-10-08, before any mutation).
+    """
+    tokens: dict[str, str] = {}
+
+    def absorb(body: str) -> None:
+        for name, value in re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;}]+)", body):
+            tokens[name] = value.strip()
+
+    for unit in css_units(css):
+        if unit["kind"] == "rule" and ":root" in unit["prelude"]:
+            absorb(unit["body"])
+        elif (
+            unit["kind"] == "at"
+            and light
+            and "prefers-color-scheme" in unit["prelude"]
+            and "light" in unit["prelude"]
+        ):
+            for child in unit["children"]:
+                if child["kind"] == "rule" and ":root" in child["prelude"]:
+                    absorb(child["body"])
+    return tokens
+
+
+def _contrast_ratio(foreground: str, background: str, tokens: dict[str, str]) -> float | None:
+    """WCAG contrast of two token values, resolving one level of `var()`."""
+    def resolve(value: str) -> str:
+        reference = re.fullmatch(r"var\((--[a-z0-9-]+)\)", value.strip())
+        return tokens.get(reference.group(1), value) if reference else value
+
+    fg = _colour(resolve(foreground), resolve(background))
+    bg = _colour(resolve(background))
+    if fg is None or bg is None:
+        return None
+    lighter, darker = sorted((_relative_luminance(fg), _relative_luminance(bg)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
 # Keys that must never appear in the site's structured data. Each one is a claim
 # this repository cannot support: no stable release exists, so there is no
 # version; the project has never collected a rating; and an `offers`/`price` or
@@ -935,45 +1301,344 @@ def asset_reference_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
-def dist_source_drift_violations(dist: pathlib.Path) -> list[str]:
-    """The committed CSS must be exactly what the sources compose — locally.
+# --------------------------------------------------------------------------
+# CSS shape: the pruner (website/tools/prune-css.mjs) and its Python mirror
+# --------------------------------------------------------------------------
+#
+# Every route inlines the modules its front matter declares, and the build then
+# drops the rules that page cannot use (`website/tools/prune-css.mjs`). This
+# section re-derives that decision from the sources so the committed build can
+# be checked without Node: it parses both sides into units, prunes the source
+# composition with the same predicate, and compares the two sequences. A rule
+# that should have survived and is missing, a rule the page cannot use that
+# still ships, a reordering, or a hand-edited declaration all show up as a
+# difference — which is what the older, byte-equality version of this check
+# proved as well, plus pruning-awareness.
 
-    The workflow's drift check rebuilds the site and diffs; that needs Node, so
-    it cannot run in the Python-only suite. This is the cheap half of the same
-    check, and it is the half a hand-edit trips: each page's inlined CSS must
-    equal the modules *that page's own front matter declares*, whitespace and
-    comments folded. A page that ships a module it did not declare, or a `dist`
-    edited by hand, fails here without a browser or a build step.
+CONDITIONAL_AT_RULES = ("@media", "@supports", "@container", "@layer")
+
+
+def _skip_string(css: str, index: int) -> int:
+    quote = css[index]
+    cursor = index + 1
+    while cursor < len(css):
+        if css[cursor] == "\\":
+            cursor += 2
+        elif css[cursor] == quote:
+            return cursor + 1
+        else:
+            cursor += 1
+    return cursor
+
+
+def _matching_brace(css: str, index: int) -> int:
+    depth = 0
+    cursor = index
+    while cursor < len(css):
+        character = css[cursor]
+        if character in "\"'":
+            cursor = _skip_string(css, cursor)
+            continue
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return cursor
+        cursor += 1
+    return len(css)
+
+
+def _is_conditional_at_rule(prelude: str) -> bool:
+    head = prelude.strip().lower()
+    return any(
+        head.startswith(name) and head[len(name) : len(name) + 1] in (" ", "(", "")
+        for name in CONDITIONAL_AT_RULES
+    )
+
+
+def css_units(css: str, start: int = 0) -> list[dict]:
+    """Split a stylesheet into rules, conditional at-blocks and statements.
+
+    Comments are assumed to be already removed (the minifier removes them, and
+    `_fold_css` folds them); a body is kept as text, exactly as the pruner does.
     """
-    front_matter = re.compile(r"^cssModules:\s*\[([^\]]*)\]", re.M)
-    modules = re.compile(r'"([a-z0-9-]+)"')
-    routes = {
-        "index.njk": "/",
-        "features.njk": "/features/",
-        "ui.njk": "/ui/",
-        "404.njk": "/404.html",
-    }
+    units: list[dict] = []
+    index = start
+    item_start = start
+    while index < len(css):
+        character = css[index]
+        if character in "\"'":
+            index = _skip_string(css, index)
+            continue
+        if character == "{":
+            prelude = css[item_start:index]
+            close = _matching_brace(css, index)
+            body = css[index + 1 : close]
+            if prelude.lstrip().startswith("@") and _is_conditional_at_rule(prelude):
+                units.append({"kind": "at", "prelude": prelude, "children": css_units(body)})
+            else:
+                units.append({"kind": "rule", "prelude": prelude, "body": body})
+            index = close + 1
+            item_start = index
+            continue
+        if character == ";":
+            units.append({"kind": "statement", "text": css[item_start : index + 1]})
+            index += 1
+            item_start = index
+            continue
+        index += 1
+    tail = css[item_start:]
+    if tail.strip():
+        units.append({"kind": "statement", "text": tail})
+    return units
+
+
+def _strip_negations(selector: str) -> str:
+    """Remove the contents of `:not(...)`, whose classes are negative matches."""
+    out = ""
+    index = 0
+    while True:
+        at = selector.find(":not(", index)
+        if at == -1:
+            return out + selector[index:]
+        out += selector[index:at]
+        depth = 0
+        cursor = at + 4
+        while cursor < len(selector):
+            if selector[cursor] == "(":
+                depth += 1
+            elif selector[cursor] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            cursor += 1
+        index = cursor + 1
+
+
+def positive_classes(selector: str) -> set[str]:
+    """Classes whose presence the selector requires (see the pruner's docstring)."""
+    return set(re.findall(r"\.(-?[A-Za-z_][\w-]*)", _strip_negations(selector)))
+
+
+def _split_selectors(prelude: str) -> list[str]:
+    selectors: list[str] = []
+    depth = 0
+    start = 0
+    for index, character in enumerate(prelude):
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+        elif character == "," and depth == 0:
+            selectors.append(prelude[start:index])
+            start = index + 1
+    selectors.append(prelude[start:])
+    return selectors
+
+
+def _rule_can_match(prelude: str, used: set[str]) -> bool:
+    for selector in _split_selectors(prelude):
+        classes = positive_classes(selector)
+        if not classes or classes & used:
+            return True
+    return False
+
+
+def _kept_selectors(prelude: str, used: set[str]) -> list[str]:
+    """The selectors of one rule that can match, in order."""
+    return [
+        selector
+        for selector in _split_selectors(prelude)
+        if not (positive_classes(selector) and not positive_classes(selector) & used)
+    ]
+
+
+def _prune_units(units: list[dict], used: set[str]) -> list[dict]:
+    kept: list[dict] = []
+    for unit in units:
+        if unit["kind"] == "rule":
+            selectors = _split_selectors(unit["prelude"])
+            survivors = _kept_selectors(unit["prelude"], used)
+            if not survivors:
+                continue
+            # The pruner rebuilds a partially pruned selector list as the
+            # surviving selectors joined by a comma, and leaves a rule whose
+            # every selector survives byte-for-byte. Mirroring both branches is
+            # what lets the two implementations agree exactly.
+            prelude = (
+                unit["prelude"]
+                if len(survivors) == len(selectors)
+                else ",".join(selector.strip() for selector in survivors)
+            )
+            kept.append({"kind": "rule", "prelude": prelude, "body": unit["body"]})
+        elif unit["kind"] == "at":
+            children = _prune_units(unit["children"], used)
+            if children:
+                kept.append({"kind": "at", "prelude": unit["prelude"], "children": children})
+        else:
+            kept.append(unit)
+    return kept
+
+
+def _flatten_units(units: list[dict]) -> list[str]:
+    """One folded string per unit, in document order — the comparison surface."""
+    flat: list[str] = []
+    for unit in units:
+        if unit["kind"] == "rule":
+            flat.append("rule:" + _fold_css(unit["prelude"] + "{" + unit["body"] + "}"))
+        elif unit["kind"] == "at":
+            flat.append("at:" + _fold_css(unit["prelude"]))
+            flat.extend(_flatten_units(unit["children"]))
+            flat.append("end")
+        else:
+            flat.append("statement:" + _fold_css(unit["text"]))
+    return flat
+
+
+def markup_without_style(path: pathlib.Path) -> str:
+    """A page's markup with its stylesheet and scripts removed.
+
+    What a rule *styles* is not evidence of what the page *draws*: `.mock .device`
+    in the CSS must not count as a mockup on screen, or the print rule below could
+    never see a page that stopped drawing one.
+    """
+    return re.sub(
+        r"<(style|script)\b[^>]*>.*?</\1>",
+        " ",
+        path.read_text(encoding="utf-8"),
+        flags=re.S | re.I,
+    )
+
+
+def classes_used_by_page(markup: str) -> set[str]:
+    """The classes a built page uses, from `class` attributes only.
+
+    `<style>` and `<script>` bodies are removed first: the stylesheet lists class
+    *selectors*, and counting those would make every rule look used.
+    """
+    outside = re.sub(r"<(style|script)\b[^>]*>.*?</\1>", " ", markup, flags=re.S | re.I)
+    used: set[str] = set()
+    for value in re.findall(r"""\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')""", outside):
+        for name in (value[0] or value[1]).split():
+            used.add(name)
+    return used
+
+
+def without_css_comments(css: str) -> str:
+    """Comments removed, whitespace untouched.
+
+    A comment can sit between a descendant combinator and its selector, or
+    contain a brace; the minifier removes comments, so the comparison ignores
+    them — but *whitespace must stay*, because folding it would glue
+    `.site-nav ul` into a class name that no page has and every descendant rule
+    would look prunable. That was a real bug in this check's first version.
+    """
+    return re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+
+
+def page_css_units(dist: pathlib.Path, route: str) -> list[dict]:
+    """The units of the CSS that page actually ships."""
+    return css_units(without_css_comments(page_stylesheet(dist, route)))
+
+
+def prune_source_css(css: str, used: set[str]) -> str:
+    """The pruner's decision, in Python: for tests and for `choose_modules`."""
+    return "".join(_restore(_prune_units(css_units(without_css_comments(css)), used)))
+
+
+def _restore(units: list[dict]) -> list[str]:
+    out: list[str] = []
+    for unit in units:
+        if unit["kind"] == "rule":
+            out.append(unit["prelude"] + "{" + unit["body"] + "}")
+        elif unit["kind"] == "at":
+            out.append(unit["prelude"] + "{" + "".join(_restore(unit["children"])) + "}")
+        else:
+            out.append(unit["text"])
+    return out
+
+
+PAGE_SOURCES = {
+    "index.njk": "/",
+    "features.njk": "/features/",
+    "ui.njk": "/ui/",
+    "404.njk": "/404.html",
+}
+
+
+def declared_modules(source_name: str) -> list[str]:
+    """The CSS modules a page's front matter declares, in order."""
+    source = SOURCE_DIR / source_name
+    if not source.is_file():
+        return []
+    match = re.search(r"^cssModules:\s*\[([^\]]*)\]", source.read_text(encoding="utf-8"), re.M)
+    if not match:
+        return []
+    return re.findall(r'"([a-z0-9-]+)"', match.group(1))
+
+
+def dist_source_drift_violations(dist: pathlib.Path) -> list[str]:
+    """The committed CSS must be the *pruned* composition of its sources.
+
+    What this used to prove (until 2026-10-08): each page's inlined CSS equalled
+    the byte-for-byte composition of the modules its front matter declares, so a
+    hand-edit or a stale build was a red test.
+
+    What it proves now: the same thing, plus the pruning step. The sources are
+    parsed, pruned with the same predicate as `website/tools/prune-css.mjs`
+    (a selector survives when it has no positive class, or at least one class the
+    page uses), and compared with the built page unit by unit and in order — so a
+    rule the page *can* use that went missing, a rule it cannot use that still
+    ships, a reordering and a changed declaration are all differences. It runs
+    without Node, in app CI as well as the site workflow, which is the point:
+    app CI has to be able to tell a stale committed build from a fresh one.
+    """
     violations: list[str] = []
-    for source_name, route in routes.items():
-        source = SOURCE_DIR / source_name
-        if not source.is_file():
+    for source_name, route in PAGE_SOURCES.items():
+        if not (SOURCE_DIR / source_name).is_file():
             violations.append(f"{source_name} is missing from the sources")
             continue
-        declared = modules.findall(front_matter.search(source.read_text(encoding="utf-8")).group(1)) if front_matter.search(source.read_text(encoding="utf-8")) else []
-        if not declared:
+        modules = declared_modules(source_name)
+        if not modules:
             violations.append(f"{source_name}: no cssModules declared")
             continue
-        expected = "\n".join(
+        path = page_paths(dist).get(route)
+        if path is None:
+            violations.append(f"{route}: built page is missing")
+            continue
+        markup = path.read_text(encoding="utf-8")
+        used = classes_used_by_page(markup)
+        composed = "\n".join(
             (SOURCE_DIR.parent / "css" / f"{name}.css").read_text(encoding="utf-8").strip()
-            for name in declared
+            for name in modules
         )
-        built = page_stylesheet(dist, route)
-        if _fold_css(expected) != _fold_css(built):
-            violations.append(
-                f"{route}: the committed CSS is not the composition of "
-                f"{', '.join(declared)} — the build is stale, or dist was edited by hand"
-            )
+        expected = _flatten_units(
+            _prune_units(css_units(without_css_comments(composed)), used)
+        )
+        built = _flatten_units(page_css_units(dist, route))
+        if built == expected:
+            continue
+        detail = _first_difference(built, expected)
+        violations.append(
+            f"{route}: the committed CSS is not the pruned composition of "
+            f"{', '.join(modules)} — {detail} "
+            f"(built {len(built)} unit(s), expected {len(expected)}; "
+            f"run `npm run build` in website/ and commit the result)"
+        )
     return violations
+
+
+def _first_difference(built: list[str], expected: list[str]) -> str:
+    for index, (actual, wanted) in enumerate(zip(built, expected)):
+        if actual != wanted:
+            return (
+                f"unit {index + 1} differs: built {actual[:70]!r}, "
+                f"expected {wanted[:70]!r}"
+            )
+    if len(built) > len(expected):
+        return f"the build carries {len(built) - len(expected)} extra unit(s), first: {built[len(expected)][:70]!r}"
+    return f"the build is missing {len(expected) - len(built)} unit(s), first: {expected[len(built)][:70]!r}"
 
 
 def _fold_css(css: str) -> str:
@@ -1021,7 +1686,44 @@ def crawlability_violations(dist: pathlib.Path) -> list[str]:
                 violations.append(f"robots.txt scopes {path}, but the site has exactly three routes")
     if not (dist / "404.html").is_file():
         violations.append("404.html is missing from the built site")
+    else:
+        # A 404 must not be offered for indexing, and a real page must not refuse
+        # it: `noindex` on `/features/` would delete the page from search results,
+        # which is a defect no other check here would notice.
+        for route, path in page_paths(dist).items():
+            markup = path.read_text(encoding="utf-8")
+            has_noindex = bool(
+                re.search(r'<meta[^>]*name="robots"[^>]*content="[^"]*noindex', markup, re.I)
+            )
+            if route == "/404.html" and not has_noindex:
+                violations.append(
+                    "404.html: no <meta name=\"robots\" content=\"noindex\"> — a crawler that "
+                    "reaches this page through a soft-404 path would list it"
+                )
+            if route != "/404.html" and has_noindex:
+                violations.append(f"{route}: carries noindex, which would remove a real page from search")
     return violations
+
+
+def _at_rule_block(css: str, marker: str) -> str:
+    """The body of the first at-rule whose prelude contains `marker`, or "".
+
+    The earlier version of both rules below sliced a fixed number of characters
+    after the marker and searched inside that — which runs past the end of the
+    block into whatever rules follow it. A rule for an element *outside* the
+    block could therefore satisfy a check about the block (a real false pass,
+    found by mutation on 2026-10-08: deleting `.mock .device { display: none }`
+    from the print block still passed because the mockup's own `.device` rule
+    comes later in the same sheet). Brace matching reads the block and nothing
+    else.
+    """
+    index = css.find(marker)
+    if index == -1:
+        return ""
+    brace = css.find("{", index)
+    if brace == -1:
+        return ""
+    return css[brace + 1 : _matching_brace(css, brace)]
 
 
 def print_style_violations(dist: pathlib.Path) -> list[str]:
@@ -1033,6 +1735,14 @@ def print_style_violations(dist: pathlib.Path) -> list[str]:
     contrast still above the floors — and this rule keeps the block those
     measurements depend on from being deleted or from shipping on two routes out
     of three.
+
+    Changed 2026-10-08, when the build started pruning each page's CSS against
+    its own markup (`website/tools/prune-css.mjs`): the rule that the print block
+    must hide the mockup drawing is now asserted only for a page that *has* a
+    drawing (`class="device` in its markup). It used to be asserted for every
+    route, which was vacuous on `/404.html` and became impossible once the
+    unprunable-anywhere `.mock .device` rule stopped shipping there. The floor is
+    the same where the effect exists: a printed drawing is a page of ink.
     """
     violations: list[str] = []
     marker = "@mediaprint"
@@ -1044,14 +1754,20 @@ def print_style_violations(dist: pathlib.Path) -> list[str]:
                 f"the printed sheet is white text on white paper"
             )
             continue
-        block = compact.split(marker, 1)[1][:3000]
+        block = _at_rule_block(compact, marker)
+        markup = path.read_text(encoding="utf-8")
         for token in ("--text:", "--bg:"):
             if token not in block:
                 violations.append(
                     f"{route}: the @media print block does not redefine {token.rstrip(':')} "
                     f"for paper"
                 )
-        if ".device" not in block:
+        # The page *draws* a mockup when its markup uses the class — checked
+        # against class attributes, not against the string ".device", which is a
+        # selector and (measured 2026-10-08) never matches markup at all. That
+        # mistake made this rule unfailable, which is not a rule.
+        draws_mockup = "device" in classes_used_by_page(markup)
+        if draws_mockup and ".device" not in block:
             violations.append(
                 f"{route}: the @media print block does not hide the decorative mockup "
                 f"drawing, so printing spends a page of ink on a recreation"
@@ -1112,7 +1828,7 @@ def forced_colors_violations(dist: pathlib.Path) -> list[str]:
                 f"plain text"
             )
             continue
-        block = compact.split(marker, 1)[1].split("}}", 1)[0][:400]
+        block = _at_rule_block(compact, marker)
         markup = path.read_text(encoding="utf-8")
         if 'class="btn' in markup and ".btn" not in block:
             violations.append(
@@ -1392,6 +2108,9 @@ CHECKS = (
     ("icon is inlined and true to its source", favicon_violations),
     ("nothing ships unreferenced", unreferenced_file_violations),
     ("accessibility floor", accessibility_violations),
+    ("current page is marked", navigation_state_violations),
+    ("in-page anchors land below the header", anchor_landing_violations),
+    ("high-contrast preference is honoured", high_contrast_violations),
     ("page metadata", metadata_violations),
     ("structured data", structured_data_violations),
     ("crawlability", crawlability_violations),

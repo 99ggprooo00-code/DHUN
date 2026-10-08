@@ -355,6 +355,102 @@ the artifact the deploy job publishes. Cost of the chosen path: publishing waits
 on a human with Pages write access; the wait is now visible in every run.
 Reversal cost: delete the step (its tests fail, by design).
 
+**D18 — a route ships only the CSS it can use, pruned at build time against its own markup.**
+Read the numbers in `docs/verification/23-per-route-css-pruning.md`; this is the
+decision record, not the evidence table. Modules are shared (`base.css` carries the
+header *and* the home hero; `components.css` carries the stat row *and* the 404
+block), so a route was shipping rules it could never match — measured at boot: 18
+unused classes on `/`, 52 on `/features/`, 53 on `/ui/`, 34 on `/404.html`.
+`website/tools/prune-css.mjs` now runs between Eleventy and the minifier and drops
+those rules per page: a selector survives when it has no positive class (so `body`,
+`*`, `[aria-current]` and `a:not(.btn)` are never touched) or at least one class
+the page uses; conditional groups are pruned recursively and dropped only when
+empty; `@keyframes`/`@font-face`/`@import` are kept verbatim. Tokens are
+deliberately **not** pruned — they are the design system's published contract
+(`/ui/` prints their values) — so the win is smaller than it could be and the
+sources stay one file per layer. Measured: `/` 53,554 → 51,311 B (−4.2 %),
+`/features/` 54,881 → 48,019 B (−12.5 %), `/ui/` 56,263 → 49,508 B (−12.0 %),
+`/404.html` 17,441 → 12,794 B (−26.6 %), with 0 bytes of client JavaScript and one
+request per route unchanged. `dist_source_drift_violations` was adapted rather than
+weakened — it now proves the committed CSS equals the *pruned* composition (same
+rule set, same order, no missing rule, no extra rule) with the predicate re-derived
+in Python, so app CI still needs no Node; `print_style_violations` now requires the
+print block to hide a mockup only on a page that draws one. Both adaptations and
+the two defects they exposed are mutation-proven (eight mutations, recorded in the
+verification record). Reversal cost: delete the `prune-css.mjs` step from the
+`build` script and rebuild — the drift check's expectation is the only other change
+to undo; ~15 minutes. Cost of keeping it: the pruning predicate exists twice (JS
+build, Python check), which the mutation table covers but no test can prove
+*equivalent*.
+
+**D19 — the header marks the page the visitor is on, and `/404.html` asks not to be indexed.**
+Measured before the change: `aria-current` appeared **nowhere** in `website/dist/`
+(this session) and none of the three routes marked itself; the 404 shipped no
+`<meta name="robots">` at all. Now the wordmark carries `aria-current="page"` on
+`/` and the matching nav item carries it on `/features/` and `/ui/`, styled twice
+over: a filled pill for sighted users and an underline with the accent colour that
+**survives Windows High Contrast**, where the engine drops author backgrounds. The
+404 is not a destination, so it carries no marker and does carry `noindex`; the
+three real routes must *not* carry it, because `noindex` on a real page removes it
+from search and no other check here would notice. The static rule
+(`navigation_state_violations`, +1 check → 27) asserts exactly-one-marker,
+marker-points-here, and a marker rule that is not background-only; the rendered
+half is `website/tests/browser.mjs` `current page` (including the forced-colours
+pass) whose decision logic lives in `rules.mjs` and is mutation-proven without a
+browser. Cost: **+290 B per route** (measured: `/` 51,311 → 51,601 B, `/features/`
+48,019 → 48,309 B, `/ui/` 49,508 → 49,798 B, `/404.html` 12,794 → 13,102 B) — an
+accessibility feature that buys no bytes, recorded so the ratchet shows it
+deliberately. Reversal cost: delete the two `{% if %}` clauses, the CSS rule, the
+`extraHead` line and the check; ~15 minutes, and the score disappears.
+
+**D20 — an in-page jump lands below the sticky header, and every anchor target exists.**
+The header is `position: sticky` (base.css) and its row is 64px tall with a 44px
+target floor inside it, so it wraps as the viewport narrows: measured off the
+page's own `:root` block, `--target` 44px + `--sp-4` 16px + `--target` 44px =
+**104px** for the two-row header, and **164px** (3 × 44 + 2 × 16) where the
+navigation itself wraps to two lines. Nothing pushed the scrollport down, so the
+skip link's `#main` and the footnote links on `/` — the site's only in-page jumps —
+landed with their first line *behind* the header; for a footnote the covered line
+is the whole footnote. Fixed with a mobile-first pair: `:root { scroll-padding-top:
+12rem }` (192px, covering the 164px three-row worst case up to 479px) and
+`@media (min-width: 480px) { :root { scroll-padding-top: 7rem } }` (112px for the
+104px two-row case, 8px slack). Both are in `rem` so a visitor who raises the
+browser's default font size gets a proportionally larger offset, not a smaller one.
+The new static check (`anchor_landing_violations`, check count 27 → 28) asserts
+both directions of the landing: every `href="#…"` on a page has a matching `id`,
+and a page that is sticky-headed *and* has an in-page jump must declare
+`scroll-padding-top` on `:root`/`html` **outside any conditional group** (a
+`@media`-only declaration is not a base), with the base value at or above the
+three-row floor and no declared value below the two-row floor — every number
+re-derived from the page's own tokens rather than trusted as 104 or 164. The rendered half — the target's real position under the real header, at
+1280×800, 380×800 and 280×653 (the smallest display class the site supports, where
+the navigation can wrap) — is the browser check `anchors land below the header`,
+decided by the mutation-proven `anchorLandingProblem()`, which also reports the
+effective `scroll-padding-top` so a failure names the number to change. Cost:
+**+57 B per route** (measured: `/` 51,631 → 51,688 B, `/features/` 48,339 →
+48,396 B, `/ui/` 49,828 → 49,885 B, `/404.html` 13,132 → 13,189 B), recorded in
+the ratchet. Reversal cost: delete the two CSS declarations, the check and its
+registration; ~10 minutes, and the jump defect returns.
+
+**D21 — a visitor who asks the operating system for more contrast gets it.**
+The sheet was built to a 4.5:1 body floor (`contrast_violations`, 13 token pairs),
+which is the requirement, not the ceiling a reader wants when they turn on
+"increase contrast" (`prefers-contrast: more` — Windows and macOS both expose it).
+Measured from the tokens this session: in the light set `--text-3` is **4.83:1** on
+`--bg` and **4.71:1** on the variant surface; in the dark set it is **7.47:1** on
+`--bg` but **6.71:1** on the variant surface. The new
+`@media (prefers-contrast: more)` block in `tokens.css` raises both secondary rungs
+to `var(--text)` — **18.10:1** on `--bg` in the dark set, **16.26:1** in the light
+set — and because the value is a *reference* rather than a colour, one declaration
+improves both schemes. New check `high_contrast_violations` (28 → 29) asserts the
+block exists, that its values resolve in both schemes, and that every token it
+redefines strictly raises contrast against `--bg`, `--surface` and
+`--surface-variant` to at least 7:1 — a block that restates the defaults, picks a
+literal colour, or references a token that does not exist fails. Cost: **+80 B per
+route**, ratcheted. Reversal cost: delete the block, the check and its
+registration, the five tests; ~10 minutes, and the readers who asked for more
+contrast are back to 4.83:1.
+
 ## 11. Work plan, execution and honest status
 
 | Phase | Deliverable | Status |

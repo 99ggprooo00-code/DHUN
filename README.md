@@ -48,6 +48,13 @@ page, where the warning about it lives next to the files — and `scripts/websit
 fails the build if a page ever links an artifact directly.
 
 - Source: `website/` — Eleventy (pinned), one command: `cd website && npm ci && npm run build`.
+  The build composes each route's stylesheet from the modules its front matter
+  declares and then drops the rules that route cannot use
+  (`website/tools/prune-css.mjs`); measured page weight falls from 53.6 KB to
+  51.3 KB on `/`, 54.9 KB to 48.0 KB on `/features/`, 56.3 KB to 49.5 KB on
+  `/ui/` and 17.4 KB to 12.8 KB on `/404.html`, with one request per route and no
+  client-side JavaScript — see
+  `docs/verification/23-per-route-css-pruning.md`.
 - Deployment: `.github/workflows/website.yml` publishes the built artifact to
   GitHub Pages from `main` only; a session branch can build and check but never
   overwrite the public site.

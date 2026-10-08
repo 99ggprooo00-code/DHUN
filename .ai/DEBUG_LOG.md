@@ -4147,3 +4147,169 @@ Open, user-gated: re-download of the rolling `test` build carrying endless
 radio + an itemized hardware soak (leave a station running 30 min, watch
 for a gap at the first refill; related row still excludes the current
 track).
+
+## 2026-10-08 · The print rule's "hide the mockup" half could not fail, and neither could its replacement (session `arena/af3e7f66-dhun`)
+
+**Symptom.** While adding per-route CSS pruning, `print_style_violations` kept
+passing on `/404.html` even though the pruned 404 no longer ships the
+`.mock .device { display: none; }` rule its print block used to carry. The
+obvious read was "the check is out of date with the pruner". It was worse than
+that: the rule was **unfailable in that direction**, and had been since it was
+written.
+
+**Root cause 1 — the window.** The rule took the compact page CSS, split on the
+`@mediaprint` marker once, and searched the first 3000 characters *after* the
+marker for `.device`. Whatever follows the print block in the same inlined sheet
+therefore counted as part of it. Because the mockup module (`css/mockups.css`)
+comes after `base.css` in every composed sheet, the mockup's own
+`.device { container-type: inline-size; … }` rule sat inside that window: deleting
+`display: none` from the print block still passed. Mutation, not reasoning, found
+it — the mutation "remove the hiding rule from the source and rebuild" returned
+`OK: 26 quality checks pass`. Fixed with `_at_rule_block(compact, marker)`, which
+brace-matches the block body and reads nothing else; `forced_colors_violations`
+had the same shape (`split(marker)[1].split("}}")[0][:400]`) and now shares the
+helper. Regression test: `test_a_rule_after_the_block_cannot_satisfy_it`.
+
+**Root cause 2 — a selector string is not markup.** The replacement condition,
+"the page draws a mockup", was first written as `".device" in markup`. `.device`
+is CSS selector syntax; markup carries `class="device"`. The condition was
+therefore always false, and the adapted rule could not fire either — a second
+unfailable rule written the same afternoon. Fixed by asking the same helper the
+pruner's mirror uses, `classes_used_by_page(markup)`, and re-run as a mutation:
+removing the hiding rule from `css/base.css` and rebuilding now produces three
+violations (one per route that draws a mockup) and none on `/404.html`.
+
+**Lesson for the next session.** "The mutation failed to fail" is the only signal
+that distinguishes a rule from a comment. Both of these read as correct code and
+were reviewed as correct code; each was a `[:3000]` or a string comparison away
+from proving nothing. Two of the four checks touched in this session had to be
+fixed this way, and the fix was always a smaller window and a stricter reader.
+
+**Also in this session (same area, same cause).** The Python mirror of the pruner
+initially folded whitespace *before* parsing the CSS
+(`css_units(_fold_css(css))`). Folding glues `.site-nav ul` into the class name
+`site-navul`, so every descendant rule looked prunable and the expected sequence
+collapsed from 227 units to 27. The comparison now strips comments and keeps
+whitespace (`without_css_comments`), and `_fold_css` is applied per unit at
+comparison time only. Symptom to recognise: "expected 27 unit(s)" against a
+240-unit build.
+
+## 2026-10-08 · Nothing marked the current page, and the 404 was offered for indexing (session `arena/af3e7f66-dhun`)
+
+**Symptom (found by reading the built HTML, not by a failing check).**
+`grep -c 'aria-current' website/dist/**/*.html` returned 0 on every route: the
+header navigation never said which page the visitor was on, so a screen-reader
+user got three links with no indication of context and a sighted user had to read
+the page title to find out. Separately, `/404.html` shipped no `<meta name="robots">`
+at all: GitHub Pages serves it with a 404 status, so no well-behaved crawler lists
+it, but a soft-404 path (an internal link to a stale URL, a proxy that rewrites the
+status) can still surface it, and nothing in the build said `noindex`.
+
+**Root cause.** Both are *absence* defects: no rule in the gate table covered
+navigation state, so no mutation could ever have caught it — the accessibility
+floor checked landmarks, headings, skip link and alt text, and the crawlability
+rule checked that the *routes* were in `sitemap.xml`, never that a non-route was
+kept out. A site built template-first has no place that says "the header must
+describe where you are", and both omissions survived eleven sessions of checks
+because nothing asked.
+
+**Fix, and why each half is provable.** `aria-current="page"` is asserted in the
+built HTML (exactly one marker, pointing at this route) *and* its rendered
+difference is measured in a browser, including `forced-colors: active` — the pill
+alone is not a marker there, which is why the underline exists and why
+`markerPerceivable()` ignores colour. `noindex` is asserted in both directions:
+present on `/404.html`, absent on the three real routes. The browser decision
+logic is in `tests/rules.mjs` with must-pass and must-fail cases, so the CI-only
+half is mutation-proven without a browser — the same split the repository already
+uses for touch targets, heading order and print caveats.
+
+## 2026-10-08 · In-page jumps landed behind the sticky header (session `arena/af3e7f66-dhun`)
+
+**Symptom.** Nothing visible in a screenshot and nothing a gate asked about: the
+header is `position: sticky` (base.css) and `scroll-padding-top` was declared
+nowhere (grep over `website/css/` returned only a `scroll-behavior` line inside the
+reduced-motion block). So the skip link's `#main` and the four footnote links on
+`/` scrolled their target flush with the top of the viewport, and on a narrow
+viewport — where the header wraps to two rows, 104px measured from the page's own
+`:root` (`--target` 44 + `--sp-4` 16 + `--target` 44) — the first line of the
+target, which for a footnote is the whole footnote, sat *under* the header.
+
+**Why no check could have caught it.** Every rule in the table read the CSS and the
+HTML separately; none of them modelled *where the scrollport lands*. The
+accessibility floor checked that the skip link exists and is reachable by Tab, not
+that what it jumps to is readable; the responsive rules checked that breakpoints
+exist, not that their height was accounted for after a jump.
+
+**Fix.** A mobile-first pair in base.css, next to the sticky header they exist for: `:root { scroll-padding-top: 12rem }` (192px, covering the 164px three-row worst case below 480px, where the navigation itself wraps to two lines) and `@media (min-width: 480px) { :root { scroll-padding-top: 7rem } }` (112px for the 104px two-row case), both in `rem` so they scale with the visitor's font size. `anchor_landing_violations` asserts the base declaration exists *outside* any conditional group (a `@media`-only declaration applies nowhere else) and that no declared value falls below the two-row floor, re-derived from the page's `--target` and `--sp-4`; moving the declaration onto `.wrap` was still caught. The rendered half is the new browser check, measured at three widths — 1280×800, 380×800 and the 280×653 cover-screen class where the navigation wraps too — and it reports the effective `scroll-padding-top`, so a failure names the number to change instead of just being red.
+where the header is two rows) instead of trusting the arithmetic.
+
+## 2026-10-08 · The smoke check could be run locally, and it counted characters as bytes (session `arena/af3e7f66-dhun`)
+
+**What was assumed.** The served-site check (`scripts/website_smoke.py`) was
+believed to need a real deploy: the workflow runs it only after a successful Pages
+deploy, and Pages still serves the repository README through Jekyll. It takes a
+base URL, so a stock `python3 -m http.server 8080 --bind 0.0.0.0` inside
+`website/dist` is enough, and the whole honesty contract plus every root-relative
+link is then checked over HTTP in under a second. This is now the cheapest way to
+get *served* evidence in a session with no browser and no internet route to the
+published site (record 26 has the exact output and recipe).
+
+**The defect that fell out of it.** The run printed `/: HTTP 200, 51627 bytes`
+against a 51,688-byte file: `len(markup)` counts characters and the output said
+bytes. The site's em dashes, arrows and multiplication signs cost two or three
+bytes each, so *every* page was understated, and the number is exactly the kind
+somebody would quote as the page weight. `served_size()` now encodes before
+measuring, and a test pins both the encoding and the equality with each committed
+file's size — the same class of mistake the weight budget avoids by using
+`stat().st_size`.
+
+## 2026-10-08 · Reading "every :root block after the first" measured the *print* palette (session `arena/af3e7f66-dhun`)
+
+**The mistake, and how it surfaced.** The new high-contrast check needs each
+token's value in the dark scheme (the first `:root` block) and in the light scheme
+(the block inside `@media (prefers-color-scheme: light)`). The first version read
+the light map as "default overlaid with every later `:root` block" — but the sheet
+also carries a *print* palette and a forced-colours palette, and those blocks come
+later, so the "light" values were actually paper's (`--bg: #ffffff`,
+`--text-3: #3d3934`). The check still passed, because the comparison it made was
+internally consistent; only printing the parsed maps showed the wrong values
+(`--text` measured as `#000000` in the "light" scheme). Scope, not position, is
+what identifies a block, so the reader now walks `css_units` and takes only `:root`
+rules that sit inside a `prefers-color-scheme: light` group. Numbers were re-read
+afterwards from the corrected map and are the ones in `docs/verification/27-*.md`.
+
+**A second trap in the same rule.** The first mutation that should have been caught
+— replacing `--text-3: var(--text)` with a literal `#3d3934` — passed, because the
+declaration parser required a trailing `;` and the minifier drops the last one in a
+block, so the offending declaration was never read. `[^;}]+` (not `[^;]+`) fixed it;
+the mutation now produces
+`/features/: --text-3 in the high-contrast block is '#3d3934', which this rule cannot resolve …`.
+Both mistakes are the same shape: a check that reads the wrong text is a check that
+cannot fail.
+
+## 2026-10-08 · A reporter's prose is a claim, and it goes stale like any other (session `arena/af3e7f66-dhun`)
+
+`website/tests/browser.mjs` measured text contrast under the emulated
+`prefers-contrast: more` and printed "this site declares no `prefers-contrast`
+rules, so the number is the same as the default scheme by design". True when it
+was written; false one commit later, when `tokens.css` gained exactly such a
+block — and the check still passed, because nothing in it depended on the
+sentence being true. A `grep -rn prefers-contrast` over the tree (done while
+writing the record for the block) is what surfaced it: the string appeared in the
+reporter, in `.ai/KNOWN_LIMITATIONS.md` and in verification record 22, each
+asserting a state of the world rather than a measurement.
+
+The fix is the same shape in all three places: replace the claim with the number
+it was standing in for. The reporter now counts the page's own
+`@media…prefers-contrast` blocks inside the page and measures the same route a
+second time with the preference *unset*, so the recorded line is
+`lowest ratio X:1 against Y:1 with the preference unset; the page's own CSS
+carries N prefers-contrast block(s)` — and a ratio that ever comes out *below*
+the default's is a `fail`, not a notice. The living document
+(`KNOWN_LIMITATIONS.md`) says what is now true; the historical record (22) keeps
+its sentence and carries a dated supersede note, because a record is evidence of
+what was believed then, not a wiki.
+
+**Lesson.** When a commit changes the world a check describes, grep the check for
+its prose. Assertions fail loudly when they go stale; sentences do not.
+

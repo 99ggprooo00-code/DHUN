@@ -24,6 +24,98 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Accessibility — "increase contrast" now increases contrast (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- The sheet met the 4.5:1 body floor everywhere and stopped there, so a visitor
+  who turns on the operating system's "increase contrast" setting got exactly the
+  same secondary text: measured from the tokens, the light set's `--text-3` is
+  4.83:1 on the page background (4.71:1 on the variant surface) and the dark set's
+  is 6.71:1 on the variant surface. A `@media (prefers-contrast: more)` block now
+  raises both secondary rungs to the primary text colour — 18.10:1 on the page
+  background in the dark set, 16.26:1 in the light set — written as a reference so
+  one declaration improves both colour schemes. A new check asserts the block
+  exists, resolves in both schemes, and strictly raises contrast to at least 7:1
+  against each surface; a block that restates the defaults, hard-codes one
+  scheme's colour, or points at a missing token fails the build. Measured cost:
+  +80 B per route. The `browser` job's own increased-contrast measurement now
+  takes the same reading twice — with the emulated preference on and in a default
+  context — and fails if the preference ever leaves a text node worse off; its old
+  sentence claiming the site "declares no `prefers-contrast` rules" was true when
+  written and false one commit later, which is why the numbers replaced it.
+
+### Fixed — the served-site smoke check reports sizes in bytes (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- `scripts/website_smoke.py` printed `len(markup)` — characters — and labelled it
+  `bytes`, understating every route by 55–61 bytes (the copy's em dashes, arrows
+  and multiplication signs cost two or three bytes each in UTF-8; measured on `/`:
+  51,627 reported against 51,688 served). The size is now `len(markup.encode(
+  "utf-8"))` in a named `served_size()`, and a new test ties the reported number to
+  `path.stat().st_size` for every committed page. Found by running the script
+  against a local static server of `website/dist` — the first *served* evidence of
+  the session; see `docs/verification/26-served-smoke-run-and-byte-accurate-sizes.md`.
+
+### Fixed — in-page jumps no longer land behind the sticky header (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- The header sticks to the top of the viewport, so the skip link's `#main` and the
+  footnote links on `/` scrolled their target to the very top, where the first
+  line — the whole footnote line — sat *under* the header. `scroll-padding-top`
+  now pads the scrollport with two mobile-first values read off the page's own
+  tokens: `12rem` up to 479px, where the navigation can wrap and the header can be
+  three rows (3 × 44px + 2 × 16px = 164px), and `7rem` from 480px, where the header
+  is at most two rows (104px). `rem` is deliberate: a visitor who raises their
+  default font size gets a larger offset, not a smaller one. A new static check
+  asserts both halves — every `href="#…"` has an `id`, and a sticky-headed page
+  with in-page jumps declares a base `scroll-padding-top` with no value below the
+  two-row floor, re-derived from its own CSS — and a new browser check measures the
+  landing at 1280×800, 380×800 and 280×653, reporting the effective padding so a
+  failure names the number to change. Measured cost: +57 B per route.
+
+### Accessibility — the header says which page you are on, and the 404 is noindex (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- **Navigation state, marked twice.** No page marked itself as the current page
+  (`aria-current` appeared nowhere in the built site). `/` now marks the wordmark,
+  `/features/` and `/ui/` mark their own nav item, and the mark is drawn as a pill
+  plus an accent underline so it survives Windows High Contrast, where author
+  backgrounds are dropped. `/404.html` is not a destination and carries no mark —
+  and now carries `<meta name="robots" content="noindex">`, which the three real
+  routes must *not* carry (a `noindex` there would delete the page from search
+  results). New gate: `navigation_state_violations` asserts exactly one marker per
+  destination, that it points at that destination, and that its styling is not
+  background-only; the rendered and forced-colours halves are measured in
+  `website/tests/browser.mjs` (`current page`) with mutation-proven logic in
+  `tests/rules.mjs`. Measured cost: +290 B per route, recorded in the ratchet.
+
+### Performance — each route ships only the CSS it can use (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- **Measured page weight, not argued.** The site inlines one stylesheet per route
+  from shared CSS modules, so a route carried rules it could never match
+  (52 unused classes on `/features/`, 53 on `/ui/`, 34 on `/404.html`, 18 on `/`
+  at boot). `website/tools/prune-css.mjs`, a new dependency-free step between
+  Eleventy and the minifier, drops those rules per page — decided against the
+  page's own `class` attributes, never against a hand-maintained list. Route
+  weight: `/` 53,554 → **51,311 B** (−4.2 %), `/features/` 54,881 → **48,019 B**
+  (−12.5 %), `/ui/` 56,263 → **49,508 B** (−12.0 %), `/404.html` 17,441 →
+  **12,794 B** (−26.6 %). Still one request per route, still **0 bytes** of
+  client-side JavaScript, and the CSS sources stay one file per layer: tokens are
+  deliberately never pruned (they are the design system's published contract).
+- **The drift check got stronger, not looser.** It used to require each page's
+  inlined CSS to equal the byte-for-byte composition of its declared modules. It
+  now requires it to equal that composition *pruned the same way the build prunes
+  it* — every rule the page can use present, no rule it cannot use shipped, source
+  order preserved, changed declarations caught — with the predicate re-derived in
+  Python (`scripts/website_quality.py`), so app CI still checks the committed
+  build without Node. `print_style_violations` now demands the drawing-hiding
+  declaration of a page that *draws* a mockup (three routes) instead of every
+  route, where it was vacuous on `/404.html`.
+- **Two rules that could not fail, found by mutation and fixed.** The print rule
+  read 3000 characters *after* the `@media print` marker, so a `.device` rule
+  later in the same sheet satisfied a check about the block; and the drawing test
+  searched the markup for the string `.device`, which is a selector and never
+  appears in markup. Both now read what they claim to (`_at_rule_block`,
+  `classes_used_by_page`), with regression tests. Root causes in
+  `.ai/DEBUG_LOG.md`; evidence in
+  `docs/verification/23-per-route-css-pruning.md`.
+
 ### Changed — the canonical URL is not the site yet, and now every run says so (2026-10-08, session `arena/37ec95ed-dhun`)
 
 - **A silence, fixed.** GitHub Pages is configured `build_type: legacy` with the

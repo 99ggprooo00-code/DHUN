@@ -48,14 +48,19 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="wrap header-inner">
-    <a class="wordmark" href="/" aria-label="DHUN home">
+    {#- aria-current marks the destination the visitor is on. `/` is the wordmark,
+        which is the site's home link; the nav items mark themselves when their
+        href is this page's URL. Exactly one per page, asserted by
+        `navigation_state_violations` in scripts/website_quality.py and measured,
+        including in Windows High Contrast, in website/tests/browser.mjs. -#}
+    <a class="wordmark" href="/" aria-label="DHUN home"{% if page.url == "/" %} aria-current="page"{% endif %}>
       <span class="wordmark-mark" aria-hidden="true">{% icon "play" %}</span>
       <span>DHUN</span>
     </a>
     <nav class="site-nav" aria-label="Main">
       <ul>
         {%- for item in site.nav %}
-        <li><a href="{{ item.href }}"{% if item.external %} rel="noopener"{% endif %}>{{ item.label }}{% if item.external %}<span class="ext" aria-hidden="true">{% icon "external" %}</span><span class="sr-only"> (opens in a new tab)</span>{% endif %}</a></li>
+        <li><a href="{{ item.href }}"{% if item.external %} rel="noopener"{% endif %}{% if item.href == page.url %} aria-current="page"{% endif %}>{{ item.label }}{% if item.external %}<span class="ext" aria-hidden="true">{% icon "external" %}</span><span class="sr-only"> (opens in a new tab)</span>{% endif %}</a></li>
         {%- endfor %}
       </ul>
     </nav>

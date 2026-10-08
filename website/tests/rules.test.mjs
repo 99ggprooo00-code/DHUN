@@ -11,6 +11,9 @@ import { test } from "node:test";
 
 import {
   INLINE_TARGET_FLOOR,
+  anchorLandingProblem,
+  currentPageProblem,
+  markerPerceivable,
   TARGET_FLOOR,
   caveatsHiddenInPrint,
   duplicateLinkTargets,
@@ -165,5 +168,108 @@ test("print: a hidden caveat is named, a visible one is not", () => {
       { key: "hardware-gates-open", visible: true, height: 0 },
     ]),
     ["borrowed-time", "hardware-gates-open"],
+  );
+});
+
+test("current page: exactly one marker, pointing at this route", () => {
+  const marker = { href: "/features/", tag: "a", text: "Features", signature: "x" };
+  assert.equal(currentPageProblem("/features/", [marker], "y"), null);
+  assert.match(
+    currentPageProblem("/features/", [], "y"),
+    /expected exactly one aria-current="page", found 0/,
+  );
+  assert.match(
+    currentPageProblem("/features/", [marker, marker], "y"),
+    /found 2/,
+  );
+  assert.match(
+    currentPageProblem("/features/", [{ ...marker, href: "/ui/" }], "y"),
+    /points at \/ui\/, not at \/features\//,
+  );
+});
+
+test("current page: a mark nobody can see is a failure", () => {
+  const marker = { href: "/ui/", tag: "a", text: "Interface", signature: "same" };
+  assert.equal(currentPageProblem("/ui/", [marker], "different"), null);
+  assert.match(currentPageProblem("/ui/", [marker], "same"), /the mark is invisible/);
+  // No siblings to compare with (a page whose navigation is one link) is not a
+  // failure: there is nothing for a visitor to confuse it with.
+  assert.equal(currentPageProblem("/ui/", [marker], null), null);
+});
+
+test("marker perceivability: a decoration or a frame survives forced colours", () => {
+  const none = { textDecorationLine: "none", outlineStyle: "none", borderTopStyle: "none" };
+  assert.equal(markerPerceivable(null), false);
+  assert.equal(markerPerceivable(none), false);
+  assert.equal(
+    markerPerceivable({ ...none, textDecorationLine: "underline" }),
+    true,
+  );
+  assert.equal(
+    markerPerceivable({ ...none, borderBottomStyle: "solid", borderBottomWidth: "2px" }),
+    true,
+  );
+  assert.equal(markerPerceivable({ ...none, outlineStyle: "solid", outlineWidth: "0px" }), false);
+  // A colour-only mark is exactly what forced colours erases.
+  assert.equal(
+    markerPerceivable({ ...none, color: "rgb(187, 134, 252)", backgroundColor: "rgb(38, 38, 38)" }),
+    false,
+  );
+});
+
+
+test("anchor landings: a target below the header and on screen passes", () => {
+  assert.equal(
+    anchorLandingProblem({ hash: "fn-a", targetTop: 120, headerBottom: 65, viewportHeight: 800 }),
+    null,
+  );
+  // Exactly at the header's bottom edge is a landing, not a collision.
+  assert.equal(
+    anchorLandingProblem({ hash: "main", targetTop: 65, headerBottom: 65, viewportHeight: 800 }),
+    null,
+  );
+});
+
+test("anchor landings: a target under the header fails with the hidden height", () => {
+  const problem = anchorLandingProblem({
+    hash: "fn-a",
+    targetTop: 18,
+    headerBottom: 105,
+    viewportHeight: 800,
+    scrollPaddingTop: 112,
+  });
+  assert.match(problem, /87px behind the sticky header/);
+  assert.match(problem, /scroll-padding-top 112px/);
+  assert.match(problem, /first line is covered/);
+});
+
+test("anchor landings: a target scrolled past the viewport fails", () => {
+  const problem = anchorLandingProblem({
+    hash: "main",
+    targetTop: 900,
+    headerBottom: 65,
+    viewportHeight: 800,
+  });
+  assert.match(problem, /100px below the bottom of the viewport/);
+});
+
+test("anchor landings: a missing target or an unmeasurable header fails", () => {
+  assert.match(
+    anchorLandingProblem({
+      hash: "main",
+      targetTop: Number.NaN,
+      headerBottom: 65,
+      viewportHeight: 800,
+    }),
+    /not in the document/,
+  );
+  assert.match(
+    anchorLandingProblem({
+      hash: "main",
+      targetTop: 120,
+      headerBottom: Number.NaN,
+      viewportHeight: 800,
+    }),
+    /no header to measure against/,
   );
 });
