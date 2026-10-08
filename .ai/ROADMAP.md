@@ -1,5 +1,107 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/9b791057-dhun` — make the site measurably faster, then move its responsive/a11y claims from argued to browser-measured (2026-10-08)
+
+Updated **2026-10-08** · fixed session branch `arena/9b791057-dhun` · branch point
+and GitHub `main` at boot **`505c3d59e66248f15bd29586f672d5b5b4b9bfac`** (PR #138
+merge — the marketing site). Working tree clean at boot and after every build
+below; the branch had no remote ref before this session's first push. The only
+pre-existing open PR is **#54** (ADR-007 research, unchanged, out of scope).
+This session's working PR is the one opened from this branch.
+
+### Recon (this session, every line read from a tool output)
+
+| Fact | State | Evidence |
+|---|---|---|
+| Branch / tree | `arena/9b791057-dhun`, clean at boot | `git status`, `git branch --show-current` |
+| Script suite | **103 tests green** in 0.115 s | `python3 -m unittest discover -s scripts -p 'test_*.py'` → `Ran 103 tests … OK` |
+| Site build | `npm ci` → 140 packages; `npm run build` → `minified: saved 13076 bytes`, 0.11 s | local, Node v22.22.3 |
+| Drift | a fresh build leaves `git status --porcelain` empty | local |
+| Route weights, uncompressed | `/` **29,167 B** · `/features/` **21,069 B** · `/download/` **13,491 B** · 404 **4,148 B** · `assets/styles.css` **21,342 B** | `stat -c%s` on `website/dist` |
+| Pages | `build_type=legacy`, `source=main:/`, `https_enforced=true` | `gh api repos/99ggprooo00-code/DHUN/pages` |
+| Rolling `test` release | republished `2026-10-08T15:04:32Z` | `gh release view test` |
+| `website` workflow on this branch | no runs yet | `gh run list --branch arena/9b791057-dhun` → empty |
+
+**Two corrections to the previous session's record, both read this session:**
+
+1. **`https://99ggprooo00-code.github.io/DHUN/website/dist/` is a 404**, not a
+   second way to reach the site. ADR-009, `docs/verification/20-marketing-site.md`
+   and the ROADMAP all state the built site is reachable there; the Pages
+   "File not found" page was fetched this session, so that claim is **wrong
+   today** and is corrected here. Until the Pages source is switched, **the site
+   has no public URL at all** — the canonical URL still renders the root
+   `README.md` through legacy Jekyll.
+2. The committed dist sizes are slightly larger than the table in
+   `docs/verification/20-marketing-site.md` (29,167 / 21,069 / 13,491 / 21,342 vs
+   29,148 / 21,069 / 13,431 / 21,307). The bytes are what matters and are
+   re-measured below; the older table is superseded, not re-litigated.
+
+### What this session does (scope boundary: `website/**` + the site's own checks/workflow + docs)
+
+The user's standing ask: *make the site better — responsive, full-on performance,
+correct code, no regressions*. Four tiers, in order, each with evidence read from
+a tool output:
+
+- **Tier A — performance, made measurable.** Collapse every route to **one
+  request** by inlining the stylesheet into each page's `<head>`; keep the
+  adaptation honest (the quality checker reads `<style>` blocks as well as
+  `.css` files, the minifier minifies inlined CSS, the minification proof still
+  proves losslessness); add a **budget ratchet** so a future edit cannot quietly
+  blow the budget; prune dead CSS; deduplicate inline SVG icons with one
+  `<symbol>` + `<use>` sprite per page.
+- **Tier B — argued → measured.** Playwright on `ubuntu-latest` across a real
+  viewport matrix: horizontal overflow, touch targets, keyboard skip-link +
+  visible focus, zero console errors, **rendered** contrast in dark *and* light,
+  reduced motion, and `@axe-core/playwright` so axe actually runs this time.
+  Screenshots as CI artifacts only. Plus a served-site smoke check that skips
+  with a warning while Pages is still `legacy`.
+- **Tier C — content depth inside the three-route limit** (`/download/`
+  verification and uninstall facts, `/features` extraction-chain explainer,
+  `/` "why there is no sign-in"), in house style with a citation per claim.
+- **Tier D — rigour.** Claim traceability on all three routes, backlog↔site
+  drift, no stale facts, extended link/robots/sitemap checks.
+
+**Decision recorded up front** (rationale and reversal cost go in
+`docs/verification/21-*.md`): *one inlined stylesheet per route, not a
+per-route split.* Inlining removes the render-blocking request and the
+dependency chain at the same byte cost and cannot drop a rule a page needs; a
+hand-maintained per-route split would risk exactly that with no browser in this
+sandbox to catch it, and the byte win would be limited to `/download/`, the
+lightest route.
+
+### Current gates (unchanged by this session unless a line says otherwise)
+
+| Gate | State | Next evidence |
+|---|---|---|
+| S3 round 4 / round 5 | 🔴 **missing, user-only** | Android landscape + Windows fullscreen; API 24–25 device install |
+| S6 | ⏳ **blocked on S3** | no release acceptance until both rounds close |
+| Dispatch-only AAB staging | 🔴 **agent-blocked, user-only** | one `test-release` dispatch, `build_only=true` |
+| ADR-008 B1 | ⛔ **BLOCKED (recorded)** | do not restart; B2 is a separate user decision |
+| Pages source | ⛔ **agent-blocked (403, re-checked this session)** | user-only: Settings → Pages → Source → GitHub Actions |
+| Real screenshots | 🔴 **missing — no image file exists in the repository** | the six captures in `.ai/WEBSITE_PLAN.md` Part A §9 |
+| axe | 🟡 **never ran locally or in CI** | this session wires `@axe-core/playwright`; if it runs, the real counts are reported as annotations |
+
+### Exact next actions
+
+1. Finish Tier A, push, let the site workflow run while Tier B is written.
+2. Wire Playwright + axe into `.github/workflows/website.yml`; expect the first
+   run to fail and iterate on the annotations (2–3 round-trips budgeted).
+3. Tier C depth, then Tier D rigour, then the finish sequence: full local gate →
+   docs → push → read one CI round → final PR comment → merge → stop.
+
+### Blockers and boundaries
+
+- No browser, no display, no JDK/Gradle/Android SDK locally: **every browser
+  number in this session comes from CI**, and nothing browser-dependent may be
+  quoted from this machine.
+- Do not touch Gradle files, `shared/`, `app-android/`, `app-desktop/`, `tools/`,
+  `web-spike/` or the four app workflows. A site failure must remain incapable of
+  reddening app CI.
+- No player, no PWA, no `app.`-style property, no backend, exactly three routes,
+  English only, no new third-party runtime asset.
+
+---
+
 ## Session `arena/fc918d37-dhun` — the Option-A marketing site is built, gated by tests, and awaiting the merge (2026-10-08)
 
 Updated **2026-10-08** · fixed session branch `arena/fc918d37-dhun` · branch
