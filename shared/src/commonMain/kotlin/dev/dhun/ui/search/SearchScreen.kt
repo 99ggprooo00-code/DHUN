@@ -37,6 +37,15 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
+
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
 import dev.dhun.core.Playlist
@@ -227,6 +236,8 @@ private fun SearchBarSection(
                 }
             },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
             shape = DhunShapes.extraLarge,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = DhunColors.glassHighlight,
@@ -246,7 +257,15 @@ private fun SearchBarSection(
             ),
             modifier = Modifier
                 .weight(1f)
-                .onFocusChanged { focusRegistry?.setFocused(focusToken, it.isFocused) },
+                .onFocusChanged { focusRegistry?.setFocused(focusToken, it.isFocused) }
+                .onKeyEvent { event ->
+                    if (event.key == Key.Enter && event.type == KeyEventType.KeyDown) {
+                        onSearchSubmit()
+                        true
+                    } else {
+                        false
+                    }
+                },
         )
         if (query.isNotBlank()) {
             DhunTextButton(onClick = onSearchSubmit) {

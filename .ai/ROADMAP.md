@@ -1,46 +1,26 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/094f77e7-dhun` — root-cause fixes for the S3 defects (2026-10-08)
+## Session `arena/5ba66cdb-dhun` — root-cause fixes for S3 regressions (2026-10-08)
 
-Updated **2026-10-08** · fixed branch `arena/094f77e7-dhun` · main baseline
-`f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5` · draft PR #127.
+Updated **2026-10-08** · fixed branch `arena/5ba66cdb-dhun` · main baseline `1a88ee380df5f68f1769213dddc133eec04ee9fd`.
 
-### Release baseline — not a corrected candidate
+### Release baseline — testing pending
 
-The rolling `test` release still targets `f0225f4` (CI **37548884056**, Build
-APK **37548884107**, test-release **37548884077**). Its APK SHA-256 is
-`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
-2.172.1 SHA-256 is
-`c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. This is
-the old build the user cannot use to validate the fixes.
+The rolling `test` release targets merge commit `1a88ee3` (PR #127). The published MSI matches user evidence exactly: version 2.178.1, SHA-256 `0c67d2bf2c870e4209757da6296ca8bb0c68a5c921f17d4679b1096366e1d721`.
+Expected Android APK SHA-256 for the tested release is `75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`. The user needs to verify this hash before Android can be marked fully accepted.
 
 ### Source trace — concrete defects and root fixes
 
-- **Windows Jump List / COM threading:** `JumpList.update()` called `drain()`
-directly when the throttle delay was zero, despite the dedicated-worker
-contract; an instance-wide flag treated apartment state as thread-independent.
-Every commit now runs on the dedicated worker with per-thread COM initialization
-and cleanup. A regression test pins both immediate and throttled commits there.
-This is a confirmed source defect and plausible cause of missing tasks; shell
-identity/privacy policy and task visibility remain hardware checks.
-- **Desktop Space shortcut:** the window handler ran after focused children, so
-  controls could consume Space. A shell preview handler now toggles playback
-  outside editable controls, with explicit focus tracking for Search and DHUN
-  text inputs so typed spaces are preserved.
-- **Navigation hidden under FullPlayer:** FullPlayer remains intentionally
-  immersive, but Ctrl+F and album-name fallback changed tabs without collapsing
-  it. Tab selection now collapses the overlay; desktop/Android shortcut paths
-  and artist/album fallback routes use that shared path.
-- **Android offline feedback:** INTERNET alone was treated as online and the
-  offline notice was drawn below FullPlayer. Online now requires INTERNET plus
-  VALIDATED; the notice is layered above the player. Retryable playback remains
-  unchanged so it can recover when connectivity returns.
-- **“Go to album”:** menu availability still requires album ID or nonblank album
-  name. The name-only fallback now reveals Search after collapsing FullPlayer;
-  a track without album metadata has no valid destination and is not claimed as
-  fixed without a known-album test.
+- **Search Enter Key:** `SearchScreen.kt` had no `KeyboardActions` or physical enter key handling. It was missing an `ImeAction.Search` callback and a physical Enter fallback. A pure logic regression test was added, and the key handler is now wired directly.
+- **Navigation hit-testing under FullPlayer:** The immersive FullPlayer overlay (`FULL_PLAYER_LAYER_Z_INDEX`) previously covered the entire screen including the `Scaffold`'s `NavigationRail`. The rail is now intentionally extracted out of the `Scaffold` area so `FullPlayer` only obscures the master/detail content while leaving the rail visible and fully interactive on two-pane layouts.
+- **Android landscape ghosting:** Likely a system-level rotation snapshot artifact captured during the orientation transition since the layout mode changes cleanly via `when` branch dropping old nodes instantly without a Compose-level crossfade. Awaiting user confirmation if the ghosting persists after the animation settles.
 
 Lyrics are working and have not been modified.
+
+### Verification evidence on the product-code head
+
+Pending CI on branch `arena/5ba66cdb-dhun`. Code must pass shared JVM tests, UI logic tests, and native builds.
+
 
 ### Verification evidence on the product-code head
 

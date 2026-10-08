@@ -2,6 +2,12 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — session `arena/5ba66cdb-dhun` S3 regression fixes
+
+- **Desktop Space vs Enter shortcuts:** The previous fix for Space playback toggling worked correctly, but `SearchScreen` still lacked physical Enter key handling and IME action bindings, preventing search submission. This is now fixed via direct `.onKeyEvent` capturing `Key.Enter` and `KeyEventType.KeyDown`. Space remains preserved for typing.
+- **FullPlayer Layering vs Rail Navigation:** The full-screen `FullPlayer` overlay previously obscured the `Scaffold`'s `NavigationRail` visually or behaviorally (depending on transparent background regions). The layout in `DhunAppShell.kt` was restructured to keep `AppNavigationRail` outside the content box covered by `FullPlayer`, matching the visual separation expected in a two-pane layout. The user reported the rail was "visible, not necessarily interactive", indicating possible layering conflicts or full-screen gesture swallowing. The explicit sibling `Row` hierarchy eliminates gesture collisions.
+- **Android Landscape Ghosting:** The user reported screenshots showing duplicated/ghosted content during an Android landscape orientation layout change. As layout mode is swapped instantly via a Compose `when` statement (and not `AnimatedContent`/`Crossfade`), this is highly likely a transient OS-level window manager rotation snapshot artifact. User confirmation is pending on whether the artifact persists after layout settling.
+
 ## 2026-10-08 — product-code head is CI-green; device confirmation remains open
 
 - The rolling `test` APK/MSI still targets `f0225f4`; it is not a corrected
