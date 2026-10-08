@@ -12,78 +12,73 @@ APK **37548884107**, test-release **37548884077**). Its APK SHA-256 is
 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
 2.172.1 SHA-256 is
 `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. This is
-the old build the user cannot use to validate the fixes. PR #127 previously
-contained documentation only; the current worktree now adds product changes,
-regression tests and updated verification documentation. Changes are not yet
-pushed or CI-verified at this writing.
+the old build the user cannot use to validate the fixes.
 
-### Source trace — concrete defects found
+### Source trace — concrete defects and root fixes
 
 - **Windows Jump List / COM threading:** `JumpList.update()` called `drain()`
-directly when the throttle delay was zero, despite the class contract promising
-a dedicated COM worker. Startup and later tray updates could therefore invoke
-COM on different caller threads while one instance-wide `comInitialized` flag
-made COM apartment state appear shared. This is a concrete source defect and a
-plausible cause of missing taskbar tasks; Windows shell identity/privacy policy
-still require hardware confirmation.
-- **Desktop Space shortcut:** the `Window.onKeyEvent` handler ran after focused
-children, so controls could consume Space before the global shortcut. It also
-had no explicit way to distinguish editable focus if moved to preview. The fix
-uses a shell preview handler plus a composition-local focus registry for both
-search and app text inputs, preserving typed spaces.
+directly when the throttle delay was zero, despite the dedicated-worker
+contract; an instance-wide flag treated apartment state as thread-independent.
+Every commit now runs on the dedicated worker with per-thread COM initialization
+and cleanup. A regression test pins both immediate and throttled commits there.
+This is a confirmed source defect and plausible cause of missing tasks; shell
+identity/privacy policy and task visibility remain hardware checks.
+- **Desktop Space shortcut:** the window handler ran after focused children, so
+  controls could consume Space. A shell preview handler now toggles playback
+  outside editable controls, with explicit focus tracking for Search and DHUN
+  text inputs so typed spaces are preserved.
 - **Navigation hidden under FullPlayer:** FullPlayer remains intentionally
-immersive, but `Ctrl+F` and the album-name fallback selected Search without
-collapsing `playerExpanded`, so the new destination stayed hidden. Tab
-navigation now collapses the player first; the desktop shortcut, Android
-launcher shortcuts, and both artist/album fallback routes use that path.
-- **Android offline feedback:** the connectivity adapter treated
-`NET_CAPABILITY_INTERNET` alone as online (not proof of validated Internet),
-and the offline notice was drawn in the Scaffold beneath the full-screen
-player. It now requires both INTERNET and VALIDATED and moves the notice above
-FullPlayer. Playback remains retryable during transient outages so it can
-resume when connectivity returns.
-- **“Go to album”:** the menu can only offer navigation when a track has an
-album id or nonblank album name. The name-only fallback searched for the album
-but could remain hidden under FullPlayer; that path now collapses it. A track
-with no album metadata still has no honest destination and must not be claimed
-as fixed without testing a known album-linked track.
+  immersive, but Ctrl+F and album-name fallback changed tabs without collapsing
+  it. Tab selection now collapses the overlay; desktop/Android shortcut paths
+  and artist/album fallback routes use that shared path.
+- **Android offline feedback:** INTERNET alone was treated as online and the
+  offline notice was drawn below FullPlayer. Online now requires INTERNET plus
+  VALIDATED; the notice is layered above the player. Retryable playback remains
+  unchanged so it can recover when connectivity returns.
+- **“Go to album”:** menu availability still requires album ID or nonblank album
+  name. The name-only fallback now reveals Search after collapsing FullPlayer;
+  a track without album metadata has no valid destination and is not claimed as
+  fixed without a known-album test.
 
 Lyrics are working and have not been modified.
 
+### Verification evidence on the product-code head
+
+Product-code head `3071d1d6650291d51559f2884f4ac7734d3aac75` passed push CI
+**37710630655**, PR CI **37710634901**, Build APK **37710634909**, and test-release
+**37710634914**. The 12 CI steps passed, including shared JVM, Android
+Robolectric/build, desktop compile/JVM tests, and PowerShell/package helpers.
+The PR test-release APK/MSI jobs passed; MSI's full `2.172.1 → 2.176.1`
+install-over preserved userdata/cache sentinels and future-upgrade/uninstall
+checks passed (no skip). PR artifact provenance (`buildOnly=true`, not published
+`test`): APK 18,383,603 B, SHA-256
+`75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`; MSI 2.176.1,
+SHA-256 `18bfc43e0fda45978f7fbe2d280c9c6cfd580786e9d801bc301f94840bdf67a0`.
+
+The initial product head `1b2dea2` failed compilation because Compose key-event
+extension imports were omitted. Commit `3071d1d` adds `type`, `key`, and
+`isCtrlPressed`; all four runs above passed on the corrected product-code head.
+The failure remains recorded rather than hidden. The local full diff, `git
+diff --check`, 31 Python unit tests, 39 JSON fixtures, and Markdown fenced-block
+checks also passed; Java is unavailable locally, so CI is the Kotlin verifier.
+
 ### Verification and release gate
 
-- New tests pin Jump List immediate/trailing commits to the dedicated worker,
-  Space shortcut/focus-suppression policy, text-input focus aggregation,
-  tab-navigation collapse, offline capability classification, and offline
-  banner placement. Existing menu-policy tests continue to pin the album-name
-  fallback.
-- This sandbox has no JDK; local Kotlin/Gradle tests cannot run. The changes
-  must pass required PR CI (shared JVM, Android unit/build, desktop JVM/compile,
-  APK/MSI packaging) before the PR is marked ready. Read test-release
-  annotations; PR-path `publish` is expected to skip.
-- Documentation is now updated locally in the handoff, limitations, roadmap,
-  hardware runbook and verification records. Include those edits in the PR and
-  ensure the published review includes them. After required tests and docs pass,
-  merge PR #127 to publish a **new corrected `test` APK/MSI**; do not tell the
-  user to test the old `f0225f4` release. Hardware acceptance remains OPEN until
-  the user retests the exact new hashes on Redmi Note 12 4G / Android 15 and
-  Windows 11. Do not represent CI as physical acceptance or assume AUMID/
-  taskbar settings are cleared.
-- For Windows, verify a running-app Jump List after a successful
-  `jump list: committed ...` startup-log line; record `winver`, installed MSI
-  version/hash and the Windows setting “Show recently opened items in Start,
-  Jump Lists, and File Explorer.” For offline Android testing, capture whether
-  the online banner appears with Wi-Fi connected but Internet unvalidated, plus
-  the time to recover. Full procedure: `docs/runbooks/s3-hardware-checklist.md`.
+The active documentation records the confirmed defects, current release identity,
+required checks, and exact hardware retest. The product-code head is green, but
+any documentation-status successor must also pass CI, Build APK and test-release
+on the **final PR head** before the PR is marked ready or merged. PR-path
+`publish`/`release_draft` are expected to skip, but APK/MSI package jobs must pass
+and the MSI annotations must prove the install-over actually ran. After those
+gates pass, merge PR #127 to publish a **new corrected rolling `test` APK/MSI**.
+Hardware acceptance remains OPEN until the user verifies the *new post-merge
+hashes* on Redmi Note 12 4G / Android 15 and Windows 11. Never use the old
+`f0225f4` assets or treat CI as hardware acceptance. Exact retest is in
+`docs/runbooks/s3-hardware-checklist.md`.
 
-**Local review complete:** the full diff was re-read; `git diff --check`, 31
-Python unit tests, 39-fixture validation, and Markdown fenced-block checks pass.
-Kotlin/Gradle tests remain unverified locally because Java is unavailable.
-
-**Immediate next steps:** commit/push only to `arena/094f77e7-dhun`, watch all PR
-checks, and merge only after the documented automated gate passes. Keep S3 open
-until the new candidate has been physically retested. PR #127 must not be merged
-in its old docs-only state; the new product-code head is the release candidate.
+**Immediate next steps:** verify all required checks on the final PR head, then
+mark PR #127 ready and merge only after the documented gate passes. Keep S3 open
+until the new candidate has been physically retested.
 
 ---
 

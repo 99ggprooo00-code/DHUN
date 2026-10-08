@@ -22,12 +22,20 @@ future-upgrade guard and uninstall smoke. The asset blob could not be downloaded
 in the sandbox; these values are from GitHub publisher annotations. The live
 release `.sha256` sidecars are still required to verify the exact device files.
 
-**This is the old baseline, not the corrected candidate.** The local PR #127
-candidate now contains source fixes and regression tests; this worktree still
-needs to be pushed and pass verification. PR-path test-release does not publish
-the rolling `test` tag. After the PR passes and merges, download again and verify
-the new APK/MSI sidecars before doing the targeted retest below. Do not use the
-`f0225f4` package to validate these fixes.
+**This is the old baseline, not the corrected candidate.** Product-code head
+`3071d1d6650291d51559f2884f4ac7734d3aac75` on draft PR #127 passed push CI
+**37710630655**, PR CI **37710634901**, Build APK **37710634909**, and
+PR test-release **37710634914**. Its PR artifacts are `buildOnly=true`, not the
+rolling release: APK 18,383,603 B / SHA-256
+`75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`; MSI
+2.176.1 / SHA-256
+`18bfc43e0fda45978f7fbe2d280c9c6cfd580786e9d801bc301f94840bdf67a0`. The
+hosted MSI install-over passed `2.172.1 → 2.176.1`, preserving userdata/cache
+sentinels and passing future-upgrade/uninstall checks. The rolling `test` tag
+still does not contain these fixes. Verify the status-sync documentation commit
+also passes the required checks on the final PR head; after merge, download the
+new `test` assets and verify their own sidecars before targeted retest. Do not
+use the `f0225f4` package to validate these fixes.
 
 `f0225f4` changes only the README after the PR #125 merge `b1dba0c`; its APK is
 byte-identical to the PR #125 APK. The `b1dba0c` MSI was **2.171.1**,
@@ -71,18 +79,20 @@ bound to the older MSI until the installed version and sequence are confirmed.
 Reported issues: DHUN Jump List tasks absent, Space not responding, and a
 full-window player surface preventing Home/Search/Playlists interaction.
 
-Source trace found several code defects, now addressed in the local PR #127
-candidate (push, CI and hardware verification still pending): Jump List's
-zero-delay path called COM on the caller despite the dedicated-worker contract;
-Space ran after child key dispatch; Ctrl+F and the album-name search fallback
-could select a page beneath FullPlayer; Android checked INTERNET without
-VALIDATED and drew the offline banner behind FullPlayer. FullPlayer remains
-intentionally immersive and the docked MiniPlayer remains a separate fixed
-**72 dp** row. Tab-navigation commands now collapse the expanded surface. The
-default AppUserModelID is not changed without evidence of an installer/process
-identity mismatch; Windows privacy/policy can still suppress Jump Lists. S3
-remains **OPEN** until the new candidate is tested on hardware. Detailed ledger:
-`docs/verification/14-release.md`.
+Source trace found several code defects, fixed and verified by CI on product-code
+head `3071d1d`: Jump List's zero-delay path called COM on the caller despite the
+dedicated-worker contract; Space ran after child key dispatch; Ctrl+F and the
+album-name search fallback could select a page beneath FullPlayer; Android
+checked INTERNET without VALIDATED and drew the offline banner behind FullPlayer.
+The first code head `1b2dea2` exposed missing Compose key-event imports; these
+were added in `3071d1d` and the successor CI/build/package workflows passed.
+FullPlayer remains intentionally immersive and the docked MiniPlayer remains a
+separate fixed **72 dp** row. Tab-navigation commands now collapse the expanded
+surface. The default AppUserModelID is not changed without evidence of an
+installer/process identity mismatch; Windows privacy/policy can still suppress
+Jump Lists. S3 remains **OPEN** until the post-merge `test` candidate is tested
+on hardware. Final-head automated checks and all device acceptance remain gates.
+Detailed ledger: `docs/verification/14-release.md`.
 
 ### Windows retest — exact reproduction and evidence
 

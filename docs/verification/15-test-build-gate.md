@@ -1,52 +1,52 @@
 # 15 — Test-build gate: step-by-step procedure
 
-> **Current gate (2026-10-08 — PR #127 product fixes pending verification).** Main
-> and the rolling `test` release still target `f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5`.
+> **Current gate (2026-10-08 — product-code head green; final PR head and hardware gates remain).**
+> Main and the rolling `test` release still target `f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5`.
 > Baseline CI **37548884056**, Build APK **37548884107**, and test-release
-> **37548884077** passed, but they predate the fixes. Baseline artifacts:
-> APK 18,367,219 B, SHA-256
-> `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
-> 112,947,200 B, ProductVersion 2.172.1, SHA-256
-> `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`.
-> The MSI baseline's full `2.171.1 → 2.172.1` hosted install-over passed with
-> sentinels, future-upgrade guard and uninstall smoke. Do not ask the user to
-> validate fixes with this old package. After PR #127's required checks and docs
-> pass, merge it to publish a new candidate; then verify its own `.sha256`
-> sidecars and record its actual target/version/hashes before device testing.
+> **37548884077** passed, but predate the fixes. Baseline APK is 18,367,219 B,
+> SHA-256 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`;
+> baseline MSI is 112,947,200 B, ProductVersion 2.172.1, SHA-256
+> `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. Do not
+> use this old package to validate fixes or confuse it with the PR build-only
+> artifacts; after merge, verify the new rolling release's own `.sha256` sidecars.
 >
 > **User report round 2 (received 2026-10-07; execution date not supplied).**
-> Android: Redmi Note 12 4G / Android 15; reported APK hash `21a5fe86…9cc2c`
-> matches the old baseline. General playback/library/download, lyrics/settings
-> and steps 19–22 were reported working; the “Go to album” action was not found,
-> HTTP 403 was not tested, and offline streaming buffered without clear feedback
-> before network recovery. Windows 11: exact build/VLC not supplied; reported
-> missing Jump List tasks, Space not responding, and FullPlayer blocking
-> Home/Search/Playlists. MSI hash `c27175…3fe17d6` identifies the old 2.172.1
-> baseline despite the report's reference to `b1dba0c` / MSI 2.171.1; capture
-> artifact sequence accurately. Lyrics are working and must not be changed.
+> Android: Redmi Note 12 4G / Android 15, reported APK hash `21a5fe86…9cc2c`;
+> general playback/library/download, lyrics/settings and steps 19–22 reported
+> working. “Go to album” was not found, HTTP 403 was not tested, and offline
+> streaming buffered without clear feedback before network recovery. Windows 11:
+> exact build/VLC not supplied; missing Jump List tasks, Space not responding,
+> and FullPlayer blocking Home/Search/Playlists were reported. MSI hash
+> `c27175…3fe17d6` identifies old 2.172.1 despite the report's reference to
+> `b1dba0c` / MSI 2.171.1; artifact timing remains ambiguous. Lyrics work and
+> must not be changed.
 >
-> **Root-cause fixes in the local PR #127 candidate (push, automated and device
-> gates still open):** JumpList immediate commits had bypassed the COM worker;
-> commits now run on its dedicated thread with thread-local apartment lifetime.
-> The Space shortcut moved to preview with text-input focus tracking. Tab
-> selection, Ctrl+F, Android launcher shortcuts, and name-only album/artist
-> fallback now collapse FullPlayer before showing the destination. Android
-> requires both INTERNET and VALIDATED for “online” and re-layers its offline
-> banner above FullPlayer. Added focused regression tests. The full player remains
-> immersive; a track without album metadata still cannot have a real album
-> destination. The default AppUserModelID remains unchanged pending evidence of
-> identity mismatch; Windows privacy/policy can also suppress Jump Lists.
+> **Root-cause fixes in product-code head `3071d1d` (automated code/package checks green):**
+> JumpList immediate commits had bypassed the COM worker; all commits now run on
+> the dedicated thread with per-thread apartment lifetime. Space uses a preview
+> handler with text-input focus tracking. Tab selection, Ctrl+F, Android launcher
+> shortcuts, and name-only album/artist fallbacks collapse FullPlayer before
+> revealing the destination. Android requires INTERNET+VALIDATED and layers the
+> offline banner above FullPlayer. FullPlayer remains immersive; a track with no
+> album metadata still has no valid album destination. Default AppUserModelID
+> remains unchanged pending identity evidence; Windows privacy/policy can hide tasks.
 >
-> **Required automated gate:** the sandbox has no JDK. Push the code/tests/docs
-> to `arena/094f77e7-dhun`, then require green PR CI (including `:shared:jvmTest`,
-> Android unit/build, desktop JVM/compile), Build APK, and PR test-release APK/MSI
-> package jobs. Read the MSI annotations; PR-path publish/release jobs are
-> expected to skip and do not mean a package failed. Do not mark the PR ready or
-> merge until the required tests and docs pass. Merge creates the new rolling
-> `test` artifacts; physical S3 remains OPEN until the user tests those exact
-> hashes. See `docs/runbooks/s3-hardware-checklist.md` for exact retest, including
-> Android offline feedback with FullPlayer open and the Windows Jump List
-> privacy setting/logs.
+> Product-code head `3071d1d6650291d51559f2884f4ac7734d3aac75` passed push CI
+> **37710630655**, PR CI **37710634901**, Build APK **37710634909**, and
+> test-release **37710634914**. CI includes shared JVM, Android Robolectric/build,
+> desktop compile/JVM tests, and packaging helpers. The MSI job completed the full
+> hosted `2.172.1 → 2.176.1` install-over, preserved userdata/cache sentinels, and
+> passed future-upgrade/uninstall checks (no skip). PR test artifacts are
+> `buildOnly=true`, not the published `test` release: APK 18,383,603 B / SHA-256
+> `75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`; MSI
+> 2.176.1 / SHA-256
+> `18bfc43e0fda45978f7fbe2d280c9c6cfd580786e9d801bc301f94840bdf67a0`.
+> The earlier head `1b2dea2` failed due to omitted Compose key-event extension
+> imports; `3071d1d` fixes them. A documentation-status successor must also pass
+> CI, Build APK and test-release on the final PR head before ready/merge. PR-path
+> `publish`/`release_draft` are expected skips; APK/MSI and the actual MSI
+> install-over must pass. Physical S3 remains OPEN until the user tests the new
+> post-merge hashes. Exact steps: `docs/runbooks/s3-hardware-checklist.md`.
 >
 > **PR #120 candidate device retest — user-reported PASS, 2026-10-05.** The user
 > downloaded the build-only `apk` artifact from test-release run **37322658878**,

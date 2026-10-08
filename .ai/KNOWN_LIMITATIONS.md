@@ -2,51 +2,51 @@
 
 Updated every phase. Nothing hidden.
 
-## 2026-10-08 — root-cause fixes added to PR #127; device confirmation remains open
+## 2026-10-08 — product-code head is CI-green; device confirmation remains open
 
-- The old rolling `test` APK/MSI still targets `f0225f4`; it is not a corrected
-  candidate. Product fixes/tests/docs are now added locally on
-  `arena/094f77e7-dhun`, based on draft PR #127; at this checkpoint they have
-  not yet been pushed or CI-verified. The sandbox has no JDK, Android device or
-  Windows taskbar.
-- **Confirmed source defects now fixed in the candidate, pending CI:** JumpList
-  immediate commits previously ran COM on their caller rather than the promised
-  worker, with instance-wide COM initialization; commits now stay on a dedicated
-  thread with thread-local COM lifetime. Space previously ran after child key
-  dispatch; it now uses a preview handler guarded by focus tracking on all
-  editable fields. Tab changes and album-name fallback now collapse FullPlayer
-  before showing the destination. Android connectivity now requires INTERNET
-  plus VALIDATED, and the offline banner is re-layered over FullPlayer.
+- The rolling `test` APK/MSI still targets `f0225f4`; it is not a corrected
+  candidate. Product-code head `3071d1d6650291d51559f2884f4ac7734d3aac75` on
+  draft PR #127 passed push CI **37710630655**, PR CI **37710634901**, Build APK
+  **37710634909**, and test-release **37710634914**. The CI steps cover shared
+  JVM tests, Android Robolectric/build, and desktop compile/JVM tests. PR MSI
+  `2.172.1 → 2.176.1` install-over, userdata/cache sentinels, future-upgrade
+  guard and uninstall smoke all passed with no skip.
+- PR test artifacts are `buildOnly=true`, not the published rolling release:
+  APK 18,383,603 B / SHA-256
+  `75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`; MSI
+  2.176.1 / SHA-256
+  `18bfc43e0fda45978f7fbe2d280c9c6cfd580786e9d801bc301f94840bdf67a0`. The
+  user must wait for a new post-merge `test` package to validate fixes.
+- **Initial red recorded:** earlier product head `1b2dea2` failed compilation
+  because `DhunAppShell` omitted Compose key-event extension imports. Commit
+  `3071d1d` adds `type`, `key`, and `isCtrlPressed`; all four checks above passed
+  on the corrected product-code head. No failure is hidden.
+- **Confirmed source defects fixed:** Jump List immediate commits now stay on
+  the dedicated worker with thread-local COM lifetime; Space uses a preview
+  handler guarded by focus tracking on Search and DHUN editable fields; tab
+  navigation and fallback routes collapse FullPlayer; Android online requires
+  INTERNET+VALIDATED and the offline banner is layered above FullPlayer.
 - **Not yet physically verified:** Windows may still suppress Jump Lists due to
-  shell identity, policy or the user setting “Show recently opened items in
-  Start, Jump Lists, and File Explorer.” Confirm the new MSI log has
-  `jump list: committed ...` and inspect the actual taskbar menu. The default
-  AppUserModelID is intentionally unchanged without evidence that it mismatches
-  jpackage's shortcut/process identity.
+  shell identity, policy or “Show recently opened items in Start, Jump Lists,
+  and File Explorer.” Confirm the new MSI log has `jump list: committed ...`
+  and inspect the real taskbar. The default AppUserModelID remains unchanged
+  without evidence of mismatch. The sandbox has no JDK, Android device or
+  Windows taskbar; Kotlin verification therefore relies on CI.
 - **Album metadata limit:** “Go to album” cannot produce a route if the track
-  has neither an album id nor a nonblank album name. The menu policy is tested
-  for metadata-backed items; the new visible name-only fallback still needs a
-  known-album device retest.
-- **Offline behavior:** the player intentionally remains retryable during a
-  transient outage and can resume when service returns. The banner must now be
-  visible over FullPlayer; no terminal playback error is claimed for a
-  recoverable connection loss. Validate the actual Android network callback and
-  visible feedback on the new APK.
-- **FullPlayer remains immersive by design.** The repair makes navigation
-  commands collapse it so the destination is visible; the full-window player
-  still covers the shell until Escape/collapse or a tab-navigation action.
-  Hardware confirmation is required that the docked MiniPlayer does not remain
-  over Home/Search/Playlists.
-- Lyrics are working and were not changed. The user's future lyrics idea stays
-  out of scope until requested.
-- Documentation is updated locally in `.ai/ROADMAP.md`,
-  `.ai/HANDOFF_NEXT_SESSION.md`, this file, the hardware runbook and the
-  verification records; include it in the pushed PR. Local full-diff review,
-  `git diff --check`, 31 Python unit tests, 39-fixture validation and Markdown
-  fence checks passed. Required next gates: push code/tests/docs, pass PR CI and
-  APK/MSI packaging, then merge to publish the corrected candidate. S3 stays
-  OPEN until the user retests that exact post-merge APK/MSI. Do not direct the
-  user to the old `f0225f4` package or call CI a device pass.
+  has neither an album ID nor a nonblank name. Menu metadata policy is tested;
+  the visible name-only fallback still needs a known-album device retest.
+- **Offline behavior:** playback remains retryable during transient outages and
+  can recover. No terminal playback error is claimed; verify the Android network
+  callback, visible banner over FullPlayer, downloads and recovery on the new APK.
+- **FullPlayer remains immersive by design.** Navigation now collapses it before
+  exposing the destination; hardware must still confirm the docked MiniPlayer
+  does not cover Home/Search/Playlists after collapse. Lyrics are working and
+  were not changed; the user's future idea remains out of scope until requested.
+- The docs record the fixes, current release identity, required checks and
+  hardware steps. Any docs-status successor must pass CI, Build APK and
+  test-release on the final PR head before ready/merge. Keep S3 OPEN until the
+  user retests the exact new post-merge APK/MSI hashes; never use the old
+  `f0225f4` build or call CI a device pass.
 
 ## 2026-10-06 — the flake fix is a race removal; green CI is not proof of absence (PR #125, session `arena/cf69112a-dhun`)
 

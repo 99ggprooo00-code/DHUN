@@ -19,13 +19,18 @@ The user later reported missing Jump List tasks, an unresponsive Space shortcut,
 and FullPlayer appearing to block Home/Search/Playlists. Source tracing found
 three concrete causes relevant to this document: JumpList's immediate update
 path bypassed its COM worker; Space was handled after focused child dispatch;
-and Ctrl+F changed tabs without collapsing the overlay. The local PR #127
-candidate addresses those paths and adds regression tests, but is not yet pushed
-or CI-verified. The corrected MSI is not yet published or hardware-tested;
-Windows privacy policy and the default shortcut/process AppUserModelID remain
-explicit hardware checks. FullPlayer remains an immersive
-surface by design, but tab-navigation actions now collapse it before presenting
-the destination.
+and Ctrl+F changed tabs without collapsing the overlay. Product-code head
+`3071d1d` passed push CI **37710630655**, PR CI **37710634901**, Build APK
+**37710634909**, and test-release **37710634914**, including the full hosted MSI
+install-over (`2.172.1 → 2.176.1`). The PR artifacts are build-only and are not
+the rolling test release; the corrected MSI is not yet published or
+hardware-tested. The initial code head `1b2dea2` missed Compose key-event
+extension imports; they were added in `3071d1d`, and the successor checks passed.
+A documentation-status successor must also pass required checks on the final PR
+head. Windows privacy policy and the default shortcut/process AppUserModelID
+remain explicit hardware checks. FullPlayer remains an immersive surface by
+design, but tab-navigation actions now collapse it before presenting the
+destination.
 
 ## Installer-specific PR verification — 2026-09-06
 

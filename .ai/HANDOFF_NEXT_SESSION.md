@@ -2,65 +2,70 @@
 
 Updated **2026-10-08**, session `arena/094f77e7-dhun`.
 
-## Current state — implementation added locally; PR verification pending
+## Current state — product-code head is green; final-head and hardware gates remain
 
-- Baseline `main` is `f0225f4`; draft PR #127 is on the fixed branch
-  `arena/094f77e7-dhun`. The rolling `test` release still targets `f0225f4`:
-  APK SHA-256 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`,
+- Draft PR #127 is on the fixed branch `arena/094f77e7-dhun`; product-code head
+  `3071d1d6650291d51559f2884f4ac7734d3aac75` fixes the confirmed source defects.
+  Push CI **37710630655**, PR CI **37710634901**, Build APK **37710634909**, and
+  test-release **37710634914** all passed on that head. The CI run includes
+  shared JVM tests, Android Robolectric/build, and desktop compile/JVM tests.
+  The test-release MSI ran the full hosted `2.172.1 → 2.176.1` upgrade, preserved
+  userdata/cache sentinels, and passed future-upgrade/uninstall checks (no skip).
+  PR artifacts were `buildOnly=true`, not a published `test` release: APK
+  18,383,603 B / SHA-256
+  `75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`; MSI
+  2.176.1 / SHA-256
+  `18bfc43e0fda45978f7fbe2d280c9c6cfd580786e9d801bc301f94840bdf67a0`.
+- The earlier product head `1b2dea2` failed compilation because the new preview
+  handler omitted Compose key-event extension imports (`type`, `key`, and
+  `isCtrlPressed`). Commit `3071d1d` adds them; all four runs above passed on the
+  corrected product-code head. This red is recorded, not hidden.
+- The rolling `test` release still targets `main@f0225f4`, not these fixes: APK
+  SHA-256 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`,
   MSI 2.172.1 SHA-256
-  `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. It is
-  too old to validate any fix. The current worktree adds product changes,
-  focused tests and docs to PR #127's former docs-only state; it is not yet
-  pushed or CI-verified in this snapshot.
-- **Confirmed source defects and fixes:** (1) Jump List's immediate update path
-  ran COM synchronously on whichever caller invoked it, while COM initialization
-  was stored per instance instead of per thread. Every commit is now queued on
-  the dedicated worker with per-thread CoInitializeEx/CoUninitialize; a test
-  pins immediate and delayed commits to that worker. (2) Space was handled at
-  the window after focused children, so controls could consume it. It now runs
-  in a shell preview handler, suppressed by tracked focus in Search and all
-  DHUN text inputs. (3) Ctrl+F and the album-name search fallback changed tabs
-  under an expanded FullPlayer. Tab selection now collapses that overlay, and
-  desktop/Android shortcut paths plus album/artist fallbacks use the shared
-  method. (4) Android offline detection used INTERNET without VALIDATED and its
-  notice sat behind FullPlayer; both are corrected and policy tests were added.
-- `Go to album` still legitimately needs album metadata. A name-only fallback
-  now reveals Search after collapsing FullPlayer; a track with no album name or
-  id cannot be routed and is not claimed as fixed without a known-track test.
-- Lyrics have not been changed.
+  `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. Do not
+  use those old assets to validate fixes. After the documentation-status update
+  is pushed, require all checks on the final PR head before marking ready/merging.
+- **Confirmed source defects and fixes:** Jump List commits now always run on
+  the dedicated worker, with per-thread CoInitializeEx/CoUninitialize; Space
+  runs in a shell preview handler guarded by focus tracking in Search and DHUN
+  text inputs; tab-navigation/shortcut/fallback actions collapse FullPlayer;
+  Android online detection requires INTERNET+VALIDATED and its offline banner
+  sits above FullPlayer. Lyrics are unchanged.
+- `Go to album` still requires an album ID or nonblank album name. A name-only
+  fallback now reveals Search after collapsing FullPlayer; tracks with no album
+  metadata have no valid destination and are not claimed as fixed without a
+  known-album device test. Windows taskbar visibility/AUMID/privacy and Android
+  offline recovery remain hardware checks.
 
 ## Next actions — single agent, sequential
 
-1. **Completed locally:** full diff re-read; `git diff --check`, 31 Python unit
-   tests, fixture validation (39 JSON fixtures), and Markdown fenced-block
-   checks pass. No JDK/Java is installed, so Kotlin/Gradle tests must be verified
-   by PR CI.
-2. Commit and push only to `arena/094f77e7-dhun`; watch CI, Build APK and
-   test-release to completion. Read annotations: PR-path publishing is expected
-   to skip, but APK and MSI package jobs must pass. Keep the PR draft until
-   required checks and documentation are complete.
-3. After automated tests and docs pass, merge PR #127 to publish the corrected
-   rolling `test` APK/MSI. Hardware acceptance stays **OPEN** until the user
-   tests the *new* hashes; never ask them to test the old `f0225f4` assets or
-   claim CI as hardware acceptance.
-4. Give exact retest steps from `docs/runbooks/s3-hardware-checklist.md`:
-   - Android: install the new APK after verifying its sidecar; test `Go to album`
-     on a known album-linked track; test offline streaming with Wi-Fi connected
-     but no validated Internet and with airplane mode; confirm the offline
-     banner is visible over FullPlayer, downloaded tracks remain available, and
-     playback recovers when Internet returns.
-   - Windows: record `winver`, version/hash, VLC, resolution and scale; test
-     Ctrl+F while FullPlayer is expanded, Escape/collapse, Space play/pause, and
-     spaces in Search. Right-click DHUN after playback and verify Play/Pause,
-     Open DHUN and recents. If tasks are absent, capture the `jump list:` log
-     line and check Settings → Personalization → Start → “Show recently opened
-     items in Start, Jump Lists, and File Explorer”.
-5. Keep S3 open for any unresolved hardware result; fix confirmed defects with
-   tests and repeat the exact corrected-package check. Do not modify lyrics.
+1. Finish the documentation status sync in this change set and keep PR #127 a
+   draft until the required checks pass on its final head. PR-path `publish` and
+   `release_draft` are expected to skip; APK/MSI package jobs must pass, and the
+   MSI annotations must prove install-over actually ran.
+2. After all automated checks and documentation pass, mark PR #127 ready and
+   merge to publish a new rolling `test` APK/MSI. Hardware acceptance stays
+   **OPEN** until the user tests the *new* hashes. Never report CI as hardware
+   acceptance or use the old `f0225f4` assets for the retest.
+3. After merge, verify the rolling release's new `.sha256` sidecars and provide
+   exact steps from `docs/runbooks/s3-hardware-checklist.md`:
+   - Android: test `Go to album` on a known album-linked track; test offline
+     streaming with Wi-Fi connected but Internet unvalidated and in airplane
+     mode; confirm the banner stays above FullPlayer, downloads remain available,
+     and playback recovers when Internet returns.
+   - Windows: record `winver`, package version/hash, VLC, resolution and scale;
+     test Ctrl+F while FullPlayer is expanded, Escape/collapse, Space playback
+     and spaces in Search. Verify Play/Pause, Open DHUN and recent tasks after a
+     `jump list: committed ...` log; if absent, capture the menu/log and check
+     Settings → Personalization → Start → “Show recently opened items in Start,
+     Jump Lists, and File Explorer”.
+4. Keep S3 open for unresolved hardware results; fix confirmed defects with
+   regression tests and repeat the corrected-package check. Do not modify lyrics.
 
 **Blockers:** no JDK or physical Android/Windows devices in this sandbox.
 Release assets downloaded inside this environment may return EOF; publisher
-provenance plus the user's current `.sha256` sidecars identify the exact files.
+provenance plus the user's current `.sha256` sidecars identify exact files.
 
 ## HISTORICAL STATE — PR #125: shared-test flake fix (merged 2026-10-06, session `arena/cf69112a-dhun`)
 
