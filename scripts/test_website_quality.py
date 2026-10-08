@@ -12,6 +12,7 @@ test — and then the whole set runs against the committed build in
 HTML, not about source files looking plausible.
 """
 
+import re
 import sys
 import tempfile
 import unittest
@@ -266,6 +267,23 @@ class BuiltSite(unittest.TestCase):
     def test_no_release_digest_is_quoted_on_the_download_page(self):
         markup = (DIST / "download" / "index.html").read_text(encoding="utf-8")
         self.assertNotRegex(markup, r"\b[0-9a-f]{64}\b")
+
+    def test_no_text_uses_the_faintest_token(self):
+        """`--text-4` measures ~3.9:1 and fails the WCAG AA body-text floor.
+
+        It stays defined for non-text affordances, but no `color:` declaration
+        may use it. This is the rule that outlaws the real defect CI found:
+        Lighthouse reported accessibility 95 on /features/ and /download/, where
+        the faint "traceable source" line and the list markers used it.
+        """
+        css = (DIST / "assets" / "styles.css").read_text(encoding="utf-8")
+        offenders = re.findall(r"[^}{]*\{[^}]*color:\s*var\(--text-4\)[^}]*\}", css)
+        self.assertEqual(
+            offenders,
+            [],
+            "these rules paint text with --text-4 (below the 4.5:1 floor): "
+            + " | ".join(offender.strip()[:80] for offender in offenders),
+        )
 
     def test_committed_build_is_minified(self):
         """A build that was never minified would fail the weight gate elsewhere;

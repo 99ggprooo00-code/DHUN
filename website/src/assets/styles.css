@@ -31,6 +31,8 @@
   --text: #ffffff;
   --text-2: rgba(255, 255, 255, 0.80);
   --text-3: rgba(255, 255, 255, 0.62);
+  /* Kept for non-text affordances only: 0.45-alpha white is ~3.9:1 and
+     fails the 4.5:1 body-text floor, so no text uses it. */
   --text-4: rgba(255, 255, 255, 0.45);
 
   /* Accent — DhunAccent.BRAND dark ramp */
@@ -364,7 +366,7 @@ p code, li code {
 .missing { list-style: none; padding: 0; color: var(--text-2); font-size: 0.95rem; }
 .missing li { padding-left: 1.4em; position: relative; }
 .missing li::before {
-  content: "—"; position: absolute; left: 0; color: var(--text-4);
+  content: "—"; position: absolute; left: 0; color: var(--text-3);
 }
 
 /* --------------------------------------------------------------- footer -- */
@@ -593,6 +595,7 @@ p code, li code {
 .winbtn {
   display: grid; place-items: center; width: 2.2em; height: 1.8em;
   border-radius: var(--r-xs); color: var(--text-3);
+  background: var(--surface-highest);
 }
 .winbtn--close { color: var(--error); }
 .window-body { display: grid; grid-template-columns: 4.6em 1fr 8.5em; min-height: 15em; }
@@ -632,7 +635,7 @@ p code, li code {
   border: 1px solid var(--hairline); border-radius: var(--r-full);
   padding: 0.2em 0.8em; background: var(--surface);
 }
-.traceable { font-size: 0.8rem; color: var(--text-4); }
+.traceable { font-size: 0.82rem; color: var(--text-3); }
 .faq { display: grid; gap: var(--sp-4); }
 .faq h3 { margin-bottom: var(--sp-1); }
 
