@@ -1,0 +1,224 @@
+name: website
+
+# The marketing site's own workflow. It is deliberately separate from the four
+# app workflows: a site failure here can never redden app CI, and app CI stays
+# Python-only (its step 1 runs scripts/test_website_*.py against the committed
+# built HTML with no Node and no network).
+#
+# Triggers are site-scoped: a change outside website/**, the site's checks, or
+# this file does not start this workflow at all.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "scripts/website_claims.py"
+      - "scripts/website_quality.py"
+      - "scripts/test_website_claims.py"
+      - "scripts/test_website_quality.py"
+      - ".github/workflows/website.yml"
+  pull_request:
+    paths:
+      - "website/**"
+      - "scripts/website_claims.py"
+      - "scripts/website_quality.py"
+      - "scripts/test_website_claims.py"
+      - "scripts/test_website_quality.py"
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and check the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install site dependencies (pinned lockfile)
+        working-directory: website
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the site
+        working-directory: website
+        run: npm run build
+
+      # Minification is how the page-weight budget is met; this proves it only
+      # removed whitespace, by rebuilding unminified and comparing.
+      - name: Prove minification is lossless
+        working-directory: website
+        run: node tools/verify-minify.mjs
+
+      # The committed mirror in website/dist/ is what app CI's step 1 checks.
+      # If a rebuild changes it, one of the two is stale and the PR must fix it.
+      - name: Committed build must match a fresh build (drift check)
+        run: |
+          if ! git diff --exit-code --stat -- website/dist; then
+            echo "::error title=Site drift::website/dist does not match a fresh build of website/src. Run 'npm run build' in website/ and commit the result."
+            exit 1
+          fi
+          echo "::notice title=Drift check::website/dist matches a fresh build of website/src."
+
+      - name: Honesty contract on the fresh build
+        run: python3 scripts/website_claims.py website/dist
+
+      - name: Quality gates on the fresh build
+        run: python3 scripts/website_quality.py website/dist
+
+      - name: HTML validation (html-validate, pinned)
+        working-directory: website
+        run: npx html-validate "dist/**/*.html"
+
+      - name: Upload the built site
+        uses: actions/upload-artifact@v6
+        with:
+          name: dhun-site
+          path: website/dist
+          retention-days: 7
+          if-no-files-found: error
+
+  a11y:
+    name: Lighthouse and axe (real numbers, printed as annotations)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: dhun-site
+          path: dist
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      # GitHub's ubuntu images ship Google Chrome; if that is ever untrue the
+      # step says so explicitly instead of reporting a score it never measured.
+      - name: Is a browser available?
+        id: browser
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            google-chrome --version
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Lighthouse::no Chrome on this runner — Lighthouse and axe could not run; no score is claimed."
+          fi
+
+      - name: Serve the built site
+        if: steps.browser.outputs.available == 'true'
+        run: |
+          python3 -m http.server 8080 --directory dist --bind 127.0.0.1 &
+          sleep 2
+          curl -sf -o /dev/null http://127.0.0.1:8080/ && echo "server up"
+
+      - name: Lighthouse (performance, accessibility, best practices, SEO)
+        if: steps.browser.outputs.available == 'true'
+        run: |
+          mkdir -p reports
+          for route in "/" "/features/" "/download/"; do
+            name=$(echo "$route" | tr -c 'a-zA-Z0-9' '_')
+            npx --yes lighthouse@13.5.0 "http://127.0.0.1:8080$route" \
+              --quiet --output=json --output=html \
+              --output-path="reports/${name}" \
+              --chrome-flags="--headless=new --no-sandbox --disable-dev-shm-usage" || exit 1
+            python3 scripts/report_lighthouse.py "$route" "reports/${name}.report.json"
+          done
+
+      # axe-core proper, so the audit is not only Lighthouse's embedded copy.
+      # It is evidence, not a gate: if the driver cannot run, that is reported as
+      # a warning annotation and no violation count is invented.
+      - name: axe-core CLI (violations reported as annotations)
+        if: steps.browser.outputs.available == 'true'
+        run: |
+          mkdir -p reports
+          for route in "/" "/features/" "/download/"; do
+            name=$(echo "$route" | tr -c 'a-zA-Z0-9' '_')
+            if npx --yes @axe-core/cli@4.14.0 "http://127.0.0.1:8080$route" \
+                 --save "reports/axe-${name}.json" --exit > "reports/axe-${name}.log" 2>&1; then
+              :
+            else
+              status=$?
+              if [ -s "reports/axe-${name}.json" ]; then
+                python3 scripts/report_axe.py "$route" "reports/axe-${name}.json" || true
+              else
+                echo "::warning title=axe-core $route::axe-core CLI did not produce a report (exit $status); its output is kept in the artifact reports/axe-${name}.log"
+              fi
+            fi
+          done
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lighthouse-reports
+          path: reports
+          retention-days: 7
+          if-no-files-found: ignore
+
+  deploy:
+    name: Deploy to GitHub Pages
+    # Gated by `build` — the job that runs the honesty contract, the quality
+    # gates, HTML validation and the drift check. The a11y job's Lighthouse/axe
+    # numbers are evidence, reported as annotations; they do not gate a publish,
+    # because a failing audit cannot be fixed by withholding the site.
+    needs: [build]
+    # Only main publishes. A branch push (including a session branch) builds and
+    # checks, and cannot overwrite the public site.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dhun-site
+          path: dist
+
+      # Pages has to be set to the Actions build type for a workflow to be able
+      # to publish (`build_type: workflow`). The agent token cannot change that
+      # setting (`PUT /repos/{owner}/{repo}/pages` -> HTTP 403 "Resource not
+      # accessible by integration"), so instead of failing red on every push to
+      # main, this step reports the exact one-line fix and the deploy steps below
+      # skip themselves while the setting is still `legacy`.
+      - name: Is the Pages source set to GitHub Actions?
+        id: pages_source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          build_type="$(gh api "repos/${{ github.repository }}/pages" --jq .build_type 2>/dev/null || echo unknown)"
+          echo "build_type=$build_type" >> "$GITHUB_OUTPUT"
+          if [ "$build_type" != "workflow" ]; then
+            echo "::warning title=Pages source not switched::Pages build_type is '$build_type', not 'workflow', so nothing was published. Fix with a token that has Pages write access: gh api -X PUT repos/${{ github.repository }}/pages -f build_type=workflow — or Settings -> Pages -> Build and deployment -> Source -> GitHub Actions. The site is already built and checked by the build job in this run."
+          else
+            echo "::notice title=Pages source::build_type=workflow; deploying."
+          fi
+
+      - if: steps.pages_source.outputs.build_type == 'workflow'
+        uses: actions/configure-pages@v6
+      - if: steps.pages_source.outputs.build_type == 'workflow'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+      - id: deployment
+        if: steps.pages_source.outputs.build_type == 'workflow'
+        uses: actions/deploy-pages@v5

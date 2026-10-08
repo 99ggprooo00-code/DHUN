@@ -1,3 +1,351 @@
+# DHUN website — build plan (Option A marketing site)
+
+> **Part A below is the plan of record for the `website/` workstream and
+> supersedes the Option-B framing of the material preserved as Part B.**
+> Part B (the 2026-10-08 `arena/ae65f1a5-dhun` research) is retained because
+> its comparative research, licence snapshot and Pages evidence are still
+> accurate and are cited by this plan; it is *not* the current decision.
+
+Status vocabulary used throughout: **verified** = I read the fact from a tool
+output in this session (git, `gh`, a build, a local command, a fetched URL);
+**expected** = plausible but unchecked; **not verified** = explicitly unchecked.
+
+---
+
+## 1. Scope — Option A marketing site (decided, not re-opened)
+
+The deliverable is a **static marketing/download site** for the applications
+that already exist: a new top-level `website/` directory, its own workflow,
+and nothing else.
+
+**Forbidden by decision D1:** anything resembling a web player — no
+`app.`-style property, no PWA, no browser playback, no Kotlin/JS, no
+TypeScript application code, no proxy/backend. `.ai/MASTER_PROMPT.md` line 46
+("Web is deferred (v2 candidate, likely 'no')") and the "Explicitly NOT in
+S1–S6" list both keep production Web out of scope; accepted
+`docs/decisions/ADR-008-browser-web-player-target.md` authorized only the B1
+deployed-origin feasibility spike, which is closed as **BLOCKED**. Building a
+player would need a new ADR, so instead of building one this session records
+the marketing-site scope as **PROPOSED ADR-009** (`docs/decisions/ADR-009-marketing-site.md`,
+status **PROPOSED** — not implemented as a product target, and it does not
+widen ADR-008).
+
+**Isolation (D2).** The site lives in `website/`; it is built by
+`.github/workflows/website.yml`, which I add. The four existing workflows
+(`ci.yml`, `build-apk.yml`, `test-release.yml`, `extraction-health.yml`),
+Gradle files, `shared/`, `app-android/`, `app-desktop/`, `settings.gradle.kts`
+and `build.gradle.kts` are **not modified**. The only edits outside
+`website/`, `.ai/`, `docs/`, `README.md` and `THIRD_PARTY.md` are:
+
+- `scripts/test_website_claims.py` + `scripts/website_claims.py` +
+  `scripts/website_quality.py` (new files, auto-discovered by CI step 1), and
+- `scripts/test_website_quality.py` (new file, same discovery).
+
+A site *build* failure cannot redden app CI: app CI's Python step reads the
+**committed** built HTML (see §5) with no `npm`, no network and no Node
+requirement. The site's own build/validate/deploy lives in its own workflow.
+
+## 2. Verified baseline (this session, 2026-10-08)
+
+| Fact | State | Evidence (this session) |
+|---|---|---|
+| Working branch | `arena/fc918d37-dhun`, clean tree at boot | `git status`, `git branch --show-current` |
+| Branch base / GitHub `main` | `ae44c7a` — **PR #137 merge**, not `8a8d6c5` | `git log --oneline -5`, `origin/main` |
+| PR #135 post-merge verdicts (left unread by the previous session) | ✅ **success** on `8a8d6c5` for CI `37772063324`, test-release `37772063364`, Build APK `37772063380`, pages `37772062338` | `gh api .../actions/runs/<id>` |
+| Rolling `test` release | republished `2026-10-08T14:14:51Z`; assets `dhun-test.apk` 18,405,859 B, `dhun-test-arm64-v8a.apk` 18,355,786 B, `dhun-test-armeabi-v7a.apk` 18,352,944 B, `dhun-test.msi` 112,971,776 B (+ four `.sha256` sidecars) | `gh release view test --json assets` |
+| Pages configuration | `build_type = legacy`, `source = main:/`, `status = built`, `https_enforced = true` | `gh api repos/99ggprooo00-code/DHUN/pages` |
+| Canonical URL content | **serves the rendered root `README.md`**, not a 404 — the D9/§10 "404" premise was the *old* `99ggprooo00` hostname and is stale | content fetched from `https://99ggprooo00-code.github.io/DHUN/` this session |
+| `README.md` line 2 | already the canonical `99ggprooo00-code.github.io` URL, and it resolves | repo file + fetched page |
+| Node / npm / Python | `v22.22.3` / `10.9.8` / `3.11.2` | `node --version`, `npm --version`, `python3 --version` |
+| Go / Ruby / Hugo / browsers | absent — no Lighthouse, axe or visual check can run locally | `which go ruby bundle hugo chrome chromium firefox` |
+| Eleventy installs | `@11ty/eleventy@3.1.6` → 129 packages in 7 s from `registry.npmjs.org` | `npm install` in `website/` this session |
+| Actions log archives | unreachable; **check-run annotations** are reachable | prior session's finding, re-used deliberately |
+| Token capability | repository `admin: true`; Pages API readable | `gh api repos/... --jq .permissions` |
+
+**Pages diagnosis (D10, done — 15-minute box respected).** The site is *not*
+misconfigured in the sense the brief assumed: legacy Pages on `main:/`
+publishes the repository root and Jekyll renders `README.md` into an
+`index.html`, which is why the URL resolves to README text. That is a *product*
+defect (the front door is an engineering document), not a deployment break
+like the 2026-10-08 auto-created `pages-build-deployment` run
+`37759719910`. The fix is to publish a real static artifact from Actions
+(`build_type: workflow`). The exact one-line change and its unverified status
+are recorded in §7.
+
+## 3. Stack decision (D3)
+
+**Eleventy (`@11ty/eleventy`) 3.1.6, pinned exactly, lockfile committed.**
+
+- Chosen over Astro because its output *is* the input: no bundler, no asset
+  hashing, no client runtime, no hydration concept to accidentally enable. The
+  build result is plain, byte-stable HTML + CSS, which is what the committed
+  dist mirror and the drift check in §5 need.
+- Rejected: Astro (also viable, heavier install, hashed asset names make the
+  committed mirror noisier); Hugo and Jekyll (not installed here — cannot be
+  built or verified locally, so the work would be CI-blind); a hand-written
+  script-only site (no reason to avoid a real generator, and Eleventy gives
+  layout inheritance for the three pages).
+- Build is one command: `npm ci && npm run build` in `website/` → `website/dist/`.
+- Zero client-side JavaScript is shipped. No analytics, no CDN, no third-party
+  request at runtime. `@11ty/eleventy` and its 128 transitive packages are
+  **build-time only**; nothing from `node_modules` is copied to `dist/`, and a
+  test asserts that (`scripts/test_website_quality.py`).
+
+## 4. Content truth contract (D5)
+
+DHUN's real surface, restated so no page can drift from it:
+
+- Android, `minSdk 24` (Android 7.0) — primary. Desktop: Windows first;
+  Linux/macOS "free via the JVM build", **never hardware-verified**.
+- No iOS, no web client, no accounts, no cross-device sync, no library import,
+  no casting, no Android Auto, no store release.
+- **No audio-quality number exists.** No bitrate, no "lossless", no "FLAC",
+  no "24/192" may appear anywhere on the site.
+
+**May lead with (each claim gets an HTML comment citing its ADR/PR):**
+no sign-in / no cookies / no PO tokens (ADR-001, ADR-003) · GPL-3.0, free,
+no ads, no telemetry · persistent offline downloads (ADR-006) · synced lyrics
+(LRCLIB → YTM lyrics → cache) · real desktop client (tray, SMTC, jump lists,
+single-instance, 10-band EQ) · Android home-screen widgets (Quick Play).
+
+**Must appear visibly on the front page:** extraction is "borrowed time"
+(MASTER_PROMPT §2); the rolling build is literally "Rolling UNVERIFIED
+development build"; the S3 hardware gates are **OPEN**.
+
+**Enforced by tests, not prose** (three checks in `scripts/`, wired into app
+CI step 1 and the site workflow, mutation-proven red-then-green):
+
+1. **Forbidden claims** — fails on any forbidden platform or capability claim
+   in the *built* HTML (iOS, web player/PWA, sync, import, FLAC, bitrate, and
+   every platform DHUN does not ship).
+2. **Required caveats** — fails if the front page is missing the unverified /
+   borrowed-time / open-gate caveats.
+3. **No baked digests** — fails on any hard-coded SHA-256 or byte size in the
+   built HTML or site sources; downloads link by URL only, because the rolling
+   assets change on every merge to `main`.
+
+## 5. Enforcement architecture (why committed `dist/`)
+
+App CI step 1 is `python3 -m unittest discover -s scripts -p 'test_*.py'`. To
+keep that step pure-Python, network-free and incapable of being reddened by a
+site *build* failure while still asserting against **built HTML**, the built
+site is committed at `website/dist/` and:
+
+- app CI step 1 (and the site workflow) check the **committed** HTML for
+  claims, caveats, digests, links, weight budget and HTML validity;
+- the site workflow rebuilds from source and **fails on drift** between the
+  fresh build and the committed mirror, then deploys the freshly built
+  artifact, so what is served is what was built, and what is tested is byte
+  identical to it.
+
+Honest limitation: the deployed artifact and the committed mirror are proven
+equal by the drift check inside the deploy workflow — that check cannot run
+before the merge (the workflow is not on `main` yet), so the drift check is
+**not verified pre-merge**.
+
+## 6. Pages and deployment (D9, D10)
+
+- Canonical URL stays `https://99ggprooo00-code.github.io/DHUN/` (no custom
+  domain — D7).
+- Deployment moves to Actions: `.github/workflows/website.yml` builds,
+  validates and deploys the `website/dist` artifact with
+  `actions/{configure-pages,upload-pages-artifact,deploy-pages}` and
+  `permissions: pages: write, id-token: write` on the `github-pages`
+  environment.
+- The Pages **source** must be switched to `build_type: workflow` (a
+  repository setting). `gh api repos/.../pages` is readable with this token;
+  whether the token can `PUT` the setting is tested at the end of this run and
+  recorded in the session docs. If it cannot, the workflow still ships and the
+  one-line user action is: *Settings → Pages → Build and deployment → Source →
+  GitHub Actions*.
+- Fallback while legacy mode is active: the committed mirror is reachable at
+  `https://99ggprooo00-code.github.io/DHUN/website/dist/` under the current
+  `main:/` source. That is a fallback, not the goal — the goal is the root.
+
+## 7. Information architecture (D6, D7)
+
+Exactly three routes, English only, copy centralised in `website/src/_data/`
+so translation stays additive later (no i18n is built):
+
+| Route | Job |
+|---|---|
+| `/` | promise, proof, the two CTAs, honestly framed risk, closing CTA |
+| `/download` | the rolling `test` release, what it is and is not, verification steps, build-it-yourself |
+| `/features` | what actually exists, each item traceable, plus an explicit "not in DHUN" list |
+
+Landing-page order (abstracted from the verified Volta pattern in Part B §3,
+with DHUN substitutions): skip link → header → badge row
+`FREE · GPL-3.0 · NO SIGN-IN · NO ADS` → 4-word H1 → one-sentence value prop →
+**exactly two CTAs** (`Download` → `/download`; `Source on GitHub` →
+repository) → platform strip → hero visual (Home) → 4-up stat row
+(`0` accounts · `GPL-3.0` free forever · `Android 24+` / desktop via the JVM
+build · `0` trackers) → **honesty footnote under the stats** → three feature
+sections (**NO SIGN-IN / OFFLINE / DESKTOP**) each kicker + promise + its own mockup (player / downloads / desktop window — four distinct screens in total, so no screen is repeated) →
+"borrowed time" risk section → closing CTA repeating both buttons → footer
+with the GPL-3.0 notice, source link and `THIRD_PARTY.md`.
+
+`/download` states, without hedging: `minSdk 24` / Android 7.0; the MSI needs
+a system VLC for playback; the build is debug-keystore-signed and test-grade,
+not store-signed; verify the `.sha256` sidecar before installing; the three
+APKs are **not** byte-identical (they are ABI splits of the same build); the
+universal APK is the one to install; nothing here is a stable release.
+
+## 8. Visual system (D4) — no images exist, so none will be faked
+
+There is no raster or vector artwork in the repository (verified in Part B
+§2.2 and unchanged: the launcher art is XML), no display and no device, so
+**there are no screenshots and none will be invented**.
+
+- Hero and feature visuals are **hand-written CSS/SVG device mockups** that
+  recreate DHUN's real UI: colours, type scale, spacing and component
+  structure are read out of `shared/src/commonMain/kotlin/dev/dhun/design/`
+  and `…/ui/`.
+- Tokens used (read from `DhunAppearance.kt` this session): background
+  `#161616`, surface `#1E1E1E`, surfaceVariant `#262626`, surfaceElevated
+  `#303030`, surfaceHighest `#363636`, surfaceCard `#2A2A2A`, accent
+  `#BB86FC`, onAccent `#000000`, accentContainer `#3A2A5A`,
+  onAccentContainer `#E8D5FF`, text ladder `#FFFFFF` / `CC` / `99` / `61`,
+  border `#1AFFFFFF`, glass edges `#38FFFFFF`; shapes 4/8/12/16/28/32 dp
+  (`DhunShapes`); spacing scale and 44/48 dp touch targets (`DhunSpacing`);
+  type scale from `DhunTypographyTokens` (display 57/45/36, headline 32/28/24,
+  title 22/16/14, body 16/14/12, brand 12 sp with 3 sp tracking).
+- **Forbidden:** stock photos, third-party album art, other projects'
+  screenshots, AI-generated imagery, and any mockup showing a feature DHUN
+  does not have.
+- Every mockup carries a visible `<figcaption>` that says it is an illustrative
+  recreation, **not a screenshot**, plus a screen-reader description of what the
+  recreation shows; the drawing itself is `aria-hidden`, so assistive tech never
+  reads placeholder UI text as if it were content. `scripts/website_quality.py`
+  fails the build if a mockup loses either the label or its §9 backlog id.
+- §9 lists exactly which real captures should replace each mockup.
+
+## 9. Screenshot capture backlog (D4 follow-through)
+
+To be captured by the user during the S3 rounds (device + Windows), in this
+priority order. Until each arrives, the named mockup stands in, labelled as a
+recreation.
+
+| # | Mockup (site id) | Real capture that should replace it | What it must show |
+|---|---|---|---|
+| 1 | `mock-home-phone` | Android Home, portrait | rail layout, now-playing backdrop, bottom nav + docked mini-player |
+| 2 | `mock-player-phone` | Android FullPlayer, portrait | blurred artwork backdrop, Lyrics tab, transport row, play disc |
+| 3 | `mock-downloads-phone` | Android Library → Downloads | downloaded rows with offline badges, in-progress row |
+| 4 | `mock-desktop-window` | Windows desktop window, 1200×780 | rails layout, tray-adjacent mini-player, EQ or queue panel open |
+| 5 | `mock-widget` | Android home screen with the Quick Play widget | widget on a launcher, not the app |
+| 6 | `mock-lyrics` | Android FullPlayer → Lyrics, mid-song | a line highlighted against real synced lyrics |
+
+Content-safety rule (unchanged from Part B §7): only legally safe content with
+recorded provenance may enter Git; no third-party album art without
+permission.
+
+## 10. Quality gates (D-quality, §5 of the brief)
+
+| Gate | How it is asserted | Where it runs |
+|---|---|---|
+| Page weight budget | `scripts/website_quality.py`: per-route HTML+CSS ≤ 60 KB uncompressed, JS ≤ 10 KB, no single asset > 150 KB | app CI step 1 + site workflow |
+| HTML validity | `html-validate` over the built output | site workflow (npm, pinned) |
+| Internal link check | `scripts/website_quality.py` — every internal href/src resolves to a built file | app CI step 1 + site workflow |
+| Honesty (D5) | the three checks in §4 | app CI step 1 + site workflow |
+| Responsive | mobile-first layout, `clamp()` type, breakpoints 480/768/1024/1440, no fixed px widths that break 320 px; asserted by a source-level scan for fixed-width declarations plus a manual reading of the CSS | local + site workflow |
+| Accessibility | semantic landmarks, one `h1` per page, skip link, visible focus, ≥4.5:1 body contrast, `prefers-reduced-motion`, `prefers-color-scheme`, keyboard-reachable nav | asserted where a machine can (structure/contrast maths in `website_quality.py`), Lighthouse/axe in CI |
+| Lighthouse / axe | real numbers from CI on `ubuntu-latest`, surfaced as **check-run annotations** so they are readable from here. **Measured, run 37795271256:** `/` 96/100/100/100 and `/features/` + `/download/` 100/100/100/100 (performance/accessibility/best-practices/SEO). `@axe-core/cli` exited 1 without writing a report on all three routes, so **no axe number exists** and none is claimed. Gated: accessibility ≥ 0.95, performance ≥ 0.90 | site workflow |
+| Craft | 404 page, canonical, Open Graph + Twitter meta, favicon from DHUN's own XML launcher art, `robots.txt`, `sitemap.xml`, `lang`, GPL notice in the footer | asserted by the quality check + review |
+
+Honesty about the environment: GitHub Pages gives no control over
+compression or cache headers — no `Content-Encoding` or `Cache-Control`
+tuning is possible, only file size and request count. Stated on the download
+page's technical footnote rather than claimed as optimised.
+
+## 11. Work plan, execution and honest status
+
+| Phase | Deliverable | Status |
+|---|---|---|
+| P0 | this plan; ROADMAP current-task correction; PR #135 verdicts read | ✅ done (commit `2e0dcf8`, this file) |
+| P1 | comparative research retained from Part B §4 with URLs, plus 3 adopted / 2 rejected techniques (§12) | ✅ done (§12) |
+| P2 | Pages diagnosis recorded (§2, §6) | ✅ diagnosed — `legacy` `main:/` renders the README; the source switch is applied at the end of the session and its outcome recorded in the PR |
+| P3 | `website/` scaffold builds locally; own workflow | ✅ done — `npm ci && npm run build`, workflow added |
+| P4 | design tokens from the Compose source | ✅ done — dark + light token sets mirrored in `styles.css` |
+| P5 | CSS/SVG mockups | ✅ done — 4 mockups, labelled, ids matching §9 |
+| P6 | `/`, `/download`, `/features` | ✅ done — plus a real 404, robots.txt, sitemap.xml |
+| P7 | quality pass (weight, a11y, HTML validity, links, meta) | ✅ done locally — budget 50,455 B worst route, html-validate clean, 12 contrast pairs pass, no third-party origin |
+| P8 | the three D5 tests, CI wiring, mutation proof | ✅ done — 47 tests in CI step 1, 3 mutations proven red then green after revert |
+| P9 | CI results read once, root-cause fixes | ✅ read at the finish sequence; verdicts recorded in the PR comment |
+| P10 | docs: ROADMAP, DEBUG_LOG, KNOWN_LIMITATIONS, verification record, README, THIRD_PARTY, CHANGELOG | ✅ done |
+| P11 | **post-merge only**: `website.yml` on `main` and the canonical URL | ⏳ cannot be observed from inside the merging session. The Pages source itself is **blocked**: the token gets HTTP 403 on `PUT /repos/{owner}/{repo}/pages`, so switching it to `build_type: workflow` is a user-only one-liner |
+
+**Unverified as of P0 (deliberately listed rather than glossed):** the CI
+verdicts for any commit of this branch; the drift check; the Actions Pages
+deployment; whether the token may switch the Pages source; `html-validate`,
+Lighthouse and axe results; the served content at the canonical root.
+
+## 12. Comparative research — what is adopted and what is rejected
+
+The eight-project survey (Spotube, RiMusic, InnerTune, ViMusic, OuterTune,
+Harmony Music, Moosync, Echo Music) with canonical URLs, licence snapshot and
+a cross-project synthesis table already exists, verified 2026-10-08, in
+**Part B §4**; it is cited rather than re-run, and the three claims that drive
+this plan were re-checked directly (see §12.1).
+
+**Three techniques adopted**
+
+1. **Two CTAs, one of them the source** (Spotube, Moosync shape; Volta shape):
+   `Download` and `Source on GitHub`. No third destination competes with them,
+   and download detail lives on its own route.
+2. **Lifecycle status outranks marketing** (RiMusic, OuterTune, Harmony all
+   lead with archived/inactive state). DHUN is alive but its rolling build is
+   unverified and its hardware gates are open, so that status is stated in the
+   first viewport, not in a footer.
+3. **Every visual is a real interface, labelled** (Echo names its six
+   screenshots; OuterTune/Harmony show that a decorative banner proves
+   nothing). DHUN has no captures yet, so each mockup is labelled as a
+   recreation and §9 names the capture that will replace it.
+
+**Two techniques rejected**
+
+1. **Store/distribution badges** (F-Droid / IzzyOnDroid / Flathub): DHUN has
+   no such channel. Displaying a badge pattern copied from InnerTune or
+   RiMusic would be a claim DHUN cannot support.
+2. **Hide the extraction risk behind architecture language** (Spotube frames
+   it as bring-your-own plug-ins; Echo and InnerTune leave it in a disclaimer
+   or FAQ). DHUN states the borrowed-time maintenance reality plainly on the
+   front page and repeats it where the download is offered.
+
+### 12.1 Spot-checks performed this session
+
+Re-checked directly rather than trusted from Part B: the DHUN repository facts
+in §2 (all re-measured here), and the licensing position in §13. Part B's
+per-project URL list is retained as cited evidence from 2026-10-08 and is
+**not** re-fetched in full — stated as a limitation, not a claim.
+
+## 13. Licence (D8)
+
+- The site is part of this GPL-3.0 repository and stays **GPL-3.0**; the
+  footer carries the notice and links `LICENSE` and `THIRD_PARTY.md`.
+- **Fonts:** the default is the system font stack — zero downloads, zero
+  licence risk, fastest paint. If a webfont is ever added it must be OFL-1.1,
+  self-hosted, subset, `font-display: swap`, and listed in `THIRD_PARTY.md`.
+- **No third-party runtime asset ships**: no stock imagery, no icon library,
+  no CDN, no analytics, no webfont file in this first build. The favicon is
+  derived from DHUN's own Android launcher art (XML, first-party) and the
+  vector is written by hand into `website/src/assets/`.
+- Build-time tooling licences (Eleventy MIT, `html-validate` MIT) are recorded
+  in `THIRD_PARTY.md` and ship nothing to the browser.
+
+---
+
+---
+
+# Part B — prior research and evidence (2026-10-08, session `arena/ae65f1a5-dhun`)
+
+> **Retained as cited evidence, not as the current plan.** Part A above is the
+> plan of record. Everything below was verified on 2026-10-08 by that session
+> and is quoted by Part A where it is still accurate: §B.2 (Pages + asset +
+> toolchain baseline), §B.4 (comparative research, licences, distribution
+> links, cross-project synthesis) and §B.7 (asset/licence gate). Its Option-B
+> framing of §B.1 and its Option-A-as-fallback conclusion in §B.6 are
+> **superseded** by Part A §1. Section numbers below are prefixed `B.` and do
+> not refer to Part A.
+
 # DHUN web presence — research and gated implementation plan
 
 > **Status (2026-10-08): RESEARCH / PLAN ONLY. W0 answers are recorded; the
@@ -15,7 +363,7 @@
 > the analysis in a `.md` file, and plan when to implement rather than rushing
 > into a copy of the sample site.
 
-## 1. The decision that comes before all implementation
+## B.1. The decision that comes before all implementation
 
 The reference URL hides two different products:
 
@@ -41,7 +389,7 @@ feasibility spike only, and B1 has now run to a **BLOCKED** result (see §1.1).
 No production player, backend/proxy, extraction change or B2 stack selection is
 approved, and B1 must not be restarted.
 
-### 1.1 W0 answers recorded on 2026-10-08
+### B.1.1 W0 answers recorded on 2026-10-08
 
 | Question | User choice | Consequence |
 |---|---|---|
@@ -62,11 +410,11 @@ stages were never reached. Firefox and Safari were unavailable. A full
 web-player architecture remains unapproved, no Web-support claim is permitted,
 and any continuation is a separate B2 user decision.
 
-## 2. Verified baseline — repository, Pages and the advertised URL
+## B.2. Verified baseline — repository, Pages and the advertised URL
 
 Verified on 2026-10-08 against GitHub and the checked-out repository:
 
-### 2.1 The advertised URL was wrong; W0 authorized the correction while Pages kept working
+### B.2.1 The advertised URL was wrong; W0 authorized the correction while Pages kept working
 
 Before the W0 correction, `README.md` line 2 advertised:
 
@@ -101,7 +449,7 @@ public experience.
 to the canonical `-code` URL. This repairs the link; it does not turn the
 rendered README into a product site or web player.
 
-### 2.2 Asset inventory
+### B.2.2 Asset inventory
 
 A repository-wide search (excluding `.git`) finds **zero** `png`, `jpg`,
 `jpeg`, `webp`, `svg` or `gif` files. Android launcher art is XML. No product
@@ -122,7 +470,7 @@ The user selected **real screenshots captured during S3**. CSS schematics
 remain an unselected fallback if safe/current captures cannot be produced and
 the user approves that substitution.
 
-### 2.3 Toolchain measured in this sandbox
+### B.2.3 Toolchain measured in this sandbox
 
 | Tool | Measured result |
 |---|---|
@@ -138,7 +486,7 @@ Consequence: Astro, Eleventy, or a no-build static site can be built and checked
 locally. Jekyll and Hugo would be CI-blind in this environment. Do not choose
 those generators merely because GitHub Pages has historical defaults for them.
 
-## 3. Volta — verified pattern, not content to copy
+## B.3. Volta — verified pattern, not content to copy
 
 Sources re-fetched 2026-10-08:
 
@@ -147,7 +495,7 @@ Sources re-fetched 2026-10-08:
 - <https://volta-music.com/en/features>
 - <https://app.volta-music.com/>
 
-### 3.1 Information architecture
+### B.3.1 Information architecture
 
 The marketing homepage follows this sequence:
 
@@ -168,7 +516,7 @@ It has three marketing routes under a locale prefix: `/en`, `/en/download`,
 `/en/features`. Download and browser app are separate destinations. The
 screenshots do most of the persuasion.
 
-### 3.2 What transfers to DHUN
+### B.3.2 What transfers to DHUN
 
 - one promise per viewport;
 - two primary actions, not a wall of badges;
@@ -177,7 +525,7 @@ screenshots do most of the persuasion.
 - a closing CTA that repeats rather than inventing a third conversion path;
 - visible support/platform qualifiers close to the claim.
 
-### 3.3 What must not transfer
+### B.3.3 What must not transfer
 
 Volta claims six platforms, cross-device sync, import, accounts, and up to FLAC
 24/192. DHUN has no evidence for those claims. DHUN currently has Android and a
@@ -187,13 +535,13 @@ has no iOS app, web app, account sync, import, or verified audio-quality number.
 Copying Volta's words, visual assets, logo, fonts, or measurements is out of
 scope. The reference is for page structure only.
 
-## 4. Comparable open-source music projects — W2 research
+## B.4. Comparable open-source music projects — W2 research
 
 Research rule: prefer each project's controlled domain or canonical GitHub
 repository. Third-party APK/SEO sites are not treated as product evidence.
 “Not found” or “archived” is itself a finding.
 
-### 4.1 Spotube
+### B.4.1 Spotube
 
 **Sources:** <https://spotube.cc/>,
 <https://github.com/team-spotube/spotube> (the old `KRTirtho/spotube` URL now
@@ -214,7 +562,7 @@ resolves to this repository), <https://spotube.cc/downloads>.
   real screenshots and two CTAs work. Do **not** copy its broad platform claim
   or hide DHUN's extraction risk behind architecture language.
 
-### 4.2 RiMusic
+### B.4.2 RiMusic
 
 **Sources:** <https://github.com/fast4x/RiMusic>, historical domain
 <https://rimusic.xyz/>, and repository `docs/index.html`.
@@ -235,7 +583,7 @@ resolves to this repository), <https://spotube.cc/downloads>.
   polished download page pretending that an unverified or retired build is
   current.
 
-### 4.3 InnerTune
+### B.4.3 InnerTune
 
 **Source:** <https://github.com/z-huang/InnerTune>. No separate homepage is
 listed by the canonical repository.
@@ -252,7 +600,7 @@ listed by the canonical repository.
   but DHUN currently has only test-grade GitHub artifacts and must not imply an
   F-Droid/store channel that does not exist.
 
-### 4.4 ViMusic
+### B.4.4 ViMusic
 
 **Sources:** original project <https://github.com/vfsfitvnm/ViMusic> and the
 separate site <https://vimusic.vercel.app/>.
@@ -272,7 +620,7 @@ separate site <https://vimusic.vercel.app/>.
 - **Lesson for DHUN:** verify ownership before using a domain as inspiration;
   a familiar product name can point at a different architecture and operator.
 
-### 4.5 OuterTune
+### B.4.5 OuterTune
 
 **Source:** <https://github.com/OuterTune/OuterTune>. The domain
 `outertune.app` fetched in research is an unrelated SEO/APK site and is **not**
@@ -291,7 +639,7 @@ used as canonical evidence.
   also demonstrates why official links should be allow-listed: a polished
   third-party download site can look more “official” than the repository.
 
-### 4.6 Harmony Music
+### B.4.6 Harmony Music
 
 **Source:** <https://github.com/anandnet/Harmony-Music>. No separate homepage is
 listed by the canonical repository.
@@ -306,7 +654,7 @@ listed by the canonical repository.
 - **Lesson for DHUN:** a banner is not product proof. Screenshots are more useful
   than a decorative hero when the promise is an interface.
 
-### 4.7 Moosync
+### B.4.7 Moosync
 
 **Sources:** <https://moosync.app/>,
 <https://github.com/Moosync/Moosync>, and the public website source
@@ -327,7 +675,7 @@ listed by the canonical repository.
   DHUN should not auto-label an OS build “supported” when its hardware gate is
   still open.
 
-### 4.8 Echo Music
+### B.4.8 Echo Music
 
 **Sources:** <https://echomusic.fun/> and
 <https://github.com/EchoMusicApp/Echo-Music>. The GitHub organization is
@@ -346,7 +694,7 @@ verified for `echomusic.fun`.
   seeing. Avoid ambiguous “no ads” copy if the download path itself uses ads;
   DHUN can truthfully keep both site and app free of ad/analytics code.
 
-### 4.9 Canonical distribution-link snapshot
+### B.4.9 Canonical distribution-link snapshot
 
 These are the destinations exposed by the canonical site/README on 2026-10-08,
 not a recommendation that DHUN copy every channel. “None found” means no such
@@ -367,7 +715,7 @@ third-party package does not exist.
 DHUN currently has only its own GitHub rolling release. It must not display
 F-Droid, store or “stable release” badges based on another project's pattern.
 
-### 4.10 Repository licence snapshot
+### B.4.10 Repository licence snapshot
 
 Verified from each canonical repository on 2026-10-08. These are **code
 repository licences**, not permission to reuse site copy, branding, screenshots,
@@ -387,7 +735,7 @@ album art, fonts or other third-party assets.
 This survey does not make any of those projects' visual assets available to
 DHUN. W3 still requires asset-by-asset provenance and permission.
 
-### 4.11 Cross-project synthesis
+### B.4.11 Cross-project synthesis
 
 | Pattern | Observed | DHUN rule proposed |
 |---|---|---|
@@ -399,7 +747,7 @@ DHUN. W3 still requires asset-by-asset provenance and permission.
 | Project lifecycle | RiMusic, ViMusic, OuterTune and Harmony expose archived/inactive state | Site content must derive release/status labels from checked facts, not evergreen copy |
 | Screenshots as proof | More persuasive than long adjective lists | One screenshot per major promise; no screenshot means footnote or schematic label |
 
-## 5. DHUN's content truth contract
+## B.5. DHUN's content truth contract
 
 Every public claim must be one of:
 
@@ -433,15 +781,15 @@ not only in a footer. `/download` should carry the expanded prerequisites,
 checksum instructions, signing warning, current S3 state and stable GitHub
 source/release links.
 
-## 6. Option-A experience (not selected; retained as fallback/reference)
+## B.6. Option-A experience (not selected; retained as fallback/reference)
 
-### 6.1 Audience and job
+### B.6.1 Audience and job
 
 Primary visitor: someone deciding in under a minute whether to try DHUN on
 Android or Windows. Secondary visitor: a developer checking source, licence and
 risk posture. The site is not a replacement for engineering documentation.
 
-### 6.2 Exactly three routes
+### B.6.2 Exactly three routes
 
 All routes are static and live under the repository base path `/DHUN/`:
 
@@ -453,7 +801,7 @@ All routes are static and live under the repository base path `/DHUN/`:
 
 Do not add blog, account, pricing, app dashboard or web-player routes in v1.
 
-### 6.3 Landing-page sequence
+### B.6.3 Landing-page sequence
 
 A DHUN-specific adaptation of the useful Volta structure:
 
@@ -476,7 +824,7 @@ A DHUN-specific adaptation of the useful Volta structure:
 The rolling release must be labelled **Rolling UNVERIFIED development build**,
 matching GitHub. The site must not hide that status to improve conversion.
 
-### 6.4 Visual direction
+### B.6.4 Visual direction
 
 - dark, artwork-led, but not a clone of Volta;
 - DHUN's existing Material 3 / artwork / translucent-surface vocabulary;
@@ -488,7 +836,7 @@ matching GitHub. The site must not hide that status to improve conversion.
 - screenshots carry meaningful alt text; decorative frames carry empty alt;
 - readable without backdrop blur or JavaScript.
 
-## 7. Asset and licence gate (W3)
+## B.7. Asset and licence gate (W3)
 
 No image or font lands before its rights are recorded.
 
@@ -531,13 +879,13 @@ permission is established.
 - width/height declared to prevent layout shift;
 - dark and small-screen readability reviewed.
 
-## 8. Option-A generator and deployment analysis
+## B.8. Option-A generator and deployment analysis
 
 This section applies to the static marketing-site fallback. **Astro is not a
 web-player architecture decision.** Option B must follow ADR-008 and its
 browser feasibility evidence before choosing any client stack.
 
-### 8.1 Candidates
+### B.8.1 Candidates
 
 | Approach | Local verifiability | Fit | Cost/risk |
 |---|---|---|---|
@@ -552,7 +900,7 @@ output and `base: "/DHUN"`. It best fits three content routes and reusable claim
 / footnote / feature components while shipping no framework runtime by default.
 Eleventy is the fallback if the dependency audit finds Astro disproportionate.
 
-### 8.2 Repository boundary
+### B.8.2 Repository boundary
 
 Proposed layout after W0–W3 pass:
 
@@ -571,7 +919,7 @@ website/
 The website gets its own dependency files and tests. Do not add npm dependencies
 at repository root and do not mix generated `dist/` into Git.
 
-### 8.3 Pages migration
+### B.8.3 Pages migration
 
 Current Pages mode is `legacy`, source `main:/`, and serves the README. W4 would
 replace that with a dedicated GitHub Actions Pages deployment **only after one
@@ -600,7 +948,7 @@ Migration acceptance includes checking both:
 A rollback is switching Pages back to `main:/`; because W4 is static and no
 application target changes, rollback does not touch Android/Desktop releases.
 
-## 9. Staged work and gates
+## B.9. Staged work and gates
 
 The order is intentionally after or alongside the remaining hardware capture,
 never instead of S3.
@@ -695,7 +1043,7 @@ fallback, which is not authorized for implementation.
 
 **Gate:** user approval. Site acceptance does not close S3 or S6.
 
-## 10. W0 decisions and the remaining approval
+## B.10. W0 decisions and the remaining approval
 
 W0 answers are complete:
 

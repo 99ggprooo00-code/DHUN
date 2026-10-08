@@ -27,6 +27,26 @@ GPL-3.0-compatible. Reused code gets: project, file, license, commit, date.
 | Robolectric (test-only) / JUnit4 (test-only) / androidx-test (test-only) | MIT / EPL-1.0 / Apache-2.0 | unit-test runtimes; ship in no artifact | Phase 03+ |
 | vivi-music (`vivizzz007/vivi-music`) | GPL-3.0 (+ musixmatch-only exception) | **UI reference only** — read in place via the GitHub API for design research; no fork, no vendored copy, nothing copied yet. Any future adaptation must stay GPL-3.0, be attributed here, and exclude the musixmatch module. See `.ai/ui-research-vivi-music.md` | UI research 2026-09-06 |
 
+## Build-time and CI-only additions — 2026-10-08 (marketing site)
+
+The `website/` workstream (see `docs/decisions/ADR-009-marketing-site.md` and
+`.ai/WEBSITE_PLAN.md` Part A) adds **no runtime dependency**: the built site
+ships zero client-side JavaScript, no webfont, no icon library, no CDN and no
+third-party image. Its favicon is first-party vector art derived from DHUN's own
+launcher art, and the inline icons are hand-drawn geometry. The system font
+stack replaces any webfont. What follows never reaches a browser:
+
+| Dependency | License | Used for | Since |
+|---|---|---|---|
+| `@11ty/eleventy` 3.1.6 (dev dependency of `website/`, pinned, lockfile committed) | MIT | builds the three static routes from `website/src` | 2026-10-08 |
+| `html-validate` 11.16.2 (dev dependency of `website/`; CI-only) | MIT | HTML validity gate on the built output | 2026-10-08 |
+| Lighthouse 13.5.0 and `@axe-core/cli` 4.14.0 (fetched by `npx` in `website.yml`, never committed) | Apache-2.0 / MPL-2.0 | accessibility + performance evidence on `ubuntu-latest` | 2026-10-08 |
+| 129 transitive packages of the two dev dependencies above | MIT/Apache-2.0/BSD/ISC (npm tree) | build only | 2026-10-08 |
+
+`website/dist/` is committed deliberately so the honesty contract can be
+asserted from app CI step 1 with Python only — no Node, no npm, no network (see
+`.ai/WEBSITE_PLAN.md` Part A §5).
+
 ## Material transport paths — 2026-09-06
 
 Copied the filled 24px `shuffle`, `repeat` and `repeat_one` path data into

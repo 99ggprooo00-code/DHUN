@@ -1,5 +1,96 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/fc918d37-dhun` — the Option-A marketing site is built, gated by tests, and awaiting the merge (2026-10-08)
+
+Updated **2026-10-08** · fixed session branch `arena/fc918d37-dhun` · branch
+point **`ae44c7a74191950c00385f705e9617b3ef71658c`** (PR #137 merge, which is
+what GitHub `main` was at boot). Working tree clean at boot; the branch had no
+remote ref. Only pre-existing open PR: #54 (unchanged, out of scope). This
+session's working PR is **#138**.
+
+### Correcting a stale ledger claim, and reading a leftover verdict
+
+- **`main` is `ae44c7a`, not `2a20024`** — two merges landed after the block
+  below was written. The stale “PR #135 awaits merge authorization” wording was
+  already corrected there; the live defect was this file's *current base*
+  claim, fixed here.
+- **PR #135's post-merge verdicts, never read by the session that merged it,
+  were read this session**: CI **37772063324**, test-release **37772063364**,
+  Build APK **37772063380** and pages **37772062338**, all **success** on
+  `8a8d6c5`. Not re-verified.
+
+### What shipped
+
+A three-route static marketing site — `/`, `/features/`, `/download/`, plus a
+real 404, `robots.txt` and `sitemap.xml` — in `website/` (Eleventy 3.1.6
+pinned, one build command, **zero client-side JavaScript**, no third-party
+runtime asset, system font stack, GPL-3.0 notice in the footer). Its own
+workflow is `.github/workflows/website.yml`; the four app workflows, every
+Gradle file, `shared/`, `app-android/` and `app-desktop/` are untouched, and a
+site build failure cannot redden app CI (app CI step 1 reads the committed
+built HTML with Python only).
+
+Truthfulness is enforced by tests, not prose:
+
+- `scripts/website_claims.py` — 8 forbidden-claim rule groups, 3 required
+  caveats bound to `data-caveat` elements, 5 digest/byte-size rules.
+- `scripts/website_quality.py` — page-weight budget, zero client JS, link and
+  origin resolution, mockup labelling, accessibility floor, metadata,
+  crawlability, responsive rules, token contrast, licence notice.
+- `scripts/test_website_claims.py` + `scripts/test_website_quality.py` — 47
+  tests, all run in app CI step 1, each rule also fed synthetic input that must
+  fail, so a rule that stops firing is a red test.
+- Plan of record and honest design notes: `.ai/WEBSITE_PLAN.md` **Part A**
+  (Part B keeps the 2026-10-08 comparative research as cited evidence);
+  decisions in `docs/decisions/ADR-009-marketing-site.md` (**PROPOSED** — it
+  authorizes no player, no PWA, no `app.` host and does not widen ADR-008).
+- Evidence record: `docs/verification/20-marketing-site.md`.
+
+### Current gates
+
+| Gate | State | Next evidence |
+|---|---|---|
+| S3 round 4 | 🔴 **missing, user-only** | Android landscape + Windows fullscreen: compact docked mini-player, Home/Search/Library usable above it |
+| S3 round 5 | 🔴 **missing, user-only** | API 24–25 device: icon, launch, search, play, background audio; record model, OS, APK digest |
+| S6 | ⏳ **blocked on S3** | no release acceptance until both rounds close |
+| Dispatch-only AAB staging | 🔴 **agent-blocked, user-only** | one `test-release` dispatch with `build_only=true`, `build_release_candidate=true` |
+| ADR-008 B1 | ⛔ **BLOCKED (run recorded)** | do not restart it; a continuation is a separate B2 user decision |
+| Website (Option A) | 🟢 **built, gated and CI-verified on this branch; the merge is the last action of PR #138** | `website` run **37795271256** (build + Lighthouse/axe job success; drift check annotation green); `docs/verification/20-marketing-site.md` |
+| Pages source | ⛔ **agent-blocked: switch to `build_type: workflow` returns HTTP 403** | user-only: Settings → Pages → Source → **GitHub Actions** (or `gh api -X PUT … -f build_type=workflow` with a Pages-write token); until then the canonical URL renders the root README and `website.yml`'s deploy job skips with a warning naming that fix |
+| Real screenshots | 🔴 **missing — the repository contains no image file** | the six captures listed in `.ai/WEBSITE_PLAN.md` Part A §9; each replaces a labelled mockup |
+| Lighthouse / axe | 🟡 **Lighthouse measured in CI; axe did not run** | run **37795271256**: `/` 96/100/100/100, `/features/` and `/download/` 100/100/100/100 (perf/a11y/BP/SEO); `@axe-core/cli` exited 1 without a report on all three routes |
+
+### Exact next actions
+
+1. **Read what this session could not**: the post-merge `website.yml` run and
+   `https://99ggprooo00-code.github.io/DHUN/`. If the Pages source is still
+   `legacy`, apply Settings → Pages → Source → **GitHub Actions** (or the
+   one-line API call recorded in PR #138's final comment) and re-run the
+   workflow.
+2. **S3 rounds 4 and 5 stay the release lane.** They are user-only, unaffected
+   by the site, and they are the source of the screenshots that replace the
+   mockups.
+3. Keep the site honest as content changes: re-run
+   `python3 -m unittest discover -s scripts -p 'test_*.py'` and
+   `cd website && npm run build`. The committed build must match a fresh build,
+   or the site workflow fails its drift check.
+
+### Blockers and boundaries
+
+- No JDK / Gradle / Android SDK / browser / display locally; CI is the Kotlin
+  and browser verifier, and no Lighthouse score may be quoted unless a run
+  produced it.
+- Locally runnable gate: `python3 -m unittest discover -s scripts -p 'test_*.py'`
+  — **102 tests green** (55 pre-existing + 47 new), re-measured this session.
+- Action-log archives remain unreachable; **check-run annotations** are the
+  readable evidence channel.
+- Do not touch Gradle, `shared/`, `app-android/`, `app-desktop/`,
+  `settings.gradle.kts`, `build.gradle.kts` or the four app workflows. Never
+  implement ADR-007. ADR-008 stays B1-only and closed; no web player, PWA or
+  `app.`-style property may be built under this workstream.
+
+---
+
 ## Session `arena/45db02aa-dhun` — record the post-merge B1 blocked result; do not restart B1, do not start B2 (2026-10-08)
 
 Updated **2026-10-08** · fixed session branch `arena/45db02aa-dhun` · current base

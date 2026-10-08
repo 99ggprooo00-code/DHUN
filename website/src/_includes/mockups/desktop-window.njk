@@ -1,0 +1,63 @@
+{#- Hand-written recreation of the Windows desktop client's rails layout
+    (Phase 12 / Phase 16 UI slice): title bar, navigation rail, content rails,
+    docked mini-player, queue panel. -#}
+<figure class="mock mock--desktop" id="mock-desktop-window">
+  <div class="window" aria-hidden="true">
+    <div class="titlebar">
+      <span class="titlebar-icon">{% icon "play" %}</span>
+      <span class="titlebar-text">DHUN</span>
+      <span class="titlebar-spacer"></span>
+      <span class="winbtn">–</span>
+      <span class="winbtn">□</span>
+      <span class="winbtn winbtn--close">×</span>
+    </div>
+    <div class="window-body">
+      <div class="navbar">
+        <span class="nav-item is-active">{% icon "home" %}<span>Home</span></span>
+        <span class="nav-item">{% icon "search" %}<span>Search</span></span>
+        <span class="nav-item">{% icon "library" %}<span>Library</span></span>
+        <span class="nav-item">{% icon "equalizer" %}<span>Equaliser</span></span>
+        <span class="nav-item">{% icon "gear" %}<span>Settings</span></span>
+      </div>
+      <div class="content">
+        <p class="rail-title">Quick picks</p>
+        <div class="tiles tiles--desktop">
+          <div class="tile"><span class="tile-art art-a"></span><span class="tile-line w70"></span><span class="tile-line w45 dim"></span></div>
+          <div class="tile"><span class="tile-art art-b"></span><span class="tile-line w60"></span><span class="tile-line w40 dim"></span></div>
+          <div class="tile"><span class="tile-art art-c"></span><span class="tile-line w75"></span><span class="tile-line w50 dim"></span></div>
+          <div class="tile"><span class="tile-art art-d"></span><span class="tile-line w65"></span><span class="tile-line w45 dim"></span></div>
+        </div>
+        <p class="rail-title">From your library</p>
+        <ul class="rows">
+          <li class="row"><span class="thumb art-d"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-time">{% icon "clock" %}3:48</span></li>
+          <li class="row"><span class="thumb art-b"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-time">{% icon "clock" %}4:12</span></li>
+        </ul>
+      </div>
+      <div class="queue">
+        <p class="queue-title">Queue</p>
+        <ul class="rows rows--queue">
+          <li class="row is-current"><span class="thumb thumb--sm art-a"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Now playing</span></span></li>
+          <li class="row"><span class="thumb thumb--sm art-c"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span></li>
+          <li class="row"><span class="thumb thumb--sm art-d"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="mini mini--desktop">
+      <span class="thumb art-a"></span>
+      <span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span>
+      <span class="mini-actions">{% icon "shuffle" %}{% icon "skipPrev" %}{% icon "play" %}{% icon "skipNext" %}{% icon "repeat" %}</span>
+      <span class="mini-extra">{% icon "equalizer" %}<span class="eq">
+        <span style="--h:40%"></span><span style="--h:75%"></span><span style="--h:55%"></span><span style="--h:90%"></span><span style="--h:35%"></span><span style="--h:65%"></span><span style="--h:50%"></span><span style="--h:80%"></span><span style="--h:45%"></span><span style="--h:70%"></span>
+      </span></span>
+      <span class="progress"><span class="progress-fill progress-fill--half"></span></span>
+    </div>
+  </div>
+  <figcaption>
+    <strong>Illustrative recreation — not a screenshot.</strong>
+    The Windows build's rails layout: navigation rail, Home rails, the open queue
+    panel and the docked mini-player with the 10-band equaliser. Tray, media-key
+    and jump-list behaviour is system chrome and cannot be shown in a page
+    mockup. Track titles are placeholder text. A real Windows capture replaces
+    this during the S3 rounds.
+  </figcaption>
+</figure>

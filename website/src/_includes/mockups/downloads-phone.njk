@@ -1,0 +1,47 @@
+{#- Hand-written recreation of DHUN's Library → Downloads surface (ADR-006):
+    offline badges on the rows, and download actions that survive the app
+    closing. -#}
+<figure class="mock mock--phone" id="mock-downloads-phone">
+  <div class="device" aria-hidden="true">
+    <div class="screen">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="statusbar-icons">{% icon "speaker" %}{% icon "offline" %}</span>
+      </div>
+      <div class="app app--library">
+        <p class="app-brand">Library</p>
+        <div class="chips">
+          <span class="chip chip--pill">Playlists</span>
+          <span class="chip chip--pill">Favourites</span>
+          <span class="chip chip--pill">History</span>
+          <span class="chip chip--pill is-active">Downloads</span>
+        </div>
+        <ul class="rows">
+          <li class="row is-downloaded"><span class="thumb art-a"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="offline-pill">{% icon "check" %}Offline</span></li>
+          <li class="row is-downloaded"><span class="thumb art-c"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="offline-pill">{% icon "check" %}Offline</span></li>
+          <li class="row"><span class="thumb art-b"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-progress"><span class="row-progress-fill"></span></span></li>
+          <li class="row"><span class="thumb art-a"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-trail">{% icon "download" %}</span></li>
+        </ul>
+      </div>
+      <div class="mini">
+        <span class="thumb art-a"></span>
+        <span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Offline · local copy</span></span>
+        <span class="mini-actions">{% icon "skipPrev" %}{% icon "pause" %}{% icon "skipNext" %}</span>
+        <span class="progress"><span class="progress-fill progress-fill--wide"></span></span>
+      </div>
+      <div class="tabbar">
+        <span class="tab">{% icon "home" %}<span>Home</span></span>
+        <span class="tab">{% icon "search" %}<span>Search</span></span>
+        <span class="tab is-active">{% icon "library" %}<span>Library</span></span>
+        <span class="tab">{% icon "gear" %}<span>Settings</span></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <strong>Illustrative recreation — not a screenshot.</strong>
+    DHUN's Library → Downloads: rows carry an Offline badge once the resumable
+    range download has finished, an in-progress row shows its own bar, and the
+    mini-player keeps playing locally with no network. Track titles are
+    placeholder text. A real Android capture replaces this during the S3 rounds.
+  </figcaption>
+</figure>

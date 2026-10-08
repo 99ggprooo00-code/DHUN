@@ -1,0 +1,20 @@
+---
+layout: base.njk
+title: "Page not found — DHUN"
+permalink: /404.html
+description: "That page does not exist on this site. DHUN has three pages: home, features and download."
+---
+<div class="wrap">
+  <section class="error-page" aria-labelledby="nf-title">
+    <p class="error-code">404</p>
+    <h1 id="nf-title">That page is not here.</h1>
+    <p class="lede">This site has three pages, and one of them is probably the one you wanted.</p>
+    <div class="cta-row" style="justify-content: center;">
+      <a class="btn btn--primary" href="/download/">Download DHUN</a>
+      <a class="btn btn--secondary" href="/features/">Features</a>
+      <a class="btn btn--secondary" href="/">Home</a>
+    </div>
+    <p class="traceable">Looking for the source, the roadmap or the known limitations?
+      They live in the repository: <a href="{{ site.repo }}" rel="noopener">{{ site.repo }}</a>.</p>
+  </section>
+</div>

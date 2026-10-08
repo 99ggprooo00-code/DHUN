@@ -1,0 +1,57 @@
+{#- Hand-written recreation of DHUN's immersive Full Player (ADR-002) in its
+    Lyrics tab: blurred-artwork backdrop, hero cover, transport row with the
+    play disc, Lyrics | Queue | Related tabs.
+    The lyric lines are the opening of "Twinkle, Twinkle, Little Star", an
+    anonymous 19th-century text in the public domain, used as a clearly
+    placeholder snippet. No real song, artist or artwork is depicted. -#}
+<figure class="mock mock--phone" id="mock-player-phone">
+  <div class="device" aria-hidden="true">
+    <div class="screen screen--player">
+      <span class="blob blob-a"></span>
+      <span class="blob blob-b"></span>
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="statusbar-icons">{% icon "speaker" %}{% icon "offline" %}</span>
+      </div>
+      <div class="app app--player">
+        <div class="player-head">
+          <span class="chip">{% icon "gear" %}</span>
+          <span class="player-context">Album · Track 1</span>
+          <span class="chip">{% icon "list" %}</span>
+        </div>
+        <div class="cover art-hero"><span class="cover-glyph">{% icon "play" %}</span></div>
+        <p class="player-title">Track title</p>
+        <p class="player-artist">Artist name</p>
+        <div class="scrub">
+          <span class="scrub-bar"><span class="scrub-fill"></span></span>
+          <span class="scrub-times"><span>1:12</span><span>3:48</span></span>
+        </div>
+        <div class="transport">
+          <span class="t-icon">{% icon "shuffle" %}</span>
+          <span class="t-icon">{% icon "skipPrev" %}</span>
+          <span class="play-disc">{% icon "play" %}</span>
+          <span class="t-icon">{% icon "skipNext" %}</span>
+          <span class="t-icon">{% icon "repeat" %}</span>
+        </div>
+        <div class="tabs">
+          <span class="tab is-active">Lyrics</span>
+          <span class="tab">Queue</span>
+          <span class="tab">Related</span>
+        </div>
+        <ul class="lyrics">
+          <li>Twinkle, twinkle, little star,</li>
+          <li class="is-current">How I wonder what you are.</li>
+          <li>Up above the world so high,</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <strong>Illustrative recreation — not a screenshot.</strong>
+    DHUN's immersive full player (ADR-002) on its Lyrics tab: the backdrop is the
+    playing artwork blurred, the lyrics scroll line by line, and the transport
+    row sits above a Lyrics | Queue | Related sheet. Lyric text shown here is a
+    public-domain placeholder snippet, not a real song. A real Android capture
+    replaces this during the S3 rounds.
+  </figcaption>
+</figure>

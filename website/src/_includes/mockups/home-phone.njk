@@ -1,0 +1,51 @@
+{#- Hand-written recreation of DHUN's Home screen from the shared Compose UI
+    (rail layout, now-playing backdrop, docked mini-player, bottom navigation).
+    No screenshot exists in this repository, and none is fabricated: see
+    .ai/WEBSITE_PLAN.md Part A §8.
+    Track/artist text is neutral placeholder text; artwork is a token-coloured
+    gradient, not album art. -#}
+<figure class="mock mock--phone" id="mock-home-phone">
+  <div class="device" aria-hidden="true">
+    <div class="screen">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="statusbar-icons">{% icon "speaker" %}{% icon "offline" %}</span>
+      </div>
+      <div class="app app--home">
+        <p class="app-brand">DHUN</p>
+        <div class="field">{% icon "search" %}<span>Search YouTube Music</span></div>
+        <p class="rail-title">Quick picks</p>
+        <div class="tiles">
+          <div class="tile"><span class="tile-art art-a"></span><span class="tile-line w70"></span><span class="tile-line w45 dim"></span></div>
+          <div class="tile"><span class="tile-art art-b"></span><span class="tile-line w60"></span><span class="tile-line w40 dim"></span></div>
+          <div class="tile"><span class="tile-art art-c"></span><span class="tile-line w75"></span><span class="tile-line w50 dim"></span></div>
+        </div>
+        <p class="rail-title">From your library</p>
+        <ul class="rows">
+          <li class="row"><span class="thumb art-a"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-trail">{% icon "check" %}</span></li>
+          <li class="row"><span class="thumb art-c"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span></li>
+        </ul>
+      </div>
+      <div class="mini">
+        <span class="thumb art-b"></span>
+        <span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span>
+        <span class="mini-actions">{% icon "skipPrev" %}{% icon "play" %}{% icon "skipNext" %}</span>
+        <span class="progress"><span class="progress-fill"></span></span>
+      </div>
+      <div class="tabbar">
+        <span class="tab is-active">{% icon "home" %}<span>Home</span></span>
+        <span class="tab">{% icon "search" %}<span>Search</span></span>
+        <span class="tab">{% icon "library" %}<span>Library</span></span>
+        <span class="tab">{% icon "gear" %}<span>Settings</span></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <strong>Illustrative recreation — not a screenshot.</strong>
+    DHUN's Home screen: rail layout over the now-playing backdrop, artwork cards,
+    the docked mini-player and the bottom navigation, drawn in CSS from the same
+    colour, shape and spacing tokens the app uses. Track titles are placeholder
+    text and artwork tiles are gradient placeholders — the repository contains no
+    album art. A real Android capture replaces this during the S3 rounds.
+  </figcaption>
+</figure>

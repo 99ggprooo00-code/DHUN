@@ -24,6 +24,27 @@ Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
    that never attempted its core mission. Every phase here ships running
    code on real hardware before it is "done."
 
+## Website
+
+<https://99ggprooo00-code.github.io/DHUN/> is a static marketing site for the
+applications above: three routes (`/`, `/features/`, `/download/`), no
+client-side JavaScript, no analytics and no third-party runtime asset.
+
+- Source: `website/` — Eleventy (pinned), one command: `cd website && npm ci && npm run build`.
+- Deployment: `.github/workflows/website.yml` publishes the built artifact to
+  GitHub Pages from `main` only; a session branch can build and check but never
+  overwrite the public site.
+- Its claims are enforced by tests, not by review: forbidden claims (iOS, a web
+  player, sync, import, FLAC or any bitrate, store channels, unshipped
+  platforms), required front-page caveats (rolling unverified build, borrowed
+  time, open hardware gates) and a ban on baked digests or byte sizes — the
+  rolling `test` assets change on every push. See
+  `scripts/website_claims.py`, `scripts/website_quality.py` and
+  `docs/verification/20-marketing-site.md`.
+- The repository contains **no screenshots**; every visual on the site is a
+  labelled CSS recreation of the real UI, and `.ai/WEBSITE_PLAN.md` §9 lists the
+  captures that should replace them.
+
 ## License
 
 GPL-3.0 — required for legitimate reuse of the ecosystem's maintained

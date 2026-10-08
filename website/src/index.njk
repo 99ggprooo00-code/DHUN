@@ -1,0 +1,132 @@
+---
+layout: base.njk
+title: "DHUN — a YouTube Music client with no sign-in, for Android and Windows"
+ogTitle: "DHUN — music without an account"
+description: "DHUN is a free, open-source YouTube Music client for Android and Windows. No sign-in, no cookies, no ads and no telemetry, with downloads that stay on your device. Public builds are rolling and unverified."
+---
+<div class="wrap">
+  <section class="hero" aria-labelledby="hero-title">
+    <!-- Badge row: each badge is a shipped fact, cited in _data/site.js. -->
+    <ul class="badges">
+      {%- for badge in site.badges %}
+      <li>{{ badge.label }}</li>
+      {%- endfor %}
+    </ul>
+    <div class="hero-split">
+    <div class="hero-inner">
+      <h1 id="hero-title">{{ site.h1 }}</h1>
+      <p>{{ site.mutationClaim }}</p>
+      <!--{{ site.leadSource }}-->
+      <p class="hero-lead">{{ site.lead }}</p>
+      <!-- Exactly two calls to action. Download and source are separate destinations. -->
+      <div class="cta-row">
+        <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
+        <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      {% include "mockups/home-phone.njk" %}
+    </div>
+    </div>
+    <ul class="platforms">
+      {%- for platform in site.platforms %}
+      <!--{{ platform.source }}-->
+      <li>
+        <strong>{{ platform.name }}</strong>
+        <span class="plat-detail">{{ platform.detail }}</span>
+        <span class="plat-status">{{ platform.status }}</span>
+      </li>
+      {%- endfor %}
+    </ul>
+  </section>
+
+  <section aria-labelledby="stats-title">
+    <div class="section-head">
+      <h2 id="stats-title">Four numbers, footnoted.</h2>
+    </div>
+    <ul class="stats">
+      {%- for stat in site.stats %}
+      <li>
+        <span class="stat-value">{{ stat.value }}</span>
+        <span class="stat-label">{{ stat.label }}<sup class="fn-mark"><a href="#fn-{{ stat.note }}" aria-label="Footnote {{ stat.note }}">{{ stat.note }}</a></sup></span>
+      </li>
+      {%- endfor %}
+    </ul>
+    <!-- Honesty footnote: immediately under the row it qualifies. -->
+    <ol class="footnotes">
+      {%- for fn in site.footnotes %}
+      <!--{{ fn.source }}-->
+      <li id="fn-{{ fn.id }}"><span class="fn-mark">{{ fn.id }}.</span> {{ fn.text }}</li>
+      {%- endfor %}
+    </ol>
+  </section>
+</div>
+
+<section aria-labelledby="features-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="kicker">WHAT MAKES IT DIFFERENT</span>
+      <h2 id="features-title">Three things DHUN does that the alternatives mostly do not.</h2>
+    </div>
+  </div>
+  {%- for feature in site.features %}
+  <div class="wrap">
+    <div class="feature" id="{{ feature.id }}">
+      <div class="feature-body">
+        <span class="kicker">{{ feature.kicker }}</span>
+        <h3>{{ feature.title }}</h3>
+        <!--{{ feature.source }}-->
+        <p>{{ feature.body }}</p>
+        <ul class="feature-points">
+          {%- for point in feature.points %}
+          <li>{{ point }}</li>
+          {%- endfor %}
+        </ul>
+      </div>
+      <div class="feature-visual">
+        {% include feature.mockFile %}
+      </div>
+    </div>
+  </div>
+  {%- endfor %}
+</section>
+
+<div class="wrap">
+  <!-- REQUIRED CAVEAT 1: extraction is borrowed time (MASTER_PROMPT §2). -->
+  <section class="risk" aria-labelledby="risk-title" data-caveat="borrowed-time">
+    <span class="kicker risk-flag">THE HONEST PART</span>
+    <h2 id="risk-title">{{ site.risk.title }}</h2>
+    {%- for paragraph in site.risk.paragraphs %}
+    <p>{{ paragraph }}</p>
+    {%- endfor %}
+    <!--{{ site.risk.source }}-->
+    <p><a href="{{ site.risk.link.href }}" rel="noopener">{{ site.risk.link.label }}</a> · <a href="{{ site.testReleasePage }}" rel="noopener">Every published build is a pre-release</a></p>
+  </section>
+
+  <!-- REQUIRED CAVEATS 2 and 3: unverified rolling build, open hardware gates. -->
+  <section aria-labelledby="status-title">
+    <div class="section-head">
+      <h2 id="status-title">{{ site.status.title }}</h2>
+    </div>
+    <ul class="status-list">
+      {%- for item in site.status.items %}
+      <!--{{ item.source }}-->
+      <li class="card" data-caveat="{% if loop.index == 1 %}rolling-unverified{% else %}hardware-gates-open{% endif %}">
+        <span class="card-label">{% if loop.index == 1 %}UNVERIFIED{% else %}OPEN GATE{% endif %}</span>
+        <h3>{{ item.label }}</h3>
+        <p>{{ item.text }}</p>
+      </li>
+      {%- endfor %}
+    </ul>
+  </section>
+
+  <section class="closing" aria-labelledby="closing-title">
+    <h2 id="closing-title">{{ site.closing.title }}</h2>
+    <p>{{ site.closing.body }}</p>
+    <!--{{ site.closing.source }}-->
+    <div class="cta-row">
+      <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
+      <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
+    </div>
+  </section>
+</div>
