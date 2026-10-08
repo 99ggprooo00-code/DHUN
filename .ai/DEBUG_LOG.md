@@ -117,9 +117,23 @@ bytes=112967680
 sha256=aa3ff19c2e3c1102cca17ecd7f0129c4e4a5b689af99f8a1761794d1fd454db7
 buildOnly=false`. PR #128's own red history is recorded in the ROADMAP ledger
 (`38536d5`, `bcd43f3` — Compose receiver-scope errors during the rail
-restructure). PR #129 checks on `643298a`: push CI **37732411763**, PR CI
-**37732439056**, Build APK **37732439037**, test-release **37732439049** —
-in flight at write time; this entry is not a claim that they passed.
+restructure). PR #129 checks — **all four green on both heads of this session**: code head
+`643298a` push CI **37732411763** (12/12 steps), PR CI **37732439056** (12/12),
+Build APK **37732439037**, test-release **37732439049**; final docs head
+`27fe90f` push CI **37732962973** (12/12), PR CI **37732965756** (12/12), Build
+APK **37732965758**, test-release **37732965769**. Step 6 is `:shared:jvmTest`,
+so the rewritten `SearchInputPolicyTest` — including the
+`@InternalComposeUiApi` `KeyEvent` factory — compiled and executed on CI; step 8
+compiled the rewired `SearchScreen` for Android. The PR-path MSI ran the full
+install-over both times with no skip (`2.182.1 → 2.183.1`, then
+`2.182.1 → 2.184.1`, baseline `aa3ff19c…` = the published release's MSI), and
+the PR artifacts are `buildOnly=true`: APK 18,383,603 B sha256
+`aa6d027ac1c6737563271ab37026ac36f79ac23ebb6ca66df4d2b1d91dc3e6a8`, MSI 2.184.1
+112,967,680 B sha256
+`513d81f682458390c68ad19e56b0c78a0751f5cd83b39b9c901ba3b79c080c27`. The
+identical APK digest on both heads is itself a check: the docs commit changed no
+app code. **Green CI is still not device acceptance** — the Enter key on a real
+window, focus routing and IME precedence are the user's S3 retest.
 
 ## 2026-10-06 — the two recurring shared-test flakes, root-caused at last: a test waited for one state and read its sibling (session `arena/cf69112a-dhun`, base `main@a9204c59`, PR #125, commit `df0504f`)
 

@@ -10,7 +10,10 @@ Updated every phase. Nothing hidden.
   asserted a private copy of it, so nothing in CI could fail if the shipped
   predicate broke. Now there is one rule, the UI calls it, and the test builds
   real `KeyEvent`s against it — Enter-down submits, Enter-up does not, numpad
-  Enter submits, Space/letters/digits/arrows/Escape never do.
+  Enter submits, Space/letters/digits/arrows/Escape never do. Executed on CI at
+  `:shared:jvmTest` (step 6 of runs **37732411763**/**37732439056** on
+  `643298a` and **37732962973**/**37732965756** on `27fe90f`), with step 8
+  compiling the rewired `SearchScreen` for Android.
 - **What is still *not* proven.** Green `:shared:jvmTest` proves the predicate
   returns the right verdicts for constructed events. It does **not** prove that
   a physical Enter press reaches the field and submits on a real window:

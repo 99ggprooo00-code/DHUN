@@ -21,16 +21,25 @@
 > #127 build-only artifacts (APK `75c9da37…`, MSI 2.176.1 `18bfc43e…`) must not
 > be used to validate these fixes.
 >
-> **PR #129 (draft, session `arena/19a284df-dhun`, head
-> `643298a8f9bc959860fe098c15c4a6a9288ff1ea`) adds one more code change on top
+> **PR #129 (draft, session `arena/19a284df-dhun`) adds one code change on top
 > of `ca6d006`:** the search-Enter rule is wired through `SearchInputPolicy`
-> (it was duplicated inline and its test asserted a private copy, so the
-> shipped predicate had no coverage). Its checks — push CI **37732411763**, PR
-> CI **37732439056**, Build APK **37732439037**, test-release **37732439049** —
-> must be green on the final head before merge, and the merge republishes the
-> rolling release again, which **moves both digests**. Re-read the release
-> provenance after that merge and record the new values here before any device
-> test.
+> (it was duplicated inline in `SearchScreen` and its test asserted a private
+> copy, so the shipped predicate had no coverage). Code head
+> `643298a8f9bc959860fe098c15c4a6a9288ff1ea` and final docs head
+> `27fe90f` are **green on all four workflows** — push CI **37732411763** /
+> **37732962973**, PR CI **37732439056** / **37732965756** (12/12 steps each,
+> step 6 = `:shared:jvmTest`, which compiled and ran the rewritten test),
+> Build APK **37732439037** / **37732965758**, test-release **37732439049** /
+> **37732965769** (APK + MSI green, full install-over `2.182.1 → 2.184.1`
+> against baseline `aa3ff19c…`, no skip; `publish`/`release_draft`/`aab` skipped
+> as main-gated). PR artifacts are `buildOnly=true`, not the published release:
+> APK 18,383,603 B sha256
+> `aa6d027ac1c6737563271ab37026ac36f79ac23ebb6ca66df4d2b1d91dc3e6a8`; MSI
+> 2.184.1, 112,967,680 B, sha256
+> `513d81f682458390c68ad19e56b0c78a0751f5cd83b39b9c901ba3b79c080c27`.
+> Merging #129 republishes the rolling release and **moves both digests**
+> (app code changed, so the APK moves too). Re-read the post-merge run's
+> provenance and record the new values here before any device test.
 >
 > **User report round 2 (received 2026-10-07; execution date not supplied).**
 > Android: Redmi Note 12 4G / Android 15, reported APK hash `21a5fe86…9cc2c`;

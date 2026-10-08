@@ -76,15 +76,28 @@ independent oracle for the spec; `track()`, `data()`, `touchTargetPx()`,
 | MSI Windows upgrade column | ✅ **GitHub verified (hosted Windows, not hardware)** | `MSI upgrade smoke PASS :: 2.178.1 -> 2.182.1; per-user install and userdata/cache sentinels preserved. Baseline SHA256=0c67d2bf…` — **no skip warning**; future-upgrade guard PASS; uninstall smoke PASS; `ProductVersion=2.182.1 UpgradeCode=31ddb86b-9666-4071-b11c-45f16fa4682d` |
 | Rolling `test` release republished at the merged fixes | ✅ **GitHub verified** | `isDraft=false`, `isPrerelease=true`, published **2026-10-08T05:19:05Z**, `targetCommitish=ca6d00684f3cf00fed101273e449bebc2fb76a05`; APK **18,383,603 B** sha256 **`ff454398bbfb16139b64ef13c9339ef192461b41453eaa8d62a55e9490142b07`**; MSI **2.182.1**, **112,967,680 B**, sha256 **`aa3ff19c2e3c1102cca17ecd7f0129c4e4a5b689af99f8a1761794d1fd454db7`** (publisher provenance notices; `buildOnly=false`) |
 | Release `.sha256` sidecars read independently | 🔴 **missing in-sandbox** | `release-assets.githubusercontent.com` is unreachable here (`SSL_ERROR_SYSCALL`), so the 80 B/81 B sidecars could not be fetched. The user must verify the sidecars before device testing — the digests above come from the run's provenance notices |
-| PR #129 code head `643298a` | ⏳ **awaiting verification** | push CI **37732411763**, PR CI **37732439056**, Build APK **37732439037**, test-release **37732439049** — in flight at write time; `:shared:jvmTest` is the only verifier of the Kotlin change (no JDK here) |
+| PR #129 code head `643298a` | ✅ **GitHub verified** | push CI **37732411763** 12/12 steps, PR CI **37732439056** 12/12 steps, Build APK **37732439037** ✅, test-release **37732439049** ✅ — `apk`+`msi` green with the full install-over (`2.182.1 → 2.183.1`, baseline `aa3ff19c…` = the published release's own MSI, no skip), `aab`/`publish`/`release_draft` skipped (main-gated) |
+| PR #129 **final** head `27fe90f` (docs successor) | ✅ **GitHub verified** | push CI **37732962973** 12/12, PR CI **37732965756** 12/12, Build APK **37732965758** ✅, test-release **37732965769** ✅ — `apk` (113166049453) + `msi` (113166049597) green, `MSI upgrade smoke PASS :: 2.182.1 -> 2.184.1`, sentinels preserved, future-upgrade guard + uninstall smoke PASS, **no skip**; PR artifacts `buildOnly=true`: APK 18,383,603 B sha256 `aa6d027ac1c6737563271ab37026ac36f79ac23ebb6ca66df4d2b1d91dc3e6a8`, MSI 2.184.1 112,967,680 B sha256 `513d81f682458390c68ad19e56b0c78a0751f5cd83b39b9c901ba3b79c080c27` |
 | Search-Enter / rail behaviour on a physical device | 🔴 **not verified** | S3 round-3 retest on Redmi Note 12 4G / Android 15 and Windows 11 against the `ca6d006` package (or its successor) |
 | Android landscape ghosting | ⚠️ **architectural risk, unresolved** | PR #128 attributed it to an OS rotation snapshot; layout swaps via a `when` branch with no Compose crossfade. No code cause found or excluded — needs a device observation after the current build settles |
 | Lyrics | ✅ untouched | working per user report; explicitly out of scope |
 
+**Which head is final.** `643298a` is the code head; `27fe90f` is the
+documentation successor that recorded its evidence. The commit carrying *this*
+ledger update is a third head, and its own four runs are therefore the
+final-head check — they are recorded in the PR #129 comment rather than in this
+file, because writing them here would create yet another head. That loop is the
+reason the gate is stated as "green on the final head", not "green on the head
+named in the docs".
+
 ### Last real error on record
 
-**None on this session's head yet** (checks in flight). The most recent real red
-in the tree is PR #128's own branch history, recorded rather than hidden:
+**None on either head of this session.** All four workflows are green on the
+code head `643298a` *and* on the final docs head `27fe90f`; step 6
+(`Unit tests — shared domain`) is `:shared:jvmTest`, so the rewritten
+`SearchInputPolicyTest` compiled and executed on CI, and step 8 (`Android debug
+build`) compiled the rewired `SearchScreen` for Android. The most recent real
+red in the tree is PR #128's own branch history, recorded rather than hidden:
 `38536d5` failed `:shared:compileKotlinJvm` with unresolved references
 (`ShellMasterPane`, `ShellTwoPane`, `BottomNavigationBar`,
 `OfflineStatusBanner`) and `val maxWidth: Dp` implicit-receiver errors (CI
@@ -100,15 +113,24 @@ reading, is the gate.
 
 ### Exact next technical step
 
-1. Watch **37732411763** / **37732439056** / **37732439037** / **37732439049**
-   to completion on `643298a`; fix any red at its root (a compile error means
-   the Compose `KeyEvent` factory or the opt-in is wrong — correct it, do not
-   delete the test).
-2. Push the documentation commit and confirm the same three workflows are green
-   on the **final PR head**.
-3. Mark PR #129 ready and merge only after that, which republishes the rolling
-   `test` APK/MSI at the new head; then record the new provenance digests and
-   hand the exact `.sha256` verification steps to the user.
+1. ~~Watch the four workflows on `643298a`.~~ **DONE — all green** (see ledger),
+   including `:shared:jvmTest`, which compiled and ran the rewritten test.
+2. ~~Push the documentation commit and re-verify the final head.~~ **DONE —
+   `27fe90f` is green on all four workflows.**
+3. **Merge authorization is the only remaining gate.** On the user's explicit
+   go-ahead: mark PR #129 ready, `gh pr merge 129 --merge`, then verify the
+   post-merge runs on the merge SHA (CI + Build APK + test-release with
+   `publish` running) and record the **new** rolling-release digests — the merge
+   moves the MSI ProductVersion (2.185.1 or later) and, because app code
+   changed, the APK digest as well. Expected PR-head candidate values are in the
+   ledger; the published ones must be re-read from the post-merge run.
+4. Then hand the user the S3 round-3 retest (`docs/runbooks/s3-hardware-checklist.md`):
+   Windows — Enter and numpad Enter submit a query, a typed space stays a space
+   and does not toggle playback, the `NavigationRail` is clickable while
+   FullPlayer is expanded, Ctrl+F / Escape / Jump List tasks; Android —
+   `Go to album` on a known album-linked track, offline/unvalidated-network
+   behaviour with the banner above FullPlayer, and the landscape-ghosting
+   observation after rotation settles.
 
 ### Blockers
 

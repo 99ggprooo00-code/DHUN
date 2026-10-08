@@ -34,14 +34,25 @@ Updated **2026-10-08**, session `arena/19a284df-dhun` (PR **#129**, draft, head
 
 ## Next actions — single agent, sequential
 
-1. Confirm push CI **37732411763**, PR CI **37732439056**, Build APK
-   **37732439037** and test-release **37732439049** are green on the final PR
-   head (at write time `:shared:jvmTest` — step 6 — had already passed on
-   `643298a`; the rest were in flight). Fix any red at its root.
-2. Merge PR #129 only after those checks, which republishes the rolling `test`
-   APK/MSI; then record the **new** provenance digests in the ROADMAP ledger,
-   `15-test-build-gate.md` §1 and `s3-hardware-checklist.md`.
-3. Hand the user the exact retest, which is unchanged in shape:
+1. ~~Confirm the four workflows on the code head.~~ **DONE, green:**
+   `643298a` push CI **37732411763** (12/12), PR CI **37732439056** (12/12),
+   Build APK **37732439037**, test-release **37732439049**; docs successor
+   `27fe90f` push CI **37732962973** (12/12), PR CI **37732965756** (12/12),
+   Build APK **37732965758**, test-release **37732965769**. Step 6 is
+   `:shared:jvmTest`, so the rewritten test compiled and ran on CI; step 8
+   compiled the rewired `SearchScreen` for Android. The PR-path MSI ran the
+   full install-over with no skip (`2.182.1 → 2.184.1` on the final head,
+   baseline `aa3ff19c…` = the published release's MSI).
+2. **Merge authorization is the only remaining automated gate.** The last docs
+   commit of this session is itself a new head, so its own four runs are the
+   final-head check — recorded in the PR #129 comment rather than in these files
+   to avoid an endless docs-successor loop.
+3. On the user's go-ahead: mark PR #129 ready, `gh pr merge 129 --merge`, verify
+   the post-merge runs on the merge SHA (CI + Build APK + test-release with
+   `publish` running), and record the **new** rolling-release digests — the
+   merge moves the MSI ProductVersion and, because app code changed, the APK
+   digest too.
+4. Then hand the user the exact retest, which is unchanged in shape:
    - **Windows 11** (record `winver`, installed MSI version + hash, VLC
      version): type a query in Search and press **Enter** (and numpad Enter) —
      results must appear; type a **space** inside the query — a space must
@@ -53,7 +64,7 @@ Updated **2026-10-08**, session `arena/19a284df-dhun` (PR **#129**, draft, head
      with Wi-Fi connected but unvalidated + airplane mode (banner above
      FullPlayer, downloads usable, recovery when the network returns), and the
      **landscape ghosting** observation after rotation settles.
-4. Keep S3 open until those results arrive. Never report green CI, a green
+5. Keep S3 open until those results arrive. Never report green CI, a green
    hosted MSI upgrade, or a republished release as hardware acceptance. Do not
    modify lyrics.
 
