@@ -1,0 +1,48 @@
+{#- Hand-written recreation of DHUN's Search surface (shared .../ui/search/):
+    query field, result-type chips, result rows. The Enter policy itself is
+    behaviour, not geometry, so it is described in the copy around the figure.
+    No screenshot exists in this repository: see .ai/WEBSITE_PLAN.md §8–§9. -#}
+<figure class="mock" id="mock-search-phone">
+  <div class="device" aria-hidden="true">
+    <div class="screen">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="statusbar-icons">{% icon "speaker" %}{% icon "offline" %}</span>
+      </div>
+      <div class="app">
+        <p class="app-brand">Search</p>
+        <div class="field field--active">{% icon "search" %}<span>artist name</span></div>
+        <div class="chips">
+          <span class="chip chip--pill is-active">Songs</span>
+          <span class="chip chip--pill">Videos</span>
+          <span class="chip chip--pill">Albums</span>
+          <span class="chip chip--pill">Playlists</span>
+          <span class="chip chip--pill">Artists</span>
+        </div>
+        <ul class="rows">
+          <li class="row is-current"><span class="thumb art-a"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-time">{% icon "play" %}</span></li>
+          <li class="row"><span class="thumb art-b"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-time">3:31</span></li>
+          <li class="row"><span class="thumb art-c"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-time">4:07</span></li>
+          <li class="row"><span class="thumb art-d"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-time">2:58</span></li>
+        </ul>
+      </div>
+      <div class="mini">
+        <span class="thumb art-b"></span>
+        <span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span>
+        <span class="mini-actions">{% icon "skipPrev" %}{% icon "pause" %}{% icon "skipNext" %}</span>
+        <span class="progress"><span class="progress-fill"></span></span>
+      </div>
+      <div class="tabbar">
+        <span class="tab">{% icon "home" %}<span>Home</span></span>
+        <span class="tab is-active">{% icon "search" %}<span>Search</span></span>
+        <span class="tab">{% icon "library" %}<span>Library</span></span>
+        <span class="tab">{% icon "gear" %}<span>Settings</span></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <strong>An illustrative recreation, not a screenshot.</strong> DHUN's Search
+    on Android: a query, result-type chips, and rows that carry artwork, title
+    and duration. Track and artist text is placeholder wording.
+  </figcaption>
+</figure>

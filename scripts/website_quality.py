@@ -10,7 +10,14 @@ and the screenshot backlog marker that keeps the mockups replaceable.
 
 Everything here reads the **built** output (`website/dist/`), so it runs in
 app CI step 1 with no Node, no network and no browser. The checks that need a
-real browser (Lighthouse/axe) run in `.github/workflows/website.yml`.
+real browser (Lighthouse/axe/Playwright) run in `.github/workflows/website.yml`.
+
+**Where the CSS lives.** The stylesheet is inlined into each page's `<head>`
+(one request per route — see `website/eleventy.config.js`), so the rules below
+read `<style>` blocks as well as any standalone `.css` file: `_read_css` returns
+the union, and `page_stylesheet` returns one page's own CSS. The rules
+themselves are unchanged, which is the point of the adaptation — a rule that only
+ever read a linked file would have proven nothing about the bytes that ship.
 
 Run directly for a report:  python3 scripts/website_quality.py [dist-dir]
 """
@@ -18,6 +25,7 @@ Run directly for a report:  python3 scripts/website_quality.py [dist-dir]
 from __future__ import annotations
 
 import html
+import json
 import pathlib
 import re
 import sys
@@ -32,22 +40,67 @@ HTML_CSS_BUDGET = 60 * KB
 JS_BUDGET = 10 * KB
 ASSET_BUDGET = 150 * KB
 
+# How much a route's HTML+CSS may grow over the committed baseline before the
+# ratchet fails (Part A §10.2). Growth is allowed, silently is not.
+RATCHET_TOLERANCE = 0.05
+
 CANONICAL_ORIGIN = "https://99ggprooo00-code.github.io/DHUN"
+
+# Copy that must never reach a visitor, whatever produced it: a leaked Markdown
+# backtick, an HTML tag that was escaped instead of rendered, a link that goes
+# nowhere, or a placeholder word. The site has no stubs by policy, so this is a
+# rule rather than a review note (Part A §4).
+ESCAPED_TAG = re.compile(r"&lt;/?(?:code|strong|em|b|i|a|span|br|p|div|ul|ol|li|pre)\b", re.I)
+DEAD_LINK = re.compile(r'href\s*=\s*"(?:#|javascript:[^"]*)"', re.I)
+PLACEHOLDER_WORDS = re.compile(r"\b(coming soon|lorem ipsum|to be announced|TBD|FIXME)\b", re.I)
+# ...but “These are absent, not ‘coming soon’” is the opposite of a promise, so
+# the word is only a violation when no negation sits in the same clause. This is
+# website_claims.py's definition, imported, for exactly that reason.
+from website_claims import CLAUSE_BOUNDARY, NEGATION_CUES  # noqa: E402
+
+
+def _placeholder_clause(text: str, start: int) -> str:
+    clauses, offset = [], 0
+    for piece in CLAUSE_BOUNDARY.split(text):
+        clauses.append((offset, piece))
+        offset += len(piece) + 1
+    for offset, piece in clauses:
+        if offset <= start <= offset + len(piece):
+            return piece
+    return text
+
+# What counts as "this claim came from somewhere" inside an HTML comment.
+CITATION = re.compile(
+    r"(ADR-\d+|PR #\d+|Phase \d+|MASTER_PROMPT|README\.md|LICENSE|THIRD_PARTY|"
+    r"\.ai/[A-Za-z_]+\.md|scripts/[a-z_]+\.py|AndroidManifest|app-android|"
+    r"app-desktop|shared/src|minSdk|"
+    r"DhunAppearance|test-release\.yml|sitemap\.njk|shared/src)",
+    re.I,
+)
+
+# Facts that rot: a semantic version, a calendar date, a build number. The site
+# currently prints none of these; anything added here needs a checked source and
+# an explicit allowlist entry (with the reason) rather than a looser pattern.
+STALE_FACT_PATTERNS = (
+    (re.compile(r"\bv?\d+\.\d+\.\d+\b"), "app version"),
+    (re.compile(r"\b20\d\d-\d\d-\d\d\b"), "date"),
+    (re.compile(r"\bbuild \d{3,}\b", re.I), "build number"),
+)
+STALE_FACT_ALLOWLIST: frozenset[str] = frozenset()
 ALLOWED_EXTERNAL_ORIGINS = (
     "https://github.com/99ggprooo00-code/DHUN",
     "https://99ggprooo00-code.github.io/DHUN",
 )
-ROUTES = ("/", "/features/", "/download/")
-MOCKUP_IDS = (
-    "mock-home-phone",
-    "mock-player-phone",
-    "mock-downloads-phone",
-    "mock-desktop-window",
-    # Planned captures that have no mockup yet — listed so the backlog and the
-    # markup stay in step (see .ai/WEBSITE_PLAN.md Part A §9).
-    "mock-widget",
-    "mock-lyrics",
-)
+# The site's routes. /download/ was removed by decision (the site is not a
+# distribution channel — the release page is), and /ui/ took its place so the
+# project's interface is what a visitor actually sees.
+ROUTES = ("/", "/features/", "/ui/")
+# The screenshot backlog lives in `.ai/WEBSITE_PLAN.md` Part A §9 and is parsed
+# from there rather than duplicated here: one table, machine-read, so a mockup
+# can never lose its replacement plan (see `backlog_drift_violations`).
+BACKLOG_PLAN = REPO_ROOT / ".ai" / "WEBSITE_PLAN.md"
+BACKLOG_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*`(mock-[a-z0-9-]+)`\s*\|\s*(shipped|planned)\s*\|", re.M)
+BACKLOG_STATUSES = ("shipped", "planned")
 
 # Token pairs asserted for WCAG AA, mirroring the app's own
 # DhunThemeContrastTest discipline. (foreground, background, minimum ratio)
@@ -81,7 +134,7 @@ def page_paths(dist: pathlib.Path) -> dict[str, pathlib.Path]:
     mapping = {
         "/": dist / "index.html",
         "/features/": dist / "features" / "index.html",
-        "/download/": dist / "download" / "index.html",
+        "/ui/": dist / "ui" / "index.html",
         "/404.html": dist / "404.html",
     }
     return {route: path for route, path in mapping.items() if path.is_file()}
@@ -99,12 +152,83 @@ def _compact(text: str) -> str:
     return re.sub(r"\s+", "", text)
 
 
+STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style>", re.S | re.I)
+STYLESHEET_LINK = re.compile(
+    r"<link\b(?=[^>]*\brel=\"stylesheet\")(?=[^>]*\bhref=\"([^\"]+)\")[^>]*>", re.I
+)
+
+
+def inline_styles(dist: pathlib.Path) -> dict[str, str]:
+    """route -> the CSS in that page's own `<style>` blocks, if any."""
+    styles: dict[str, str] = {}
+    for route, path in page_paths(dist).items():
+        css = "\n".join(STYLE_BLOCK.findall(path.read_text(encoding="utf-8")))
+        if css.strip():
+            styles[route] = css
+    return styles
+
+
+def external_css(dist: pathlib.Path) -> dict[str, str]:
+    assets = dist / "assets"
+    if not assets.is_dir():
+        return {}
+    return {p.name: p.read_text(encoding="utf-8") for p in sorted(assets.glob("*.css")) if p.is_file()}
+
+
 def _read_css(dist: pathlib.Path) -> dict[str, str]:
-    return {
-        p.name: p.read_text(encoding="utf-8")
-        for p in (dist / "assets").glob("*.css")
-        if p.is_file()
-    } if (dist / "assets").is_dir() else {}
+    """Every stylesheet the site ships, whatever shape it ships in.
+
+    External files keep their own names; inlined CSS is merged under the
+    logical name `styles.css`, which is what the rule bodies below ask for.
+    The site currently inlines one composed sheet per route, so this returns
+    every module the site uses, in route order.
+    """
+    sheets = external_css(dist)
+    inline = inline_styles(dist)
+    if inline and "styles.css" not in sheets:
+        sheets["styles.css"] = "\n".join(inline[route] for route in page_paths(dist) if route in inline)
+    return sheets
+
+
+def site_stylesheet(dist: pathlib.Path) -> str:
+    """The whole site's CSS, from wherever it lives (see `_read_css`)."""
+    return _read_css(dist).get("styles.css", "")
+
+
+def linked_stylesheets(dist: pathlib.Path, route: str) -> list[pathlib.Path]:
+    """The stylesheets a page links, resolved to files that exist in `dist`."""
+    path = page_paths(dist).get(route)
+    if path is None:
+        return []
+    files: list[pathlib.Path] = []
+    for href in STYLESHEET_LINK.findall(path.read_text(encoding="utf-8")):
+        reference = href.split("?", 1)[0].split("#", 1)[0]
+        if reference.startswith(("http://", "https://", "data:")):
+            continue
+        candidate = dist / reference.lstrip("/") if reference.startswith("/") else path.parent / reference
+        if candidate.is_file():
+            files.append(candidate)
+    return files
+
+
+def page_weight_bytes(dist: pathlib.Path, route: str, path: pathlib.Path) -> int:
+    """Bytes on the wire for one route: its HTML plus any stylesheet it links.
+
+    Inlined CSS is already inside the HTML, so it is never counted twice.
+    """
+    total = path.stat().st_size
+    total += sum(f.stat().st_size for f in linked_stylesheets(dist, route))
+    return total
+
+
+def page_stylesheet(dist: pathlib.Path, route: str) -> str:
+    """The CSS that page actually ships: its inline blocks, or its linked file."""
+    inline = inline_styles(dist).get(route)
+    if inline:
+        return inline
+    return "\n".join(
+        f.read_text(encoding="utf-8") for f in linked_stylesheets(dist, route)
+    )
 
 
 # --------------------------------------------------------------------------
@@ -114,8 +238,6 @@ def _read_css(dist: pathlib.Path) -> dict[str, str]:
 
 def weight_violations(dist: pathlib.Path) -> list[str]:
     violations: list[str] = []
-    css = _read_css(dist)
-    css_bytes = sum(len(v.encode("utf-8")) for v in css.values())
     pages = page_paths(dist)
 
     for route in ROUTES:
@@ -124,11 +246,14 @@ def weight_violations(dist: pathlib.Path) -> list[str]:
             violations.append(f"{route}: built page is missing")
             continue
         html_bytes = path.stat().st_size
-        total = html_bytes + css_bytes
+        linked = sum(f.stat().st_size for f in linked_stylesheets(dist, route))
+        total = html_bytes + linked
         if total > HTML_CSS_BUDGET:
+            where = f"HTML {html_bytes} B (CSS inlined)" if not linked else (
+                f"HTML {html_bytes} B + linked CSS {linked} B"
+            )
             violations.append(
-                f"{route}: HTML+CSS is {total} B, over the {HTML_CSS_BUDGET} B budget "
-                f"(HTML {html_bytes} B + CSS {css_bytes} B)"
+                f"{route}: HTML+CSS is {total} B, over the {HTML_CSS_BUDGET} B budget ({where})"
             )
 
     js_bytes = sum(
@@ -199,6 +324,194 @@ def link_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def backlog_rows() -> list[tuple[str, str]]:
+    """(site id, status) for every row of the §9 screenshot backlog table."""
+    if not BACKLOG_PLAN.is_file():
+        return []
+    return [(match.group(2), match.group(3)) for match in BACKLOG_ROW.finditer(BACKLOG_PLAN.read_text(encoding="utf-8"))]
+
+
+def backlog_drift_violations(dist: pathlib.Path) -> list[str]:
+    """The backlog and the built pages must agree in both directions.
+
+    A mockup is a stand-in for a capture that does not exist yet, so the two can
+    drift apart in two ways that both matter: a mockup with no replacement plan
+    (nobody will ever replace it), and a plan entry that has quietly become a
+    figure on a page (or a `planned` row used as if it were real). Both are
+    failures here rather than a review note.
+    """
+    violations: list[str] = []
+    rows = backlog_rows()
+    if not rows:
+        return [
+            "the screenshot backlog in .ai/WEBSITE_PLAN.md §9 could not be parsed; "
+            "expected rows like | 1 | `mock-home-phone` | shipped | … |"
+        ]
+    ids = [row_id for row_id, _status in rows]
+    if len(ids) != len(set(ids)):
+        violations.append("§9 lists the same mockup id twice")
+    status = dict(rows)
+
+    on_pages: dict[str, list[str]] = {}
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for figure_id in re.findall(r'<figure\b[^>]*\bid="(mock-[a-z0-9-]+)"', markup, re.I):
+            on_pages.setdefault(figure_id, []).append(route)
+
+    for figure_id, routes in sorted(on_pages.items()):
+        if figure_id not in status:
+            violations.append(
+                f"mockup ‘{figure_id}’ is on {'/'.join(routes)} but has no row in the §9 backlog"
+            )
+        elif status[figure_id] != "shipped":
+            violations.append(
+                f"mockup ‘{figure_id}’ is on {'/'.join(routes)} but §9 marks it ‘{status[figure_id]}’"
+            )
+    for figure_id, state in sorted(status.items()):
+        if state == "shipped" and figure_id not in on_pages:
+            violations.append(
+                f"§9 marks ‘{figure_id}’ shipped, but no built page carries that figure"
+            )
+        if state == "planned" and figure_id in on_pages:
+            violations.append(
+                f"§9 marks ‘{figure_id}’ planned, but it is already on {'/'.join(on_pages[figure_id])}"
+            )
+    if not any(state == "shipped" for state in status.values()):
+        violations.append("§9 lists no shipped mockup, so the backlog proves nothing about the site")
+    return violations
+
+
+def copy_hygiene_violations(dist: pathlib.Path) -> list[str]:
+    """Nothing may ship that a reader would see as a mistake.
+
+    A literal backtick is a Markdown habit that leaked into the copy; an
+    `&lt;code&gt;` is markup that was escaped instead of rendered (both shipped
+    on the download page once — the first looked like a typo, the second showed
+    a tag name to every visitor); `href="#"` is a link that goes nowhere; and a
+    placeholder word is a page that promises content instead of carrying it.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        text = text_of(markup)
+        for match in ESCAPED_TAG.finditer(markup):
+            violations.append(f"{route}: escaped markup is rendered as text: {match.group(0)}…")
+        for match in DEAD_LINK.finditer(markup):
+            violations.append(f"{route}: a link goes nowhere: {match.group(0)}")
+        for match in PLACEHOLDER_WORDS.finditer(text):
+            if NEGATION_CUES.search(_placeholder_clause(text, match.start())):
+                continue
+            violations.append(f"{route}: placeholder wording ‘{match.group(0)}’")
+        for index, line in enumerate(text.split("`")[1::2], 1):
+            snippet = line.strip()[:40]
+            violations.append(f"{route}: literal backtick #{index} in the copy: …{snippet}…")
+    return violations
+
+
+# --------------------------------------------------------------------------
+# The site is not a distribution channel.
+# --------------------------------------------------------------------------
+
+# The user's direction for this session: downloads are not the website's
+# business. Made checkable rather than remembered, in two parts.
+#
+# 1. No page may link a release *asset*. A direct link to dhun-test.apk implies
+#    "this build is for you, now"; the rolling test build is unverified and
+#    replaced on every merge, so the site points at the release page instead,
+#    where the warning and the files live together.
+BINARY_LINK = re.compile(
+    r'href\s*=\s*"[^"]*?(?:/releases/download/[^"]*|\.(?:apk|msi|aab|dmg|exe|deb|rpm|zip|tar\.gz|sha256))"',
+    re.I,
+)
+
+# 2. No page may carry installation or verification instructions — checksum
+#    commands, sideloading, signing-key archaeology. Those belong with the
+#    artifact and its own README, and they rot as that page changes.
+INSTALL_INSTRUCTION_TERMS = (
+    re.compile(r"\bsha256sum\b", re.I),
+    re.compile(r"\bshasum\b", re.I),
+    re.compile(r"\bGet-FileHash\b", re.I),
+    re.compile(r"\badb install\b", re.I),
+    re.compile(r"\bsideload\w*\b", re.I),
+    re.compile(r"\.sha256\b", re.I),
+    re.compile(r"\bchecksum\w*\b", re.I),
+)
+
+
+def distribution_boundary_violations(dist: pathlib.Path) -> list[str]:
+    """The site describes the software; it does not hand out or verify builds."""
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        text = text_of(markup)
+        for match in BINARY_LINK.finditer(markup):
+            violations.append(f"{route}: links a downloadable artifact: {match.group(0)[:80]}")
+        for pattern in INSTALL_INSTRUCTION_TERMS:
+            for match in pattern.finditer(text):
+                violations.append(
+                    f"{route}: carries installation/verification instructions "
+                    f"(‘{match.group(0)}’) — that belongs with the release, not here"
+                )
+    return violations
+
+
+def claim_traceability_violations(dist: pathlib.Path) -> list[str]:
+    """Every claim block cites the source it came from, in the built HTML.
+
+    `.ai/WEBSITE_PLAN.md` Part A §4 asks for one promise per section with its
+    ADR/PR written next to it, so a reviewer can trace a sentence to its source
+    without leaving the page. This asserts it per `<section>` (a comment naming
+    an ADR, a PR, a phase, a manifest, a roadmap file or a script), on every
+    page — the previous version of the rule was a convention on the front page
+    only, which is not a rule.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for index, section in enumerate(re.findall(r"<section\b[^>]*>(.*?)</section>", markup, re.S), 1):
+            comments = re.findall(r"<!--(.*?)-->", section, re.S)
+            if any(CITATION.search(comment) for comment in comments):
+                continue
+            heading = re.search(r"<(h1|h2|h3)\b[^>]*>(.*?)</\1>", section, re.S)
+            title = re.sub(r"<[^>]+>", "", heading.group(2)).strip()[:60] if heading else "?"
+            violations.append(
+                f"{route}: section {index} (“{title}”) carries claims with no citation comment "
+                f"(expected an ADR, PR, phase or file reference in an HTML comment)"
+            )
+    return violations
+
+
+def stale_fact_violations(dist: pathlib.Path) -> list[str]:
+    """No app version, release identity or date may be printed without a source.
+
+    The site describes a project whose artifacts are replaced on every push to
+    `main`. A version string or a date written into the copy is wrong within
+    days and nothing would catch it, so the copy carries none: facts that could
+    rot are either absent or derived from a checked source at build time. If a
+    value is genuinely derivable, add it to the allowlist below with the source
+    named in the comment — an unexplained entry is how this rule would stop
+    meaning anything.
+    """
+    violations: list[str] = []
+    allowed = STALE_FACT_ALLOWLIST
+    for route, path in page_paths(dist).items():
+        text = text_of(path.read_text(encoding="utf-8"))
+        for pattern, label in STALE_FACT_PATTERNS:
+            for match in pattern.finditer(text):
+                if match.group(0) in allowed:
+                    continue
+                snippet = text[max(0, match.start() - 40) : match.end() + 40].strip()
+                violations.append(f"{route}: {label} ‘{match.group(0)}’ in “…{snippet}…”")
+    return violations
+
+
+def _sitemap_locations(dist: pathlib.Path) -> set[str]:
+    sitemap = dist / "sitemap.xml"
+    if not sitemap.is_file():
+        return set()
+    return set(re.findall(r"<loc>([^<]+)</loc>", sitemap.read_text(encoding="utf-8")))
+
+
 def mockup_violations(dist: pathlib.Path) -> list[str]:
     """Every mockup is labelled as a recreation, and carries its backlog id."""
     violations: list[str] = []
@@ -217,7 +530,8 @@ def mockup_violations(dist: pathlib.Path) -> list[str]:
                 violations.append(f"{route}: a mockup figure has no id (backlog mapping)")
                 continue
             figure_id = id_match.group(1)
-            if figure_id not in MOCKUP_IDS:
+            backlog = {row_id for row_id, _status in backlog_rows()}
+            if figure_id not in backlog:
                 violations.append(
                     f"{route}: mockup id ‘{figure_id}’ is not in the screenshot backlog "
                     f"(.ai/WEBSITE_PLAN.md Part A §9)"
@@ -306,11 +620,23 @@ def crawlability_violations(dist: pathlib.Path) -> list[str]:
         violations.append("sitemap.xml is missing from the built site")
     else:
         content = sitemap.read_text(encoding="utf-8")
+        expected = {f"{CANONICAL_ORIGIN}{route}" for route in ROUTES}
+        listed = _sitemap_locations(dist)
         for route in ROUTES:
             if f"<loc>{CANONICAL_ORIGIN}{route}</loc>" not in content:
                 violations.append(f"sitemap.xml does not list {route}")
+        for extra in sorted(listed - expected):
+            violations.append(
+                f"sitemap.xml lists {extra}, which is not one of the three routes "
+                f"(/, /features/, /ui/)"
+            )
         if "{{" in content or "{%" in content:
             violations.append("sitemap.xml still contains an unrendered template tag")
+    if robots.is_file():
+        other_urls = re.findall(r"^\s*(?:Allow|Disallow):\s*(\S+)", robots.read_text(encoding="utf-8"), re.M)
+        for path in other_urls:
+            if path not in ("/", ""):
+                violations.append(f"robots.txt scopes {path}, but the site has exactly three routes")
     if not (dist / "404.html").is_file():
         violations.append("404.html is missing from the built site")
     return violations
@@ -425,6 +751,159 @@ def footer_licence_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def css_coverage_violations(dist: pathlib.Path) -> list[str]:
+    """Every class a page uses must be defined in the CSS that page ships.
+
+    This is the safety net for the module split (eleventy.config.js): a route
+    declares its modules in front matter, and if a page starts using a class
+    from a module it does not carry — or a rule is moved between modules and
+    missed — the page would render unstyled with no other check noticing. It
+    also catches a class that is only defined but never used anywhere, because
+    each page is checked against its own sheet.
+    """
+    violations: list[str] = []
+    defined_by_route = {
+        route: set(re.findall(r"\.([a-zA-Z_][\w-]*)", page_stylesheet(dist, route)))
+        for route in page_paths(dist)
+    }
+    used_anywhere: set[str] = set()
+    for route, path in page_paths(dist).items():
+        markup = re.sub(r"<!--.*?-->", " ", path.read_text(encoding="utf-8"), flags=re.S)
+        for value in re.findall(r'\bclass="([^"]*)"', markup):
+            used_anywhere.update(value.split())
+    # The other direction: a rule no page uses is bytes shipped for nothing.
+    # This is what "prune dead CSS" means as a rule rather than a one-off edit.
+    dead = sorted(set().union(*defined_by_route.values()) - used_anywhere if defined_by_route else [])
+    if dead:
+        violations.append(
+            f"CSS defines {len(dead)} class(es) no built page uses (dead CSS): {', '.join(dead[:8])}"
+        )
+
+    for route, path in page_paths(dist).items():
+        markup = re.sub(r"<!--.*?-->", " ", path.read_text(encoding="utf-8"), flags=re.S)
+        used: set[str] = set()
+        for value in re.findall(r'\bclass="([^"]*)"', markup):
+            used.update(value.split())
+        missing = sorted(used - defined_by_route[route])
+        if missing:
+            violations.append(
+                f"{route}: {len(missing)} class(es) used but not defined in this page's CSS "
+                f"(add the module to its cssModules front matter): {', '.join(missing[:8])}"
+            )
+    return violations
+
+
+def sprite_violations(dist: pathlib.Path) -> list[str]:
+    """Icons are `<use>` references into a per-page `<symbol>` sprite.
+
+    The sprite is assembled by an Eleventy transform, so it can be wrong in two
+    ways that are invisible to every other check: a reference with no definition
+    (an icon that renders as nothing) and a definition with no reference (bytes
+    shipped for no reason). Both directions are asserted, per page.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        used = set(re.findall(r'<use\b[^>]*\bhref="#i-([^"]+)"', markup, re.I))
+        defined = set(re.findall(r'<symbol\b[^>]*\bid="i-([^"]+)"', markup, re.I))
+        for name in sorted(used - defined):
+            violations.append(f"{route}: <use> points at icon ‘{name}’, which this page does not define")
+        for name in sorted(defined - used):
+            violations.append(f"{route}: icon ‘{name}’ is defined in the sprite but never used")
+        if defined and '<svg class="sprite"' not in markup:
+            violations.append(f"{route}: icon symbols are present without the hidden sprite container")
+        for match in re.finditer(r"<use\b([^>]*)>", markup, re.I):
+            if not re.search(r'\bhref="#i-', match.group(1)):
+                violations.append(f"{route}: <use> without an internal #i- reference: {match.group(0)[:60]}")
+    return violations
+
+
+def _baseline_path() -> pathlib.Path:
+    return REPO_ROOT / "website" / "budget-baseline.json"
+
+
+def budget_ratchet_violations(
+    dist: pathlib.Path, baseline_path: pathlib.Path | None = None
+) -> list[str]:
+    """The weight budget, ratcheted against the committed baseline.
+
+    The absolute budget (60 KB HTML+CSS per route) is generous enough that a
+    content edit could double a page and still pass. Page sizes here are
+    deterministic — same input, same bytes, on any machine — so growth can be
+    policed exactly: a route may not exceed its committed baseline by more than
+    RATCHET_TOLERANCE. Legitimate growth is a deliberate act: regenerate the
+    baseline (python3 scripts/website_quality.py --write-baseline) so the diff
+    shows the new number and a reviewer sees what changed.
+
+    A missing or unreadable baseline is a violation, not a silent pass: a
+    ratchet nobody can fail is decoration.
+    """
+    baseline_path = baseline_path or _baseline_path()
+    if not baseline_path.is_file():
+        return [
+            f"budget baseline {baseline_path} is missing — regenerate it with "
+            f"python3 scripts/website_quality.py --write-baseline"
+        ]
+    try:
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    except ValueError as error:
+        return [f"budget baseline {baseline_path} is not valid JSON: {error}"]
+
+    violations: list[str] = []
+    routes = baseline.get("routes")
+    if not isinstance(routes, dict) or not routes:
+        return [f"budget baseline {baseline_path} has no routes table"]
+
+    pages = page_paths(dist)
+    for route, entry in routes.items():
+        path = pages.get(route)
+        if path is None:
+            violations.append(f"{route}: budgeted route is missing from the built site")
+            continue
+        recorded = int(entry["htmlCss"])
+        measured = page_weight_bytes(dist, route, path)
+        limit = int(recorded * (1 + RATCHET_TOLERANCE))
+        if measured > limit:
+            violations.append(
+                f"{route}: HTML+CSS grew from the committed {recorded} B baseline to "
+                f"{measured} B (+{measured - recorded} B, {100 * (measured - recorded) / recorded:.1f}%), "
+                f"over the {int(RATCHET_TOLERANCE * 100)}% ratchet. Regenerate the baseline if this "
+                f"growth is intended."
+            )
+    for route in ROUTES:
+        if route not in routes:
+            violations.append(f"{route}: route is not in the budget baseline")
+    return violations
+
+
+def write_baseline(dist: pathlib.Path, baseline_path: pathlib.Path | None = None) -> pathlib.Path:
+    """Record the current per-route weight as the ratchet's reference point."""
+    baseline_path = baseline_path or _baseline_path()
+    pages = page_paths(dist)
+    document = {
+        "_comment": (
+            "Committed page weights (uncompressed bytes on the wire) so that growth is "
+            "deliberate. Written by scripts/website_quality.py --write-baseline; asserted by "
+            "budget_ratchet_violations() in the same module."
+        ),
+        "tolerance": RATCHET_TOLERANCE,
+        "routes": {
+            route: {
+                "htmlCss": page_weight_bytes(dist, route, pages[route]),
+                "html": pages[route].stat().st_size,
+                "cssInlined": len(
+                    "".join(STYLE_BLOCK.findall(pages[route].read_text(encoding="utf-8")))
+                ),
+                "cssLinked": sum(f.stat().st_size for f in linked_stylesheets(dist, route)),
+            }
+            for route in ROUTES
+            if route in pages
+        },
+    }
+    baseline_path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    return baseline_path
+
+
 CHECKS = (
     ("page weight budget", weight_violations),
     ("no client-side JavaScript", javascript_violations),
@@ -436,6 +915,14 @@ CHECKS = (
     ("responsive rules", responsive_violations),
     ("token contrast", contrast_violations),
     ("licence notice", footer_licence_violations),
+    ("class coverage", css_coverage_violations),
+    ("icon sprite integrity", sprite_violations),
+    ("page-weight ratchet", budget_ratchet_violations),
+    ("claim traceability", claim_traceability_violations),
+    ("backlog ↔ site drift", backlog_drift_violations),
+    ("no stale facts", stale_fact_violations),
+    ("copy hygiene", copy_hygiene_violations),
+    ("distribution boundary", distribution_boundary_violations),
 )
 
 
@@ -451,6 +938,12 @@ def run_checks(dist: pathlib.Path = DEFAULT_DIST) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if "--write-baseline" in argv:
+        argv = [name for name in argv if name != "--write-baseline"]
+        dist = pathlib.Path(argv[0]) if argv else DEFAULT_DIST
+        written = write_baseline(dist)
+        print(f"wrote {written} from {dist}")
+        return 0
     dist = pathlib.Path(argv[0]) if argv else DEFAULT_DIST
     violations = run_checks(dist)
     if violations:

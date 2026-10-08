@@ -14,16 +14,22 @@ on:
       - "website/**"
       - "scripts/website_claims.py"
       - "scripts/website_quality.py"
+      - "scripts/website_smoke.py"
       - "scripts/test_website_claims.py"
       - "scripts/test_website_quality.py"
+      - "scripts/test_website_smoke.py"
+      - "scripts/test_website_workflow.py"
       - ".github/workflows/website.yml"
   pull_request:
     paths:
       - "website/**"
       - "scripts/website_claims.py"
       - "scripts/website_quality.py"
+      - "scripts/website_smoke.py"
       - "scripts/test_website_claims.py"
       - "scripts/test_website_quality.py"
+      - "scripts/test_website_smoke.py"
+      - "scripts/test_website_workflow.py"
       - ".github/workflows/website.yml"
   workflow_dispatch:
 
@@ -49,6 +55,10 @@ jobs:
 
       - name: Install site dependencies (pinned lockfile)
         working-directory: website
+        env:
+          # The dev dependency tree includes Playwright; its browser binaries are
+          # ~150 MB and only the browser job below needs them.
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
         run: npm ci --no-audit --no-fund
 
       - name: Build the site
@@ -89,8 +99,76 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-  a11y:
-    name: Lighthouse and axe (real numbers, printed as annotations)
+  browser:
+    name: "Browser measurements (Playwright: viewports, keyboard, contrast, motion, axe)"
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: dhun-site
+          path: dist
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - name: Install site dependencies (pinned lockfile)
+        working-directory: website
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm ci --no-audit --no-fund
+
+      # Chromium, exactly the version @playwright/test 1.64.0 pins, with its
+      # system dependencies. This is the only browser any number here comes
+      # from; no other engine is claimed anywhere in the repository.
+      - name: Install the pinned Chromium
+        working-directory: website
+        run: npx playwright install --with-deps chromium
+
+      - name: Serve the built site
+        run: |
+          nohup python3 -m http.server 8080 --directory dist --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -sf -o /dev/null http://127.0.0.1:8080/; then
+              echo "server up after ${attempt}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080"; cat /tmp/site-server.log; exit 1
+
+      # Every number is printed as a check-run annotation: Actions log archives
+      # are not retrievable from the environment this repository is maintained
+      # in, so the annotations are the readable channel. A failure here fails
+      # this job, and only this job — Lighthouse lives next door so that one
+      # noisy score can never hide the browser evidence.
+      #
+      # axe used to run through `@axe-core/cli`, which exited 1 without writing
+      # a report on every route (a driver/browser handshake failure, not a
+      # finding). axe-core now runs inside `website/tests/browser.mjs` via
+      # `@axe-core/playwright`, against the same pages as every other check
+      # here; serious or critical violations fail the job.
+      - name: Browser measurements (viewports, keyboard, contrast, motion, axe, icons)
+        working-directory: website
+        env:
+          SITE_BASE: http://127.0.0.1:8080
+        run: node tests/browser.mjs
+
+      # Full-page captures for a human to eyeball later. CI artifacts, never
+      # committed: the repository contains no image files on purpose, because
+      # there are no real screenshots and nothing is fabricated.
+      - name: Upload browser evidence (screenshots)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-evidence
+          path: website/tests/screenshots
+          retention-days: 7
+          if-no-files-found: warn
+
+  lighthouse:
+    name: Lighthouse (three samples per route, gate on the median)
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -103,9 +181,10 @@ jobs:
         with:
           node-version: "22"
 
-      # GitHub's ubuntu images ship Google Chrome; if that is ever untrue the
-      # step says so explicitly instead of reporting a score it never measured.
-      - name: Is a browser available?
+      # GitHub's ubuntu images ship Google Chrome, which Lighthouse drives. If
+      # that is ever untrue the step says so explicitly instead of reporting a
+      # score it never measured.
+      - name: Is Google Chrome available?
         id: browser
         run: |
           if command -v google-chrome >/dev/null 2>&1; then
@@ -113,50 +192,70 @@ jobs:
             google-chrome --version
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Lighthouse::no Chrome on this runner — Lighthouse and axe could not run; no score is claimed."
+            echo "::warning title=Lighthouse::no Chrome on this runner — Lighthouse did not run; no score is claimed."
           fi
 
       - name: Serve the built site
         if: steps.browser.outputs.available == 'true'
         run: |
-          python3 -m http.server 8080 --directory dist --bind 127.0.0.1 &
-          sleep 2
-          curl -sf -o /dev/null http://127.0.0.1:8080/ && echo "server up"
-
-      - name: Lighthouse (performance, accessibility, best practices, SEO)
-        if: steps.browser.outputs.available == 'true'
-        run: |
-          mkdir -p reports
-          for route in "/" "/features/" "/download/"; do
-            name=$(echo "$route" | tr -c 'a-zA-Z0-9' '_')
-            npx --yes lighthouse@13.5.0 "http://127.0.0.1:8080$route" \
-              --quiet --output=json --output=html \
-              --output-path="reports/${name}" \
-              --chrome-flags="--headless=new --no-sandbox --disable-dev-shm-usage" || exit 1
-            python3 scripts/report_lighthouse.py "$route" "reports/${name}.report.json"
+          nohup python3 -m http.server 8080 --directory dist --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -sf -o /dev/null http://127.0.0.1:8080/; then
+              echo "server up after ${attempt}s"; exit 0
+            fi
+            sleep 1
           done
+          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080"; cat /tmp/site-server.log; exit 1
 
-      # axe-core proper, so the audit is not only Lighthouse's embedded copy.
-      # It is evidence, not a gate: if the driver cannot run, that is reported as
-      # a warning annotation and no violation count is invented.
-      - name: axe-core CLI (violations reported as annotations)
+      # Three samples, gate on the median. One Lighthouse run on a shared runner
+      # swings by double digits for a page that did not change; the median is
+      # what makes the gate about the site rather than about the runner.
+      # Three samples, gate on the median. One Lighthouse run on a shared runner
+      # swings by double digits for a page that did not change; the median is
+      # what makes the gate about the site rather than about the runner.
+      #
+      # A sample that fails is retried once and then *reported as an annotation*
+      # with the tail of its own log: the first version of this step exited 1 on
+      # an unreproducible second-route failure and said nothing, and Actions log
+      # archives are not retrievable from the environment this repository is
+      # maintained in. Silence is not evidence.
+      - name: Lighthouse (three samples per route)
         if: steps.browser.outputs.available == 'true'
         run: |
           mkdir -p reports
-          for route in "/" "/features/" "/download/"; do
+          failed=0
+          for route in "/" "/features/" "/ui/"; do
             name=$(echo "$route" | tr -c 'a-zA-Z0-9' '_')
-            if npx --yes @axe-core/cli@4.14.0 "http://127.0.0.1:8080$route" \
-                 --save "reports/axe-${name}.json" --exit > "reports/axe-${name}.log" 2>&1; then
-              :
-            else
-              status=$?
-              if [ -s "reports/axe-${name}.json" ]; then
-                python3 scripts/report_axe.py "$route" "reports/axe-${name}.json" || true
+            reports=""
+            for sample in 1 2 3; do
+              log="reports/${name}-${sample}.log"
+              ok=0
+              for attempt in 1 2; do
+                if npx --yes lighthouse@13.5.0 "http://127.0.0.1:8080$route" \
+                    --quiet --output=json --output=html \
+                    --output-path="reports/${name}-${sample}" \
+                    --chrome-flags="--headless=new --no-sandbox --disable-dev-shm-usage" >"$log" 2>&1; then
+                  ok=1
+                  break
+                fi
+                if [ "$attempt" = 1 ]; then
+                  echo "::warning title=Lighthouse ${route} sample ${sample}::first attempt failed, retrying once (runner noise is common; a silent retry is not)."
+                fi
+              done
+              if [ "$ok" = 1 ]; then
+                reports="$reports reports/${name}-${sample}.report.json"
               else
-                echo "::warning title=axe-core $route::axe-core CLI did not produce a report (exit $status); its output is kept in the artifact reports/axe-${name}.log"
+                failed=1
+                echo "::error title=Lighthouse ${route} sample ${sample}::lighthouse failed twice. Last output: $(tail -c 700 "$log" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | tr '\n' ' ')"
               fi
+            done
+            if [ -n "$reports" ]; then
+              python3 scripts/report_lighthouse.py "$route" $reports || failed=1
+            else
+              echo "::error title=Lighthouse ${route}::no sample produced a report for this route, so no score is claimed for it."
             fi
           done
+          exit $failed
 
       - name: Upload Lighthouse reports
         if: always()
@@ -170,13 +269,19 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     # Gated by `build` — the job that runs the honesty contract, the quality
-    # gates, HTML validation and the drift check. The a11y job's Lighthouse/axe
-    # numbers are evidence, reported as annotations; they do not gate a publish,
-    # because a failing audit cannot be fixed by withholding the site.
+    # gates, HTML validation and the drift check. The `browser` and `lighthouse`
+    # jobs are evidence, reported as annotations, and do not gate a publish:
+    # a failing audit cannot be fixed by withholding the site.
     needs: [build]
     # Only main publishes. A branch push (including a session branch) builds and
     # checks, and cannot overwrite the public site.
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # `published` is the only honest signal that this job actually put bytes on
+    # the web: the job *succeeds* while its publish steps skip under
+    # `build_type: legacy`, so "deploy finished" is not the same as "the site
+    # changed". The `served` job gates on this output rather than on the job.
+    outputs:
+      published: ${{ steps.pages_source.outputs.build_type == 'workflow' }}
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -222,3 +327,20 @@ jobs:
       - id: deployment
         if: steps.pages_source.outputs.build_type == 'workflow'
         uses: actions/deploy-pages@v5
+
+  served:
+    name: Served-site smoke check (the bytes a visitor actually gets)
+    # Runs only when `deploy` actually published. `needs: [deploy]` alone would
+    # not do it: while Pages stays `build_type: legacy` the deploy job still
+    # *succeeds* — it just skips every publish step — so this job would fetch
+    # the legacy Jekyll README, which lacks all three required caveats, and go
+    # red on main for a reason that is not about the site. Gating on the real
+    # publish output keeps a skip a skip.
+    needs: [deploy]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.deploy.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch the served site and re-run the honesty contract on it
+        run: python3 scripts/website_smoke.py https://99ggprooo00-code.github.io/DHUN

@@ -13,6 +13,7 @@ HTML, not about source files looking plausible.
 """
 
 import re
+import shutil
 import sys
 import tempfile
 import unittest
@@ -46,7 +47,7 @@ def minimal_site(**overrides) -> dict[str, str]:
     files = {
         "index.html": page,
         "features/index.html": page,
-        "download/index.html": page,
+        "ui/index.html": page,
         "assets/styles.css": ":root{--x:1px}",
         "assets/favicon.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
     }
@@ -217,7 +218,7 @@ class AccessibilityFloor(unittest.TestCase):
             {
                 "index.html": markup,
                 "features/index.html": self.BASE,
-                "download/index.html": self.BASE,
+                "ui/index.html": self.BASE,
                 "assets/styles.css": css,
             },
         )
@@ -232,6 +233,133 @@ class AccessibilityFloor(unittest.TestCase):
 
     def test_clean_page_passes(self):
         self.assertEqual(quality.accessibility_violations(self.make(self.BASE)), [])
+
+
+class ClassCoverage(unittest.TestCase):
+    def page(self, css: str, body: str) -> str:
+        return (
+            "<!DOCTYPE html><html lang=\"en\"><head><style>"
+            + css
+            + "</style></head><body>"
+            + body
+            + '<main id="main"><h1>t</h1></main></body></html>'
+        )
+
+    def test_class_without_a_rule_fails(self):
+        markup = self.page(".used{color:red}", '<p class="used orphaned">x</p>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            violations = quality.css_coverage_violations(root)
+            self.assertTrue(any("orphaned" in v for v in violations), violations)
+
+    def test_dead_css_fails(self):
+        markup = self.page(".used{color:red}.never{color:blue}", '<p class="used">x</p>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            violations = quality.css_coverage_violations(root)
+            self.assertTrue(any("dead CSS" in v and "never" in v for v in violations), violations)
+
+    def test_per_page_modules_are_checked_separately(self):
+        """A class defined on another route is not defined on this one."""
+        index = self.page(".used{color:red}", '<p class="used">x</p>')
+        other = self.page(".other{color:red}", '<p class="missing-here">x</p>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": index, "ui/index.html": other})
+            violations = quality.css_coverage_violations(root)
+            self.assertTrue(
+                any("/ui/" in v and "missing-here" in v for v in violations), violations
+            )
+
+    def test_clean_site_passes(self):
+        markup = self.page(".used{color:red}", '<p class="used">x</p>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            self.assertEqual(quality.css_coverage_violations(root), [])
+
+
+class IconSprite(unittest.TestCase):
+    SPRITE = '<svg class="sprite" aria-hidden="true"><symbol id="i-play" viewBox="0 0 24 24"/></svg>'
+
+    def page(self, sprite: str, uses: str) -> str:
+        return (
+            '<!DOCTYPE html><html lang="en"><head></head><body>'
+            + sprite
+            + uses
+            + '<main id="main"><h1>t</h1></main></body></html>'
+        )
+
+    def test_dangling_use_fails(self):
+        markup = self.page(self.SPRITE, '<svg class="i" aria-hidden="true"><use href="#i-play"/><use href="#i-missing"/></svg>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            violations = quality.sprite_violations(root)
+            # the rule reports the bare icon name (the `i-` prefix is the
+            # sprite's namespace, and both directions strip it identically)
+            self.assertTrue(
+                any("does not define" in v and "‘missing’" in v for v in violations), violations
+            )
+
+    def test_unused_symbol_fails(self):
+        sprite = '<svg class="sprite" aria-hidden="true"><symbol id="i-play"/><symbol id="i-unused"/></svg>'
+        markup = self.page(sprite, '<svg class="i" aria-hidden="true"><use href="#i-play"/></svg>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            violations = quality.sprite_violations(root)
+            self.assertTrue(any("never used" in v for v in violations), violations)
+
+    def test_symbols_without_the_sprite_container_fail(self):
+        markup = self.page('<symbol id="i-play"/>', '<svg class="i" aria-hidden="true"><use href="#i-play"/></svg>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            self.assertTrue(any("sprite container" in v for v in quality.sprite_violations(root)))
+
+    def test_consistent_sprite_passes(self):
+        markup = self.page(self.SPRITE, '<svg class="i" aria-hidden="true"><use href="#i-play"/></svg>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            self.assertEqual(quality.sprite_violations(root), [])
+
+
+class BudgetRatchet(unittest.TestCase):
+    def site(self, root: Path, size: int) -> Path:
+        return write_tree(root, {"index.html": "x" * size, "features/index.html": "x" * size,
+                                 "ui/index.html": "x" * size})
+
+    def test_growth_beyond_tolerance_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.site(Path(tmp) / "dist", 1000)
+            baseline = Path(tmp) / "baseline.json"
+            quality.write_baseline(root, baseline)
+            growth = int(1000 * (1 + quality.RATCHET_TOLERANCE)) + 1
+            (root / "index.html").write_text("x" * growth, encoding="utf-8")
+            violations = quality.budget_ratchet_violations(root, baseline)
+            self.assertTrue(any("ratchet" in v for v in violations), violations)
+
+    def test_growth_within_tolerance_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.site(Path(tmp) / "dist", 1000)
+            baseline = Path(tmp) / "baseline.json"
+            quality.write_baseline(root, baseline)
+            (root / "index.html").write_text("x" * 1040, encoding="utf-8")
+            self.assertEqual(quality.budget_ratchet_violations(root, baseline), [])
+
+    def test_missing_baseline_is_a_violation_not_a_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.site(Path(tmp) / "dist", 1000)
+            violations = quality.budget_ratchet_violations(root, Path(tmp) / "absent.json")
+            self.assertTrue(any("baseline" in v for v in violations), violations)
+
+    def test_inlined_css_is_not_counted_twice(self):
+        """A page's inline CSS is inside its bytes; the weight must not double it."""
+        title = ".skip-link{color:red}"
+        markup = (
+            '<!DOCTYPE html><html lang="en"><head><style>' + title + "</style></head><body>"
+            '<a class="skip-link" href="#main">s</a><main id="main"><h1>t</h1></main></body></html>'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            measured = quality.page_weight_bytes(root, "/", root / "index.html")
+            self.assertEqual(measured, (root / "index.html").stat().st_size)
 
 
 class BuiltSite(unittest.TestCase):
@@ -249,34 +377,66 @@ class BuiltSite(unittest.TestCase):
 
     def test_weight_budget_has_headroom_reported(self):
         """Record the real numbers, so a future change sees how close it is."""
-        css_bytes = sum(
-            path.stat().st_size for path in (DIST / "assets").glob("*.css")
-        )
-        for route, relative in (
-            ("/", "index.html"),
-            ("/features/", "features/index.html"),
-            ("/download/", "download/index.html"),
-        ):
-            total = (DIST / relative).stat().st_size + css_bytes
+        # The weight that matters is HTML+CSS *as served*: the stylesheet is
+        # inlined, so the page file is the whole request.
+        for route, path in quality.page_paths(DIST).items():
+            if route == "/404.html":
+                continue
+            total = quality.page_weight_bytes(DIST, route, path)
             self.assertLessEqual(
                 total,
                 quality.HTML_CSS_BUDGET,
                 f"{route} is {total} B with a {quality.HTML_CSS_BUDGET} B budget",
             )
 
-    def test_no_release_digest_is_quoted_on_the_download_page(self):
-        markup = (DIST / "download" / "index.html").read_text(encoding="utf-8")
-        self.assertNotRegex(markup, r"\b[0-9a-f]{64}\b")
+    def test_every_route_is_a_single_request(self):
+        """One request per route: the CSS is inlined, nothing is linked.
+
+        This is the Tier-A decision (Part A §10.1) stated as a rule, so a
+        future edit cannot quietly reintroduce a render-blocking stylesheet or
+        a second `<style>` block (which would duplicate CSS across modules).
+        """
+        for route, relative in (
+            ("/", "index.html"),
+            ("/features/", "features/index.html"),
+            ("/ui/", "ui/index.html"),
+            ("/404.html", "404.html"),
+        ):
+            markup = (DIST / relative).read_text(encoding="utf-8")
+            self.assertEqual(
+                markup.count("<style"), 1, f"{route} should inline exactly one stylesheet"
+            )
+            self.assertNotRegex(
+                markup,
+                r"<link[^>]*rel=\"stylesheet\"",
+                f"{route} links a stylesheet, which costs a render-blocking request",
+            )
+            self.assertNotRegex(markup, r"<script", f"{route} ships a script tag")
+
+    def test_inlined_css_is_minified(self):
+        css = quality.site_stylesheet(DIST)
+        self.assertNotIn("/*", css, "the inlined CSS still carries comments")
+        self.assertNotRegex(css, r"\s\{\s", "the inlined CSS is not whitespace-collapsed")
+
+    def test_no_release_digest_is_quoted_anywhere(self):
+        for route, path in quality.page_paths(DIST).items():
+            markup = path.read_text(encoding="utf-8")
+            self.assertNotRegex(markup, r"\b[0-9a-f]{64}\b", f"{route} quotes a digest")
 
     def test_no_text_uses_the_faintest_token(self):
         """`--text-4` measures ~3.9:1 and fails the WCAG AA body-text floor.
 
         It stays defined for non-text affordances, but no `color:` declaration
         may use it. This is the rule that outlaws the real defect CI found:
-        Lighthouse reported accessibility 95 on /features/ and /download/, where
+        Lighthouse reported accessibility 95 on the routes, where
         the faint "traceable source" line and the list markers used it.
         """
-        css = (DIST / "assets" / "styles.css").read_text(encoding="utf-8")
+        # The stylesheet is inlined into the pages now, so this reads the CSS
+        # through the same helper the checks use: `assets/styles.css` no longer
+        # exists in dist, and the rule must follow the bytes rather than the
+        # file layout. The rule itself is unchanged.
+        css = quality.site_stylesheet(DIST)
+        self.assertTrue(css, "no CSS found in the built site at all")
         offenders = re.findall(r"[^}{]*\{[^}]*color:\s*var\(--text-4\)[^}]*\}", css)
         self.assertEqual(
             offenders,
@@ -290,9 +450,244 @@ class BuiltSite(unittest.TestCase):
         here it is asserted directly, because the gate must not pass by luck."""
         markup = (DIST / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("\n      ", markup)
-        css = (DIST / "assets" / "styles.css").read_text(encoding="utf-8")
+        # Same adaptation as the contrast rule above: read the CSS where the
+        # site ships it (inline), not where it used to ship it (a linked file).
+        css = quality.site_stylesheet(DIST)
+        self.assertTrue(css, "no CSS found in the built site at all")
         self.assertNotIn("/*", css)
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DistCopyMixin(unittest.TestCase):
+    """Run one check against a disposable copy of the real built site."""
+
+    def copy_dist(self) -> Path:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        target = root / "dist"
+        shutil.copytree(DIST, target)
+        return target
+
+
+class DistributionBoundary(DistCopyMixin):
+    """The site describes the software; it does not distribute or install it.
+
+    This is the rule for the session's redirection: downloads are not the
+    website's business, so a direct artifact link or a verification instruction
+    is a defect rather than a convenience.
+    """
+
+    def test_the_real_site_is_clean(self):
+        self.assertEqual(quality.distribution_boundary_violations(DIST), [])
+
+    def mutate(self, relative: str, old: str, new: str) -> list[str]:
+        dist = self.copy_dist()
+        page = dist / relative
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn(old, markup)
+        page.write_text(markup.replace(old, new, 1), encoding="utf-8")
+        violations = quality.distribution_boundary_violations(dist)
+        self.assertTrue(violations, f"mutation {old!r} -> {new!r} was not caught")
+        return violations
+
+    def test_a_direct_apk_link_fails(self):
+        violations = self.mutate(
+            "features/index.html",
+            'href="/ui/"',
+            'href="https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk"',
+        )
+        self.assertTrue(any("artifact" in v for v in violations), violations)
+
+    def test_a_release_download_path_fails(self):
+        violations = self.mutate(
+            "features/index.html", 'href="/ui/"', 'href="https://github.com/x/releases/download/test/a"'
+        )
+        self.assertTrue(any("artifact" in v for v in violations), violations)
+
+    def test_a_checksum_instruction_fails(self):
+        violations = self.mutate(
+            "features/index.html", "Read the code", "Read the code. Run sha256sum -c build.sha256", 
+        )
+        self.assertTrue(any("installation" in v for v in violations), violations)
+
+    def test_a_sideload_instruction_fails(self):
+        violations = self.mutate("features/index.html", "Read the code", "Sideload the build")
+        self.assertTrue(any("installation" in v for v in violations), violations)
+
+    def test_the_release_page_is_still_reachable(self):
+        """Banning artifacts must not ban the one honest pointer to them."""
+        markup = (DIST / "features" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("/releases/tag/test", markup)
+        self.assertEqual(quality.distribution_boundary_violations(DIST), [])
+
+
+class CopyHygiene(DistCopyMixin):
+    """Nothing may ship that a reader would read as a mistake.
+
+    The download page shipped a literal Markdown backtick and a visibly escaped
+    `<code>` tag; neither the weight, link, claim or traceability rules could
+    see them, because both are *valid* HTML. These tests keep the rule firing.
+    """
+
+    def test_the_real_site_is_clean(self):
+        self.assertEqual(quality.copy_hygiene_violations(DIST), [])
+
+    def mutate(self, relative: str, old: str, new: str) -> list[str]:
+        dist = self.copy_dist()
+        page = dist / relative
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn(old, markup)
+        page.write_text(markup.replace(old, new, 1), encoding="utf-8")
+        violations = quality.copy_hygiene_violations(dist)
+        self.assertTrue(violations, f"mutation {old!r} -> {new!r} was not caught")
+        return violations
+
+    def test_a_literal_backtick_fails(self):
+        violations = self.mutate("features/index.html", "Read the code", "`Read the code")
+        self.assertTrue(any("backtick" in v for v in violations), violations)
+
+    def test_escaped_markup_fails(self):
+        violations = self.mutate(
+            "features/index.html",
+            "GPL-3.0",
+            "&lt;code&gt;GPL-3.0&lt;/code&gt;",
+        )
+        self.assertTrue(any("escaped markup" in v for v in violations), violations)
+
+    def test_a_link_to_nowhere_fails(self):
+        violations = self.mutate("features/index.html", 'href="/ui/"', 'href="#"')
+        self.assertTrue(any("goes nowhere" in v for v in violations), violations)
+
+    def test_a_placeholder_word_fails(self):
+        violations = self.mutate("features/index.html", "Read the code", "Lorem ipsum Read the code")
+        self.assertTrue(any("placeholder" in v for v in violations), violations)
+
+    def test_a_negated_placeholder_word_passes(self):
+        """“These are absent, not coming soon” is the opposite of a promise."""
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        page.write_text(
+            markup.replace("Read the code", "Absent, not coming soon. Read the code", 1),
+            encoding="utf-8",
+        )
+        self.assertEqual(quality.copy_hygiene_violations(dist), [])
+
+
+class ClaimTraceability(DistCopyMixin):
+    def test_every_section_on_the_real_site_is_traceable(self):
+        self.assertEqual(quality.claim_traceability_violations(DIST), [])
+
+    def test_a_section_without_a_citation_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        start = markup.index("<section")
+        end = markup.index("</section>") + len("</section>")
+        section = re.sub(r"<!--.*?-->", " ", markup[start:end], flags=re.S)
+        page.write_text(markup[:start] + section + markup[end:], encoding="utf-8")
+        violations = quality.claim_traceability_violations(dist)
+        self.assertTrue(violations, "a section stripped of its citation still passed")
+        self.assertTrue(any("no citation" in v for v in violations), violations)
+
+
+class BacklogDrift(DistCopyMixin):
+    def test_the_real_site_matches_the_backlog(self):
+        self.assertEqual(quality.backlog_drift_violations(DIST), [])
+
+    def contract(self, dist: Path, plan: Path) -> list[str]:
+        original = quality.BACKLOG_PLAN
+        quality.BACKLOG_PLAN = plan
+        try:
+            return quality.backlog_drift_violations(dist)
+        finally:
+            quality.BACKLOG_PLAN = original
+
+    def test_a_shipped_mockup_that_is_missing_fails(self):
+        dist = self.copy_dist()
+        plan = Path(tempfile.mkdtemp()) / "WEBSITE_PLAN.md"
+        self.addCleanup(shutil.rmtree, plan.parent, ignore_errors=True)
+        plan.write_text(
+            "| # | Mockup (site id) | Status | Real capture | What it must show |\n"
+            "|---|---|---|---|---|\n"
+            "| 1 | `mock-home-phone` | shipped | Android Home | layout |\n"
+            "| 2 | `mock-never-drawn` | shipped | nothing | nothing |\n",
+            encoding="utf-8",
+        )
+        violations = self.contract(dist, plan)
+        self.assertTrue(any("mock-never-drawn" in v for v in violations), violations)
+
+    def test_a_mockup_on_a_page_with_no_row_fails(self):
+        dist = self.copy_dist()
+        route = quality.page_paths(dist)["/features/"]
+        markup = route.read_text(encoding="utf-8")
+        route.write_text(
+            markup.replace(
+                "<main",
+                '<main data-x="1"',
+                1,
+            ).replace(
+                "</main>",
+                '<figure id="mock-not-in-the-plan"><span class="mock-badge">not a screenshot</span></figure></main>',
+                1,
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.backlog_drift_violations(dist)
+        self.assertTrue(any("mock-not-in-the-plan" in v for v in violations), violations)
+
+    def test_a_planned_mockup_that_is_already_on_a_page_fails(self):
+        dist = self.copy_dist()
+        plan = Path(tempfile.mkdtemp()) / "WEBSITE_PLAN.md"
+        self.addCleanup(shutil.rmtree, plan.parent, ignore_errors=True)
+        plan.write_text(
+            "| # | Mockup (site id) | Status | Real capture | What it must show |\n"
+            "|---|---|---|---|---|\n"
+            "| 1 | `mock-home-phone` | planned | Android Home | layout |\n",
+            encoding="utf-8",
+        )
+        violations = self.contract(dist, plan)
+        self.assertTrue(any("mock-home-phone" in v for v in violations), violations)
+
+
+class StaleFacts(DistCopyMixin):
+    def test_the_real_site_states_no_version_date_or_build_number(self):
+        self.assertEqual(quality.stale_fact_violations(DIST), [])
+
+    def test_a_version_string_fails(self):
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace("</h1>", "</h1><p>Version 3.2.1 is out.</p>", 1),
+            encoding="utf-8",
+        )
+        violations = quality.stale_fact_violations(dist)
+        self.assertTrue(any("3.2.1" in v for v in violations), violations)
+
+    def test_a_bare_date_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace("</h1>", "</h1><p>Updated 2026-10-08.</p>", 1),
+            encoding="utf-8",
+        )
+        violations = quality.stale_fact_violations(dist)
+        self.assertTrue(any("2026-10-08" in v for v in violations), violations)
+
+
+class SitemapScope(DistCopyMixin):
+    def test_a_fourth_route_in_the_sitemap_fails(self):
+        dist = self.copy_dist()
+        sitemap = dist / "sitemap.xml"
+        sitemap.write_text(
+            sitemap.read_text(encoding="utf-8").replace(
+                "</urlset>",
+                "<url><loc>https://99ggprooo00-code.github.io/DHUN/blog/</loc></url></urlset>",
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.crawlability_violations(dist)
+        self.assertTrue(any("/blog/" in v for v in violations), violations)

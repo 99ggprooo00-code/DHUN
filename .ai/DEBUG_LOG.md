@@ -1,5 +1,129 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — the site denied a feature the app ships, and the config silently dropped a stylesheet (session `arena/9b791057-dhun`)
+
+Two defects that only a *product* site can have: one was the copy lying about the
+app, the other was the build lying about success.
+
+**1. "No Android equaliser yet" was false.** The features page listed it as an
+open item while the tree contains
+`shared/src/commonMain/kotlin/dev/dhun/player/equalizer/` — `EqualizerBands`
+(`COUNT = 10`, libVLC's 60 Hz–16 kHz frequencies, ±20 dB gain), an Android engine
+bound to `android.media.audiofx` in `app-android/.../equalizer/`, a desktop
+command file, and a full UI section in `ui/settings/SettingsScreen.kt` with
+presets, preamp and per-band sliders. A negative list is a claim like any other,
+and nothing checked it against the tree — the claims rules only reject
+*positive* over-claims. Fix: the feature catalogue now cites the file behind
+every item, the equaliser is listed as shipped, and the negative list was
+corrected to "no store channel and no signed release". Policy: before adding a
+line to `notInDhun`, grep for the feature — an under-claim is a lie in the
+opposite direction and it costs the same trust.
+
+**2. `cssModules: ["...", "ui"]` produced a page with no stylesheet, and the
+build stayed green.** The Eleventy filter was
+`CSS_MODULES.filter((name) => modules.includes(name))`: an unknown module name
+simply vanished, so `/ui/` shipped unstyled. The class-coverage rule caught it
+*by accident* — because the page's classes were "used but not defined" — which
+is a long way from an error message. Fix: the filter now iterates the page's
+declared modules and `readModule` throws on an unknown name. Policy: when a
+configuration list filters the *input* rather than validating it, a typo becomes
+a silent omission; validate the input.
+
+**3. Nested `<section>` broke the traceability scan.** `re.findall` with a
+non-greedy `(.*?)</section>` closes the outer section at the *first* inner
+`</section>`, so a wrapper section with five sections inside gave five misaligned
+"section N" matches and one of them (the last surface) looked citation-free.
+Fix: the surfaces are five top-level sections under a plain `<div class="wrap">`
+with an `<h2>`. Policy: claim-bearing sections do not nest.
+
+
+## 2026-10-08 — four tooling traps from rebuilding the site's own checks (session `arena/9b791057-dhun`)
+
+Each of these cost real time in this session. They are recorded because each
+one fails *quietly*: the tool that should have complained instead reported
+success.
+
+**1. A typo in a Nunjucks comment terminator swallows the template.** The
+closing form is `-#}`. A `-*-}` typo makes the comment run to the end of the
+file, so the rendered page is missing everything after it — and Eleventy still
+prints `Wrote 5 files` and exits 0. A page that builds but has no `</html>` is a
+template-syntax bug, not a content bug: grep the template for a mistyped
+comment before debugging anything else.
+
+**2. A regex written for a multi-line CSS block silently matches nothing** when
+the rule sits on one line. `\.tag-list \{.*?\n\}` never matched because the
+deleted rule was one line long; the "dead rule" scan reported a clean sheet for
+a rule that was still there. Match on the closing brace, or edit line by line.
+
+**3. A test helper that double-wrapped its own responses.** `served(**overrides)`
+built `{route: (status, (status, body))}` and the failure surfaced two frames
+away as `AttributeError: 'tuple' object has no attribute 'strip'` inside the
+page checker. The helper now holds `(status, body)` and nothing else. A helper
+whose value shape is wrong produces an error in the code that *reads* it, which
+is the slowest possible place to find it.
+
+**4. `assertNotIn("@axe-core/cli", workflow_text)` fails on a comment that
+explains why the tool was retired.** The assertion now targets the invocation
+(`assertNotRegex(r"npx[^\n]*@axe-core/cli")`) instead of the word, and the
+comment stays: it is the record of why axe-cli went, and the reason the removal
+can be verified at all.
+
+**And one that is a trap for the workflow, not for the tests:** writing Python
+with regex and emoji through a shell heredoc mangles raw strings — the escaping
+survives into the file. Patch programmatically and then prove the file parses
+(`python3 -c "import ast; ast.parse(open(path).read())"`).
+
+## 2026-10-08 — the measurement job's first run: three real defects, and two checks that could not name their own findings (session `arena/9b791057-dhun`)
+
+**What happened.** `website` run **37802245177** (head `0570377`) was the first
+execution of `website/tests/browser.mjs` anywhere — the sandbox has no browser,
+so every earlier responsive/a11y statement in this repository was structural.
+It failed on three real defects and, in passing, showed that two of its own
+diagnostics were unable to say what was wrong.
+
+**Findings, each read from a check-run annotation:**
+
+1. `a.wordmark “DHUN” is 90.9×28 (44 px floor)` on all three pages — the header
+   logo link was under the target floor.
+2. `a.no-class “a” is 7.1×14 …` — the superscript footnote links on the front
+   page were 6–7 px wide. Inline in a sentence is WCAG 2.5.8's inline
+   exception, but that size is not hittable even deliberately, so they now
+   carry a 24×24 box.
+3. `overflow /download/ @ 320x568: documentElement.scrollWidth 444 > innerWidth
+   320` (and at 360). Real horizontal overflow — and `body { overflow-x: hidden }`
+   meant no scrollbar, so it presented as content cut off at the right edge.
+
+**Why the browser check could not name the offender.** `overflowReport` skipped
+any element with an ancestor whose `overflow-x` was not `visible` — reasoning
+that such a container clips or scrolls its own content. Every element on this
+site has one such ancestor: `body { overflow-x: hidden }`. So the offenders
+list was permanently empty while the document was measurably 444 px wide. The
+walk now ignores `body` (its `overflow-x` is propagated to the viewport, so it
+does not clip), and a second pass reports elements whose *content* is wider than
+their own box — spill that no border-box scan can see.
+
+**Why the annotations were incomplete.** GitHub returns roughly ten annotations
+per level per check run. The script emitted one `::error` per route per
+viewport, so the failures pushed the *measurements* out of the only channel this
+environment can read. Findings are now grouped by category into at most eight
+error annotations, with the full text still on stdout.
+
+**Why the Lighthouse job went red for no stated reason.** It ran `/` at the
+median of three samples (98, 100, 100 → **100** across all four categories,
+FCP=LCP=SI 1106 ms, TBT 0 ms, CLS 0.000, 49.9 kB, 2 requests) and then exited 1
+on the next route without printing any `::error`. Nothing in this environment
+can read the step log, so the failure was invisible. Each sample is now retried
+once, and a sample that fails twice reports an `::error` annotation carrying the
+tail of its own log. The gate is unchanged.
+
+**Also learned:** a `name: … (Playwright: …)` line in a workflow is invalid YAML
+(an unquoted `: ` in a plain scalar). It parses as a block mapping and GitHub
+rejects the run before any job starts. There is no YAML parser in the sandbox
+(`pypi` is unreachable), so `scripts/test_website_workflow.py` now carries
+`yaml_hygiene_violations` for exactly this class of mistake, and the *file* was
+also validated by parsing it with the `yaml` package in a throwaway directory —
+a local check, not a repository dependency.
+
 ## 2026-10-08 — CI found a contrast defect the site's own checks were written to miss, and axe cannot run (session `arena/fc918d37-dhun`)
 
 **What happened.** The first `website` run on this branch (`37794857026`,

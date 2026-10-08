@@ -1,0 +1,98 @@
+/* ========================== INTERFACE PAGE =============================== */
+/* Styles that only /ui/ needs: token swatches, the shape and spacing scales,
+   the type ramp, surface walkthroughs and the figure inventory table. Loaded
+   by that page alone (cssModules), so the other routes ship none of it. */
+
+.sub-title {
+  margin: var(--sp-6) 0 var(--sp-3); font-size: 1.05rem; letter-spacing: 0.02em;
+}
+
+/* ------------------------------------------------------------- swatches -- */
+.swatches {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.swatch {
+  display: grid; grid-template-columns: 2.2rem 1fr; grid-template-rows: auto auto auto;
+  gap: 0 var(--sp-3); align-items: center;
+  padding: var(--sp-3); border: 1px solid var(--hairline); border-radius: var(--r-md);
+  background: var(--surface-card); min-width: 0;
+}
+.swatch-chip {
+  grid-row: 1 / span 3; width: 2.2rem; height: 2.2rem;
+  border-radius: var(--r-sm); border: 1px solid var(--hairline-strong);
+}
+.swatch-name { font-weight: 600; font-size: 0.92rem; }
+.swatch-value { font-family: var(--mono); font-size: 0.82rem; color: var(--text-2); }
+.swatch-use { font-size: 0.82rem; color: var(--text-3); }
+
+/* ------------------------------------------------- shape + spacing scale -- */
+.scales {
+  list-style: none; margin: 0 0 var(--sp-4); padding: 0;
+  display: grid; gap: var(--sp-2);
+}
+.scale {
+  display: grid; grid-template-columns: 6.5rem 1fr auto; align-items: center;
+  gap: var(--sp-3); min-width: 0;
+}
+.scale-bar {
+  display: block; height: 1.4rem; background: var(--accent-container);
+  border: 1px solid var(--glass-edge); justify-self: start;
+}
+.scales--spacing .scale-bar { height: 0.6rem; background: var(--accent); }
+.scale-name { font-family: var(--mono); font-size: 0.82rem; color: var(--text-2); }
+.scale-value { font-family: var(--mono); font-size: 0.82rem; color: var(--text-3); }
+
+/* ------------------------------------------------------------ type ramp -- */
+.type-ramp { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.type-ramp li {
+  display: grid; grid-template-columns: 6.5rem 1fr; gap: var(--sp-3);
+  min-width: 0; border-bottom: 1px solid var(--hairline); padding-bottom: var(--sp-2);
+}
+.type-name { font-family: var(--mono); font-size: 0.85rem; color: var(--text-2); }
+.type-value { font-size: 0.9rem; color: var(--text); }
+
+/* ---------------------------------------------------- surface walkthrough -- */
+.surface {
+  display: grid; gap: var(--sp-6); grid-template-columns: 1fr;
+  align-items: start; padding: var(--sp-6) 0;
+  border-top: 1px solid var(--hairline);
+}
+.surface-body { min-width: 0; }
+.surface-body h3 { margin: 0.2rem 0 var(--sp-3); }
+.surface-visual { min-width: 0; display: grid; justify-items: center; }
+.surface-visual--text {
+  border: 1px dashed var(--hairline-strong); border-radius: var(--r-md);
+  padding: var(--sp-4); align-content: center;
+}
+.planned { list-style: none; margin: var(--sp-4) 0; padding: 0; display: grid; gap: var(--sp-2); }
+.planned code, .inventory code { font-size: 0.85em; }
+.risk-body { color: var(--text-2); }
+
+/* ------------------------------------------------------------- inventory -- */
+.table-scroll { overflow-x: auto; }
+.inventory {
+  width: 100%; border-collapse: collapse; font-size: 0.92rem;
+  border: 1px solid var(--hairline); border-radius: var(--r-md);
+  /* `fixed` + breakable code keeps the widest cell inside 288 px at the
+     narrowest viewport, so this table never needs its scroll container. */
+  table-layout: fixed;
+}
+.inventory th:nth-child(1), .inventory td:nth-child(1) { width: 38%; }
+.inventory th:nth-child(2), .inventory td:nth-child(2) { width: 36%; }
+.inventory code { overflow-wrap: anywhere; }
+.inventory caption {
+  text-align: left; padding: 0 var(--sp-2) var(--sp-3);
+  color: var(--text-3); font-size: 0.85rem;
+}
+.inventory th, .inventory td {
+  text-align: left; padding: var(--sp-3); border-top: 1px solid var(--hairline);
+}
+.inventory thead th { border-top: 0; color: var(--text-2); font-size: 0.85rem; }
+.inventory tbody tr:nth-child(odd) { background: var(--surface-card); }
+
+@media (min-width: 768px) {
+  .surface { grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: var(--sp-8); }
+  .surface:nth-of-type(even) .surface-body { order: 2; }
+}

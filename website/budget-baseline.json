@@ -1,0 +1,24 @@
+{
+  "_comment": "Committed page weights (uncompressed bytes on the wire) so that growth is deliberate. Written by scripts/website_quality.py --write-baseline; asserted by budget_ratchet_violations() in the same module.",
+  "tolerance": 0.05,
+  "routes": {
+    "/": {
+      "htmlCss": 51748,
+      "html": 51748,
+      "cssInlined": 21847,
+      "cssLinked": 0
+    },
+    "/features/": {
+      "htmlCss": 53075,
+      "html": 53075,
+      "cssInlined": 21847,
+      "cssLinked": 0
+    },
+    "/ui/": {
+      "htmlCss": 54319,
+      "html": 54319,
+      "cssInlined": 24898,
+      "cssLinked": 0
+    }
+  }
+}

@@ -27,8 +27,14 @@ Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 ## Website
 
 <https://99ggprooo00-code.github.io/DHUN/> is a static marketing site for the
-applications above: three routes (`/`, `/features/`, `/download/`), no
-client-side JavaScript, no analytics and no third-party runtime asset.
+applications above: three routes (`/`, `/features/`, `/ui/`), no client-side
+JavaScript, no analytics and no third-party runtime asset.
+
+**It is not a distribution channel.** The site describes the software and shows
+its interface; it does not hand out builds, digests, sizes or installation
+instructions. The rolling `test` pre-release is one link away, on its release
+page, where the warning about it lives next to the files — and `scripts/website_quality.py`
+fails the build if a page ever links an artifact directly.
 
 - Source: `website/` — Eleventy (pinned), one command: `cd website && npm ci && npm run build`.
 - Deployment: `.github/workflows/website.yml` publishes the built artifact to
@@ -42,8 +48,14 @@ client-side JavaScript, no analytics and no third-party runtime asset.
   `scripts/website_claims.py`, `scripts/website_quality.py` and
   `docs/verification/20-marketing-site.md`.
 - The repository contains **no screenshots**; every visual on the site is a
-  labelled CSS recreation of the real UI, and `.ai/WEBSITE_PLAN.md` §9 lists the
-  captures that should replace them.
+  labelled CSS recreation of the real UI (six of them, on `/` and `/features/`
+  and `/ui/`), and `.ai/WEBSITE_PLAN.md` §9 lists the captures that should
+  replace them. The `/ui/` page also states the app's design tokens, read from
+  `shared/src/commonMain/kotlin/dev/dhun/design/`.
+- Browser-measured, not argued: Playwright checks six viewports (320–1440 px)
+  for overflow, touch targets, focus, contrast and reduced motion in the
+  `browser` job, and Lighthouse gates the median of three samples per route in
+  the `lighthouse` job.
 
 ## License
 

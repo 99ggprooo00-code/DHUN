@@ -37,7 +37,7 @@ SOURCE_DIR = REPO_ROOT / "website" / "src"
 ROUTES = {
     "/": "index.html",
     "/features/": "features/index.html",
-    "/download/": "download/index.html",
+    "/ui/": "ui/index.html",
     "/404.html": "404.html",
 }
 

@@ -1,0 +1,109 @@
+/* ----------------------------------------------------------------- stats -- */
+.stats {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3); margin: 0 0 var(--sp-5); padding: 0; list-style: none;
+}
+.stats li {
+  margin: 0; padding: var(--sp-5) var(--sp-4); text-align: center;
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+}
+.stat-value {
+  display: block; font-size: clamp(1.5rem, 4vw, 2.1rem);
+  font-weight: 700; color: var(--text); letter-spacing: -0.01em;
+}
+.stat-label { display: block; font-size: 0.86rem; color: var(--text-2); }
+.footnotes {
+  font-size: 0.86rem; color: var(--text-3);
+  border-top: 1px solid var(--hairline); padding-top: var(--sp-4);
+  max-width: 78ch;
+}
+.footnotes li { margin-bottom: var(--sp-2); }
+.footnotes .fn-mark { color: var(--accent); font-weight: 700; }
+/* The superscript footnote links are inline in a sentence, so WCAG 2.5.8's
+   inline exception applies — but they were 6.4x14 px, which is too small to
+   hit even deliberately. This gives each one a 24x24 box while the glyph stays
+   a superscript. (Measured, not argued: scripts/website_quality.py holds the
+   static floor, website/tests/browser.mjs the rendered one.) */
+.fn-mark a {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; min-height: 24px;
+}
+
+/* -------------------------------------------------------------- feature -- */
+.feature {
+  display: grid; grid-template-columns: 1fr; gap: var(--sp-6);
+  align-items: center; padding: var(--sp-8) 0;
+  border-top: 1px solid var(--hairline);
+}
+.feature-body p { color: var(--text-2); }
+.feature-points { margin: 0; padding-left: 1.1em; color: var(--text-2); font-size: 0.95rem; }
+.feature-points li::marker { color: var(--accent); }
+.feature-visual { display: grid; place-items: center; }
+
+/* ---------------------------------------------------------------- cards -- */
+.card {
+  background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--r-lg); padding: var(--sp-5);
+  min-width: 0;
+}
+.card h3 { margin-bottom: var(--sp-2); }
+.card p:last-child { margin-bottom: 0; }
+.card-label {
+  display: inline-block; font-size: 0.76rem; font-weight: 700;
+  letter-spacing: 0.06em; color: var(--on-accent-container);
+  background: var(--accent-container); border-radius: var(--r-full);
+  padding: 0.2em 0.7em; margin-bottom: var(--sp-3);
+}
+.card-grid { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
+.status-list { list-style: none; padding: 0; display: grid; gap: var(--sp-4); }
+.status-list li { margin: 0; }
+.risk { background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: var(--r-xl); padding: var(--sp-6); }
+.risk h2 { color: var(--text); }
+.risk p { color: var(--text-2); }
+.risk .risk-flag { color: var(--warning); font-weight: 700; }
+.notice {
+  border-left: 3px solid var(--accent); padding-left: var(--sp-4);
+  color: var(--text-2); font-size: 0.95rem;
+}
+
+/* ----------------------------------------------------------- closing CTA -- */
+.closing { text-align: center; }
+.closing .cta-row { justify-content: center; }
+.closing p { color: var(--text-2); max-width: 58ch; margin-inline: auto; }
+
+/* ------------------------------------------------------------ 404 + misc -- */
+.error-page { text-align: center; padding: var(--sp-12) 0; }
+.error-code { font-size: clamp(3rem, 12vw, 6rem); font-weight: 700; letter-spacing: -0.03em; margin: 0; color: var(--accent); }
+.traceable { font-size: 0.82rem; color: var(--text-3); }
+/* Browser-measured: catalogue sources are long unbroken paths, and `anywhere`
+   (unlike `break-word`) also reduces min-content width — which is what the
+   card, the wrap and the page were overflowing by at 320 and 360 px. */
+.traceable { overflow-wrap: anywhere; }
+.feature-why {
+  margin-top: var(--sp-3); padding-left: var(--sp-4);
+  border-left: 3px solid var(--accent); color: var(--text-2); font-size: 0.95rem;
+}
+.faq { display: grid; gap: var(--sp-4); }
+.faq > * { min-width: 0; }
+.faq h3 { margin-bottom: var(--sp-1); }
+
+@media (min-width: 640px) {
+  .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 768px) {
+  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .feature { grid-template-columns: 1fr 1fr; gap: var(--sp-8); }
+  .feature:nth-of-type(even) .feature-visual { order: -1; }
+}
+
+/* Shared by /features/ ("NOT IN DHUN") and /download/ ("what is not on this
+   page"): the list of things DHUN deliberately does not have. It lives in the
+   shared module for exactly that reason — the class-coverage rule fails the
+   build if a page uses a class its own module set does not define. */
+.missing { list-style: none; padding: 0; color: var(--text-2); font-size: 0.95rem; }
+.missing li { padding-left: 1.4em; position: relative; }
+.missing li::before {
+  content: "—"; position: absolute; left: 0; color: var(--text-3);
+}

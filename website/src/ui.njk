@@ -1,0 +1,137 @@
+---
+layout: base.njk
+title: "DHUN's interface — the app's real screens and design system"
+ogTitle: "The DHUN interface"
+description: "DHUN's Android and Windows surfaces and the token values behind them — every drawing hand-written from the app's own design system and labelled as a recreation, never a screenshot."
+cssModules: ["tokens", "base", "components", "mockups", "ui"]
+---
+<div class="wrap">
+  <section class="hero" aria-labelledby="ui-title">
+    <span class="kicker">THE INTERFACE</span>
+    <h1 id="ui-title">{{ site.ui.h1 }}</h1>
+    <p class="hero-lead">{{ site.ui.lead }}</p>
+    <!--{{ site.ui.source }}-->
+    <div class="cta-row">
+      <a class="btn btn--primary" href="/features/">What it can do</a>
+      <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
+    </div>
+  </section>
+
+  <section aria-labelledby="tokens-title">
+    <div class="section-head">
+      <span class="kicker">DESIGN SYSTEM</span>
+      <h2 id="tokens-title">{{ site.ui.tokens.title }}</h2>
+      <p class="lede">{{ site.ui.tokens.lead }}</p>
+      <!--{{ site.ui.tokens.source }}-->
+    </div>
+
+    <h3 class="sub-title">Colour</h3>
+    <ul class="swatches">
+      {%- for color in site.ui.tokens.colors %}
+      <li class="swatch">
+        <span class="swatch-chip" style="background: {{ color.value }}" aria-hidden="true"></span>
+        <span class="swatch-name">{{ color.name }}</span>
+        <span class="swatch-value">{{ color.value }}</span>
+        <span class="swatch-use">{{ color.use }}</span>
+      </li>
+      {%- endfor %}
+    </ul>
+
+    <h3 class="sub-title">Shape and spacing</h3>
+    <ul class="scales">
+      {%- for shape in site.ui.tokens.shapes %}
+      <li class="scale"><span class="scale-bar" style="border-radius: {{ shape.value }}; width: {{ shape.value }}"></span><span class="scale-name">{{ shape.name }}</span><span class="scale-value">{{ shape.value }}</span></li>
+      {%- endfor %}
+    </ul>
+    <ul class="scales scales--spacing">
+      {%- for step in site.ui.tokens.spacing %}
+      <li class="scale"><span class="scale-bar" style="width: {{ step.value }}px"></span><span class="scale-name">{{ step.name }}</span><span class="scale-value">{{ step.value }}</span></li>
+      {%- endfor %}
+    </ul>
+
+    <h3 class="sub-title">Type ramp</h3>
+    <ul class="type-ramp">
+      {%- for type in site.ui.tokens.type %}
+      <li><span class="type-name">{{ type.name }}</span><span class="type-value">{{ type.value }}</span></li>
+      {%- endfor %}
+    </ul>
+    <p class="notice">{{ site.ui.tokens.target }}</p>
+  </section>
+</div>
+
+<div class="wrap">
+  <div class="section-head">
+    <span class="kicker">SURFACES</span>
+    <h2 id="surfaces-title">Five screens, drawn as they are built.</h2>
+    <p class="lede">
+      The walkthrough below covers the surfaces that carry the most product
+      decisions. Two of them are drawn on this page; the rest are drawn
+      elsewhere on the site, and the link says where.
+    </p>
+    <!-- Each surface below is its own <section> with its own citation; listing
+         them here rather than nesting them keeps one citation per section.
+         shared/src/commonMain/kotlin/dev/dhun/ui/, app-desktop/src/jvmMain/ -->
+  </div>
+</div>
+
+{%- for surface in site.ui.surfaces %}
+  <div class="wrap">
+    <section class="surface" id="{{ surface.id }}" aria-labelledby="surface-{{ surface.id }}">
+      <div class="surface-body">
+        <span class="kicker">{{ surface.kicker }}</span>
+        <h3 id="surface-{{ surface.id }}">{{ surface.title }}</h3>
+        <p>{{ surface.body }}</p>
+        <!--{{ surface.path }}-->
+        <ul class="feature-points">
+          {%- for point in surface.points %}
+          <li>{{ point }}</li>
+          {%- endfor %}
+        </ul>
+        {%- if surface.note %}
+        <p class="traceable">{{ surface.note }} <a href="{{ surface.href }}">Open that page</a></p>
+        {%- endif %}
+      </div>
+      {%- if surface.mockFile %}
+      <div class="surface-visual">
+        {% include surface.mockFile %}
+      </div>
+      {%- else %}
+      <div class="surface-visual surface-visual--text">
+        <p class="traceable">Drawn further down this page.</p>
+      </div>
+      {%- endif %}
+    </section>
+  </div>
+  {%- endfor %}
+
+<div class="wrap">
+  <section aria-labelledby="contract-title">
+    <div class="section-head">
+      <span class="kicker">THE HONEST PART</span>
+      <h2 id="contract-title">{{ site.ui.contract.title }}</h2>
+      <p class="lede">{{ site.ui.contract.body }}</p>
+      <!--{{ site.ui.contract.source }} -->
+    </div>
+    <div class="table-scroll">
+      <table class="inventory">
+        <caption>Every figure on the site, and where it lives.</caption>
+        <thead>
+          <tr><th scope="col">Figure id</th><th scope="col">Surface</th><th scope="col">Page</th></tr>
+        </thead>
+        <tbody>
+          {%- for row in site.ui.contract.rows %}
+          <tr><td><code>{{ row.id }}</code></td><td>{{ row.surface }}</td><td><code>{{ row.page }}</code></td></tr>
+          {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+    <ul class="planned">
+      {%- for row in site.ui.contract.planned %}
+      <li><code>{{ row.id }}</code> — {{ row.surface }}</li>
+      {%- endfor %}
+    </ul>
+    <p class="notice">{{ site.ui.contract.plannedNote }}</p>
+    <p class="risk-body">{{ site.ui.whyNoShots.body }}</p>
+    <!--{{ site.ui.whyNoShots.source }} -->
+  </section>
+</div>

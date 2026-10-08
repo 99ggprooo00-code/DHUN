@@ -40,8 +40,11 @@ stack replaces any webfont. What follows never reaches a browser:
 |---|---|---|---|
 | `@11ty/eleventy` 3.1.6 (dev dependency of `website/`, pinned, lockfile committed) | MIT | builds the three static routes from `website/src` | 2026-10-08 |
 | `html-validate` 11.16.2 (dev dependency of `website/`; CI-only) | MIT | HTML validity gate on the built output | 2026-10-08 |
-| Lighthouse 13.5.0 and `@axe-core/cli` 4.14.0 (fetched by `npx` in `website.yml`, never committed) | Apache-2.0 / MPL-2.0 | accessibility + performance evidence on `ubuntu-latest` | 2026-10-08 |
-| 129 transitive packages of the two dev dependencies above | MIT/Apache-2.0/BSD/ISC (npm tree) | build only | 2026-10-08 |
+| Lighthouse 13.5.0 (fetched by `npx` in `website.yml`, never committed) | Apache-2.0 | performance/accessibility/SEO scores on `ubuntu-latest` | 2026-10-08 |
+| `@playwright/test` 1.64.0 (dev dependency of `website/`, pinned, lockfile committed; CI-only — the build job installs it with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`) | Apache-2.0 | drives `website/tests/browser.mjs`: viewport overflow, touch targets, keyboard focus, rendered contrast, reduced motion, icon rendering, screenshots-as-artifacts | 2026-10-08 |
+| `@axe-core/playwright` 4.13.0 (dev dependency of `website/`, pinned; CI-only) | MPL-2.0 | runs axe-core against the served pages inside that browser job (serious/critical violations fail the job) | 2026-10-08 |
+| ~~`@axe-core/cli` 4.14.0~~ (removed — its webdriver handshake exited 1 without writing a report on every route; axe-core now runs through `@axe-core/playwright` instead) | MPL-2.0 | was: accessibility evidence | 2026-10-08, retired the same day |
+| 146 packages in the `website/package-lock.json` tree (4 direct `devDependencies` + 142 transitive) | MIT/Apache-2.0/BSD/ISC/MPL-2.0 (npm tree) | build and CI only; nothing is copied into `dist/` | 2026-10-08 |
 
 `website/dist/` is committed deliberately so the honesty contract can be
 asserted from app CI step 1 with Python only — no Node, no npm, no network (see

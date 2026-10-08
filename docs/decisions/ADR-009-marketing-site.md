@@ -11,6 +11,18 @@
   workflow `.github/workflows/website.yml`. **No application code, no Gradle
   file, no shared module, and none of the four existing workflows are touched.**
 
+## Amendment — 2026-10-08 (session `arena/9b791057-dhun`)
+
+The decision below stands, with one correction of scope: the site's role is
+**the product, not the distribution**. By explicit direction, the download page
+was removed and its route replaced by `/ui/` (the interface: surfaces, design
+tokens, and the recreation contract). The site therefore has three routes —
+`/`, `/features/`, `/ui/` — plus a 404, and it links the rolling `test`
+pre-release only as a page, never as an artifact: no digest, no byte size, no
+installation or verification instructions. `scripts/website_quality.py` enforces
+that boundary (`distribution_boundary_violations`), and the claims contract
+(`scripts/website_claims.py`) is unchanged otherwise.
+
 ## Context
 
 `README.md` line 2 has advertised a GitHub Pages URL since early in the

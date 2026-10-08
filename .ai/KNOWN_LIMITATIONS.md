@@ -1,5 +1,27 @@
 # KNOWN_LIMITATIONS
 
+## 2026-10-08 — session `arena/9b791057-dhun`: the site is a product site now, and its interface page has never been rendered
+
+- **`/ui/` is unverified in a browser.** The page was built, gated by 18 static
+  checks, validated and minification-proven in this session, but no browser
+  exists in the sandbox: its overflow, touch-target, contrast and axe results
+  can only come from the `browser` job on the pushed head. Until that run is
+  read, "it looks right" is not a claim this project makes.
+- **The site does not distribute builds, and that is a decision with a cost.**
+  Removing the download page removes instructions that some visitors would have
+  found useful (checksum verification, uninstall). They live in the release's own
+  README instead, one click away; the trade is deliberate — a page of install
+  steps rots every time the artifacts change, and the artifacts are replaced on
+  every merge.
+- **`notInDhun` is only as good as its last audit.** This session found a
+  shipped feature listed as missing. The negative list is now file-cited, but no
+  test can prove an absent feature is absent; that requires reading the tree.
+- **Headless Chromium is not a device.** The browser job measures one engine at
+  six viewports. No Firefox, no WebKit, no screen reader, no real touch hardware,
+  no Windows High Contrast mode — so accessibility is *measured to a floor*, not
+  certified.
+
+
 Updated every phase. Nothing hidden.
 
 ## 2026-10-08 — `arena/fc918d37-dhun`: the marketing site is real, and so are its gaps

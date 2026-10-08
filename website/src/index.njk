@@ -3,6 +3,7 @@ layout: base.njk
 title: "DHUN — a YouTube Music client with no sign-in, for Android and Windows"
 ogTitle: "DHUN — music without an account"
 description: "DHUN is a free, open-source YouTube Music client for Android and Windows. No sign-in, no cookies, no ads and no telemetry, with downloads that stay on your device. Public builds are rolling and unverified."
+cssModules: ["tokens", "base", "components", "mockups"]
 ---
 <div class="wrap">
   <section class="hero" aria-labelledby="hero-title">
@@ -82,6 +83,10 @@ description: "DHUN is a free, open-source YouTube Music client for Android and W
           <li>{{ point }}</li>
           {%- endfor %}
         </ul>
+        {%- if feature.why %}
+        <p class="feature-why">{{ feature.why }}</p>
+        <!--{{ feature.whySource }}-->
+        {%- endif %}
       </div>
       <div class="feature-visual">
         {% include feature.mockFile %}
