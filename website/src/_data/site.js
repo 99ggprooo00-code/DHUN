@@ -34,7 +34,7 @@ export default {
 
   nav: [
     { href: "/features/", label: "Features" },
-    { href: "/download/", label: "Download" },
+    { href: "/ui/", label: "Interface" },
     { href: REPO, label: "Source", external: true },
   ],
 
@@ -50,7 +50,11 @@ export default {
   lead:
     "DHUN plays YouTube Music on Android and Windows through its own tokenless extraction chain. There is no sign-in to create, no cookie to hand over, and no PO token to solve — and what you save for offline listening stays on your device.",
   leadSource: "ADR-001 (extraction engine), ADR-003 (staged identity chain), ADR-006 (offline downloads)",
-  ctaPrimary: { href: "/download/", label: "Download DHUN" },
+  // The site does not distribute binaries. Its primary call to action is the
+  // interface itself; the repository is where a build actually lives. Both
+  // hrefs are asserted by scripts/website_quality.py, which fails on any link
+  // to a release *asset*.
+  ctaPrimary: { href: "/ui/", label: "See the interface" },
   ctaSecondary: { href: REPO, label: "Source on GitHub", external: true },
 
   // Platform strip: what actually ships, with the honest status of each.
@@ -189,156 +193,173 @@ export default {
       {
         label: "Nothing is store-ready",
         text:
-          "No Play Store, no F-Droid, no Microsoft Store, no versioned release. Sideload only onto a device you are willing to experiment with.",
+          "No Play Store, no F-Droid, no Microsoft Store, no versioned release — only a rolling pre-release that is replaced on every merge, signed with a public test key. This site does not hand out builds; the release page carries the files and the warnings that belong with them.",
         source: "MASTER_PROMPT §7 S6; .ai/ROADMAP.md",
       },
     ],
   },
 
   closing: {
-    title: "Try it, or build it yourself.",
+    title: "Read it, run it, or build it yourself.",
     body:
-      "One APK for Android, one MSI for Windows, and the whole source under GPL-3.0. If a claim on this site is wrong, the honesty tests in the repository fail the build — and you can check them.",
+      "The whole project is GPL-3.0 source, and the public binaries live on the release page as a rolling, unverified pre-release. If a claim on this site is wrong, the honesty tests in the repository fail the build — and you can check them.",
     source: "scripts/test_website_claims.py",
   },
 
-  // /download — the rolling test release, by URL only.
-  downloads: {
-    title: "Download DHUN",
-    intro:
-      "Everything here comes from the rolling “test” pre-release, which GitHub replaces on every push to main. The links are stable; the bytes are not. Verify the checksum sidecar before you install.",
-    assets: [
-      {
-        name: "dhun-test.apk",
-        url: `${TEST_RELEASE}/dhun-test.apk`,
-        sha256Url: `${TEST_RELEASE}/dhun-test.apk.sha256`,
-        label: "Universal APK — install this one",
-        detail:
-          "Contains every ABI DHUN ships. Works on any supported Android device; use this unless you have a specific reason to pick a split.",
-        kind: "android",
-        recommended: true,
-      },
-      {
-        name: "dhun-test-arm64-v8a.apk",
-        url: `${TEST_RELEASE}/dhun-test-arm64-v8a.apk`,
-        sha256Url: `${TEST_RELEASE}/dhun-test-arm64-v8a.apk.sha256`,
-        label: "ARM64 split",
-        detail:
-          "ABI split of the same build for 64-bit ARM devices. DHUN bundles no native code, so this is smaller only by packaging — the three APKs are not byte-identical.",
-        kind: "android",
-      },
-      {
-        name: "dhun-test-armeabi-v7a.apk",
-        url: `${TEST_RELEASE}/dhun-test-armeabi-v7a.apk`,
-        sha256Url: `${TEST_RELEASE}/dhun-test-armeabi-v7a.apk.sha256`,
-        label: "ARMv7 split",
-        detail: "ABI split of the same build for older 32-bit ARM devices.",
-        kind: "android",
-      },
-      {
-        name: "dhun-test.msi",
-        url: `${TEST_RELEASE}/dhun-test.msi`,
-        sha256Url: `${TEST_RELEASE}/dhun-test.msi.sha256`,
-        label: "Windows installer",
-        detail:
-          "Per-user install (no administrator prompt) to %LOCALAPPDATA%\\DHUN. Playback needs a system VLC/libVLC install; DHUN neither installs nor removes VLC.",
-        kind: "desktop",
-      },
-    ],
-    steps: [
-      {
-        title: "Check the sidecar first",
-        body:
-          "Each file has a `.sha256` sidecar next to it. Download both, then run `sha256sum -c dhun-test.apk.sha256` (Linux/macOS) or `Get-FileHash dhun-test.apk -Algorithm SHA256` (Windows PowerShell) and compare. The digests change on every merge — this page deliberately does not print them.",
-      },
-      {
-        title: "Install the APK",
-        body:
-          "Sideload it (your file manager, or `adb install dhun-test.apk`). Android will warn about installing an unknown app and about the test signing key; that is expected for a build signed with a public throwaway certificate. Use it on a device you are willing to experiment with, and note that it will not update over a differently-signed build.",
-      },
-      {
-        title: "Install VLC for the desktop build",
-        body:
-          "The Windows client plays through libVLC, which it does not bundle. Install VLC first, then run the MSI. SmartScreen will warn that the installer is not Authenticode-signed — that is true of this test build, not a false positive.",
-      },
-    ],
-    notAvailable: [
-      "No stable versioned release — the only public artifacts are the rolling “test” pre-release.",
-      "No Play Store, F-Droid, IzzyOnDroid, Microsoft Store or package-manager channel.",
-      "No iOS or iPadOS build (and none planned here).",
-      "No web player and no browser client.",
-      "No macOS disk image or App Store build.",
-    ],
-    verify: {
-      title: "Verify the download, per platform",
-      lede:
-        "Each file has a .sha256 sidecar in the same format as sha256sum: a digest, two spaces, the filename. Download both into one folder and run the command for your platform. A mismatch means the file is not what the release published, and you should delete it.",
-      platforms: [
-        { name: "Linux", command: "sha256sum -c dhun-test.apk.sha256" },
-        { name: "macOS", command: "shasum -a 256 -c dhun-test.apk.sha256" },
-        { name: "Windows (PowerShell)", command: "Get-FileHash .\\dhun-test.apk -Algorithm SHA256" },
-      ],
-      note:
-        "PowerShell prints the digest instead of comparing it: compare it with the first field of the .sha256 file. The same three commands work for the .msi and for both ABI splits — only the filename changes.",
-      source: "scripts/stage_artifact.py (sidecar format), README.md",
-    },
-
-    lifecycle: {
-      title: "Upgrade and uninstall",
-      lede:
-        "Two platforms, two different answers to “how do I update this?” and “what does uninstalling take with it?”. Both answers below are the ones in the repository's own install notes.",
-      android: {
-        heading: "Android",
-        upgrade:
-          "The APKs are signed with the same committed test key, so a newer test APK installs straight over the previous one — no uninstall step, and the library and downloads survive the upgrade.",
-        uninstall:
-          "Uninstalling from the launcher or Settings → Apps → DHUN deletes the app-private tree with it: database, cached audio segments and image cache. Nothing was written to shared storage, and Android will not offer to keep the data.",
-      },
-      desktop: {
-        heading: "Windows",
-        upgrade:
-          "The MSI is a per-user install (no Administrator prompt) under %LOCALAPPDATA%\\DHUN with a stable upgrade identity, so a newer build installs over the previous one. Clean-target cleanup and in-place upgrade data preservation are exercised on a disposable runner and still await verification on real hardware.",
-        uninstall:
-          "Uninstall from Settings → Apps → DHUN. Packaged runtime data is meant to live under the install directory (SQLite database plus audio cache) so it goes with the program instead of being left behind in %APPDATA%.",
-        aside:
-          "VLC is a separate installation: DHUN neither installs nor removes it.",
-      },
-      source: "README.md install/uninstall notes; app-desktop/build.gradle.kts (perUserInstall, upgradeUuid); scripts/check_msi_upgrade.ps1",
-    },
-
-    testKey: {
-      title: "What the test signing key means",
+  // The /ui/ page. Everything here is read out of the app's own design system
+  // and UI code, and every drawing is labelled as a recreation: no screenshot
+  // exists in this repository and none is fabricated (.ai/WEBSITE_PLAN.md §8).
+  ui: {
+    h1: "The interface, drawn from the code.",
+    lead:
+      "DHUN's screens are built from one Compose design system — the same colour tokens, shapes, spacing scale and type ramp on Android and Windows. This page shows what those surfaces look like, states the token values behind them, and is explicit about one thing: every drawing here is hand-written CSS and SVG, not a screenshot.",
+    source:
+      "shared/src/commonMain/kotlin/dev/dhun/design/ (DhunAppearance, DhunShapes, DhunSpacing, DhunTypography) and .../ui/ (home, search, browse, library, player, settings)",
+    whyNoShots: {
+      title: "Why there are no screenshots",
       body:
-        "The APKs are signed with a keystore committed to the repository (app-android/keystores/dhun-test.p12) — a test key, not a secret. Two consequences, both real: a new test APK installs over an old one without an uninstall, and the signature proves nothing about who built the file. Anyone with the repository can mint a same-key APK, so install only from the links on this page or from the GitHub release page.",
-      source: "README.md test-builds policy; app-android/build.gradle.kts signingConfigs.testBuild",
+        "This repository contains no raster or vector artwork and no device or display is available to it, so there is nothing honest to paste in. Rather than borrow another project's screenshot or invent one, each surface below is recreated in CSS from the app's own tokens — geometry, spacing and colour — and labelled as a recreation wherever it appears. Six real captures are planned to replace them, listed with what each must show in the project's website plan.",
+      source: ".ai/WEBSITE_PLAN.md Part A §8 and §9",
     },
-
-    noStable: {
-      title: "What “no stable release” costs you",
-      items: [
-        "No version number to pin: a bug report has to name a commit, not a version.",
-        "No previous build to roll back to — the release page carries the current bytes only.",
-        "No in-app updater and no store channel, so every upgrade is a manual download and verify.",
-        "The published bytes are replaced on every merge to main, so a link saved last week may hand you a different build today. The .sha256 sidecar is what tells you which build you actually have.",
+    surfaces: [
+      {
+        id: "home",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/home/HomeScreen.kt",
+        kicker: "ANDROID",
+        title: "Home",
+        body:
+          "The first screen is a rail layout: a now-playing backdrop behind a dense list of tiles and rows, seeded by listening history, with the mini-player docked above the bottom navigation rather than floating over the content.",
+        points: [
+          "Quick picks and a “from your library” rail, seeded by history",
+          "Docked mini-player above the tab bar — navigation stays reachable",
+          "Bottom navigation: Home, Search, Library, Settings",
+        ],
+        note: "Drawn on the home page.",
+        href: "/",
+      },
+      {
+        id: "search",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/search/",
+        kicker: "ANDROID",
+        title: "Search",
+        body:
+          "Typing filters into songs, videos, albums, playlists and artists, and Enter does one documented thing rather than guessing: the row you have highlighted is submitted, and pressing Enter twice does not jump you somewhere unexpected.",
+        points: [
+          "Chips switch the result type without losing the query",
+          "Rows carry artwork, title and artist or duration",
+          "The Enter policy is asserted by the app's own UI tests",
+        ],
+        mockFile: "mockups/search-phone.njk",
+      },
+      {
+        id: "player",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt",
+        kicker: "ANDROID",
+        title: "Full player",
+        body:
+          "Artwork is sampled at runtime and blurred into the backdrop, so the player picks up the colour of whatever is playing instead of a fixed gradient. Tabs switch between the queue and synced lyrics; the transport row carries shuffle, repeat and the play disc.",
+        points: [
+          "Blurred, colour-sampled artwork backdrop",
+          "Synced lyrics with the current line emphasised",
+          "Queue as a tab, not a separate route",
+        ],
+        note: "Drawn on the features page.",
+        href: "/features/",
+      },
+      {
+        id: "settings",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt",
+        kicker: "ANDROID",
+        title: "Settings, including the equaliser",
+        body:
+          "Settings is grouped into appearance, playback and storage, and sound. The equaliser is ten bands matching libVLC's geometry, with presets, a preamp and per-band gain from −20 dB to +20 dB; Android binds it to the current audio session, so it is the same control surface on both platforms.",
+        points: [
+          "10 bands: 60 Hz, 170 Hz, 310 Hz, 600 Hz, 1 kHz, 3 kHz, 6 kHz, 12 kHz, 14 kHz, 16 kHz",
+          "Presets plus a preamp, and gain clamped to ±20 dB",
+          "Resume-on-launch and a capped download cache",
+        ],
+        mockFile: "mockups/settings-phone.njk",
+      },
+      {
+        id: "desktop",
+        path: "app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/native/DhunTray.kt",
+        kicker: "WINDOWS",
+        title: "Desktop window",
+        body:
+          "The Windows build is the same Kotlin code in a different shell: a navigation rail on the left, the queue as a panel on the right, and the player docked along the bottom of the window. Closing the window leaves it in the system tray, where playback keeps its own controls.",
+        points: [
+          "Navigation rail and a permanent queue panel",
+          "Docked player, media keys through the OS, jump lists of recent tracks",
+          "One instance only — a second launch hands its request to the first",
+        ],
+        mockFile: "mockups/desktop-window.njk",
+      },
+    ],
+    tokens: {
+      title: "The design system behind every screen",
+      lead:
+        "These are the values the app compiles with, not a palette invented for a website. The dark set is the default; the light scheme mirrors it, and the site uses the same two schemes so a drawing here looks the way the app looks.",
+      source: "shared/.../design/DhunAppearance.kt, DhunShapes.kt, DhunSpacing.kt, DhunTypography.kt",
+      colors: [
+        { name: "background", value: "#161616", use: "app canvas" },
+        { name: "surface", value: "#1E1E1E", use: "cards, sheets" },
+        { name: "surfaceVariant", value: "#262626", use: "raised rows" },
+        { name: "surfaceElevated", value: "#303030", use: "dialogs" },
+        { name: "surfaceHighest", value: "#363636", use: "controls on top" },
+        { name: "accent", value: "#BB86FC", use: "brand ramp, dark" },
+        { name: "accentContainer", value: "#3A2A5A", use: "selected states" },
+        { name: "warning", value: "#FFB74D", use: "gates, warnings" },
       ],
-      source: "README.md test-builds policy; test-release.yml",
+      shapes: [
+        { name: "xs", value: "4 px" },
+        { name: "sm", value: "8 px" },
+        { name: "md", value: "12 px" },
+        { name: "lg", value: "16 px" },
+        { name: "xl", value: "28 px" },
+        { name: "xxl", value: "32 px" },
+        { name: "full", value: "999 px" },
+      ],
+      spacing: [
+        { name: "sp-1", value: 4 },
+        { name: "sp-2", value: 8 },
+        { name: "sp-3", value: 12 },
+        { name: "sp-4", value: 16 },
+        { name: "sp-5", value: 20 },
+        { name: "sp-6", value: 24 },
+        { name: "sp-8", value: 32 },
+        { name: "sp-12", value: 48 },
+      ],
+      type: [
+        { name: "display", value: "57 / 45 / 36" },
+        { name: "headline", value: "32 / 28 / 24" },
+        { name: "title", value: "22 / 16 / 14" },
+        { name: "body", value: "16 / 14 / 12" },
+        { name: "brand", value: "12 sp, 3 sp tracking" },
+      ],
+      target: "Touch targets: 44 dp minimum, 48 dp in lists",
     },
-
-    buildIt: {
-      title: "Or build it from source",
+    contract: {
+      title: "What the drawings are, and what they are not",
       body:
-        "The APK and MSI above are debug-keystore-signed test artifacts. A release build needs JDK 17 and an Android SDK, and produces the same code from the same commit.",
-      commands: [
-        "./gradlew :app-android:assembleDebug   # Android debug APK",
-        "./gradlew :app-desktop:run             # desktop (needs libVLC)",
+        "Every figure on this site is a recreation: hand-written HTML, CSS and inline SVG, with the app's token values and the app's layout rules. None is a photograph of a running app, and none shows a feature DHUN does not have — a mockup of an unshipped screen would be a lie with better production values. Track and artist text is placeholder wording, artwork is a token-coloured gradient, and device chrome such as the clock is illustrative.",
+      rows: [
+        { id: "mock-home-phone", surface: "Android Home, portrait", page: "/" },
+        { id: "mock-player-phone", surface: "Android FullPlayer", page: "/" },
+        { id: "mock-downloads-phone", surface: "Android Library → Downloads", page: "/features/" },
+        { id: "mock-desktop-window", surface: "Windows desktop window", page: "/features/" },
+        { id: "mock-search-phone", surface: "Android Search", page: "/ui/" },
+        { id: "mock-settings-phone", surface: "Android Settings → Equalizer", page: "/ui/" },
       ],
-      source: "README.md build section",
+      planned: [
+        { id: "mock-widget", surface: "Android home screen with the Quick Play widget" },
+        { id: "mock-lyrics", surface: "Android FullPlayer → Lyrics, mid-song" },
+      ],
+      plannedNote:
+        "Two captures are still to be taken. Until they exist, nothing on the site pretends to show them — the widget and the lyrics tab are described in words only.",
+      source: ".ai/WEBSITE_PLAN.md Part A §9 (backlog, machine-checked both ways)",
     },
-    technicalNote:
-      "Hosting reality: GitHub Pages sets its own caching and compression headers. This site cannot tune either, so it optimises what it controls — three static routes, one stylesheet, no client-side JavaScript and no third-party request.",
   },
 
-  // /features — how the chain works, and what breaks when it does.
   chain: {
     title: "How the extraction chain works — and how it breaks",
     lede:
@@ -398,40 +419,60 @@ export default {
   },
 
   // /features — what exists, and what does not.
+  // The app's real surfaces, grouped the way the app groups them. Every line
+  // was read out of the tree this session; a claim the code cannot support does
+  // not belong here, and neither does a shipped feature in `notInDhun` below.
+  // The app's real surfaces, grouped the way the app groups them. Every line
+  // was read out of the tree this session; `source` is shown to the reader and
+  // `path` is the full file the claim came from, which the build writes into
+  // the page as a citation comment (asserted by website_quality.py, per
+  // section — that is why a section may never lose it).
   featureGroups: [
     {
       title: "Getting to the music",
       items: [
-        { text: "Home with history-seeded recommendations", source: "Phase 07 / PR #68" },
-        { text: "Search, with a documented Enter policy", source: "PR #129" },
-        { text: "Artist, album and playlist pages", source: "Phase 09" },
-        { text: "Library: playlists, favourites, history and downloads", source: "Phase 10" },
+        { text: "Home, seeded by listening history, with an endless radio", source: "Phase 07 / PR #68", path: "shared/src/commonMain/kotlin/dev/dhun/ui/home/HomeScreen.kt" },
+        { text: "Search across songs, videos, albums, playlists and artists, with a documented Enter policy", source: "PR #129", path: "shared/src/commonMain/kotlin/dev/dhun/ui/search/" },
+        { text: "Artist, album and playlist pages, each with its own actions", source: "Phase 09", path: "shared/src/commonMain/kotlin/dev/dhun/ui/browse/" },
+        { text: "Library in four tabs: playlists, favourites, history and downloads", source: "Phase 10", path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt" },
+        { text: "Reorderable playlists — drag a track to move it", source: "ui/components/ReorderableList.kt", path: "shared/src/commonMain/kotlin/dev/dhun/ui/components/ReorderableList.kt" },
       ],
     },
     {
       title: "Playing it",
       items: [
-        { text: "Queue engine with shuffle and repeat", source: "Phase 06/08" },
-        { text: "Next-track pre-buffering and an isolated temp cache", source: "ADR-005" },
-        { text: "Immersive full player with a real blurred-artwork backdrop", source: "ADR-002, PR #68" },
-        { text: "Synced lyrics from LRCLIB, then YouTube Music lyrics, then cache", source: "Phase 11" },
+        { text: "Queue engine with shuffle, repeat and a reorderable queue panel", source: "Phase 06/08", path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/PlayerTabs.kt" },
+        { text: "Next-track pre-buffering and an isolated temp cache", source: "ADR-005", path: "docs/decisions/ADR-005.md" },
+        { text: "Full player with a real blurred-artwork backdrop, tabs and a play disc", source: "ui/player/FullPlayer.kt", path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt" },
+        { text: "Synced lyrics: LRCLIB, then YouTube Music lyrics, then the local cache", source: "Phase 11", path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/SyncedLyrics.kt" },
+        { text: "Sleep timer that cycles through durations and can be turned off", source: "presentation/player/PlayerViewModel.kt", path: "shared/src/commonMain/kotlin/dev/dhun/presentation/player/PlayerViewModel.kt" },
+      ],
+    },
+    {
+      title: "Sound",
+      items: [
+        { text: "10-band equaliser: presets, a preamp and per-band gain, −20 dB to +20 dB", source: "player/equalizer/EqualizerBands.kt", path: "shared/src/commonMain/kotlin/dev/dhun/player/equalizer/EqualizerBands.kt (COUNT = 10)" },
+        { text: "Desktop equalisation uses libVLC's own 10-band geometry", source: "player/equalizer/VlcEqualizerCommand.kt", path: "shared/src/commonMain/kotlin/dev/dhun/player/equalizer/VlcEqualizerCommand.kt" },
+        { text: "Android equalisation binds android.media.audiofx to the live audio session", source: "app-android/.../equalizer/AndroidEqualizerEngine.kt", path: "app-android/src/main/kotlin/dev/dhun/android/equalizer/AndroidEqualizerEngine.kt" },
+        { text: "Settings for appearance, resume-on-launch and a capped download cache", source: "ui/settings/SettingsScreen.kt", path: "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt" },
       ],
     },
     {
       title: "Keeping it",
       items: [
-        { text: "Persistent offline downloads with resume", source: "ADR-006" },
-        { text: "Android home-screen widget for quick play", source: "Phase 15 widgets" },
-        { text: "Theme modes with six accent ramps", source: "DhunAppearance (candidate 28)" },
+        { text: "Persistent offline downloads that resume after the app closes", source: "ADR-006", path: "docs/decisions/ADR-006.md" },
+        { text: "Library → Downloads keeps its own filter tab and offline badges", source: "Phase 10", path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt" },
+        { text: "Quick Play home-screen widget, sized to a 4×2 launcher slot", source: "app-android AndroidManifest.xml", path: "app-android/src/main/AndroidManifest.xml (DhunQuickPlayWidgetProvider)" },
+        { text: "Theme modes with accent ramps read from the shared design system", source: "DhunAppearance", path: "shared/src/commonMain/kotlin/dev/dhun/design/DhunAppearance.kt" },
       ],
     },
     {
       title: "On the desktop",
       items: [
-        { text: "System tray with playback control and close-to-tray", source: "Phase 12" },
-        { text: "Media keys through the OS transport controls", source: "Phase 12 SMTC" },
-        { text: "Taskbar jump lists, single-instance behaviour", source: "Phase 12" },
-        { text: "10-band equaliser", source: "Phase 15 EQ" },
+        { text: "System tray with playback control and close-to-tray", source: "app-desktop native/DhunTray.kt", path: "app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/native/DhunTray.kt" },
+        { text: "Media keys through the OS transport controls", source: "app-desktop smct/Smct.kt", path: "app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/smct/Smct.kt" },
+        { text: "Taskbar jump lists of recent tracks, and a single running instance", source: "app-desktop native/JumpList.kt", path: "app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/native/JumpList.kt" },
+        { text: "Playback needs a system VLC install; it is never bundled", source: "README.md install notes", path: "README.md" },
       ],
     },
   ],
@@ -442,13 +483,13 @@ export default {
     { text: "No iOS, no web player, no browser client, no PWA.", source: "MASTER_PROMPT §1 and §7 (Web/PWA explicitly out of S1–S6)" },
     { text: "No published audio-quality figure. DHUN makes no bitrate, lossless or FLAC claim of any kind.", source: "no verified number exists in the repository" },
     { text: "No casting, no Android Auto, no CarPlay.", source: "not implemented anywhere in the tree" },
-    { text: "No Android equaliser yet — it is an open item, not a shipped feature.", source: ".ai/ROADMAP.md S4" },
     { text: "No recommendation engine of its own: related tracks and the radio come from the same anonymous endpoints as everything else.", source: "ADR-001, Phase 15 endless-radio" },
+    { text: "No store channel and no signed release: the only public artifact is the rolling test pre-release.", source: "app-android/.../keystores/dhun-test.p12, releases/tag/test" },
   ],
 
   install: {
     permissions:
-      "Android permissions: internet, notifications, foreground media playback (the <code>FOREGROUND_SERVICE_DATA_SYNC</code> type, used only while a download is running), wake lock, and a one-shot battery-optimisation exemption dialog. No contacts, SMS, location, camera, microphone, shared storage, overlay or accessibility access.",
+      "Android permissions: internet, notifications, foreground media playback (the FOREGROUND_SERVICE_DATA_SYNC service type, used only while a download is running), wake lock, and a one-shot battery-optimisation exemption dialog. No contacts, SMS, location, camera, microphone, shared storage, overlay or accessibility access.",
     source: "app-android/src/main/AndroidManifest.xml",
     privacy:
       "No analytics, no telemetry, no crash reporting, no advertising SDK. This website loads nothing from a third-party origin — no CDN, no font service, no analytics script.",

@@ -43,7 +43,7 @@ import website_claims as claims  # noqa: E402
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_BASE = "https://99ggprooo00-code.github.io/DHUN"
 CANONICAL = "https://99ggprooo00-code.github.io/DHUN"
-ROUTES = ("/", "/features/", "/download/")
+ROUTES = ("/", "/features/", "/ui/")
 TIMEOUT = 30
 USER_AGENT = "DHUN-site-smoke/1.0 (+https://github.com/99ggprooo00-code/DHUN)"
 

@@ -179,7 +179,11 @@ pre {
   border-radius: var(--r-md); padding: var(--sp-4); overflow-x: auto;
   font-family: var(--mono); font-size: 0.85rem; color: var(--text);
 }
-code { font-family: var(--mono); font-size: 0.9em; }
+/* Browser-measured: a 41-character constant inside a <code> made its paragraph
+   409px wide in a 269px box at 320px viewport. `anywhere` gives long paths and
+   constant names a break opportunity — and, unlike `break-word`, it also
+   affects min-content sizing, which is what the overflow came from. */
+code { font-family: var(--mono); font-size: 0.9em; overflow-wrap: anywhere; }
 p code, li code {
   background: var(--surface-variant); border-radius: var(--r-xs);
   padding: 0.1em 0.35em;

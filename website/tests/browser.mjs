@@ -39,7 +39,7 @@ import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 const BASE = process.env.SITE_BASE || "http://127.0.0.1:8080";
-const ROUTES = ["/", "/features/", "/download/"];
+const ROUTES = ["/", "/features/", "/ui/"];
 const VIEWPORTS = [
   { name: "320x568", width: 320, height: 568 },
   { name: "360x800", width: 360, height: 800 },
@@ -94,30 +94,36 @@ function group(entries) {
 
 const clip = (text, limit = 4000) => (text.length > limit ? `${text.slice(0, limit)} …(truncated)` : text);
 
+// GitHub's annotation API is the only channel this environment can substitute a
+// browser for, and it returns annotations per level with a practical cap around
+// ten. So: one annotation per category, at most eight, and a ninth that carries
+// *everything* suppressed rather than a count of it. Five notices were silently
+// lost to an earlier six-notice cap — including every axe scan — so a dropped
+// measurement is a bug in this file, not a display detail.
+const ANNOTATION_CAP = 8;
+
 function emitReport(grouped, level, label) {
-  let emitted = 0;
-  for (const [key, entries] of grouped) {
-    if (emitted >= 8) {
-      annotate(level, `${label}: ${grouped.size - emitted} more categor(y|ies)`, clip(entries.join(" || ")));
-      break;
-    }
-    annotate(level, `${key} — ${entries.length} ${label}(s)`, clip(entries.join(" || ")));
-    emitted += 1;
+  const entries = [...grouped.entries()];
+  for (const [key, items] of entries.slice(0, ANNOTATION_CAP)) {
+    annotate(level, `${key} — ${items.length} ${label}(s)`, clip(items.join(" || ")));
+  }
+  const rest = entries.slice(ANNOTATION_CAP);
+  if (rest.length) {
+    const suppressed = rest.flatMap(([, items]) => items);
+    annotate(
+      level,
+      `${rest.length} more categor(y|ies) — ${suppressed.length} ${label}(s)`,
+      clip(suppressed.join(" || ")),
+    );
   }
 }
 
 function emitAnnotations() {
   if (failures.length) emitReport(group(failures), "error", "problem");
   if (warnings.length) emitReport(group(warnings), "warning", "note");
-  if (measurements.length) {
-    const byCategory = group(measurements);
-    let emitted = 0;
-    for (const [key, entries] of byCategory) {
-      if (emitted >= 6) break;
-      annotate("notice", `measured: ${key}`, clip(entries.join(" || "), 3500));
-      emitted += 1;
-    }
-  }
+  // Measurements are the deliverable, not a courtesy: they go through the same
+  // cap-and-carry path as findings so that none can be dropped on the floor.
+  if (measurements.length) emitReport(group(measurements), "notice", "measurement");
 }
 
 const url = (route) => `${BASE}${route}`;
@@ -473,6 +479,21 @@ async function checkKeyboard(browser) {
   await page.goto(url("/"), { waitUntil: "load" });
 
   await page.keyboard.press("Tab");
+  // The skip link animates in over 120 ms. Measuring inside the first frame
+  // reports its hidden position and calls that a failure; wait for it to settle,
+  // then measure. If it never settles, the check below fails — which is exactly
+  // what it exists to catch.
+  await page
+    .waitForFunction(
+      () => {
+        const link = document.querySelector(".skip-link");
+        if (!link) return true;
+        const rect = link.getBoundingClientRect();
+        return rect.top >= -1 && rect.bottom <= window.innerHeight + 1;
+      },
+      { timeout: 1500 },
+    )
+    .catch(() => {});
   const skip = await page.evaluate(focusSnapshot);
   if (!skip || !skip.className.includes("skip-link")) {
     fail("skip link is not first", `first Tab landed on ${JSON.stringify(skip)}`);

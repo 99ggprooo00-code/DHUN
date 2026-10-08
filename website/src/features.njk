@@ -26,12 +26,13 @@ cssModules: ["tokens", "base", "components", "mockups"]
   <section aria-labelledby="group-{{ loop.index }}">
     <div class="section-head">
       <h2 id="group-{{ loop.index }}">{{ group.title }}</h2>
+      <!-- Every item below cites its own file; the group cites the surface it belongs to: shared/src/commonMain/kotlin/dev/dhun/ui/ -->
     </div>
     <ul class="card-grid" style="list-style: none; padding: 0;">
       {%- for item in group.items %}
       <li class="card">
         <p style="margin: 0 0 0.5rem;">{{ item.text }}</p>
-        <!--{{ item.source }}-->
+        <!--{{ item.path or item.source }}-->
         <p class="traceable" style="margin: 0;">{{ item.source }}</p>
       </li>
       {%- endfor %}
@@ -153,8 +154,18 @@ cssModules: ["tokens", "base", "components", "mockups"]
         <h3>What does it cost, and how is it funded?</h3>
         <p>Nothing, and it is not. DHUN is GPL-3.0 free software with no paid
         tier, no ads in the app, no analytics and no sponsor placement. The
-        download is hosted on GitHub's free release storage.</p>
+        public build is hosted on GitHub's free release storage.</p>
         <!--LICENSE; THIRD_PARTY.md -->
+      </div>
+      <div class="card">
+        <h3>What does the Android build ask for?</h3>
+        <p>{{ site.install.permissions }}</p>
+        <!--{{ site.install.source }}-->
+      </div>
+      <div class="card">
+        <h3>What does it send anywhere?</h3>
+        <p>{{ site.install.privacy }}</p>
+        <!--{{ site.install.sourceTwo }}-->
       </div>
       <div class="card">
         <h3>Which platforms actually work?</h3>
@@ -169,8 +180,12 @@ cssModules: ["tokens", "base", "components", "mockups"]
 
   <section class="closing" aria-labelledby="feat-close">
     <!-- README.md (test-builds policy) and test-release.yml: the download is the rolling pre-release, not a versioned release. -->
-    <h2 id="feat-close">Ready when you are.</h2>
-    <p>One APK, one MSI, and the whole source under GPL-3.0.</p>
+    <h2 id="feat-close">Read the code, or run the rolling build.</h2>
+    <p>The whole thing is GPL-3.0 source. Public binaries live on the release
+    page, which carries the warning that belongs with them: they are rolling,
+    unverified development builds replaced on every merge.</p>
+    <p><a href="{{ site.testReleasePage }}" rel="noopener">The rolling test pre-release</a>
+    · <a href="{{ site.plan }}" rel="noopener">How this site is built and checked</a></p>
     <div class="cta-row">
       <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
       <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>

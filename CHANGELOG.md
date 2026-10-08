@@ -24,6 +24,30 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — the marketing site is now a product site, not a download page (2026-10-08, session `arena/9b791057-dhun`)
+
+- **`/download/` is gone and `/ui/` takes its place.** By direction, the website
+  is not a distribution channel: the page that listed the rolling APKs, their
+  sidecars and per-OS verification commands was deleted rather than shortened,
+  and the third route is now the interface — five surface walkthroughs, the
+  app's real design tokens, and a figure inventory that says which drawings are
+  recreations. The rolling pre-release is still reachable, as one link to its
+  release page.
+- **The feature catalogue now matches the tree.** Each feature group and item
+  cites the file it came from, and one stale entry was corrected: the site used
+  to list "no Android equaliser yet", while the app ships a 10-band equaliser
+  with presets and a preamp on both platforms.
+- **New rules, mutation-proven:** no page may link a release artifact
+  (`/releases/download/…`, `.apk`, `.msi`, `.sha256`), and no page may carry
+  installation or verification instructions — those belong with the artifact.
+  The direct-link test in `test_website_claims.py` was inverted to match, not
+  deleted.
+- **Two new mockups** (`mock-search-phone`, `mock-settings-phone`), both listed
+  in `.ai/WEBSITE_PLAN.md` §9 so the drift check stays two-way.
+- **`eleventy.config.js`**: an unknown `cssModules` name is now a build failure
+  instead of a silently dropped stylesheet.
+
+
 ### Added — a static marketing site at the project's GitHub Pages URL (2026-10-08, session `arena/fc918d37-dhun`)
 
 - **`website/`** — three static routes (`/`, `/features/`, `/download/`), a real

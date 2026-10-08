@@ -40,7 +40,7 @@ def served(**overrides: tuple[int, str]) -> dict[str, tuple[int, str]]:
     pages = {
         "/": (200, front_page()),
         "/features/": (200, page("/features/", "<h1>DHUN</h1>")),
-        "/download/": (200, page("/download/", "<h1>DHUN</h1>")),
+        "/ui/": (200, page("/ui/", "<h1>DHUN</h1>")),
     }
     pages.update(overrides)
     return pages
@@ -51,7 +51,7 @@ class ResponseRules(unittest.TestCase):
         self.assertEqual(smoke.smoke_problems(served()), [])
 
     def test_non_200_fails(self):
-        problems = smoke.smoke_problems(served(**{"/download/": (500, "")}))
+        problems = smoke.smoke_problems(served(**{"/ui/": (500, "")}))
         self.assertTrue(any("HTTP 500" in p for p in problems), problems)
 
     def test_empty_body_fails(self):
@@ -93,8 +93,8 @@ class RequiredCaveats(unittest.TestCase):
 
 class ServedLinks(unittest.TestCase):
     def test_root_relative_links_are_collected(self):
-        markup = page("/").replace("<h1>DHUN</h1>", '<h1>DHUN</h1><a href="/download/">d</a><a href="/features/">f</a>')
-        self.assertEqual(smoke.internal_links(markup), ["/download/", "/features/"])
+        markup = page("/").replace("<h1>DHUN</h1>", '<h1>DHUN</h1><a href="/ui/">u</a><a href="/features/">f</a>')
+        self.assertEqual(smoke.internal_links(markup), ["/features/", "/ui/"])
 
     def test_broken_internal_link_on_a_served_page_fails(self):
         markup = page("/").replace("<h1>DHUN</h1>", '<h1>DHUN</h1><a href="/gone/">x</a>')
@@ -106,7 +106,7 @@ class ServedLinks(unittest.TestCase):
         self.assertTrue(any("/gone/" in p and "404" in p for p in problems), problems)
 
     def test_resolving_internal_links_pass(self):
-        markup = page("/").replace("<h1>DHUN</h1>", '<h1>DHUN</h1><a href="/download/">d</a>')
+        markup = page("/").replace("<h1>DHUN</h1>", '<h1>DHUN</h1><a href="/ui/">u</a>')
         problems = smoke.link_problems(
             "https://example.test", served(**{"/": (200, markup)}), lambda url: (200, "")
         )
@@ -123,7 +123,7 @@ class CommittedBuild(unittest.TestCase):
     """
 
     def test_committed_pages_pass_the_served_site_rules(self):
-        files = {"/": "index.html", "/features/": "features/index.html", "/download/": "download/index.html"}
+        files = {"/": "index.html", "/features/": "features/index.html", "/ui/": "ui/index.html"}
         fetched = {
             route: (200, (DIST / name).read_text(encoding="utf-8"))
             for route, name in files.items()

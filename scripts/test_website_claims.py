@@ -60,7 +60,7 @@ class ForbiddenClaims(unittest.TestCase):
                 )
 
     def test_flags_a_store_channel_claim(self):
-        pages = {"/download/": page("<p>Get it on F-Droid.</p>")}
+        pages = {"/features/": page("<p>Get it on F-Droid.</p>")}
         self.assertTrue(claims.forbidden_claim_violations(pages))
 
     def test_allows_a_negated_mention(self):
@@ -126,22 +126,22 @@ class RequiredCaveats(unittest.TestCase):
 class NoBakedDigests(unittest.TestCase):
     def test_flags_a_sha256(self):
         digest = "a" * 64
-        violations = claims.digest_violations({"/download/": f"<p>SHA-256: {digest}</p>"})
+        violations = claims.digest_violations({"/features/": f"<p>SHA-256: {digest}</p>"})
         self.assertTrue(violations)
 
     def test_flags_a_byte_size(self):
         violations = claims.digest_violations(
-            {"/download/": "<p>dhun-test.apk — 18,405,859 bytes</p>"}
+            {"/features/": "<p>dhun-test.apk — 18,405,859 bytes</p>"}
         )
         self.assertTrue(violations)
 
     def test_flags_a_megabyte_size(self):
-        violations = claims.digest_violations({"/download/": "<p>The APK is 18.4 MB.</p>"})
+        violations = claims.digest_violations({"/features/": "<p>The APK is 18.4 MB.</p>"})
         self.assertTrue(violations)
 
     def test_allows_the_sidecar_url(self):
         documents = {
-            "/download/": (
+            "/features/": (
                 "<a href=\"https://github.com/99ggprooo00-code/DHUN/releases/download/test/"
                 "dhun-test.apk.sha256\">Get the .sha256 sidecar</a>"
             )
@@ -178,30 +178,28 @@ class BuiltOutput(unittest.TestCase):
         documents = {**self.pages, **claims.load_site_sources()}
         self.assertEqual(claims.digest_violations(documents), [])
 
-    def test_download_links_are_url_only_and_well_formed(self):
-        """The rolling assets are linked by URL, and nothing else is linked in."""
-        download = self.pages["/download/"]
-        urls = set(
-            re.findall(
-                r'href="(https://github\.com/99ggprooo00-code/DHUN/releases/download/[^"]+)"',
-                download,
-            )
+    def test_no_release_asset_is_linked_and_the_release_page_is(self):
+        """Downloads are not this site's business: point, never hand out.
+
+        Until this session the download page linked all eight rolling assets
+        directly. That page is gone by decision, and the rule is inverted: a
+        direct link to an artifact is a defect (the files are unverified and
+        replaced on every merge), while the release *page* — where the warning
+        lives next to the files — must still be reachable from the site.
+        """
+        for route, markup in self.pages.items():
+            artifacts = re.findall(r'href="([^"]*/releases/download/[^"]*)"', markup)
+            self.assertEqual(artifacts, [], f"{route} links a release asset")
+            for extension in (".apk", ".msi", ".aab", ".sha256"):
+                self.assertNotRegex(
+                    markup,
+                    rf'href="[^"]*\{extension}"',
+                    f"{route} links a {extension} file",
+                )
+        self.assertTrue(
+            any("/releases/tag/test" in markup for markup in self.pages.values()),
+            "the release page is not reachable from any built page",
         )
-        self.assertTrue(urls, "the download page links no release asset")
-        names = {url.rsplit("/", 1)[-1] for url in urls}
-        for expected in (
-            "dhun-test.apk",
-            "dhun-test.apk.sha256",
-            "dhun-test-arm64-v8a.apk",
-            "dhun-test-arm64-v8a.apk.sha256",
-            "dhun-test-armeabi-v7a.apk",
-            "dhun-test-armeabi-v7a.apk.sha256",
-            "dhun-test.msi",
-            "dhun-test.msi.sha256",
-        ):
-            self.assertIn(expected, names)
-        for url in urls:
-            self.assertIn("/releases/download/test/", url)
 
     def test_front_page_states_the_honest_status_visibly(self):
         text = claims.html_to_text(self.pages["/"]).lower()

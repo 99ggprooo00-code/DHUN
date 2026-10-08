@@ -46,10 +46,34 @@ RATCHET_TOLERANCE = 0.05
 
 CANONICAL_ORIGIN = "https://99ggprooo00-code.github.io/DHUN"
 
+# Copy that must never reach a visitor, whatever produced it: a leaked Markdown
+# backtick, an HTML tag that was escaped instead of rendered, a link that goes
+# nowhere, or a placeholder word. The site has no stubs by policy, so this is a
+# rule rather than a review note (Part A §4).
+ESCAPED_TAG = re.compile(r"&lt;/?(?:code|strong|em|b|i|a|span|br|p|div|ul|ol|li|pre)\b", re.I)
+DEAD_LINK = re.compile(r'href\s*=\s*"(?:#|javascript:[^"]*)"', re.I)
+PLACEHOLDER_WORDS = re.compile(r"\b(coming soon|lorem ipsum|to be announced|TBD|FIXME)\b", re.I)
+# ...but “These are absent, not ‘coming soon’” is the opposite of a promise, so
+# the word is only a violation when no negation sits in the same clause. This is
+# website_claims.py's definition, imported, for exactly that reason.
+from website_claims import CLAUSE_BOUNDARY, NEGATION_CUES  # noqa: E402
+
+
+def _placeholder_clause(text: str, start: int) -> str:
+    clauses, offset = [], 0
+    for piece in CLAUSE_BOUNDARY.split(text):
+        clauses.append((offset, piece))
+        offset += len(piece) + 1
+    for offset, piece in clauses:
+        if offset <= start <= offset + len(piece):
+            return piece
+    return text
+
 # What counts as "this claim came from somewhere" inside an HTML comment.
 CITATION = re.compile(
     r"(ADR-\d+|PR #\d+|Phase \d+|MASTER_PROMPT|README\.md|LICENSE|THIRD_PARTY|"
-    r"\.ai/[A-Za-z_]+\.md|scripts/[a-z_]+\.py|AndroidManifest|app-android|minSdk|"
+    r"\.ai/[A-Za-z_]+\.md|scripts/[a-z_]+\.py|AndroidManifest|app-android|"
+    r"app-desktop|shared/src|minSdk|"
     r"DhunAppearance|test-release\.yml|sitemap\.njk|shared/src)",
     re.I,
 )
@@ -67,7 +91,10 @@ ALLOWED_EXTERNAL_ORIGINS = (
     "https://github.com/99ggprooo00-code/DHUN",
     "https://99ggprooo00-code.github.io/DHUN",
 )
-ROUTES = ("/", "/features/", "/download/")
+# The site's routes. /download/ was removed by decision (the site is not a
+# distribution channel — the release page is), and /ui/ took its place so the
+# project's interface is what a visitor actually sees.
+ROUTES = ("/", "/features/", "/ui/")
 # The screenshot backlog lives in `.ai/WEBSITE_PLAN.md` Part A §9 and is parsed
 # from there rather than duplicated here: one table, machine-read, so a mockup
 # can never lose its replacement plan (see `backlog_drift_violations`).
@@ -107,7 +134,7 @@ def page_paths(dist: pathlib.Path) -> dict[str, pathlib.Path]:
     mapping = {
         "/": dist / "index.html",
         "/features/": dist / "features" / "index.html",
-        "/download/": dist / "download" / "index.html",
+        "/ui/": dist / "ui" / "index.html",
         "/404.html": dist / "404.html",
     }
     return {route: path for route, path in mapping.items() if path.is_file()}
@@ -354,6 +381,80 @@ def backlog_drift_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def copy_hygiene_violations(dist: pathlib.Path) -> list[str]:
+    """Nothing may ship that a reader would see as a mistake.
+
+    A literal backtick is a Markdown habit that leaked into the copy; an
+    `&lt;code&gt;` is markup that was escaped instead of rendered (both shipped
+    on the download page once — the first looked like a typo, the second showed
+    a tag name to every visitor); `href="#"` is a link that goes nowhere; and a
+    placeholder word is a page that promises content instead of carrying it.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        text = text_of(markup)
+        for match in ESCAPED_TAG.finditer(markup):
+            violations.append(f"{route}: escaped markup is rendered as text: {match.group(0)}…")
+        for match in DEAD_LINK.finditer(markup):
+            violations.append(f"{route}: a link goes nowhere: {match.group(0)}")
+        for match in PLACEHOLDER_WORDS.finditer(text):
+            if NEGATION_CUES.search(_placeholder_clause(text, match.start())):
+                continue
+            violations.append(f"{route}: placeholder wording ‘{match.group(0)}’")
+        for index, line in enumerate(text.split("`")[1::2], 1):
+            snippet = line.strip()[:40]
+            violations.append(f"{route}: literal backtick #{index} in the copy: …{snippet}…")
+    return violations
+
+
+# --------------------------------------------------------------------------
+# The site is not a distribution channel.
+# --------------------------------------------------------------------------
+
+# The user's direction for this session: downloads are not the website's
+# business. Made checkable rather than remembered, in two parts.
+#
+# 1. No page may link a release *asset*. A direct link to dhun-test.apk implies
+#    "this build is for you, now"; the rolling test build is unverified and
+#    replaced on every merge, so the site points at the release page instead,
+#    where the warning and the files live together.
+BINARY_LINK = re.compile(
+    r'href\s*=\s*"[^"]*?(?:/releases/download/[^"]*|\.(?:apk|msi|aab|dmg|exe|deb|rpm|zip|tar\.gz|sha256))"',
+    re.I,
+)
+
+# 2. No page may carry installation or verification instructions — checksum
+#    commands, sideloading, signing-key archaeology. Those belong with the
+#    artifact and its own README, and they rot as that page changes.
+INSTALL_INSTRUCTION_TERMS = (
+    re.compile(r"\bsha256sum\b", re.I),
+    re.compile(r"\bshasum\b", re.I),
+    re.compile(r"\bGet-FileHash\b", re.I),
+    re.compile(r"\badb install\b", re.I),
+    re.compile(r"\bsideload\w*\b", re.I),
+    re.compile(r"\.sha256\b", re.I),
+    re.compile(r"\bchecksum\w*\b", re.I),
+)
+
+
+def distribution_boundary_violations(dist: pathlib.Path) -> list[str]:
+    """The site describes the software; it does not hand out or verify builds."""
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        text = text_of(markup)
+        for match in BINARY_LINK.finditer(markup):
+            violations.append(f"{route}: links a downloadable artifact: {match.group(0)[:80]}")
+        for pattern in INSTALL_INSTRUCTION_TERMS:
+            for match in pattern.finditer(text):
+                violations.append(
+                    f"{route}: carries installation/verification instructions "
+                    f"(‘{match.group(0)}’) — that belongs with the release, not here"
+                )
+    return violations
+
+
 def claim_traceability_violations(dist: pathlib.Path) -> list[str]:
     """Every claim block cites the source it came from, in the built HTML.
 
@@ -527,7 +628,7 @@ def crawlability_violations(dist: pathlib.Path) -> list[str]:
         for extra in sorted(listed - expected):
             violations.append(
                 f"sitemap.xml lists {extra}, which is not one of the three routes "
-                f"(/ , /features/, /download/)"
+                f"(/, /features/, /ui/)"
             )
         if "{{" in content or "{%" in content:
             violations.append("sitemap.xml still contains an unrendered template tag")
@@ -820,6 +921,8 @@ CHECKS = (
     ("claim traceability", claim_traceability_violations),
     ("backlog ↔ site drift", backlog_drift_violations),
     ("no stale facts", stale_fact_violations),
+    ("copy hygiene", copy_hygiene_violations),
+    ("distribution boundary", distribution_boundary_violations),
 )
 
 

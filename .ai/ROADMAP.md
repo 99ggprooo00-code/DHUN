@@ -1,6 +1,6 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/9b791057-dhun` — make the site measurably faster, then move its responsive/a11y claims from argued to browser-measured (2026-10-08)
+## Session `arena/9b791057-dhun` — make the site measurably faster, move its responsive/a11y claims from argued to browser-measured, then rebuild it as a product site (2026-10-08)
 
 Updated **2026-10-08** · fixed session branch `arena/9b791057-dhun` · branch point
 and GitHub `main` at boot **`505c3d59e66248f15bd29586f672d5b5b4b9bfac`** (PR #138
@@ -81,13 +81,36 @@ lightest route.
 | Real screenshots | 🔴 **missing — no image file exists in the repository** | the six captures in `.ai/WEBSITE_PLAN.md` Part A §9 |
 | axe | 🟡 **never ran locally or in CI** | this session wires `@axe-core/playwright`; if it runs, the real counts are reported as annotations |
 
+### Direction change, mid-session (2026-10-08) — the site is the product, not the distribution
+
+The user redirected the work: carry the app's features and UI onto the website
+("implemented similarly on website (as that of app)"), **remove the download
+material**, and borrow the *ideas* of comparable projects' sites with DHUN's own
+character. Executed in this session:
+
+| Change | Evidence |
+|---|---|
+| `/download/` deleted (page, `download.css`, built route); **`/ui/`** added — five surface walkthroughs, the app's design tokens, the recreation contract | `website/src/ui.njk`, `website/css/ui.css`, build `Wrote 5 files` |
+| Feature catalogue rebuilt with a citation per item, including the equaliser the site had wrongly denied | `website/src/_data/site.js` (`featureGroups`, `notInDhun`) |
+| Two new mockups (`mock-search-phone`, `mock-settings-phone`) and §9 rows 5–6 | `.ai/WEBSITE_PLAN.md` §9, `website/src/_includes/mockups/` |
+| New gate: no artifact links, no installation instructions | `distribution_boundary_violations` in `scripts/website_quality.py`, mutation-proven |
+| Gates after the change | quality `OK: 18 checks`, claims `OK: 4 pages`, `Ran 173 tests … OK`, `html-validate` clean, `verify-minify` OK |
+| Weights | `/` 51,280 · `/features/` 52,757 · `/ui/` 53,941 B (budget 60 KB/route); baseline regenerated deliberately |
+
+**Not verified:** `/ui/` has never been rendered — no browser in the sandbox.
+Its browser-job verdict, and the verdict on the earlier contrast/skip-link/
+overflow fixes, are CI facts to be read from the pushed head, not claimed here.
+
 ### Exact next actions
 
-1. Finish Tier A, push, let the site workflow run while Tier B is written.
-2. Wire Playwright + axe into `.github/workflows/website.yml`; expect the first
-   run to fail and iterate on the annotations (2–3 round-trips budgeted).
-3. Tier C depth, then Tier D rigour, then the finish sequence: full local gate →
-   docs → push → read one CI round → final PR comment → merge → stop.
+1. Commit the redirection (site, checks, tests, docs) after the R3 git-state
+   read, and push `arena/9b791057-dhun`.
+2. Read one CI round on the pushed head: the `browser` job first (it is the only
+   place `website/tests/browser.mjs` runs, and `/ui/` has never been rendered),
+   then `build`, then `lighthouse` (job `113400767722` was mid-run at last read).
+   Fix and push again if red; never merge red.
+3. Final PR comment for #139 with the numbers read from tool output, then merge
+   (`gh pr merge 139 --merge`) and stop — nothing after the merge (R1).
 
 ### Blockers and boundaries
 

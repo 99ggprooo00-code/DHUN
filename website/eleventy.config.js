@@ -14,8 +14,10 @@
  *     into one `<style>` block in `<head>`. That removes the render-blocking
  *     stylesheet request and the network dependency tree entirely, at the same
  *     byte cost as the linked sheet — and because the modules are declared
- *     explicitly, a route never ships a module it cannot use (`/download/`
- *     carries no mockup geometry). What it gives up is cross-page CSS caching,
+ *     explicitly, a route never ships a module it cannot use (the 404 carries
+ *     none of the mockup geometry, and `/ui/` alone carries the token
+ *     swatches). A module name the config does not know is a build failure,
+ *     not a silent omission. What it gives up is cross-page CSS caching,
  *     which costs nothing here: the sheet lives in the HTML.
  *  2. **Icons are one `<symbol>` each, referenced with `<use>`.** A page draws
  *     the same glyph many times (the mockups are full of them), so the geometry
@@ -71,7 +73,7 @@ const SPRITE_USE = /<use href="#i-([a-zA-Z0-9]+)"\/>/g;
 // Module order is meaningful: tokens first, then the shared layers, then the
 // page-specific ones. `scripts/website_quality.py` reads the built pages, so
 // the order only has to be stable — and it is, because it is written here.
-const CSS_MODULES = ["tokens", "base", "components", "download", "mockups"];
+const CSS_MODULES = ["tokens", "base", "components", "mockups", "ui"];
 
 function readModule(name) {
   if (!CSS_MODULES.includes(name)) {
@@ -88,7 +90,16 @@ export default function (eleventyConfig) {
   // lossless CSS pass it uses everywhere else, and `tools/verify-minify.mjs`
   // proves that pass only removed whitespace and comments.
   eleventyConfig.addFilter("inlineCss", function (modules) {
-    const names = CSS_MODULES.filter((name) => (modules || []).includes(name));
+    // Iterate what the *page* asked for, not the allowlist. A name the config
+    // does not know is a typo in front matter, and `readModule` throws on it —
+    // the earlier filter-first version silently dropped an unknown module, so a
+    // page shipped with no stylesheet and nothing said so until the class
+    // coverage rule noticed the unstyled markup.
+    const names = (modules || []).filter((name) => CSS_MODULES.includes(name));
+    if (names.length !== (modules || []).length) {
+      const unknown = (modules || []).filter((name) => !CSS_MODULES.includes(name));
+      throw new Error(`unknown CSS module(s): ${unknown.join(", ")} (known: ${CSS_MODULES.join(", ")})`);
+    }
     return names.map(readModule).join("\n");
   });
 

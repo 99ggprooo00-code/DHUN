@@ -1,0 +1,64 @@
+{#- Hand-written recreation of DHUN's Settings → Equalizer surface
+    (shared .../ui/settings/SettingsScreen.kt, EqualizerBands.kt): section
+    headers, preset chips, preamp and per-band sliders. Band count, frequency
+    labels and gain range are the app's real values. No screenshot exists in
+    this repository: see .ai/WEBSITE_PLAN.md §8–§9. -#}
+<figure class="mock" id="mock-settings-phone">
+  <div class="device" aria-hidden="true">
+    <div class="screen">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="statusbar-icons">{% icon "speaker" %}{% icon "offline" %}</span>
+      </div>
+      <div class="app">
+        <p class="app-brand">Settings</p>
+
+        <div class="setting-row">
+          <span class="setting-label">Appearance</span>
+          <span class="setting-value">Theme modes</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Resume on launch</span>
+          <span class="toggle is-on" aria-hidden="true"><span></span></span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Download cache</span>
+          <span class="setting-value">Capped</span>
+        </div>
+
+        <p class="section-label">{% icon "equalizer" %} Equalizer</p>
+        <div class="chips">
+          <span class="chip chip--pill is-active">Rock</span>
+          <span class="chip chip--pill">Jazz</span>
+          <span class="chip chip--pill">Bass</span>
+        </div>
+        <div class="bands">
+          <span class="band"><i style="--h: 82%"></i></span>
+          <span class="band"><i style="--h: 66%"></i></span>
+          <span class="band"><i style="--h: 44%"></i></span>
+          <span class="band"><i style="--h: 58%"></i></span>
+          <span class="band"><i style="--h: 38%"></i></span>
+          <span class="band"><i style="--h: 54%"></i></span>
+          <span class="band"><i style="--h: 62%"></i></span>
+          <span class="band"><i style="--h: 72%"></i></span>
+          <span class="band"><i style="--h: 46%"></i></span>
+          <span class="band"><i style="--h: 30%"></i></span>
+        </div>
+        <div class="band-labels">
+          <span>60</span><span>170</span><span>310</span><span>600</span><span>1k</span>
+          <span>3k</span><span>6k</span><span>12k</span><span>14k</span><span>16k</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Preamp</span>
+          <span class="setting-value">0 dB</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <strong>An illustrative recreation, not a screenshot.</strong> DHUN's
+    Settings → Equalizer on Android: ten bands at libVLC's frequencies, presets,
+    a preamp, and gain clamped to ±20 dB — the same control surface the desktop
+    build uses.
+  </figcaption>
+</figure>
