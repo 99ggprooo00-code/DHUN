@@ -13,6 +13,7 @@ HTML, not about source files looking plausible.
 """
 
 import re
+import shutil
 import sys
 import tempfile
 import unittest
@@ -460,3 +461,130 @@ class BuiltSite(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DistCopyMixin(unittest.TestCase):
+    """Run one check against a disposable copy of the real built site."""
+
+    def copy_dist(self) -> Path:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        target = root / "dist"
+        shutil.copytree(DIST, target)
+        return target
+
+
+class ClaimTraceability(DistCopyMixin):
+    def test_every_section_on_the_real_site_is_traceable(self):
+        self.assertEqual(quality.claim_traceability_violations(DIST), [])
+
+    def test_a_section_without_a_citation_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        start = markup.index("<section")
+        end = markup.index("</section>") + len("</section>")
+        section = re.sub(r"<!--.*?-->", " ", markup[start:end], flags=re.S)
+        page.write_text(markup[:start] + section + markup[end:], encoding="utf-8")
+        violations = quality.claim_traceability_violations(dist)
+        self.assertTrue(violations, "a section stripped of its citation still passed")
+        self.assertTrue(any("no citation" in v for v in violations), violations)
+
+
+class BacklogDrift(DistCopyMixin):
+    def test_the_real_site_matches_the_backlog(self):
+        self.assertEqual(quality.backlog_drift_violations(DIST), [])
+
+    def contract(self, dist: Path, plan: Path) -> list[str]:
+        original = quality.BACKLOG_PLAN
+        quality.BACKLOG_PLAN = plan
+        try:
+            return quality.backlog_drift_violations(dist)
+        finally:
+            quality.BACKLOG_PLAN = original
+
+    def test_a_shipped_mockup_that_is_missing_fails(self):
+        dist = self.copy_dist()
+        plan = Path(tempfile.mkdtemp()) / "WEBSITE_PLAN.md"
+        self.addCleanup(shutil.rmtree, plan.parent, ignore_errors=True)
+        plan.write_text(
+            "| # | Mockup (site id) | Status | Real capture | What it must show |\n"
+            "|---|---|---|---|---|\n"
+            "| 1 | `mock-home-phone` | shipped | Android Home | layout |\n"
+            "| 2 | `mock-never-drawn` | shipped | nothing | nothing |\n",
+            encoding="utf-8",
+        )
+        violations = self.contract(dist, plan)
+        self.assertTrue(any("mock-never-drawn" in v for v in violations), violations)
+
+    def test_a_mockup_on_a_page_with_no_row_fails(self):
+        dist = self.copy_dist()
+        route = quality.page_paths(dist)["/download/"]
+        markup = route.read_text(encoding="utf-8")
+        route.write_text(
+            markup.replace(
+                "<main",
+                '<main data-x="1"',
+                1,
+            ).replace(
+                "</main>",
+                '<figure id="mock-not-in-the-plan"><span class="mock-badge">not a screenshot</span></figure></main>',
+                1,
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.backlog_drift_violations(dist)
+        self.assertTrue(any("mock-not-in-the-plan" in v for v in violations), violations)
+
+    def test_a_planned_mockup_that_is_already_on_a_page_fails(self):
+        dist = self.copy_dist()
+        plan = Path(tempfile.mkdtemp()) / "WEBSITE_PLAN.md"
+        self.addCleanup(shutil.rmtree, plan.parent, ignore_errors=True)
+        plan.write_text(
+            "| # | Mockup (site id) | Status | Real capture | What it must show |\n"
+            "|---|---|---|---|---|\n"
+            "| 1 | `mock-home-phone` | planned | Android Home | layout |\n",
+            encoding="utf-8",
+        )
+        violations = self.contract(dist, plan)
+        self.assertTrue(any("mock-home-phone" in v for v in violations), violations)
+
+
+class StaleFacts(DistCopyMixin):
+    def test_the_real_site_states_no_version_date_or_build_number(self):
+        self.assertEqual(quality.stale_fact_violations(DIST), [])
+
+    def test_a_version_string_fails(self):
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace("</h1>", "</h1><p>Version 3.2.1 is out.</p>", 1),
+            encoding="utf-8",
+        )
+        violations = quality.stale_fact_violations(dist)
+        self.assertTrue(any("3.2.1" in v for v in violations), violations)
+
+    def test_a_bare_date_fails(self):
+        dist = self.copy_dist()
+        page = dist / "download" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace("</h1>", "</h1><p>Updated 2026-10-08.</p>", 1),
+            encoding="utf-8",
+        )
+        violations = quality.stale_fact_violations(dist)
+        self.assertTrue(any("2026-10-08" in v for v in violations), violations)
+
+
+class SitemapScope(DistCopyMixin):
+    def test_a_fourth_route_in_the_sitemap_fails(self):
+        dist = self.copy_dist()
+        sitemap = dist / "sitemap.xml"
+        sitemap.write_text(
+            sitemap.read_text(encoding="utf-8").replace(
+                "</urlset>",
+                "<url><loc>https://99ggprooo00-code.github.io/DHUN/blog/</loc></url></urlset>",
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.crawlability_violations(dist)
+        self.assertTrue(any("/blog/" in v for v in violations), violations)

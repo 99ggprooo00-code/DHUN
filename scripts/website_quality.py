@@ -45,21 +45,35 @@ ASSET_BUDGET = 150 * KB
 RATCHET_TOLERANCE = 0.05
 
 CANONICAL_ORIGIN = "https://99ggprooo00-code.github.io/DHUN"
+
+# What counts as "this claim came from somewhere" inside an HTML comment.
+CITATION = re.compile(
+    r"(ADR-\d+|PR #\d+|Phase \d+|MASTER_PROMPT|README\.md|LICENSE|THIRD_PARTY|"
+    r"\.ai/[A-Za-z_]+\.md|scripts/[a-z_]+\.py|AndroidManifest|app-android|minSdk|"
+    r"DhunAppearance|test-release\.yml|sitemap\.njk|shared/src)",
+    re.I,
+)
+
+# Facts that rot: a semantic version, a calendar date, a build number. The site
+# currently prints none of these; anything added here needs a checked source and
+# an explicit allowlist entry (with the reason) rather than a looser pattern.
+STALE_FACT_PATTERNS = (
+    (re.compile(r"\bv?\d+\.\d+\.\d+\b"), "app version"),
+    (re.compile(r"\b20\d\d-\d\d-\d\d\b"), "date"),
+    (re.compile(r"\bbuild \d{3,}\b", re.I), "build number"),
+)
+STALE_FACT_ALLOWLIST: frozenset[str] = frozenset()
 ALLOWED_EXTERNAL_ORIGINS = (
     "https://github.com/99ggprooo00-code/DHUN",
     "https://99ggprooo00-code.github.io/DHUN",
 )
 ROUTES = ("/", "/features/", "/download/")
-MOCKUP_IDS = (
-    "mock-home-phone",
-    "mock-player-phone",
-    "mock-downloads-phone",
-    "mock-desktop-window",
-    # Planned captures that have no mockup yet — listed so the backlog and the
-    # markup stay in step (see .ai/WEBSITE_PLAN.md Part A §9).
-    "mock-widget",
-    "mock-lyrics",
-)
+# The screenshot backlog lives in `.ai/WEBSITE_PLAN.md` Part A §9 and is parsed
+# from there rather than duplicated here: one table, machine-read, so a mockup
+# can never lose its replacement plan (see `backlog_drift_violations`).
+BACKLOG_PLAN = REPO_ROOT / ".ai" / "WEBSITE_PLAN.md"
+BACKLOG_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*`(mock-[a-z0-9-]+)`\s*\|\s*(shipped|planned)\s*\|", re.M)
+BACKLOG_STATUSES = ("shipped", "planned")
 
 # Token pairs asserted for WCAG AA, mirroring the app's own
 # DhunThemeContrastTest discipline. (foreground, background, minimum ratio)
@@ -283,6 +297,120 @@ def link_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def backlog_rows() -> list[tuple[str, str]]:
+    """(site id, status) for every row of the §9 screenshot backlog table."""
+    if not BACKLOG_PLAN.is_file():
+        return []
+    return [(match.group(2), match.group(3)) for match in BACKLOG_ROW.finditer(BACKLOG_PLAN.read_text(encoding="utf-8"))]
+
+
+def backlog_drift_violations(dist: pathlib.Path) -> list[str]:
+    """The backlog and the built pages must agree in both directions.
+
+    A mockup is a stand-in for a capture that does not exist yet, so the two can
+    drift apart in two ways that both matter: a mockup with no replacement plan
+    (nobody will ever replace it), and a plan entry that has quietly become a
+    figure on a page (or a `planned` row used as if it were real). Both are
+    failures here rather than a review note.
+    """
+    violations: list[str] = []
+    rows = backlog_rows()
+    if not rows:
+        return [
+            "the screenshot backlog in .ai/WEBSITE_PLAN.md §9 could not be parsed; "
+            "expected rows like | 1 | `mock-home-phone` | shipped | … |"
+        ]
+    ids = [row_id for row_id, _status in rows]
+    if len(ids) != len(set(ids)):
+        violations.append("§9 lists the same mockup id twice")
+    status = dict(rows)
+
+    on_pages: dict[str, list[str]] = {}
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for figure_id in re.findall(r'<figure\b[^>]*\bid="(mock-[a-z0-9-]+)"', markup, re.I):
+            on_pages.setdefault(figure_id, []).append(route)
+
+    for figure_id, routes in sorted(on_pages.items()):
+        if figure_id not in status:
+            violations.append(
+                f"mockup ‘{figure_id}’ is on {'/'.join(routes)} but has no row in the §9 backlog"
+            )
+        elif status[figure_id] != "shipped":
+            violations.append(
+                f"mockup ‘{figure_id}’ is on {'/'.join(routes)} but §9 marks it ‘{status[figure_id]}’"
+            )
+    for figure_id, state in sorted(status.items()):
+        if state == "shipped" and figure_id not in on_pages:
+            violations.append(
+                f"§9 marks ‘{figure_id}’ shipped, but no built page carries that figure"
+            )
+        if state == "planned" and figure_id in on_pages:
+            violations.append(
+                f"§9 marks ‘{figure_id}’ planned, but it is already on {'/'.join(on_pages[figure_id])}"
+            )
+    if not any(state == "shipped" for state in status.values()):
+        violations.append("§9 lists no shipped mockup, so the backlog proves nothing about the site")
+    return violations
+
+
+def claim_traceability_violations(dist: pathlib.Path) -> list[str]:
+    """Every claim block cites the source it came from, in the built HTML.
+
+    `.ai/WEBSITE_PLAN.md` Part A §4 asks for one promise per section with its
+    ADR/PR written next to it, so a reviewer can trace a sentence to its source
+    without leaving the page. This asserts it per `<section>` (a comment naming
+    an ADR, a PR, a phase, a manifest, a roadmap file or a script), on every
+    page — the previous version of the rule was a convention on the front page
+    only, which is not a rule.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for index, section in enumerate(re.findall(r"<section\b[^>]*>(.*?)</section>", markup, re.S), 1):
+            comments = re.findall(r"<!--(.*?)-->", section, re.S)
+            if any(CITATION.search(comment) for comment in comments):
+                continue
+            heading = re.search(r"<(h1|h2|h3)\b[^>]*>(.*?)</\1>", section, re.S)
+            title = re.sub(r"<[^>]+>", "", heading.group(2)).strip()[:60] if heading else "?"
+            violations.append(
+                f"{route}: section {index} (“{title}”) carries claims with no citation comment "
+                f"(expected an ADR, PR, phase or file reference in an HTML comment)"
+            )
+    return violations
+
+
+def stale_fact_violations(dist: pathlib.Path) -> list[str]:
+    """No app version, release identity or date may be printed without a source.
+
+    The site describes a project whose artifacts are replaced on every push to
+    `main`. A version string or a date written into the copy is wrong within
+    days and nothing would catch it, so the copy carries none: facts that could
+    rot are either absent or derived from a checked source at build time. If a
+    value is genuinely derivable, add it to the allowlist below with the source
+    named in the comment — an unexplained entry is how this rule would stop
+    meaning anything.
+    """
+    violations: list[str] = []
+    allowed = STALE_FACT_ALLOWLIST
+    for route, path in page_paths(dist).items():
+        text = text_of(path.read_text(encoding="utf-8"))
+        for pattern, label in STALE_FACT_PATTERNS:
+            for match in pattern.finditer(text):
+                if match.group(0) in allowed:
+                    continue
+                snippet = text[max(0, match.start() - 40) : match.end() + 40].strip()
+                violations.append(f"{route}: {label} ‘{match.group(0)}’ in “…{snippet}…”")
+    return violations
+
+
+def _sitemap_locations(dist: pathlib.Path) -> set[str]:
+    sitemap = dist / "sitemap.xml"
+    if not sitemap.is_file():
+        return set()
+    return set(re.findall(r"<loc>([^<]+)</loc>", sitemap.read_text(encoding="utf-8")))
+
+
 def mockup_violations(dist: pathlib.Path) -> list[str]:
     """Every mockup is labelled as a recreation, and carries its backlog id."""
     violations: list[str] = []
@@ -301,7 +429,8 @@ def mockup_violations(dist: pathlib.Path) -> list[str]:
                 violations.append(f"{route}: a mockup figure has no id (backlog mapping)")
                 continue
             figure_id = id_match.group(1)
-            if figure_id not in MOCKUP_IDS:
+            backlog = {row_id for row_id, _status in backlog_rows()}
+            if figure_id not in backlog:
                 violations.append(
                     f"{route}: mockup id ‘{figure_id}’ is not in the screenshot backlog "
                     f"(.ai/WEBSITE_PLAN.md Part A §9)"
@@ -390,11 +519,23 @@ def crawlability_violations(dist: pathlib.Path) -> list[str]:
         violations.append("sitemap.xml is missing from the built site")
     else:
         content = sitemap.read_text(encoding="utf-8")
+        expected = {f"{CANONICAL_ORIGIN}{route}" for route in ROUTES}
+        listed = _sitemap_locations(dist)
         for route in ROUTES:
             if f"<loc>{CANONICAL_ORIGIN}{route}</loc>" not in content:
                 violations.append(f"sitemap.xml does not list {route}")
+        for extra in sorted(listed - expected):
+            violations.append(
+                f"sitemap.xml lists {extra}, which is not one of the three routes "
+                f"(/ , /features/, /download/)"
+            )
         if "{{" in content or "{%" in content:
             violations.append("sitemap.xml still contains an unrendered template tag")
+    if robots.is_file():
+        other_urls = re.findall(r"^\s*(?:Allow|Disallow):\s*(\S+)", robots.read_text(encoding="utf-8"), re.M)
+        for path in other_urls:
+            if path not in ("/", ""):
+                violations.append(f"robots.txt scopes {path}, but the site has exactly three routes")
     if not (dist / "404.html").is_file():
         violations.append("404.html is missing from the built site")
     return violations
@@ -676,6 +817,9 @@ CHECKS = (
     ("class coverage", css_coverage_violations),
     ("icon sprite integrity", sprite_violations),
     ("page-weight ratchet", budget_ratchet_violations),
+    ("claim traceability", claim_traceability_violations),
+    ("backlog ↔ site drift", backlog_drift_violations),
+    ("no stale facts", stale_fact_violations),
 )
 
 

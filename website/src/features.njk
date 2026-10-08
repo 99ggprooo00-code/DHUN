@@ -19,6 +19,7 @@ cssModules: ["tokens", "base", "components", "mockups"]
       <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
       <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
     </div>
+    <!-- Phase 06–15 (.ai/ROADMAP.md): every item listed below is implemented in the tree this site is built from; the negative list is checked by scripts/website_claims.py. -->
   </section>
 
   {%- for group in site.featureGroups %}
@@ -50,6 +51,7 @@ cssModules: ["tokens", "base", "components", "mockups"]
         content. Both come from the same shared Compose code — these drawings
         are recreations, labelled as such, not screenshots.
       </p>
+      <!-- Drawn from shared/src/commonMain/kotlin/dev/dhun/design/ (tokens, shapes, spacing) and .../ui/ (layout); replacement captures are listed in .ai/WEBSITE_PLAN.md Part A §9. -->
     </div>
     <div class="card-grid">
       {% include "mockups/downloads-phone.njk" %}
@@ -121,6 +123,7 @@ cssModules: ["tokens", "base", "components", "mockups"]
   </section>
 
   <section class="closing" aria-labelledby="feat-close">
+    <!-- README.md (test-builds policy) and test-release.yml: the download is the rolling pre-release, not a versioned release. -->
     <h2 id="feat-close">Ready when you are.</h2>
     <p>One APK, one MSI, and the whole source under GPL-3.0.</p>
     <div class="cta-row">

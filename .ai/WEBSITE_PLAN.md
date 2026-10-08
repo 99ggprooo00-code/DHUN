@@ -225,14 +225,21 @@ To be captured by the user during the S3 rounds (device + Windows), in this
 priority order. Until each arrives, the named mockup stands in, labelled as a
 recreation.
 
-| # | Mockup (site id) | Real capture that should replace it | What it must show |
-|---|---|---|---|
-| 1 | `mock-home-phone` | Android Home, portrait | rail layout, now-playing backdrop, bottom nav + docked mini-player |
-| 2 | `mock-player-phone` | Android FullPlayer, portrait | blurred artwork backdrop, Lyrics tab, transport row, play disc |
-| 3 | `mock-downloads-phone` | Android Library → Downloads | downloaded rows with offline badges, in-progress row |
-| 4 | `mock-desktop-window` | Windows desktop window, 1200×780 | rails layout, tray-adjacent mini-player, EQ or queue panel open |
-| 5 | `mock-widget` | Android home screen with the Quick Play widget | widget on a launcher, not the app |
-| 6 | `mock-lyrics` | Android FullPlayer → Lyrics, mid-song | a line highlighted against real synced lyrics |
+The **Status** column is machine-read: `scripts/website_quality.py` parses this
+one table and fails the build in both directions — a `shipped` row whose figure
+is missing from the built pages, a `planned` row that appears on a page before
+its capture exists, and a figure on a page that no row names. Adding a mockup to
+the site without adding it here (or the reverse) is therefore a red test, not a
+review note.
+
+| # | Mockup (site id) | Status | Real capture that should replace it | What it must show |
+|---|---|---|---|---|
+| 1 | `mock-home-phone` | shipped | Android Home, portrait | rail layout, now-playing backdrop, bottom nav + docked mini-player |
+| 2 | `mock-player-phone` | shipped | Android FullPlayer, portrait | blurred artwork backdrop, Lyrics tab, transport row, play disc |
+| 3 | `mock-downloads-phone` | shipped | Android Library → Downloads | downloaded rows with offline badges, in-progress row |
+| 4 | `mock-desktop-window` | shipped | Windows desktop window, 1200×780 | rails layout, tray-adjacent mini-player, EQ or queue panel open |
+| 5 | `mock-widget` | planned | Android home screen with the Quick Play widget | widget on a launcher, not the app |
+| 6 | `mock-lyrics` | planned | Android FullPlayer → Lyrics, mid-song | a line highlighted against real synced lyrics |
 
 Content-safety rule (unchanged from Part B §7): only legally safe content with
 recorded provenance may enter Git; no third-party album art without
