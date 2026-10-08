@@ -432,6 +432,25 @@ effective `scroll-padding-top` so a failure names the number to change. Cost:
 the ratchet. Reversal cost: delete the two CSS declarations, the check and its
 registration; ~10 minutes, and the jump defect returns.
 
+**D21 — a visitor who asks the operating system for more contrast gets it.**
+The sheet was built to a 4.5:1 body floor (`contrast_violations`, 13 token pairs),
+which is the requirement, not the ceiling a reader wants when they turn on
+"increase contrast" (`prefers-contrast: more` — Windows and macOS both expose it).
+Measured from the tokens this session: in the light set `--text-3` is **4.83:1** on
+`--bg` and **4.71:1** on the variant surface; in the dark set it is **7.47:1** on
+`--bg` but **6.71:1** on the variant surface. The new
+`@media (prefers-contrast: more)` block in `tokens.css` raises both secondary rungs
+to `var(--text)` — **18.10:1** on `--bg` in the dark set, **16.26:1** in the light
+set — and because the value is a *reference* rather than a colour, one declaration
+improves both schemes. New check `high_contrast_violations` (28 → 29) asserts the
+block exists, that its values resolve in both schemes, and that every token it
+redefines strictly raises contrast against `--bg`, `--surface` and
+`--surface-variant` to at least 7:1 — a block that restates the defaults, picks a
+literal colour, or references a token that does not exist fails. Cost: **+80 B per
+route**, ratcheted. Reversal cost: delete the block, the check and its
+registration, the five tests; ~10 minutes, and the readers who asked for more
+contrast are back to 4.83:1.
+
 ## 11. Work plan, execution and honest status
 
 | Phase | Deliverable | Status |

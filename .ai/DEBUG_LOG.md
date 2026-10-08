@@ -4263,3 +4263,27 @@ measuring, and a test pins both the encoding and the equality with each committe
 file's size — the same class of mistake the weight budget avoids by using
 `stat().st_size`.
 
+## 2026-10-08 · Reading "every :root block after the first" measured the *print* palette (session `arena/af3e7f66-dhun`)
+
+**The mistake, and how it surfaced.** The new high-contrast check needs each
+token's value in the dark scheme (the first `:root` block) and in the light scheme
+(the block inside `@media (prefers-color-scheme: light)`). The first version read
+the light map as "default overlaid with every later `:root` block" — but the sheet
+also carries a *print* palette and a forced-colours palette, and those blocks come
+later, so the "light" values were actually paper's (`--bg: #ffffff`,
+`--text-3: #3d3934`). The check still passed, because the comparison it made was
+internally consistent; only printing the parsed maps showed the wrong values
+(`--text` measured as `#000000` in the "light" scheme). Scope, not position, is
+what identifies a block, so the reader now walks `css_units` and takes only `:root`
+rules that sit inside a `prefers-color-scheme: light` group. Numbers were re-read
+afterwards from the corrected map and are the ones in `docs/verification/27-*.md`.
+
+**A second trap in the same rule.** The first mutation that should have been caught
+— replacing `--text-3: var(--text)` with a literal `#3d3934` — passed, because the
+declaration parser required a trailing `;` and the minifier drops the last one in a
+block, so the offending declaration was never read. `[^;}]+` (not `[^;]+`) fixed it;
+the mutation now produces
+`/features/: --text-3 in the high-contrast block is '#3d3934', which this rule cannot resolve …`.
+Both mistakes are the same shape: a check that reads the wrong text is a check that
+cannot fail.
+

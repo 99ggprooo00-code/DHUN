@@ -1405,3 +1405,68 @@ class AnchorLandings(DistCopyMixin):
         markup = markup.replace(":root{scroll-padding-top:7rem}", "", 1)
         page.write_text(markup, encoding="utf-8")
         self.assertEqual(quality.anchor_landing_violations(dist), [])
+
+
+class HighContrastPreference(DistCopyMixin):
+    """A visitor who asks the OS for more contrast gets more contrast.
+
+    The block raising the secondary text rungs is checked against the page's own
+    tokens in both colour schemes. The browser job cannot emulate
+    `prefers-contrast: more` on every engine, so this is the local half; the
+    numbers it uses are re-derived from the sheet rather than restated here.
+    """
+
+    BLOCK = "@media (prefers-contrast:more){:root{--text-2:var(--text);--text-3:var(--text)}}"
+
+    def test_the_committed_site_raises_contrast_when_asked(self):
+        self.assertEqual(quality.high_contrast_violations(DIST), [])
+
+    def mutate(self, relative: str, new: str) -> list[str]:
+        dist = self.copy_dist()
+        page = dist / relative
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn(self.BLOCK, markup)
+        page.write_text(markup.replace(self.BLOCK, new, 1), encoding="utf-8")
+        return quality.high_contrast_violations(dist)
+
+    def test_a_page_without_the_block_fails(self):
+        violations = self.mutate("index.html", "")
+        self.assertTrue(
+            any(v.startswith("/:") and "no @media (prefers-contrast: more) block" in v for v in violations),
+            violations,
+        )
+
+    def test_a_literal_colour_in_the_block_fails(self):
+        """A literal is one scheme's colour: it cannot improve both."""
+        violations = self.mutate(
+            "features/index.html",
+            "@media (prefers-contrast:more){:root{--text-2:var(--text);--text-3:#3d3934}}",
+        )
+        self.assertTrue(
+            any(
+                "/features/" in v and "#3d3934" in v and "cannot resolve" in v
+                for v in violations
+            ),
+            violations,
+        )
+
+    def test_a_block_that_restates_the_default_fails(self):
+        violations = self.mutate(
+            "ui/index.html", "@media (prefers-contrast:more){:root{--text-3:var(--text-3)}}"
+        )
+        self.assertTrue(
+            any(
+                "/ui/" in v and ("no better than the default" in v or "short of the 7:1" in v)
+                for v in violations
+            ),
+            violations,
+        )
+
+    def test_a_reference_to_an_undefined_token_fails(self):
+        violations = self.mutate(
+            "404.html", "@media (prefers-contrast:more){:root{--text-3:var(--text-missing)}}"
+        )
+        self.assertTrue(
+            any("/404.html" in v and "--text-missing" in v and "does not define" in v for v in violations),
+            violations,
+        )

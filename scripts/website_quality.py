@@ -851,6 +851,142 @@ def _root_declarations(units: list[dict]) -> tuple[dict[str, str], dict[str, str
     return base, conditional
 
 
+def high_contrast_violations(dist: pathlib.Path) -> list[str]:
+    """A visitor who asks for more contrast gets more contrast, in both schemes.
+
+    The sheet's contrast rule checks the *default* ladder against the 4.5:1 body
+    floor. A reader who turns on the operating system's "increase contrast"
+    setting is asking for more than that, so `website/css/tokens.css` carries a
+    `@media (prefers-contrast: more)` block raising the secondary text rungs. This
+    rule asserts that block exists, that it redefines something *readable*, and
+    that every token it redefines (a) resolves against the same token in both the
+    dark and the light scheme, (b) strictly raises the contrast against each
+    surface the token is used on, and (c) lands at or above 7:1 — a block that
+    restates the defaults, or that picks a lower-contrast colour, is worse than
+    none, because it claims to have helped.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        css = page_stylesheet(dist, route)
+        pressed = _at_rule_block(css, "prefers-contrast:more") or _at_rule_block(
+            css, "prefers-contrast: more"
+        )
+        if not pressed:
+            violations.append(
+                f"{route}: no @media (prefers-contrast: more) block ships, so a visitor who "
+                f"asks the operating system for more contrast gets the default ladder"
+            )
+            continue
+        # `[^;}]+` and not `[^;]+`: the minifier drops the final semicolon, and a
+        # parser that needs one silently ignores the last declaration in a block —
+        # which is how a literal low-contrast colour in this block first went
+        # unnoticed (2026-10-08).
+        redefined = dict(re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;}]+)", pressed))
+        if not redefined:
+            violations.append(
+                f"{route}: the @media (prefers-contrast: more) block redefines nothing"
+            )
+            continue
+        schemes = {
+            "dark": _parse_scheme_tokens(css),
+            "light": _parse_scheme_tokens(css, light=True),
+        }
+        if not schemes["dark"]:
+            violations.append(f"{route}: cannot find the default :root token block")
+            continue
+        for name, value in sorted(redefined.items()):
+            reference = re.fullmatch(r"var\((--[a-z0-9-]+)\)", value.strip())
+            if reference is None:
+                violations.append(
+                    f"{route}: {name} in the high-contrast block is {value.strip()!r}, which this "
+                    f"rule cannot resolve — use `var(--…)` so both colour schemes get the "
+                    f"improved contrast"
+                )
+                continue
+            source = reference.group(1)
+            undefined = [
+                scheme
+                for scheme, tokens in sorted(schemes.items())
+                if tokens and source not in tokens
+            ]
+            if undefined:
+                violations.append(
+                    f"{route}: {name} in the high-contrast block refers to {source}, which the "
+                    f"{' and '.join(undefined)} scheme does not define"
+                )
+                continue
+            for surface in ("--bg", "--surface", "--surface-variant"):
+                for scheme, tokens in sorted(schemes.items()):
+                    if not tokens or name not in tokens or surface not in tokens:
+                        continue
+                    before = _contrast_ratio(tokens[name], tokens[surface], tokens)
+                    after = _contrast_ratio(tokens[source], tokens[surface], tokens)
+                    if before is None or after is None:
+                        violations.append(
+                            f"{route}: cannot resolve {name} or {surface} in the {scheme} scheme"
+                        )
+                        continue
+                    if after < 7.0:
+                        violations.append(
+                            f"{route}: {name} in the high-contrast block reaches only "
+                            f"{after:.2f}:1 on {surface} in the {scheme} scheme, short of the "
+                            f"7:1 a visitor asking for more contrast expects"
+                        )
+                    elif after <= before:
+                        violations.append(
+                            f"{route}: {name} in the high-contrast block is {after:.2f}:1 on "
+                            f"{surface} in the {scheme} scheme, no better than the default "
+                            f"{before:.2f}:1 — the block claims an improvement it does not make"
+                        )
+    return violations
+
+
+def _parse_scheme_tokens(css: str, light: bool = False) -> dict[str, str]:
+    """The `:root` tokens of one colour scheme, from the page's own CSS.
+
+    Scope matters, not position: the default map is every `:root` rule that is not
+    inside a conditional group, and the light map adds the ones inside
+    `@media (prefers-color-scheme: light)`. Reading "every `:root` block after the
+    first" was wrong — the sheet also carries a *print* palette and a forced-colours
+    palette, and folding those in made the default look like paper, which is how a
+    comparison against the high-contrast block can pass while measuring the wrong
+    thing (found by reading the debug output on 2026-10-08, before any mutation).
+    """
+    tokens: dict[str, str] = {}
+
+    def absorb(body: str) -> None:
+        for name, value in re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;}]+)", body):
+            tokens[name] = value.strip()
+
+    for unit in css_units(css):
+        if unit["kind"] == "rule" and ":root" in unit["prelude"]:
+            absorb(unit["body"])
+        elif (
+            unit["kind"] == "at"
+            and light
+            and "prefers-color-scheme" in unit["prelude"]
+            and "light" in unit["prelude"]
+        ):
+            for child in unit["children"]:
+                if child["kind"] == "rule" and ":root" in child["prelude"]:
+                    absorb(child["body"])
+    return tokens
+
+
+def _contrast_ratio(foreground: str, background: str, tokens: dict[str, str]) -> float | None:
+    """WCAG contrast of two token values, resolving one level of `var()`."""
+    def resolve(value: str) -> str:
+        reference = re.fullmatch(r"var\((--[a-z0-9-]+)\)", value.strip())
+        return tokens.get(reference.group(1), value) if reference else value
+
+    fg = _colour(resolve(foreground), resolve(background))
+    bg = _colour(resolve(background))
+    if fg is None or bg is None:
+        return None
+    lighter, darker = sorted((_relative_luminance(fg), _relative_luminance(bg)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
 # Keys that must never appear in the site's structured data. Each one is a claim
 # this repository cannot support: no stable release exists, so there is no
 # version; the project has never collected a rating; and an `offers`/`price` or
@@ -1974,6 +2110,7 @@ CHECKS = (
     ("accessibility floor", accessibility_violations),
     ("current page is marked", navigation_state_violations),
     ("in-page anchors land below the header", anchor_landing_violations),
+    ("high-contrast preference is honoured", high_contrast_violations),
     ("page metadata", metadata_violations),
     ("structured data", structured_data_violations),
     ("crawlability", crawlability_violations),

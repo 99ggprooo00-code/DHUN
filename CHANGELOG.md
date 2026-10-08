@@ -24,6 +24,21 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Accessibility — "increase contrast" now increases contrast (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- The sheet met the 4.5:1 body floor everywhere and stopped there, so a visitor
+  who turns on the operating system's "increase contrast" setting got exactly the
+  same secondary text: measured from the tokens, the light set's `--text-3` is
+  4.83:1 on the page background (4.71:1 on the variant surface) and the dark set's
+  is 6.71:1 on the variant surface. A `@media (prefers-contrast: more)` block now
+  raises both secondary rungs to the primary text colour — 18.10:1 on the page
+  background in the dark set, 16.26:1 in the light set — written as a reference so
+  one declaration improves both colour schemes. A new check asserts the block
+  exists, resolves in both schemes, and strictly raises contrast to at least 7:1
+  against each surface; a block that restates the defaults, hard-codes one
+  scheme's colour, or points at a missing token fails the build. Measured cost:
+  +80 B per route.
+
 ### Fixed — the served-site smoke check reports sizes in bytes (2026-10-08, session `arena/af3e7f66-dhun`)
 
 - `scripts/website_smoke.py` printed `len(markup)` — characters — and labelled it
