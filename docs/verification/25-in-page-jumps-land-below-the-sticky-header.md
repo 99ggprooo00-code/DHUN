@@ -41,7 +41,7 @@ the rest of the sheet: the narrow case is the base, the wide case is the
 
 | Layer | Rule | Proves |
 |---|---|---|
-| Static (local) | `anchor_landing_violations` in `scripts/website_quality.py` (check count 27 → 28) | every `href="#…"` in a built page has a matching `id`; and a page whose own CSS makes its `<header>` sticky, and which has an in-page jump, declares `scroll-padding-top` on `:root`/`html` **outside any conditional group** (a `@media`-only declaration is not a base) with no declared value below the two-row floor — re-derived from that page's `--target` and `--sp-4`, never hard-coded |
+| Static (local) | `anchor_landing_violations` in `scripts/website_quality.py` (check count 27 → 28) | every `href="#…"` in a built page has a matching `id`; and a page whose own CSS makes its `<header>` sticky, and which has an in-page jump, declares `scroll-padding-top` on `:root`/`html` **outside any conditional group** (a `@media`-only declaration is not a base), with the base value at or above the **three-row** floor and no declared value below the two-row floor — all four numbers re-derived from that page's `--target` and `--sp-4`, never hard-coded (the three-row floor was added in record 26) |
 | Rendered (CI only) | `anchors land below the header` in `website/tests/browser.mjs` | at 1280×800, 380×800 and 280×653 — after each in-page jump the target's top edge is below the header's bottom edge and inside the viewport, and the record prints the effective `scroll-padding-top` |
 | Decision logic (local) | `anchorLandingProblem()` in `website/tests/rules.mjs`, 4 tests | covered target, landed target, overshot target, missing target/unmeasurable header — must-pass and must-fail halves, with the padding in the message |
 
@@ -54,6 +54,7 @@ Against disposable copies of the committed build (`AnchorLandings` in
 |---|---|
 | Remove the base declaration *and* the override from `/` | `/: the header sticks to the top and the page jumps to in-page anchors, but no scroll-padding-top is declared, so the target's first line lands behind the header` |
 | Keep only the `@media`-only declaration (move the base onto `.wrap`) | `/404.html: scroll-padding-top is declared only inside a conditional group, so it does not apply at every viewport — and the header sticks at every viewport` |
+| Shrink the **base** declaration to `8rem` on `/` (still above the two-row floor) | `/: the base scroll-padding-top is 128px, but below 480px the navigation itself can wrap, making the header three rows (44px + 16px + 44px + 16px + 44px = 164px), so a jump there lands behind it` |
 | Shrink the ≥480px override to `4rem` on `/features/` | `/features/: scroll-padding-top falls to 64px at some viewport, but the header is two rows (44px + 16px + 44px = 104px) on a narrow one, so in-page jumps land partly behind it` |
 | Rename the skip-link target (`id="main"`) | `/ui/: links to #main, which no element on the page has — the jump goes nowhere` |
 | Remove every in-page jump from `/ui/` *and* the padding | no violation — a page with nothing to land has nothing to pad (`test_a_page_with_no_in_page_anchors_is_exempt`) |

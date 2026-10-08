@@ -420,9 +420,9 @@ The new static check (`anchor_landing_violations`, check count 27 → 28) assert
 both directions of the landing: every `href="#…"` on a page has a matching `id`,
 and a page that is sticky-headed *and* has an in-page jump must declare
 `scroll-padding-top` on `:root`/`html` **outside any conditional group** (a
-`@media`-only declaration is not a base) with no declared value below the two-row
-floor — both numbers re-derived from the page's own tokens rather than trusted as
-104. The rendered half — the target's real position under the real header, at
+`@media`-only declaration is not a base), with the base value at or above the
+three-row floor and no declared value below the two-row floor — every number
+re-derived from the page's own tokens rather than trusted as 104 or 164. The rendered half — the target's real position under the real header, at
 1280×800, 380×800 and 280×653 (the smallest display class the site supports, where
 the navigation can wrap) — is the browser check `anchors land below the header`,
 decided by the mutation-proven `anchorLandingProblem()`, which also reports the

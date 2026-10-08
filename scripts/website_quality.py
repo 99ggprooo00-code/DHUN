@@ -799,6 +799,7 @@ def anchor_landing_violations(dist: pathlib.Path) -> list[str]:
             )
             continue
         floor = 2 * target + gap
+        narrow_floor = 3 * target + 2 * gap
         if declared is None:
             violations.append(
                 f"{route}: scroll-padding-top is "
@@ -811,6 +812,13 @@ def anchor_landing_violations(dist: pathlib.Path) -> list[str]:
                 f"{route}: scroll-padding-top falls to {smallest:g}px at some viewport, but "
                 f"the header is two rows ({target:g}px + {gap:g}px + {target:g}px = "
                 f"{floor:g}px) on a narrow one, so in-page jumps land partly behind it"
+            )
+        if declared < narrow_floor:
+            violations.append(
+                f"{route}: the base scroll-padding-top is {declared:g}px, but below 480px the "
+                f"navigation itself can wrap, making the header three rows "
+                f"({target:g}px + {gap:g}px + {target:g}px + {gap:g}px + {target:g}px = "
+                f"{narrow_floor:g}px), so a jump there lands behind it"
             )
     return violations
 

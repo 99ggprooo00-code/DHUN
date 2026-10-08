@@ -24,6 +24,17 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — the served-site smoke check reports sizes in bytes (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- `scripts/website_smoke.py` printed `len(markup)` — characters — and labelled it
+  `bytes`, understating every route by 55–61 bytes (the copy's em dashes, arrows
+  and multiplication signs cost two or three bytes each in UTF-8; measured on `/`:
+  51,627 reported against 51,688 served). The size is now `len(markup.encode(
+  "utf-8"))` in a named `served_size()`, and a new test ties the reported number to
+  `path.stat().st_size` for every committed page. Found by running the script
+  against a local static server of `website/dist` — the first *served* evidence of
+  the session; see `docs/verification/26-served-smoke-run-and-byte-accurate-sizes.md`.
+
 ### Fixed — in-page jumps no longer land behind the sticky header (2026-10-08, session `arena/af3e7f66-dhun`)
 
 - The header sticks to the top of the viewport, so the skip link's `#main` and the

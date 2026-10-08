@@ -60,6 +60,18 @@ def fetch(url: str) -> tuple[int, str]:
         return 0, f"<unreachable: {error.reason}>"
 
 
+def served_size(markup: str) -> int:
+    """The size of a response body in bytes — what a visitor downloads.
+
+    `len(markup)` counts *characters*: the site's em dashes, arrows and
+    multiplication signs cost two or three bytes each in UTF-8, so the old
+    `… bytes` in the run output understated every page (measured 2026-10-08:
+    `/` reported 61 bytes less than it serves). The body is decoded for the
+    honesty contract; its wire size is the encoded length.
+    """
+    return len(markup.encode("utf-8"))
+
+
 def digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
 
@@ -147,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
 
     for route in ROUTES:
         status, markup = fetched[route]
-        print(f"{route}: HTTP {status}, {len(markup)} bytes, sha256:{digest(markup)}")
+        print(f"{route}: HTTP {status}, {served_size(markup)} bytes, sha256:{digest(markup)}")
 
     problems = smoke_problems(fetched)
     problems += link_problems(base, fetched)

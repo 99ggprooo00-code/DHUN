@@ -1356,6 +1356,19 @@ class AnchorLandings(DistCopyMixin):
             violations,
         )
 
+    def test_a_base_padding_below_the_three_row_case_fails(self):
+        """Below 480px the navigation itself can wrap: 8rem is too little."""
+        violations = self.mutate(
+            "index.html", "scroll-padding-top:12rem", "scroll-padding-top:8rem"
+        )
+        self.assertTrue(
+            any(
+                v.startswith("/:") and "128px" in v and "164px" in v and "three rows" in v
+                for v in violations
+            ),
+            violations,
+        )
+
     def test_padding_smaller_than_the_two_row_header_fails(self):
         violations = self.mutate(
             "features/index.html", "scroll-padding-top:7rem", "scroll-padding-top:4rem"

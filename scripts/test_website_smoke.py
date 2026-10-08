@@ -135,3 +135,28 @@ class CommittedBuild(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ServedSizeIsBytes(unittest.TestCase):
+    """The run output must say bytes, and bytes are not characters.
+
+    The site's copy is full of em dashes, arrows and multiplication signs; each
+    costs two or three bytes in UTF-8, so counting characters understates every
+    page (measured 2026-10-08: `/` by 61 bytes). The committed pages are the
+    strongest case: decoding and re-encoding each one must give back exactly the
+    file's own size.
+    """
+
+    def test_a_multibyte_character_costs_its_encoded_length(self):
+        self.assertEqual(smoke.served_size("a"), 1)
+        self.assertEqual(smoke.served_size("—"), 3)
+        self.assertEqual(smoke.served_size("≈"), 3)
+        self.assertEqual(smoke.served_size("ab—c"), 6)
+
+    def test_every_committed_page_reports_its_file_size(self):
+        checked = 0
+        for path in sorted(DIST.rglob("*.html")):
+            text = path.read_text(encoding="utf-8")
+            self.assertEqual(smoke.served_size(text), path.stat().st_size, str(path))
+            checked += 1
+        self.assertGreaterEqual(checked, 4, "no committed pages found — this test went stale")
