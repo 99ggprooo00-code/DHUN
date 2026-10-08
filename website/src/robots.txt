@@ -1,0 +1,5 @@
+# DHUN — https://99ggprooo00-code.github.io/DHUN/
+User-agent: *
+Allow: /
+
+Sitemap: https://99ggprooo00-code.github.io/DHUN/sitemap.xml

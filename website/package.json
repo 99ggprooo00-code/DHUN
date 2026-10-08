@@ -6,11 +6,12 @@
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "build": "eleventy",
+    "build": "eleventy && node tools/minify.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "check": "node ../scripts/website_checks.mjs"
+    "verify:minify": "node tools/verify-minify.mjs"
   },
   "devDependencies": {
-    "@11ty/eleventy": "3.1.6"
+    "@11ty/eleventy": "3.1.6",
+    "html-validate": "11.16.2"
   }
 }

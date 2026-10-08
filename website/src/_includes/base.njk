@@ -1,0 +1,73 @@
+{#- Base layout: head, skip link, header, footer. One <h1> per page comes from
+    the page template, never from here. -#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<meta name="description" content="{{ description }}">
+<link rel="canonical" href="{{ site.url }}{{ page.url }}">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#161616" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F6F4F1" media="(prefers-color-scheme: light)">
+<meta name="generator" content="Eleventy">
+<meta property="og:type" content="{{ site.ogType }}">
+<meta property="og:site_name" content="DHUN">
+<meta property="og:title" content="{{ ogTitle or title }}">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:url" content="{{ site.url }}{{ page.url }}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ ogTitle or title }}">
+<meta name="twitter:description" content="{{ description }}">
+<link rel="icon" href="/assets/dhun-favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/styles.css">
+{%- if extraHead %}
+{{ extraHead | safe }}
+{%- endif %}
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="wordmark" href="/" aria-label="DHUN home">
+      <span class="wordmark-mark" aria-hidden="true">{% icon "play" %}</span>
+      <span class="wordmark-text">DHUN</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        {%- for item in site.nav %}
+        <li><a href="{{ item.href }}"{% if item.external %} rel="noopener"{% endif %}>{{ item.label }}{% if item.external %}<span class="ext" aria-hidden="true">{% icon "external" %}</span><span class="sr-only"> (opens in a new tab)</span>{% endif %}</a></li>
+        {%- endfor %}
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="main">
+{{ content | safe }}
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <p class="footer-brand">DHUN</p>
+        <p class="footer-note">{{ site.footer.licence }}
+        <a href="{{ site.licence }}" rel="noopener">LICENSE</a> ·
+        <a href="{{ site.thirdParty }}" rel="noopener">THIRD_PARTY.md</a></p>
+      </div>
+      <nav aria-label="Footer">
+        <ul class="footer-links">
+          <li><a href="/features/">Features</a></li>
+          <li><a href="/download/">Download</a></li>
+          <li><a href="{{ site.repo }}" rel="noopener">Source</a></li>
+          <li><a href="{{ site.issues }}" rel="noopener">Issues</a></li>
+          <li><a href="{{ site.changelog }}" rel="noopener">Changelog</a></li>
+        </ul>
+      </nav>
+    </div>
+    <p class="footer-note footer-independence">{{ site.footer.independence }}</p>
+    <p class="footer-note">{{ site.footer.builtWith }}</p>
+  </div>
+</footer>
+</body>
+</html>

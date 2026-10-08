@@ -1,0 +1,130 @@
+---
+layout: base.njk
+title: "DHUN features — what actually ships, and what does not"
+ogTitle: "DHUN features"
+description: "What DHUN actually ships: anonymous playback with no sign-in, persistent offline downloads, synced lyrics, a real Windows desktop client and Android widgets — plus an explicit list of what it does not have."
+---
+<div class="wrap">
+  <section class="hero" aria-labelledby="feat-title">
+    <span class="kicker">FEATURES</span>
+    <h1 id="feat-title">What DHUN does, and what it does not.</h1>
+    <p class="hero-lead">
+      Every item below is implemented in the repository this site is built
+      from. The second half of the page is the part most product pages leave
+      out: the features DHUN does <em>not</em> have, including the ones its
+      closest alternatives do.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
+      <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
+    </div>
+  </section>
+
+  {%- for group in site.featureGroups %}
+  <section aria-labelledby="group-{{ loop.index }}">
+    <div class="section-head">
+      <h2 id="group-{{ loop.index }}">{{ group.title }}</h2>
+    </div>
+    <ul class="card-grid" style="list-style: none; padding: 0;">
+      {%- for item in group.items %}
+      <li class="card">
+        <p style="margin: 0 0 0.5rem;">{{ item.text }}</p>
+        <!--{{ item.source }}-->
+        <p class="traceable" style="margin: 0;">{{ item.source }}</p>
+      </li>
+      {%- endfor %}
+    </ul>
+  </section>
+  {%- endfor %}
+</div>
+
+<section aria-labelledby="visuals-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="kicker">THE DESKTOP AND ANDROID SURFACES</span>
+      <h2 id="visuals-title">Two layouts, one codebase.</h2>
+      <p class="lede">
+        The Android shell uses bottom navigation with a docked mini-player; the
+        desktop window uses a navigation rail with a queue panel beside the
+        content. Both come from the same shared Compose code — these drawings
+        are recreations, labelled as such, not screenshots.
+      </p>
+    </div>
+    <div class="card-grid">
+      {% include "mockups/downloads-phone.njk" %}
+      {% include "mockups/desktop-window.njk" %}
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <section class="risk" aria-labelledby="not-title">
+    <span class="kicker risk-flag">NOT IN DHUN</span>
+    <h2 id="not-title">Things DHUN deliberately does not claim</h2>
+    <p class="lede">
+      These are absent, not "coming soon". DHUN has no accounts and no server
+      of its own, so anything that would need one is out by construction.
+    </p>
+    <ul class="missing">
+      {%- for item in site.notInDhun %}
+      <!--{{ item.source }}-->
+      <li>{{ item.text }}</li>
+      {%- endfor %}
+    </ul>
+    <!-- REQUIRED CAVEAT: extraction is borrowed time (MASTER_PROMPT §2). -->
+    <div data-caveat="borrowed-time">
+      <p><strong>And one thing that is true of every client in this space:</strong>
+      DHUN's playback depends on endpoints YouTube controls. The extraction
+      chain is maintenance, not a solved problem, and the project treats it as
+      borrowed time — see <a href="{{ site.risk.link.href }}" rel="noopener">ADR-001</a>
+      and the daily extraction drill in <code>.github/workflows/extraction-health.yml</code>.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="faq-title">
+    <div class="section-head">
+      <h2 id="faq-title">Short answers</h2>
+    </div>
+    <div class="faq">
+      <div class="card">
+        <h3>Does DHUN need a YouTube Music account?</h3>
+        <p>No. There is no sign-in anywhere in the app, no session cookie is kept,
+        and no PO token or BotGuard attestation is solved. Anonymous playback is
+        the only mode that exists.</p>
+        <!--ADR-001, ADR-003 -->
+      </div>
+      <div class="card">
+        <h3>Does it work offline?</h3>
+        <p>Tracks you save do. Downloads are written to app-private storage with
+        a resumable range download and are served from disk before the network on
+        every later play. Nothing else is cached beyond the app's normal
+        temporary buffer.</p>
+        <!--ADR-006 -->
+      </div>
+      <div class="card">
+        <h3>What does it cost, and how is it funded?</h3>
+        <p>Nothing, and it is not. DHUN is GPL-3.0 free software with no paid
+        tier, no ads in the app, no analytics and no sponsor placement. The
+        download is hosted on GitHub's free release storage.</p>
+        <!--LICENSE; THIRD_PARTY.md -->
+      </div>
+      <div class="card">
+        <h3>Which platforms actually work?</h3>
+        <p>Android 7.0+ is the primary, tested target. Windows is the tested
+        desktop target and needs a system VLC install for playback. Linux and
+        macOS run the same JVM build but have never been checked on hardware —
+        that is a gap, not a supported claim.</p>
+        <!--MASTER_PROMPT §1; S3 checklists -->
+      </div>
+    </div>
+  </section>
+
+  <section class="closing" aria-labelledby="feat-close">
+    <h2 id="feat-close">Ready when you are.</h2>
+    <p>One APK, one MSI, and the whole source under GPL-3.0.</p>
+    <div class="cta-row">
+      <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
+      <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,207 @@
+name: website
+
+# The marketing site's own workflow. It is deliberately separate from the four
+# app workflows: a site failure here can never redden app CI, and app CI stays
+# Python-only (its step 1 runs scripts/test_website_*.py against the committed
+# built HTML with no Node and no network).
+#
+# Triggers are site-scoped: a change outside website/**, the site's checks, or
+# this file does not start this workflow at all.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "scripts/website_claims.py"
+      - "scripts/website_quality.py"
+      - "scripts/test_website_claims.py"
+      - "scripts/test_website_quality.py"
+      - ".github/workflows/website.yml"
+  pull_request:
+    paths:
+      - "website/**"
+      - "scripts/website_claims.py"
+      - "scripts/website_quality.py"
+      - "scripts/test_website_claims.py"
+      - "scripts/test_website_quality.py"
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and check the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install site dependencies (pinned lockfile)
+        working-directory: website
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the site
+        working-directory: website
+        run: npm run build
+
+      # Minification is how the page-weight budget is met; this proves it only
+      # removed whitespace, by rebuilding unminified and comparing.
+      - name: Prove minification is lossless
+        working-directory: website
+        run: node tools/verify-minify.mjs
+
+      # The committed mirror in website/dist/ is what app CI's step 1 checks.
+      # If a rebuild changes it, one of the two is stale and the PR must fix it.
+      - name: Committed build must match a fresh build (drift check)
+        run: |
+          if ! git diff --exit-code --stat -- website/dist; then
+            echo "::error title=Site drift::website/dist does not match a fresh build of website/src. Run 'npm run build' in website/ and commit the result."
+            exit 1
+          fi
+          echo "::notice title=Drift check::website/dist matches a fresh build of website/src."
+
+      - name: Honesty contract on the fresh build
+        run: python3 scripts/website_claims.py website/dist
+
+      - name: Quality gates on the fresh build
+        run: python3 scripts/website_quality.py website/dist
+
+      - name: HTML validation (html-validate, pinned)
+        working-directory: website
+        run: npx html-validate "dist/**/*.html"
+
+      - name: Upload the built site
+        uses: actions/upload-artifact@v6
+        with:
+          name: dhun-site
+          path: website/dist
+          retention-days: 7
+          if-no-files-found: error
+
+  a11y:
+    name: Lighthouse and axe (real numbers, printed as annotations)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: dhun-site
+          path: dist
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      # GitHub's ubuntu images ship Google Chrome; if that is ever untrue the
+      # step says so explicitly instead of reporting a score it never measured.
+      - name: Is a browser available?
+        id: browser
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            google-chrome --version
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Lighthouse::no Chrome on this runner — Lighthouse and axe could not run; no score is claimed."
+          fi
+
+      - name: Serve the built site
+        if: steps.browser.outputs.available == 'true'
+        run: |
+          python3 -m http.server 8080 --directory dist --bind 127.0.0.1 &
+          sleep 2
+          curl -sf -o /dev/null http://127.0.0.1:8080/ && echo "server up"
+
+      - name: Lighthouse (performance, accessibility, best practices, SEO)
+        if: steps.browser.outputs.available == 'true'
+        run: |
+          mkdir -p reports
+          for route in "/" "/features/" "/download/"; do
+            name=$(echo "$route" | tr -c 'a-zA-Z0-9' '_')
+            npx --yes lighthouse@13.5.0 "http://127.0.0.1:8080$route" \
+              --quiet --output=json --output=html \
+              --output-path="reports/${name}" \
+              --chrome-flags="--headless=new --no-sandbox --disable-dev-shm-usage" || exit 1
+            python3 - "$route" "reports/${name}.report.json" <<'PY'
+          import json, sys
+          route, path = sys.argv[1], sys.argv[2]
+          report = json.load(open(path))
+          scores = {
+              key: report["categories"][key]["score"]
+              for key in ("performance", "accessibility", "best-practices", "seo")
+          }
+          text = " · ".join(f"{k}={v * 100:.0f}" for k, v in scores.items() if v is not None)
+          print(f"::notice title=Lighthouse {route}::{text}")
+          print(f"{route}: {text}")
+          failures = []
+          if scores["accessibility"] is not None and scores["accessibility"] < 0.95:
+              failures.append(f"accessibility {scores['accessibility'] * 100:.0f} < 95")
+          if scores["performance"] is not None and scores["performance"] < 0.9:
+              failures.append(f"performance {scores['performance'] * 100:.0f} < 90")
+          if failures:
+              print(f"::error title=Lighthouse {route}::" + "; ".join(failures))
+              sys.exit(1)
+          PY
+          done
+
+      # axe-core proper, run through its CLI on the three routes, so the audit
+      # is not only Lighthouse's embedded copy.
+      - name: axe-core CLI
+        if: steps.browser.outputs.available == 'true'
+        run: |
+          for route in "/" "/features/" "/download/"; do
+            npx --yes @axe-core/cli@4.14.0 "http://127.0.0.1:8080$route" --exit || exit 1
+          done
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lighthouse-reports
+          path: reports
+          retention-days: 7
+          if-no-files-found: ignore
+
+  deploy:
+    name: Deploy to GitHub Pages
+    # Gated by `build` — the job that runs the honesty contract, the quality
+    # gates, HTML validation and the drift check. The a11y job's Lighthouse/axe
+    # numbers are evidence, reported as annotations; they do not gate a publish,
+    # because a failing audit cannot be fixed by withholding the site.
+    needs: [build]
+    # Only main publishes. A branch push (including a session branch) builds and
+    # checks, and cannot overwrite the public site.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dhun-site
+          path: dist
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v5
