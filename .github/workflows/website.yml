@@ -333,8 +333,10 @@ jobs:
     # a failing audit cannot be fixed by withholding the site.
     needs: [build]
     # Only main publishes. A branch push (including a session branch) builds and
-    # checks, and cannot overwrite the public site.
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # checks, and cannot overwrite the public site.  workflow_dispatch is also
+    # allowed so an operator can trigger a deploy without touching main directly
+    # (e.g. after switching Pages build_type from legacy to workflow).
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     # `published` is the only honest signal that this job actually put bytes on
     # the web: the job *succeeds* while its publish steps skip under
     # `build_type: legacy`, so "deploy finished" is not the same as "the site
@@ -396,7 +398,7 @@ jobs:
     # red on main for a reason that is not about the site. Gating on the real
     # publish output keeps a skip a skip.
     needs: [deploy]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.deploy.outputs.published == 'true'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.deploy.outputs.published == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
