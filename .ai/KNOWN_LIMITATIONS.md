@@ -26,6 +26,21 @@
 - **`og:image` is deliberately absent.** No image exists in the repository, an
   SVG `og:image` is not rendered by the major crawlers, and a generated PNG would
   be fabricated imagery. Cards therefore render as text-only previews.
+- **The canonical URL serves the repository README, not the site, and nothing
+  here can change that.** Re-read 2026-10-08: `build_type: legacy`, source
+  `main:/`, `status: errored`; the Pages build for `505c3d5` failed with "Page
+  build failed." and the one for `c6414f4` is still `building` with a 0 ms
+  duration, so the bytes a visitor gets are the last *successful* legacy build's
+  README rendering. `PUT /repos/99ggprooo00-code/DHUN/pages` returns HTTP 403
+  ("Resource not accessible by integration") to the token this workstream
+  authenticates with, and `gh auth status` confirms it is a GitHub App token, not
+  a PAT — the setting is a human action. What is now true: every `website` run
+  reports the `build_type` and the fix on every trigger (summary + warning),
+  `docs/runbooks/publishing-the-site.md` records the switch and its verification,
+  and the README no longer calls that URL the marketing site. What is still
+  missing: a served-site check — `scripts/website_smoke.py` cannot run until the
+  source is `workflow`, so the `served` job remains a *skip*, not a pass, and no
+  byte on the public origin has ever been verified from this workstream.
 - **A link checker for external URLs was not added.** The site's outbound links
   point at `github.com/...` and `grouplens`-free paths; a network-dependent test
   is not allowed in the Python-only suite, and CI annotations cannot carry a

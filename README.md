@@ -26,9 +26,20 @@ Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 
 ## Website
 
-<https://99ggprooo00-code.github.io/DHUN/> is a static marketing site for the
-applications above: three routes (`/`, `/features/`, `/ui/`), no client-side
-JavaScript, no analytics and no third-party runtime asset.
+`website/dist/` is a static marketing site for the applications above: three
+routes (`/`, `/features/`, `/ui/`), no client-side JavaScript, no analytics and
+no third-party runtime asset.
+
+**Where it is served — read this before trusting the URL.** Its canonical URL is
+<https://99ggprooo00-code.github.io/DHUN/>, but as of 2026-10-08 that URL does
+**not** serve this site: Pages is configured `build_type: legacy` / source
+`main:/`, so Jekyll renders *this README* there instead. The site itself is
+built, checked and committed — publishing is one repository setting away, and
+the automation cannot change it (`PUT .../pages` → HTTP 403). Every `website`
+workflow run reports the current `build_type` in its summary and as a warning.
+**Fix: Settings → Pages → Build and deployment → Source → GitHub Actions** — the
+full runbook, with what to check afterwards, is
+`docs/runbooks/publishing-the-site.md`.
 
 **It is not a distribution channel.** The site describes the software and shows
 its interface; it does not hand out builds, digests, sizes or installation

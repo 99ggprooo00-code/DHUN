@@ -309,11 +309,18 @@ Truthfulness is enforced by tests, not prose:
 
 ### Exact next actions
 
+0. **Switch the Pages source (human, 30 seconds).** <https://99ggprooo00-code.github.io/DHUN/>
+   serves Jekyll's rendering of the root `README.md`, not the site, because the
+   repository is configured `build_type: legacy`, source `main:/`
+   (`gh api repos/99ggprooo00-code/DHUN/pages` → `status: errored`; the API
+   refuses the change with HTTP 403 "Resource not accessible by integration").
+   **Settings → Pages → Build and deployment → Source → GitHub Actions** — then
+   the next `main` push publishes `website/dist` and the `served` job stops being
+   skipped. Full runbook: `docs/runbooks/publishing-the-site.md`. Every `website`
+   run now reports the current `build_type` in its summary, so this is visible
+   without reading a doc.
 1. **Read what this session could not**: the post-merge `website.yml` run and
-   `https://99ggprooo00-code.github.io/DHUN/`. If the Pages source is still
-   `legacy`, apply Settings → Pages → Source → **GitHub Actions** (or the
-   one-line API call recorded in PR #138's final comment) and re-run the
-   workflow.
+   `https://99ggprooo00-code.github.io/DHUN/`.
 2. **S3 rounds 4 and 5 stay the release lane.** They are user-only, unaffected
    by the site, and they are the source of the screenshots that replace the
    mockups.

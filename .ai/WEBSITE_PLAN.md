@@ -339,6 +339,22 @@ checked against every `*.gradle.kts` / `*.versions.toml` in the repository
 against synthetic trees in `test_website_claims.py`. Reversal cost: none — it is
 an added rule.
 
+**D17 — the URL is reported on every run; the site is not planted at the repo
+root.** The public URL renders the README (D9/§10 said so a session ago, and it
+is still true), and that was recorded in planning documents only. A visitor, and
+a reviewer reading a pull request, saw nothing. Decision: the `build` job now
+reads the Pages source first, writes it to the run summary and raises a
+`::warning::` naming the exact setting (Settings → Pages → Build and deployment →
+Source → GitHub Actions) while `build_type != workflow`; the deploy job keeps its
+publish gate and `served` keeps gating on the real publish output, so a skip is
+still a skip. Deliberately **not** done: a copy of `dist` at the repository root
+(`index.html`, `features/`, `ui/`) so legacy Jekyll would serve *something* —
+that is a second, ungated copy of the site that every future site change has to
+mirror by hand, published next to `docs/` and `.ai/`, and it would still not be
+the artifact the deploy job publishes. Cost of the chosen path: publishing waits
+on a human with Pages write access; the wait is now visible in every run.
+Reversal cost: delete the step (its tests fail, by design).
+
 ## 11. Work plan, execution and honest status
 
 | Phase | Deliverable | Status |

@@ -109,10 +109,57 @@ them itself — a rule that could never fire. All three are written up in
 `.ai/DEBUG_LOG.md`; the print one is now a local 4.5:1 check on the print palette,
 and the forced-colours one reads each route's own stylesheet.
 
+## Publishing: the canonical URL does not serve this site yet
+
+Read this session, from the GitHub API — this is the first time the repository
+has recorded the *publishing* state with its full history rather than one line:
+
+```text
+GET repos/99ggprooo00-code/DHUN/pages
+  {"build_type":"legacy","source":{"branch":"main","path":"/"},"https_enforced":true,"status":"errored"}
+
+GET repos/99ggprooo00-code/DHUN/pages/builds?per_page=5
+  building  2026-10-08T16:27:39Z  commit=c6414f4  dur=0ms
+  errored   2026-10-08T14:58:05Z  commit=505c3d5  "Page build failed."
+  built     2026-10-08T14:14:54Z  commit=ae44c7a  dur=101561ms
+  built     2026-10-08T13:19:51Z  commit=2a20024  dur=135241ms
+  built     2026-10-08T12:41:21Z  commit=fddc436  dur=63349ms
+
+PUT repos/99ggprooo00-code/DHUN/pages -f build_type=workflow
+  {"message":"Resource not accessible by integration","status":403}
+```
+
+Consequences, stated plainly:
+
+- <https://99ggprooo00-code.github.io/DHUN/> serves Jekyll's rendering of the
+  repository `README.md` — an engineering document — not `website/dist/`.
+- The repository root has no `index.*`, no `_config.yml` and no `.nojekyll`, so
+  there is nothing else the legacy build could serve at `/`.
+- The switch is a human action: the integration token gets HTTP 403 on the Pages
+  endpoint, and `gh auth status` shows a GitHub App token, not a PAT.
+- Therefore this session's deliverable for that request is visibility and
+  documentation, not a serving change: the `build` job reports `build_type`, the
+  URL it actually serves, and the exact setting on **every** trigger (run summary
+  + `::warning::`), `docs/runbooks/publishing-the-site.md` records the switch,
+  the verification steps and the two rejected alternatives (a second copy of the
+  site at the repository root; a `_config.yml`), and the README no longer
+  presents that URL as the marketing site.
+- Six tests in `scripts/test_website_workflow.py` pin it, including one that
+  fails if the warning is ever turned into an error — the deploy job's
+  `published` output and the `served` job's gate are re-asserted unchanged, so a
+  skip stays a skip and nothing claims a publish that did not happen.
+- **Still not verified:** any byte served from that origin. `served` runs
+  `scripts/website_smoke.py` against the public URL only after a real publish, so
+  it remains a skip, not a pass.
+
 ## CI evidence
 
 **Read at the finish sequence; the numbers are in the PR #140 comment, which is
-the record of what the runs on this head actually said.** What was on record
+the record of what the runs on this head actually said.** The first run of the
+`browser` and `lighthouse` jobs on this branch (head `89834c0`) began after the
+final push; its annotations are the only browser evidence for the viewports,
+forced colours, print and focus work described above. Until they are read, every
+browser statement in this file is *built*, not *measured*. What was on record
 before this session's head existed (run `37808955045`, the merged head `c6414f4`,
 quoted because it is what this session is measured against):
 
@@ -160,4 +207,6 @@ quoted because it is what this session is measured against):
 
 `dfd8539` recon · `6240fa6` one request + reporter naming · `8795c38` viewports,
 High Contrast, print, rule tests · `e8f2701` structured data + metadata assertions
-· `48f5cd9` sitemap/asset/drift rules · then docs and the ratchet.
+· `48f5cd9` sitemap/asset/drift rules · `4203d94` telemetry rule + docs + ratchet
+baseline · `89834c0` the two dead focus helpers deleted (33 lines out, 0 in) ·
+then the publishing report, its runbook and the `.md` sweep.

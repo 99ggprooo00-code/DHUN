@@ -149,7 +149,12 @@ canonical-origin/browser evidence is open.
 - The formerly advertised URL
   `https://99ggprooo00.github.io/DHUN/` → 404. The user chose “correct now,”
   so README line 2 now uses the actual canonical Pages URL:
-  `https://99ggprooo00-code.github.io/DHUN/` → live, rendering the README.
+  `https://99ggprooo00-code.github.io/DHUN/` → live, rendering the README —
+  **still true** as of `arena/37ec95ed-dhun` (`build_type: legacy`,
+  `status: errored`), and the reason the site has no public URL yet: the Pages
+  source must be set to **GitHub Actions** by a human with Pages write access.
+  See `docs/runbooks/publishing-the-site.md`; every `website` run reports the
+  current `build_type`.
 - Pages API: legacy source `main:/`, status `built`; build 1269157028 and run
   37772062338 succeeded. The failure is the missing `-code` in the advertised
   hostname, **not** an empty artifact or bad Pages source.

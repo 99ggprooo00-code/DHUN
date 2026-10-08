@@ -1,11 +1,12 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
-## 2026-10-08 — five defects found by trying to break the new checks (session `arena/37ec95ed-dhun`)
+## 2026-10-08 — six defects found by asking who would actually see the failure (session `arena/37ec95ed-dhun`)
 
 The session's own rule was "a rule that cannot be made to fail is not a rule", so
-every new check was mutated before it was trusted. Five defects surfaced; three
-were in code I had just written, one was in a workflow filter, and one was in my
-own hand-written numbers.
+every new check was mutated before it was trusted. Five defects were in the
+plumbing (three in code I had just written, one in a workflow filter, one in my
+own hand-written numbers). The sixth was reported by the person who owns the
+repository, looking at the public URL.
 
 **1. `forced_colors_violations` read the union of all pages' CSS and passed a
 per-page deletion.** `site_stylesheet()` joins the inlined CSS of every route for
@@ -41,6 +42,22 @@ test, and `test_website_workflow.py` gained a derived rule — every
 pull_request). Mutation: removing one path from the filter fails with "is used by
 website.yml but does not trigger it on both push and pull_request".
 Lesson: hand-maintained lists drift; derive the list from the thing it describes.
+
+**6. Everything knew the canonical URL was not the site; nobody was told.**
+`README.md` line 2 advertised <https://99ggprooo00-code.github.io/DHUN/> as the
+marketing site while Pages is configured `build_type: legacy` / `main:/`, so
+Jekyll renders the repository README there (`status: errored`; the API answers
+HTTP 403 to the token here). The plan and the limitations file said so; the
+deploy job even printed a `::warning::` naming the fix — but that job only runs
+on a push to `main`, so a pull request, a run summary and every visitor saw
+nothing, and the README went on promising a site that is not there. **A correct
+warning nobody reads is a defect of discoverability, not a pass.** Fix: the
+`build` job now reports `build_type`, the URL and the exact setting on every
+trigger (summary + warning), `docs/runbooks/publishing-the-site.md` records the
+switch and its verification, the README says plainly what that URL serves today,
+and six tests fail if any of that regresses — including one that fails if the
+warning is ever upgraded to an error, because a setting an agent cannot change
+must not redden a build that is otherwise green.
 
 **5. Two commit messages carried test counts I had not read.** `6240fa6` claims
 "178 → 194 (10 icon/inlining + 6 reporter naming + 1 derived trigger rule)" — the

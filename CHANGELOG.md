@@ -24,6 +24,26 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — the canonical URL is not the site yet, and now every run says so (2026-10-08, session `arena/37ec95ed-dhun`)
+
+- **A silence, fixed.** GitHub Pages is configured `build_type: legacy` with the
+  branch source `main:/`, so <https://99ggprooo00-code.github.io/DHUN/> serves
+  Jekyll's rendering of the repository `README.md`, not `website/dist/`. The
+  deploy job has always detected this and skipped its publish steps — correct,
+  but it only runs on a push to `main`, and the README presented the URL as the
+  marketing site. Now the `build` job reports `build_type`, the URL it actually
+  serves and the one fix on **every** trigger, in the run summary and as a
+  warning; `docs/runbooks/publishing-the-site.md` records the setting, the
+  verification steps and the two things deliberately not done (no copy of the
+  site at the repository root, no `_config.yml`). Switching the source needs
+  Pages write access, which this automation does not have.
+- **Tested, not asserted:** `scripts/test_website_workflow.py` fails if the
+  build job stops reporting the Pages source, if the warning is ever upgraded to
+  an error (a setting an agent cannot change must not redden a green build), if
+  the deploy job stops owning the publish gate, if the runbook disappears, or if
+  the README again offers that URL as the site without saying what gates it.
+
+
 ### Changed — one request per route, the hard viewports measured, and print (2026-10-08, session `arena/37ec95ed-dhun`)
 
 - **Every route is now a single HTTP request.** The tab icon is inlined as a

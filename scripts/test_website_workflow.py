@@ -224,6 +224,61 @@ class DeployJob(WorkflowText):
         self.assertRegex(self.job("deploy"), r"needs:\s*\[?build\]?")
 
 
+class CanonicalUrlIsReported(WorkflowText):
+    """The URL a reader visits first is not the site yet, and every run says so.
+
+    The deploy job has always skipped its publish steps with a warning while
+    Pages' source is the branch (`build_type: legacy`), which is right — but it
+    only runs on a push to main, so a pull request, a visitor and the run summary
+    all saw nothing. Meanwhile the canonical URL renders the repository README
+    through legacy Jekyll, and README.md advertised it as the marketing site: the
+    defect was not the behaviour, it was the silence.
+
+    These tests pin the three things that make the fact survive: it is reported
+    in the *build* job (which runs on every trigger and fails nothing), it names
+    the exact setting and the runbook, and it stays a warning rather than an
+    error — a misconfiguration an agent cannot fix must never redden a build that
+    is otherwise green.
+    """
+
+    def test_build_job_reports_the_pages_source_on_every_run(self):
+        job = self.job("build")
+        self.assertIn("build_type", job)
+        self.assertIn("GITHUB_STEP_SUMMARY", job)
+        self.assertRegex(job, r"::warning title=The canonical URL is not this site yet")
+
+    def test_the_report_names_the_setting_and_the_runbook(self):
+        job = self.job("build")
+        self.assertIn("Settings -> Pages", job)
+        self.assertIn("GitHub Actions", job)
+        self.assertIn("docs/runbooks/publishing-the-site.md", job)
+
+    def test_the_report_is_a_warning_not_an_error(self):
+        self.assertNotIn("::error title=The canonical URL", self.job("build"))
+
+    def test_deploy_job_still_owns_the_publish_gate(self):
+        job = self.job("deploy")
+        self.assertIn("steps.pages_source.outputs.build_type == 'workflow'", job)
+
+
+class PublishingRunbook(unittest.TestCase):
+    """The runbook a reader needs when the warning tells them to go read it."""
+
+    def test_the_runbook_exists_and_names_the_exact_setting(self):
+        runbook = REPO_ROOT / "docs" / "runbooks" / "publishing-the-site.md"
+        self.assertTrue(runbook.is_file(), "the Pages warning points at a missing runbook")
+        text = runbook.read_text(encoding="utf-8")
+        for phrase in ("Build and deployment", "GitHub Actions", "build_type", "website/dist"):
+            self.assertIn(phrase, text)
+
+    def test_every_doc_that_promises_the_url_is_the_site_says_when_it_is_not(self):
+        """A doc may call the URL the site only if it also says what gates that."""
+        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        section = readme.split("## Website", 1)[1].split("\n## ", 1)[0]
+        if "99ggprooo00-code.github.io/DHUN" in section:
+            self.assertIn("legacy", section.lower())
+
+
 class SiteOwnedScriptsExist(unittest.TestCase):
     def test_every_referenced_site_script_exists(self):
         text = WORKFLOW.read_text(encoding="utf-8")
