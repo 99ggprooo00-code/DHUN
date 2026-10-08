@@ -58,13 +58,7 @@ export function fullPlayer(player, { lyrics = [], activeLyricIndex = -1, tab = "
         </button>
       </div>
 
-      <img
-        class="dhun-full__art"
-        alt=""
-        aria-hidden="true"
-        style="${raw(artworkStyle(track.id))};display:block"
-        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"
-      />
+      <span class="dhun-full__art" style="${raw(artworkStyle(track.id))}" aria-hidden="true"></span>
       <div class="dhun-full__meta">
         <h2 class="dhun-full__title">${track.title}</h2>
         <p class="dhun-full__artist">${track.artist} · ${track.album}</p>

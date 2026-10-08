@@ -135,7 +135,7 @@ export function homeScreen({ feed, source, currentTrackId }) {
       quickPicks
         ? html`<section class="dhun-section">
             ${raw(sectionHeader(quickPicks.title))}
-            <div class="dhun-rail">
+            <div class="dhun-shelf">
               ${raw(
                 quickPicks.tracks
                   .map(

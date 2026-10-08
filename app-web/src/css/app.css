@@ -377,6 +377,22 @@ button {
   list-style: none;
 }
 
+/* A row is the row button plus, optionally, its overflow button. */
+.dhun-tracklist > li {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-track__time {
+  flex: 0 0 auto;
+  padding: 0 var(--dhun-space-sm);
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  color: var(--dhun-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
 .dhun-track {
   display: flex;
   align-items: center;
@@ -456,8 +472,9 @@ button {
 }
 
 /* Quick picks shelf: DhunSpacing.quickPickWidth cards in a horizontal rail
- * (HorizontalRail). */
-.dhun-rail {
+ * (HorizontalRail). Named `shelf`, not `rail`: `dhun-rail` is the large-screen
+ * navigation rail, and the two rules collided. */
+.dhun-shelf {
   display: flex;
   gap: var(--dhun-space-md);
   padding: 0 var(--dhun-space-screen-padding) var(--dhun-space-sm);
@@ -466,11 +483,11 @@ button {
   scrollbar-width: none;
 }
 
-.dhun-rail::-webkit-scrollbar {
+.dhun-shelf::-webkit-scrollbar {
   display: none;
 }
 
-.dhun-rail > * {
+.dhun-shelf > * {
   scroll-snap-align: start;
 }
 
@@ -1139,6 +1156,11 @@ button {
 
 .dhun-menu__row:hover {
   background: var(--dhun-overlay-hover);
+}
+
+.dhun-menu__row > .dhun-icon {
+  flex: 0 0 auto;
+  color: var(--dhun-text-tertiary);
 }
 
 /* ------------------------------------------------------------------ shimmer --
