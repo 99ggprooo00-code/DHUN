@@ -1,6 +1,136 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/5ba66cdb-dhun` — root-cause fixes for S3 regressions (2026-10-08)
+## Session `arena/19a284df-dhun` — S3 round 3: the Enter fix is wired into the UI and its test is real (2026-10-08)
+
+Updated **2026-10-08** · session branch `arena/19a284df-dhun` · PR **#129**
+(draft, one working PR for the session) · `main` =
+**`ca6d00684f3cf00fed101273e449bebc2fb76a05`** (merge of PR #128,
+2026-10-08T05:12:57Z).
+
+### Phase and scope
+
+**Stage S3 — hardware verification round 3 (user-gated), agent lane open.**
+S1 is closed green, S2 merged (PR #111), S4/S5 code merged (PRs #74/#118),
+S6 blocked on S3. There is no device in the sandbox, so the agent lane is:
+root-cause the reported defects, keep the release path honest, and keep the
+evidence trail accurate. This session's slice is the **verification integrity of
+the Search-Enter fix** — the one S3 defect whose fix and test were both
+nominally "done" on `main` while neither actually covered the shipped code.
+
+### The defect found this session (source-traced, not inherited)
+
+PR #128 fixed *"typing a query and pressing Enter does nothing"* by wiring the
+key check **inline** in `SearchScreen.kt`, and added
+`shared/src/commonMain/kotlin/dev/dhun/ui/search/SearchInputPolicy.kt` plus
+`SearchInputPolicyTest.kt`. On inspection of `main@ca6d006`:
+
+- `SearchScreen.kt:262` contained its own copy of the rule
+  (`event.key == Key.Enter && event.type == KeyEventType.KeyDown`) and **never
+  called** `SearchInputPolicy` — the policy object was dead code in production.
+- `SearchInputPolicyTest.kt` asserted a **private re-implementation**
+  (`private fun shouldSubmitOnEnter(isKeyDown, isEnter) = isEnter && isKeyDown`)
+  instead of the policy. It could not fail whatever the policy or its caller
+  did — i.e. the fix shipped with the shipped predicate uncovered *and* the
+  existing coverage unable to fail.
+
+**Fix (PR #129, commit `643298a8f9bc959860fe098c15c4a6a9288ff1ea`):**
+- `SearchScreen`'s `onKeyEvent` now calls
+  `SearchInputPolicy.shouldSubmitOnKeyEvent(event)`; the four now-unused
+  key-event imports were removed.
+- `SearchInputPolicy` names its submit keys — `Key.Enter` **and**
+  `Key.NumPadEnter`, the pair `isTransportActivationKey` already accepts — and
+  keeps the KeyDown-only guard (a held Enter submits once, not once per repeat).
+- `SearchInputPolicyTest` builds **real desktop `KeyEvent`s** (Compose's
+  `@InternalComposeUiApi` factory; on JVM the native key-event type is `Any`,
+  so there is no public constructor) and pins: Enter-down submits, Enter-up does
+  not, numpad Enter submits, and Space / letters / digits / arrows / Escape
+  never do — the space bar must keep typing spaces (the window-level half of
+  that rule is `DesktopShortcutPolicy`, which *was* correctly wired and tested
+  in PR #127).
+
+**Audit of the same defect class:** all 65 `shared` test files plus
+`app-android`/`app-desktop` were scanned for tests that re-implement the
+production rule instead of calling it. **`SearchInputPolicyTest` was the only
+one.** `DhunThemeContrastTest`'s private WCAG luminance is a deliberate
+independent oracle for the spec; `track()`, `data()`, `touchTargetPx()`,
+`actions()` and friends are thin wrappers that do call production code.
+
+### Files in this session's change set
+
+- `shared/src/commonMain/kotlin/dev/dhun/ui/search/SearchInputPolicy.kt` (rule + docs)
+- `shared/src/commonMain/kotlin/dev/dhun/ui/search/SearchScreen.kt` (wiring, dead imports removed)
+- `shared/src/jvmTest/kotlin/dev/dhun/ui/search/SearchInputPolicyTest.kt` (real `KeyEvent`s)
+- Docs: `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`, `.ai/KNOWN_LIMITATIONS.md`,
+  `.ai/HANDOFF_NEXT_SESSION.md`, `CHANGELOG.md`,
+  `docs/verification/15-test-build-gate.md`,
+  `docs/runbooks/s3-hardware-checklist.md`
+
+### Status ledger (GitHub evidence, checked this session — not local impressions)
+
+| Item | State | Evidence |
+|---|---|---|
+| PR #127 (`arena/094f77e7-dhun`) S3 round-2 fixes | ✅ **GitHub verified — merged** | merge commit `1a88ee380df5f68f1769213dddc133eec04ee9fd`, 2026-10-08T02:05:54Z |
+| PR #128 (`arena/5ba66cdb-dhun`) Search Enter + rail layout + UI logic tests | ✅ **GitHub verified — merged** | merge commit `ca6d00684f3cf00fed101273e449bebc2fb76a05`, 2026-10-08T05:12:57Z; head `be788c0` CI **37730428214**, test-release **37730428234**, Build APK **37730428204** |
+| Post-merge CI on `main@ca6d006` | ✅ **GitHub verified** | CI **37731260148** — 12/12 steps success (shared JVM, Android Robolectric, Android build, probe, desktop compile + JVM tests, packaging helpers) |
+| Post-merge packaging on `main@ca6d006` | ✅ **GitHub verified** | Build APK **37731260114** ✅; test-release **37731260236** ✅ — `apk` ✅ (job 113160651719), `msi` ✅ (job 113160651868), `publish` ✅ (job 113162155556); `aab`/`release_draft` skipped (main-gated, expected) |
+| MSI Windows upgrade column | ✅ **GitHub verified (hosted Windows, not hardware)** | `MSI upgrade smoke PASS :: 2.178.1 -> 2.182.1; per-user install and userdata/cache sentinels preserved. Baseline SHA256=0c67d2bf…` — **no skip warning**; future-upgrade guard PASS; uninstall smoke PASS; `ProductVersion=2.182.1 UpgradeCode=31ddb86b-9666-4071-b11c-45f16fa4682d` |
+| Rolling `test` release republished at the merged fixes | ✅ **GitHub verified** | `isDraft=false`, `isPrerelease=true`, published **2026-10-08T05:19:05Z**, `targetCommitish=ca6d00684f3cf00fed101273e449bebc2fb76a05`; APK **18,383,603 B** sha256 **`ff454398bbfb16139b64ef13c9339ef192461b41453eaa8d62a55e9490142b07`**; MSI **2.182.1**, **112,967,680 B**, sha256 **`aa3ff19c2e3c1102cca17ecd7f0129c4e4a5b689af99f8a1761794d1fd454db7`** (publisher provenance notices; `buildOnly=false`) |
+| Release `.sha256` sidecars read independently | 🔴 **missing in-sandbox** | `release-assets.githubusercontent.com` is unreachable here (`SSL_ERROR_SYSCALL`), so the 80 B/81 B sidecars could not be fetched. The user must verify the sidecars before device testing — the digests above come from the run's provenance notices |
+| PR #129 code head `643298a` | ⏳ **awaiting verification** | push CI **37732411763**, PR CI **37732439056**, Build APK **37732439037**, test-release **37732439049** — in flight at write time; `:shared:jvmTest` is the only verifier of the Kotlin change (no JDK here) |
+| Search-Enter / rail behaviour on a physical device | 🔴 **not verified** | S3 round-3 retest on Redmi Note 12 4G / Android 15 and Windows 11 against the `ca6d006` package (or its successor) |
+| Android landscape ghosting | ⚠️ **architectural risk, unresolved** | PR #128 attributed it to an OS rotation snapshot; layout swaps via a `when` branch with no Compose crossfade. No code cause found or excluded — needs a device observation after the current build settles |
+| Lyrics | ✅ untouched | working per user report; explicitly out of scope |
+
+### Last real error on record
+
+**None on this session's head yet** (checks in flight). The most recent real red
+in the tree is PR #128's own branch history, recorded rather than hidden:
+`38536d5` failed `:shared:compileKotlinJvm` with unresolved references
+(`ShellMasterPane`, `ShellTwoPane`, `BottomNavigationBar`,
+`OfflineStatusBanner`) and `val maxWidth: Dp` implicit-receiver errors (CI
+**37729932288** / **37729923656**, Build APK **37729932201**, test-release
+**37729932219**); `bcd43f3` failed both Kotlin compiles with
+`RowScope.AnimatedVisibility … cannot be called in this context with an
+implicit receiver` (CI **37730244289** / **37730239232**, Build APK
+**37730244253**, test-release **37730244260** cancelled). Both were the rail
+restructure's scope errors; `be788c0` is green. That failure mode — Compose
+receiver scope after moving composables between layouts — is the same class
+this session's `SearchScreen` import edit could hit, which is why CI, not local
+reading, is the gate.
+
+### Exact next technical step
+
+1. Watch **37732411763** / **37732439056** / **37732439037** / **37732439049**
+   to completion on `643298a`; fix any red at its root (a compile error means
+   the Compose `KeyEvent` factory or the opt-in is wrong — correct it, do not
+   delete the test).
+2. Push the documentation commit and confirm the same three workflows are green
+   on the **final PR head**.
+3. Mark PR #129 ready and merge only after that, which republishes the rolling
+   `test` APK/MSI at the new head; then record the new provenance digests and
+   hand the exact `.sha256` verification steps to the user.
+
+### Blockers
+
+- **No JDK / Android SDK / display / Windows taskbar in the sandbox** — CI is
+  the Kotlin verifier and the user's devices are the acceptance gate. Release
+  asset downloads are also blocked in-sandbox, so sidecar digests must be
+  confirmed by the user.
+- **S3 remains OPEN** until the user retests the post-merge package. Green CI,
+  a green hosted MSI upgrade and a republished release are **not** hardware
+  acceptance.
+
+---
+
+## Previous session — PR #127 + PR #128 (`arena/094f77e7-dhun`, `arena/5ba66cdb-dhun`): S3 round-2 regression fixes, both merged and republished
+
+> **Historical record; superseded by the block above.** Its "immediate next
+> step" (verify the final PR head, merge, republish) is **DONE**: PR #127
+> merged as `1a88ee3` (2026-10-08T02:05:54Z) and PR #128 as `ca6d006`
+> (2026-10-08T05:12:57Z); the rolling `test` release now targets `ca6d006`
+> (published 2026-10-08T05:19:05Z, MSI **2.182.1**). The release-baseline
+> paragraph below is stale in exactly that way — read it as the state at
+> 2026-10-08T02:00Z, and take current digests from the ledger above.
 
 Updated **2026-10-08** · fixed branch `arena/5ba66cdb-dhun` · main baseline `1a88ee380df5f68f1769213dddc133eec04ee9fd`.
 

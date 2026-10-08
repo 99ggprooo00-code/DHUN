@@ -1,8 +1,73 @@
-# HANDOFF — root-cause fixes and corrected test candidate
+# HANDOFF — the search-Enter rule is wired and really tested; S3 still user-gated
 
-Updated **2026-10-08**, session `arena/094f77e7-dhun`.
+Updated **2026-10-08**, session `arena/19a284df-dhun` (PR **#129**, draft, head
+`643298a8f9bc959860fe098c15c4a6a9288ff1ea`).
 
-## Current state — product-code head is green; final-head and hardware gates remain
+## Current state — both round-2 PRs are merged and the rolling release carries them
+
+- `main` = **`ca6d00684f3cf00fed101273e449bebc2fb76a05`** (PR #128, merged
+  2026-10-08T05:12:57Z). PR #127 merged earlier the same day as
+  `1a88ee380df5f68f1769213dddc133eec04ee9fd` (02:05:54Z). Post-merge on
+  `ca6d006`: CI **37731260148** (12/12 steps), Build APK **37731260114**,
+  test-release **37731260236** — `apk` ✅, `msi` ✅ with the **full** hosted
+  install-over (`2.178.1 → 2.182.1`, sentinels preserved, no skip warning),
+  `publish` ✅, `aab`/`release_draft` skipped (main-gated).
+- The rolling `test` release was republished **2026-10-08T05:19:05Z** at
+  `ca6d006`: published pre-release (`isDraft=false`), APK **18,383,603 B**
+  sha256 `ff454398bbfb16139b64ef13c9339ef192461b41453eaa8d62a55e9490142b07`;
+  MSI **2.182.1**, **112,967,680 B**, sha256
+  `aa3ff19c2e3c1102cca17ecd7f0129c4e4a5b689af99f8a1761794d1fd454db7`
+  (publisher provenance, `buildOnly=false`). Sidecars were **not** fetched
+  in-sandbox (release-asset host unreachable) — the user must verify them.
+- **What this session changed (PR #129).** At `ca6d006` the search-Enter rule
+  existed twice: inline in `SearchScreen`'s `onKeyEvent` and, **unused**, in
+  `SearchInputPolicy`; `SearchInputPolicyTest` asserted a private copy
+  (`isEnter && isKeyDown`), so CI could not fail if the shipped predicate broke.
+  `643298a` makes `SearchScreen` call `SearchInputPolicy.shouldSubmitOnKeyEvent`,
+  names the submit keys (`Key.Enter` + `Key.NumPadEnter`, matching
+  `isTransportActivationKey`), and rewrites the test to build real desktop
+  `KeyEvent`s through Compose's `@InternalComposeUiApi` factory (pinned against
+  `compose-multiplatform-core` tag `v1.8.2`, the project's Compose). Space /
+  letters / digits / arrows / Escape are pinned as **never** submitting.
+- Audit of the same defect class across all 65 `shared` test files plus
+  `app-android`/`app-desktop` found **no other instance**.
+
+## Next actions — single agent, sequential
+
+1. Confirm push CI **37732411763**, PR CI **37732439056**, Build APK
+   **37732439037** and test-release **37732439049** are green on the final PR
+   head (at write time `:shared:jvmTest` — step 6 — had already passed on
+   `643298a`; the rest were in flight). Fix any red at its root.
+2. Merge PR #129 only after those checks, which republishes the rolling `test`
+   APK/MSI; then record the **new** provenance digests in the ROADMAP ledger,
+   `15-test-build-gate.md` §1 and `s3-hardware-checklist.md`.
+3. Hand the user the exact retest, which is unchanged in shape:
+   - **Windows 11** (record `winver`, installed MSI version + hash, VLC
+     version): type a query in Search and press **Enter** (and numpad Enter) —
+     results must appear; type a **space** inside the query — a space must
+     appear and playback must not toggle; with FullPlayer expanded, click the
+     **NavigationRail** (Home / Search / Library) — the rail must be visible
+     *and* interactive; Ctrl+F, Escape, Jump List tasks.
+   - **Android (Redmi Note 12 4G / Android 15)**: hardware-keyboard Enter if
+     available, `Go to album` on a known album-linked track, offline streaming
+     with Wi-Fi connected but unvalidated + airplane mode (banner above
+     FullPlayer, downloads usable, recovery when the network returns), and the
+     **landscape ghosting** observation after rotation settles.
+4. Keep S3 open until those results arrive. Never report green CI, a green
+   hosted MSI upgrade, or a republished release as hardware acceptance. Do not
+   modify lyrics.
+
+**Blockers:** no JDK, Android SDK, display or Windows taskbar in the sandbox;
+release-asset downloads are blocked, so sidecar digests must be confirmed by the
+user. Kotlin verification is CI-only by construction.
+
+## HISTORICAL STATE — PR #127: root-cause fixes and corrected test candidate (merged 2026-10-08 as `1a88ee3`, session `arena/094f77e7-dhun`)
+
+> Superseded by the section above. Its "next actions" (final-head checks, mark
+> ready, merge, verify the new sidecars) are done for PR #127 and PR #128; the
+> device retest they gated is still open and is restated above.
+
+## State as of PR #127 — product-code head was green; final-head and hardware gates remained
 
 - Draft PR #127 is on the fixed branch `arena/094f77e7-dhun`; product-code head
   `3071d1d6650291d51559f2884f4ac7734d3aac75` fixes the confirmed source defects.

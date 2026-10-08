@@ -25,6 +25,30 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 ## [Unreleased]
 
 
+### Fixed — the search Enter rule is now the code the UI runs, and its test is real (2026-10-08, PR #129)
+
+- **The gap:** PR #128 fixed *"Enter in the search field does nothing"* with an
+  inline key check in `SearchScreen`, while the extracted `SearchInputPolicy`
+  was never called and `SearchInputPolicyTest` asserted a **private copy** of
+  the predicate. The shipped rule had no coverage, and the coverage that
+  existed could not fail — the same regression could have returned green.
+- `SearchScreen` now calls `SearchInputPolicy.shouldSubmitOnKeyEvent`, so there
+  is exactly one rule and the test exercises it.
+- The policy names its submit keys — **Enter and numpad Enter** (the pair the
+  transport controls already accept, so a full-size keyboard behaves like a
+  laptop one) — and keeps the key-down-only guard, so holding Enter submits
+  once instead of once per key repeat.
+- The test builds real desktop `KeyEvent`s and pins the behaviour that matters:
+  Enter submits, its release does not, and **Space / letters / digits / arrows /
+  Escape never do** — the space bar has to keep typing spaces (the window-level
+  half of that rule is `DesktopShortcutPolicy`).
+- All 65 `shared` test files plus the Android and desktop suites were scanned
+  for the same defect class; this was the only instance.
+- Evidence and limits: `:shared:jvmTest` on GitHub Actions is the verifier (no
+  JDK in the maintenance sandbox), and a unit test on constructed events is
+  **not** device acceptance — the S3 retest of Enter-on-a-real-window stays
+  open. See `.ai/DEBUG_LOG.md` (2026-10-08) and `.ai/KNOWN_LIMITATIONS.md`.
+
 ### Testing — the two recurring shared-test flakes are root-caused (2026-10-06, PR #125)
 
 No user-visible change; test infrastructure only.

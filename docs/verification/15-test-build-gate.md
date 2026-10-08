@@ -1,14 +1,36 @@
 # 15 — Test-build gate: step-by-step procedure
 
-> **Current gate (2026-10-08 — product-code head green; final PR head and hardware gates remain).**
-> Main and the rolling `test` release still target `f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5`.
-> Baseline CI **37548884056**, Build APK **37548884107**, and test-release
-> **37548884077** passed, but predate the fixes. Baseline APK is 18,367,219 B,
-> SHA-256 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`;
-> baseline MSI is 112,947,200 B, ProductVersion 2.172.1, SHA-256
-> `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. Do not
-> use this old package to validate fixes or confuse it with the PR build-only
-> artifacts; after merge, verify the new rolling release's own `.sha256` sidecars.
+> **Current gate (2026-10-08 — round-2 fixes are merged and the rolling release carries them; hardware gate remains OPEN).**
+> `main` and the rolling `test` release now both target
+> **`ca6d00684f3cf00fed101273e449bebc2fb76a05`** (PR #128, merged
+> 2026-10-08T05:12:57Z). Post-merge evidence: CI **37731260148** (12/12 steps),
+> Build APK **37731260114**, test-release **37731260236** — `apk` ✅, `msi` ✅
+> with the **full** hosted install-over (`2.178.1 → 2.182.1`, userdata/cache
+> sentinels preserved, no `MSI install-over SKIPPED` warning), `publish` ✅.
+> Release republished 2026-10-08T05:19:05Z as a **published pre-release**
+> (`isDraft=false`, `isPrerelease=true`, `targetCommitish=ca6d006…`):
+> APK **18,383,603 B**, provenance SHA-256
+> `ff454398bbfb16139b64ef13c9339ef192461b41453eaa8d62a55e9490142b07`; MSI
+> **112,967,680 B**, ProductVersion **2.182.1**, provenance SHA-256
+> `aa3ff19c2e3c1102cca17ecd7f0129c4e4a5b689af99f8a1761794d1fd454db7`
+> (`buildOnly=false`). **Those digests are publisher provenance, not fetched
+> sidecars** — release-asset downloads are unreachable in the maintenance
+> sandbox, so verify the release's own `dhun-test.apk.sha256` /
+> `dhun-test.msi.sha256` before installing anything. The superseded baseline
+> `f0225f4` (APK `21a5fe86…9cc2c`, MSI 2.172.1 `c27175…3fe17d6`) and the PR
+> #127 build-only artifacts (APK `75c9da37…`, MSI 2.176.1 `18bfc43e…`) must not
+> be used to validate these fixes.
+>
+> **PR #129 (draft, session `arena/19a284df-dhun`, head
+> `643298a8f9bc959860fe098c15c4a6a9288ff1ea`) adds one more code change on top
+> of `ca6d006`:** the search-Enter rule is wired through `SearchInputPolicy`
+> (it was duplicated inline and its test asserted a private copy, so the
+> shipped predicate had no coverage). Its checks — push CI **37732411763**, PR
+> CI **37732439056**, Build APK **37732439037**, test-release **37732439049** —
+> must be green on the final head before merge, and the merge republishes the
+> rolling release again, which **moves both digests**. Re-read the release
+> provenance after that merge and record the new values here before any device
+> test.
 >
 > **User report round 2 (received 2026-10-07; execution date not supplied).**
 > Android: Redmi Note 12 4G / Android 15, reported APK hash `21a5fe86…9cc2c`;

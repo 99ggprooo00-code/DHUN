@@ -1,5 +1,126 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — a fix that shipped unwired, guarded by a test that could not fail (session `arena/19a284df-dhun`, base `main@ca6d006`, PR #129, commit `643298a`)
+
+**Why this lane.** Boot found PR #128 already merged into `main@ca6d006`
+(2026-10-08T05:12:57Z) and the rolling `test` release republished at it
+(2026-10-08T05:19:05Z), so the S3 round-2 fixes are live — with no device
+retest. The agent lane therefore went to the one thing a sandbox can still do
+honestly: re-read the shipped diff of the reported defects instead of trusting
+the summary. The Search-Enter fix did not survive that reading.
+
+**The symptom that started it.** PR #128's file list contained both
+`SearchInputPolicy.kt` (new) and `SearchInputPolicyTest.kt` (new) *and* an edit
+to `SearchScreen.kt` — which should have been one rule and one test. Reading
+`main@ca6d006`:
+
+- `SearchScreen.kt:262` had its own inline copy of the rule:
+  `if (event.key == Key.Enter && event.type == KeyEventType.KeyDown)`.
+  `SearchInputPolicy` was **never referenced by production code** — `grep` for
+  it outside its own file and its test returned nothing.
+- `SearchInputPolicyTest.kt` did not touch the policy either:
+
+  ```kotlin
+  @Test fun shouldSubmitOnEnter() {
+      assertTrue(shouldSubmitOnEnter(isKeyDown = true, isEnter = true))
+      …
+  }
+  private fun shouldSubmitOnEnter(isKeyDown: Boolean, isEnter: Boolean) =
+      isEnter && isKeyDown
+  ```
+
+  A private re-implementation, same name as the concept under test. It passes
+  for any state of the policy and of `SearchScreen` — including both being
+  deleted.
+
+**Why it matters beyond this one file.** The rule "a test must execute the code
+it claims to pin" is the only thing standing between a defect report and a
+green build. Here the report was closed with a test that measured a copy, so
+CI green meant nothing about the shipped predicate — and the shipped predicate
+was reachable only by an inline expression no test could see. That is the exact
+shape of a regression that returns silently.
+
+**The fix (`643298a`).** `SearchScreen` calls
+`SearchInputPolicy.shouldSubmitOnKeyEvent(event)` (one rule; the four dead
+key-event imports removed); the policy names its submit keys
+(`Key.Enter` + `Key.NumPadEnter`, the pair `isTransportActivationKey` already
+accepts) and keeps the KeyDown-only guard; the test builds **real desktop
+`KeyEvent`s** and calls the policy.
+
+**Environment trap worth keeping: there is no public `KeyEvent` constructor on
+JVM.** `androidx.compose.ui.input.key.KeyEvent` is a common
+`@JvmInline value class KeyEvent(val nativeKeyEvent: NativeKeyEvent)`, and on
+the skiko/desktop target `actual typealias NativeKeyEvent = Any` — so you cannot
+wrap a `java.awt.event.KeyEvent` directly; `KeyEvent.desktop.kt` maps AWT →
+Compose through an `internal data class InternalKeyEvent`
+(`toComposeEvent()`). The supported way to build one in a test is the
+`@InternalComposeUiApi` factory in `KeyEvent.skiko.kt`:
+
+```kotlin
+@OptIn(InternalComposeUiApi::class)
+val e = KeyEvent(key = Key.Enter, type = KeyEventType.KeyDown)
+```
+
+Verified against the **pinned** Compose (`org.jetbrains.compose` 1.8.2) by
+reading `compose-multiplatform-core` at tag `v1.8.2` through the GitHub API —
+`compose/ui/ui/src/skikoMain/kotlin/androidx/compose/ui/input/key/KeyEvent.skiko.kt`
+(factory, parameter names, `InternalKeyEvent`) and
+`compose/ui/ui-util/src/commonMain/kotlin/androidx/compose/ui/InternalComposeUiApi.kt`
+(it *is* a `@RequiresOptIn` marker, so the opt-in is required, not decorative).
+`Key.kt` at the same tag confirms every constant the test uses
+(`Unknown`, `DirectionDown`, `Zero`, `A`, `Z`, `Spacebar`, `Enter`, `Escape`,
+`NumPadEnter`). Named arguments (`key =`, `type =`) also rule out the value
+class's own constructor, whose single parameter is `nativeKeyEvent`.
+
+**Audit — was this systemic?** Scanned all 65 `shared` test files plus
+`app-android` and `app-desktop` for test-private functions whose names also
+exist in production code (the fingerprint of this defect). Every other hit is
+legitimate: fixture factories (`track()`, `downloaded()`, `data()`, `shelf()`),
+thin wrappers that *do* call production (`touchTargetPx()` →
+`DhunSpacing.touchTarget`, `actions()` → `TrackMenuPolicy.actionsFor`), or
+`DhunThemeContrastTest`'s private WCAG luminance/contrast — which is an
+**independent oracle for a spec**, the correct design for a numeric gate, not a
+copy of product logic. `SearchInputPolicyTest` was the only real instance.
+
+**Sandbox limits hit again (unchanged, re-confirmed not assumed).** No
+`java`/`javac`/`gradle`/`pwsh` on PATH and no `/usr/lib/jvm`, so no Kotlin
+compile; `scripts/restore-toolchain.sh` downloads from `api.adoptium.net`,
+which is not reachable here, and the Kotlin compiler's own GitHub release
+redirects to `release-assets.githubusercontent.com` — blocked, the same wall
+that stops release-asset downloads (`SSL_ERROR_SYSCALL`). Maven Central is
+unreachable too, so even with a JDK the Compose classpath could not resolve.
+Consequence: `:shared:jvmTest` on GitHub Actions is the first and only compile
+of this change. The local gates that do run — `python3 -m unittest discover -s
+scripts` **31 OK**, `scripts/validate_fixtures.py` **PASS: 39 files** — do not
+touch Kotlin and are not offered as evidence for it.
+
+**Never do.** Do not "fix" a red `:shared:jvmTest` here by deleting the test or
+reverting to a primitive-typed policy just to dodge the internal API: the point
+is that the shipped rule is the tested rule. Do not quote the provenance
+digests below as user-verified device builds — the `.sha256` sidecars were not
+independently fetched in-sandbox.
+
+**Evidence verified against GitHub this session (not inherited).**
+`main@ca6d006` post-merge: CI **37731260148** 12/12 steps success; Build APK
+**37731260114** success; test-release **37731260236** success — `apk`
+(113160651719), `msi` (113160651868) with `MSI upgrade smoke PASS :: Hosted
+Windows: 2.178.1 -> 2.182.1; per-user install and userdata/cache sentinels
+preserved. Baseline SHA256=0c67d2bf…` (the PR #127 publish's MSI, so the
+install-over upgraded the release's own build), future-upgrade guard PASS,
+uninstall smoke PASS, **no `MSI install-over SKIPPED` warning** — and `publish`
+(113162155556) republished `test`: `isDraft=false`, `isPrerelease=true`,
+published 2026-10-08T05:19:05Z, target `ca6d006…`; provenance `dhun-test.apk
+source=ca6d006… bytes=18383603
+sha256=ff454398bbfb16139b64ef13c9339ef192461b41453eaa8d62a55e9490142b07
+buildOnly=false`, `dhun-test.msi source=ca6d006… version=2.182.1
+bytes=112967680
+sha256=aa3ff19c2e3c1102cca17ecd7f0129c4e4a5b689af99f8a1761794d1fd454db7
+buildOnly=false`. PR #128's own red history is recorded in the ROADMAP ledger
+(`38536d5`, `bcd43f3` — Compose receiver-scope errors during the rail
+restructure). PR #129 checks on `643298a`: push CI **37732411763**, PR CI
+**37732439056**, Build APK **37732439037**, test-release **37732439049** —
+in flight at write time; this entry is not a claim that they passed.
+
 ## 2026-10-06 — the two recurring shared-test flakes, root-caused at last: a test waited for one state and read its sibling (session `arena/cf69112a-dhun`, base `main@a9204c59`, PR #125, commit `df0504f`)
 
 **Why this lane, this session.** Boot found the S3 hardware round still
