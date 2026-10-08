@@ -1,58 +1,82 @@
-# HANDOFF — next session (and hardware re-test script)
+# HANDOFF — root-cause fixes and corrected test candidate
 
-Created **2026-09-21, session `arena/01a0c174-dhun`** (the file this message
-thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
-never committed by the earlier session — its content survived in the session
-message and is transcribed verbatim below, now in-repo).
+Updated **2026-10-08**, session `arena/094f77e7-dhun`.
 
-## CURRENT STATE — PR #125: the two recurring shared-test flakes are root-caused (2026-10-06, session `arena/cf69112a-dhun`, base `main@a9204c59`)
+## Current state — product-code head is green; final-head and hardware gates remain
 
-**What this session did.** The S3 hardware round is user-gated, so it took the
-hardware-free lane: the two `:shared:jvmTest` flakes carried since 2026-09-18
-as "load/timing" are now root-caused and de-raced. Both are one class — a wait
-on one state followed by a read of a *sibling* state that production publishes
-separately:
-- `LibraryViewModelTest.historyPlaybackQueuesCorrectly` (runs **35309124090**,
-  **37320618809**, **37407043852**): `groupedHistory` is derived
-  **asynchronously**, so `if (day != null)` silently skipped the day-play
-  block, after which `prepareCalls >= 2` could never become true — a coin-flip
-  race amplified into a guaranteed 15 s timeout. Now the derived state is
-  waited for and the day path is unconditional.
-- `PlayerViewModelTest.endlessRadioDropsAPageFetchedForAQueueThatChangedMidFetch`
-  (run **37320626452**, `expected:<tok-2> but was:<tok-a>`): the token was read
-  between the queue swap and the token consumption. Now
-  `RadioFixture.awaitContinuationToken(token)` waits for it (and the three
-  sibling radio tests use it).
-- Both `eventually` helpers now take a `label` (evaluated only on expiry) and
-  fail through `kotlin.test.fail`: the check-run annotation — the only CI
-  readout this sandbox can reach — reads
-  `eventually(15000ms) timed out: <label + live state>`.
+- Draft PR #127 is on the fixed branch `arena/094f77e7-dhun`; product-code head
+  `3071d1d6650291d51559f2884f4ac7734d3aac75` fixes the confirmed source defects.
+  Push CI **37710630655**, PR CI **37710634901**, Build APK **37710634909**, and
+  test-release **37710634914** all passed on that head. The CI run includes
+  shared JVM tests, Android Robolectric/build, and desktop compile/JVM tests.
+  The test-release MSI ran the full hosted `2.172.1 → 2.176.1` upgrade, preserved
+  userdata/cache sentinels, and passed future-upgrade/uninstall checks (no skip).
+  PR artifacts were `buildOnly=true`, not a published `test` release: APK
+  18,383,603 B / SHA-256
+  `75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`; MSI
+  2.176.1 / SHA-256
+  `18bfc43e0fda45978f7fbe2d280c9c6cfd580786e9d801bc301f94840bdf67a0`.
+- The earlier product head `1b2dea2` failed compilation because the new preview
+  handler omitted Compose key-event extension imports (`type`, `key`, and
+  `isCtrlPressed`). Commit `3071d1d` adds them; all four runs above passed on the
+  corrected product-code head. This red is recorded, not hidden.
+- The rolling `test` release still targets `main@f0225f4`, not these fixes: APK
+  SHA-256 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`,
+  MSI 2.172.1 SHA-256
+  `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. Do not
+  use those old assets to validate fixes. After the documentation-status update
+  is pushed, require all checks on the final PR head before marking ready/merging.
+- **Confirmed source defects and fixes:** Jump List commits now always run on
+  the dedicated worker, with per-thread CoInitializeEx/CoUninitialize; Space
+  runs in a shell preview handler guarded by focus tracking in Search and DHUN
+  text inputs; tab-navigation/shortcut/fallback actions collapse FullPlayer;
+  Android online detection requires INTERNET+VALIDATED and its offline banner
+  sits above FullPlayer. Lyrics are unchanged.
+- `Go to album` still requires an album ID or nonblank album name. A name-only
+  fallback now reveals Search after collapsing FullPlayer; tracks with no album
+  metadata have no valid destination and are not claimed as fixed without a
+  known-album device test. Windows taskbar visibility/AUMID/privacy and Android
+  offline recovery remain hardware checks.
 
-**Evidence.** Push CI **37408908111** on `df0504f` — **12/12 steps** incl.
-`Unit tests — shared domain`; PR CI **37408920918**, Build APK **37408921035**,
-test-release **37408920959** — all green. Local JDK-free gates: 31 unittest OK,
-`validate_fixtures.py` PASS 39. Sheet:
-`docs/verification/16-ci-flake-hygiene.md`. **PR #125 is open, CI-green,
-awaiting the user's merge authorization.**
+## Next actions — single agent, sequential
 
-**The `main`-push verification of the previous session's repair (on
-`a9204c59`).** Run **37408148220**: `msi` ✅ with the **full install-over path,
-no skip** (`PASS::Hosted Windows: 2.160.1 -> 2.163.1`, sentinels preserved,
-baseline SHA256 `74109a13…`) + future-upgrade guard + uninstall smoke, and
-**`publish` ✅** replaced the rolling release; CI **37408148211** 9/9, Build APK
-**37408148184**. `test` is a published pre-release again (target `a9204c59…`,
-four assets, MSI 2.163.1 sha256 `12745f81394a357c266c8453903e70aa78c2f7b29450d97e5c8348dfc45f5f8e`,
-APK 18,367,219 B sha256 `21a5fe86…`). PR #124 (previous session, docs-only)
-carries the same record.
+1. Finish the documentation status sync in this change set and keep PR #127 a
+   draft until the required checks pass on its final head. PR-path `publish` and
+   `release_draft` are expected to skip; APK/MSI package jobs must pass, and the
+   MSI annotations must prove install-over actually ran.
+2. After all automated checks and documentation pass, mark PR #127 ready and
+   merge to publish a new rolling `test` APK/MSI. Hardware acceptance stays
+   **OPEN** until the user tests the *new* hashes. Never report CI as hardware
+   acceptance or use the old `f0225f4` assets for the retest.
+3. After merge, verify the rolling release's new `.sha256` sidecars and provide
+   exact steps from `docs/runbooks/s3-hardware-checklist.md`:
+   - Android: test `Go to album` on a known album-linked track; test offline
+     streaming with Wi-Fi connected but Internet unvalidated and in airplane
+     mode; confirm the banner stays above FullPlayer, downloads remain available,
+     and playback recovers when Internet returns.
+   - Windows: record `winver`, package version/hash, VLC, resolution and scale;
+     test Ctrl+F while FullPlayer is expanded, Escape/collapse, Space playback
+     and spaces in Search. Verify Play/Pause, Open DHUN and recent tasks after a
+     `jump list: committed ...` log; if absent, capture the menu/log and check
+     Settings → Personalization → Start → “Show recently opened items in Start,
+     Jump Lists, and File Explorer”.
+4. Keep S3 open for unresolved hardware results; fix confirmed defects with
+   regression tests and repeat the corrected-package check. Do not modify lyrics.
 
-**Next session's exact first step.** Merge #125 once authorized; if #124 lands
-first, merge `origin/main` into `arena/cf69112a-dhun` and keep exactly one
-current ROADMAP block (its record below the new one). Then: watch repetition —
-the two test names must stay absent from every subsequent run. The user-gated
-S3 items are unchanged: gate steps 19–22 (PR #121 surfaces), notification/
-lock-screen/widget controls, downloads/offline, lyrics, settings/theme
-persistence, Android EQ, the Windows native column, 30-minute soaks,
-clean-target installs.
+**Blockers:** no JDK or physical Android/Windows devices in this sandbox.
+Release assets downloaded inside this environment may return EOF; publisher
+provenance plus the user's current `.sha256` sidecars identify exact files.
+
+## HISTORICAL STATE — PR #125: shared-test flake fix (merged 2026-10-06, session `arena/cf69112a-dhun`)
+
+PR #125 fixed the two recurring `:shared:jvmTest` race-shaped failures and added
+labeled timeout diagnostics. Its PR checks passed, and it merged as `b1dba0c`.
+The post-merge CI **37411494455**, Build APK **37411494443**, and test-release
+**37411494399** passed; the MSI install-over ran fully (`2.170.1 → 2.171.1`),
+userdata/cache sentinels were preserved, and future-upgrade/uninstall checks
+passed. The repaired tests are also green in later main CI **37548884056** on
+`f0225f4`; continued recurrence surveillance is still appropriate. Detailed
+evidence: `docs/verification/16-ci-flake-hygiene.md`.
 
 ## CURRENT STATE — PR #122: the MSI/release deadlock is fixed, and the rolling release carries installation files again (2026-10-06, session `arena/95fb0f92-dhun`)
 

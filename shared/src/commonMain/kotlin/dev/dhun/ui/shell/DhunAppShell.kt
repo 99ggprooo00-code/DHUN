@@ -9,6 +9,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -32,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,6 +45,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.zIndex
 import dev.dhun.core.AlwaysOnlineConnectivityMonitor
@@ -63,7 +71,9 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.GlassDock
+import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.NowPlayingBackdrop
+import dev.dhun.design.components.TextInputFocusRegistry
 import dev.dhun.design.components.acrylicGlass
 import dev.dhun.design.components.lyricsVeil
 import dev.dhun.player.DhunPlayer
@@ -208,7 +218,27 @@ fun DhunAppShell(
         track.albumId?.let { nav.push(DetailRoute.AlbumPage(it)) }
     }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    val textInputFocusRegistry = remember { TextInputFocusRegistry() }
+    CompositionLocalProvider(LocalTextInputFocusRegistry provides textInputFocusRegistry) {
+        BoxWithConstraints(
+            modifier = modifier
+                .fillMaxSize()
+                .onPreviewKeyEvent { event ->
+                    if (DesktopShortcutPolicy.shouldTogglePlaybackOnSpace(
+                            isDesktop = isDesktop,
+                            isKeyDown = event.type == KeyEventType.KeyDown,
+                            isSpace = event.key == Key.Spacebar,
+                            controlPressed = event.isCtrlPressed,
+                            textInputFocused = textInputFocusRegistry.hasFocusedTextInput,
+                        )
+                    ) {
+                        playerViewModel.togglePlay()
+                        true
+                    } else {
+                        false
+                    }
+                },
+        ) {
         // ONE decision drives both large-screen affordances: [DhunShellLayout.of]
         // reuses the rail breakpoint token, so the rail and the intent to split
         // can never drift apart. Below it the shell is exactly what shipped to
@@ -220,6 +250,11 @@ fun DhunAppShell(
         // Phase 14 error taxonomy: offline banner. Rendered in the Scaffold
         // topBar slot so innerPadding pushes content down while it shows.
         val isOnline by connectivity.isOnline.collectAsState()
+        val playerOverlayVisible = nav.playerExpanded && currentTrack != null
+        val offlineBannerPlacement = DhunShellPolicy.offlineBannerPlacement(
+            isOnline = isOnline,
+            fullPlayerVisible = playerOverlayVisible,
+        )
         val sleepRemaining by playerViewModel.sleepTimerRemainingMs.collectAsState()
         val sleepLabel = sleepRemaining?.let { ms ->
             val mins = ((ms + 59_999L) / 60_000L).toInt().coerceAtLeast(1)
@@ -280,18 +315,11 @@ fun DhunAppShell(
             containerColor = Color.Transparent,
             topBar = {
                 AnimatedVisibility(
-                    visible = !isOnline,
+                    visible = offlineBannerPlacement == OfflineBannerPlacement.ScaffoldTopBar,
                     enter = slideInVertically { -it } + fadeIn(DhunAnimations.mediumTween()),
                     exit = slideOutVertically { -it } + fadeOut(DhunAnimations.fastTween()),
                 ) {
-                    Surface(color = DhunColors.errorContainer, modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            "You're offline. Search and streaming are unavailable until the connection returns.",
-                            fontSize = DhunTypographyTokens.labelSmall.fontSize,
-                            color = DhunColors.warning,
-                            modifier = Modifier.padding(DhunSpacing.xsPlus),
-                        )
-                    }
+                    OfflineStatusBanner()
                 }
             },
             bottomBar = if (useNavigationRail) {
@@ -517,6 +545,19 @@ fun DhunAppShell(
                 )
             }
         }
+        // The Scaffold's top bar is behind the immersive player. Re-layer the
+        // same offline status above FullPlayer so buffering cannot look silent.
+        AnimatedVisibility(
+            visible = offlineBannerPlacement == OfflineBannerPlacement.AboveFullPlayer,
+            enter = slideInVertically { -it } + fadeIn(DhunAnimations.mediumTween()),
+            exit = slideOutVertically { -it } + fadeOut(DhunAnimations.fastTween()),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .zIndex(FULL_PLAYER_LAYER_Z_INDEX + 1f),
+        ) {
+            OfflineStatusBanner(modifier = Modifier.safeDrawingPadding())
+        }
 
         // ---------------- dialogs (topmost) ---------------------------------------
         overflowTrack?.let { track ->
@@ -530,14 +571,11 @@ fun DhunAppShell(
                     if (id != null) {
                         nav.push(DetailRoute.ArtistPage(id))
                     } else {
-                        // Same visibility rule as [AppNavState.push]: the
-                        // redirect must be seen even when issued from above
-                        // the expanded player.
-                        nav.playerExpanded = false
-                        nav.detailStack.clear()
+                        // The fallback search must be visible even when this
+                        // action came from above the expanded player.
                         searchViewModel.onQueryChange(track.artistName)
                         searchViewModel.performSearch(track.artistName, dev.dhun.innertube.SearchFilter.ARTISTS)
-                        nav.selectedTab = AppTab.SEARCH
+                        nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = false)
                     }
                 },
                 onNavigateToAlbum = {
@@ -546,10 +584,9 @@ fun DhunAppShell(
                     if (albumId != null) {
                         nav.push(DetailRoute.AlbumPage(albumId))
                     } else if (!albumName.isNullOrBlank()) {
-                        nav.detailStack.clear()
                         searchViewModel.onQueryChange(albumName)
                         searchViewModel.performSearch(albumName, dev.dhun.innertube.SearchFilter.ALBUMS)
-                        nav.selectedTab = AppTab.SEARCH
+                        nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = false)
                     }
                 },
                 onDismiss = { overflowTrack = null },
@@ -568,6 +605,19 @@ fun DhunAppShell(
                 },
             )
         }
+        }
+    }
+}
+
+@Composable
+private fun OfflineStatusBanner(modifier: Modifier = Modifier) {
+    Surface(color = DhunColors.errorContainer, modifier = modifier.fillMaxWidth()) {
+        Text(
+            "You're offline. Search and streaming are unavailable; downloaded tracks remain available.",
+            fontSize = DhunTypographyTokens.labelSmall.fontSize,
+            color = DhunColors.warning,
+            modifier = Modifier.padding(DhunSpacing.xsPlus),
+        )
     }
 }
 

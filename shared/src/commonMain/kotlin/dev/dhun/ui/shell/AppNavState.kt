@@ -178,14 +178,15 @@ class AppNavState {
     }
 
     /**
-     * Nav-bar / nav-rail tap.
+     * Nav-bar / nav-rail tap or an equivalent tab-navigation shortcut.
      *
-     * [keepDetailOnTabChange] is the large-screen rule: with a separate detail
-     * pane the page stays open while the master switches tabs, and re-tapping
-     * the already-selected tab is the "up" affordance that pops one page. A
-     * single-pane shell passes `false`, which reproduces the shipped behavior
-     * exactly: switching tabs drops the whole stack, because a stack that is
-     * merely hidden is a stack the user cannot get back to.
+     * Navigation always collapses the FullPlayer overlay first; otherwise the
+     * destination changes underneath it and looks like a dead tap. The
+     * [keepDetailOnTabChange] large-screen rule then applies: with a separate
+     * detail pane the page stays open while the master switches tabs, and
+     * re-tapping the already-selected tab is the "up" affordance that pops
+     * one page. A single-pane shell passes `false`, which drops the whole stack
+     * because a merely hidden page is a page the user cannot get back to.
      *
      * Either way the switch is recorded in the tab history, so BACK still
      * returns to the tab the user was on.
@@ -194,16 +195,20 @@ class AppNavState {
      *   exists so the rule is testable rather than implicit in the click lambda).
      */
     fun selectTab(tab: AppTab, keepDetailOnTabChange: Boolean = false): Boolean {
+        val playerWasExpanded = playerExpanded
+        playerExpanded = false
         val tabChanged = tab != selectedTab
         selectedTab = tab
         if (!keepDetailOnTabChange) {
             val hadDetail = detailStack.isNotEmpty()
             detailStack.clear()
-            return tabChanged || hadDetail
+            return tabChanged || hadDetail || playerWasExpanded
         }
         // Two-pane: a *different* tab switches the master under the page; a
         // re-tap on the selected tab is the up affordance and pops one entry.
-        return if (tabChanged) true else popDetail()
+        // When the player was covering the shell, one tab action only collapses
+        // it; the next action may pop the detail page.
+        return if (tabChanged || playerWasExpanded) true else popDetail()
     }
 
     /** History for `onSaveInstanceState` (oldest first). */

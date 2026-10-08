@@ -9,16 +9,43 @@ Builds: the rolling [`test` pre-release](https://github.com/99ggprooo00-code/DHU
 Always re-download after the merge you are qualifying, and note the
 `main@<sha>` you tested.
 
-**Build identity (release metadata rechecked 2026-10-05):** rolling `test`
-published **2026-09-28T18:48:23Z**, target and tag
-**`73b88b60b647120662812a5d33b233876acad283`** (PR #119); APK **18,367,219 B**,
-MSI **112,934,912 B**, ProductVersion **2.137.1**. Use
-`docs/verification/15-test-build-gate.md` §1 for the digest-verification status,
-and run its **18-check walkthrough first**, then the download/radio/shuffle
-re-test in `.ai/HANDOFF_NEXT_SESSION.md` and the standing checks below. The
-#119 SHA-256 values are not yet verified in the sandbox; do not reuse the
-#118 hashes or infer identity from equal byte sizes. If `test` has moved, verify
-the new release target/tag and matching `.sha256` sidecars before installing.
+**Build identity (rechecked 2026-10-07):** rolling `test` is a published
+pre-release targeting **`f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5`**, published
+**2026-10-06T23:56:54Z** from test-release run **37548884077**. CI
+**37548884056** and Build APK **37548884107** also passed. Current artifacts:
+APK **18,367,219 B**, provenance SHA-256
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
+**112,947,200 B**, ProductVersion **2.172.1**, provenance SHA-256
+`c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. The MSI
+run completed the full `2.171.1 → 2.172.1` install-over, sentinel preservation,
+future-upgrade guard and uninstall smoke. The asset blob could not be downloaded
+in the sandbox; these values are from GitHub publisher annotations. The live
+release `.sha256` sidecars are still required to verify the exact device files.
+
+**This is the old baseline, not the corrected candidate.** Product-code head
+`3071d1d6650291d51559f2884f4ac7734d3aac75` on draft PR #127 passed push CI
+**37710630655**, PR CI **37710634901**, Build APK **37710634909**, and
+PR test-release **37710634914**. Its PR artifacts are `buildOnly=true`, not the
+rolling release: APK 18,383,603 B / SHA-256
+`75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`; MSI
+2.176.1 / SHA-256
+`18bfc43e0fda45978f7fbe2d280c9c6cfd580786e9d801bc301f94840bdf67a0`. The
+hosted MSI install-over passed `2.172.1 → 2.176.1`, preserving userdata/cache
+sentinels and passing future-upgrade/uninstall checks. The rolling `test` tag
+still does not contain these fixes. Verify the status-sync documentation commit
+also passes the required checks on the final PR head; after merge, download the
+new `test` assets and verify their own sidecars before targeted retest. Do not
+use the `f0225f4` package to validate these fixes.
+
+`f0225f4` changes only the README after the PR #125 merge `b1dba0c`; its APK is
+byte-identical to the PR #125 APK. The `b1dba0c` MSI was **2.171.1**,
+112,947,200 B, SHA-256
+`353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`. The MSI
+version/hash therefore matters when labelling a Windows upgrade report. Use
+`docs/verification/15-test-build-gate.md` §1 to verify current sidecars; run the
+18-check walkthrough and steps 19–22 before the standing checks below. The
+rolling release changes on every `main` push, so re-download and record the
+actual target, version and hashes immediately before testing.
 
 **Preserve user data:** upgrade-install over the existing app first and check
 playlists, settings and downloads remain. Do not uninstall your daily-use
@@ -30,6 +57,74 @@ Recording: check each box with `[x]`, device model + OS version, and any
 failure as *expected vs actual*. Paste the filled checklist back to the
 agent — failures become S3-found functional bugs (the only UI work allowed
 pre-tag besides this list).
+
+## S3 hardware round 2 — user report received 2026-10-07 (partial; not sign-off)
+
+Execution date/time was not recorded. The device report says Android: Redmi
+Note 12 4G / Android 15, APK SHA-256 `21a5fe86…9cc2c`; this matches the
+current `f0225f4` APK provenance and the byte-identical APK produced at
+`b1dba0c`. General playback/library/download, lyrics/settings and steps 19–22
+were reported as working. `Go to album` was not found, the HTTP 403 case was not
+tested, and offline streaming reportedly buffered for a long time without a
+clear error before recovery after the network returned. These are partial
+results, not an Android S3 pass. Lyrics are working; do not modify them for the
+user's future idea unless asked.
+
+Windows 11 was reported without its exact build or VLC version. The reported MSI
+hash `c27175…3fe17d6` is the **current** `f0225f4` MSI 2.172.1; the report also
+calls the test based on `b1dba0c`, whose MSI was 2.171.1 / SHA-256
+`353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`. The hash's
+pre/post-upgrade timing is not specified, so do not claim the Windows result is
+bound to the older MSI until the installed version and sequence are confirmed.
+Reported issues: DHUN Jump List tasks absent, Space not responding, and a
+full-window player surface preventing Home/Search/Playlists interaction.
+
+Source trace found several code defects, fixed and verified by CI on product-code
+head `3071d1d`: Jump List's zero-delay path called COM on the caller despite the
+dedicated-worker contract; Space ran after child key dispatch; Ctrl+F and the
+album-name search fallback could select a page beneath FullPlayer; Android
+checked INTERNET without VALIDATED and drew the offline banner behind FullPlayer.
+The first code head `1b2dea2` exposed missing Compose key-event imports; these
+were added in `3071d1d` and the successor CI/build/package workflows passed.
+FullPlayer remains intentionally immersive and the docked MiniPlayer remains a
+separate fixed **72 dp** row. Tab-navigation commands now collapse the expanded
+surface. The default AppUserModelID is not changed without evidence of an
+installer/process identity mismatch; Windows privacy/policy can still suppress
+Jump Lists. S3 remains **OPEN** until the post-merge `test` candidate is tested
+on hardware. Final-head automated checks and all device acceptance remain gates.
+Detailed ledger: `docs/verification/14-release.md`.
+
+### Windows retest — exact reproduction and evidence
+
+1. Install only the new post-merge candidate. Record `winver`, display
+   resolution/scale, installed DHUN version, VLC version (or “not installed”),
+   and pre/post-upgrade MSI file hashes. Verify the MSI against the current
+   `test` release sidecar.
+2. Start a track, expand FullPlayer, then press **Ctrl+F**. Search must become
+   visible because the shortcut also collapses the expanded player. Press
+   **Escape** or the **Collapse player** control as a separate check; Home,
+   Search and Playlists must then be interactive, with only the fixed 72 dp
+   docked MiniPlayer remaining. Capture a full-window screenshot if any page
+   remains covered.
+3. Test **Space** with focus on non-editable content and confirm playback
+   toggles. Focus Search and type spaces; they must remain text and must not
+   toggle playback. Repeat once while a DHUN name field is focused if available.
+4. In Windows Settings → Personalization → Start, turn on **“Show recently
+   opened items in Start, Jump Lists, and File Explorer”** (record if policy
+   locks it off). While packaged DHUN is running, play a track and wait for
+   `jump list: committed ...` in `dhun-startup.log`; then right-click the
+   running/pinned taskbar icon. Expected app tasks include **Play / Pause** and
+   **Open DHUN** (plus recent tracks after playback). If only Windows
+   pin/unpin/close items appear, capture the menu and all `jump list:` log lines
+   from `<install-dir>\userdata\dhun-startup.log` or `%TEMP%\dhun-startup.log`.
+   Sanitize personal paths before sharing.
+5. On Android, use a known album-linked track and record `Go to album`'s
+   destination; also try a name-only album track if available. Test uncached
+   streaming offline both with Wi-Fi connected but no validated Internet and in
+   airplane mode, while FullPlayer is open. Confirm the offline message remains
+   visible above the player, downloaded tracks remain available, and streaming
+   resumes when Internet returns. Record the wait and recovery time. HTTP 403
+   remains “not tested” unless a safe reproducible response is available.
 
 ## S3 hardware round 1 — partial report received 2026-10-05
 
@@ -101,16 +196,29 @@ not re-litigated, with scope stated honestly — everything else below is still 
 - [ ] Separately, clean-install on a disposable Windows profile/VM.
 - [ ] On that disposable installation only, verify ordinary uninstall removes
       test userdata (intentional, unlike upgrade); never use personal data here.
-- [ ] Launch → Home loads; search + play; Space/←/→/Ctrl+←/→ shortcuts work.
+- [ ] Launch → Home loads; search + play. Test Space with focus on
+      non-editable content, then focus Search and a DHUN name field and verify
+      spaces type normally without toggling playback. Test ←/→/Ctrl+←/→ separately.
+- [ ] Expand FullPlayer, then use **Ctrl+F**: Search must appear and FullPlayer
+      must collapse. Also test Escape and the Collapse control. Home, Search and
+      Playlists must be interactive afterward; docked MiniPlayer is the fixed
+      72 dp row. If not, screenshot the entire window (see retest above).
 - [ ] Double-launch `DHUN.exe` while running → no second window (the
       existing one surfaces).
-- [ ] **Jump-list verb (S4):** right-click the taskbar icon → **Play/Pause**
-      → playback toggles WITHOUT the window surfacing; **Open DHUN**
-      surfaces it. (If the tasks are missing, note it — jump-list
-      registration is Windows-version-sensitive.)
-- [ ] **Close-to-tray (S4):** default on → window X hides to tray, music
-      keeps playing, tray **Quit** exits. Settings → off → restart app →
-      X now quits the app.
+- [ ] **Jump-list verb (S4):** first verify Windows' “Show recently opened
+      items in Start, Jump Lists, and File Explorer” setting is on. After playing
+      a track, wait for `jump list: committed ...` and right-click the running/
+      pinned taskbar icon. **Play / Pause** toggles playback WITHOUT surfacing
+      the window; **Open DHUN** surfaces it; a recent task appears. If only
+      standard pin/unpin/close items appear, screenshot the menu and collect all
+      `jump list:` lines from the startup log path above; record `winver` and MSI
+      version. An explicit AppUserModelID has not been introduced; if commit is
+      logged but tasks remain absent, report the shortcut identity and Windows
+      setting state rather than treating the COM call as hardware acceptance.
+- [ ] **Close/minimize contract:** window **X always exits and stops playback**;
+      the separate minimize control leaves the app/tray playback running; tray
+      **Quit** exits. Do not expect X to hide to tray (the old close-to-tray
+      preference no longer changes this behavior).
 - [ ] **Settings (S4):** theme Light + an accent → instant → restart →
       persisted. Cache budget selectable.
 - [ ] **Equalizer (S4):** enable → Full Treble on a bright track → clearly

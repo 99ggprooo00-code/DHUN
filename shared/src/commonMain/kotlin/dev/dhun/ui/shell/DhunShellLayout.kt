@@ -99,6 +99,13 @@ enum class ShellBackAction {
 /** Result of [DhunShellPolicy.backAction] — an explicit action, never a nullable fall-through. */
 data class ShellBack(val action: ShellBackAction, val detailPaneOpen: Boolean)
 
+/** Where the offline notice must render so the expanded player cannot hide it. */
+enum class OfflineBannerPlacement {
+    Hidden,
+    ScaffoldTopBar,
+    AboveFullPlayer,
+}
+
 /**
  * The shell's layout rules. See [DhunShellLayout] for why they live apart from
  * the composable.
@@ -142,6 +149,20 @@ object DhunShellPolicy {
 
     /** Layout the shell should render for a measured width. */
     fun layoutAt(availableWidth: Dp): DhunShellLayout = DhunShellLayout.of(availableWidth)
+
+    /**
+     * Keep the offline status visible when FullPlayer covers the Scaffold.
+     * The shell draws [OfflineBannerPlacement.AboveFullPlayer] after the player
+     * layer and uses [OfflineBannerPlacement.ScaffoldTopBar] otherwise.
+     */
+    fun offlineBannerPlacement(
+        isOnline: Boolean,
+        fullPlayerVisible: Boolean,
+    ): OfflineBannerPlacement = when {
+        isOnline -> OfflineBannerPlacement.Hidden
+        fullPlayerVisible -> OfflineBannerPlacement.AboveFullPlayer
+        else -> OfflineBannerPlacement.ScaffoldTopBar
+    }
 
     /**
      * Whether the shell should reserve a second column right now. Large

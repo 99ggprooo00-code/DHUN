@@ -1,10 +1,35 @@
 # 16 — CI flake hygiene: the two recurring `:shared:jvmTest` flakes
 
-> **Status: CI-verified, awaiting repetition.** This document is the evidence
-> sheet for PR #125 (session `arena/cf69112a-dhun`, commit `df0504f`,
-> base `main@a9204c59`). It is a **test-infrastructure** record: there is no
-> hardware gate for it, and by construction it cannot be signed off on a
-> device. Read the "What green CI does not prove" section before quoting it.
+> **Status: PR #125 merged; initial post-merge repetition clean; surveillance continues.**
+> PR #125 (session `arena/cf69112a-dhun`) merged as
+> `b1dba0c0cec9c5cde7f910f04405b7fe81a25b0e` on 2026-10-06T03:58:26Z. Its
+> post-merge CI **37411494455**, Build APK **37411494443**, and test-release
+> **37411494399** passed. The merge did not change the test-only scope: this
+> document has no device gate and proves nothing about hardware behavior.
+>
+> **Post-merge observation:** the fixed `:shared:jvmTest` suite passed on the
+> `b1dba0c` main CI **37411494455** and the later `f0225f4` main CI
+> **37548884056**; neither run reports either repaired test as a failure. This
+> is two post-merge observations, not a statistical claim that the race can
+> never recur. Continue watching later unrelated PR/main CI runs.
+>
+> **Release-path evidence:** test-release **37411494399** ran the complete MSI
+> install-over `2.170.1 → 2.171.1`, with userdata/cache sentinels preserved,
+> future-upgrade guard and uninstall smoke passing (no skip). The later current
+> main test-release **37548884077** likewise ran full install-over
+> `2.171.1 → 2.172.1` (`buildOnly=false`), with the same guard/sentinel/uninstall
+> checks passing. Current rolling `test` targets `f0225f4`; APK hash
+> `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`, MSI
+> 2.172.1 hash
+> `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6` (from
+> publisher provenance annotations; device downloads must still be checked
+> against their current release sidecars).
+>
+> The scheduled extraction-health run **37455619019** separately classified
+> **`ENVIRONMENT_BLOCKED`** because the hosted runner could not verify live
+> playback. That run is not the CI suite and does not change the test-flake
+> result. Local Gradle remains unavailable without a JDK; GitHub CI is the
+> Kotlin compiler/test gate.
 
 ## 1. What was broken
 
@@ -63,6 +88,11 @@ Neither was a product defect: the end state is always reached.
 | Packaging/fixture helpers (local) | ✅ 31 tests OK | `python3 -m unittest discover -s scripts` |
 | Fixture validation (local) | ✅ PASS: 39 files | `scripts/validate_fixtures.py` |
 | Delimiter sanity on both edits (local) | ✅ balanced (with untouched controls) | string/comment-aware scanner |
+| PR #125 merge to `b1dba0c` | ✅ merged 2026-10-06T03:58:26Z | merge commit `b1dba0c` |
+| Post-merge main CI | ✅ shared `jvmTest` green; both fixed names absent | run **37411494455** |
+| Later main CI observation | ✅ shared `jvmTest` green; both fixed names absent | run **37548884056** on `f0225f4` |
+| Post-merge test-release | ✅ full MSI upgrade `2.170.1 → 2.171.1`, no skip | run **37411494399** |
+| Latest test-release | ✅ full MSI upgrade `2.171.1 → 2.172.1`, no skip | run **37548884077** |
 
 The sandbox has **no JDK and no egress** (`api.adoptium.net`,
 `repo1.maven.org`, `services.gradle.org` all refused this session), so CI is
@@ -83,9 +113,15 @@ the compiler for Kotlin; the local gates are the JDK-free ones.
 - No hardware/manual gate applies to a test-only diff; the S3 round
   (`docs/runbooks/s3-hardware-checklist.md`) is unchanged and still open.
 
-## 6. Exit criteria
+## 6. Exit criteria and continued surveillance
 
-1. Recurrence-free across every run between `df0504f`'s merge and the next
-   unrelated `main` push.
-2. If either test fails again: read the label first — it names the wait and the
-   observed state — and treat it as a new race, not as a flake to retry.
+PR #125 is merged, and the repaired tests have passed on two observed
+post-merge `main` CI runs (`b1dba0c` / **37411494455** and `f0225f4` /
+**37548884056**) without either test appearing as a failure. This satisfies the
+merge-time evidence gate; it does not prove permanent absence of a race.
+
+If either test fails again, read the label first—it identifies the wait and
+observed state—and treat the result as a race-reopen signal, not as a flake to
+retry. Keep checking subsequent unrelated PR and `main` runs. The separate
+`ENVIRONMENT_BLOCKED` extraction-health result is not evidence about these
+`:shared:jvmTest` tests.
