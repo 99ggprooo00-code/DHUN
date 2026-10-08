@@ -55,10 +55,10 @@ Truthfulness is enforced by tests, not prose:
 | S6 | ⏳ **blocked on S3** | no release acceptance until both rounds close |
 | Dispatch-only AAB staging | 🔴 **agent-blocked, user-only** | one `test-release` dispatch with `build_only=true`, `build_release_candidate=true` |
 | ADR-008 B1 | ⛔ **BLOCKED (run recorded)** | do not restart it; a continuation is a separate B2 user decision |
-| Website (Option A) | 🟡 **built and gated; the merge is the last action of PR #138** | `website/`, `docs/verification/20-marketing-site.md` |
-| Pages source | ⚠️ **was `legacy` / `main:/` at boot, rendering the root README** | see the session's final notes in the PR comment for what the canonical URL serves |
+| Website (Option A) | 🟢 **built, gated and CI-verified on this branch; the merge is the last action of PR #138** | `website` run **37795271256** (build + Lighthouse/axe job success; drift check annotation green); `docs/verification/20-marketing-site.md` |
+| Pages source | ⛔ **agent-blocked: switch to `build_type: workflow` returns HTTP 403** | user-only: Settings → Pages → Source → **GitHub Actions** (or `gh api -X PUT … -f build_type=workflow` with a Pages-write token); until then the canonical URL renders the root README and `website.yml`'s deploy job skips with a warning naming that fix |
 | Real screenshots | 🔴 **missing — the repository contains no image file** | the six captures listed in `.ai/WEBSITE_PLAN.md` Part A §9; each replaces a labelled mockup |
-| Lighthouse / axe | ⚪ **cannot run locally** (no browser, no display) | the `a11y` job's check-run annotations on `ubuntu-latest` |
+| Lighthouse / axe | 🟡 **Lighthouse measured in CI; axe did not run** | run **37795271256**: `/` 96/100/100/100, `/features/` and `/download/` 100/100/100/100 (perf/a11y/BP/SEO); `@axe-core/cli` exited 1 without a report on all three routes |
 
 ### Exact next actions
 

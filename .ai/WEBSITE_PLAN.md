@@ -248,7 +248,7 @@ permission.
 | Honesty (D5) | the three checks in §4 | app CI step 1 + site workflow |
 | Responsive | mobile-first layout, `clamp()` type, breakpoints 480/768/1024/1440, no fixed px widths that break 320 px; asserted by a source-level scan for fixed-width declarations plus a manual reading of the CSS | local + site workflow |
 | Accessibility | semantic landmarks, one `h1` per page, skip link, visible focus, ≥4.5:1 body contrast, `prefers-reduced-motion`, `prefers-color-scheme`, keyboard-reachable nav | asserted where a machine can (structure/contrast maths in `website_quality.py`), Lighthouse/axe in CI |
-| Lighthouse / axe | real numbers from a CI run on `ubuntu-latest` (local cannot: no browser), surfaced as **check-run annotations** so they are readable from here | site workflow |
+| Lighthouse / axe | real numbers from CI on `ubuntu-latest`, surfaced as **check-run annotations** so they are readable from here. **Measured, run 37795271256:** `/` 96/100/100/100 and `/features/` + `/download/` 100/100/100/100 (performance/accessibility/best-practices/SEO). `@axe-core/cli` exited 1 without writing a report on all three routes, so **no axe number exists** and none is claimed. Gated: accessibility ≥ 0.95, performance ≥ 0.90 | site workflow |
 | Craft | 404 page, canonical, Open Graph + Twitter meta, favicon from DHUN's own XML launcher art, `robots.txt`, `sitemap.xml`, `lang`, GPL notice in the footer | asserted by the quality check + review |
 
 Honesty about the environment: GitHub Pages gives no control over
@@ -271,7 +271,7 @@ page's technical footnote rather than claimed as optimised.
 | P8 | the three D5 tests, CI wiring, mutation proof | ✅ done — 47 tests in CI step 1, 3 mutations proven red then green after revert |
 | P9 | CI results read once, root-cause fixes | ✅ read at the finish sequence; verdicts recorded in the PR comment |
 | P10 | docs: ROADMAP, DEBUG_LOG, KNOWN_LIMITATIONS, verification record, README, THIRD_PARTY, CHANGELOG | ✅ done |
-| P11 | **post-merge only**: `website.yml` on `main`, the Pages source, the canonical URL | ⏳ cannot be observed from inside the merging session |
+| P11 | **post-merge only**: `website.yml` on `main` and the canonical URL | ⏳ cannot be observed from inside the merging session. The Pages source itself is **blocked**: the token gets HTTP 403 on `PUT /repos/{owner}/{repo}/pages`, so switching it to `build_type: workflow` is a user-only one-liner |
 
 **Unverified as of P0 (deliberately listed rather than glossed):** the CI
 verdicts for any commit of this branch; the drift check; the Actions Pages

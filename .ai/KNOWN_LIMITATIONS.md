@@ -10,9 +10,21 @@ Updated every phase. Nothing hidden.
   `build_type: workflow`, and what the canonical URL serves after that, is
   recorded in PR #138's final comment — the point of this entry is that a
   successful `website.yml` **build** is not evidence that the site is published.
-- **No Lighthouse or axe number exists from this machine.** There is no browser
-  and no display in the sandbox. Any score quoted anywhere must come from a CI
-  run's annotations; there is no local measurement to fall back on.
+- **Lighthouse runs in CI; axe does not.** `website` run **37795271256** on
+  `e6cbb42` reported `/` 96/100/100/100 and `/features/` and `/download/`
+  100/100/100/100 (performance/accessibility/best-practices/SEO) — accessibility
+  rose to 100 from 95 after the `--text-4` contrast fix the previous run exposed.
+  **`@axe-core/cli` exited 1 without writing a report on all three routes**, so
+  there is no axe number from either machine, and the reason is only in an
+  artifact this environment cannot retrieve. Report it as "did not run", never
+  as a pass.
+- **The repository's Pages source cannot be switched with the agent token.**
+  `PUT /repos/99ggprooo00-code/DHUN/pages -f build_type=workflow` returns
+  **HTTP 403 "Resource not accessible by integration"**, so Pages stays
+  `legacy`/`main:/` and the canonical URL still renders the root `README.md`.
+  The site is built, checked and drift-verified; only the *publishing* step
+  needs a human (Settings → Pages → Source → **GitHub Actions**, or the same API
+  call with a token that has Pages write).
 - **No real screenshot exists.** The repository contains no image file at all,
   so every visual on the site is a hand-written CSS mockup labelled
   "not a screenshot", with the capture that should replace it listed in

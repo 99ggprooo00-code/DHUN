@@ -1,5 +1,44 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — CI found a contrast defect the site's own checks were written to miss, and axe cannot run (session `arena/fc918d37-dhun`)
+
+**What happened.** The first `website` run on this branch (`37794857026`,
+head `e496464`) was green in the build job — build, minification proof, drift
+check, honesty contract, quality gates and `html-validate` all passed in CI —
+and red in the a11y job with accessibility **95** on `/features/` and
+`/download/` (`/` scored 100). The check-run annotations carried the numbers but
+not the failing audit, and Actions log archives are unreachable here, so the
+cause had to be reasoned from the numbers.
+
+**Root cause.** `--text-4` is 0.45-alpha white: ~3.9:1 on the dark surfaces,
+below the 4.5:1 body-text floor. It painted exactly two things — `.traceable`
+(the "source: ADR-002, PR #68" line) and the `.missing` list markers — and both
+appear on `/features/` and `/download/` but **not** on `/`, which is the shape
+the scores showed. The site's own contrast gate had not caught it because it
+asserts the *declared token pairs* (`--text-3` on `--bg` and friends), not every
+use of every token; `--text-4` was never wired to a text role in that table.
+
+**Fix.** That text moved to `--text-3` (7.5:1); `--text-4` stays defined for
+non-text affordances only, and a new test
+(`test_no_text_uses_the_faintest_token`) fails the build if any `color:`
+declaration uses it again. The next run (`37795271256`, head `e6cbb42`) scored
+100/100/100 on all three routes.
+
+**Also learned, and now reported instead of hidden:**
+
+- `@axe-core/cli` exited 1 on all three routes **without writing a report** —
+  a driver/browser handshake failure, not a verdict. The workflow now emits an
+  explicit `::warning::` naming that, so a future run cannot mistake silence for
+  a pass, and `scripts/report_axe.py` reports real violations as annotations if
+  the tool ever does run.
+- The job now prints every failing Lighthouse audit id as its own annotation,
+  because "accessibility=95" alone is not actionable without the log archive.
+- `PUT /repos/99ggprooo00-code/DHUN/pages -f build_type=workflow` returns
+  **HTTP 403 "Resource not accessible by integration"**: the agent token cannot
+  switch the Pages source. The deploy job therefore detects `legacy` and skips
+  the three publishing steps with a warning that names the one-line human fix,
+  instead of failing red on every push to `main` for a setting it cannot change.
+
 ## 2026-10-08 — the site's own gates caught three of its claims while it was being built (session `arena/fc918d37-dhun`)
 
 **This entry records defects the honesty/quality gates found, not app incidents.**

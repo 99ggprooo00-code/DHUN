@@ -50,19 +50,70 @@ this session:
 | a real SHA-256 pasted into the download page copy | **FAIL** — `baked labelled digest ‘SHA-256: 9665b75f…’` | OK |
 | the same SHA-256 injected directly into **built** `dist/download/index.html` | **FAIL** — 2 violations (`baked SHA-256 digest`, `baked labelled digest`) | OK — rebuilding restored the committed bytes exactly |
 
+## CI evidence (read from run annotations — log archives are unreachable)
+
+`website` run **37795271256** on `e6cbb42` — **success**:
+
+| Job | Verdict | Evidence |
+|---|---|---|
+| Build and check the site | **success** | annotation *"Drift check: website/dist matches a fresh build of website/src"* — the committed mirror and a fresh build agree in CI, not just locally |
+| Lighthouse and axe | **success** | scores below |
+| Deploy to GitHub Pages | **skipped** | correct: the workflow only deploys on `main` |
+
+Real Lighthouse numbers (check-run annotations, `ubuntu-latest`, Chrome
+supplied by the runner):
+
+| Route | performance | accessibility | best-practices | SEO |
+|---|---:|---:|---:|---:|
+| `/` | 96 | **100** | 100 | 100 |
+| `/features/` | 100 | **100** | 100 | 100 |
+| `/download/` | 100 | **100** | 100 | 100 |
+
+**The first run on this branch failed, and the failure was real.** Run
+**37794857026** on `e496464`: the build job was green, and the a11y job failed
+with accessibility **95** on `/features/` and `/download/` (against 100 on `/`).
+Root cause: the "traceable source" line and the list markers used `--text-4`
+(0.45-alpha white ≈ 3.9:1), below the 4.5:1 body-text floor — and those elements
+exist on exactly the two pages that scored 95. Fixed by moving that text to
+`--text-3` (7.5:1) and adding a test that fails the build if any `color:`
+declaration uses `--text-4` again (`scripts/test_website_quality.py`). The next
+run scored 100 on all three routes.
+
+Non-scored performance **insights** the annotations still list on the
+`/download/` and `/features/` routes: unused CSS, render-blocking requests,
+network dependency tree and cache lifetimes. The last of those is a GitHub Pages
+constraint — the site cannot set `Cache-Control` — which the download page says
+out loud rather than claiming it was optimised.
+
+**axe-core did not run.** All three `@axe-core/cli` invocations exited 1 without
+writing a report
+(`axe-core /download/: axe-core CLI did not produce a report (exit 1)`), which is
+the driver/browser handshake failing rather than a finding; its output is kept in
+the run's `reports/` artifact, which this environment cannot retrieve. So: no
+axe number is claimed in either direction, and Lighthouse's accessibility
+category (which embeds axe-core rules) is the accessibility evidence that
+exists.
+
 ## What is **not** verified here
 
-- **CI verdicts for this branch**: not read at the time this record was
-  written; the session's finish sequence records the run IDs it read.
-- **The Actions Pages deployment**: `build_type` was `legacy` on `main:/`
-  when this session started (`gh api repos/.../pages`), so the canonical URL
-  rendered the root `README.md`. Whether the repository token may switch the
-  source to `build_type: workflow`, and whether the `deploy-pages` job then
-  publishes, is recorded in the session's final notes and PR comment.
-- **Lighthouse and axe**: **no browser and no display exist in this sandbox**
-  (no `google-chrome`, `chromium` or `firefox` binary), so no score can be
-  measured locally and none is claimed. The numbers, if any, come from the
-  `a11y` job's check-run annotations on `ubuntu-latest`.
+- **CI verdicts for the app workflows on this head**: read in the session's
+  finish sequence; the run IDs are in the PR comment.
+- **The Pages source switch**: attempted and **blocked** — see below.
+- **The Actions Pages deployment is blocked by a permission, not by the site.**
+  This session verified that the repository's Pages source cannot be changed
+  with the available token: `PUT /repos/99ggprooo00-code/DHUN/pages -f
+  build_type=workflow` → **HTTP 403 `Resource not accessible by integration`**.
+  The setting therefore stays at the state it was found in
+  (`build_type=legacy`, `source=main:/`, `status=built`,
+  `html_url=https://99ggprooo00-code.github.io/DHUN/`, `https_enforced=true`),
+  and the canonical URL keeps rendering the root `README.md` until the source is
+  switched. The one-line fix is in the PR comment; the `deploy` job in
+  `website.yml` detects `legacy` and skips the three publishing steps with a
+  warning annotation naming that fix, so `main` stays green instead of failing
+  on a setting it is not allowed to change.
+- **Lighthouse and axe could not run locally** — no `google-chrome`,
+  `chromium` or `firefox` binary and no display exist in this sandbox. The
+  numbers above come from the CI run; axe did not run there either (above).
 - **Published-site identity**: no post-merge verification is possible from
   inside the merging session.
 - **Cross-browser rendering**: not tested anywhere. The responsive work is
