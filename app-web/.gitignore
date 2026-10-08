@@ -1,0 +1,5 @@
+# Build output — produced by `npm run build`, never committed.
+dist/
+
+# Dependencies — this module ships none, and must never ship one.
+node_modules/

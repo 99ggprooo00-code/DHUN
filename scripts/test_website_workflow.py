@@ -352,6 +352,17 @@ class BrowserHarnessSurvivesAndDiagnoses(unittest.TestCase):
                 f"{name} is defined but never runs: a check that is not in CHECKS is not a check",
             )
 
+    def test_annotations_are_packed_to_a_budget_instead_of_hoping(self):
+        """The parked bug: a 24 KB carry annotation clipped at ~4 KB and
+        dropped everything past it — both axe scans among the losses. The
+        budget now lives in one tested module and the full report goes to the
+        job log and the run summary, which are not capped."""
+        self.assertIn('"./annotation-report.mjs"', self.src, "browser.mjs must use the packing module")
+        self.assertIn("MESSAGE_BUDGET", self.src)
+        self.assertNotIn("CARRY_CLIP = 24000", self.src, "the 24 KB carry clipped at ~4 KB")
+        self.assertIn("GITHUB_STEP_SUMMARY", self.src, "the uncapped channel must be used")
+        self.assertIn("appendFileSync", self.src)
+
     def test_the_guard_records_and_the_annotations_always_run(self):
         guard = self.body_of(self.src, "guard")
         self.assertRegex(guard, r"catch\s*\(error\)")

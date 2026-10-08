@@ -1,0 +1,1264 @@
+/**
+ * DHUN web — application chrome.
+ *
+ * Every selector here maps to a composable in
+ * shared/src/commonMain/kotlin/dev/dhun/ui/. Where a rule encodes a decision
+ * the app makes (breakpoints, ordering, placement), the comment names the
+ * Kotlin file it mirrors so a future edit has somewhere to check.
+ *
+ * Colours, type, shapes, spacing and durations come from tokens.css — this
+ * file contains no raw hex and no raw px outside the two values the token
+ * file itself defines (0 and the 100% stack below).
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--dhun-background);
+  color: var(--dhun-text);
+  font: var(--dhun-text-body-medium);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: var(--dhun-space-icon-stroke) solid var(--dhun-accent);
+  outline-offset: var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-small);
+}
+
+.dhun-skip-link {
+  position: absolute;
+  left: var(--dhun-space-md);
+  top: var(--dhun-space-md);
+  transform: translateY(-200%);
+  z-index: 40;
+  padding: var(--dhun-space-md) var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-button);
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
+  font: var(--dhun-text-label-large);
+  letter-spacing: var(--dhun-tracking-label-large);
+}
+
+.dhun-skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* ------------------------------------------------------------------ shell --
+ * Mirrors ui/shell/DhunShellLayout.kt: one breakpoint at
+ * DhunSpacing.navigationRailBreakpoint (840dp) decides rail + two-pane.
+ * Below it: bottom nav, single pane. At/above it: nav rail, master + detail.
+ * ------------------------------------------------------------------------ */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.dhun-shell {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.dhun-rail {
+  display: none;
+  flex: 0 0 auto;
+  width: var(--dhun-space-bottom-nav-height);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  padding: var(--dhun-space-md) 0;
+  background: var(--dhun-glass-strong);
+  border-right: var(--dhun-space-border) solid var(--dhun-border);
+  backdrop-filter: blur(var(--dhun-space-lg));
+}
+
+.dhun-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.dhun-master {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dhun-pane-seam {
+  display: none;
+  flex: 0 0 auto;
+  width: var(--dhun-space-border);
+  background: var(--dhun-border);
+}
+
+.dhun-detail {
+  display: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--dhun-background);
+}
+
+.dhun-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* DhunSpacing.contentBottomInset — room above the frosted mini + nav dock */
+  padding-bottom: var(--dhun-space-content-bottom-inset);
+  scrollbar-width: thin;
+}
+
+.dhun-scroll--plain {
+  padding-bottom: var(--dhun-space-xxl);
+}
+
+/* Two-pane (DhunShellLayout.TwoPane at >= 840px): rail shows, master keeps a
+ * reading measure (ShellPanes.masterWidth, capped at 720dp), detail takes the
+ * rest. Empty detail stack keeps master full width. */
+@media (min-width: 840px) {
+  .dhun-rail {
+    display: flex;
+  }
+
+  .dhun-scroll {
+    padding-bottom: var(--dhun-space-mini-player-height);
+  }
+
+  .dhun-shell[data-detail="open"] .dhun-master {
+    flex: 0 0 clamp(var(--dhun-pane-master-min), 40%, var(--dhun-pane-master-max));
+  }
+
+  .dhun-shell[data-detail="open"] .dhun-pane-seam,
+  .dhun-shell[data-detail="open"] .dhun-detail {
+    display: block;
+  }
+}
+
+/* -------------------------------------------------------------- nav items --
+ * DhunAppShell's NavigationBar / NavigationRail items: icon + labelSmall,
+ * selected tint accent, indicator accentContainer, unselected textTertiary.
+ * ------------------------------------------------------------------------ */
+.dhun-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dhun-space-xs);
+  min-height: var(--dhun-space-navigation-bar-content);
+  min-width: var(--dhun-space-compact-target);
+  padding: var(--dhun-space-sm) var(--dhun-space-md);
+  border-radius: var(--dhun-shape-nav-indicator);
+  color: var(--dhun-text-tertiary);
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  transition: color var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-nav-item[aria-current="page"] {
+  background: var(--dhun-accent-container);
+  color: var(--dhun-accent);
+}
+
+.dhun-nav-item[aria-current="page"] .dhun-icon {
+  color: var(--dhun-on-accent-container);
+}
+
+.dhun-bottom-nav {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: var(--dhun-space-sm);
+  min-height: var(--dhun-space-bottom-nav-height);
+  padding: var(--dhun-space-sm) var(--dhun-space-md);
+  /* DhunColors.glassStrong + a hairline top edge (glassBarTop is the bar's
+     own separation cue in the app's docked chrome). */
+  background: var(--dhun-glass-strong);
+  border-top: var(--dhun-space-border) solid var(--dhun-glass-bar-top);
+  backdrop-filter: blur(var(--dhun-space-lg));
+  padding-bottom: max(var(--dhun-space-sm), env(safe-area-inset-bottom));
+}
+
+@media (min-width: 840px) {
+  .dhun-bottom-nav {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- wordmark --
+ * DhunTypographyTokens.brand is the only tracked-out text in the product.
+ * ------------------------------------------------------------------------ */
+.dhun-wordmark {
+  font: var(--dhun-text-label-medium);
+  font-weight: 700;
+  letter-spacing: var(--dhun-tracking-brand);
+  color: var(--dhun-text-secondary);
+  text-transform: uppercase;
+}
+
+.dhun-brand-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+  padding: var(--dhun-space-sm) 0 var(--dhun-space-md);
+}
+
+/* ------------------------------------------------------------------ header --
+ * Mirrors the Home/Search/Library headers: screenPadding horizontal,
+ * headlineMedium title, a settings affordance at the end.
+ * ------------------------------------------------------------------------ */
+.dhun-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-xl) var(--dhun-space-screen-padding) var(--dhun-space-md);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(180deg, var(--dhun-background) 60%, transparent);
+}
+
+.dhun-topbar__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: var(--dhun-text-headline-medium);
+  color: var(--dhun-text);
+}
+
+.dhun-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+}
+
+/* ------------------------------------------------------------ icon buttons --
+ * DhunSpacing.touchTarget (48dp) in the app; compactTarget is 44dp and is the
+ * floor for anything a finger has to hit.
+ * ------------------------------------------------------------------------ */
+.dhun-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dhun-space-touch-target);
+  height: var(--dhun-space-touch-target);
+  border-radius: var(--dhun-shape-full);
+  color: var(--dhun-text-secondary);
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-icon-button:hover {
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-icon-button:active {
+  background: var(--dhun-overlay-pressed);
+}
+
+.dhun-icon-button--active {
+  color: var(--dhun-accent);
+}
+
+.dhun-icon {
+  display: block;
+  width: var(--dhun-space-icon-size);
+  height: var(--dhun-space-icon-size);
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------- sections --
+ * SectionHeader (ui/../design/components/SectionHeader.kt): labelLarge over a
+ * row, with the section spacing token above it.
+ * ------------------------------------------------------------------------ */
+.dhun-section {
+  margin-top: var(--dhun-space-section-spacing);
+}
+
+.dhun-section__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dhun-space-md);
+  padding: 0 var(--dhun-space-screen-padding) var(--dhun-space-md);
+  margin: 0;
+  font: var(--dhun-text-title-large);
+  color: var(--dhun-text);
+}
+
+.dhun-section__hint {
+  margin: 0 var(--dhun-space-screen-padding) var(--dhun-space-sm);
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-tertiary);
+}
+
+/* ------------------------------------------------------------------- chips --
+ * DhunFilterChip: pill, selected = accentContainer fill + onAccentContainer
+ * text; unselected = glass fill + textSecondary.
+ * ------------------------------------------------------------------------ */
+.dhun-chip-row {
+  display: flex;
+  gap: var(--dhun-space-sm);
+  padding: 0 var(--dhun-space-screen-padding);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dhun-chip-row::-webkit-scrollbar {
+  display: none;
+}
+
+.dhun-chip {
+  flex: 0 0 auto;
+  min-height: var(--dhun-space-compact-target);
+  padding: 0 var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-chip);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass);
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-large);
+  letter-spacing: var(--dhun-tracking-label-large);
+  white-space: nowrap;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-chip:hover {
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-chip[aria-pressed="true"],
+.dhun-chip[aria-selected="true"] {
+  background: var(--dhun-accent-container);
+  border-color: transparent;
+  color: var(--dhun-on-accent-container);
+}
+
+.dhun-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------- track rows --
+ * TrackRow: 56dp artworkMini (thumb 64 in lists), title trackTitle,
+ * subtitle bodySmall textSecondary, trailing overflow button.
+ * ------------------------------------------------------------------------ */
+.dhun-tracklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-item-spacing);
+  padding: 0 var(--dhun-space-screen-padding);
+  margin: 0;
+  list-style: none;
+}
+
+/* A row is the row button plus, optionally, its overflow button. */
+.dhun-tracklist > li {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-track__time {
+  flex: 0 0 auto;
+  padding: 0 var(--dhun-space-sm);
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  color: var(--dhun-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dhun-track {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  width: 100%;
+  min-height: var(--dhun-space-artwork-mini);
+  padding: var(--dhun-space-xs) var(--dhun-space-sm);
+  border-radius: var(--dhun-shape-medium);
+  text-align: left;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-track:hover {
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-track[data-playing="true"] .dhun-track__title {
+  color: var(--dhun-accent);
+}
+
+.dhun-track__art {
+  flex: 0 0 auto;
+  width: var(--dhun-space-artwork-mini);
+  height: var(--dhun-space-artwork-mini);
+  border-radius: var(--dhun-shape-artwork);
+  background: linear-gradient(135deg, var(--dhun-placeholder-start), var(--dhun-placeholder-end));
+  object-fit: cover;
+}
+
+.dhun-track__meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.dhun-track__title,
+.dhun-track__subtitle {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-track__title {
+  font: var(--dhun-text-track-title);
+  color: var(--dhun-text);
+}
+
+.dhun-track__subtitle {
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+/* ------------------------------------------------------------- glass cards --
+ * GlassCard: glass fill, glassEdge hairline, sheen on the top edge,
+ * shape large (card) / extraLarge (cardLarge).
+ * ------------------------------------------------------------------------ */
+.dhun-card {
+  position: relative;
+  padding: var(--dhun-space-card-padding);
+  border-radius: var(--dhun-shape-card);
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-glass-edge);
+  overflow: hidden;
+}
+
+.dhun-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--dhun-space-divider);
+  background: var(--dhun-glass-sheen);
+}
+
+.dhun-card--large {
+  border-radius: var(--dhun-shape-card-large);
+}
+
+/* Quick picks shelf: DhunSpacing.quickPickWidth cards in a horizontal rail
+ * (HorizontalRail). Named `shelf`, not `rail`: `dhun-rail` is the large-screen
+ * navigation rail, and the two rules collided. */
+.dhun-shelf {
+  display: flex;
+  gap: var(--dhun-space-md);
+  padding: 0 var(--dhun-space-screen-padding) var(--dhun-space-sm);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.dhun-shelf::-webkit-scrollbar {
+  display: none;
+}
+
+.dhun-shelf > * {
+  scroll-snap-align: start;
+}
+
+.dhun-quickpick {
+  flex: 0 0 var(--dhun-space-quick-pick-width);
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-card-padding);
+  border-radius: var(--dhun-shape-card);
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-glass-edge);
+  text-align: left;
+}
+
+.dhun-quickpick__art {
+  flex: 0 0 auto;
+  width: var(--dhun-space-artwork-thumb);
+  height: var(--dhun-space-artwork-thumb);
+  border-radius: var(--dhun-shape-medium);
+  background: linear-gradient(135deg, var(--dhun-placeholder-start), var(--dhun-placeholder-end));
+  object-fit: cover;
+}
+
+/* ----------------------------------------------------------------- artwork --
+ * ArtworkImage: placeholder gradient while loading; artworkLarge for hero
+ * surfaces, artworkCard for grid cards.
+ * ------------------------------------------------------------------------ */
+.dhun-artwork-hero {
+  width: 100%;
+  max-width: var(--dhun-space-artwork-large);
+  aspect-ratio: 1;
+  border-radius: var(--dhun-shape-artwork-hero);
+  background: linear-gradient(135deg, var(--dhun-placeholder-start), var(--dhun-placeholder-end));
+  object-fit: cover;
+}
+
+.dhun-artwork-card {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--dhun-shape-artwork);
+  background: linear-gradient(135deg, var(--dhun-placeholder-start), var(--dhun-placeholder-end));
+  object-fit: cover;
+}
+
+.dhun-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--dhun-grid-card-min), 1fr));
+  gap: var(--dhun-space-md);
+  padding: 0 var(--dhun-space-screen-padding);
+  margin: 0;
+  list-style: none;
+}
+
+.dhun-grid__item {
+  min-width: 0;
+  text-align: left;
+}
+
+.dhun-grid__title {
+  margin: var(--dhun-space-sm) 0 0;
+  font: var(--dhun-text-title-small);
+  letter-spacing: var(--dhun-tracking-title-small);
+  color: var(--dhun-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-grid__subtitle {
+  margin: var(--dhun-space-xs) 0 0;
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------- search --
+ * DhunTextField: filled glass field, pill-ish medium radius, leading search
+ * icon, trailing clear ("Clear search").
+ * ------------------------------------------------------------------------ */
+.dhun-search {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  margin: 0 var(--dhun-space-screen-padding) var(--dhun-space-md);
+  padding: 0 var(--dhun-space-md);
+  min-height: var(--dhun-space-touch-target);
+  border-radius: var(--dhun-shape-medium);
+  background: var(--dhun-surface-variant);
+  border: var(--dhun-space-border) solid transparent;
+  transition: border-color var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-search:focus-within {
+  border-color: var(--dhun-accent);
+}
+
+.dhun-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--dhun-text);
+  font: var(--dhun-text-body-large);
+  letter-spacing: var(--dhun-tracking-body-large);
+}
+
+.dhun-search input::placeholder {
+  color: var(--dhun-text-hint);
+}
+
+.dhun-search input:focus {
+  outline: none;
+}
+
+/* --------------------------------------------------------------- empty/
+ * error views — ErrorView / the "Nothing to display" states.
+ * ------------------------------------------------------------------------ */
+.dhun-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-huge) var(--dhun-space-screen-padding);
+  text-align: center;
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-state__icon {
+  width: var(--dhun-space-icon-size-lg);
+  height: var(--dhun-space-icon-size-lg);
+  color: var(--dhun-text-tertiary);
+}
+
+.dhun-state__title {
+  margin: 0;
+  font: var(--dhun-text-title-large);
+  color: var(--dhun-text);
+}
+
+.dhun-state__body {
+  margin: 0;
+  max-width: 42ch;
+  font: var(--dhun-text-body-relaxed);
+}
+
+.dhun-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dhun-space-sm);
+  min-height: var(--dhun-space-touch-target);
+  padding: 0 var(--dhun-space-xxl);
+  border-radius: var(--dhun-shape-button);
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+  font: var(--dhun-text-label-large);
+  letter-spacing: var(--dhun-tracking-label-large);
+}
+
+.dhun-button--tonal {
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
+}
+
+.dhun-button--ghost {
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  color: var(--dhun-text);
+}
+
+/* ------------------------------------------------------------- mini player --
+ * MiniPlayer: docked above the bottom nav (single pane) or at the bottom of
+ * the master column (two pane). glassStrong bar, 72dp tall, 56dp artwork.
+ * ------------------------------------------------------------------------ */
+.dhun-mini {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  min-height: var(--dhun-space-mini-player-height);
+  padding: var(--dhun-space-sm) var(--dhun-space-md);
+  background: var(--dhun-glass-strong);
+  border-top: var(--dhun-space-border) solid var(--dhun-glass-bar-top);
+  backdrop-filter: blur(var(--dhun-space-lg));
+}
+
+.dhun-mini[hidden] {
+  display: none;
+}
+
+.dhun-mini__art {
+  flex: 0 0 auto;
+  width: var(--dhun-space-artwork-mini);
+  height: var(--dhun-space-artwork-mini);
+  border-radius: var(--dhun-shape-medium);
+  background: linear-gradient(135deg, var(--dhun-placeholder-start), var(--dhun-placeholder-end));
+  object-fit: cover;
+}
+
+.dhun-mini__meta {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.dhun-mini__title {
+  margin: 0;
+  font: var(--dhun-text-title-small);
+  letter-spacing: var(--dhun-tracking-title-small);
+  color: var(--dhun-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-mini__subtitle {
+  margin: 0;
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-mini__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--dhun-space-progress-height);
+  background: var(--dhun-overlay-focus);
+}
+
+.dhun-mini {
+  position: relative;
+}
+
+.dhun-mini__progress > i {
+  display: block;
+  height: 100%;
+  background: var(--dhun-accent);
+}
+
+/* ------------------------------------------------------------- full player --
+ * FullPlayer: a sheet over everything. Stacked below 480px-wide-landscape,
+ * Wide above it (PlayerLayout.fullPlayerLayoutMode). Immersive backdrop via
+ * NowPlayingBackdrop (scrim over blurred artwork).
+ * ------------------------------------------------------------------------ */
+.dhun-full {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--dhun-background);
+  overflow: hidden;
+}
+
+.dhun-full[hidden] {
+  display: none;
+}
+
+.dhun-full__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(var(--dhun-space-huge)) saturate(1.4);
+  transform: scale(1.2);
+  opacity: 0.35;
+}
+
+.dhun-full__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--dhun-scrim-strong);
+}
+
+.dhun-full__inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--dhun-space-lg);
+  padding: var(--dhun-space-lg) var(--dhun-space-screen-padding) var(--dhun-space-xl);
+  overflow-y: auto;
+}
+
+.dhun-full__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+}
+
+.dhun-full__label {
+  flex: 1;
+  margin: 0;
+  font: var(--dhun-text-label-medium);
+  letter-spacing: var(--dhun-tracking-label-medium);
+  color: var(--dhun-text-tertiary);
+  text-transform: uppercase;
+}
+
+.dhun-full__art {
+  align-self: center;
+  width: min(100%, var(--dhun-space-artwork-large));
+  aspect-ratio: 1;
+  border-radius: var(--dhun-shape-artwork-hero);
+  background: linear-gradient(135deg, var(--dhun-placeholder-start), var(--dhun-placeholder-end));
+  object-fit: cover;
+}
+
+.dhun-full__meta {
+  align-self: center;
+  width: min(100%, var(--dhun-space-artwork-large));
+  text-align: left;
+}
+
+.dhun-full__title {
+  margin: 0;
+  font: var(--dhun-text-player-title);
+  color: var(--dhun-text);
+}
+
+.dhun-full__artist {
+  margin: var(--dhun-space-xs) 0 0;
+  font: var(--dhun-text-body-large);
+  letter-spacing: var(--dhun-tracking-body-large);
+  color: var(--dhun-text-secondary);
+}
+
+/* Seek bar: PlayerSeekBar — 4dp track, 8dp when active, accent fill. */
+.dhun-seek {
+  width: 100%;
+}
+
+.dhun-seek input[type="range"] {
+  width: 100%;
+  height: var(--dhun-space-progress-height-active);
+  appearance: none;
+  background: none;
+}
+
+.dhun-seek input[type="range"]::-webkit-slider-runnable-track {
+  height: var(--dhun-space-progress-height);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-overlay-focus);
+}
+
+.dhun-seek input[type="range"]::-moz-range-track {
+  height: var(--dhun-space-progress-height);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-overlay-focus);
+}
+
+.dhun-seek input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: var(--dhun-space-md-plus);
+  height: var(--dhun-space-md-plus);
+  margin-top: calc((var(--dhun-space-progress-height) - var(--dhun-space-md-plus)) / 2);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  border: 0;
+}
+
+.dhun-seek input[type="range"]::-moz-range-thumb {
+  width: var(--dhun-space-md-plus);
+  height: var(--dhun-space-md-plus);
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+}
+
+.dhun-seek__times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--dhun-space-xs);
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  color: var(--dhun-text-tertiary);
+}
+
+/* TransportControls: 52dp targets, play/pause larger and filled. */
+.dhun-transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dhun-space-lg);
+}
+
+.dhun-transport__secondary {
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-transport__play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dhun-space-transport-target);
+  height: var(--dhun-space-transport-target);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+}
+
+.dhun-transport__play .dhun-icon {
+  width: var(--dhun-space-medium-large);
+  height: var(--dhun-space-medium-large);
+}
+
+/* PlayerTabs: Up next / Lyrics. */
+.dhun-tabs {
+  display: flex;
+  gap: var(--dhun-space-sm);
+  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+}
+
+.dhun-tab {
+  padding: var(--dhun-space-md) var(--dhun-space-lg);
+  color: var(--dhun-text-tertiary);
+  font: var(--dhun-text-label-large);
+  letter-spacing: var(--dhun-tracking-label-large);
+  border-bottom: var(--dhun-space-icon-stroke) solid transparent;
+}
+
+.dhun-tab[aria-selected="true"] {
+  color: var(--dhun-accent);
+  border-bottom-color: var(--dhun-accent);
+}
+
+.dhun-lyrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-lg) 0;
+  font: var(--dhun-text-body-relaxed);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-lyrics__line {
+  margin: 0;
+  transition: color var(--dhun-motion-medium) var(--dhun-motion-easing);
+}
+
+.dhun-lyrics__line[data-active="true"] {
+  color: var(--dhun-text);
+  font-weight: 600;
+}
+
+/* Wide player layout (PlayerLayout.fullPlayerLayoutMode: width >= 480 and
+ * landscape) — artwork beside the controls instead of above them. */
+@media (min-width: 480px) and (orientation: landscape) {
+  .dhun-full__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(var(--dhun-player-controls-min), var(--dhun-player-controls-max));
+    align-items: center;
+    gap: var(--dhun-space-xxl);
+    padding: var(--dhun-space-lg) var(--dhun-space-xxl);
+  }
+
+  .dhun-full__bar {
+    grid-column: 1 / -1;
+  }
+
+  .dhun-full__art,
+  .dhun-full__meta {
+    align-self: center;
+  }
+
+  .dhun-full__controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--dhun-space-lg);
+  }
+}
+
+/* ---------------------------------------------------------------- settings --
+ * SettingsSwitchRow + the equalizer slider rows.
+ * ------------------------------------------------------------------------ */
+.dhun-settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-sm) var(--dhun-space-screen-padding);
+}
+
+.dhun-settings-row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.dhun-settings-row__title {
+  margin: 0;
+  font: var(--dhun-text-body-large);
+  letter-spacing: var(--dhun-tracking-body-large);
+  color: var(--dhun-text);
+}
+
+.dhun-settings-row__subtitle {
+  margin: var(--dhun-space-xs) 0 0;
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-switch {
+  flex: 0 0 auto;
+  position: relative;
+  width: var(--dhun-space-huge);
+  height: var(--dhun-space-medium-large);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-surface-highest);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-switch::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--dhun-space-xs);
+  width: var(--dhun-space-xl);
+  height: var(--dhun-space-xl);
+  transform: translateY(-50%);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-text-secondary);
+  transition: transform var(--dhun-motion-fast) var(--dhun-motion-easing),
+    background var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-switch[aria-checked="true"] {
+  background: var(--dhun-accent);
+  border-color: transparent;
+}
+
+.dhun-switch[aria-checked="true"]::after {
+  transform: translateY(-50%) translateX(var(--dhun-space-xl));
+  background: var(--dhun-on-accent);
+}
+
+.dhun-slider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+}
+
+.dhun-slider-row__label {
+  flex: 0 0 var(--dhun-space-touch-target);
+  font: var(--dhun-text-body-medium);
+  letter-spacing: var(--dhun-tracking-body-medium);
+  color: var(--dhun-text);
+}
+
+.dhun-slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  height: var(--dhun-space-touch-target);
+  background: none;
+}
+
+.dhun-slider-row input[type="range"]::-webkit-slider-runnable-track {
+  height: var(--dhun-space-progress-height);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-overlay-focus);
+}
+
+.dhun-slider-row input[type="range"]::-moz-range-track {
+  height: var(--dhun-space-progress-height);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-overlay-focus);
+}
+
+.dhun-slider-row input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: var(--dhun-space-lg);
+  height: var(--dhun-space-lg);
+  margin-top: calc((var(--dhun-space-progress-height) - var(--dhun-space-lg)) / 2);
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+}
+
+.dhun-slider-row input[type="range"]::-moz-range-thumb {
+  width: var(--dhun-space-lg);
+  height: var(--dhun-space-lg);
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+}
+
+.dhun-slider-row__value {
+  flex: 0 0 auto;
+  min-width: 6ch;
+  text-align: right;
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+/* ------------------------------------------------------------------ dialog --
+ * AddToPlaylistDialog / TrackOverflowDialog: menuMinWidth..menuMaxWidth,
+ * menuRowHeight rows, shape extraLarge.
+ * ------------------------------------------------------------------------ */
+.dhun-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--dhun-scrim-strong);
+  padding: var(--dhun-space-lg);
+}
+
+.dhun-scrim[hidden] {
+  display: none;
+}
+
+.dhun-sheet {
+  width: 100%;
+  max-width: var(--dhun-space-dialog-max-width);
+  min-width: var(--dhun-space-dialog-min-width);
+  padding: var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-bottom-sheet);
+  background: var(--dhun-surface-elevated);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+}
+
+.dhun-sheet__title {
+  margin: 0 0 var(--dhun-space-md);
+  font: var(--dhun-text-title-medium);
+  letter-spacing: var(--dhun-tracking-title-medium);
+  color: var(--dhun-text);
+}
+
+.dhun-menu {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dhun-menu__row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  width: 100%;
+  min-height: var(--dhun-space-menu-row-height);
+  padding: 0 var(--dhun-space-sm);
+  border-radius: var(--dhun-shape-small);
+  text-align: left;
+  color: var(--dhun-text);
+  font: var(--dhun-text-body-medium);
+  letter-spacing: var(--dhun-tracking-body-medium);
+}
+
+.dhun-menu__row:hover {
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-menu__row > .dhun-icon {
+  flex: 0 0 auto;
+  color: var(--dhun-text-tertiary);
+}
+
+/* ------------------------------------------------------------------ shimmer --
+ * LoadingShimmer: placeholder gradient pulse.
+ * ------------------------------------------------------------------------ */
+.dhun-shimmer {
+  border-radius: var(--dhun-shape-small);
+  background: linear-gradient(
+    90deg,
+    var(--dhun-shimmer-base) 0%,
+    var(--dhun-shimmer-highlight) 50%,
+    var(--dhun-shimmer-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: dhun-shimmer var(--dhun-motion-slow) linear infinite;
+}
+
+@keyframes dhun-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ------------------------------------------------------------------ notices --
+ * The engineering-preview banner and the honest offline/data notice. The app
+ * has an offline banner (OfflineBannerPlacement); the preview notice is web
+ * only and is required by ADR-008 boundary 4 until playback is proven.
+ * ------------------------------------------------------------------------ */
+.dhun-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dhun-space-md);
+  margin: 0 var(--dhun-space-screen-padding) var(--dhun-space-md);
+  padding: var(--dhun-space-md);
+  border-radius: var(--dhun-shape-medium);
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+}
+
+.dhun-notice--error {
+  background: var(--dhun-error-container);
+  color: var(--dhun-error);
+}
+
+.dhun-notice p {
+  margin: 0;
+}
+
+/* --------------------------------------------------------- reduced motion --
+ * The app animates at DhunAnimations durations; a user who asks for less
+ * motion gets none of it, including the shimmer.
+ * ------------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------ forced colors --
+ * Windows High Contrast: let the system palette through instead of a
+ * translucency that may not render.
+ * ------------------------------------------------------------------------ */
+@media (forced-colors: active) {
+  .dhun-card,
+  .dhun-mini,
+  .dhun-bottom-nav,
+  .dhun-rail,
+  .dhun-sheet,
+  .dhun-quickpick {
+    background: Canvas;
+    border: var(--dhun-space-border) solid CanvasText;
+    backdrop-filter: none;
+  }
+
+  .dhun-chip[aria-pressed="true"],
+  .dhun-nav-item[aria-current="page"] {
+    border: var(--dhun-space-border) solid CanvasText;
+  }
+}
+
+.dhun-visually-hidden {
+  position: absolute;
+  width: var(--dhun-space-border);
+  height: var(--dhun-space-border);
+  margin: calc(-1 * var(--dhun-space-border));
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

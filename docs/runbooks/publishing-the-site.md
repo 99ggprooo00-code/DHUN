@@ -65,6 +65,20 @@ every run by reporting `build_type` and the URL in the run summary and as a
   canonical URL in the pages' `<link rel="canonical">`, the sitemap, `robots.txt`
   and the JSON-LD block. Changing it is a site-wide edit, not a Pages setting.
 
+## If Pages ever falls back to legacy
+
+The `build` job's warning fires whenever `build_type` is not `workflow`. When
+that happens, the reader it points here needs the click-path, not just the API:
+
+1. **Settings → Pages → Build and deployment → Source → GitHub Actions.**
+2. Trigger **Actions → website → Run workflow** (`workflow_dispatch` works on
+   `main` for both the `deploy` and `served` jobs), or push to `main` touching
+   `website/**`.
+3. Re-check with the commands in "How to tell whether it still works".
+
+Under `legacy` the repository root is republished by Jekyll, so the URL renders
+README.md instead of the artifact — a product defect, not a broken deploy.
+
 ## Reversal
 
 `gh api -X PUT repos/99ggprooo00-code/DHUN/pages -f build_type=legacy` (with a

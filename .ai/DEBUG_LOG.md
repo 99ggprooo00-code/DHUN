@@ -1,5 +1,56 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-09 — the red trunk, the duplicated class, and the action that re-opened its own sheet (session `arena/967513fd-dhun`)
+
+**1. `main` was red before any of this session's code existed.**
+`gh run list --branch main` showed CI run **37831998519** failing at
+*Packaging and fixture helper tests*:
+`test_website_workflow.py::PublishingRunbook::test_the_runbook_exists_and_names_the_exact_setting`
+asserted `docs/runbooks/publishing-the-site.md` contains `"Build and deployment"`.
+Root cause: `d82aa19` rewrote that runbook for a *published* site (Pages is now
+`build_type=workflow`) and dropped the manual setting path. The assertion was
+right and the doc was right about different things — the runbook had lost the
+recovery path an operator needs when Pages falls back to legacy. Fix: the
+runbook gained a "If Pages ever falls back to legacy" section naming the click
+path and the `gh api` reversal; the test was left untouched. Verification: 272
+tests green locally (was 271 + 1 failure), and CI on the branch. Lesson: when a
+doc and a test disagree, decide which half is *stale*, do not weaken the test.
+
+**2. `.dhun-rail` named two different things.** In `app-web/src/css/app.css` the
+class was used for the large-screen navigation rail and again, later in the
+same file, for the horizontal quick-picks shelf. The shelf's rule
+(`display:flex; overflow-x:auto`) came second and won, so the rail rendered as a
+horizontal row. Found by reading the diff, not by a test — there is no browser
+here to catch it. Fix: the shelf was renamed `.dhun-shelf`. Verification: the
+two rules are now distinct; still **not verified in a browser** (no engine
+exists in this environment), which is recorded in
+`docs/verification/29-web-app-mirror.md`. Lesson: a CSS mirror of a design
+system needs a naming convention, not just a token file.
+
+**3. `Add to playlist` re-opened its own sheet.** The sheet's playlist rows
+carried the same `data-action="add-to-playlist"` as the entry point that opens
+it, so choosing a playlist set the same state again. Root cause: one action
+name for two verbs. Fix: rows now use `data-action="confirm-add-to-playlist"`,
+handled separately — and adding to the *Liked Songs* folder is favouriting the
+track, because that is what the app's own model means by it
+(`LibraryTab.FAVORITES` is deprecated in favour of a folder inside Playlists).
+Verification: a boot test asserts the sheet renders the confirm action and the
+Liked Songs row; the state change itself is **not** covered by a test because
+the DOM stub cannot dispatch clicks.
+
+**4. A track row stacked its overflow button underneath itself.** `.dhun-tracklist > li`
+had no `display:flex`, so the row button and the 48 dp overflow button rendered
+as two lines and the target sat outside the row. Fix: the list item is a flex
+row; row times got the `labelSmall` treatment they were missing.
+
+**Environment trap (unchanged, re-confirmed).** This sandbox reaches
+github.com, api.github.com, registry.npmjs.org, pypi.org and
+files.pythonhosted.org only. Consequences that shaped this session: no browser
+binary can be installed (so no Lighthouse, axe or visual check of `app-web/`),
+the deployed origin cannot be fetched, and the live catalogue is unreachable —
+which is why the web app ships a labelled sample catalogue and a labelled
+clock instead of pretending to play audio.
+
 ## 2026-10-08 — seven defects found by asking who would actually see the failure (session `arena/37ec95ed-dhun`)
 
 The session's own rule was "a rule that cannot be made to fail is not a rule", so
