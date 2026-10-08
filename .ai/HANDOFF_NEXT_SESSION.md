@@ -1,3 +1,106 @@
+# HANDOFF — PR #136 rebased; ADR-008 B1 candidate awaits canonical-origin evidence
+
+Updated **2026-10-08**, session `arena/ae65f1a5-dhun`. Fixed session branch:
+`arena/ae65f1a5-dhun`. Current base and GitHub `main`:
+`fddc4361bfeff7757c8ee706de6f249f14751d9a` (the user's direct README URL
+correction over PR #135 merge `8a8d6c5`). The branch is rebased. This session
+recovered post-merge evidence, recreated the website plan, and implemented only
+the accepted B1 engineering probe candidate. Its one working PR is **#136**; no
+production site or player exists.
+
+## Current state
+
+- **PR #135 is merged and post-merge green.** CI **37772063324**,
+  test-release **37772063364**, Build APK **37772063380**, Pages
+  **37772062338** all concluded success on `main@8a8d6c5`. CI's AAB compile and
+  both API-24 `NewApi` lint steps succeeded. `aab` and `release_draft` in
+  test-release skipped as expected.
+- **Main advanced to `fddc436` and is green.** The direct README correction ran
+  CI **37778666069**, Build APK **37778666083**, test-release **37778666170**
+  and Pages **37778665529**, all success. The rolling `test` release now targets
+  it (2026-10-08T12:46:19Z): universal APK 18,405,859 B
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+  arm64 18,355,786 B `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  v7a 18,352,944 B `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`;
+  MSI **2.213.1**, 112,971,776 B,
+  `f4d5677b61b9f471cd8fba7b3b6f4b73b79a9c9529732e4fe34816bb64c8c52d`.
+  Hosted upgrade `2.210.1 → 2.213.1` passed sentinels only; no playback/visual
+  test ran.
+- **Extraction-health 37769870656 is classified from its annotation, not
+  folklore.** It says `ENVIRONMENT_BLOCKED — inspect the probe log and verify
+  playback outside the GitHub runner`; the deliberate final non-zero step makes
+  the run red. This is not a production pass and does not trigger extraction
+  work.
+- **S3 remains open.** Round 4 (Android landscape + Windows fullscreen docked
+  mini-player) and round 5 (API 24–25 icon/launch/search/play/background) are
+  user-only. S6 remains blocked on S3.
+- **AAB staging remains user-only.** One `test-release` dispatch with
+  `build_only=true`, `build_release_candidate=true` must exercise the `aab`
+  job's `stage_artifact.py` path. The automatic CI gate compiles only.
+
+## Website research and corrected Pages diagnosis
+
+Read **`.ai/WEBSITE_PLAN.md`** before any web work. It is the durable W0–W6
+research/plan and includes Volta plus eight comparable projects. No production
+scaffold exists. The accepted B1 candidate is implemented in `web-spike/`, but
+canonical-origin/browser evidence is open.
+
+- The formerly advertised URL
+  `https://99ggprooo00.github.io/DHUN/` → 404. The user chose “correct now,”
+  so README line 2 now uses the actual canonical Pages URL:
+  `https://99ggprooo00-code.github.io/DHUN/` → live, rendering the README.
+- Pages API: legacy source `main:/`, status `built`; build 1269157028 and run
+  37772062338 succeeded. The failure is the missing `-code` in the advertised
+  hostname, **not** an empty artifact or bad Pages source.
+- W0 answers: **browser player**; real screenshots captured during S3;
+  product-first wording with the unofficial warning lower on the first viewport;
+  canonical github.io; English-only v1; README corrected now.
+- Repository still has zero raster/vector image files. Real S3 captures are a
+  gated dependency; live music artwork/lyrics cannot be committed without
+  rights.
+- The selected browser player contradicts MASTER_PROMPT's prior Web cut and
+  Android+JVM-only stack. The user separately accepted **ADR-008 for B1 only**.
+  The dependency-free, noindex, credential-free candidate is implemented and
+  locally checked; it is not on canonical Pages and has no playback verdict.
+  No production player, adopted stack, backend/proxy, extraction change or Web
+  claim is approved. See verification record 19.
+
+## Next actions — in order
+
+1. Review/run the Arena preview only as preflight. Do not record it as the
+   canonical B1 verdict.
+2. After explicit merge authorization for PR #136, verify Pages publishes the
+   exact merged commit at `/DHUN/web-spike/`; record Chromium/Firefox and Safari
+   tested/unavailable evidence in verification record 19.
+3. Keep S3 device rounds ahead of optional Web work. Use the exact current
+   hashes above and record device/OS/hash. Capture licence-safe screenshots with
+   provenance because that is the selected W3 asset path.
+4. User-only: dispatch the AAB release-candidate staging path once.
+5. After B1, stop for B2. A pass does not choose Kotlin/JS, TypeScript or a
+   backend; a failure may choose stop or the researched static Option-A fallback.
+
+## Do not
+
+- Do not merge/close PR #54 or implement ADR-007.
+- ADR-008 authorizes B1 only. Do not widen it into a proxy/backend, adopted
+  browser stack or production player.
+- Do not touch extraction/probe semantics, FullPlayer (ADR-002), lyrics, or ABI
+  splits.
+- Do not call CI, hosted MSI smoke, a static lint gate or a marketing site
+  hardware acceptance.
+- Do not copy Volta claims/assets or claim working Web/iOS/sync/import/lossless
+  quality.
+- Do not use third-party APK sites as official distribution evidence.
+
+**Environment:** no local JDK/Gradle/Android SDK/display. Local executable gate:
+`python3 -m unittest discover -s scripts -p 'test_*.py'` (55 tests). Actions log
+archives and release bodies remain blocked; REST annotations and asset digests
+are the evidence source.
+
+---
+
+# HISTORICAL — PR #135 before merge (superseded by the handoff above)
+
 # HANDOFF — PR #135: the API-24 lint gate now covers both Android modules; S3 rounds 4 and 5 open
 
 Updated **2026-10-08**, session `arena/8be68e2c-dhun`. `main` =

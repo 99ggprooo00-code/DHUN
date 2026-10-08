@@ -43,7 +43,9 @@ YouTube Music — **past feature construction, into verification and
 release hardening.**
 
 - **Platforms:** Android (primary) and Desktop (Windows first;
-  Linux/macOS free via JVM). Web is deferred (v2 candidate, likely "no").
+  Linux/macOS free via JVM). Production Web remains deferred; accepted ADR-008
+  permits only an isolated deployed-origin browser feasibility spike (B1), not
+  a product target or stack choice.
 - **Current surface:** Home, Search, Library (Playlists / Favorites /
   History / Downloads), Artist / Album / Playlist pages, MiniPlayer +
   immersive FullPlayer (Lyrics | Queue | Related), synced lyrics,
@@ -144,7 +146,11 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
   unverified), jump lists, single-instance guard, close-to-tray,
   keyboard shortcuts, per-user unsigned MSI (test-grade until release
   signing is decided).
-- **Web:** cut. No shims, no stubs, no dead code "for later."
+- **Web:** production target still cut. ADR-008 is the narrow exception: one
+  isolated B1 deployed-origin feasibility spike is accepted. A dependency-free
+  candidate exists in `web-spike/`, but canonical-origin/browser evidence is
+  open. No shared browser source set, backend/proxy, production player or
+  Web-support claim is approved.
 
 ### Music source
 - YouTube Music via the revised doctrine above. No paid API. No keys.
@@ -205,9 +211,11 @@ re-opened without a written ADR proving a blocking defect.
 | Logging | **Platform-native** (`android.util.Log` / JDK logging) | **(corrected)** Kermit was never adopted; do not add a logging framework now |
 | Desktop native | **JNA 5.17** (SMTC, jump lists) | Base JNA only; fail-open off-Windows |
 
-**Still explicitly rejected:** Flutter, Electron/Tauri, separate
-backend, Compose for Web / Kotlin-JS, Room, Hilt, account sign-in for
-core playback (guest-first per #60).
+**Still explicitly rejected for product adoption:** Flutter,
+Electron/Tauri, separate backend, Compose for Web / Kotlin-JS, Room, Hilt,
+account sign-in for core playback (guest-first per #60). ADR-008 B1 may use only
+the minimum disposable browser code needed to measure deployed-origin
+feasibility; it does not adopt a browser stack or relax the no-backend rule.
 
 ---
 
@@ -224,7 +232,7 @@ DHUN/
 │   ├── PROMPT_SEQUENCE.md      # HISTORICAL: original 30-phase audit (do not rewrite)
 │   └── RISK_REGISTER.md        # extraction rot, drill, kill-switch criteria
 ├── docs/
-│   ├── decisions/              # ADRs 001–006 ACCEPTED; 007 PROPOSED on open PR #54
+│   ├── decisions/              # ADRs 001–006 accepted; 007 proposed on PR #54; 008 accepted for B1 only
 │   ├── research/               # spike findings (short, factual)
 │   └── verification/           # per-phase on-hardware logs (many gates OPEN)
 ├── shared/                     # KMP module (android+jvm)
@@ -248,8 +256,9 @@ DHUN/
 │                               # jump lists, single-instance, packaging
 ├── tools/playback-probe/       # Phase 01 CLI harness — STILL the rot drill's probe
 │                               # (+ OfflineMain deterministic check, SmokeMain)
+├── web-spike/                  # ADR-008 B1 static probe candidate; not a product target
 ├── tests/fixtures/             # captured InnerTube JSON for parser tests
-├── scripts/                    # python packaging/CI-contract gates (29 tests)
+├── scripts/                    # python packaging/CI/Web-spike contracts (55 tests)
 └── .github/workflows/          # ci.yml · test-release.yml · build-apk.yml ·
                                 # extraction-health.yml (id 360655315 — the
                                 # restored daily drill; superseded the deleted
@@ -418,8 +427,9 @@ acceptance gates the next. File-level tasking lives in
   go-ahead. Then and only then: tag + publish.
 
 ### Explicitly NOT in S1–S6 (v2 backlog — see ROADMAP)
-Web/PWA · Android Auto · Cast · cross-device sync · optional cookie
-sign-in (#60) · EQ beyond S4 · widgets beyond Quick Play · security
+Production Web/PWA (ADR-008 B1 feasibility is the only exception) · Android
+Auto · Cast · cross-device sync · optional cookie sign-in (#60) · EQ beyond S4
+· widgets beyond Quick Play · security
 hardening program (#63) · store releases · v1.0 GA · any ADR-007
 implementation (contingency only).
 

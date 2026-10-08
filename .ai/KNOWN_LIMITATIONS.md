@@ -2,6 +2,97 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — latest session state: `main@fddc436`, rolling MSI 2.213.1, and B1 exists without a browser verdict
+
+- **Main moved after the earlier entries below.** The user committed the approved
+  README hostname correction directly as `fddc436`. CI **37778666069**, Build
+  APK **37778666083**, test-release **37778666170** and Pages **37778665529**
+  succeeded. This branch is rebased onto it; PR #136 remains the only working
+  PR for this session.
+- **The rolling APKs are still byte-identical to the recorded `8a8d6c5`
+  publish.** Universal remains
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+  arm64 `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  v7a `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`.
+  MSI advanced to **2.213.1**, 112,971,776 B,
+  `f4d5677b61b9f471cd8fba7b3b6f4b73b79a9c9529732e4fe34816bb64c8c52d`.
+  Hosted smoke is still packaging-only (`2.210.1 → 2.213.1`); no playback or
+  visual acceptance follows.
+- **ADR-008 B1 is implemented only as a candidate.** `web-spike/` is a
+  dependency-free, noindex, credential-free diagnostic route with no proxy,
+  persistence, remote assets or product navigation. Its local contract and JS
+  syntax pass; that does not prove CORS, media ranges, codecs or sound.
+- **Canonical-origin evidence is blocked on review/merge plus a real browser.**
+  Legacy Pages serves `main:/`, so PR code cannot appear at
+  `/DHUN/web-spike/` before an authorized merge. Arena preview is a different
+  origin and is preflight only. Chromium and Firefox audible evidence plus
+  Safari tested/unavailable must be recorded in verification record 19.
+- **No B2 choice is implied.** A B1 pass does not authorize Kotlin/Wasm/JS,
+  TypeScript, a backend/proxy or a production player. A failure does not
+  authorize extraction changes. Either result stops for the B2 user decision.
+
+## 2026-10-08 — session `arena/ae65f1a5-dhun`: PR #135 is merged and green; the remaining gates did not become hardware evidence
+
+- **Post-merge verification is complete.** PR #135 merged as `8a8d6c5`.
+  CI **37772063324**, test-release **37772063364** and Build APK
+  **37772063380** succeeded. In CI, `bundleDebug`, app `NewApi` lint and shared
+  `NewApi` lint all succeeded. This closes the former “awaiting merge” status;
+  it does not close API-24 hardware or AAB install acceptance.
+- **The published APKs are unchanged, now verified rather than predicted.**
+  Universal: 18,405,859 B,
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+  arm64-v8a: 18,355,786 B, `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  armeabi-v7a: 18,352,944 B,
+  `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`.
+  The split APKs still differ from universal. The MSI is now **2.210.1**,
+  112,971,776 B,
+  `8a2383475947f8b9f5557d584cf0d6f0d34cec489aee3d3a40ab543d8618e298`.
+- **Hosted MSI smoke is packaging evidence only.** Its annotation proves an
+  install-over `2.202.1 → 2.210.1`, userdata/cache sentinels, future-upgrade
+  guard and uninstall on hosted Windows. It explicitly says no app launch,
+  playback or visuals were tested. S3 round 4 stays open.
+- **The dispatch-only AAB path is still untested.** The post-merge push skipped
+  `aab` as designed. CI proves `:app-android:bundleDebug` compiles; it still
+  does not exercise `scripts/stage_artifact.py`, inspect the staged bundle or
+  install through bundletool. One user `workflow_dispatch` with
+  `build_only=true` and `build_release_candidate=true` remains required.
+- **The latest extraction-health classification was read from the annotation.**
+  Scheduled run **37769870656** is red by design at its final non-zero step, but
+  job 113286519680 says: `ENVIRONMENT_BLOCKED — inspect the probe log and verify
+  playback outside the GitHub runner.` That supports the runner classification,
+  not a production pass. S1 residential evidence remains separate; no T1/T2
+  trigger or extraction change follows from this run.
+
+## 2026-10-08 — session `arena/ae65f1a5-dhun`: Pages hostname repaired; browser player selected, with only B1 feasibility approved
+
+- **Diagnosis corrected.** `https://99ggprooo00.github.io/DHUN/` 404s because
+  the repository owner is `99ggprooo00-code`. GitHub's Pages API reports the
+  canonical URL `https://99ggprooo00-code.github.io/DHUN/`, legacy source
+  `main:/`, status `built`; that canonical URL is live and renders the root
+  README. Post-merge Pages run **37772062338** and build **1269157028** both
+  succeeded. The earlier “empty artifact / misconfigured source” theory is
+  disproven.
+- **The bad front-door link is repaired, but the page is not a product.** W0
+  authorized correcting README line 2 to the canonical `-code` URL, and that
+  edit is applied. It now opens the live rendered engineering README. This is a
+  link fix, not browser-player deployment evidence.
+- **The user selected a browser player, not a static download site.** That
+  reverses MASTER_PROMPT's prior Web cut and the locked Android+JVM-only stack.
+  The user separately accepted ADR-008 for **B1 feasibility only**. The static
+  candidate now exists, but canonical/browser evidence is open. A production
+  player, shared browser source set, adopted stack,
+  backend/proxy, extraction change and public Web-support claim all remain
+  unapproved; success would still stop at the B2 architecture decision.
+- **There are still no image assets in this repository.** The user selected real
+  S3 Android/Windows captures instead of CSS mockups. Those captures do not
+  exist yet and must use legally safe content with recorded provenance. Live
+  album artwork and lyrics are third-party copyrighted content and cannot be
+  committed merely because DHUN displayed them.
+- **The legacy auto-created Pages workflow has platform noise.** Run
+  37772062338 is green but annotates `actions/upload-artifact@v4` as Node-20
+  code forced onto Node 24. A future standalone site workflow should pin a
+  current Pages action; this warning is not an application CI failure.
+
 ## 2026-10-08 — session `arena/8be68e2c-dhun`: both Android modules are now lint-gated at API 24; a static gate is still not a device
 
 - **What changed.** `:shared` now runs Android Lint's `NewApi` rule as an error

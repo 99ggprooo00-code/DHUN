@@ -1,5 +1,101 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — ADR-008 B1: a working static page is not deployed-origin evidence (session `arena/ae65f1a5-dhun`)
+
+**Constraint exposed before implementation.** GitHub Pages is still legacy
+`main:/`. A PR branch has no canonical preview URL, and changing Pages source to
+the session branch would replace the project's live source before review. That
+would be a consequential deployment mutation, not a harmless test. Therefore B1
+was implemented as an unlinked `web-spike/` candidate and stopped before any
+Pages setting change or merge.
+
+**Smallest honest probe.** The candidate is three static files with no package
+manager or framework. It asks one narrow sequence: anonymous oEmbed metadata →
+one credential-omitting WEB_REMIX `/player` POST → allow-listed direct
+`*.googlevideo.com` candidate → 32 KiB CORS range read → separately clicked
+`<audio crossorigin=anonymous>` → explicit tester “I heard audio” confirmation.
+Metadata, player response, range access, media events and human audibility stay
+separate so one green row cannot launder another red row.
+
+**Privacy/security boundary.** CSP allows only self, the two YouTube origins and
+googlevideo media. There is no iframe, autoplay, cookie/credential request,
+local storage, proxy, remote image/font, analytics or response-body export.
+Ephemeral stream URLs/query strings remain in memory and are removed on reset;
+the copied JSON carries only sanitized stage evidence. The default presentation
+is synthetic and the upstream test item is the CC-licensed Big Buck Bunny work;
+no artwork/title response is rendered or committed.
+
+**What local checks prove.** `scripts/test_web_spike.py` pins that boundary and
+the WEB_REMIX identity against `InnerTubeClient`; the full Python suite is now
+55 tests. `node --check web-spike/probe.js` proves JavaScript syntax. Serving it
+in Arena proves the three assets load. None proves CORS, byte ranges, codecs or
+sound because Arena's preview origin is not
+`https://99ggprooo00-code.github.io`.
+
+**Remaining verdict.** PR #136 must be reviewed and explicitly authorized for
+merge before legacy Pages can expose `/DHUN/web-spike/`. Then real Chromium and
+Firefox runs (Safari tested or unavailable) populate
+`docs/verification/19-browser-feasibility-spike.md`. A pass or failure both stop
+at B2; neither permits a proxy or extraction change.
+
+## 2026-10-08 — the “successful Pages deploy but advertised URL 404s” incident was a hostname mismatch, not an empty deployment (session `arena/ae65f1a5-dhun`)
+
+**Symptom inherited.** README line 2 links
+`https://99ggprooo00.github.io/DHUN/`, which returns GitHub's “There isn't a
+GitHub Pages site here.” The auto-created `pages-build-deployment` workflow was
+green, so the previous session left two hypotheses: branch-source with no index,
+or an Actions source publishing an empty artifact.
+
+**The missing check.** The repository is `99ggprooo00-code/DHUN`; the assumed
+Pages hostname dropped the `-code` suffix from the owner. The Pages API is the
+authority and reports:
+
+```text
+html_url = https://99ggprooo00-code.github.io/DHUN/
+build_type = legacy
+source = main:/
+status = built
+```
+
+Fetching that canonical URL works and renders the root README through GitHub's
+legacy Jekyll build. Post-PR-#135 Pages run **37772062338** succeeded on
+`main@8a8d6c5`; Pages build **1269157028** is `built` with no error. Therefore
+the successful workflow was honest: it deployed to the URL GitHub configured.
+The 404 was the wrong hostname on the project's front door.
+
+**Residual issue and later W0 resolution.** The live canonical page is an
+engineering README, not the requested product site. The diagnosis did not guess
+the link disposition. Later in this session the user chose “correct now,” so
+README line 2 was changed to the canonical `-code` URL. No Pages setting,
+workflow, site scaffold or browser-player code changed **at the time of this
+diagnosis**. The link was fixed and the product surface remained absent. The
+user later accepted ADR-008 B1; the top entry now supersedes this point-in-time
+status with the implemented-but-not-deployed probe candidate.
+
+**Workflow noise found while reading the actual annotation.** The legacy Pages
+build uses `actions/upload-artifact@v4`, which GitHub now warns targets deprecated
+Node 20 and is being forced onto Node 24. The deploy is still green. A future
+approved site workflow should use current Pages actions rather than attempting
+to edit the auto-created workflow.
+
+## 2026-10-08 — the unread post-merge verdicts for PR #135 were all green; extraction-health was classified from its warning annotation
+
+PR #135 merged as `8a8d6c5` at 11:44:32Z. Runs left queued/in progress by the
+previous session all completed: CI **37772063324**, test-release
+**37772063364**, Build APK **37772063380** and Pages **37772062338** succeeded.
+The rolling publish kept all APK bytes/digests and produced MSI 2.210.1
+(112,971,776 B,
+`8a2383475947f8b9f5557d584cf0d6f0d34cec489aee3d3a40ab543d8618e298`).
+The hosted upgrade annotation proves `2.202.1 → 2.210.1` and sentinel checks,
+not playback.
+
+Scheduled extraction-health **37769870656** was not re-labelled from its red
+conclusion alone. Its job warning says exactly: `ENVIRONMENT_BLOCKED — inspect
+the probe log and verify playback outside the GitHub runner.` The final
+keep-non-zero step then failed deliberately. That is the evidence for the
+runner classification, while the warning title — “Extraction health is not a
+production pass” — prevents treating it as live playback acceptance.
+
 ## 2026-10-08 — the API-24 lint gate covered one of the two Android modules (session `arena/8be68e2c-dhun`, base `main@6f1e6ba`, PR #135)
 
 **The gap.** PR #134 added `Android Lint — API 24 floor (NewApi)` running

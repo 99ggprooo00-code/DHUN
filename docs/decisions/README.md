@@ -9,3 +9,4 @@ of them is being challenged, not before.
 - [ADR-005](ADR-005-next-track-prebuffering-and-temp-cache.md) — Next-track pre-buffering, temporary cache lifecycle, and stream isolation (2026-09-06)
 - [ADR-006](ADR-006-offline-music-downloads-architecture.md) — Persistent offline downloads: schema v3, range-resume engine, offline-first routing (ACCEPTED 2026-09-07)
 - ADR-007 (PROPOSED, not filed — lives on open PR #54) — Android stream attestation / PO-token options A–D. Contingency reference only: implement solely on triggers T1/T2 (MASTER_PROMPT §2) with the user's explicit go-ahead.
+- [ADR-008](ADR-008-browser-web-player-target.md) — Browser-player target feasibility gate (**ACCEPTED for the B1 deployed-origin spike only, 2026-10-08**; no production player, backend/proxy, extraction change or B2 stack is approved).

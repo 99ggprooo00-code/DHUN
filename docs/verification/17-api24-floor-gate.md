@@ -1,9 +1,10 @@
 # 17 — API-24 floor gate: Android Lint `NewApi` in CI (both Android modules)
 
-> **Status: PR #134 merged (app module); PR #135 (shared module) — CI-proven on
-> the PR head, awaiting merge authorization.** This document records a **CI
-> gate**, not hardware behaviour. It proves that an unguarded framework call
-> above API 24 fails the build. It does **not** prove that DHUN works on an
+> **Status: merged and post-merge CI-proven on both Android modules.** PR #134
+> added the app-module gate; PR #135 merged the shared-module gate as
+> `main@8a8d6c5adc536f34c8b677c9b20e5245747ed2e9`. This document records a
+> **CI gate**, not hardware behaviour. It proves that an unguarded framework
+> call above API 24 fails the build. It does **not** prove that DHUN works on an
 > Android 7.0/7.1 device — that is S3 round 5 and it is still open.
 
 ## What the gate is, and why it exists
@@ -42,7 +43,7 @@ are unaffected.
 - Merged as `6f1e6ba730e590cca693c4735a558556cd8378ae` (PR #134,
   2026-10-08T09:53:02Z).
 
-## Evidence — `:shared` (PR #135)
+## Evidence — `:shared` (PR #135, merged)
 
 Session `arena/8be68e2c-dhun`, base `main@6f1e6ba`.
 
@@ -94,17 +95,26 @@ is **empty** — the tree is byte-identical to the pre-probe head — and CI
 pull_request **37766214968** is green on it, 14/14 steps with step 10
 **success**.
 
-**Head PR #135 asks to merge:** `f027dfc` (the ledger above, on top of
-`a66b342`) plus the trailing commit that records `f027dfc`'s own runs — no code
-change since `a66b342`. All four workflows green on `f027dfc`: CI pull_request
-**37767256325** (14/14, step 10 success), CI push **37767248647**, Build APK
-**37767256472**, test-release **37767256281**.
+**Final PR evidence:** `f027dfc` (the ledger above, on top of `a66b342`) plus
+the trailing documentation commit changed no code after `a66b342`. All four
+workflows were green on `f027dfc`: CI pull_request **37767256325** (14/14,
+step 10 success), CI push **37767248647**, Build APK **37767256472** and
+test-release **37767256281**.
+
+**Post-merge close-out:** PR #135 merged at 2026-10-08T11:44:32Z as
+`8a8d6c5adc536f34c8b677c9b20e5245747ed2e9`. CI push **37772063324** finished
+success with both `NewApi` steps green and `:app-android:bundleDebug` green.
+Build APK **37772063380** and test-release **37772063364** also succeeded. This
+closes the static-gate merge acceptance only; the API 24–25 hardware row below
+remains open.
 
 ## Contract tests (runnable without a JDK)
 
 `scripts/test_ci_workflow.py` (executed by CI step 1,
-`python3 -m unittest discover -s scripts -p 'test_*.py'`) grew from 39 to 45
-tests. Six pin this gate:
+`python3 -m unittest discover -s scripts -p 'test_*.py'`) gained six tests for
+this gate (39 → 45 at that change; the suite reached 47 after the separate AAB
+contract). The repository-wide suite is now **55** after ADR-008 B1 added eight
+independent Web-spike contract tests. The six API-floor tests pin:
 
 - both lint steps exist in `ci.yml`, with their distinct honest names, app module
   first;
@@ -116,7 +126,10 @@ tests. Six pin this gate:
 
 Mutation-proven locally: removing the `:shared` lint step together with the
 `checkOnly`/`abortOnError` pair turns **3** of the new tests red
-(`FAILED (failures=2, errors=1)`); restoring returns **45/45 OK**.
+(`FAILED (failures=2, errors=1)`); restoring returned **45/45 OK** at the gate
+commit; after the separate AAB contract the then-current suite was **47/47
+OK**. The current repository-wide suite is **55/55 OK**; the eight later tests
+belong to ADR-008 B1, not this gate.
 
 ## Static read of `shared/src/androidMain` (7 files)
 
@@ -150,7 +163,9 @@ violation-free tree.
   attribute, or a resource that inflates differently below API 26 is outside it.
 - Not hardware. **S3 round 5** (an API 24–25 device: launcher icon renders, app
   launches, searches, plays, keeps background audio) is still **open** and
-  user-gated. The current rolling `test` build is the package to install.
+  user-gated. Install the current rolling `test` universal APK and record the
+  exact SHA-256:
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`.
 - Not `commonMain` coverage. Lint sees `androidMain`; `commonMain` is protected
   by the KMP compiler instead.
 
