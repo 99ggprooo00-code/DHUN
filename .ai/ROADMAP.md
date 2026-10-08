@@ -1,5 +1,74 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/af3e7f66-dhun` — per-route CSS, a marked current page, anchor landings that clear the header, byte-true sizes, and an honoured increase-contrast preference (2026-10-08)
+
+Updated **2026-10-08** · fixed session branch `arena/af3e7f66-dhun` · branch point
+and GitHub `main` at boot **`1062a869258705bdf17dbd3125542d8556bb9925`**. Working
+tree clean at boot; the branch had no remote ref and no PR at boot, so this
+session opened **PR #141** (six commits: `c242a2f`, `a67f9ac`, `9e31320`,
+`2730de7`, `585af30`, `4f4c2b2`, `72d9bad`).
+
+### Recon (every line read from a tool output)
+
+| Fact | State | Evidence |
+|---|---|---|
+| Branch / tree | `arena/af3e7f66-dhun`, clean at boot | `git status --short`, `git branch --show-current` |
+| Script suite | **267 tests green** at boot → **272** at hand-off | `python3 -m unittest discover -s scripts -p 'test_*.py'` |
+| Site build | `minified: saved 49418 bytes` at boot → **53466** | `npm run build`, Node v22.22.3 |
+| Quality gates | **28 checks** at boot → **29** | `scripts/website_quality.py website/dist` |
+| Route weights (uncompressed) at boot | `/` 53,554 · `/features/` 54,881 · `/ui/` 56,263 · `/404.html` 17,441 B | `website/budget-baseline.json` |
+| Pages | `build_type=legacy`, source `main:/`, **`status=errored`** | `gh api repos/99ggprooo00-code/DHUN/pages` |
+| Canonical URL from the sandbox | unreachable (egress allowlist is github.com/npm/pypi only) | `curl` → SSL error |
+
+### What this session changed (each with a measurement and a mutation proof)
+
+| # | Item | Result | Evidence |
+|---|---|---|---|
+| D18 | Per-route CSS pruning (`website/tools/prune-css.mjs`, 17 node tests) | `/` 51,311 · `/features/` 48,019 · `/ui/` 49,508 · `/404.html` 12,794 B; `pruned 4 page(s): 27693 bytes of CSS no page can use` | record 24; build log |
+| D19 | Current page marked (`aria-current="page"` + a pill and a Windows-High-Contrast-proof underline; `/404.html` `noindex`) | CI: `/` marked by `a.wordmark`, `/features/`/`/ui/` by their nav link; all three keep the mark under forced colours | record 25; run 37821648145 |
+| D20 | Anchor landings (`scroll-padding-top: 12rem` base, `7rem` from 480 px) | CI: `#main` lands at 65/109/161 px against header bottoms of 65/109/161 px at 1280/380/280 px wide | records 25–26; same run |
+| D21 | `prefers-contrast: more` honoured (`tokens.css`, both secondary rungs → `var(--text)`; **29th** check) | Statically: 4.83:1 → 16.26:1 (light `--text-3` on `--bg`), 6.71:1 → 18.10:1 (dark, variant surface) | record 27 |
+| — | `served_size()` in `scripts/website_smoke.py` (was `len()`, i.e. characters) | sizes are bytes on the wire, pinned by `ServedSizeIsBytes` | record 26 |
+| — | The reporter's stale prose replaced by a comparison (see below) | `browser.mjs` measures the same route with the preference *unset* and fails if the preference makes a node worse | record 28 |
+
+### CI for this branch — the first website run this branch ever had
+
+**Run `37821648145` (`72d9bad`): build ✅ · browser ✅ · lighthouse ✅** — all three
+routes `100/100/100/100`, `TBT=0ms`, `CLS=0.000`, `requests=1`,
+`unused-css-rules: none`; `deploy`/`served` skipped (Pages is still `legacy`).
+
+The **first** run (`37820644105`, `4f4c2b2`) failed Lighthouse on `/`:
+performance median **81** (samples 71 · 81 · 100, `TBT=819ms` on a page with zero
+scripts, the other routes 100/100/100 in the same job). Re-runs are refused from
+this environment (403 for both `gh run rerun --failed` and `workflow_dispatch`).
+The next commit touched only tests and docs — **`dist` byte-identical** — and
+scored `/` 99 · 100 · 100 with `TBT=0ms`: runner noise, proved on identical bytes
+rather than argued. Details in record 28.
+
+### Exact next actions for the next session
+
+1. **Read `main`'s website run for the merge of PR #141** (`gh run list --workflow
+   website.yml --branch main --limit 1`): confirm the same three green jobs and
+   the `/` Lighthouse number. If `/` is red there with the same `TBT` signature,
+   the gate — not the site — needs the look, and record 28 has the two runs to
+   compare against.
+2. **Fix the annotation carry** (`website/tests/browser.mjs`, `emitReport`): GitHub
+   truncates a check-run message at ~4 KB while `CARRY_CLIP = 24000` promises
+   otherwise, so every run silently drops measurements — the emulated
+   increase-contrast numbers and both axe scan sets among them. Parked on purpose
+   (record 28): the fix is more, smaller annotations inside GitHub's ~10-per-step
+   cap, and its effect is only visible in a CI run. Mutation-proof it with a tiny
+   CARRY_CLIP and a run, not by reading the constant.
+3. **Pages source** is still `legacy` — until someone with repo write access
+   switches Settings → Pages → Source to *GitHub Actions*, `deploy` and `served`
+   keep skipping and the public URL stays unverified. Runbook:
+   `docs/runbooks/publishing-the-site.md`.
+4. The §9 screenshot backlog is unchanged; a real capture is still the only thing
+   that replaces a mockup.
+
+---
+
+
 ## Session `arena/37ec95ed-dhun` — one request per route, a browser matrix that includes the hard viewports, print, and metadata that is asserted rather than assumed (2026-10-08)
 
 Updated **2026-10-08** · fixed session branch `arena/37ec95ed-dhun` · branch point
