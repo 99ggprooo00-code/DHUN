@@ -107,6 +107,15 @@ network trace, browser versions, deployed commit and result. A local dev-server
 pass is insufficient. Failure is a valid result and must not trigger extraction
 changes.
 
+#### B1 implementation status — candidate only
+
+PR #136 now contains a dependency-free candidate in `web-spike/`, pinned by
+`scripts/test_web_spike.py` and documented in
+`docs/verification/19-browser-feasibility-spike.md`. It is deliberately unlinked,
+`noindex`, credential-free, allow-listed and labelled as an engineering probe.
+It has **not** reached the canonical Pages origin, so B1 has no CORS, media or
+audible-playback verdict yet. Local/Arena preview behavior is preflight only.
+
 ### B2 — Architecture selection after evidence
 
 Choose one only after B1:

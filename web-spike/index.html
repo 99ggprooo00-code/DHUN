@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src https://www.youtube.com https://music.youtube.com https://*.googlevideo.com; media-src https://*.googlevideo.com; font-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>DHUN browser feasibility spike</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./probe.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#probe">Skip to test controls</a>
+
+  <main>
+    <header class="hero" aria-labelledby="page-title">
+      <div class="eyebrow"><span class="signal" aria-hidden="true"></span> ADR-008 · B1 engineering probe</div>
+      <h1 id="page-title">Can a browser reach the music path?</h1>
+      <p class="lede">
+        This disposable page measures browser restrictions before DHUN chooses a Web architecture.
+        It is <strong>not a Web player</strong>, product preview, or support claim.
+      </p>
+      <div class="boundary" role="note">
+        <strong>Strict boundary:</strong> no sign-in, cookies, PO tokens, proxy, analytics, storage,
+        artwork, lyrics, or changes to the Android/Windows resolver.
+      </div>
+    </header>
+
+    <section class="facts" aria-label="Probe facts">
+      <article>
+        <span class="fact-label">Origin under test</span>
+        <strong id="originValue">Reading…</strong>
+      </article>
+      <article>
+        <span class="fact-label">Probe revision</span>
+        <strong>b1-v1</strong>
+      </article>
+      <article>
+        <span class="fact-label">Stored data</span>
+        <strong>None</strong>
+      </article>
+    </section>
+
+    <section class="panel controls" id="probe" aria-labelledby="probe-title">
+      <div class="section-heading">
+        <div>
+          <p class="kicker">One known public item</p>
+          <h2 id="probe-title">Run the direct-origin test</h2>
+        </div>
+        <span class="state-pill" id="overallState" data-state="idle">Not run</span>
+      </div>
+
+      <p class="test-note">
+        The default ID is the Blender Foundation’s CC-licensed <em>Big Buck Bunny</em> upload.
+        No title, artwork, lyrics, or response body is displayed or saved. You may replace it
+        only with content you are authorized to test.
+      </p>
+
+      <label for="videoId">YouTube video ID</label>
+      <div class="input-row">
+        <input id="videoId" name="videoId" value="aqz-KE-bpKQ" maxlength="11"
+               pattern="[A-Za-z0-9_-]{11}" autocomplete="off" spellcheck="false"
+               aria-describedby="video-help">
+        <button class="primary" id="runProbe" type="button">Run B1 probe</button>
+      </div>
+      <p class="help" id="video-help">Exactly 11 characters. The value stays in this tab.</p>
+
+      <div class="player-block">
+        <div>
+          <p class="kicker">Resolved media</p>
+          <p id="playerHint">Run the probe first. A separate click is required before playback.</p>
+        </div>
+        <audio id="probeAudio" controls preload="none" crossorigin="anonymous"></audio>
+        <div class="button-row">
+          <button id="playResolved" type="button" disabled>Play resolved stream</button>
+          <button id="heardAudio" type="button" disabled>I heard audio</button>
+          <button class="quiet" id="resetProbe" type="button">Reset</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="result-grid" aria-label="B1 stage results">
+      <article class="result-card" id="metadataCard" data-state="idle">
+        <span class="step">01</span>
+        <h2>Anonymous metadata</h2>
+        <p id="metadataResult">Not tested</p>
+      </article>
+      <article class="result-card" id="playerCard" data-state="idle">
+        <span class="step">02</span>
+        <h2>Player response</h2>
+        <p id="playerResult">Not tested</p>
+      </article>
+      <article class="result-card" id="rangeCard" data-state="idle">
+        <span class="step">03</span>
+        <h2>CORS + byte range</h2>
+        <p id="rangeResult">Not tested</p>
+      </article>
+      <article class="result-card" id="mediaCard" data-state="idle">
+        <span class="step">04</span>
+        <h2>Browser media</h2>
+        <p id="mediaResult">Not tested</p>
+      </article>
+    </section>
+
+    <section class="panel diagnostics" aria-labelledby="diagnostics-title">
+      <div class="section-heading">
+        <div>
+          <p class="kicker">Local-only evidence</p>
+          <h2 id="diagnostics-title">Sanitized result</h2>
+        </div>
+        <button class="quiet" id="copyResult" type="button">Copy JSON</button>
+      </div>
+      <p>
+        The report excludes stream URLs, query strings, response bodies, titles, and author names.
+        Copy it into the verification record only after checking it.
+      </p>
+      <pre id="resultJson" tabindex="0">Run the probe to produce a report.</pre>
+
+      <h3>Event timeline</h3>
+      <ol class="timeline" id="timeline" aria-live="polite">
+        <li>Waiting for a manual run.</li>
+      </ol>
+    </section>
+
+    <section class="stop-rule" aria-labelledby="stop-title">
+      <p class="kicker">Decision rule</p>
+      <h2 id="stop-title">A pass still stops at B2.</h2>
+      <p>
+        Audible playback from the deployed GitHub Pages origin would justify a separate architecture
+        decision. A CORS, direct-URL, codec, or media failure is also a valid B1 result. Neither result
+        permits a proxy or extraction change.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <span>DHUN · ADR-008 B1</span>
+    <span>No telemetry · no persistence · no product claim</span>
+  </footer>
+</body>
+</html>
