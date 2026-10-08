@@ -2,6 +2,48 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — session `arena/688214aa-dhun`: minSdk 24 is compiled, not device-proven; the three APKs may be identical
+
+- **minSdk 24 is a manifest + resource change, not a hardware pass.** API 24–25
+  launch, the legacy launcher icon, search, playback and background audio are
+  the S3 round-5 retest. There is no API 24 emulator in this sandbox and no JDK,
+  so CI compile is the only pre-device gate. Do not describe a green apk job as
+  "Android 7 works."
+- **The legacy icon is an XML layer-list, not a density PNG.** `mipmap-anydpi`
+  resolves `@mipmap/ic_launcher` below API 26, which the adaptive-only v26
+  resource did not. A launcher that cannot inflate a vector/layer-list could
+  still draw a generic icon; the round-5 check is "renders, not blank/default,"
+  and a failure there is a real defect, not a docs miss.
+- **ABI splits are not byte-identical.** Source has no `System.loadLibrary` /
+  jniLibs / ndk, and the handoff expected identical APKs. CI disproved that
+  (test-release **37748364969**, apk job 113215222450, `buildOnly=true`,
+  source SHA `93e90875` = the PR merge ref, not a published release):
+  universal `dhun-test.apk` **18,405,859 B**
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+  arm64-v8a **18,355,786 B**
+  `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  armeabi-v7a **18,352,944 B**
+  `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`.
+  The size gaps (universal − arm64 = 50,073; universal − v7a = 52,915;
+  those two gaps differ by 2,842, which is also arm64 − v7a) fit "universal
+  contains both ABI payloads, each split contains one." The artifact zip could
+  not be downloaded here (EOF), so the entry name is **not** identified — do
+  not invent a `.so` name. Install `dhun-test.apk` (universal) unless you are
+  specifically testing a split. Do not drop the `splits` block on an
+  identical-bytes theory; that theory is false. Version codes stay the same;
+  do not add Play-style per-ABI version overrides without a decision (they
+  would widen the byte difference and can block installing the universal over
+  a split).
+- **The lost local commits were not recoverable.** `5151774` / `b5c349a` are not
+  on origin and were not in this clone. This tree reconstructs the specified
+  result. Do not treat a missing cherry-pick as "the change already landed."
+- **Android &lt;12 blur fallback is a larger population now.** minSdk 24 means
+  API 24–30 keep the designed dark backdrop (`Modifier.blur` is a no-op below
+  API 31). That is unchanged behavior, on more devices.
+- **S3 round 4 is still open**, and it does **not** wait on this change. The
+  merged mini-player dock is already on the rolling `test` release at
+  `4607e07` (APK `590bd34a…`). Round 5 waits until this change is published.
+
 ## 2026-10-08 — session `arena/b4449fdd-dhun`: the rail-layout mini-player now docks instead of floating over the tab content (commit `6ef48e9`)
 
 - **Defect:** on Android **landscape** and Windows **fullscreen** (both ≥ 840dp →

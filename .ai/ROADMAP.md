@@ -1,107 +1,97 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/b4449fdd-dhun` — S3 round 4: dock the rail-layout mini-player so it stops covering Home/Search/Library (2026-10-08)
+## Session `arena/688214aa-dhun` — lower-Android release: minSdk 24 + three APKs (2026-10-08)
 
-Updated **2026-10-08** · session branch `arena/b4449fdd-dhun` · base
-`main@9f88b6e` (merge of PR #129). **PR #130** open
-(`arena/b4449fdd-dhun` → `main`), head `3803ecf`.
+Updated **2026-10-08** · session branch `arena/688214aa-dhun` · base
+`main@4607e07076e038f4290045f3f23f5f7fd082a058` (merge of PR #130).
 
 ### Phase and scope
 
-**Stage S3 — hardware verification (user + agent).** The prior session's slice
-(PR #129, the Search-Enter verification-integrity fix) is **merged and
-post-merge verified** (ledger below). This session's slice is the **next S3
-round-4 defect the user reported from hardware**: in Android **landscape** and
-Windows **fullscreen**, the mini-player **covers the entire Home/Search/Library
-content**. The full-screen player is correct/stable (ADR-002) and is **not**
-touched; only the collapsed mini-player's placement changes.
+**Stage S3 — hardware verification (user + agent).** PR #130 (rail-layout
+mini-player docked) is **merged and post-merge verified** (ledger below). This
+session's slice is the lower-Android release the previous session specified but
+did not get onto `origin`: `minSdk` 26 → **24** (Android 7.0), a legacy launcher
+icon so API 24–25 does not show a blank icon, and a release that publishes
+**three APKs** (universal + `arm64-v8a` + `armeabi-v7a`) beside the MSI.
 
-### The defect, root-caused from source (not inherited)
+### Recovery (do not re-hunt the lost commits)
 
-- **Trigger:** both reported configs — Android landscape and a maximized Windows
-  window — have width ≥ **840dp** (`DhunSpacing.navigationRailBreakpoint`), so
-  `DhunShellPolicy.layoutAt` returns **TwoPane** (rail + content). Portrait phone
-  / windowed desktop stay **SinglePane**.
-- **The bug:** in the shell's `panes == null || detailRoute == null` branch
-  (`DhunAppShell.kt`), the tab content (`ShellMasterPane`) and the `MiniPlayer`
-  were **two children of one `Box`**, the mini-player with
-  `Modifier.align(Alignment.BottomCenter)` — a **floating card painted on top of**
-  the Home/Search/Library list, with no content padding to reserve room. On the
-  short landscape height the fixed-height bar reads as covering the whole screen.
-- **Why only this branch:** SinglePane docks the mini-player in the `GlassDock`
-  bottom bar (Scaffold `innerPadding` pushes content above it); `ShellTwoPane`
-  docks it as a `Column` child of the master. This no-detail-route TwoPane branch
-  was the **only** one that floated it.
-- **The MiniPlayer itself is bounded** (`DhunSpacing.miniPlayerHeight` row inside
-  an `AcrylicSurface` that wraps content height) — it never grows in place; the
-  defect is purely its **floating placement over the content**.
+`5151774` and `b5c349a` are **not on origin** and **not in this clone**
+(`git cat-file` fails; `arena/b4449fdd-dhun` on origin is only docs commit
+`ff71b2c`, which *set* the task as not started). The workspace did not retain
+those files. This change is a **reconstruction of that specified result**, not
+a cherry-pick. Decisions taken from the handoff, not re-opened: minSdk **24**
+(not 21), legacy icons at `mipmap-anydpi/ic_launcher{,_round}.xml`, ABI splits
+with a universal APK, three published names.
 
-### The fix (commit `6ef48e9`)
+### The change
 
-Restructure that one branch from `Box` to a **`Column`**: tab content in a
-`Box(Modifier.weight(1f))`, the `MiniPlayer` a **docked bottom bar** (its
-`.align(...)` removed — it is a `Column` child now) that reserves its own height
-and can never overlay the list. Matches SinglePane and `ShellTwoPane`. The
-full-screen `FullPlayer` overlay and ADR-002 are untouched.
-
-- File: `shared/src/commonMain/kotlin/dev/dhun/ui/shell/DhunAppShell.kt`.
-- **No new unit test:** the repo has no Compose UI-test harness (`createComposeRule`
-  unused repo-wide) and this is a pure layout-structure change — the honest gate
-  is CI compile (shared + Android + desktop) + the **hardware retest** below,
-  consistent with the project rule that visual acceptance is device-gated.
+- `minSdk = 24` in `:app-android` and `:shared`. Floor is 24, not 21:
+  `AndroidConnectivityMonitor` calls `registerDefaultNetworkCallback`
+  unconditionally (API 24). Libraries allow 21; do not drop further without a
+  connectivity fallback. Notification channels and typed `startForeground` were
+  already version-guarded. Blur stays API 31+ with the existing dark fallback.
+- Legacy launcher icons: `mipmap-anydpi/ic_launcher.xml` and
+  `ic_launcher_round.xml` (layer-list + `drawable/ic_launcher_legacy.xml`).
+  The only previous definition was `<adaptive-icon>` in `mipmap-anydpi-v26`,
+  which does not resolve below API 26. API 26+ still prefers the v26 qualifier.
+  These files are **not** `<adaptive-icon>` (that element fails to inflate
+  below 26).
+- ABI splits: `arm64-v8a` + `armeabi-v7a` + universal. Version codes are **not**
+  overridden (sideload alternatives of one build, not Play multi-APK).
+- `test-release` `apk` job runs `scripts/stage_android_apks.py`: globs
+  `*universal*`, `*arm64-v8a*`, `*armeabi-v7a*` must each match exactly one
+  file, copied to `dhun-test.apk`, `dhun-test-arm64-v8a.apk`,
+  `dhun-test-armeabi-v7a.apk`. The job prints size + SHA-256 and whether each
+  per-ABI APK is byte-identical to the universal. **Identity is reported, not
+  enforced.** The repo source has no `System.loadLibrary` / jniLibs / ndk, but
+  the first CI measurement showed the APKs are **not** byte-identical (ledger).
+  Publish attaches all three APKs and their `.sha256` sidecars. The v0.1.0
+  draft path does the same under `dhun-v0.1.0*.apk` names.
+- Dropping the split back to one universal APK is removing the `splits { abi }`
+  block in `app-android/build.gradle.kts`. That is **not** justified by
+  identical bytes — CI showed they differ. Do it only if the user explicitly
+  wants a single APK anyway (the size win of a split is ~50 KB).
 
 ### Status ledger (GitHub evidence)
 
 | Item | State | Evidence |
 |---|---|---|
-| PR #129 (`arena/19a284df-dhun`) Search-Enter verification fix | ✅ **merged** | merge commit `9f88b6ebf837d23c8217aa1d637618d65a2249d2`, 2026-10-08T05:56:11Z |
-| Post-merge CI on `main@9f88b6e` | ✅ **GitHub verified** | CI **37734902276** — 12/12 steps success |
-| Post-merge Build APK on `9f88b6e` | ✅ **GitHub verified** | **37734902281** success |
-| Post-merge test-release on `9f88b6e` | ✅ **GitHub verified** | **37734902315** — `apk` ✅ `msi` ✅ `publish` ✅; `aab`/`release_draft` skipped (main-gated) |
-| Rolling `test` release republished at the merge | ✅ **GitHub verified** | published **2026-10-08T06:01:08Z**, `targetCommitish=9f88b6e`, `isDraft=false`, prerelease; APK **18,383,603 B** sha256 **`aa6d027a…`**; MSI **2.185.1** **112,967,680 B** sha256 **`86b1184c…`**; both `.sha256` sidecars present |
-| MSI hosted upgrade on `9f88b6e` | ✅ **GitHub verified (hosted, not hardware)** | `2.182.1 → 2.185.1`, baseline `aa3ff19c…` (prior release MSI), sentinels preserved; uninstall + future-upgrade guards PASS |
-| `extraction-health` scheduled drill | 🟡 **ENVIRONMENT_BLOCKED (accepted steady state)** | every recent run (…37611927562, 37455619019, 37303751722, 37195912826) = `ENVIRONMENT_BLOCKED` (runner datacenter IPs gated by YouTube; residential unaffected). **Not** a resolver regression |
-| **This session's fix** `6ef48e9` (head `3803ecf`, PR #130) | ✅ **GitHub verified** | push CI **37739138881** 12/12, PR CI **37739165969** 12/12, Build APK **37739165966**, test-release **37739165959** — `apk`+`msi` green with the full install-over `2.186.1 → 2.187.1` (no skip, sentinels preserved, uninstall + future-upgrade guards PASS) |
-| PR #130 candidate artifacts (buildOnly, **not published**) | 🟡 **PR-path only** | APK **18,383,603 B** sha256 **`590bd34a…`** (differs from the release's `aa6d027a…` — app code changed); MSI **2.187.1** **112,971,776 B** sha256 **`0f9691a4…`**. These become the published digests only after merge to `main` |
-| Mini-player docked (no longer covers content) on a device | 🔴 **not verified** | S3 round-4 retest on Redmi Note 12 4G / Android 15 **landscape** and Windows 11 **fullscreen** vs the republished rolling `test` |
-
-### Last real error on record
-
-**None this session.** No CI failure yet on `6ef48e9` (runs pending). The most
-recent real reds remain PR #128's branch history (`38536d5`, `bcd43f3` — Compose
-receiver-scope errors during the rail restructure). That class is relevant here
-because this fix also moves a composable between layout containers — which is
-exactly why CI, not local reading, is the gate (the `.align` removal is the
-load-bearing part).
+| PR #130 mini-player dock | ✅ **merged** | merge `4607e07076e038f4290045f3f23f5f7fd082a058`, 2026-10-08T07:06:09Z |
+| Post-merge CI / Build APK / test-release on `4607e07` | ✅ **GitHub verified** | CI **37741393880**, Build APK **37741393815**, test-release **37741393816** (`apk` 113192672786, `msi` 113192672531, `publish` 113194175657; `aab`/`release_draft` skipped) |
+| Rolling `test` release at the merge | ✅ **GitHub verified** | published **2026-10-08T07:11:13Z**, `targetCommitish=4607e07`, `isDraft=false`, prerelease. APK **18,383,603 B**, provenance + GitHub asset digest **`590bd34a4b61f004185248043b04058644e7f64ec4067ee2b1aaa0918b8ad023`**. MSI **2.189.1**, **112,971,776 B**, provenance + asset digest **`ad036fffc1f41be428d1232580fb0632cc50bf2c6ac142d16ebd67596d8634a9`**. Sidecar *files* were not downloaded here. |
+| MSI hosted upgrade on `4607e07` | ✅ **GitHub verified (hosted, not hardware)** | `2.186.1 → 2.189.1`, baseline `b15da5091254be81fb8a92e3201adc29bbf040342053b22edc51901e3b6d5e1c`, sentinels preserved; future-upgrade + uninstall smokes PASS |
+| `extraction-health` scheduled drill | 🟡 **ENVIRONMENT_BLOCKED (accepted steady state)** | runner datacenter IP gating. Not an extraction regression. Escalate only on `FAIL` or a residential failure |
+| Mini-player docked on a device | 🔴 **not verified** | S3 round 4 vs the **current** rolling `test` (`4607e07` / APK `590bd34a…`) — that package contains `6ef48e9` |
+| This session's minSdk 24 + three-APK change | 🟡 **PR #131, code head CI-green, not merged, not published** | reconstructed (lost commits not recoverable). Code head `5ed50eb`. Push CI **37748346397**. PR CI **37748365000** (12/12, including Android debug build). Build APK **37748365178**. test-release **37748364969** — `apk` job 113215222450 step `Stage three split APKs` ✅ (each glob matched one file: `app-android-universal-debug.apk`, `app-android-arm64-v8a-debug.apk`, `app-android-armeabi-v7a-debug.apk`); `msi` ✅ `2.189.1 → 2.190.1` vs baseline `ad036ffc…`, no skip; `publish`/`aab`/`release_draft` skipped (PR path). PR artifacts are `buildOnly=true`, source SHA `93e90875` (the pull_request merge ref, not `5ed50eb`) |
+| API 24–25 device (icon, launch, play, background audio) | 🔴 **not verified** | S3 round 5, after this change is on the rolling `test` release |
 
 ### Exact next technical step
 
-1. ~~Push `arena/b4449fdd-dhun`, open the one working PR, watch CI / Build APK /
-   test-release on the head.~~ **DONE — PR #130, all four green** on head
-   `3803ecf` (ledger above), no red to fix.
-2. ~~Update the `6ef48e9` ledger row to ✅ with the run IDs.~~ **DONE.**
-3. **Ask for merge authorization** (the only remaining gate before the user can
-   retest). After merge, verify the post-merge runs on the merge SHA and record
-   the **new** published digests — the merge moves the MSI ProductVersion past
-   2.187.1 **and** the APK digest (app code changed: PR candidate
-   `590bd34a…` replaces the release's `aa6d027a…`).
-4. Hand the user the S3 round-4 retest (`docs/runbooks/s3-hardware-checklist.md`):
-   - **Android (Redmi Note 12 4G / Android 15), landscape:** play a song,
-     collapse the full player to Home — the mini-player must be a **compact
-     bottom bar** and the Home/Search/Library list fully visible/scrollable
-     **above** it, never covered.
-   - **Windows 11, fullscreen/maximized:** same — mini-player docked at the
-     bottom, tab content fully usable above it; the full-screen player still
-     opens full-bleed on expand (unchanged).
+1. ~~Push, open PR #131, watch CI.~~ **DONE on code head `5ed50eb`** — all four
+   workflows green; splits are **not** byte-identical (see KNOWN_LIMITATIONS).
+   This docs commit is a new head; its own CI is the final-head check and is
+   recorded in the PR comment, not by another docs commit.
+2. **Ask for merge authorization.** Do not merge without an explicit yes.
+3. After merge: verify post-merge CI + that the rolling `test` release carries
+   **three APKs**, and record the real target commit, sizes, and SHA-256.
+   Those published values are the only ones round 5 may install.
+4. Hand the user the hardware retests (`docs/runbooks/s3-hardware-checklist.md`):
+   - **Round 4 (can run now, against `4607e07`):** Android landscape + Windows
+     fullscreen — mini-player is a compact docked bottom bar; Home/Search/Library
+     fully visible/scrollable above it; full-screen player unchanged.
+   - **Round 5 (after this PR is published):** install `dhun-test.apk` on an
+     API 24–25 device. Launcher icon must render (not blank/default). App must
+     launch, search, play, and background audio must work. Record device, OS,
+     and APK SHA-256.
 
 ### Blockers
 
-- **No JDK / Android SDK / display / Windows taskbar in the sandbox** — CI is the
-  Kotlin verifier; the user's devices are the acceptance gate. Release asset
-  downloads are blocked in-sandbox, so sidecar digests must be confirmed by the
-  user.
-- **S3 stays OPEN** until the user retests the republished rolling `test`. Green
-  CI is not hardware acceptance.
+- **No JDK / Android SDK / display / Windows taskbar in the sandbox.** CI is the
+  Kotlin verifier. Devices are the acceptance gate. Green CI is not hardware
+  acceptance.
+- **S3 stays OPEN** until rounds 4 and 5 are reported. Do not modify the
+  full-screen player (ADR-002) or lyrics.
 
 ---
 

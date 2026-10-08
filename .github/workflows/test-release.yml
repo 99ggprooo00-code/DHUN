@@ -72,11 +72,19 @@ jobs:
       - name: Build debug APK
         run: ./gradlew :app-android:assembleDebug --no-daemon
 
-      - name: Stage APK and revision-bound checksum
+      # ABI splits replace app-android-debug.apk. stage_android_apks.py is the
+      # contract: *universal*, *arm64-v8a* and *armeabi-v7a* must each match
+      # exactly one file, copied to the three release names. It prints size +
+      # SHA-256 and whether the per-ABI APKs equal the universal (expected:
+      # no native libraries). A difference is reported, not failed.
+      - name: Stage three split APKs (universal, arm64-v8a, armeabi-v7a)
         run: |
-          mkdir -p out
-          cp app-android/build/outputs/apk/debug/app-android-debug.apk out/dhun-test.apk
+          python scripts/stage_android_apks.py \
+            app-android/build/outputs/apk/debug \
+            out
           python scripts/stage_artifact.py out/dhun-test.apk --build-only "$BUILD_ONLY"
+          python scripts/stage_artifact.py out/dhun-test-arm64-v8a.apk --build-only "$BUILD_ONLY"
+          python scripts/stage_artifact.py out/dhun-test-armeabi-v7a.apk --build-only "$BUILD_ONLY"
 
       - uses: actions/upload-artifact@v6
         with:
@@ -87,6 +95,12 @@ jobs:
             out/dhun-test.apk
             out/dhun-test.apk.sha256
             out/dhun-test.apk.build-info.json
+            out/dhun-test-arm64-v8a.apk
+            out/dhun-test-arm64-v8a.apk.sha256
+            out/dhun-test-arm64-v8a.apk.build-info.json
+            out/dhun-test-armeabi-v7a.apk
+            out/dhun-test-armeabi-v7a.apk.sha256
+            out/dhun-test-armeabi-v7a.apk.build-info.json
 
   msi:
     runs-on: windows-latest
@@ -241,14 +255,16 @@ jobs:
           gh release delete test --yes --cleanup-tag || true
           git push origin :refs/tags/test || true
 
-          cp dist/dhun-test.apk dist/dhun-test.msi .
-          cp dist/dhun-test.apk.sha256 dist/dhun-test.msi.sha256 .
+          cp dist/dhun-test.apk dist/dhun-test-arm64-v8a.apk dist/dhun-test-armeabi-v7a.apk dist/dhun-test.msi .
+          cp dist/dhun-test.apk.sha256 dist/dhun-test-arm64-v8a.apk.sha256 dist/dhun-test-armeabi-v7a.apk.sha256 dist/dhun-test.msi.sha256 .
           gh release create test \
             dhun-test.apk dhun-test.apk.sha256 \
+            dhun-test-arm64-v8a.apk dhun-test-arm64-v8a.apk.sha256 \
+            dhun-test-armeabi-v7a.apk dhun-test-armeabi-v7a.apk.sha256 \
             dhun-test.msi dhun-test.msi.sha256 \
             --target "$GITHUB_SHA" \
             --title "DHUN test build (auto-replaced on every update)" \
-            --notes "Rolling UNVERIFIED development build of main. dhun-test.apk = Android, dhun-test.msi = Windows (playback needs a VLC install). Nothing here is stable, signed for stores, or recommended for daily-driver devices. Install only where that is acceptable. Current open checks: docs/verification/03-android-skeleton.md, docs/verification/12-desktop-native.md" \
+            --notes "Rolling UNVERIFIED development build of main. Android minSdk 24 (Android 7.0): install dhun-test.apk (universal). dhun-test-arm64-v8a.apk and dhun-test-armeabi-v7a.apk are ABI splits of the same build — DHUN bundles no native code, so compare the .sha256 sidecars before assuming they differ. dhun-test.msi = Windows (playback needs a VLC install). Nothing here is stable, signed for stores, or recommended for daily-driver devices. Install only where that is acceptable. Current open checks: docs/verification/03-android-skeleton.md, docs/verification/12-desktop-native.md" \
             --prerelease
 
           # A draft release is listed only to callers with push access, so a
@@ -298,9 +314,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out
-          cp dist/apk/dhun-test.apk      out/dhun-v0.1.0.apk
-          cp dist/msi/dhun-test.msi      out/dhun-v0.1.0.msi
-          cp dist/aab/dhun-v0.1.0.aab    out/dhun-v0.1.0.aab
+          cp dist/apk/dhun-test.apk              out/dhun-v0.1.0.apk
+          cp dist/apk/dhun-test-arm64-v8a.apk    out/dhun-v0.1.0-arm64-v8a.apk
+          cp dist/apk/dhun-test-armeabi-v7a.apk  out/dhun-v0.1.0-armeabi-v7a.apk
+          cp dist/msi/dhun-test.msi              out/dhun-v0.1.0.msi
+          cp dist/aab/dhun-v0.1.0.aab            out/dhun-v0.1.0.aab
           python - <<'PY'
           import json, os, sys
           from pathlib import Path
@@ -325,12 +343,19 @@ jobs:
 
           # Integrity: every staged binary must come from THIS run/commit.
           check_source('APK', 'dist/apk/dhun-test.apk.build-info.json')
+          check_source('APK arm64-v8a', 'dist/apk/dhun-test-arm64-v8a.apk.build-info.json')
+          check_source('APK armeabi-v7a', 'dist/apk/dhun-test-armeabi-v7a.apk.build-info.json')
           msi_info = check_source('MSI', 'dist/msi/dhun-test.msi.build-info.json')
           check_source('AAB', 'dist/aab/dhun-v0.1.0.aab.build-info.json')
 
           # Re-stage under the release-style names so .sha256/.build-info.json
           # describe the exact public asset bytes (same run, same commit).
-          for name in ('dhun-v0.1.0.apk', 'dhun-v0.1.0.aab'):
+          for name in (
+              'dhun-v0.1.0.apk',
+              'dhun-v0.1.0-arm64-v8a.apk',
+              'dhun-v0.1.0-armeabi-v7a.apk',
+              'dhun-v0.1.0.aab',
+          ):
               stage_artifact(Path('out') / name, os.environ, build_only=False)
           stage_artifact(
               Path('out') / 'dhun-v0.1.0.msi', os.environ, build_only=False,
@@ -367,9 +392,12 @@ jobs:
           Desktop soaks, clean-target installs) are real.
 
           Artifacts (all debug-keystore / unsigned test artifacts):
-          - `dhun-v0.1.0.apk` — Android debug APK, signed with the committed
-            public test keystore (`app-android/keystores/dhun-test.p12`);
-            sideload only.
+          - `dhun-v0.1.0.apk` — Android universal debug APK (minSdk 24 /
+            Android 7.0), signed with the committed public test keystore
+            (`app-android/keystores/dhun-test.p12`); sideload only. Install this.
+          - `dhun-v0.1.0-arm64-v8a.apk` and `dhun-v0.1.0-armeabi-v7a.apk` —
+            ABI splits of the same build. DHUN bundles no native code, so
+            compare the `.sha256` sidecars before assuming they differ.
           - `dhun-v0.1.0.aab` — Android App Bundle, same debug-keystore
             signature; NOT Play-upload ready. Test-install with bundletool
             (`bundletool build-apks --mode=universal …`).
@@ -386,6 +414,8 @@ jobs:
 
           gh release create v0.1.0 \
             out/dhun-v0.1.0.apk out/dhun-v0.1.0.apk.sha256 out/dhun-v0.1.0.apk.build-info.json \
+            out/dhun-v0.1.0-arm64-v8a.apk out/dhun-v0.1.0-arm64-v8a.apk.sha256 out/dhun-v0.1.0-arm64-v8a.apk.build-info.json \
+            out/dhun-v0.1.0-armeabi-v7a.apk out/dhun-v0.1.0-armeabi-v7a.apk.sha256 out/dhun-v0.1.0-armeabi-v7a.apk.build-info.json \
             out/dhun-v0.1.0.aab out/dhun-v0.1.0.aab.sha256 out/dhun-v0.1.0.aab.build-info.json \
             out/dhun-v0.1.0.msi out/dhun-v0.1.0.msi.sha256 out/dhun-v0.1.0.msi.build-info.json \
             --repo "$GITHUB_REPOSITORY" \

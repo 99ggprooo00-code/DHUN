@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Visible play mark for the pre-26 launcher icon. The adaptive foreground
+     keeps the triangle inside the 66dp safe zone of a 108dp canvas; used raw
+     as a legacy icon that padding reads as a nearly blank tile. This glyph
+     fills the tile so API 24–25 launchers show a mark, not an empty square. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#BB86FC"
+        android:pathData="M18,12 L18,36 L36,24 Z" />
+</vector>

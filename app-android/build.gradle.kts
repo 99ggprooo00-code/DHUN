@@ -10,10 +10,35 @@ android {
 
     defaultConfig {
         applicationId = "dev.dhun.android"
-        minSdk = 26
+        // Android 7.0. The floor is API 24, not 21: AndroidConnectivityMonitor
+        // calls registerDefaultNetworkCallback unconditionally (API 24+).
+        // Media3 1.5.1 / Compose / AndroidX allow 21; do not drop below 24
+        // without a connectivity fallback. shared's minSdk must stay <= this.
+        minSdk = 24
         targetSdk = 35
         versionCode = 5
         versionName = "0.1.4"
+    }
+
+    // ABI splits plus a universal APK. The rolling release publishes all three:
+    // dhun-test.apk (universal) + dhun-test-arm64-v8a.apk + dhun-test-armeabi-v7a.apk.
+    // Do not assume the per-ABI APKs match the universal. The repo has no
+    // jniLibs, but test-release 37748364969 measured them ~50KB apart (the
+    // apk job prints size + SHA-256; a difference does not fail the build).
+    // Version codes are intentionally NOT overridden:
+    // these are sideload alternatives of one build, not Play multi-APK, and a
+    // version override would make the bytes differ and could block installing
+    // the universal over a split.
+    //
+    // Removing this block is the one-line change that ships a single universal
+    // APK again, if the user confirms the splits are redundant.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = true
+        }
     }
 
     signingConfigs {

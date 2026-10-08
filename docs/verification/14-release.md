@@ -1,5 +1,14 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
+> **Superseding status (2026-10-08, session `arena/688214aa-dhun`).** The banner
+> below is historical (PR #127 / `f0225f4`). Rolling `test` now targets
+> **`4607e07`** (PR #130), published 2026-10-08T07:11:13Z from test-release
+> **37741393816**: APK 18,383,603 B `590bd34a4b61f004185248043b04058644e7f64ec4067ee2b1aaa0918b8ad023`,
+> MSI 2.189.1 112,971,776 B `ad036fffc1f41be428d1232580fb0632cc50bf2c6ac142d16ebd67596d8634a9`.
+> Still one APK. The minSdk-24 three-APK publish is **not** this release — record
+> its digests here only after a post-merge `publish` job, from that run, not
+> from a PR `buildOnly=true` artifact. Hardware gates remain OPEN.
+
 > **Current status (2026-10-08 — product-code head CI-green; final-head and hardware gates remain).**
 > Draft PR #127's product-code head is `3071d1d6650291d51559f2884f4ac7734d3aac75`.
 > The main/rolling-release baseline remains `f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5`;

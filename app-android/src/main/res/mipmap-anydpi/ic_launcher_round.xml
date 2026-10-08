@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-26 round launcher icon. Same reason as ic_launcher.xml: the only
+     other definition is an adaptive icon in mipmap-anydpi-v26, unresolved
+     below API 26. android:roundIcon is read on API 25; API 24 ignores it
+     and uses ic_launcher. Do not change this file to <adaptive-icon>. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/ic_launcher_background" />
+        </shape>
+    </item>
+    <item android:drawable="@drawable/ic_launcher_legacy" />
+</layer-list>

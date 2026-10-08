@@ -135,7 +135,9 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
 ### Platforms
 - **Android:** full player — Media3 background playback, media session,
   notification + lock-screen controls, queue, playlists, lyrics,
-  downloads with foreground service, widgets, shortcuts. minSdk 26;
+  downloads with foreground service, widgets, shortcuts. minSdk 24
+  (Android 7.0; not 21 — connectivity uses the API 24 default-network
+  callback with no fallback);
   real blur is API 31+ with a designed dark fallback below (PR #70).
 - **Desktop:** single-window app (ADR-004 — never re-add a second
   window), system tray, media keys, SMTC where stable (round-trip

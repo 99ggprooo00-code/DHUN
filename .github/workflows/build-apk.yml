@@ -9,8 +9,10 @@ name: Build APK
 # Module names are not guesses in this repo: the Android application module is
 # `:app-android` (settings.gradle.kts), NOT `:app` — `:app` is *ambiguous*
 # (candidates `app-android`, `app-desktop`) and Gradle fails the task lookup.
-# The debug output is `app-android/build/outputs/apk/debug/app-android-debug.apk`,
-# the same path test-release.yml copies out as `dhun-test.apk`.
+# ABI splits replace the single `app-android-debug.apk`. assembleDebug writes
+# `*universal*`, `*arm64-v8a*` and `*armeabi-v7a*` APKs under
+# `app-android/build/outputs/apk/debug/`; test-release.yml stages those three
+# as the rolling-release names. This job only uploads the raw outputs.
 
 on:
   push:
@@ -48,4 +50,5 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: debug-apk
-          path: app-android/build/outputs/apk/debug/app-android-debug.apk
+          if-no-files-found: error
+          path: app-android/build/outputs/apk/debug/*.apk

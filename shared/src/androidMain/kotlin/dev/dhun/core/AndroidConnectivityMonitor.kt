@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Android connectivity signal for the offline banner: default-network
- * callback (API 24+, minSdk 26) plus an initial read of the active network.
+ * callback (API 24+, which is also minSdk — do not call this below 24)
+ * plus an initial read of the active network.
  * A network is online only when it has both INTERNET and VALIDATED; a Wi-Fi
  * link or captive portal alone must not hide the offline notice.
  */

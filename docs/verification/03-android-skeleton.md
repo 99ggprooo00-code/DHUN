@@ -23,7 +23,8 @@ hardware and remain OPEN until then:
 4. 403 mid-stream recovery observed (resolve → play → invalidate → resume at position)
 5. No-network → clean typed error, no crash
 
-**How to verify:** install `dhun-debug.apk` on Android 8+ (allow unknown
+**How to verify:** install `dhun-test.apk` (universal) on Android 7.0+ / API 24+
+(allow unknown
 sources), open DHUN, grant notification permission, search "queen", tap a
 row, hear audio, lock the phone, use lock controls, swipe the app away.
 
