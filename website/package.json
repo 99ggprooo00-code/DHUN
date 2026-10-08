@@ -1,0 +1,16 @@
+{
+  "name": "dhun-website",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Static marketing site for DHUN (GPL-3.0). Build-only dependency; ships no client-side JavaScript.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "build": "eleventy",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "check": "node ../scripts/website_checks.mjs"
+  },
+  "devDependencies": {
+    "@11ty/eleventy": "3.1.6"
+  }
+}

@@ -1,0 +1,5 @@
+# Build-only dependency tree; never committed, never shipped.
+node_modules/
+
+# Eleventy build cache
+.eleventy-cache/

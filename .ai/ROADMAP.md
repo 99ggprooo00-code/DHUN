@@ -1,5 +1,86 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/fc918d37-dhun` — build the Option-A marketing site at the canonical Pages URL (2026-10-08)
+
+Updated **2026-10-08** · fixed session branch `arena/fc918d37-dhun` · branch
+point and current GitHub `main` **`ae44c7a74191950c00385f705e9617b3ef71658c`**
+(PR #137 merge). The working tree was clean at boot, the branch had no remote
+ref, and the only pre-existing open PR is #54 (ADR-007 research; unchanged and
+out of scope). This session's one working PR is the website workstream.
+
+### Correcting a stale ledger claim, and reading a leftover verdict
+
+- **`main` is `ae44c7a`, not `2a20024`** — two merges (#136, #137) landed after
+  the block above was written. The stale “PR #135 awaits merge authorization”
+  wording is already corrected in the block below and needed no further edit;
+  the live defect was this file's *current base* claim, corrected here.
+- **PR #135's post-merge verdicts, left unread by the session that merged it,
+  were read this session** and are recorded below: CI **37772063324**,
+  test-release **37772063364**, Build APK **37772063380** and pages
+  **37772062338** all **success** on `8a8d6c5`. No further re-verification.
+
+### Task
+
+The user's standing instruction for this session: build the **Option-A static
+marketing site** for the existing Android/desktop applications, deploy it at the
+canonical Pages URL, and encode the site's truthfulness in tests instead of
+prose. Options B (web player), PWA and `app.`-style properties are **forbidden**
+by the same instruction and by MASTER_PROMPT lines 46/421 — a player would need
+a new ADR, so only a **PROPOSED ADR-009** (marketing site) is written.
+
+### Decisions already made (not re-opened this session)
+
+Option A scope; a new top-level `website/` directory with its **own** workflow;
+Astro or Eleventy (Eleventy 3.1.6 chosen, pinned, lockfile committed); no
+images exist so every visual is a hand-written CSS/SVG mockup of the real
+Compose UI, labelled as a recreation; exactly three routes (`/`, `/download`,
+`/features`), English only; GPL-3.0, no third-party runtime asset, system font
+stack; the rolling `test` release linked by URL only (digests move every merge).
+
+### Current gates
+
+| Gate | State | Next evidence |
+|---|---|---|
+| S3 round 4 | 🔴 **missing, user-only** | Android landscape + Windows fullscreen: compact docked mini-player, Home/Search/Library visible and usable above it |
+| S3 round 5 | 🔴 **missing, user-only** | API 24–25 device: icon, launch, search, play, background audio; record model, OS and installed universal APK digest |
+| S6 | ⏳ **blocked on S3** | no release acceptance until both rounds and the remaining S6 gates close |
+| Dispatch-only AAB staging | 🔴 **agent-blocked, user-only** | one `test-release` dispatch with `build_only=true`, `build_release_candidate=true` |
+| ADR-008 B1 | ⛔ **BLOCKED (run recorded)** | do not restart B1; a continuation is a separate **ADR-008 B2 user decision** |
+| Website (Option A) | 🟡 **in progress this session** | plan of record: [`.ai/WEBSITE_PLAN.md`](WEBSITE_PLAN.md) Part A; honesty gates in `scripts/`; deploy workflow `website.yml` |
+| Pages source | ⚠️ **still `legacy` / `main:/`** | currently renders root `README.md`; the switch to `build_type: workflow` is the one setting this session may not be able to make (token-dependent) |
+
+### Exact next actions
+
+1. **Site first, S3 unchanged.** The device rounds above stay user-only and are
+   unaffected by the website work; they are also the source of the real
+   screenshots that replace the mockups (`.ai/WEBSITE_PLAN.md` §9).
+2. Read the session's own CI at the end of the run; do not re-verify already
+   recorded verdicts.
+3. If the website PR merges, the *first* thing the next session must check is
+   the post-merge `website.yml` run and
+   `https://99ggprooo00-code.github.io/DHUN/` — those cannot be observed from
+   inside the merging session.
+
+### Blockers and boundaries
+
+- No JDK / Gradle / Android SDK / browser / display locally; CI is the Kotlin
+  and browser verifier. Lighthouse/axe can only run in Actions.
+- Locally runnable gate:
+  `python3 -m unittest discover -s scripts -p 'test_*.py'` — **55 tests green**
+  at boot, re-measured this session.
+- Action-log archives remain unavailable; **check-run annotations** are
+  reachable and are how this session reads a failure or a Lighthouse number.
+- Do not touch Gradle, `shared/`, `app-android/`, `app-desktop/`,
+  `settings.gradle.kts`, `build.gradle.kts` or the four existing workflows.
+  Never implement ADR-007. ADR-008 stays B1-only and closed.
+
+---
+
+
+> **Historical detail; superseded by the block above.** Its `main = 2a20024`
+> statement was accurate when written; GitHub `main` has since advanced to
+> **`ae44c7a`** (PR #137 merge).
+
 ## Session `arena/45db02aa-dhun` — record the post-merge B1 blocked result; do not restart B1, do not start B2 (2026-10-08)
 
 Updated **2026-10-08** · fixed session branch `arena/45db02aa-dhun` · current base
