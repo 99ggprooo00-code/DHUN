@@ -337,6 +337,7 @@ function overflowReport() {
       spilling.push({
         element: element.tagName.toLowerCase(),
         className: String(element.className || "").slice(0, 60),
+        text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40),
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,
       });
@@ -561,7 +562,7 @@ async function checkViewports(browser) {
           `overflow ${route} @ ${viewport.name}`,
           `content wider than its box: ` +
             overflow.spilling
-              .map((o) => `${o.element}.${o.className} ${o.scrollWidth}>${o.clientWidth}`)
+              .map((o) => `${o.element}.${o.className} “${o.text}” ${o.scrollWidth}>${o.clientWidth}`)
               .join(", "),
         );
       }
