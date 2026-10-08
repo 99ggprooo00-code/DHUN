@@ -42,9 +42,17 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   18,355,786 B, v7a 18,352,944 B — PR test-release **37748364969**,
   `buildOnly=true`, not a published release). Not a Play multi-APK (version
   codes are not overridden).
-- **Not yet on the rolling `test` release.** The published release at `4607e07`
-  is still the single APK. API 24–25 install is the S3 round-5 retest after
-  this change is merged and republished. CI compile is not that retest.
+- **Published** on the rolling `test` release at `1ee85b0`
+  (2026-10-08T08:50:21Z, test-release **37751721906**, `buildOnly=false`).
+  GitHub asset digests match the apk-job provenance: universal
+  `dhun-test.apk` **18,405,859 B**
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+  `dhun-test-arm64-v8a.apk` **18,355,786 B**
+  `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  `dhun-test-armeabi-v7a.apk` **18,352,944 B**
+  `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`.
+  They differ. Install the universal for the API 24–25 retest. CI is not
+  that retest.
 
 ### Fixed — the rail-layout mini-player is docked, not floating over the tab content (2026-10-08, session `arena/b4449fdd-dhun`, commit `6ef48e9`)
 

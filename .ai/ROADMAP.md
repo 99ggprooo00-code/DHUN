@@ -62,28 +62,24 @@ with a universal APK, three published names.
 | Rolling `test` release at the merge | ✅ **GitHub verified** | published **2026-10-08T07:11:13Z**, `targetCommitish=4607e07`, `isDraft=false`, prerelease. APK **18,383,603 B**, provenance + GitHub asset digest **`590bd34a4b61f004185248043b04058644e7f64ec4067ee2b1aaa0918b8ad023`**. MSI **2.189.1**, **112,971,776 B**, provenance + asset digest **`ad036fffc1f41be428d1232580fb0632cc50bf2c6ac142d16ebd67596d8634a9`**. Sidecar *files* were not downloaded here. |
 | MSI hosted upgrade on `4607e07` | ✅ **GitHub verified (hosted, not hardware)** | `2.186.1 → 2.189.1`, baseline `b15da5091254be81fb8a92e3201adc29bbf040342053b22edc51901e3b6d5e1c`, sentinels preserved; future-upgrade + uninstall smokes PASS |
 | `extraction-health` scheduled drill | 🟡 **ENVIRONMENT_BLOCKED (accepted steady state)** | runner datacenter IP gating. Not an extraction regression. Escalate only on `FAIL` or a residential failure |
-| Mini-player docked on a device | 🔴 **not verified** | S3 round 4 vs the **current** rolling `test` (`4607e07` / APK `590bd34a…`) — that package contains `6ef48e9` |
-| This session's minSdk 24 + three-APK change | 🟡 **PR #131, code head CI-green, not merged, not published** | reconstructed (lost commits not recoverable). Code head `5ed50eb`. Push CI **37748346397**. PR CI **37748365000** (12/12, including Android debug build). Build APK **37748365178**. test-release **37748364969** — `apk` job 113215222450 step `Stage three split APKs` ✅ (each glob matched one file: `app-android-universal-debug.apk`, `app-android-arm64-v8a-debug.apk`, `app-android-armeabi-v7a-debug.apk`); `msi` ✅ `2.189.1 → 2.190.1` vs baseline `ad036ffc…`, no skip; `publish`/`aab`/`release_draft` skipped (PR path). PR artifacts are `buildOnly=true`, source SHA `93e90875` (the pull_request merge ref, not `5ed50eb`) |
-| API 24–25 device (icon, launch, play, background audio) | 🔴 **not verified** | S3 round 5, after this change is on the rolling `test` release |
+| Mini-player docked on a device | 🔴 **not verified** | S3 round 4 vs the **current** rolling `test` (`1ee85b0` / universal APK `9665b75f…`) — that package contains `6ef48e9` |
+| This session's minSdk 24 + three-APK change | ✅ **merged and published** | PR **#131** merged as `1ee85b092aa1ad57c314b77c05ce0cf18a10e7e5` (2026-10-08T08:43:18Z). PR #132 (docs-only `ff71b2c`, task still "not started") was **closed, not merged**. Post-merge CI **37751722312**, Build APK **37751722015**, test-release **37751721906** (`apk` 113226306533, `msi` 113226306197, `publish` 113228786935). Rolling `test` republished **2026-10-08T08:50:21Z** at `1ee85b0`, `buildOnly=false`. GitHub asset digests match provenance: universal **18,405,859 B** `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`; arm64-v8a **18,355,786 B** `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`; armeabi-v7a **18,352,944 B** `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf` (DIFFERS from universal). MSI **2.193.1** **112,971,776 B** `af3266953bd8f4756ef0352339c309b4358ce90353bb0d567eb6ea0488dca3e4`, upgrade `2.189.1 → 2.193.1` vs baseline `ad036ffc…`, no skip |
+| API 24–25 device (icon, launch, play, background audio) | 🔴 **not verified** | S3 round 5 against published `1ee85b0` universal APK `9665b75f…`. Not yet on a device |
 
 ### Exact next technical step
 
-1. ~~Push, open PR #131, watch CI.~~ **DONE on code head `5ed50eb`** — all four
-   workflows green; splits are **not** byte-identical (see KNOWN_LIMITATIONS).
-   This docs commit is a new head; its own CI is the final-head check and is
-   recorded in the PR comment, not by another docs commit.
-2. **Ask for merge authorization.** Do not merge without an explicit yes.
-3. After merge: verify post-merge CI + that the rolling `test` release carries
-   **three APKs**, and record the real target commit, sizes, and SHA-256.
-   Those published values are the only ones round 5 may install.
-4. Hand the user the hardware retests (`docs/runbooks/s3-hardware-checklist.md`):
-   - **Round 4 (can run now, against `4607e07`):** Android landscape + Windows
-     fullscreen — mini-player is a compact docked bottom bar; Home/Search/Library
-     fully visible/scrollable above it; full-screen player unchanged.
-   - **Round 5 (after this PR is published):** install `dhun-test.apk` on an
-     API 24–25 device. Launcher icon must render (not blank/default). App must
-     launch, search, play, and background audio must work. Record device, OS,
-     and APK SHA-256.
+1. ~~Push, open PR #131, watch CI, merge on authorization.~~ **DONE.** Merged
+   as `1ee85b0`. PR #132 closed, not merged. Post-merge publish recorded in
+   the ledger. Splits are **not** byte-identical.
+2. Hardware only (`docs/runbooks/s3-hardware-checklist.md`), both against
+   the republished rolling `test` (`1ee85b0`). Install `dhun-test.apk`
+   (universal, `9665b75f…`) and the MSI (`af326695…`).
+   - **Round 4:** Android landscape + Windows fullscreen — mini-player is a
+     compact docked bottom bar; Home/Search/Library fully visible above it;
+     full-screen player unchanged.
+   - **Round 5:** API 24–25. Launcher icon must render. App must launch,
+     search, play, and keep background audio. Record device, OS, and the
+     SHA-256 actually installed.
 
 ### Blockers
 

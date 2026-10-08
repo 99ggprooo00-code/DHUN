@@ -9,36 +9,31 @@ Builds: the rolling [`test` pre-release](https://github.com/99ggprooo00-code/DHU
 Always re-download after the merge you are qualifying, and note the
 `main@<sha>` you tested.
 
-**Build identity (rechecked 2026-10-08, session `arena/688214aa-dhun`):** rolling
-`test` is a published pre-release targeting
-**`4607e07076e038f4290045f3f23f5f7fd082a058`** (PR #130, merged
-2026-10-08T07:06:09Z), published **2026-10-08T07:11:13Z** from test-release run
-**37741393816** (`publish` job 113194175657). CI **37741393880** and Build APK
-**37741393815** also passed on that SHA. Current artifacts (one APK, not the
-three-APK set — that lands only after the minSdk-24 PR merges):
+**Build identity (rechecked 2026-10-08, after PR #131 merged):** rolling `test`
+targets **`1ee85b092aa1ad57c314b77c05ce0cf18a10e7e5`**, published
+**2026-10-08T08:50:21Z** from test-release **37751721906** (`publish` ran).
+CI **37751722312** and Build APK **37751722015** also passed. This package
+contains the mini-player dock **and** minSdk 24. GitHub asset digests match
+the publisher provenance (`buildOnly=false`). Verify the release's own
+`.sha256` sidecars before installing and record what you downloaded.
 
-| Asset | Bytes | Identity |
+| Asset | Bytes | SHA-256 |
 |---|---|---|
-| `dhun-test.apk` | 18,383,603 | provenance notice **and** GitHub asset digest `590bd34a4b61f004185248043b04058644e7f64ec4067ee2b1aaa0918b8ad023` |
-| `dhun-test.msi` | 112,971,776 | ProductVersion **2.189.1**, provenance notice **and** GitHub asset digest `ad036fffc1f41be428d1232580fb0632cc50bf2c6ac142d16ebd67596d8634a9` |
+| `dhun-test.apk` (universal — install this) | 18,405,859 | `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97` |
+| `dhun-test-arm64-v8a.apk` | 18,355,786 | `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896` |
+| `dhun-test-armeabi-v7a.apk` | 18,352,944 | `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf` |
+| `dhun-test.msi` (2.193.1) | 112,971,776 | `af3266953bd8f4756ef0352339c309b4358ce90353bb0d567eb6ea0488dca3e4` |
 
-MSI install-over on that run: `2.186.1 → 2.189.1`, baseline
-`b15da5091254be81fb8a92e3201adc29bbf040342053b22edc51901e3b6d5e1c`, sentinels
-preserved, future-upgrade guard and uninstall smoke passed, **no skip**. The
-`.sha256` sidecar *files* were not downloaded in the sandbox — **verify the
-release's own sidecars before installing** and record what you actually
-downloaded. This package **contains the round-4 mini-player dock** (`6ef48e9`).
-It does **not** contain minSdk 24 or the ABI-split APKs.
+The per-ABI APKs are **not** the same bytes as the universal. MSI install-over
+on that run: `2.189.1 → 2.193.1`, baseline `ad036ffc…`, sentinels preserved,
+no skip. Do not use the previous single-APK release (`4607e07`, APK
+`590bd34a…`) for round 5.
 
-**This package contains PRs #127–#130 and has not been hardware-signed-off.**
-It includes the Search-Enter policy wiring (PR #129) and the docked rail-layout
-mini-player (PR #130 / `6ef48e9`). It does **not** lower minSdk and it does
-**not** publish ABI-split APKs. Whichever build you install, record its SHA-256
-first — do not reuse `f0225f4` (APK `21a5fe86…9cc2c`, MSI 2.172.1
-`c27175…3fe17d6`) or any PR-only `buildOnly=true` artifact to validate a merged
-fix. Use `docs/verification/15-test-build-gate.md` §1 to verify current
-sidecars. The rolling release changes on every `main` push, so re-download and
-record the actual target, version and hashes immediately before testing.
+**This package contains PRs #127–#131 and has not been hardware-signed-off.**
+It includes the Search-Enter wiring (PR #129), the docked mini-player (PR #130),
+and minSdk 24 plus the three APKs (PR #131). Record the SHA-256 you install.
+Do not reuse `f0225f4` (`21a5fe86…`) or `4607e07` (`590bd34a…`) or any
+`buildOnly=true` artifact. The rolling release changes on every `main` push.
 
 **Preserve user data:** upgrade-install over the existing app first and check
 playlists, settings and downloads remain. Do not uninstall your daily-use
@@ -53,16 +48,13 @@ pre-tag besides this list).
 
 ## S3 hardware round 5 — API 24–25 (Android 7.0–7.1) install (after the minSdk-24 release is published)
 
-**Not yet possible.** The rolling `test` release above is still minSdk 26 and a
-single APK. Do this only after the minSdk-24 change is merged and the release
-is republished with three APKs. Record the new `main@<sha>` and the APK
-SHA-256 you actually installed — do not reuse `590bd34a…`.
+**The package is published. Not yet on a device.** Use the rolling `test`
+release above (`1ee85b0`). Record the APK SHA-256 you actually installed —
+expected universal `9665b75f…ed97`. Do not reuse `590bd34a…`.
 
-1. Download **`dhun-test.apk`** (the universal). The `arm64-v8a` and
-   `armeabi-v7a` assets are splits of the same build; DHUN bundles no native
-   code, so they are expected to match the universal's SHA-256. Install the
-   universal unless a split's sidecar differs and you are specifically testing
-   that file.
+1. Download **`dhun-test.apk`** (the universal). The ABI splits are the same
+   build but **not** the same bytes (see the table). Install the universal
+   unless you are specifically testing a split.
 2. Device: **API 24 or 25** (Android 7.0 or 7.1). Record model, `Build.VERSION.RELEASE`,
    API level, and the APK SHA-256.
 3. **Launcher icon must render** — a play mark on a dark tile, not a blank or
@@ -72,12 +64,12 @@ SHA-256 you actually installed — do not reuse `590bd34a…`.
    with the screen off / app backgrounded (notification or lock-screen controls
    respond). A crash on launch or a blank icon is a fail — paste logcat.
 
-## S3 hardware round 4 — mini-player docked in landscape / fullscreen (retest against `4607e07`)
+## S3 hardware round 4 — mini-player docked in landscape / fullscreen (retest against `1ee85b0`)
 
-**Not yet on a device. The fix is already in the rolling `test` release above**
-(`4607e07`, APK `590bd34a…`, MSI 2.189.1 `ad036ffc…`). Targets the
-mini-player-covers-content defect fixed by commit `6ef48e9`. Record the APK/MSI
-digests you install (verify sidecars; do not reuse older hashes).
+**Not yet on a device.** The fix is in the rolling `test` release above
+(universal APK `9665b75f…`, MSI 2.193.1 `af326695…`). Targets the
+mini-player-covers-content defect fixed by commit `6ef48e9`. Use this release,
+not `4607e07`. Record the digests you install.
 
 1. **Android (Redmi Note 12 4G / Android 15), LANDSCAPE:** start a track, expand
    the full player, then collapse it back to Home. The mini-player must be a

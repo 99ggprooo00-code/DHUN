@@ -1,16 +1,20 @@
 # 15 — Test-build gate: step-by-step procedure
 
 > **Superseding gate (2026-10-08, session `arena/688214aa-dhun`).** The block
-> below this one is historical (`ca6d006`). The rolling `test` release now
-> targets **`4607e07076e038f4290045f3f23f5f7fd082a058`** (PR #130), published
-> **2026-10-08T07:11:13Z** from test-release **37741393816**. APK **18,383,603 B**
-> `590bd34a4b61f004185248043b04058644e7f64ec4067ee2b1aaa0918b8ad023`; MSI
-> **2.189.1** **112,971,776 B**
-> `ad036fffc1f41be428d1232580fb0632cc50bf2c6ac142d16ebd67596d8634a9`
-> (publisher provenance and GitHub asset digest agree; sidecar files not
-> fetched here). Still **one APK, minSdk 26**. The minSdk-24 / three-APK change
-> is not published until its PR merges — do not use these hashes for an API
-> 24–25 install. Verify sidecars before installing. Hardware gate remains OPEN.
+> below this one is historical. Rolling `test` targets
+> **`1ee85b092aa1ad57c314b77c05ce0cf18a10e7e5`** (PR #131), published
+> **2026-10-08T08:50:21Z** from test-release **37751721906** (`buildOnly=false`).
+> Install the universal APK. GitHub asset digests:
+> `dhun-test.apk` **18,405,859 B**
+> `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+> `dhun-test-arm64-v8a.apk` **18,355,786 B**
+> `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+> `dhun-test-armeabi-v7a.apk` **18,352,944 B**
+> `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`;
+> MSI **2.193.1** **112,971,776 B**
+> `af3266953bd8f4756ef0352339c309b4358ce90353bb0d567eb6ea0488dca3e4`.
+> The per-ABI APKs differ from the universal. Verify sidecars before
+> installing. Hardware gate remains OPEN.
 
 > **Current gate (2026-10-08 — round-2 fixes are merged and the rolling release carries them; hardware gate remains OPEN).**
 > `main` and the rolling `test` release now both target

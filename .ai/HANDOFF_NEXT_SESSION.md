@@ -1,60 +1,37 @@
-# HANDOFF — minSdk 24 + three APKs reconstructed; S3 rounds 4 and 5 open
+# HANDOFF — PR #131 merged and published; PR #132 closed; S3 rounds 4 and 5 open
 
-Updated **2026-10-08**, session `arena/688214aa-dhun`. Base is
-`main@4607e07076e038f4290045f3f23f5f7fd082a058` (PR #130 merged). One working PR
-on this branch. **Do not merge without an explicit user yes.**
+Updated **2026-10-08**, session `arena/688214aa-dhun`. `main` =
+`1ee85b092aa1ad57c314b77c05ce0cf18a10e7e5` (PR #131, merged 2026-10-08T08:43:18Z).
+PR #132 (`ff71b2c`, docs-only, task still "not started") was closed, not merged.
 
 ## Current state
 
-- **`main` = `4607e07`.** Post-merge CI **37741393880**, Build APK
-  **37741393815**, test-release **37741393816** (`publish` ran). Rolling `test`
-  published **2026-10-08T07:11:13Z** at that SHA: APK **18,383,603 B**
-  `590bd34a4b61f004185248043b04058644e7f64ec4067ee2b1aaa0918b8ad023` (provenance
-  notice and GitHub asset digest agree); MSI **2.189.1** **112,971,776 B**
-  `ad036fffc1f41be428d1232580fb0632cc50bf2c6ac142d16ebd67596d8634a9`. Sidecar
-  files were not fetched here. This release has the mini-player dock and is
-  still **one APK, minSdk 26**.
-- **Lower-Android change (this session), reconstructed — not cherry-picked.**
-  `5151774` and `b5c349a` were never on origin and were not in this clone.
-  `origin/arena/b4449fdd-dhun` is only docs commit `ff71b2c` (task set, not
-  implemented). Reconstructed result: `minSdk` 24, legacy
-  `mipmap-anydpi/ic_launcher{,_round}.xml` (not adaptive-icon), ABI splits
-  `arm64-v8a` + `armeabi-v7a` + universal, release publishes
-  `dhun-test.apk` + `dhun-test-arm64-v8a.apk` + `dhun-test-armeabi-v7a.apk`.
-  No native libraries, so per-ABI bytes are expected to match the universal;
-  the apk job prints size + SHA-256 and does not fail on a difference.
-- **Code head `5ed50eb` is CI-green (PR #131).** Push CI **37748346397**, PR CI
-  **37748365000** (12/12), Build APK **37748365178**, test-release
-  **37748364969** (`apk` + `msi` green; `publish` skipped). Globs each matched
-  one file. Digests (`buildOnly=true`, source `93e90875` = PR merge ref):
-  universal **18,405,859 B** `9665b75f…ed97` **DIFFERS** from arm64
-  **18,355,786 B** `23903dd6…0896` and v7a **18,352,944 B** `7e4f80ad…2baf`.
-  Artifact zip was not downloadable (EOF) — do not name a `.so`. MSI on that
-  run: 2.190.1, `e38507dd…`, upgrade `2.189.1 → 2.190.1` against the published
-  release MSI `ad036ffc…`, no skip. These are **not** the published release.
-- **CI on a head is the compiler, not hardware acceptance.** No JDK here. Do not
-  claim the three-APK release exists until post-merge `gh release view test`
-  shows three APKs and their digests are recorded from that publish run.
+- **`main` = `1ee85b0`.** Post-merge CI **37751722312**, Build APK
+  **37751722015**, test-release **37751721906** (`publish` ran). Rolling `test`
+  published **2026-10-08T08:50:21Z** at that SHA, `buildOnly=false`. GitHub
+  asset digests match provenance: universal APK **18,405,859 B**
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`; arm64-v8a
+  **18,355,786 B** `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  armeabi-v7a **18,352,944 B**
+  `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf` (**DIFFERS**
+  from universal). MSI **2.193.1** **112,971,776 B**
+  `af3266953bd8f4756ef0352339c309b4358ce90353bb0d567eb6ea0488dca3e4`, upgrade
+  `2.189.1 → 2.193.1` vs `ad036ffc…`, no skip.
+- The lower-Android change was reconstructed (`5151774`/`b5c349a` never reached
+  origin). minSdk 24, legacy `mipmap-anydpi` icons, three published APKs.
+  Do not name a `.so` — the artifact zip was not downloadable. Do not drop the
+  ABI split on an identical-bytes theory; that theory is false.
+- **Green CI is not hardware acceptance.** Rounds 4 and 5 are open.
 
 ## Next actions — single agent, sequential
 
-1. If this PR is not yet green: watch CI, Build APK, and test-release. The apk
-   job step `Stage three split APKs` must succeed; read the `APK split digest`
-   notices. Fix red step names. Record run IDs.
-2. **Ask for merge authorization.** `gh pr merge <n> --merge` only on an
-   explicit yes.
-3. After merge, verify post-merge runs and that the rolling `test` release
-   carries three APKs. Write the real sizes and SHA-256 into
-   `docs/verification/14-release.md`, the ROADMAP ledger, and `CHANGELOG.md`.
-   Do not copy PR-path `buildOnly=true` digests into those files as if published.
-4. Hardware (user-gated), `docs/runbooks/s3-hardware-checklist.md`:
-   - **Round 4 now**, against `4607e07`: Android landscape + Windows fullscreen.
-     Mini-player is a compact docked bottom bar; Home/Search/Library scroll
-     above it; full-screen player unchanged.
-   - **Round 5 after publish:** `dhun-test.apk` on API 24–25. Icon renders, app
-     launches, search, play, background audio. Record device, OS, APK SHA-256.
-5. Only if the user confirms the per-ABI APKs are redundant, remove the
-   `splits { abi }` block in `app-android/build.gradle.kts`. Not before.
+1. Hardware only, against the published `1ee85b0` release. Install
+   `dhun-test.apk` (universal) and the MSI `af326695…`. Round 4: landscape /
+   fullscreen mini-player dock. Round 5: API 24–25 icon, launch, search, play,
+   background audio. Record device, OS, and the SHA-256 actually installed.
+2. Do not drop the ABI split unless the user explicitly wants a single APK.
+   The splits are not byte-identical. Do not modify the full-screen player or
+   lyrics. `extraction-health` `ENVIRONMENT_BLOCKED` is still the steady state.
 
 **Do not:** modify the full-screen player (ADR-002) or lyrics; treat
 `extraction-health` `ENVIRONMENT_BLOCKED` as a regression; `git clean` or
