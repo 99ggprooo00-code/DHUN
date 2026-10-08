@@ -10,8 +10,17 @@ The desktop suite had the mirror-image gap: the jvmTest source set existed
 but no workflow step executed it — compileKotlinJvm only compiles jvmMain.
 ci.yml must name :app-desktop:jvmTest as its own step, after the compile
 step so each failure keeps an honest name.
+
+The minSdk-24 floor has the same shape of gap, twice over. Android Lint
+analyses only the module it runs in, so PR #134's `:app-android:lintDebug`
+step never looked at `shared/src/androidMain`, and `shared`'s own lint block
+had `abortOnError = false`, so a run there could not fail either. Both
+Android modules must have a named NewApi step AND a lint block that scopes
+to NewApi with abortOnError on — a step naming a task whose gate is off is
+green theater, which is the exact failure mode this file exists to catch.
 """
 
+import re
 import unittest
 from pathlib import Path
 
@@ -54,6 +63,76 @@ class CiWorkflowTest(unittest.TestCase):
             "the desktop suite must run after the compile step so a compile "
             "break fails Desktop compiles, not Unit tests",
         )
+
+    def test_api24_newapi_gate_is_a_named_step_for_the_app_module(self):
+        # minSdk 24 is otherwise proven only by compilation: assembleDebug
+        # links an API-26+ call without complaint and it crashes on API 24-25.
+        self.assertIn("./gradlew :app-android:lintDebug", self.text)
+        self.assertIn("Android Lint — API 24 floor (NewApi)", self.text)
+
+    def test_api24_newapi_gate_is_a_named_step_for_the_shared_module(self):
+        # Android Lint analyses only the module it runs in, so
+        # `:app-android:lintDebug` never looked at shared/src/androidMain —
+        # the expect/actual Android code (connectivity, blur, download
+        # transport, storage probes). Both Android modules need a NewApi run.
+        self.assertIn("./gradlew :shared:lintDebug", self.text)
+        self.assertIn(
+            "Android Lint — shared androidMain API 24 floor (NewApi)",
+            self.text,
+        )
+
+    def test_api24_newapi_gate_steps_keep_honest_names(self):
+        # Two lint steps must not collapse into one ambiguous name, or a red
+        # shared-module floor violation reads as an app-module failure.
+        app_at = self.text.index("./gradlew :app-android:lintDebug")
+        shared_at = self.text.index("./gradlew :shared:lintDebug")
+        self.assertLess(
+            app_at,
+            shared_at,
+            "the app-module NewApi step must come first so the two lint steps "
+            "keep distinct, honest names in the run summary",
+        )
+
+
+class Api24LintConfigTest(unittest.TestCase):
+    """The workflow step is worthless if the Gradle gate behind it is off.
+
+    Both lint blocks must scope to NewApi (so unrelated warnings cannot redden
+    the build) AND abort on error (so a violation actually fails the step).
+    `shared` previously had `abortOnError = false`, i.e. a lint run there could
+    never fail.
+    """
+
+    def lint_block(self, module):
+        text = (ROOT / module / "build.gradle.kts").read_text()
+        start = text.index("lint {")
+        return text[start : text.index("}", start)]
+
+    def test_app_android_lint_gates_newapi_and_aborts(self):
+        block = self.lint_block("app-android")
+        self.assertIn('"NewApi"', block)
+        self.assertIn("abortOnError = true", block)
+
+    def test_shared_lint_gates_newapi_and_aborts(self):
+        block = self.lint_block("shared")
+        self.assertIn('"NewApi"', block)
+        self.assertIn("abortOnError = true", block)
+        self.assertNotIn(
+            "abortOnError = false",
+            block,
+            "a lint block that cannot fail is not a gate",
+        )
+
+    def test_both_android_modules_keep_the_same_min_sdk_floor(self):
+        # The merged manifest enforces the HIGHER of the two, so a drift here
+        # silently raises the real floor above 24 and the lint gate would then
+        # be checking against the wrong API level.
+        def min_sdk(module):
+            text = (ROOT / module / "build.gradle.kts").read_text()
+            return int(re.search(r"minSdk\s*=\s*(\d+)", text).group(1))
+
+        self.assertEqual(24, min_sdk("app-android"))
+        self.assertEqual(24, min_sdk("shared"))
 
 
 if __name__ == "__main__":

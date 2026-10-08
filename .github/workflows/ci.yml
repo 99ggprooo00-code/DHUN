@@ -45,6 +45,14 @@ jobs:
       - name: "Android Lint — API 24 floor (NewApi)"
         run: ./gradlew :app-android:lintDebug --no-daemon
 
+      # The step above only analyses :app-android's own sources: AGP does not
+      # lint a module's library dependencies unless `checkDependencies` is set.
+      # shared/src/androidMain holds the expect/actual Android code
+      # (connectivity, blur, download transport, storage probes), so it needs
+      # its own NewApi run. Config lives in shared/build.gradle.kts lint { }.
+      - name: "Android Lint — shared androidMain API 24 floor (NewApi)"
+        run: ./gradlew :shared:lintDebug --no-daemon
+
       - name: Probe compiles
         run: ./gradlew :tools:playback-probe:compileKotlin --no-daemon
 
