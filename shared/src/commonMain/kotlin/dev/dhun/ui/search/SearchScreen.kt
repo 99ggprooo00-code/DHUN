@@ -41,10 +41,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.KeyEventType
 
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
@@ -259,7 +255,11 @@ private fun SearchBarSection(
                 .weight(1f)
                 .onFocusChanged { focusRegistry?.setFocused(focusToken, it.isFocused) }
                 .onKeyEvent { event ->
-                    if (event.key == Key.Enter && event.type == KeyEventType.KeyDown) {
+                    // Physical Enter (desktop keyboards, and Android hardware
+                    // keyboards) — the IME Search action above is the soft-key
+                    // half. The rule lives in SearchInputPolicy so the shipped
+                    // predicate is the one its regression test exercises.
+                    if (SearchInputPolicy.shouldSubmitOnKeyEvent(event)) {
                         onSearchSubmit()
                         true
                     } else {
