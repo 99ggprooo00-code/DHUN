@@ -61,6 +61,23 @@ cssModules: ["tokens", "base", "components", "download"]
       <a href="{{ site.testReleasePage }}" rel="noopener">releases/tag/test</a> — the same files, listed by GitHub.</p>
   </section>
 
+  <section aria-labelledby="verify-title">
+    <div class="section-head">
+      <h2 id="verify-title">{{ site.downloads.verify.title }}</h2>
+      <p class="lede">{{ site.downloads.verify.lede }}</p>
+      <!--{{ site.downloads.verify.source }}-->
+    </div>
+    <div class="faq">
+      {%- for platform in site.downloads.verify.platforms %}
+      <div class="card">
+        <h3>{{ platform.name }}</h3>
+        <pre><code>{{ platform.command }}</code></pre>
+      </div>
+      {%- endfor %}
+    </div>
+    <p class="traceable" style="margin-top: var(--sp-3);">{{ site.downloads.verify.note }}</p>
+  </section>
+
   <section aria-labelledby="install-title">
     <div class="section-head">
       <h2 id="install-title">Install</h2>
@@ -78,6 +95,32 @@ cssModules: ["tokens", "base", "components", "download"]
     <div class="notice" style="margin-top: 1.5rem;">
       <p><strong>What it asks for.</strong> {{ site.install.permissions }}</p>
       <p><strong>What it never sends.</strong> {{ site.install.privacy }}</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="lifecycle-title">
+    <div class="section-head">
+      <h2 id="lifecycle-title">{{ site.downloads.lifecycle.title }}</h2>
+      <p class="lede">{{ site.downloads.lifecycle.lede }}</p>
+      <!--{{ site.downloads.lifecycle.source }} -->
+    </div>
+    <div class="faq">
+      <div class="card">
+        <h3>{{ site.downloads.lifecycle.android.heading }}</h3>
+        <p><strong>Upgrade.</strong> {{ site.downloads.lifecycle.android.upgrade }}</p>
+        <p><strong>Uninstall.</strong> {{ site.downloads.lifecycle.android.uninstall }}</p>
+      </div>
+      <div class="card">
+        <h3>{{ site.downloads.lifecycle.desktop.heading }}</h3>
+        <p><strong>Upgrade.</strong> {{ site.downloads.lifecycle.desktop.upgrade }}</p>
+        <p><strong>Uninstall.</strong> {{ site.downloads.lifecycle.desktop.uninstall }}</p>
+        <p>{{ site.downloads.lifecycle.desktop.aside }}</p>
+      </div>
+      <div class="card">
+        <h3>{{ site.downloads.testKey.title }}</h3>
+        <p>{{ site.downloads.testKey.body }}</p>
+        <!--{{ site.downloads.testKey.source }} -->
+      </div>
     </div>
   </section>
 
@@ -116,6 +159,13 @@ cssModules: ["tokens", "base", "components", "download"]
     <p>There is also no stable release to fall back to: the honest state is one
     rolling pre-release plus the source.</p>
     <!--MASTER_PROMPT §7 Stage S3; .ai/ROADMAP.md current gates; .ai/KNOWN_LIMITATIONS.md -->
+    <h3 style="margin-top: var(--sp-5);">{{ site.downloads.noStable.title }}</h3>
+    <ul class="missing">
+      {%- for item in site.downloads.noStable.items %}
+      <li>{{ item }}</li>
+      {%- endfor %}
+    </ul>
+    <!--{{ site.downloads.noStable.source }}-->
     <p><a href="{{ site.changelog }}" rel="noopener">CHANGELOG.md</a> ·
        <a href="{{ site.repo }}/blob/main/.ai/KNOWN_LIMITATIONS.md" rel="noopener">Known limitations</a> ·
        <a href="{{ site.risk.link.href }}" rel="noopener">ADR-001: the maintenance contract</a></p>

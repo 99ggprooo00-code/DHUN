@@ -125,6 +125,9 @@ export default {
         "Playback resolution walks a staged chain of anonymous player clients.",
         "Session corroboration is fail-open: no token, no block.",
       ],
+      why:
+        "Why there is no sign-in at all: a signed-in client needs a session — a cookie jar, a PO token, BotGuard attestation — and DHUN has no server of its own to authenticate against. The extraction chain is deliberately tokenless by design, so the anonymous path is not a limitation the app works around; it is the only path the app has.",
+      whySource: "ADR-001 (own tokenless client chain), ADR-003 (staged identity waves)",
     },
     {
       id: "offline",
@@ -266,6 +269,61 @@ export default {
       "No web player and no browser client.",
       "No macOS disk image or App Store build.",
     ],
+    verify: {
+      title: "Verify the download, per platform",
+      lede:
+        "Each file has a .sha256 sidecar in the same format as sha256sum: a digest, two spaces, the filename. Download both into one folder and run the command for your platform. A mismatch means the file is not what the release published, and you should delete it.",
+      platforms: [
+        { name: "Linux", command: "sha256sum -c dhun-test.apk.sha256" },
+        { name: "macOS", command: "shasum -a 256 -c dhun-test.apk.sha256" },
+        { name: "Windows (PowerShell)", command: "Get-FileHash .\\dhun-test.apk -Algorithm SHA256" },
+      ],
+      note:
+        "PowerShell prints the digest instead of comparing it: compare it with the first field of the .sha256 file. The same three commands work for the .msi and for both ABI splits — only the filename changes.",
+      source: "scripts/stage_artifact.py (sidecar format), README.md",
+    },
+
+    lifecycle: {
+      title: "Upgrade and uninstall",
+      lede:
+        "Two platforms, two different answers to “how do I update this?” and “what does uninstalling take with it?”. Both answers below are the ones in the repository's own install notes.",
+      android: {
+        heading: "Android",
+        upgrade:
+          "The APKs are signed with the same committed test key, so a newer test APK installs straight over the previous one — no uninstall step, and the library and downloads survive the upgrade.",
+        uninstall:
+          "Uninstalling from the launcher or Settings → Apps → DHUN deletes the app-private tree with it: database, cached audio segments and image cache. Nothing was written to shared storage, and Android will not offer to keep the data.",
+      },
+      desktop: {
+        heading: "Windows",
+        upgrade:
+          "The MSI is a per-user install (no Administrator prompt) under %LOCALAPPDATA%\\DHUN with a stable upgrade identity, so a newer build installs over the previous one. Clean-target cleanup and in-place upgrade data preservation are exercised on a disposable runner and still await verification on real hardware.",
+        uninstall:
+          "Uninstall from Settings → Apps → DHUN. Packaged runtime data is meant to live under the install directory (SQLite database plus audio cache) so it goes with the program instead of being left behind in %APPDATA%.",
+        aside:
+          "VLC is a separate installation: DHUN neither installs nor removes it.",
+      },
+      source: "README.md install/uninstall notes; app-desktop/build.gradle.kts (perUserInstall, upgradeUuid); scripts/check_msi_upgrade.ps1",
+    },
+
+    testKey: {
+      title: "What the test signing key means",
+      body:
+        "The APKs are signed with a keystore committed to the repository (app-android/keystores/dhun-test.p12) — a test key, not a secret. Two consequences, both real: a new test APK installs over an old one without an uninstall, and the signature proves nothing about who built the file. Anyone with the repository can mint a same-key APK, so install only from the links on this page or from the GitHub release page.",
+      source: "README.md test-builds policy; app-android/build.gradle.kts signingConfigs.testBuild",
+    },
+
+    noStable: {
+      title: "What “no stable release” costs you",
+      items: [
+        "No version number to pin: a bug report has to name a commit, not a version.",
+        "No previous build to roll back to — the release page carries the current bytes only.",
+        "No in-app updater and no store channel, so every upgrade is a manual download and verify.",
+        "The published bytes are replaced on every merge to main, so a link saved last week may hand you a different build today. The .sha256 sidecar is what tells you which build you actually have.",
+      ],
+      source: "README.md test-builds policy; test-release.yml",
+    },
+
     buildIt: {
       title: "Or build it from source",
       body:
@@ -278,6 +336,65 @@ export default {
     },
     technicalNote:
       "Hosting reality: GitHub Pages sets its own caching and compression headers. This site cannot tune either, so it optimises what it controls — three static routes, one stylesheet, no client-side JavaScript and no third-party request.",
+  },
+
+  // /features — how the chain works, and what breaks when it does.
+  chain: {
+    title: "How the extraction chain works — and how it breaks",
+    lede:
+      "DHUN talks to YouTube's own endpoints with no account and no token. That is a choice with a maintenance bill, and the repository pays it in the open rather than in a support inbox.",
+    stages: [
+      {
+        title: "Metadata",
+        body:
+          "Search, browse, playlists and artist pages come from DHUN's own thin InnerTube client, which reads the current client version off the homepage instead of pinning one that would expire.",
+        source: "ADR-001",
+      },
+      {
+        title: "Stream resolution",
+        body:
+          "A resolver walks a fixed list of tokenless player identities and stops at the first that returns playable audio. The walk is fanned out into staged waves, because the sequential worst case was measured in minutes, not seconds.",
+        source: "ADR-001, ADR-003",
+      },
+      {
+        title: "Desktop fallback",
+        body:
+          "When a stream will not resolve, the desktop build can call a yt-dlp binary you provide, on PATH or via DHUN_YTDLP. Android cannot do this: there is no Python runtime there, so it uses the in-JVM resolver only.",
+        source: "README.md; ADR-001",
+      },
+      {
+        title: "Recovery watch",
+        body:
+          "NewPipe Extractor stays pinned and watched, deliberately outside the active chain: it re-enters as an option when the daily drill goes green on it. No local fork, no patched copy to maintain.",
+        source: "ADR-001",
+      },
+      {
+        title: "The daily drill",
+        body:
+          "extraction-health.yml runs a live playback probe once a day, resolves a real track, checks the audio bytes, and opens or closes a rot-drill issue when the answer changes.",
+        source: "ADR-001; extraction-health.yml",
+      },
+    ],
+    cost:
+      "When the chain breaks, playback breaks until it is patched — for everyone at once, with no server-side fix to deploy. That is the honest cost of a client with no sign-in, and the reason the public build is labelled unverified rather than stable.",
+  },
+
+  // /features — what only the desktop build can do, and what it needs.
+  desktopOnly: {
+    title: "What the Windows desktop build adds",
+    lede:
+      "The desktop client is a real Compose Desktop application, not the phone layout in a window. Some capabilities exist only there — and two requirements arrive with them.",
+    items: [
+      "Tray icon and close-to-tray: closing the window keeps playback alive, and the tray menu controls it.",
+      "System media keys through the OS transport controls, plus taskbar jump lists and single-instance behaviour.",
+      "A 10-band equaliser; the Android equaliser is an open item on the roadmap, not a shipped feature.",
+      "A user-provided yt-dlp fallback for streams the in-JVM resolver cannot resolve.",
+    ],
+    requirements: [
+      "Playback goes through libVLC, which DHUN neither bundles nor installs: install VLC first, and DHUN leaves it alone afterwards — including on uninstall.",
+      "The MSI is not Authenticode-signed, so SmartScreen warns on first run. That is true of this test build, not a false positive.",
+    ],
+    source: "Phase 12 desktop native surface; Phase 15 EQ; README.md install notes",
   },
 
   // /features — what exists, and what does not.

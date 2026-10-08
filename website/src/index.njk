@@ -83,6 +83,10 @@ cssModules: ["tokens", "base", "components", "mockups"]
           <li>{{ point }}</li>
           {%- endfor %}
         </ul>
+        {%- if feature.why %}
+        <p class="feature-why">{{ feature.why }}</p>
+        <!--{{ feature.whySource }}-->
+        {%- endif %}
       </div>
       <div class="feature-visual">
         {% include feature.mockFile %}

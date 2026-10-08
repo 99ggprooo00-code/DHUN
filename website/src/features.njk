@@ -60,6 +60,51 @@ cssModules: ["tokens", "base", "components", "mockups"]
   </div>
 </section>
 
+<section aria-labelledby="chain-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="kicker">THE MAINTENANCE CONTRACT</span>
+      <h2 id="chain-title">{{ site.chain.title }}</h2>
+      <p class="lede">{{ site.chain.lede }}</p>
+      <!-- ADR-001 (extraction engine, recovery watch); .github/workflows/extraction-health.yml -->
+    </div>
+    <ul class="card-grid" style="list-style: none; padding: 0;">
+      {%- for stage in site.chain.stages %}
+      <li class="card">
+        <h3>{{ stage.title }}</h3>
+        <p style="margin: 0;">{{ stage.body }}</p>
+        <!--{{ stage.source }}-->
+      </li>
+      {%- endfor %}
+    </ul>
+    <div class="notice" style="margin-top: var(--sp-4);">
+      <p>{{ site.chain.cost }}</p>
+      <!--{{ site.chain.stages[0].source }}; .ai/ROADMAP.md current gates -->
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <section aria-labelledby="desktop-title">
+    <div class="section-head">
+      <span class="kicker">DESKTOP-ONLY</span>
+      <h2 id="desktop-title">{{ site.desktopOnly.title }}</h2>
+      <p class="lede">{{ site.desktopOnly.lede }}</p>
+      <!--{{ site.desktopOnly.source }}-->
+    </div>
+    <ul class="feature-points">
+      {%- for item in site.desktopOnly.items %}
+      <li>{{ item }}</li>
+      {%- endfor %}
+    </ul>
+    <ul class="missing" style="margin-top: var(--sp-3);">
+      {%- for item in site.desktopOnly.requirements %}
+      <li>{{ item }}</li>
+      {%- endfor %}
+    </ul>
+  </section>
+</div>
+
 <div class="wrap">
   <section class="risk" aria-labelledby="not-title">
     <span class="kicker risk-flag">NOT IN DHUN</span>

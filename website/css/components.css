@@ -66,6 +66,10 @@
 .error-page { text-align: center; padding: var(--sp-12) 0; }
 .error-code { font-size: clamp(3rem, 12vw, 6rem); font-weight: 700; letter-spacing: -0.03em; margin: 0; color: var(--accent); }
 .traceable { font-size: 0.82rem; color: var(--text-3); }
+.feature-why {
+  margin-top: var(--sp-3); padding-left: var(--sp-4);
+  border-left: 3px solid var(--accent); color: var(--text-2); font-size: 0.95rem;
+}
 .faq { display: grid; gap: var(--sp-4); }
 .faq h3 { margin-bottom: var(--sp-1); }
 
