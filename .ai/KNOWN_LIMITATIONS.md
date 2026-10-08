@@ -2,7 +2,56 @@
 
 Updated every phase. Nothing hidden.
 
-## 2026-10-08 — latest session state: `main@fddc436`, rolling MSI 2.213.1, and B1 exists without a browser verdict
+## 2026-10-08 — `main@2a20024`: ADR-008 B1 ran from the canonical origin and is BLOCKED; the browser question is unresolved, not answered
+
+- **PR #136 is merged and verified, but the browser question is not.** Merge
+  `2a20024d4b626b3f40ae95776cefb6b1e49cfdca` (merged 2026-10-08T13:19:49Z with
+  explicit user authorization) put the probe on legacy Pages at
+  `https://99ggprooo00-code.github.io/DHUN/web-spike/`. CI **37783500689**,
+  Build APK **37783500620**, test-release **37783500838** and Pages
+  **37783499138** all succeeded on that commit.
+- **The probe is deployed; playback is not proven.** The user confirmed the probe
+  UI rendered at the canonical URL and ran it in **Brave `1.96.61`** (Chromium
+  `154.0.8037.98`, Official Build, 64-bit). Anonymous metadata **passed** (the
+  values were discarded). The **player request failed** — blocked before a
+  readable response. Direct URL, byte range, codec/media, `playing` event and
+  audible playback were **never reached**, and no "I heard audio" confirmation
+  exists.
+- **The failure mode is unknown, and that is the honest limitation.** No
+  sanitized JSON, screenshot or DevTools network trace was supplied, so the
+  result must **not** be narrowed to a specific HTTP response, an `OPTIONS`
+  preflight rejection, extension/Shield behavior or a network/ISP/VPN policy.
+  Treating any of those as the cause would be invention.
+- **Cross-browser coverage is unavailable.** Brave is Chromium-family, not stock
+  Chrome/Chromium, so even a pass there would not satisfy B1's
+  Chromium-and-Firefox requirement. Firefox and Safari were **unavailable** —
+  not inferred failures. `B1 PASS` is therefore impossible from this evidence.
+- **One uninspected artifact must not be used as evidence.** Pages artifact
+  **11552239018** exists (1,171,094 B), but its archive redirected to an external
+  blob host that was unavailable in the previous session. It was never
+  inspected; it is deployment bookkeeping, not browser evidence.
+- **No Web-support claim is permitted** in README, site copy, changelog or
+  conversation. B1 stops here. Any continuation requires a separate **ADR-008 B2
+  user decision** (which may be “stop / static Option A”).
+- **Nothing downstream of B1 is authorized.** No proxy/backend, no extraction or
+  production client-profile change, no Kotlin/JS/Wasm/TypeScript adoption, no
+  production browser stack, no static Option-A implementation.
+- **Rolling `test` release matches the recorded bytes.** Release id
+  **406857108** targets `2a20024`, published 2026-10-08T13:25:17Z. Universal APK
+  18,405,859 B `9665b75f…`; arm64 18,355,786 B `23903dd6…`; v7a 18,352,944 B
+  `7e4f80ad…`; MSI **2.215.1** 112,971,776 B `fec11d50…`. APK bytes are unchanged
+  from the previous publish; the split APKs still differ from universal. Hosted
+  MSI smoke remains packaging-only (`2.213.1 → 2.215.1`, sentinels, future-guard,
+  uninstall) and proves no launch, playback or visuals.
+- **The independent gates are untouched by this result.** S3 round 4 (Android
+  landscape + Windows fullscreen must keep the mini-player a compact docked bar
+  with Home/Search/Library visible above it), S3 round 5 (API 24–25 hardware:
+  launcher icon, launch, search, play, background audio, with device model,
+  OS/API, APK filename and installed APK SHA-256 recorded), and S6 (blocked on
+  S3) all remain open. AAB staging remains user-only via a `test-release`
+  dispatch with `build_only=true` and `build_release_candidate=true`.
+
+## 2026-10-08 — session `arena/ae65f1a5-dhun`: `main@fddc436`, rolling MSI 2.213.1, and B1 exists without a browser verdict — *superseded by the entry above; the probe is now deployed and the run is recorded*
 
 - **Main moved after the earlier entries below.** The user committed the approved
   README hostname correction directly as `fddc436`. CI **37778666069**, Build
