@@ -50,6 +50,8 @@ import AxeBuilder from "@axe-core/playwright";
 
 import {
   caveatsHiddenInPrint,
+  currentPageProblem,
+  markerPerceivable,
   duplicateLinkTargets,
   focusChanged,
   forcedColorsBoundaryMissing,
@@ -484,6 +486,56 @@ function forcedColorsReport() {
   };
 }
 
+/**
+ * The link that says "you are here", and how it renders.
+ *
+ * Self-contained on purpose: this function is serialized into the page, so a
+ * reference to anything imported in Node scope is a ReferenceError *inside the
+ * page* (see the note in `forcedColorsReport`). It gathers; `rules.mjs` decides.
+ */
+function currentPageReport() {
+  const fields = [
+    "color",
+    "backgroundColor",
+    "textDecorationLine",
+    "textDecorationColor",
+    "textUnderlineOffset",
+    "borderTopStyle",
+    "borderTopWidth",
+    "borderRightStyle",
+    "borderRightWidth",
+    "borderBottomStyle",
+    "borderBottomWidth",
+    "borderLeftStyle",
+    "borderLeftWidth",
+    "outlineStyle",
+    "outlineWidth",
+  ];
+  const snapshot = (element) => {
+    const computed = getComputedStyle(element);
+    const picked = {};
+    for (const field of fields) picked[field] = computed[field];
+    return {
+      element: `${element.tagName.toLowerCase()}.${String(element.className || "").split(/\s+/)[0]}`,
+      href: element.getAttribute("href"),
+      text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24),
+      style: picked,
+      signature: fields.map((field) => picked[field]).join("|"),
+    };
+  };
+  const markers = [...document.querySelectorAll('[aria-current="page"]')].map(snapshot);
+  const nav = document.querySelector(".site-nav");
+  const siblings = nav
+    ? [...nav.querySelectorAll("a")].filter((link) => link.getAttribute("aria-current") !== "page")
+    : [];
+  return {
+    forcedColorsActive: window.matchMedia("(forced-colors: active)").matches,
+    markers,
+    siblings: siblings.map((link) => snapshot(link).signature),
+    siblingElements: siblings.map((link) => snapshot(link).element),
+  };
+}
+
 /** Every `data-caveat` disclosure, and whether print still renders it. */
 function caveatReport() {
   const caveats = [];
@@ -678,6 +730,92 @@ async function checkKeyboard(browser) {
     );
   }
   await context.close();
+}
+
+/**
+ * The current page is marked — and the mark survives Windows High Contrast.
+ *
+ * Three parts, same as the static rule in `scripts/website_quality.py`: exactly
+ * one marker, pointing at this route, and *visible* — a mark that renders
+ * identically to the links that are not current tells a sighted visitor nothing.
+ * The forced-colours pass is the one only a browser can make: that mode drops
+ * author backgrounds, so the filled pill disappears and the underline is what
+ * remains.
+ */
+async function checkCurrentPage(browser) {
+  const mostCommon = (values) => {
+    const counts = new Map();
+    for (const value of values) counts.set(value, (counts.get(value) || 0) + 1);
+    let best = null;
+    let bestCount = 0;
+    for (const [value, count] of counts) {
+      if (count > bestCount) {
+        best = value;
+        bestCount = count;
+      }
+    }
+    return best;
+  };
+
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: "dark" });
+  for (const route of ROUTES) {
+    const page = await context.newPage();
+    await page.goto(url(route), { waitUntil: "load" });
+    const report = await page.evaluate(currentPageReport);
+    const problem = currentPageProblem(route, report.markers, mostCommon(report.siblings));
+    if (problem) {
+      fail(`current page ${route}`, problem);
+    } else {
+      const [marker] = report.markers;
+      record(
+        `current page ${route}`,
+        `marked by ${marker.element} “${marker.text}” → ${marker.href}; ` +
+          `${report.siblings.length} other nav link(s) (${report.siblingElements.join(", ")}) render differently`,
+      );
+    }
+    await page.close();
+  }
+  await context.close();
+
+  const forced = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    colorScheme: "dark",
+    forcedColors: "active",
+  });
+  for (const route of ROUTES) {
+    const page = await forced.newPage();
+    await page.goto(url(route), { waitUntil: "load" });
+    const report = await page.evaluate(currentPageReport);
+    if (!report.forcedColorsActive) {
+      fail(
+        `current page ${route} (forced colours)`,
+        "the emulated preference is not visible to the page (matchMedia forced-colors=false) — " +
+          "every result below would be a false green",
+      );
+      await page.close();
+      continue;
+    }
+    const [marker] = report.markers;
+    if (!marker) {
+      fail(`current page ${route} (forced colours)`, "no aria-current marker in the DOM");
+    } else if (!markerPerceivable(marker.style)) {
+      fail(
+        `current page ${route} (forced colours)`,
+        `${marker.element} “${marker.text}” loses its mark when the OS picks the colours: ` +
+          `text-decoration ${marker.style.textDecorationLine}, border ` +
+          `${marker.style.borderBottomStyle} ${marker.style.borderBottomWidth}, outline ` +
+          `${marker.style.outlineStyle} ${marker.style.outlineWidth}`,
+      );
+    } else {
+      record(
+        `current page ${route} (forced colours)`,
+        `${marker.element} keeps its mark (text-decoration ${marker.style.textDecorationLine}) ` +
+          `after the background is repainted`,
+      );
+    }
+    await page.close();
+  }
+  await forced.close();
 }
 
 async function checkContrast(browser) {
@@ -1101,6 +1239,7 @@ const CHECKS = [
   ["keyboard", () => checkKeyboard(browser)],
   ["structure", () => checkStructure(browser)],
   ["tab stops", () => checkTabStops(browser)],
+  ["current page", () => checkCurrentPage(browser)],
   ["contrast", () => checkContrast(browser)],
   ["reduced motion", () => checkReducedMotion(browser)],
   ["preferences", () => checkPreferences(browser)],

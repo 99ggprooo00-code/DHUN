@@ -150,3 +150,54 @@ export function caveatsHiddenInPrint(caveats) {
     .filter((caveat) => !caveat.visible || caveat.height <= 0)
     .map((caveat) => caveat.key);
 }
+
+/**
+ * The link that marks the page the visitor is on.
+ *
+ * Three things have to be true, and only the last one needs a browser:
+ * exactly one marker on the page; the marked link points at the page being
+ * rendered (a marker on the wrong link is a lie about where the visitor is);
+ * and the marker renders differently from the links that are *not* current —
+ * otherwise the attribute is a machine-only fact and a sighted visitor cannot
+ * tell where they are. `markers` are `{ href, tag, className, text, signature }`
+ * gathered from the DOM; `siblingSignature` is the most common signature among
+ * the other links in the same navigation, or null when there are none.
+ */
+export function currentPageProblem(route, markers, siblingSignature) {
+  if (!Array.isArray(markers) || markers.length !== 1) {
+    const count = Array.isArray(markers) ? markers.length : 0;
+    return `expected exactly one aria-current="page", found ${count}`;
+  }
+  const [marker] = markers;
+  if (marker.href !== route) {
+    return `the current-page marker points at ${marker.href || "nothing"}, not at ${route}`;
+  }
+  if (siblingSignature && marker.signature === siblingSignature) {
+    return (
+      `the current link renders exactly like the non-current ones ` +
+      `(${marker.signature}) — the mark is invisible`
+    );
+  }
+  return null;
+}
+
+/**
+ * Whether a mark still reads when the OS picks the colours.
+ *
+ * `forced-colors: active` (Windows High Contrast) repaints the page with the
+ * system palette and *drops author backgrounds*, so a filled pill is gone: only
+ * a decoration (underline / strike) or a frame (border / outline) survives.
+ * Colour is deliberately not part of this: every author colour is repainted.
+ */
+export function markerPerceivable(style) {
+  if (!style) return false;
+  const width = (value) => Number.parseFloat(value) || 0;
+  if (style.textDecorationLine && style.textDecorationLine !== "none") return true;
+  const border = ["Top", "Right", "Bottom", "Left"].some(
+    (side) =>
+      style[`border${side}Style`] !== "none" && width(style[`border${side}Width`]) > 0,
+  );
+  if (border) return true;
+  return style.outlineStyle !== "none" && width(style.outlineWidth) > 0;
+}
+

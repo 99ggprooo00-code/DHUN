@@ -24,6 +24,21 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Accessibility — the header says which page you are on, and the 404 is noindex (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- **Navigation state, marked twice.** No page marked itself as the current page
+  (`aria-current` appeared nowhere in the built site). `/` now marks the wordmark,
+  `/features/` and `/ui/` mark their own nav item, and the mark is drawn as a pill
+  plus an accent underline so it survives Windows High Contrast, where author
+  backgrounds are dropped. `/404.html` is not a destination and carries no mark —
+  and now carries `<meta name="robots" content="noindex">`, which the three real
+  routes must *not* carry (a `noindex` there would delete the page from search
+  results). New gate: `navigation_state_violations` asserts exactly one marker per
+  destination, that it points at that destination, and that its styling is not
+  background-only; the rendered and forced-colours halves are measured in
+  `website/tests/browser.mjs` (`current page`) with mutation-proven logic in
+  `tests/rules.mjs`. Measured cost: +290 B per route, recorded in the ratchet.
+
 ### Performance — each route ships only the CSS it can use (2026-10-08, session `arena/af3e7f66-dhun`)
 
 - **Measured page weight, not argued.** The site inlines one stylesheet per route

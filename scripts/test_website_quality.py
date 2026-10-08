@@ -1164,6 +1164,94 @@ class CssPruningPredicate(unittest.TestCase):
                 )
 
 
+class CurrentPageIsMarked(DistCopyMixin):
+    """`aria-current` on the page the visitor is on, and not on the 404.
+
+    The rendered half of this (does the marker *look* different, does it survive
+    Windows High Contrast) is a browser measurement; these are the mutations that
+    need no browser.
+    """
+
+    def test_the_committed_site_marks_each_destination_once(self):
+        self.assertEqual(quality.navigation_state_violations(DIST), [])
+
+    def test_a_page_without_a_marker_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(' aria-current="page"', "", 1),
+            encoding="utf-8",
+        )
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(
+            any("/features/" in v and "exactly one" in v for v in violations), violations
+        )
+
+    def test_a_marker_on_two_links_fails(self):
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                '<a class="wordmark" href="/"', '<a aria-current="page" class="wordmark" href="/"', 1
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(any("/ui/" in v and "found 2" in v for v in violations), violations)
+
+    def test_a_marker_pointing_at_another_route_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        start = markup.index('<a href="/features/" aria-current="page"')
+        page.write_text(
+            markup.replace(markup[start : start + 35], '<a href="/ui/" aria-current="page"', 1),
+            encoding="utf-8",
+        )
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(any("/features/" in v and "/ui/" in v for v in violations), violations)
+
+    def test_a_marker_on_the_404_fails(self):
+        dist = self.copy_dist()
+        page = dist / "404.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                '<a class="btn btn--primary" href="/ui/"',
+                '<a class="btn btn--primary" aria-current="page" href="/ui/"',
+                1,
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(any("/404.html" in v for v in violations), violations)
+
+    def test_a_marker_with_no_visible_style_fails(self):
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        # Drop every rule that styles the marker, wherever the pruner kept it.
+        for prelude, body in re.findall(r'([^{}]*\[aria-current="page"\][^{}]*)\{([^{}]*)\}', markup):
+            markup = markup.replace(prelude + "{" + body + "}", "", 1)
+        page.write_text(markup, encoding="utf-8")
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(
+            any("/: " in v and "no rule in this page" in v for v in violations), violations
+        )
+
+    def test_a_background_only_marker_fails(self):
+        """Forced colours drops author backgrounds, so a pill alone is not a marker."""
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        # Keep only the pill: remove the rule whose body carries the underline.
+        for prelude, body in re.findall(r'([^{}]*\[aria-current="page"\][^{}]*)\{([^{}]*)\}', markup):
+            if "text-decoration" in body:
+                markup = markup.replace(prelude + "{" + body + "}", "", 1)
+        page.write_text(markup, encoding="utf-8")
+        violations = quality.navigation_state_violations(dist)
+        self.assertTrue(any("/ui/" in v and "High Contrast" in v for v in violations), violations)
+
+
 class DistMatchesItsSources(DistCopyMixin):
     """The cheap, Node-free half of the workflow's drift check."""
 

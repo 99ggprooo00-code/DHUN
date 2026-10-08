@@ -113,6 +113,7 @@ CONTRAST_PAIRS = (
     ("--text-3", "--bg", 4.5),
     ("--accent", "--bg", 4.5),
     ("--text", "--surface", 4.5),
+    ("--text", "--surface-variant", 4.5),  # the current-page pill in the nav
     ("--text-2", "--surface", 4.5),
     ("--text-3", "--surface", 4.5),
     ("--accent", "--surface", 4.5),
@@ -618,6 +619,72 @@ def accessibility_violations(dist: pathlib.Path) -> list[str]:
             tag = match.group(0)
             if not (re.search(r'aria-hidden="true"', tag) or re.search(r'aria-label="', tag) or re.search(r"role=\"img\"", tag)):
                 violations.append(f"{route}: <svg> is neither labelled nor aria-hidden")
+    return violations
+
+
+def navigation_state_violations(dist: pathlib.Path) -> list[str]:
+    """Each destination says which page the visitor is on — and the 404 does not.
+
+    `/`, `/features/` and `/ui/` are the site's three destinations, and the header
+    marks the one being read with `aria-current="page"` (the wordmark on `/`, the
+    matching nav item elsewhere). What this asserts is the *effect*, in three
+    parts: exactly one marker per destination; the marked link points at that
+    destination; and the page's own stylesheet draws the marker in a way that
+    survives Windows High Contrast, where the engine drops author backgrounds —
+    so a marker that is only a background colour is not a marker. The rendered
+    versions of the same three parts are measured in a browser by
+    `website/tests/browser.mjs` (`current page`), whose decision logic is
+    mutation-proven without one in `website/tests/rules.mjs`.
+
+    `/404.html` is not a destination: marking a nav item current there would tell
+    a screen-reader user they are somewhere they are not, so the rule asserts no
+    marker at all on that page. (It also asserts the page is `noindex`, see
+    `crawlability_violations`.)
+    """
+    violations: list[str] = []
+    current = re.compile(r"<a\b([^>]*\baria-current=\"page\"[^>]*)>", re.I)
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        markers = current.findall(markup)
+        if route == "/404.html":
+            if markers:
+                violations.append(
+                    "/404.html: marks a nav item as the current page, but a 404 is not one "
+                    "of the site's destinations"
+                )
+            continue
+        if len(markers) != 1:
+            violations.append(
+                f"{route}: expected exactly one aria-current=\"page\", found {len(markers)}"
+            )
+            continue
+        href = re.search(r'href="([^"]+)"', markers[0])
+        if not href or href.group(1) != route:
+            violations.append(
+                f"{route}: the current-page marker points at "
+                f"{href.group(1) if href else 'no href'}, not at this route"
+            )
+        css = page_stylesheet(dist, route)
+        marker_rules = [
+            body
+            for prelude, body in re.findall(r"([^{}]*)\{([^{}]*)\}", css)
+            if '[aria-current="page"]' in prelude or "[aria-current='page']" in prelude
+        ]
+        if not marker_rules:
+            violations.append(
+                f"{route}: no rule in this page's own CSS styles [aria-current=\"page\"] — "
+                f"the current page is indistinguishable from the others"
+            )
+            continue
+        # The marker must not be a background colour alone: forced colours drops
+        # it, and the underline or border is what remains.
+        if not any(
+            re.search(r"(text-decoration|border|outline)", body) for body in marker_rules
+        ):
+            violations.append(
+                f"{route}: the current-page marker is a colour or background only, which "
+                f"Windows High Contrast removes; give it a decoration or a frame"
+            )
     return violations
 
 
@@ -1320,6 +1387,22 @@ def crawlability_violations(dist: pathlib.Path) -> list[str]:
                 violations.append(f"robots.txt scopes {path}, but the site has exactly three routes")
     if not (dist / "404.html").is_file():
         violations.append("404.html is missing from the built site")
+    else:
+        # A 404 must not be offered for indexing, and a real page must not refuse
+        # it: `noindex` on `/features/` would delete the page from search results,
+        # which is a defect no other check here would notice.
+        for route, path in page_paths(dist).items():
+            markup = path.read_text(encoding="utf-8")
+            has_noindex = bool(
+                re.search(r'<meta[^>]*name="robots"[^>]*content="[^"]*noindex', markup, re.I)
+            )
+            if route == "/404.html" and not has_noindex:
+                violations.append(
+                    "404.html: no <meta name=\"robots\" content=\"noindex\"> — a crawler that "
+                    "reaches this page through a soft-404 path would list it"
+                )
+            if route != "/404.html" and has_noindex:
+                violations.append(f"{route}: carries noindex, which would remove a real page from search")
     return violations
 
 
@@ -1726,6 +1809,7 @@ CHECKS = (
     ("icon is inlined and true to its source", favicon_violations),
     ("nothing ships unreferenced", unreferenced_file_violations),
     ("accessibility floor", accessibility_violations),
+    ("current page is marked", navigation_state_violations),
     ("page metadata", metadata_violations),
     ("structured data", structured_data_violations),
     ("crawlability", crawlability_violations),

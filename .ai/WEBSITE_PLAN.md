@@ -383,6 +383,26 @@ to undo; ~15 minutes. Cost of keeping it: the pruning predicate exists twice (JS
 build, Python check), which the mutation table covers but no test can prove
 *equivalent*.
 
+**D19 — the header marks the page the visitor is on, and `/404.html` asks not to be indexed.**
+Measured before the change: `aria-current` appeared **nowhere** in `website/dist/`
+(this session) and none of the three routes marked itself; the 404 shipped no
+`<meta name="robots">` at all. Now the wordmark carries `aria-current="page"` on
+`/` and the matching nav item carries it on `/features/` and `/ui/`, styled twice
+over: a filled pill for sighted users and an underline with the accent colour that
+**survives Windows High Contrast**, where the engine drops author backgrounds. The
+404 is not a destination, so it carries no marker and does carry `noindex`; the
+three real routes must *not* carry it, because `noindex` on a real page removes it
+from search and no other check here would notice. The static rule
+(`navigation_state_violations`, +1 check → 27) asserts exactly-one-marker,
+marker-points-here, and a marker rule that is not background-only; the rendered
+half is `website/tests/browser.mjs` `current page` (including the forced-colours
+pass) whose decision logic lives in `rules.mjs` and is mutation-proven without a
+browser. Cost: **+290 B per route** (measured: `/` 51,311 → 51,601 B, `/features/`
+48,019 → 48,309 B, `/ui/` 49,508 → 49,798 B, `/404.html` 12,794 → 13,102 B) — an
+accessibility feature that buys no bytes, recorded so the ratchet shows it
+deliberately. Reversal cost: delete the two `{% if %}` clauses, the CSS rule, the
+`extraHead` line and the check; ~15 minutes, and the score disappears.
+
 ## 11. Work plan, execution and honest status
 
 | Phase | Deliverable | Status |

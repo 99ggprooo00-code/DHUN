@@ -4,6 +4,10 @@ title: "Page not found — DHUN"
 permalink: /404.html
 description: "That page does not exist on this site. DHUN has three pages: home, features, and the interface."
 cssModules: ["tokens", "base", "components"]
+# A 404 is not one of the site's three destinations: it carries `noindex` so a
+# crawler that reaches it through a soft-404 path does not list it (it is also
+# absent from sitemap.xml — `crawlability_violations` asserts both directions).
+extraHead: '<meta name="robots" content="noindex">'
 ---
 <div class="wrap">
   <section class="error-page" aria-labelledby="nf-title">

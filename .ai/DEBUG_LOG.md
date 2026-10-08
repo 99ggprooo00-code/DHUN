@@ -4194,3 +4194,32 @@ whitespace (`without_css_comments`), and `_fold_css` is applied per unit at
 comparison time only. Symptom to recognise: "expected 27 unit(s)" against a
 240-unit build.
 
+## 2026-10-08 · Nothing marked the current page, and the 404 was offered for indexing (session `arena/af3e7f66-dhun`)
+
+**Symptom (found by reading the built HTML, not by a failing check).**
+`grep -c 'aria-current' website/dist/**/*.html` returned 0 on every route: the
+header navigation never said which page the visitor was on, so a screen-reader
+user got three links with no indication of context and a sighted user had to read
+the page title to find out. Separately, `/404.html` shipped no `<meta name="robots">`
+at all: GitHub Pages serves it with a 404 status, so no well-behaved crawler lists
+it, but a soft-404 path (an internal link to a stale URL, a proxy that rewrites the
+status) can still surface it, and nothing in the build said `noindex`.
+
+**Root cause.** Both are *absence* defects: no rule in the gate table covered
+navigation state, so no mutation could ever have caught it — the accessibility
+floor checked landmarks, headings, skip link and alt text, and the crawlability
+rule checked that the *routes* were in `sitemap.xml`, never that a non-route was
+kept out. A site built template-first has no place that says "the header must
+describe where you are", and both omissions survived eleven sessions of checks
+because nothing asked.
+
+**Fix, and why each half is provable.** `aria-current="page"` is asserted in the
+built HTML (exactly one marker, pointing at this route) *and* its rendered
+difference is measured in a browser, including `forced-colors: active` — the pill
+alone is not a marker there, which is why the underline exists and why
+`markerPerceivable()` ignores colour. `noindex` is asserted in both directions:
+present on `/404.html`, absent on the three real routes. The browser decision
+logic is in `tests/rules.mjs` with must-pass and must-fail cases, so the CI-only
+half is mutation-proven without a browser — the same split the repository already
+uses for touch targets, heading order and print caveats.
+
