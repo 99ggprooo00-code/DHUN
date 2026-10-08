@@ -371,9 +371,15 @@ fun DhunAppShell(
                 if (panes == null || detailRoute == null) {
                     // Phone / narrow window, or a large screen with no route:
                     // unchanged content wiring, with the master using all of the
-                    // available space. The floating MiniPlayer is only needed
-                    // here because the rail layout has no bottom navigation dock.
-                    Box(
+                    // available space. A Column (not a Box) so the rail layout's
+                    // MiniPlayer is a DOCKED bottom bar that reserves its own
+                    // height instead of floating over the tab list. Android
+                    // landscape and Windows fullscreen cross the 840dp rail
+                    // breakpoint into this branch; the old floating card sat on
+                    // top of Home/Search/Library and, on the short landscape
+                    // height, read as "covering the whole screen". The rail owns
+                    // navigation here, so this bar IS the dock.
+                    Column(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
@@ -382,6 +388,9 @@ fun DhunAppShell(
                         // screen with no detail route, or a constrained window that
                         // cannot fit two usable columns. Only a non-empty route is
                         // rendered here; the normal empty state stays on the tab.
+                        // Weighted Box so the docked MiniPlayer below always keeps
+                        // its own strip and can never overlay the list.
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         ShellMasterPane(
                             tab = nav.selectedTab,
                             detailRoute = detailRoute,
@@ -416,12 +425,12 @@ fun DhunAppShell(
                             equalizerSession = equalizerSession,
                             onOpenSettings = { nav.push(DetailRoute.SettingsPage) },
                         )
+                        }
                         if (useNavigationRail && !nav.playerExpanded) {
                             MiniPlayer(
                                 viewModel = playerViewModel,
                                 onExpand = { nav.playerExpanded = true },
                                 modifier = Modifier
-                                    .align(Alignment.BottomCenter)
                                     .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
                             )
                         }

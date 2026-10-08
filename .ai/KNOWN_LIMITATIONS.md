@@ -2,6 +2,28 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — session `arena/b4449fdd-dhun`: the rail-layout mini-player now docks instead of floating over the tab content (commit `6ef48e9`)
+
+- **Defect:** on Android **landscape** and Windows **fullscreen** (both ≥ 840dp →
+  TwoPane), the mini-player floated over the Home/Search/Library list and, on the
+  short landscape height, read as covering the whole screen. Reported from
+  hardware; the full-screen player (ADR-002) was confirmed fine and is untouched.
+- **Fix:** `DhunAppShell.kt`'s no-detail-route TwoPane branch is a `Column` now —
+  content in a weighted `Box`, the mini-player a docked bottom bar that reserves
+  its own height. This matches SinglePane (`GlassDock`) and `ShellTwoPane`
+  (master `Column`); it was the only branch that floated the mini-player.
+- **What is proven:** the code compiles on CI (shared JVM/Android/desktop) and
+  the change is a pure layout-container swap. **What is NOT proven:** that the
+  mini-player is visually a compact bottom bar with the list fully usable above
+  it — that is the S3 round-4 device retest (Redmi Note 12 4G landscape, Windows
+  11 fullscreen), still open. There is no Compose UI-test harness in the repo, so
+  no automated layout assertion exists; do not describe green CI as the fix being
+  accepted.
+- **Residual risk:** a Box→Column move can hit the same Compose receiver-scope
+  errors that reddened PR #128 (`Modifier.align` is BoxScope-only). The `.align`
+  removal is the load-bearing part; if CI fails to compile, that is the first
+  place to look.
+
 ## 2026-10-08 — session `arena/19a284df-dhun`: what the real Search-Enter test does and does not prove (PR #129, commit `643298a`)
 
 - **What is now covered that was not.** At `main@ca6d006` the rule that decides

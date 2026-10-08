@@ -1,5 +1,45 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — the rail-layout mini-player floated over the tab content (session `arena/b4449fdd-dhun`, base `main@9f88b6e`, commit `6ef48e9`)
+
+**The report.** On Android **landscape** and Windows **fullscreen**, the user
+reported the mini-player "expands and covers the entire home/search/library."
+Clarified directly: the **full-screen player is fine and stable**; collapsing it
+returns to Home with the mini-player on the bottom — but the **mini-player itself
+is so big it covers the whole Home/Search/Library content** (navigation still
+works, the list behind is hidden).
+
+**Root cause (source-traced).** Both reported configs have width ≥ 840dp
+(`DhunSpacing.navigationRailBreakpoint`), so `DhunShellPolicy.layoutAt` returns
+**TwoPane**. In `DhunAppShell.kt`'s `panes == null || detailRoute == null` branch
+(the large-screen, no-detail-route case), the tab content (`ShellMasterPane`) and
+the `MiniPlayer` were **siblings inside one `Box`**, the mini-player positioned
+with `Modifier.align(Alignment.BottomCenter)` — a floating card painted over the
+list with no reserved space. The other two placements already dock it: SinglePane
+puts it in the `GlassDock` bottom bar (Scaffold `innerPadding` lifts the content),
+and `ShellTwoPane` makes it a `Column` child of the master. This branch was the
+lone float. The `MiniPlayer` composable is a bounded `miniPlayerHeight` row in an
+`AcrylicSurface` (wrap-content height) — it never grows in place; the defect is
+the placement, not the widget.
+
+**Fix (`6ef48e9`).** That branch is now a `Column`: content in
+`Box(Modifier.weight(1f))`, the mini-player a docked bottom bar (its `.align`
+removed — a `Column` child), so it reserves its own height and cannot overlay the
+list. Full-screen `FullPlayer` (ADR-002) untouched. Compile-gated by CI (no
+Compose UI-test harness exists repo-wide); visual acceptance is the S3 device
+retest. Note the same Compose-receiver-scope trap that reddened PR #128
+(`38536d5`/`bcd43f3`) applies to moving a composable between layout containers —
+the `.align` (BoxScope) removal is the load-bearing edit.
+
+**Also reconciled this session (GitHub evidence, not local impression):** PR #129
+is **merged** (`9f88b6e`, 2026-10-08T05:56:11Z); post-merge CI **37734902276**
+(12/12), Build APK **37734902281**, test-release **37734902315** (`publish` ran);
+rolling `test` republished at `9f88b6e` (2026-10-08T06:01:08Z) — APK `aa6d027a…`
+(unchanged from the PR head, since app code did not change between the final head
+and the merge) and MSI **2.185.1** `86b1184c…`. The scheduled `extraction-health`
+drill is `ENVIRONMENT_BLOCKED` (runner datacenter gating) — the accepted steady
+state, **not** a resolver regression.
+
 ## 2026-10-08 — a fix that shipped unwired, guarded by a test that could not fail (session `arena/19a284df-dhun`, base `main@ca6d006`, PR #129, commit `643298a`)
 
 **Why this lane.** Boot found PR #128 already merged into `main@ca6d006`
