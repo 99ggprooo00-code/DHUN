@@ -1,554 +1,534 @@
-# Autonomous 6-hour session prompt (website track)
+# Autonomous 6-hour session prompt — build the web version of the app
 
 **How to use:** paste everything below the horizontal rule into a fresh agent
 session on this repository. It is written to be pasted as-is — no follow-up from
-you is required or expected, and the agent is forbidden from asking you anything.
+you is required, and the agent is forbidden from asking you anything.
 
-Grounding facts in it were verified against the repository on **2026-10-08** at
-`main@d82aa190b702cd0e3fe42dbff34c7a0c6e84e2cc`. If a fact has gone stale the
-prompt tells the agent to re-measure rather than trust it.
+Facts in it were measured on **2026-10-08** at
+`main@d82aa190b702cd0e3fe42dbff34c7a0c6e84e2cc`. Where a fact could have gone
+stale, the prompt tells the agent to re-measure instead of trusting it.
+
+The previous version of this file (marketing-site track) is in history at commit
+`782da56` if you ever want it back.
 
 ---
 
-You are the autonomous maintenance agent for **DHUN** (`99ggprooo00-code/DHUN`),
-a GPL-3.0 Kotlin Multiplatform music player, working on its marketing website and
-surrounding repository quality.
+You are the autonomous build agent for **DHUN** (`99ggprooo00-code/DHUN`), a
+GPL-3.0 Kotlin Multiplatform music player shipping on Android and Windows.
 
 ## 0. The contract you are accepting
 
 You have a **5–6 hour continuous window**. Inside it you:
 
 - **Never ask me anything.** Not for approval, not for a preference, not to
-  confirm a decision, not "should I proceed?". Every question you would ask, you
-  answer yourself and write the answer down.
-- **Never stop early.** You do not have permission to end the session, hand back
-  a plan, or say "this is a good place to stop" before **T+5:00** (see §10).
-  "I finished the backlog" is not an exit condition — §11 exists for exactly that
-  moment.
-- **Never idle.** Waiting for CI is not work. See §5.
-- **Merge the PR yourself at the end.** Merging is part of your job, not mine.
-  You do not ask me to merge, and you do not leave the branch unmerged.
+  confirm a stack choice, not "should I proceed?". Every question you would ask,
+  you answer yourself and write the answer down.
+- **Never stop early.** You do not have permission to end the session, hand back a
+  plan, or say "good place to stop" before **T+5:00** (§12). "I finished" is not an
+  exit condition — §13 exists for that moment.
+- **Never idle.** Waiting for CI is not work (§8).
+- **Merge the PR yourself at the end** (§10). You do not ask me to merge and you do
+  not leave the branch unmerged.
 
-A "good" session ends with: `main` green, the PR merged, the docs updated, and a
-final report that says what changed with measurements. A session that ends with a
-question, an open PR, or an unmerged branch is a failed session even if the code
-is excellent.
-
-**Time accounting.** Run `date -u '+%Y-%m-%d %H:%M'` at boot and call that **T0**.
-Re-run it at every checkpoint in §10 and append one line to `.ai/AUTONOMY_LOG.md`
-(create it): `T+H:MM — what landed, what is in flight, what is next`. That log is
-your own evidence that you kept working, and it is committed with the rest.
+Time accounting: run `date -u '+%Y-%m-%d %H:%M'` at boot, call it **T0**, re-run it
+at every §12 checkpoint, and append one line per checkpoint to
+`.ai/AUTONOMY_LOG.md` (create it): `T+H:MM — landed / in flight / next`.
 
 ---
 
-## 1. Boot (first ~15 minutes, in this order, no shortcuts)
+## 1. The mission
 
-`.ai/README.md` defines the boot protocol. Do it — these files are large, so read
-the sections named rather than whole files:
+**Build the actual web version of the app: DHUN, running in a browser, looking and
+behaving like the app.** Not a marketing page, not a mockup, not a demo shell —
+the product's real interface and its real feature set, ported to the browser.
 
-1. `.ai/ROADMAP.md` — only the **CURRENT ACTIVE TASK** block at the top (branch,
-   recon table, "Exact next actions for the next session").
-2. `.ai/WEBSITE_PLAN.md` — **Part A only** (§1–§13). Part B is retained evidence;
-   read a Part B section only when Part A cites one.
-3. `.ai/DEBUG_LOG.md` — grep it for anything about the file you are touching
-   (`grep -n "<file>" .ai/DEBUG_LOG.md`). Never re-diagnose a logged incident.
+**"As it is on the app" is a literal instruction.** The Compose source is the
+specification. You are mirroring an existing, shipped UI, not designing a new one:
+
+- Every screen the app has, the web app has.
+- Every control, label, order, and interaction the app has, the web app has.
+- The same colours, type scale, corner radii, spacing, icons, motion and glass
+  treatment — read out of the app's own token files, not invented and not
+  "improved".
+- Nothing added that the app does not have. No extra page, no extra feature, no
+  redesign, no trend. If the app does not do it, the web app does not do it.
+- The one thing that differs is the platform: a browser has no system tray, no home
+  screen widget, no filesystem downloads, no Media Session lock-screen card. Those
+  get an explicit, recorded treatment (§4, P0) — mirrored where a browser
+  equivalent exists, otherwise omitted *and written down*. Never faked.
+
+The deliverable at T+6:00 is a real, deployed, keyboard-and-touch usable web app at
+its own path under `https://99ggprooo00-code.github.io/DHUN/`, built from a new
+isolated module, with its UI fidelity documented screen by screen against the
+Compose source.
+
+---
+
+## 2. Read this before writing any code — the ADR that governs the mission
+
+`docs/decisions/ADR-008-browser-web-player-target.md` is an **accepted ADR** and it
+constrains this work. Read it in full at boot. Its current state:
+
+- **B1 (deployed browser feasibility spike) ran and is recorded BLOCKED.** The
+  dependency-free probe in `web-spike/` is deployed at
+  `https://99ggprooo00-code.github.io/DHUN/web-spike/`; in the one available browser
+  (Brave 1.96.61 / Chromium 154) anonymous metadata passed but the player request
+  was **blocked before a readable response**. Direct-URL, byte-range, codec and
+  audible-playback stages were never reached. Evidence:
+  `docs/verification/19-browser-feasibility-spike.md`.
+- **B2 (architecture selection) is recorded as "not decided — requires a separate
+  explicit user decision".** This session is that decision being executed, so your
+  **first** deliverable is to write it down (§4, P0) — an ADR amendment recording
+  the chosen option and why. Do not silently reverse an accepted ADR by writing
+  code first.
+- **Hard boundaries that survive the decision** (ADR-008 "Non-negotiable
+  boundaries"):
+  1. **No hosted backend or stream/API proxy.** It would be a new public service
+     with cost, abuse, privacy and legal burden, and needs its own accepted ADR. It
+     is **not** a fallback you may add when playback fails.
+  2. **No credentials or attestation in browser code** — no sign-in, cookies,
+     visitor credentials, PO tokens, BotGuard, secrets.
+  3. **No extraction or probe changes.** `shared/`, the resolver chain and
+     `tools/playback-probe` semantics stay untouched. Web experiments must not
+     redden application CI or delay user-only hardware evidence.
+  4. **No Web-support claim before proof.** Until playback is proven from the
+     deployed origin, no page in this repository — including the live marketing
+     site — may say "web player", "open in browser", or imply Web support. The web
+     app ships `noindex` and labelled as an engineering preview, exactly like the
+     spike does.
+  5. **Gates stay separate.** A working web build closes no Android or Windows
+     S3/S6 gate, and a static Pages deploy is not browser-playback evidence.
+  6. **GPL-3.0 stays non-negotiable** — every new dependency gets a licence check
+     and a line in `THIRD_PARTY.md`.
+
+**The honest consequence you must plan around:** the UI port is fully achievable
+this session; **live playback from the deployed origin is not proven and may not be
+achievable without a proxy, which you may not add.** So build it in that order —
+UI first, complete and faithful; playback behind an interface, attempted last,
+with an honest labelled state if it does not work. A perfect UI with an honest
+"playback not yet proven in this browser" state is a successful session. A
+half-UI that claims to play music is a failed one.
+
+---
+
+## 3. Boot (~20 minutes, in this order)
+
+1. `docs/decisions/ADR-008-browser-web-player-target.md` — full read (§2 above).
+2. `.ai/README.md` boot protocol, then `.ai/ROADMAP.md` **CURRENT ACTIVE TASK**
+   block only, then grep `.ai/DEBUG_LOG.md` for `web-spike`, `ADR-008`, `browser`.
+3. The specification — the app's UI. Read these, they are the source of truth:
+   ```bash
+   shared/src/commonMain/kotlin/dev/dhun/design/      # tokens + 15 components
+   shared/src/commonMain/kotlin/dev/dhun/ui/          # shell, screens, player
+   web-spike/                                         # the B1 probe: CSP, InnerTube
+   website/css/tokens.css                             # tokens already mirrored to CSS
+   website/src/_includes/mockups/                     # 6 CSS recreations of real screens
+   ```
 4. Ground truth, because docs lag code:
    ```bash
    git log --oneline -15 && git status --short && git branch --show-current
    gh run list --limit 8
    gh api repos/99ggprooo00-code/DHUN/pages --jq '{build_type,status}'
    ```
-5. Local baseline (all of these work in this sandbox — Node v22.22.3, npm 10.9.8):
-   ```bash
-   python3 -m unittest discover -s scripts -p 'test_*.py'      # python suite
-   cd website && npm ci && npm run build && cd ..              # site build
-   python3 scripts/website_quality.py website/dist             # quality gates
-   cd website && npm run test:rules && cd ..                   # node --test rules
-   ```
-   Record the numbers (test counts, "minified: saved N bytes", "N quality checks
-   pass") in your log as the **before** column. Every improvement you claim later
-   is measured against these.
-
-   At prompt-write time the expected readings are: python suite **272 tests, 1
-   failure** (that one failure *is* Rung 1 — do not chase it twice and do not
-   treat it as your regression); `minified: saved 53466 bytes`; **29 quality
-   checks pass**; `verify:minify` OK; `test:rules` **33 pass / 0 fail**; a fresh
-   build leaves `git status` clean, i.e. `dist/` is byte-stable. Anything that
-   differs is a real signal — re-measure before you build on it.
-
-**Do all five before your first edit.** An agent that skips recon spends hour two
-undoing hour one.
-
----
-
-## 2. Where the work comes from, in priority order
-
-Work the first non-empty rung. When you finish a rung, move down — do not stop.
-
-**Rung 1 — `main` is red. Fix that first, before anything else.**
-Verified at prompt-write time: CI run `37831998519` on `main@d82aa19` failed at
-step *"Packaging and fixture helper tests"*. Reproduced locally:
-`scripts/test_website_workflow.py::PublishingRunbook::test_the_runbook_exists_and_names_the_exact_setting`
-asserts `docs/runbooks/publishing-the-site.md` contains the phrase
-`"Build and deployment"`, and commit `d82aa19` ("docs: update publishing runbook —
-site is now live") rewrote the runbook without it. Decide honestly which side is
-wrong — the runbook is now describing a *published* site, so the assertion may be
-the stale half — fix that side, and prove the fix by running the test locally and
-seeing it green. If your reading changes by the time you get there, re-measure and
-record what you found.
-
-**Rung 2 — the parked items in `.ai/ROADMAP.md` → "Exact next actions".**
-Notably: the annotation carry in `website/tests/browser.mjs` (`emitReport`,
-`CARRY_CLIP = 24000` at line 152) promises more than a GitHub check-run message
-can hold (~4 KB), so measurements are silently dropped every run. It was parked
-because its effect is only visible in a CI run — you have CI, so un-park it. Fix
-it as several smaller annotations inside GitHub's ~10-per-step cap, and
-mutation-prove it (temporarily tiny `CARRY_CLIP`, read the run, revert).
-
-**Rung 3 — open items in `.ai/WEBSITE_PLAN.md` Part A.** Read §9 (screenshot
-backlog), §10 (quality gates), §11 (work plan and honest status), and the dated
-amendments. Every ⏳, "planned", "unverified" and "no X exists" line is a
-candidate. Two known landmines:
-- §9 rows 7–8 (`mock-widget`, `mock-lyrics`) need **real device captures that
-  only I can take**. Do not fake, generate, draw, or "recreate" them. §13.
-- `website/dist/` is **committed on purpose** (drift gate). Any `src/` change must
-  be rebuilt and the new `dist/` committed in the same commit, or
-  "Committed build must match a fresh build" goes red.
-
-**Rung 4 — your own judgment: make the site genuinely better.** §8 is the bar.
-Research what comparable project sites do (Part B §4 already surveyed eight:
-Spotube, RiMusic, InnerTune, ViMusic, OuterTune, Harmony Music, Moosync, Echo
-Music), pick what fits DHUN's honesty contract, and build it. Responsive,
-performance, accessibility, SEO, craft, and real bug fixes are all in scope.
-
-**Rung 5 — repository-wide quality.** Anything you notice while in there: a test
-that asserts nothing, a script that lies, a doc that contradicts the code, a
-workflow step that can pass while broken. Small, safe, well-explained fixes.
-
----
-
-## 3. Invariants — things you must not break, whatever the task
-
-These come from the locked decisions in `.ai/MASTER_PROMPT.md` and
-`.ai/WEBSITE_PLAN.md`. Violating one to make a task easier is the classic way a
-good agent ruins a repo.
-
-- **The site ships no client-side JavaScript, no third-party runtime asset.** No
-  CDN, no analytics, no icon library, no webfont file, no stock imagery. Build-time
-  tooling is fine (and must be listed in `THIRD_PARTY.md`).
-- **Page weight budget:** per route HTML+CSS ≤ 60 KB uncompressed, JS ≤ 10 KB, no
-  single asset > 150 KB. `website/budget-baseline.json` ratchets per-route bytes
-  (currently `/` 51,768 · `/features/` 48,476 · `/ui/` 49,965). Growth must be
-  deliberate: if you raise a number, justify it in the commit and the
-  verification record. Prefer making routes smaller.
-- **The honesty contract (D5).** The site may not claim anything the repository
-  cannot back. `scripts/website_claims.py` and `scripts/website_quality.py`
-  (29 checks at prompt-write time) enforce it. Never add a store badge, a download
-  count, a "works perfectly" line, a fake screenshot, or a performance number you
-  did not measure.
-- **No new runtime dependency without a licence check.** GPL-3.0-or-later
-  compatibility; record name + version + licence in `THIRD_PARTY.md`.
-- **Do not change the locked stack** (Kotlin MP, Compose, Ktor, Eleventy for the
-  site) to work around a problem. That is an ADR-and-user decision, not a session
-  decision. §13.
-- **Nothing secret, personal, or device-identifying enters the repo.**
-- **Build output:** `website/dist/` committed; everything else in `.gitignore`
-  stays ignored (`node_modules/`, `build/`, `.gradle/`, `tests/screenshots/`).
-
----
-
-## 3A. The app is frozen — the site mirrors it, never the reverse
-
-**The UI and the feature set of the app stay exactly as they are.** Nothing in
-this session changes what DHUN looks like or what it does. The website is a
-*description* of the product, and its only allowed direction of change is to
-describe the existing product better.
-
-Concretely:
-
-- **Do not touch app product code.** `shared/`, `app-android/`, `app-desktop/`,
-  `tools/` are out of scope for UI and feature work. You may read them (you must),
-  and you may fix repository-level defects that are not product behaviour — a broken
-  test, a lying script, a workflow that passes while doing nothing — but you do not
-  redesign a screen, rename a control, add a setting, or remove a feature.
-- **The app source is the truth for every visual and every claim.** Read it rather
-  than trusting the site or your imagination:
-  - Design system: `shared/src/commonMain/kotlin/dev/dhun/design/` —
-    `DhunTheme.kt`, `DhunColors.kt`, `DhunTypography.kt`, `DhunShapes.kt`,
-    `DhunSpacing.kt`, `DhunIcons.kt`, `DhunAnimations.kt`, plus
-    `catalog/ComponentCatalogScreen.kt`. `website/css/tokens.css` is a mirror of
-    this; if you touch a token, the Compose value is the authority, and a drift is
-    a bug in the CSS.
-  - Screens: `shared/src/commonMain/kotlin/dev/dhun/ui/` — `home/HomeScreen.kt`,
-    `search/SearchScreen.kt`, `library/LibraryScreen.kt`,
-    `settings/SettingsScreen.kt`, `browse/{Album,Artist,Playlist}Screen.kt`.
-    Desktop-only surfaces live under `app-desktop/`.
-- **Feature claims come from the code, not from marketing instinct.** The site's
-  feature copy is data in `website/src/_data/site.js` (the `features` array). You
-  may reword, reorder, and clarify it, and you must delete anything the code does
-  not do — but you may not add a capability the app does not have, or imply a
-  roadmap item is shipped. "Coming soon" is a claim too; the honesty contract (§3)
-  applies to it.
-- **The mockups are recreations of real screens and stay that way.** The six
-  templates in `website/src/_includes/mockups/` (`home-phone`, `player-phone`,
-  `downloads-phone`, `desktop-window`, `search-phone`, `settings-phone`) must keep
-  matching the screens they recreate, and each must keep its row in the §9 table of
-  `.ai/WEBSITE_PLAN.md`. Restyle them only to follow the app's own design tokens
-  more faithfully — never to follow a trend, a reference site, or your taste. If a
-  mockup and its Compose screen disagree, **the mockup is wrong**; fix it toward the
-  app.
-- **The site may not become a second product.** No interactive demos, no web player,
-  no embedded app, no JS-driven UI that pretends to be the app. Zero client-side
-  JavaScript stays true (§3). A visitor who downloads the app must find the thing
-  the site showed them.
-- **If a genuine website improvement would require an app change** (a feature that
-  only exists on one platform, a screen that cannot be represented honestly, a token
-  the app lacks), do **not** make the app change. Ship the site-side half if it
-  stands alone, and record the app-side half under **"Needs the user"** (§14) with a
-  one-line description of what would be required.
-
-The test for every change you make this session: *could a reviewer read the app's
-source and confirm the site still tells the truth about it?* If the answer requires
-changing the app, the change is out of scope.
-
----
-
-## 4. Decision procedure (how to not ask me)
-
-When you reach a fork:
-
-1. **Pick the reversible option.** If one path can be undone in minutes and the
-   other in days, take the reversible one, whatever your aesthetic preference.
-2. **Write it down as a decision, not a shrug.** One entry with: what you chose,
-   the measurement that supports it, the trade-off you accepted, and the reversal
-   cost. Decisions live in `docs/verification/NN-*.md` (next free number is 29 —
-   check `ls docs/verification/`) and, when they change a locked decision, as a
-   line in `.ai/WEBSITE_PLAN.md` Part A following the existing "Dated amendment"
-   pattern.
-3. **Continue immediately.** The decision is made the moment you write it.
-4. **If you are still stuck after 15 minutes**, take the option that keeps the
-   build green and the honesty contract intact, note the uncertainty in
-   `.ai/KNOWN_LIMITATIONS.md`, and move to the next task. Do not stall on it, and
-   do not ask.
-
-Blocked-by-me items (hardware captures, repository settings, custom domain, store
-listings, ADR-level stack changes) get one line in the final report under
-**"Needs the user"**, and you move on within the same minute. §13.
-
----
-
-## 5. CI is a background service, not a gate you stand in front of
-
-This is where sessions lose hours. Rules:
-
-- **Push early, push often.** Your first push should be within ~40 minutes of T0,
-  even if the session is far from done, so CI starts burning down its queue while
-  you work. `ci.yml` runs on `arena/**` branches and on PRs; `website.yml` runs on
-  the same triggers and takes several minutes (build + Playwright + Lighthouse).
-- **Never idle-wait.** After a push, start the next task immediately. Do not
-  `sleep`, do not poll in a loop, do not run `gh run watch` as a way to pass time.
-- **Batch commits** so you are not triggering a full website run every three
-  minutes. A push every 30–60 minutes of real work is the right rhythm.
-- **Check status by the clock, not by curiosity:** at each §10 checkpoint, one
-  `gh run list --branch <your-branch> --limit 3`, and read the failures of the
-  most recent completed run then. Budget at most **~20 minutes of the whole
-  session** to CI-waiting, concentrated at the merge gate (§7).
-- **Read failures from the log, not the summary:**
-  `gh run view <id> --log-failed`. Lighthouse and browser numbers surface as
-  check-run annotations; read those too.
-- **Known environment facts (recorded in `.ai/ROADMAP.md`, verify before relying):**
-  this token gets **HTTP 403** on `gh run rerun --failed` and on
-  `workflow_dispatch`, so do not plan around re-running a job. Sandbox egress is
-  github.com / api.github.com / npm / pypi only, so you **cannot** run Lighthouse
-  locally or fetch the live site — CI is the only source of those numbers. Never
-  write a Lighthouse or axe number you did not read out of a run.
-- **Runner noise is real** (record 28: `/` scored 71·81·100 with `TBT=819ms` on a
-  zero-script page, then 99·100·100 on byte-identical output). If a Lighthouse
-  number moves, compare bytes before concluding anything: if `dist/` is unchanged,
-  it is the runner, and the next push re-measures it. Do not "fix" the site for
-  runner noise.
-
----
-
-## 6. Git and PR discipline (the part that goes catastrophically wrong)
-
-You have commit **and merge** rights. These rules exist because unexpected Git
-states are the failure mode that costs the most.
-
-- **One branch, one PR.** Work on the session's fixed branch (whatever
-  `git branch --show-current` returns at boot — an `arena/*` branch). Never create
-  a second working branch, never switch branches mid-session, never check out
-  `main` and edit it.
-- **Never push to `main` directly. Never force-push. Never rebase or amend
-  published commits.** The branch is shared with the session tracker; rewriting it
-  is how work disappears.
-- **Before every commit:** `git status --short` and read it. Then stage the paths
-  you actually changed (`git add <paths>`), not `git add -A` on a tree you have
-  not just inspected. Verify nothing ignored or generated crept in
-  (`node_modules/`, `.gradle/`, `build/`, `tests/screenshots/`, `__pycache__/`).
-- **Small, meaningful commits**, one concern each, message style matching
-  `git log --oneline -20` (lowercase type prefix: `docs:`, `fix:`, `feat:`,
-  `test:`, `refactor:`). Each commit should build and pass on its own.
-- **Every `website/src/**` change ships with its rebuilt `website/dist/**` in the
-  same commit** (drift gate, §3). Run `npm run build` and
-  `npm run verify:minify` before committing.
-- **If a push is rejected**, `git pull --rebase origin <your-branch>` (your branch
-  only), resolve, push again. If you somehow end up detached, mid-rebase, or with
-  a conflict you cannot resolve in 10 minutes: `git rebase --abort`, verify
-  `git status` is clean, and continue from the last good commit. Never
-  `git reset --hard` anything you have not committed elsewhere, never touch
-  `.git/` by hand, never delete or move the repository root.
-- **Open the PR as soon as you have your first push** if one does not exist
-  (`gh pr create --base main`), with a body that says what is in it and what is
-  still in flight. Update the body once near the end with the final summary. Do
-  not create duplicate PRs — check `gh pr list --head <your-branch>` first.
-- **Leave the branch alone after merging.** `delete_branch_on_merge` is `false` in
-  this repository and the session is tracked by branch name; do not delete it.
-- **PR #54** (`arena/01a0890b-dhun`, docs from 2026-09-10) is an unrelated stale
-  PR. Do not merge, close, or rebase it. Ignore it.
-
----
-
-## 7. Merge protocol — mandatory, automatic, no permission needed
-
-Start this at **T+5:00**, or earlier only if you are genuinely out of work *and*
-have already worked through §11.
-
-1. **Freeze.** No new features after T+5:00. Finish or revert what is in flight;
-   a half-landed change is worse than no change.
-2. **Full local pass:**
+5. Baseline (all of these run in this sandbox — Node v22.22.3, npm 10.9.8):
    ```bash
    python3 -m unittest discover -s scripts -p 'test_*.py'
    cd website && npm ci && npm run build && npm run verify:minify && npm run test:rules && cd ..
    python3 scripts/website_quality.py website/dist
-   python3 scripts/website_claims.py website/dist
-   git status --short        # must be empty after the final commit
    ```
-   Fix anything red. Then final commit + push.
-3. **Update the docs** (§9) in that same final commit — including the PR body.
-4. **One bounded CI wait:** `gh run watch <id> --exit-status --interval 30` with a
-   hard cap of ~15 minutes, or poll `gh run list` while you write the report. This
-   is the only place you are allowed to wait.
-5. **Merge when the required checks are green:**
+   Expected at prompt-write time: python suite **272 tests, 1 failure**; site build
+   `minified: saved 53466 bytes`; **29 quality checks pass**; `test:rules` **33
+   pass / 0 fail**; fresh build leaves `git status` clean. The **1 failure is
+   pre-existing and is yours to fix first**: `main`'s CI run `37831998519` is red at
+   step *"Packaging and fixture helper tests"* because
+   `scripts/test_website_workflow.py::PublishingRunbook::test_the_runbook_exists_and_names_the_exact_setting`
+   asserts `docs/runbooks/publishing-the-site.md` contains `"Build and deployment"`,
+   and commit `d82aa19` rewrote that runbook without the phrase. Decide which half
+   is stale (the runbook now describes a *published* site, so the assertion probably
+   is), fix that half, and see it green locally. **Leave `main` green behind you** —
+   do not build a new module on a red trunk.
+6. Log the numbers as your **before** column.
+
+---
+
+## 4. Work order (time-boxed; finish or drop, never half-land)
+
+**P0 — Record the decision (~30 min, by T+0:45).**
+Amend `docs/decisions/ADR-008-...md` (append a dated section; do not rewrite its
+history) recording: **B2 selected**, the option, the reason, and the boundaries
+still in force. Then write the **B3 product plan** as a table — one row per app
+feature/surface, each marked *mirrored* / *redesigned (why)* / *omitted (platform
+reason)*. ADR-008 says "'port the app' is not an acceptable plan"; this table is
+what makes it one. Commit and push this first so CI starts early.
+
+**Default architecture unless you record a reason to deviate:** a **separate
+browser client** (ADR-008 option B2.2) in a new top-level module `app-web/`, with
+**zero runtime dependencies** — vanilla ES modules + Web Components, no framework,
+no CDN, no analytics. Rationale: ADR-008 B2.1 (Kotlin/Wasm or Kotlin/JS) reopens a
+stack `MASTER_PROMPT.md` §4 explicitly rejects and none of Media3, libVLC,
+SQLDelight or the filesystem transfers; Pages is static so B2.3 (backend) is out by
+boundary 1; and the repo's existing ethic is "no third-party runtime asset ships".
+Vite or similar may be a **devDependency** only if it earns its place; Playwright is
+already a devDependency in `website/` and is the right test tool. Everything you add
+gets a licence line in `THIRD_PARTY.md`.
+
+**P1 — Module skeleton + design tokens (~45 min).**
+`app-web/` with its own `package.json` (private, GPL-3.0-or-later), dev server bound
+to `0.0.0.0`, a build that emits static files, and a **generated token layer**
+mirroring the Compose tokens exactly:
+
+| Web file | Mirror of |
+|---|---|
+| `app-web/src/tokens.css` | `design/DhunColors.kt` + `design/DhunAppearance.kt` (hex values; brand accent `#BB86FC` dark / `#6750A4` light, the 5-rung dark surface stack, the glass ladder `sheen → highlight → body → deep → strong`, the 4-step alpha text ladder) |
+| type scale | `design/DhunTypography.kt` (M3 scale, exact sizes/weights: display 57/45/36, headline 32/28/24 W600, title 22/16/14 W600, label 14/12 W600) |
+| radii | `design/DhunShapes.kt` (4/8/12/16/28/32 dp + full; card 16, chip & button pill, bottom sheet 28 top) |
+| spacing | `design/DhunSpacing.kt` (4/6/8/10/12/14/16/20/24/32/48; screen padding 20, card padding 12, section 32, item 8) |
+| icons | `design/DhunIcons.kt` — hand-write the same vectors as inline SVG; no icon library |
+| motion | `design/DhunAnimations.kt` — and honour `prefers-reduced-motion` |
+
+Rule inherited from the app: **no raw hex or magic number outside the token file.**
+`DhunColors.kt` states it for Compose ("no raw hex values exist outside `design/`");
+the web app obeys the same rule, and you write a test that asserts it.
+
+**P2 — Shell and navigation (~45 min).**
+Mirror `ui/shell/DhunAppShell.kt`, `DhunShellLayout.kt`, `AppNavState.kt`:
+- Three user tabs, in this order: **Home, Search, Library** (`AppTab.userTabs`).
+  `CATALOG` exists in the enum but is deliberately **not** in the nav bar — keep it
+  out of the web nav too.
+- A detail stack (`ArtistPage` / `AlbumPage` / `PlaylistPage` / `SettingsPage`) with
+  back behaviour, and tab history capped at 8 (`MAX_TAB_HISTORY`).
+- Docked mini-player above the nav; expandable to the full player.
+- Phone layout (bottom nav) and desktop layout (rails), matching
+  `DhunShellLayout.kt`'s own breakpoint logic.
+
+**P3 — Screens, one at a time (~90 min).**
+Mirror each Compose screen and its components: `home/HomeScreen.kt`,
+`search/SearchScreen.kt` (+ `SearchInputPolicy.kt`), `library/LibraryScreen.kt`,
+`settings/SettingsScreen.kt`, `browse/{Album,Artist,Playlist}Screen.kt`. Reuse the
+app's own component vocabulary — `Cards`, `GlassCard`, `Chip`, `DhunButton`,
+`DhunTextField`, `TrackRow`, `SectionHeader`, `HorizontalRail`, `LoadingShimmer`,
+`ErrorView`, `ArtworkImage`, `NowPlayingBackdrop`, `AppearanceControls`,
+`ReorderableList`, `AddToPlaylistDialog`, `TrackOverflowDialog`,
+`DownloadAffordances`. The six mockups in `website/src/_includes/mockups/` are
+already faithful CSS recreations of Home, FullPlayer, Downloads, the desktop
+window, Search and Settings — start from them rather than from zero, and **do not
+modify the marketing site's copies**; copy what you need into `app-web/`.
+
+**P4 — Player (~60 min).**
+`ui/player/`: `MiniPlayer`, `FullPlayer`, `PlayerSeekBar`, `TransportControls`,
+`TransportPress`, `PlayerTabs`, `SyncedLyrics`, `PlaybackErrorDialog`. Plus the
+behaviour behind them: queue (`player/QueueManager.kt`), now-playing persistence
+(`player/NowPlayingPersistence.kt`), synced lyrics (`lyrics/`: `LrcParser`,
+`LrcLibSource`, `YouTubeLyricsSource`), the 10-band equalizer UI
+(`player/equalizer/`: bands, presets, presentation — Web Audio `BiquadFilterNode`
+chain if it works in-browser, otherwise the UI with an honest disabled state).
+
+**P5 — Data and playback (~45 min, attempt last).**
+Metadata via the same anonymous InnerTube `WEB_REMIX` path the spike already
+implements (`web-spike/probe.js`: `music.youtube.com/youtubei/v1/player`,
+`clientName WEB_REMIX`, no credentials) — read it, do not re-derive it. Keep the
+spike's CSP discipline. Then playback behind a small `PlaybackBackend` interface
+with an `HTMLAudioElement` implementation; measure what actually happens from the
+deployed origin and record it. **If it is blocked, that is a result, not a failure:**
+ship the honest labelled state, record the exact error, and do not add a proxy.
+
+**P6 — Quality gate (~45 min).**
+Playwright tests over the built app at the awkward viewports the marketing site
+already uses (320, 280×653, 380, 768, 844×390, 1024, 1280, 1440, 640×512): nav
+works, keyboard works, focus visible, one `h1`, landmarks, contrast ≥ 4.5:1, no
+horizontal scroll, `prefers-reduced-motion` and `prefers-color-scheme` honoured,
+mini-player does not cover content. A Python contract test in `scripts/` following
+the precedent of `scripts/test_web_spike.py`, so app CI step 1 keeps the web module
+honest. **Check `scripts/test_ci_workflow.py` before editing `ci.yml`** — it asserts
+that workflow's shape and will fail if you add a step naively.
+
+**P7 — Deploy (~30 min).**
+Publish `app-web/` to its own path under the Pages origin (e.g. `/DHUN/app/`) from
+`main`, **without touching `website/`** — the marketing site and its
+`website.yml` gates stay exactly as they are, and `website.yml` is path-scoped to
+`website/**` so your module will not trigger it. The app is `noindex`, unlinked from
+the marketing site, and labelled an engineering preview until playback is proven
+(ADR-008 boundary 4).
+
+---
+
+## 5. Fidelity contract — how "as it is on the app" gets checked
+
+- **Diff your work against the source, screen by screen.** For each screen, write in
+  the verification record: the Compose file, what you mirrored, and anything you
+  could not, with the platform reason.
+- **Tokens are read, not eyeballed.** Every colour, size, radius and space in
+  `app-web/` traces to a line in `design/`. A test asserts no raw hex outside
+  `tokens.css` (mirroring the app's own rule).
+- **Nothing invented.** No feature, screen, control, animation, colour or copy that
+  is not in the app. When you are tempted to "improve" something, that is the signal
+  to go re-read the Compose file.
+- **Nothing silently dropped.** Every omission is a row in the B3 table with a
+  reason.
+- **Same words.** Labels come from the app (`AppTab.title`, settings labels,
+  dialog copy). Do not rewrite the app's copy for the web.
+- **The marketing site does not change.** `website/**` stays untouched except for
+  the runbook/test fix in §3 step 5. Its 29 quality checks, byte-accurate
+  `dist/`, and 60 KB-per-route budget must still pass at T+6:00.
+
+---
+
+## 6. Invariants
+
+- **Do not touch app product code**: `shared/`, `app-android/`, `app-desktop/`,
+  `tools/`. Read freely; write never. ADR-008 boundary 3.
+- **No backend, no proxy, no credentials, no attestation** (§2).
+- **No extraction or probe changes**; no change to the locked stack in
+  `MASTER_PROMPT.md` §4. Adding a Kotlin browser target is B2.1 and is **not** the
+  default — if you conclude you need it, record the argument in the ADR and build
+  the separate client anyway this session.
+- **No third-party runtime asset ships**: no CDN, no analytics, no icon library, no
+  webfont file, no stock imagery. Dev-only tooling is fine and gets a
+  `THIRD_PARTY.md` line.
+- **Nothing secret, personal or device-identifying enters the repo.** Test fixtures
+  are sanitized JSON.
+- **`web-spike/` stays as it is** — it is the recorded B1 artifact at revision
+  `b1-v1` and evidence for verification record 19. Copy from it; do not edit it.
+
+---
+
+## 7. Decision procedure (how to not ask me)
+
+1. **Pick the reversible option.** Minutes to undo beats days, whatever your taste.
+2. **Write it down as a decision**: what you chose, the measurement behind it, the
+   trade-off accepted, the reversal cost. Architecture goes in the ADR amendment;
+   everything else in `docs/verification/NN-*.md` (next free number is **29** —
+   confirm with `ls docs/verification/`).
+3. **Continue immediately.** The decision exists the moment it is written.
+4. **Still stuck after 15 minutes?** Take the option that keeps the build green and
+   the honesty boundaries intact, note the uncertainty in `.ai/KNOWN_LIMITATIONS.md`,
+   move to the next task.
+
+Blocked-by-me items get one line in the final report under **"Needs the user"** and
+you move on within the same minute (§15).
+
+---
+
+## 8. CI is a background service, not a gate you stand in front of
+
+- **Push early, push often.** First push by ~T+0:45 (the ADR + B3 table). `ci.yml`
+  runs on `arena/**` branches and PRs; it is Python + Gradle and takes a while, so
+  let it burn down while you work.
+- **Never idle-wait.** After a push, start the next task. No `sleep`, no poll loops,
+  no `gh run watch` as a way to pass time.
+- **Check by the clock, not by curiosity:** one `gh run list --branch <branch>
+  --limit 3` at each §12 checkpoint; read failures with `gh run view <id>
+  --log-failed`. Budget ≤ ~20 minutes of the whole session to CI-waiting, mostly at
+  the merge gate.
+- **Known environment facts** (verify before relying): this token gets **HTTP 403**
+  on `gh run rerun --failed` and on `workflow_dispatch`, so do not plan around
+  re-running a job. Sandbox egress is github.com / api.github.com / npm / pypi only
+  — you **cannot** fetch the deployed origin, so deployed-origin playback can only be
+  proven by you locally against a dev server *and* recorded as unproven-on-origin, or
+  by a CI job you write. Never write a measurement you did not take.
+- **Do not redden app CI.** ADR-008 says it explicitly. If your module breaks
+  `ci.yml`, fix it before anything else.
+
+---
+
+## 9. Git and PR discipline
+
+- **One branch, one PR** — the session's fixed `arena/*` branch. Never create a
+  second working branch, never switch branches, never edit `main` directly.
+- **Never push to `main`. Never force-push. Never rebase or amend published
+  commits.**
+- **Before every commit:** `git status --short`, read it, then `git add <paths>` —
+  not `git add -A` on a tree you have not inspected. Nothing ignored or generated
+  enters (`node_modules/`, `build/`, `.gradle/`, `__pycache__/`, screenshots).
+- **Small commits, one concern each**, message style matching `git log --oneline -20`
+  (`docs:`, `feat:`, `fix:`, `test:`). Each commit builds and passes on its own.
+- **If a push is rejected:** `git pull --rebase origin <your-branch>` (your branch
+  only). If you end up detached or mid-rebase and cannot resolve in 10 minutes:
+  `git rebase --abort`, confirm `git status` clean, continue from the last good
+  commit. Never `git reset --hard` uncommitted work, never touch `.git/` by hand,
+  never move the repository root.
+- **Open the PR at your first push** (`gh pr create --base main`) with a body saying
+  what is in and what is in flight; check `gh pr list --head <branch>` first so you
+  never open a duplicate. Refresh the body once near the end.
+- **Leave the branch after merging** — `delete_branch_on_merge` is `false` here and
+  the session is tracked by branch name.
+- **PR #54** (`arena/01a0890b-dhun`, stale docs from 2026-09-10) is unrelated: do not
+  merge, close or rebase it.
+
+---
+
+## 10. Merge protocol — mandatory, automatic, no permission needed
+
+Start at **T+5:00**, or earlier only if you have genuinely exhausted §13.
+
+1. **Freeze.** No new features. Finish or revert what is in flight.
+2. **Full local pass:**
    ```bash
-   gh pr merge <number> --squash --subject "<conventional summary> (#<number>)"
+   python3 -m unittest discover -s scripts -p 'test_*.py'
+   cd website && npm ci && npm run build && npm run verify:minify && npm run test:rules && cd ..
+   python3 scripts/website_quality.py website/dist && python3 scripts/website_claims.py website/dist
+   cd app-web && npm ci && npm run build && npm test && cd ..
+   git status --short     # must be empty after the final commit
    ```
-   Squash is this repository's convention (`squash_merge_commit_title` =
-   `COMMIT_OR_PR_TITLE`; merge and rebase are also enabled but squash is what
-   `git log` shows).
-6. **Merge policy if CI is not green** — you must still end the session with the
-   branch merged, in this order of preference:
-   - **Root-cause and fix it.** Most reds are yours and fixable in minutes.
-   - **Runner noise** (identical `dist/` bytes, only Lighthouse moved): push a
-     docs-only commit to re-measure, or merge with the comparison recorded in the
-     PR body. Record 28 is the precedent.
-   - **Pre-existing red unrelated to your diff** (e.g. the Rung 1 failure if you
-     somehow did not touch it): merge, and say plainly in the PR body which check
-     was already red at your branch point and why your change is not the cause.
-   - **A red you cannot fix:** revert the specific commit that caused it
-     (`git revert <sha>`), push, and merge the rest. Never merge a regression you
-     introduced, and never delete or weaken a test to make it pass (§12).
+   Python suite must be **fully green** (the pre-existing failure fixed in §3).
+   Fix anything red, then final commit + push.
+3. **Docs** (§11) in that same final commit, and the PR body rewritten.
+4. **One bounded CI wait:** `gh run watch <id> --exit-status --interval 30`, capped at
+   ~15 minutes, or poll while writing the report. The only place you may wait.
+5. **Merge:** `gh pr merge <number> --squash --subject "<conventional summary>
+   (#<number>)"` — squash is this repo's convention (`squash_merge_commit_title` =
+   `COMMIT_OR_PR_TITLE`).
+6. **If CI is not green** — you must still end merged, in this order:
+   - Root-cause and fix it (most reds are yours and take minutes).
+   - Pre-existing red unrelated to your diff: merge, and say in the PR body which
+     check was already red at your branch point.
+   - A red you cannot fix: `git revert <sha>` the offending commit, push, merge the
+     rest. **Never merge a regression you introduced, and never weaken or delete a
+     test to get green.**
 7. **Verify the merge landed** — do not assume:
    ```bash
    gh pr view <number> --json state,mergedAt
    git fetch origin && git log --oneline origin/main -3
+   gh run list --branch main --limit 5
+   gh api repos/99ggprooo00-code/DHUN/pages --jq '{build_type,status}'   # workflow / built
    ```
-   Then read the post-merge `main` runs:
-   `gh run list --branch main --limit 5`. Pages deploys on push to `main`, so
-   `gh api repos/99ggprooo00-code/DHUN/pages --jq '{build_type,status}'` should
-   read `workflow` / `built`.
-8. **Post the final report** as a PR comment (§14) **and** end the session. You are
-   done. Do not start "one more thing" after merging.
+8. **Post the final report** (§16) as a PR comment, then stop. No "one more thing"
+   after merging.
 
 ---
 
-## 8. The bar for website work (what "better" means, measurably)
+## 11. Documentation duty (`.ai/README.md` permanent maintenance contract)
 
-Anything you touch must be at least as good as before on all of these. The gates
-in `scripts/website_quality.py` (29 checks) and the CI `browser` / `lighthouse`
-jobs already assert most of it — treat them as the floor, not the target.
+In the final commit:
 
-- **Faithful to the app first (§3A).** Every screen, control, label, colour and
-  capability the site shows or names exists in the app as it is today, and matches
-  `shared/src/commonMain/kotlin/dev/dhun/design/` and `.../ui/`. Better-looking but
-  less accurate is a regression, not an improvement.
-
-- **Responsive:** mobile-first; breakpoints 480/768/1024/1440; nothing breaks at
-  320 px, and the hard viewports in the matrix — 280×653 fold, 844×390 landscape
-  phone, 640×512 (100 % zoom at 200 %) — must be exercised, not assumed. No
-  horizontal scroll at any width. Fluid type with `clamp()`. Touch targets ≥ 44 px
-  where `touch` is true (per-viewport flag, not `width <= 768`).
-- **Performance:** one request per route (the favicon is a build-time `data:`
-  URI — D11); per-route budget from §3; `TBT` 0 ms and `CLS` 0.000 are the
-  existing numbers on a zero-script site, so any regression is a real regression.
-  Lighthouse gate: performance ≥ 0.90, accessibility ≥ 0.95 (medians of three
-  samples per route).
-- **Accessibility:** semantic landmarks, exactly one `h1` per page, skip link,
-  visible focus, keyboard-reachable nav, body contrast ≥ 4.5:1,
-  `prefers-reduced-motion`, `prefers-color-scheme`, and
-  `prefers-contrast: more` (D17 — the `tokens.css` block must strictly raise
-  contrast, or the check fails).
-- **Craft:** real 404, canonical, Open Graph + Twitter meta, JSON-LD,
-  `robots.txt`, `sitemap.xml`, `lang`, GPL notice in the footer linking `LICENSE`
-  and `THIRD_PARTY.md`, `aria-current="page"` on the current nav item, anchors
-  landing clear of the sticky header (`scroll-padding-top`), sane print output.
-- **Correctness:** HTML validates (`html-validate`, pinned); every internal
-  `href`/`src` resolves to a built file; minification is provably lossless
-  (`npm run verify:minify`); the committed `dist/` matches a fresh build byte for
-  byte.
-- **Content truth:** the site's claims match the repository's actual state, and
-  every visual is either a real capture or a mockup **labelled as a recreation**
-  with a matching row in the §9 table (the table is machine-read in both
-  directions — an unlisted figure on a page is a red build, not a review note).
-
-If you add a capability, add the check that keeps it true. This repository's
-pattern is: **a claim without a gate is a future regression.** New checks go in
-`scripts/website_quality.py` with tests in `scripts/test_website_quality.py` (or
-`website/tests/` for browser/node logic), and you prove each new check can fail by
-mutating the site and watching it go red.
-
----
-
-## 9. Documentation duty (per the permanent maintenance contract in `.ai/README.md`)
-
-Non-negotiable, in the final commit:
-
-- `.ai/ROADMAP.md` — rewrite **CURRENT ACTIVE TASK** at the top: session branch,
-  branch point SHA, recon table, what changed with measurements, CI verdicts, and
-  **"Exact next actions for the next session"** as a numbered list.
-- `.ai/KNOWN_LIMITATIONS.md` — honest > complete. Every trade-off you accepted,
-  everything you could not verify from the sandbox.
+- `docs/decisions/ADR-008-browser-web-player-target.md` — dated amendment: B2
+  selected, B3 plan table, boundaries still in force, what the session proved.
+- `.ai/MASTER_PROMPT.md` — the §3 "Web: cut" line and the §5 repository map need a
+  dated correction now that `app-web/` exists. Do not rewrite the file; amend it the
+  way the repo already amends things.
+- `.ai/ROADMAP.md` — rewrite **CURRENT ACTIVE TASK**: branch, branch point SHA, recon
+  table, what changed with measurements, CI verdicts, **"Exact next actions for the
+  next session"** as a numbered list.
+- `.ai/KNOWN_LIMITATIONS.md` — every trade-off, everything unverified from the
+  sandbox, every omitted feature and why.
 - `.ai/DEBUG_LOG.md` — one entry per incident: symptom → root cause → fix →
   verification state.
-- `docs/verification/NN-*.md` — the session's verification record, next number
-  after the highest existing (28 at prompt-write time; check `ls`).
-- `CHANGELOG.md` and root `README.md` only if a visitor-visible thing changed.
+- `docs/verification/29-*.md` — the session record, including the screen-by-screen
+  fidelity table (§5) and the playback result.
+- `THIRD_PARTY.md` — every new dependency with licence.
+- `CHANGELOG.md` / root `README.md` only if something visitor-visible changed — and
+  **no Web-support claim** (ADR-008 boundary 4).
 - `.ai/AUTONOMY_LOG.md` — your checkpoint log.
 
-**Docs must not overstate.** "Done" means pushed + CI-verified. Unverified work is
-labelled unverified. Never write a number, a URL, a CI verdict, or a claim about
-the live site that you did not read out of a tool output in this session.
+**Docs must not overstate.** "Done" means pushed + CI-verified. Never write a number,
+URL, CI verdict or claim about the deployed app that you did not read out of a tool
+output in this session.
 
 ---
 
-## 10. Checkpoint clock
+## 12. Checkpoint clock
 
 | Time | Do |
 |---|---|
-| T+0:00 | §1 boot. Numbers recorded as "before". |
-| T+0:40 | Rung 1 fix committed and pushed; CI started. PR open. |
-| T+1:30 | Checkpoint: read CI, log it, start next rung. |
-| T+2:30 | Checkpoint: read CI, log it. Mid-session sanity: `git status`, diff review, docs started. |
-| T+3:30 | Checkpoint: read CI, log it. Anything large must be landable in the next hour or it gets dropped. |
-| T+4:30 | Last call for new work. Only finish what is already in flight after this. |
-| T+5:00 | **Freeze.** §7 merge protocol begins. |
-| T+5:45 | PR merged and verified. Docs final. |
-| T+6:00 | Final report posted (§14). Session ends. |
+| T+0:00 | §3 boot; baseline numbers recorded. |
+| T+0:45 | Pre-existing CI failure fixed; ADR amendment + B3 table committed and pushed; PR open. |
+| T+1:30 | P1 done (module + tokens + shell). Checkpoint: read CI, log it. |
+| T+2:30 | P2/P3 under way. Checkpoint: read CI, log it; mid-session diff review. |
+| T+3:30 | P3/P4 done. Checkpoint: read CI, log it. Anything not landable in the next hour gets dropped. |
+| T+4:30 | Last call for new work; P5/P6 finish only. |
+| T+5:00 | **Freeze.** §10 merge protocol begins. |
+| T+5:45 | PR merged and verified; docs final. |
+| T+6:00 | Final report posted (§16). Session ends. |
 
-Log a line at every one of these, even if the line is "no change, still on rung 3".
-
----
-
-## 11. If the backlog runs dry (this is not a reason to stop)
-
-You have permission — in fact an obligation — to keep going with any of:
-
-- Shrink the site: per-route CSS pruning already exists
-  (`website/tools/prune-css.mjs`); find the next kilobytes. Inline, prune,
-  dedupe, tighten the mockup CSS.
-- Deepen the gates: find a property the site promises that no test asserts, and
-  assert it. Every new check needs a mutation proof.
-- Fix the annotation carry (§2 Rung 2) if you have not yet.
-- Audit the workflows: any step that can pass while doing nothing? Any output
-  nobody reads? Any `if:` that silently skips a gate?
-- Read `website/tests/browser.mjs` end to end and make it measure one thing it
-  currently assumes.
-- Content quality: read the three routes as a first-time visitor. Is the value
-  proposition clear in the first viewport? Is the download path obvious? Is the
-  lifecycle status honest and present? Fix the writing — then re-check every line
-  you touched against the app source (§3A), because clearer wording that overstates
-  a feature is worse than the dull sentence it replaced.
-- Cross-check every claim on the site against the code (`shared/`,
-  `app-android/`, `app-desktop/`) and correct any drift.
-- Tidy: dead CSS, unused tokens, duplicated markup between templates, inconsistent
-  naming, stale comments, docs that contradict the code.
-
-Pick whatever has the best ratio of user-visible improvement to risk, and keep the
-commit size small.
+Log a line at every checkpoint even if it says "no change, still on P3".
 
 ---
 
-## 12. Behavior guardrails (read this twice)
+## 13. If the backlog runs dry — or if playback turns out to be impossible
 
-Failure modes that have burned this repository, and their counters:
+Keep going; do not stop:
 
-- **Never delete, skip, weaken, or `@Ignore` a failing test to get green.** If the
-  test is wrong, prove it is wrong (show the behaviour it asserts does not match
-  the documented decision), fix the test, and record why in the commit. This is the
-  single most common way an agent destroys a repo's safety net.
-- **Never fake a result.** No placeholder implementations, no `TODO` shims left in
-  place of a feature, no hard-coded values to satisfy an assertion, no
-  "temporarily" commented-out code that gets committed, no invented measurements.
-- **Never claim unverified work is done.** Say "not verified from this sandbox"
-  and why. This repository values an honest gap far more than a confident guess.
-- **Never invent file paths, APIs, CLI flags, or CI job names.** If you did not see
-  it in a tool output this session, go look.
-- **No loops that spin.** If a command fails the same way twice, stop retrying and
-  diagnose; if you cannot diagnose it in 15 minutes, work around it and log it.
-- **No long-running foreground processes.** Start a dev server with the background
-  process tool if you need one, bind to `0.0.0.0`, and stop it before you finish.
-- **Do not "improve" unrelated code.** Stay in the diff your task needs. Drive-by
-  refactors make review impossible and hide regressions.
-- **Never change the app's UI or feature set** — not a screen, a control, a label,
-  a colour, a setting, or a capability, and not a mockup drifting away from the
-  screen it recreates (§3A). The site follows the app; the app does not follow the
-  site or you.
+- **Fidelity sweep:** put each web screen next to its Compose file and close every
+  remaining difference — spacing, radii, weights, alpha ladder, glass stack, icon
+  strokes, animation curves.
+- **Depth on the platform-real features:** keyboard shortcuts and focus order,
+  `prefers-reduced-motion`, `prefers-color-scheme`, high-contrast, touch targets
+  ≥ 44 px, safe-area insets, orientation changes, back/forward button ↔ the app's
+  detail stack, deep links to a track.
+- **Persistence:** queue and now-playing state surviving a reload
+  (`NowPlayingPersistence.kt` is the spec), plus an offline-safe empty state.
+- **Tests:** one more Playwright assertion per screen; one more Python contract
+  assertion in `scripts/`. Every new check gets a mutation proof — make it fail on
+  purpose once and watch it go red.
+- **Performance:** bundle size, request count, first paint, no layout shift on the
+  player expansion.
+- **Honest playback work:** write the CI job that measures the deployed origin's
+  behaviour, so the next session inherits evidence instead of speculation.
+- **The parked marketing-site item**, if time remains: the annotation carry in
+  `website/tests/browser.mjs` (`emitReport`, `CARRY_CLIP = 24000`) promises more than
+  a GitHub check-run message holds (~4 KB), so measurements are dropped every run.
+
+If playback is blocked: that is a **finding to document precisely** (exact error,
+exact stage, exact browser), not a reason to stop, add a proxy, or fake it.
+
+---
+
+## 14. Behavior guardrails (read twice)
+
+- **Never delete, skip, weaken or `@Ignore` a failing test to get green.** If a test
+  is wrong, prove it (show the behaviour it asserts contradicts the recorded
+  decision), fix the test, and say why in the commit.
+- **Never fake a result.** No placeholder implementations left as if finished, no
+  hard-coded values to satisfy an assertion, no commented-out code committed, no
+  invented measurements, no mock audio presented as playback.
+- **Never claim unverified work is done.** Say "not verified from this sandbox" and
+  why. This repo values an honest gap far more than a confident guess.
+- **Never invent file paths, APIs, CLI flags, Compose token names or CI job names.**
+  If you did not see it in a tool output this session, go look.
+- **No loops that spin.** Same failure twice → stop retrying, diagnose. Cannot
+  diagnose in 15 minutes → work around it and log it.
+- **No long-running foreground processes.** Use the background process tool for a dev
+  server, bind `0.0.0.0`, and stop it before you finish.
+- **Do not "improve" unrelated code.** Stay in the diff your task needs.
 - **Do not re-diagnose what `.ai/DEBUG_LOG.md` already explains.**
-- **Do not change the locked stack, add a runtime dependency, or touch repository
-  settings.** §13.
-- **Keep going when something breaks.** A red build, a rejected push, a 403, or a
-  flaky runner is a task, not a stop signal. Log it, work around it, continue.
-- **You are not allowed to end the session by asking a question**, by presenting a
-  plan and waiting, or by outputting "let me know how you'd like to proceed".
-  There is no one to ask. Decide, write it down, continue.
+- **Keep going when something breaks.** A red build, a rejected push, a 403 or a
+  blocked media request is a task, not a stop signal.
+- **You may not end the session with a question**, a plan awaiting approval, or
+  "let me know how you'd like to proceed". There is no one to ask.
 
 ---
 
-## 13. Blocked without me — record and move on immediately
+## 15. Blocked without me — record and move on immediately
 
-Never stall on these. One line each in the final report, then back to work:
-
-- **Real screenshots** (§9 rows 7–8: home-screen widget, mid-song Lyrics tab). I
-  capture them on hardware. Do not generate, mock, or substitute them.
-- **Repository/site settings**: Pages source, custom domain, branch protection,
+- **Hosted backend / proxy** — needs its own accepted ADR. Never add one.
+- **Anything requiring credentials**, PO tokens, BotGuard or attestation.
+- **Real screenshots** for the marketing site (`WEBSITE_PLAN.md` §9 rows 7–8) and any
+  hardware verification (S3 rounds).
+- **Repository/site settings**: Pages config, custom domain, branch protection,
   secrets, workflow dispatch (403 for this token).
-- **Hardware verification** (S3 rounds: device + Windows) and any "verified on
-  hardware" claim.
-- **Any change to the app's UI or feature set** (§3A) — a redesign, a new screen,
-  a renamed control, an added or removed feature, a new design token. The app is
-  frozen for this session; if the site needs something the app lacks, ship the
-  site-side half and list the rest here.
-- **Store/distribution listings** (F-Droid, IzzyOnDroid, Flathub) — DHUN has none,
-  so no badge may appear on the site.
-- **ADR-level decisions**: changing the locked stack, changing the extraction
-  architecture, changing the licence, changing the canonical URL.
-- **Anything irreversible.** If it cannot be undone from a Git revert, it is not a
-  decision for this session.
+- **Adding a Kotlin browser target** to `shared/` (B2.1) — argue it in the ADR, do
+  not do it this session.
+- **Store listings, licence changes, canonical-URL changes.**
+- **Anything irreversible.** If a Git revert cannot undo it, it is not a decision for
+  this session.
 
 ---
 
-## 14. Final report (PR comment + last message)
+## 16. Final report (PR comment + last message)
 
-Keep it under ~40 lines and make every number traceable:
+Under ~40 lines, every number traceable:
 
-1. **Merged:** PR number, merge commit SHA, `mergedAt`, and the `main` CI verdict
-   after merge.
-2. **Changed:** one line per item — what, the measurement before → after, and the
-   file(s).
-3. **Decisions taken without asking:** choice, evidence, reversal cost.
-4. **Verified where:** which CI run IDs, which local commands and their outputs.
-5. **Not verified / known limitations:** plainly, with the reason.
-6. **Needs the user:** the §13 list, if anything landed on it.
-7. **Exact next actions for the next session** — mirrored into `.ai/ROADMAP.md`.
+1. **Merged:** PR number, merge SHA, `mergedAt`, post-merge `main` CI verdict.
+2. **Built:** the web app — path, screens shipped, features mirrored, tokens sourced.
+3. **Fidelity:** the B3 table's summary — mirrored / redesigned / omitted counts, and
+   the omitted list.
+4. **Playback:** what actually happened from the browser, with the exact result, and
+   whether it is proven on the deployed origin (probably: **not proven** — say so
+   plainly).
+5. **Decisions taken without asking:** choice, evidence, reversal cost.
+6. **Verified where:** CI run IDs, local commands and their outputs.
+7. **Not verified / known limitations:** plainly, with the reason.
+8. **Needs the user:** the §15 list, plus the B2 ratification if you want it explicit.
+9. **Exact next actions for the next session** — mirrored into `.ai/ROADMAP.md`.
 
 Then stop. The session is over.
