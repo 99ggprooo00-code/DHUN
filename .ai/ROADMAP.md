@@ -3,8 +3,8 @@
 ## Session `arena/b4449fdd-dhun` — S3 round 4: dock the rail-layout mini-player so it stops covering Home/Search/Library (2026-10-08)
 
 Updated **2026-10-08** · session branch `arena/b4449fdd-dhun` · base
-`main@9f88b6e` (merge of PR #129). **No session PR open yet** — the branch is
-`main` + the one fix below; a single working PR is opened when it is pushed.
+`main@9f88b6e` (merge of PR #129). **PR #130** open
+(`arena/b4449fdd-dhun` → `main`), head `3803ecf`.
 
 ### Phase and scope
 
@@ -61,7 +61,8 @@ full-screen `FullPlayer` overlay and ADR-002 are untouched.
 | Rolling `test` release republished at the merge | ✅ **GitHub verified** | published **2026-10-08T06:01:08Z**, `targetCommitish=9f88b6e`, `isDraft=false`, prerelease; APK **18,383,603 B** sha256 **`aa6d027a…`**; MSI **2.185.1** **112,967,680 B** sha256 **`86b1184c…`**; both `.sha256` sidecars present |
 | MSI hosted upgrade on `9f88b6e` | ✅ **GitHub verified (hosted, not hardware)** | `2.182.1 → 2.185.1`, baseline `aa3ff19c…` (prior release MSI), sentinels preserved; uninstall + future-upgrade guards PASS |
 | `extraction-health` scheduled drill | 🟡 **ENVIRONMENT_BLOCKED (accepted steady state)** | every recent run (…37611927562, 37455619019, 37303751722, 37195912826) = `ENVIRONMENT_BLOCKED` (runner datacenter IPs gated by YouTube; residential unaffected). **Not** a resolver regression |
-| **This session's fix** `6ef48e9` | ⏳ **awaiting CI** | pushed to `arena/b4449fdd-dhun`; CI / Build APK / test-release watched after push |
+| **This session's fix** `6ef48e9` (head `3803ecf`, PR #130) | ✅ **GitHub verified** | push CI **37739138881** 12/12, PR CI **37739165969** 12/12, Build APK **37739165966**, test-release **37739165959** — `apk`+`msi` green with the full install-over `2.186.1 → 2.187.1` (no skip, sentinels preserved, uninstall + future-upgrade guards PASS) |
+| PR #130 candidate artifacts (buildOnly, **not published**) | 🟡 **PR-path only** | APK **18,383,603 B** sha256 **`590bd34a…`** (differs from the release's `aa6d027a…` — app code changed); MSI **2.187.1** **112,971,776 B** sha256 **`0f9691a4…`**. These become the published digests only after merge to `main` |
 | Mini-player docked (no longer covers content) on a device | 🔴 **not verified** | S3 round-4 retest on Redmi Note 12 4G / Android 15 **landscape** and Windows 11 **fullscreen** vs the republished rolling `test` |
 
 ### Last real error on record
@@ -75,12 +76,15 @@ load-bearing part).
 
 ### Exact next technical step
 
-1. Push `arena/b4449fdd-dhun`, open the one working PR, watch CI / Build APK /
-   test-release on the head; fix any red root-cause.
-2. Update the `6ef48e9` ledger row to ✅ with the run IDs.
-3. **Then ask for merge authorization.** After merge, verify post-merge runs and
-   the **new** rolling-release digests (merge bumps the MSI ProductVersion past
-   2.185.1; APK digest changes only if app code changed).
+1. ~~Push `arena/b4449fdd-dhun`, open the one working PR, watch CI / Build APK /
+   test-release on the head.~~ **DONE — PR #130, all four green** on head
+   `3803ecf` (ledger above), no red to fix.
+2. ~~Update the `6ef48e9` ledger row to ✅ with the run IDs.~~ **DONE.**
+3. **Ask for merge authorization** (the only remaining gate before the user can
+   retest). After merge, verify the post-merge runs on the merge SHA and record
+   the **new** published digests — the merge moves the MSI ProductVersion past
+   2.187.1 **and** the APK digest (app code changed: PR candidate
+   `590bd34a…` replaces the release's `aa6d027a…`).
 4. Hand the user the S3 round-4 retest (`docs/runbooks/s3-hardware-checklist.md`):
    - **Android (Redmi Note 12 4G / Android 15), landscape:** play a song,
      collapse the full player to Home — the mini-player must be a **compact
