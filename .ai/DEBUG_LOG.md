@@ -1,5 +1,22 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — lower-Android commits `5151774` / `b5c349a` were not recoverable (session `arena/688214aa-dhun`)
+
+**What was claimed.** The previous session committed `minSdk` 26 → 24, legacy
+`mipmap-anydpi` launcher icons, and ABI-split APKs locally (`5151774`,
+`b5c349a`) and could not push before the session closed.
+
+**What this clone actually had.** `git cat-file` on both SHAs fails. `git fetch`
+does not find them. `origin/arena/b4449fdd-dhun` is `ff71b2c` — a docs commit
+that *sets* the lower-Android task as not started and records PR #130's
+post-merge evidence. Working tree at clone was clean at `main@4607e07`. The
+"modified files persist in the workspace" recovery path was empty.
+
+**What was done.** The specified result was reconstructed (not cherry-picked):
+minSdk 24, non-adaptive `mipmap-anydpi` icons, three published APKs, digest
+report that does not fail if the per-ABI APKs differ from the universal. CI on
+this head is the compiler. Do not cite `5151774` as an ancestor.
+
 ## 2026-10-08 — the rail-layout mini-player floated over the tab content (session `arena/b4449fdd-dhun`, base `main@9f88b6e`, commit `6ef48e9`)
 
 **The report.** On Android **landscape** and Windows **fullscreen**, the user

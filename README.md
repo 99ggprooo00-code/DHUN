@@ -46,9 +46,10 @@ Requires JDK 17 and an Android SDK (`ANDROID_HOME`).
 ./gradlew :tools:playback-probe:run --no-daemon
 ```
 
-Outputs: APK
-`app-android/build/outputs/apk/debug/app-android-debug.apk`, AAB
-`app-android/build/outputs/bundle/debug/app-android-debug.aab`. Both are
+Outputs: ABI-split debug APKs under
+`app-android/build/outputs/apk/debug/` (`*universal*`, `*arm64-v8a*`,
+`*armeabi-v7a*` — there is no single `app-android-debug.apk` once splits are
+on), AAB `app-android/build/outputs/bundle/debug/app-android-debug.aab`. All are
 signed with the committed **public test keystore**
 (`app-android/keystores/dhun-test.p12`, see the *Release build* section for
 the exact sign/verify/install commands and what that key is — and is not —
@@ -57,13 +58,17 @@ for).
 ## Test builds policy
 
 ONE rolling test **pre-release** exists — tag `test`, assets
-`dhun-test.apk` (Android) and `dhun-test.msi` (Windows, needs libVLC
-installed), auto-replaced on every push to main. No versioned releases for
-unfinished builds; nothing in Releases is stable or store-ready. Install
-test builds only on devices where that is acceptable (not your daily
-phone). Stable URLs:
+`dhun-test.apk` (Android universal, minSdk 24 / Android 7.0),
+`dhun-test-arm64-v8a.apk` and `dhun-test-armeabi-v7a.apk` (ABI splits of the
+same build; DHUN bundles no native code — compare the `.sha256` sidecars),
+and `dhun-test.msi` (Windows, needs libVLC installed), auto-replaced on every
+push to main. Install the universal APK unless you have a reason not to. No
+versioned releases for unfinished builds; nothing in Releases is stable or
+store-ready. Install test builds only on devices where that is acceptable
+(not your daily phone). Stable URLs:
 `https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk`,
-`…/dhun-test.msi`. What is in a build: [`CHANGELOG.md`](CHANGELOG.md)
+`…/dhun-test-arm64-v8a.apk`, `…/dhun-test-armeabi-v7a.apk`, `…/dhun-test.msi`.
+What is in a build: [`CHANGELOG.md`](CHANGELOG.md)
 (`Unreleased` until `v0.1.0` earns its tag).
 
 ### Branch candidates without publishing a release
@@ -163,7 +168,7 @@ only on a device you are willing to experiment with.
 
 | Asset | Gradle/CI job | Raw output path | Signing |
 |---|---|---|---|
-| `dhun-v0.1.0.apk` | `:app-android:assembleDebug` (CI `apk`) | `app-android/build/outputs/apk/debug/app-android-debug.apk` | `testBuild` debug keystore (below) |
+| `dhun-v0.1.0.apk` (universal) plus `dhun-v0.1.0-arm64-v8a.apk` and `dhun-v0.1.0-armeabi-v7a.apk` | `:app-android:assembleDebug` (CI `apk`, staged by `scripts/stage_android_apks.py`) | `app-android/build/outputs/apk/debug/*universal*`, `*arm64-v8a*`, `*armeabi-v7a*` | `testBuild` debug keystore (below) |
 | `dhun-v0.1.0.aab` | `:app-android:bundleDebug` (CI `aab`) | `app-android/build/outputs/bundle/debug/app-android-debug.aab` | same `testBuild` debug keystore |
 | `dhun-v0.1.0.msi` | `:app-desktop:packageMsi` (CI `msi`) | under `app-desktop/build/compose/` | not Authenticode-signed |
 
@@ -229,9 +234,9 @@ verifies every binary came from the same run/commit. It replaces an older
 
 ```bash
 ./gradlew :app-android:assembleDebug :app-android:bundleDebug --no-daemon
-# verify the APK signature (Android SDK build-tools):
-apksigner verify --print-certs app-android/build/outputs/apk/debug/app-android-debug.apk
-adb install -r app-android/build/outputs/apk/debug/app-android-debug.apk
+# ABI splits: install the universal. There is no app-android-debug.apk.
+apksigner verify --print-certs app-android/build/outputs/apk/debug/*universal*.apk
+adb install -r app-android/build/outputs/apk/debug/*universal*.apk
 
 # AAB test install via bundletool (key = the committed test keystore):
 java -jar bundletool.jar build-apks \

@@ -88,7 +88,9 @@ android {
     namespace = "dev.dhun.shared"
     compileSdk = 35
     defaultConfig {
-        minSdk = 26
+        // Must stay <= :app-android minSdk (24 / Android 7.0). A higher value
+        // here is what the merged manifest actually enforces.
+        minSdk = 24
     }
     lint {
         abortOnError = false

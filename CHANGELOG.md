@@ -24,6 +24,26 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Changed — Android minSdk is 24, and the test release publishes three APKs (2026-10-08, session `arena/688214aa-dhun`)
+
+- **minSdk 26 → 24** (Android 7.0) in the app and the shared module. Android 5–6
+  stay unsupported: connectivity uses `registerDefaultNetworkCallback` (API 24)
+  with no fallback. Blur is still API 31+; API 24–30 keep the designed dark
+  fallback.
+- **Launcher icon on API 24–25.** The icon was adaptive-only
+  (`mipmap-anydpi-v26`), which does not resolve below API 26, so the launcher
+  showed a blank or default icon. `mipmap-anydpi/ic_launcher.xml` and
+  `ic_launcher_round.xml` are the legacy configuration. API 26+ still uses the
+  adaptive icon.
+- **Three Android APKs on every test release:** `dhun-test.apk` (universal —
+  install this), `dhun-test-arm64-v8a.apk`, `dhun-test-armeabi-v7a.apk`, each
+  with a `.sha256` sidecar. DHUN bundles no native libraries, so the per-ABI
+  APKs are expected to match the universal; the apk job prints size + SHA-256
+  so that is confirmed rather than assumed. Not a Play multi-APK (version codes
+  are not overridden).
+- **Not yet on the rolling `test` release.** The published release at `4607e07`
+  is still the single APK. API 24–25 install is the S3 round-5 retest after
+  this change is merged and republished. CI compile is not that retest.
 
 ### Fixed — the rail-layout mini-player is docked, not floating over the tab content (2026-10-08, session `arena/b4449fdd-dhun`, commit `6ef48e9`)
 

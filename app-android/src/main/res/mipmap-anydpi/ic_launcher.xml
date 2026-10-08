@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-26 launcher icon. mipmap-anydpi-v26/ic_launcher.xml is an
+     <adaptive-icon>, which does not resolve on API 24–25, so the launcher
+     shows a blank or default icon. This is the configuration @mipmap/ic_launcher
+     resolves to below 26. API 26+ still prefers the more-specific v26 adaptive
+     icon. Do not change this file to <adaptive-icon>. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ic_launcher_background" />
+    <item android:drawable="@drawable/ic_launcher_legacy" />
+</layer-list>

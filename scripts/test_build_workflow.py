@@ -98,6 +98,17 @@ class BuildWorkflowTest(unittest.TestCase):
     def test_branch_build_cannot_cancel_the_main_release_group(self):
         self.assertIn("github.ref == 'refs/heads/main' && 'test-release' || format('test-build-{0}', github.ref)", self.text)
 
+    def test_rolling_release_publishes_universal_and_both_abi_apks(self):
+        apk = self.text.split("\n  apk:\n", 1)[1].split("\n  msi:\n", 1)[0]
+        self.assertIn("python scripts/stage_android_apks.py", apk)
+        self.assertIn("app-android/build/outputs/apk/debug", apk)
+        self.assertNotIn("cp app-android/build/outputs/apk/debug/app-android-debug.apk", apk)
+        create = self.publish.split("gh release create test", 1)[1].split("--target", 1)[0]
+        for name in ("dhun-test.apk", "dhun-test-arm64-v8a.apk", "dhun-test-armeabi-v7a.apk"):
+            self.assertIn(f"python scripts/stage_artifact.py out/{name}", apk)
+            self.assertIn(name, create)
+            self.assertIn(f"{name}.sha256", create)
+
     def test_msi_uses_the_existing_packaging_workflow_counter(self):
         self.assertIn("python scripts/installer_version.py $env:GITHUB_RUN_NUMBER $env:GITHUB_RUN_ATTEMPT", self.text)
         self.assertIn('"-PdhunInstallerVersion=$version"', self.text)

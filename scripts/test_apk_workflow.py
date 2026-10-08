@@ -42,10 +42,16 @@ class ApkWorkflowTest(unittest.TestCase):
             gradle_modules(),
             f"{path}: '{module}' is not a module included by settings.gradle.kts",
         )
-        # The path must be the module's debug output, not a hand-written guess.
+        # ABI splits remove the single app-android-debug.apk. The upload must
+        # be the module's debug APK directory, not a guessed module or the
+        # pre-split filename (which assembleDebug no longer writes).
         self.assertRegex(
             path,
-            rf"^{re.escape(module)}/build/outputs/apk/debug/{re.escape(module)}-debug\.apk$",
+            rf"^{re.escape(module)}/build/outputs/apk/debug/\*.apk$",
+        )
+        self.assertNotIn(
+            "path: app-android/build/outputs/apk/debug/app-android-debug.apk",
+            self.text,
         )
 
     def test_build_job_never_asks_for_write_permissions(self):
@@ -65,6 +71,35 @@ class ApkWorkflowTest(unittest.TestCase):
                     modules,
                     f"{workflow.name}: '{path}' is not under an included module {sorted(modules)}",
                 )
+
+
+    def test_pre_26_launcher_icons_exist_and_are_not_adaptive(self):
+        res = ROOT / "app-android/src/main/res"
+        for name in ("ic_launcher.xml", "ic_launcher_round.xml"):
+            legacy = res / "mipmap-anydpi" / name
+            adaptive = (res / "mipmap-anydpi-v26" / name).read_text()
+            self.assertTrue(
+                legacy.is_file(),
+                f"{legacy} is required; an adaptive-only icon does not resolve below API 26",
+            )
+            text = legacy.read_text()
+            # Comments may name <adaptive-icon>; the element itself must not.
+            body = text.split("-->", 1)[-1]
+            self.assertIn("<layer-list", body)
+            self.assertNotIn("<adaptive-icon", body)
+            self.assertIn("<adaptive-icon", adaptive)
+            self.assertIn("@drawable/ic_launcher_legacy", text)
+
+    def test_minsdk_24_and_abi_splits_are_the_android_release_contract(self):
+        gradle = (ROOT / "app-android/build.gradle.kts").read_text()
+        shared = (ROOT / "shared/build.gradle.kts").read_text()
+        self.assertIn("minSdk = 24", gradle)
+        self.assertIn("minSdk = 24", shared)
+        self.assertNotIn("minSdk = 26", gradle)
+        self.assertNotIn("minSdk = 26", shared)
+        self.assertIn('include("arm64-v8a", "armeabi-v7a")', gradle)
+        self.assertIn("isUniversalApk = true", gradle)
+
 
 
 if __name__ == "__main__":

@@ -2,6 +2,37 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — session `arena/688214aa-dhun`: minSdk 24 is compiled, not device-proven; the three APKs may be identical
+
+- **minSdk 24 is a manifest + resource change, not a hardware pass.** API 24–25
+  launch, the legacy launcher icon, search, playback and background audio are
+  the S3 round-5 retest. There is no API 24 emulator in this sandbox and no JDK,
+  so CI compile is the only pre-device gate. Do not describe a green apk job as
+  "Android 7 works."
+- **The legacy icon is an XML layer-list, not a density PNG.** `mipmap-anydpi`
+  resolves `@mipmap/ic_launcher` below API 26, which the adaptive-only v26
+  resource did not. A launcher that cannot inflate a vector/layer-list could
+  still draw a generic icon; the round-5 check is "renders, not blank/default,"
+  and a failure there is a real defect, not a docs miss.
+- **ABI splits are expected to be redundant.** The repo bundles no native
+  libraries. The per-ABI APKs are published anyway so the digest report can
+  confirm identity instead of assuming it. They are **not** a reason to install
+  a different file on an API 24 phone — install `dhun-test.apk` (universal).
+  Dropping the `splits { abi }` block is a one-line change, only after the user
+  confirms the splits are redundant. Version codes are intentionally the same;
+  do not add Play-style per-ABI version overrides without an ADR-level decision
+  (they would make the bytes differ and can block installing the universal over
+  a split).
+- **The lost local commits were not recoverable.** `5151774` / `b5c349a` are not
+  on origin and were not in this clone. This tree reconstructs the specified
+  result. Do not treat a missing cherry-pick as "the change already landed."
+- **Android &lt;12 blur fallback is a larger population now.** minSdk 24 means
+  API 24–30 keep the designed dark backdrop (`Modifier.blur` is a no-op below
+  API 31). That is unchanged behavior, on more devices.
+- **S3 round 4 is still open**, and it does **not** wait on this change. The
+  merged mini-player dock is already on the rolling `test` release at
+  `4607e07` (APK `590bd34a…`). Round 5 waits until this change is published.
+
 ## 2026-10-08 — session `arena/b4449fdd-dhun`: the rail-layout mini-player now docks instead of floating over the tab content (commit `6ef48e9`)
 
 - **Defect:** on Android **landscape** and Windows **fullscreen** (both ≥ 840dp →

@@ -1,7 +1,63 @@
-# HANDOFF — the rail-layout mini-player is docked (no longer covers content); S3 round-4 retest open
+# HANDOFF — minSdk 24 + three APKs reconstructed; S3 rounds 4 and 5 open
+
+Updated **2026-10-08**, session `arena/688214aa-dhun`. Base is
+`main@4607e07076e038f4290045f3f23f5f7fd082a058` (PR #130 merged). One working PR
+on this branch. **Do not merge without an explicit user yes.**
+
+## Current state
+
+- **`main` = `4607e07`.** Post-merge CI **37741393880**, Build APK
+  **37741393815**, test-release **37741393816** (`publish` ran). Rolling `test`
+  published **2026-10-08T07:11:13Z** at that SHA: APK **18,383,603 B**
+  `590bd34a4b61f004185248043b04058644e7f64ec4067ee2b1aaa0918b8ad023` (provenance
+  notice and GitHub asset digest agree); MSI **2.189.1** **112,971,776 B**
+  `ad036fffc1f41be428d1232580fb0632cc50bf2c6ac142d16ebd67596d8634a9`. Sidecar
+  files were not fetched here. This release has the mini-player dock and is
+  still **one APK, minSdk 26**.
+- **Lower-Android change (this session), reconstructed — not cherry-picked.**
+  `5151774` and `b5c349a` were never on origin and were not in this clone.
+  `origin/arena/b4449fdd-dhun` is only docs commit `ff71b2c` (task set, not
+  implemented). Reconstructed result: `minSdk` 24, legacy
+  `mipmap-anydpi/ic_launcher{,_round}.xml` (not adaptive-icon), ABI splits
+  `arm64-v8a` + `armeabi-v7a` + universal, release publishes
+  `dhun-test.apk` + `dhun-test-arm64-v8a.apk` + `dhun-test-armeabi-v7a.apk`.
+  No native libraries, so per-ABI bytes are expected to match the universal;
+  the apk job prints size + SHA-256 and does not fail on a difference.
+- **CI on this head is the compiler.** No JDK here. Do not claim the three-APK
+  release exists until post-merge `gh release view test` shows three APKs and
+  their digests are recorded.
+
+## Next actions — single agent, sequential
+
+1. If this PR is not yet green: watch CI, Build APK, and test-release. The apk
+   job step `Stage three split APKs` must succeed; read the `APK split digest`
+   notices. Fix red step names. Record run IDs.
+2. **Ask for merge authorization.** `gh pr merge <n> --merge` only on an
+   explicit yes.
+3. After merge, verify post-merge runs and that the rolling `test` release
+   carries three APKs. Write the real sizes and SHA-256 into
+   `docs/verification/14-release.md`, the ROADMAP ledger, and `CHANGELOG.md`.
+   Do not copy PR-path `buildOnly=true` digests into those files as if published.
+4. Hardware (user-gated), `docs/runbooks/s3-hardware-checklist.md`:
+   - **Round 4 now**, against `4607e07`: Android landscape + Windows fullscreen.
+     Mini-player is a compact docked bottom bar; Home/Search/Library scroll
+     above it; full-screen player unchanged.
+   - **Round 5 after publish:** `dhun-test.apk` on API 24–25. Icon renders, app
+     launches, search, play, background audio. Record device, OS, APK SHA-256.
+5. Only if the user confirms the per-ABI APKs are redundant, remove the
+   `splits { abi }` block in `app-android/build.gradle.kts`. Not before.
+
+**Do not:** modify the full-screen player (ADR-002) or lyrics; treat
+`extraction-health` `ENVIRONMENT_BLOCKED` as a regression; `git clean` or
+`reset --hard`.
+
+---
+
+# HISTORICAL — the rail-layout mini-player is docked (no longer covers content); S3 round-4 retest open
 
 Updated **2026-10-08**, session `arena/b4449fdd-dhun` (branch = `main@9f88b6e` +
 commit `6ef48e9`; one working PR opened on push). PR **#129** is **merged**.
+PR **#130** later merged as `4607e07` (see the current block above).
 
 ## Current state
 

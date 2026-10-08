@@ -1,5 +1,17 @@
 # 15 — Test-build gate: step-by-step procedure
 
+> **Superseding gate (2026-10-08, session `arena/688214aa-dhun`).** The block
+> below this one is historical (`ca6d006`). The rolling `test` release now
+> targets **`4607e07076e038f4290045f3f23f5f7fd082a058`** (PR #130), published
+> **2026-10-08T07:11:13Z** from test-release **37741393816**. APK **18,383,603 B**
+> `590bd34a4b61f004185248043b04058644e7f64ec4067ee2b1aaa0918b8ad023`; MSI
+> **2.189.1** **112,971,776 B**
+> `ad036fffc1f41be428d1232580fb0632cc50bf2c6ac142d16ebd67596d8634a9`
+> (publisher provenance and GitHub asset digest agree; sidecar files not
+> fetched here). Still **one APK, minSdk 26**. The minSdk-24 / three-APK change
+> is not published until its PR merges — do not use these hashes for an API
+> 24–25 install. Verify sidecars before installing. Hardware gate remains OPEN.
+
 > **Current gate (2026-10-08 — round-2 fixes are merged and the rolling release carries them; hardware gate remains OPEN).**
 > `main` and the rolling `test` release now both target
 > **`ca6d00684f3cf00fed101273e449bebc2fb76a05`** (PR #128, merged
