@@ -14,7 +14,7 @@ vanilla ES modules, two stylesheets, one HTML file.
 
 | Claim | State | Evidence |
 |---|---|---|
-| Module builds | **verified** | `node tools/build.mjs` → 14 files, 83,741 bytes |
+| Module builds | **verified** | `node tools/build.mjs` → 17 files, **165,921 bytes** (117,895 B JS, 50,495 B CSS, 1,807 B HTML, uncompressed) |
 | Node tests | **verified** | `cd app-web && npm test` → **60 tests, 60 pass, 0 fail** |
 | Python contract tests (CI gate) | **verified** | `python3 -m unittest discover -s scripts -p 'test_*.py'` → **295 tests OK** (23 of them new, in `scripts/test_app_web.py`) |
 | Dev server serves the app | **verified** | `node tools/serve.mjs 4173` → `index.html` 200; `js/main.js` 26,905 B; `css/tokens.css` 16,559 B; `css/app.css` 33,274 B; `js/icons.js` 6,178 B |
