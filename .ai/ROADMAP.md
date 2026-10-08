@@ -82,14 +82,42 @@ loosened or renamed away.
 - No player, no PWA, no `app.`-style property, no backend, exactly three routes,
   English only, no new third-party runtime asset, no client-side JavaScript.
 
-### Exact next actions
+### Outcome (this session, 2026-10-08) — PR #140
 
-1. Commit this recon block and push `arena/37ec95ed-dhun`; open its PR (it is the
-   deliverable) — done in this commit's session.
-2. Land the five work items above, each with its mutation proof and its docs.
-3. Rebuild `website/dist`, re-run every local gate, read one CI round on the
-   final head (bounded wait), write the verification record, post the PR comment,
-   merge, stop.
+All six work items landed, each with its mutation proof; the full evidence table is
+`docs/verification/22-one-request-hard-viewports-print-and-structured-data.md`.
+
+| Item | Result | Evidence read this session |
+|---|---|---|
+| One request per route | Icon is a build-time `data:` URI (638 B base64), the passthrough copy is gone, `favicon_violations` + `unreferenced_file_violations` gate it | `minified: saved 49454 bytes`; weights `/` 53,554 · `/features/` 54,881 · `/ui/` 56,125 B; `requests=1` is for the next Lighthouse run to confirm |
+| Reporter names requests | `subresources:` line per route + dependency-tree items resolved to URLs | 10 reporter tests (`Ran 10 tests … OK` in that module) |
+| Hard viewports + new checks | 280×653, 844×390, 640×512@200 %, forced colours, increased contrast, print, Tab walk, rendered headings, link text | `# pass 9` / `# fail 0` (`node --test`), wired into the build job |
+| Print + High Contrast CSS | Both blocks ship per route and are asserted by `print_style_violations` / `forced_colors_violations`; the print palette is checked at 4.5:1 locally | mutation: white-on-white print ramp `exit=1 :: 1.00:1` |
+| Structured data | One honest `SoftwareApplication` block; banned-key list; theme-color per scheme; og:url = canonical; `og:image` refused with a reason | mutation: invented `aggregateRating` `exit=1` |
+| Cheap Python checks | sitemap parsed as XML; every path attribute resolves; dist-vs-source CSS drift | `OK: 26 quality checks pass`; `Ran 232 tests in 0.672s` |
+| Content depth | **parked** — the remaining candidate ("what the app never sends") cannot be stated honestly from this tree; the *existing* telemetry claim was made machine-checked instead | `.ai/WEBSITE_PLAN.md` amendment, item C |
+
+**Three of my new rules passed their first mutation and were wrong** (the
+forced-colours rule read a union of pages, the print rule only checked that tokens
+were mentioned, the tab walk fed `focusChanged` its own output). Each was fixed and
+the failure is written up in `.ai/DEBUG_LOG.md` — the mutations are in the
+verification record, not just the fixes.
+
+**Not verified:** every browser-dependent measurement on this head (CI is the only
+channel), the served URL (this sandbox cannot reach `*.github.io`), and the Pages
+source switch (user-only; `status: errored` under `build_type: legacy`).
+
+### Exact next actions for the next session
+
+1. Read the CI runs for the merged head of PR #140 (`website` → `build`, `browser`,
+   `lighthouse`) and confirm `subresources: none — the document only` and
+   `requests=1`; if the browser job is red, the annotation names the route,
+   viewport and element.
+2. If the Pages source has been switched to GitHub Actions by then, the `served`
+   job stops skipping — that is the first real check of the public URL in this
+   workstream's history.
+3. The §9 screenshot backlog is unchanged (6 shipped, 2 planned); a real capture
+   is still the only thing that replaces a mockup.
 
 ---
 

@@ -274,6 +274,71 @@ compression or cache headers — no `Content-Encoding` or `Cache-Control`
 tuning is possible, only file size and request count. Stated on the download
 page's technical footnote rather than claimed as optimised.
 
+### Dated amendment — 2026-10-08 (session `arena/37ec95ed-dhun`): one request for real, the hard viewports, print, and structured data
+
+Read the numbers in `docs/verification/22-one-request-hard-viewports-print-and-structured-data.md`;
+this is the decision record, not the evidence table.
+
+**D11 — the tab icon is a build-time `data:` URI, and no asset file ships.** The
+merged head measured `requests=2` per route, the second request being
+`/assets/dhun-favicon.svg`. `src/_data/favicon.js` now inlines the SVG (base64 of
+the source with inter-tag whitespace folded; measured 638 B against 692 B for the
+percent-encoded form and 620 B for one that leaves literal spaces in a URI and is
+therefore invalid), the passthrough copy is removed, and
+`favicon_violations` decodes the URI out of every built page and compares it with
+`src/assets/dhun-favicon.svg`, so the icon cannot drift from the file it claims to
+be. Trade-off recorded rather than hidden: a client that does not render SVG
+favicons shows no tab icon instead of fetching one — see
+`.ai/KNOWN_LIMITATIONS.md`. Reversal cost: restore `addPassthroughCopy`, the
+`<link>` href and delete the data file; ~10 minutes.
+
+**D12 — the browser matrix includes the awkward viewports, not just the common
+ones.** 280×653 (fold-class), 844×390 (landscape phone) and 640×512 (a 1280×1024
+window at 200 % zoom — the layout viewport, which `deviceScaleFactor` does *not*
+emulate) join the six earlier widths, and a per-viewport `touch` flag replaces the
+`width <= 768` test so the touch-target floor follows the context rather than the
+orientation. Windows High Contrast and `prefers-contrast: more` are emulated;
+each context asserts the emulation is visible to the page before measuring
+anything, because a forced-colours check whose condition did not apply is a false
+green. Reversal cost: delete the entries.
+
+**D13 — the decision logic of those checks is a pure module, tested without a
+browser.** `website/tests/rules.mjs` holds every predicate (target floors, heading
+order, duplicate link text, focus change, forced-colours boundary, print caveats)
+and `rules.test.mjs` exercises each with a must-pass and a must-fail case under
+`node --test` in the *build* job. `browser.mjs` only gathers data. This is the
+only way a rule that can run only on a Chromium runner could be mutation-proven
+in an environment that has no browser at all. Reversal cost: high — the
+alternative is untestable rules.
+
+**D14 — print and forced-colours get real CSS.** No `@media print` rule existed;
+the site is dark-first and browsers drop background colours, so a printed page was
+white text on white paper. Both blocks are asserted per route by
+`website_quality.py` (including the printed `--text` on `--bg` contrast ratio,
+computed locally) and measured in the browser job. What is *not* claimed: the
+print and forced-colours **rendering** is CI-measured, not eyeballed — no browser
+exists in this environment.
+
+**D15 — structured data is one `SoftwareApplication` block, and `og:image` is
+refused.** The JSON-LD block states name, category, Android 7.0+/Windows, free,
+LICENSE, canonical URL and repository; `structured_data_violations` asserts a
+banned-key list (`aggregateRating`, `offers`, `price`, `softwareVersion`,
+`datePublished`, `downloadUrl`, `installUrl`, …) is absent, because structured
+data is what a machine repeats without the caveats around it. `og:image` is
+**deliberately not added**: the repository contains no image, the only honest
+option would be a hand-authored SVG, and no major crawler renders SVG for
+`og:image` — an `og:image` pointing at an SVG would be a claim that fails where it
+is consumed. A PNG would be exactly the fabricated imagery §8 forbids. Reversal
+cost: low, if a real capture ever enters the repository.
+
+**D16 — the honesty contract now reads the app's dependency graph.** `/features/`
+says "no telemetry, no crash reporting, no advertising SDK". Nothing could check
+that: the forbidden-claim rules only read the site's words back. The claim is now
+checked against every `*.gradle.kts` / `*.versions.toml` in the repository
+(12 name-shaped SDK patterns), with the four claim/SDK combinations exercised
+against synthetic trees in `test_website_claims.py`. Reversal cost: none — it is
+an added rule.
+
 ## 11. Work plan, execution and honest status
 
 | Phase | Deliverable | Status |

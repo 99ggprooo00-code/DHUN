@@ -263,6 +263,90 @@ def digest_violations(documents: dict[str, str]) -> list[str]:
 
 
 # --------------------------------------------------------------------------
+# 4. Copy checked against the code that ships.
+# --------------------------------------------------------------------------
+
+# "No telemetry, no crash reporting, no advertising SDK" is a claim about the
+# *application*, not about this site, and nothing above can check it: the
+# forbidden-claim rules only read the site's own words back. So the claim is
+# checked against the dependency graph the builds actually resolve. A claim
+# whose evidence is a grep run once by hand is a claim with an expiry date.
+TELEMETRY_CLAIMS = (
+    "no telemetry",
+    "no crash reporting",
+    "no advertising sdk",
+    "no trackers",
+    "no analytics",
+)
+
+# Matched case-insensitively against every Gradle build script and version
+# catalogue in the repository. Deliberately name-shaped rather than a bare
+# "firebase": `google-services`/`firebase-bom` alone would be a false positive
+# on a project that merely configures something else, and a rule that cries wolf
+# gets switched off.
+TELEMETRY_SDKS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("Firebase Analytics", re.compile(r"firebase-analytics|firebase\s*analytics|play-services-analytics", re.I)),
+    ("Crashlytics", re.compile(r"crashlytics", re.I)),
+    ("Sentry", re.compile(r"\bsentry", re.I)),
+    ("Bugsnag", re.compile(r"\bbugsnag", re.I)),
+    ("New Relic", re.compile(r"newrelic|new-relic", re.I)),
+    ("Datadog", re.compile(r"\bdatadog", re.I)),
+    ("Mixpanel", re.compile(r"\bmixpanel", re.I)),
+    ("Amplitude", re.compile(r"\bamplitude", re.I)),
+    # Broadened after the test caught the original being too narrow: the real
+    # artefact is `com.segment.analytics.kotlin:android`, which contains none of
+    # `analytics-android`, `segment-analytics` or `analytics-kotlin`.
+    ("Segment", re.compile(r"segment[.-]analytics|analytics-kotlin|analytics-android", re.I)),
+    ("AppsFlyer/Adjust", re.compile(r"appsflyer|adjust-android", re.I)),
+    ("Braze", re.compile(r"\bbraze\b", re.I)),
+    ("Google Analytics", re.compile(r"google-analytics|gtag", re.I)),
+)
+
+BUILD_FILE_GLOBS = ("*.gradle.kts", "*.gradle", "*.versions.toml")
+
+
+def build_files(root: pathlib.Path = REPO_ROOT) -> list[pathlib.Path]:
+    """Every Gradle build script and version catalogue under `root`."""
+    found: list[pathlib.Path] = []
+    for pattern in BUILD_FILE_GLOBS:
+        found.extend(sorted(pathlib.Path(root).rglob(pattern)))
+    return [path for path in found if ".git" not in path.parts]
+
+
+def telemetry_claim_violations(
+    pages: dict[str, str], root: pathlib.Path = REPO_ROOT
+) -> list[str]:
+    """A page that claims no telemetry must not ship a telemetry SDK.
+
+    Direction matters and is asserted in both: the rule fires when the claim and
+    the SDK are both present, and is silent when either is absent — a site that
+    stopped making the claim is not checked, and a tree with no SDK passes. The
+    tests in `test_website_claims.py` exercise all four combinations against
+    synthetic trees, because the real one is not allowed to be broken on purpose
+    (the Gradle files are outside this workstream).
+    """
+    claimed: list[str] = []
+    for route, markup in pages.items():
+        text = html_to_text(markup).lower() + " " + markup.lower()
+        for phrase in TELEMETRY_CLAIMS:
+            if phrase in text:
+                claimed.append(f"{route} ({phrase})")
+                break
+    if not claimed:
+        return []
+    violations: list[str] = []
+    for path in build_files(root):
+        content = path.read_text(encoding="utf-8", errors="replace")
+        for name, pattern in TELEMETRY_SDKS:
+            for match in pattern.finditer(content):
+                violations.append(
+                    f"{path.relative_to(root)}: {name} dependency ‘{match.group(0)}’ is in "
+                    f"the build, but {' and '.join(claimed)} claim there is none"
+                )
+    return violations
+
+
+# --------------------------------------------------------------------------
 # Loading and reporting.
 # --------------------------------------------------------------------------
 
@@ -296,6 +380,7 @@ def main(argv: list[str] | None = None) -> int:
     problems += forbidden_claim_violations(pages)
     problems += required_caveat_violations(pages)
     problems += digest_violations({**pages, **load_site_sources()})
+    problems += telemetry_claim_violations(pages)
 
     if problems:
         print(f"FAIL: {len(problems)} honesty-contract violation(s):", file=sys.stderr)
@@ -306,7 +391,8 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"OK: {len(pages)} built page(s) pass the honesty contract "
         f"({len(FORBIDDEN_TERMS)} forbidden-claim rules, "
-        f"{len(REQUIRED_CAVEATS)} required caveats, {len(DIGEST_PATTERNS)} digest rules)."
+        f"{len(REQUIRED_CAVEATS)} required caveats, {len(DIGEST_PATTERNS)} digest rules, "
+        f"{len(TELEMETRY_SDKS)} telemetry-SDK rules against the shipped dependency graph)."
     )
     return 0
 

@@ -1,5 +1,59 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — five defects found by trying to break the new checks (session `arena/37ec95ed-dhun`)
+
+The session's own rule was "a rule that cannot be made to fail is not a rule", so
+every new check was mutated before it was trusted. Five defects surfaced; three
+were in code I had just written, one was in a workflow filter, and one was in my
+own hand-written numbers.
+
+**1. `forced_colors_violations` read the union of all pages' CSS and passed a
+per-page deletion.** `site_stylesheet()` joins the inlined CSS of every route for
+rules that ask "does the site define X". Deleting the `@media (forced-colors:
+active)` block from `index.html` alone left the other two copies in the union, so
+the rule stayed green: a mutation that *should* have failed. Fix: the rule now
+iterates `page_paths()` and reads `page_stylesheet(dist, route)` — each page's own
+`<style>` — so a single route losing the block is a red test. Lesson: a rule over
+a *union* of pages cannot see a per-page omission; ask which page you mean.
+
+**2. `print_style_violations` only checked that the tokens were *mentioned*.**
+`--text:#ffffff` on a white `--bg` passed — a sheet that prints blank. Fix: the
+rule parses the print block's `--text`/`--bg` and computes the WCAG ratio with the
+same maths the token rule uses (`1.00:1, below the 4.5:1 floor` when mutated).
+Lesson: "the mechanism exists" and "the mechanism works" are two rules; the cheap
+one belongs in Python, the expensive one in the browser job.
+
+**3. `checkTabStops` passed already-computed signatures to `focusChanged`.**
+`focusChanged(before, after)` computes `focusSignature()` itself, so handing it two
+strings produced `"undefined|undefined|undefined…"` on both sides and the rule
+could never fire. Caught while re-reading the new code, before any push. Fix: the
+in-page probe returns a style *record* and the pure rule does the folding — the
+page and the rule now share one definition instead of two.
+Lesson: a pure function that takes the *input* of a comparison must not be fed the
+comparison's output; the type names were the clue and the tests did not cover the
+call site, only the function.
+
+**4. `scripts/report_lighthouse.py` was used by `website.yml` but missing from
+both `paths:` filters.** A change to the only reader of the Lighthouse reports
+could not start the workflow that runs it. Fix: both filters list it *and* its
+test, and `test_website_workflow.py` gained a derived rule — every
+`scripts/*.py` the workflow runs must appear at least twice (push and
+pull_request). Mutation: removing one path from the filter fails with "is used by
+website.yml but does not trigger it on both push and pull_request".
+Lesson: hand-maintained lists drift; derive the list from the thing it describes.
+
+**5. Two commit messages carried test counts I had not read.** `6240fa6` claims
+"178 → 194 (10 icon/inlining + 6 reporter naming + 1 derived trigger rule)" — the
+breakdown adds to 15, and `48f5cd9` claims "215 → 231" while the suite reported
+225 (`Ran 225 tests`). The totals in those messages came from the tool; the
+parentheticals did not. Both are corrected here rather than rewritten: history is
+append-only in this project, and a wrong number in a commit message is a
+documented slip, not a silent one. Measured counts after this session's work:
+**`Ran 232 tests in 0.672s` → OK** on the Python-only suite (178 at boot), plus
+**`# pass 9` / `# fail 0`** for `website/tests/rules.test.mjs` under `node --test`.
+Lesson: every digit in a commit message is evidence and follows the same rule as a
+number in a doc — read it from a tool output or do not write it.
+
 ## 2026-10-08 — the site denied a feature the app ships, and the config silently dropped a stylesheet (session `arena/9b791057-dhun`)
 
 Two defects that only a *product* site can have: one was the copy lying about the

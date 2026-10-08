@@ -1,5 +1,41 @@
 # KNOWN_LIMITATIONS
 
+## 2026-10-08 — session `arena/37ec95ed-dhun`: what one request, print and High Contrast still do not prove
+
+- **The single-request claim is architecture, and the number behind it is a CI
+  annotation.** The rule proves the page carries no separate subresource
+  reference, and `requests=2 → 1` can only be confirmed by the Lighthouse job's
+  next run on this head (`subresources: none — the document only`). Until that
+  annotation is read, "one request" is a static fact, not a measured one.
+- **A `data:` URI favicon is a trade.** A client that does not render SVG
+  favicons now shows no tab icon, where previously it fetched a file it also
+  could not render (or rendered as a fallback). No browser in this environment
+  can settle that; the alternative cost is losing one request per route.
+- **Print and forced-colours rendering is CI-measured, never eyeballed.** No
+  browser and no Windows machine exist here, so `forced-colors: active` and
+  `@media print` were written from the documented behaviour of the engines
+  (backgrounds and gradients dropped; a `transparent` border stays transparent;
+  no control border is drawn for an `<a>`) and their *effect* is asserted only in
+  the `browser` job. If Chromium disagrees, that job goes red on this head and
+  that is the intended loop — the static rules cannot see it.
+- **`prefers-contrast: more` changes nothing on this site.** It is emulated, the
+  page is asserted to see it, its text contrast is measured and printed — and
+  there are no `prefers-contrast` rules, by decision: the scheme already meets AA.
+  The measurement is recorded so the claim stays honest, not because a
+  high-contrast rendering exists.
+- **`og:image` is deliberately absent.** No image exists in the repository, an
+  SVG `og:image` is not rendered by the major crawlers, and a generated PNG would
+  be fabricated imagery. Cards therefore render as text-only previews.
+- **A link checker for external URLs was not added.** The site's outbound links
+  point at `github.com/...` and `grouplens`-free paths; a network-dependent test
+  is not allowed in the Python-only suite, and CI annotations cannot carry a
+  per-URL report without crowding the cap. Parked with a reason rather than
+  half-built.
+- **Nine viewports in one engine is still not a device.** No Firefox, no WebKit,
+  no screen reader, no touch hardware, no real Windows High Contrast session, and
+  a 200 %-zoom *emulation* is a layout-viewport approximation, not a browser's
+  own zoom implementation.
+
 ## 2026-10-08 — session `arena/9b791057-dhun`: the site is a product site now, and its interface page has never been rendered
 
 - **`/ui/` is unverified in a browser.** The page was built, gated by 18 static
