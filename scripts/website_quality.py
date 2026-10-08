@@ -30,6 +30,7 @@ import json
 import pathlib
 import re
 import sys
+import xml.etree.ElementTree as ElementTree
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_DIST = REPO_ROOT / "website" / "dist"
@@ -873,6 +874,120 @@ def unreferenced_file_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def _parse_xml_locations(content: str) -> list[str]:
+    """`<loc>` values via the XML parser, not a regex.
+
+    The crawlability rule compares sets of URLs with a regex, which is enough to
+    answer "is this route listed" but says nothing about whether the document is
+    *well-formed* — an unclosed `<url>` or a stray ampersand is a malformed
+    sitemap that Search Console rejects, and a regex reads straight past it.
+    """
+    root = ElementTree.fromstring(content)
+    namespace = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+    return [(element.text or "").strip() for element in root.iter(f"{namespace}loc")]
+
+
+def sitemap_violations(dist: pathlib.Path) -> list[str]:
+    """`sitemap.xml` must be a well-formed sitemap, not XML-shaped text."""
+    sitemap = dist / "sitemap.xml"
+    if not sitemap.is_file():
+        return ["sitemap.xml is missing from the built site"]
+    content = sitemap.read_text(encoding="utf-8")
+    try:
+        locations = _parse_xml_locations(content)
+    except ElementTree.ParseError as error:
+        return [f"sitemap.xml is not well-formed XML: {error}"]
+    violations: list[str] = []
+    if not locations:
+        violations.append("sitemap.xml has no <loc> entries")
+    for location in locations:
+        if not location.startswith(f"{CANONICAL_ORIGIN}/"):
+            violations.append(
+                f"sitemap.xml lists {location}, which is not under {CANONICAL_ORIGIN}/"
+            )
+    if len(locations) != len(set(locations)):
+        duplicates = sorted({url for url in locations if locations.count(url) > 1})
+        violations.append(f"sitemap.xml lists the same URL twice: {', '.join(duplicates)}")
+    return violations
+
+
+def asset_reference_violations(dist: pathlib.Path) -> list[str]:
+    """Any attribute that names a file must name a file that exists.
+
+    `link_violations` reads `href`/`src` on the four element types that carry
+    them. This is the general case: *every* attribute whose value is a
+    site-root path is resolved, so a `poster`, a `srcset` candidate or an
+    attribute nobody has invented yet cannot point at a file the build does not
+    ship. A `data:` URI is inlined bytes, not a file — `favicon_violations`
+    reads those back out.
+    """
+    violations: list[str] = []
+    attribute = re.compile(r"\b([a-z-]+)=\"(/[^\"]*)\"", re.I)
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for match in attribute.finditer(markup):
+            reference = match.group(2)
+            if not _resolve_internal(dist, reference):
+                violations.append(
+                    f"{route}: {match.group(1)}=\"{reference}\" names a file the build "
+                    f"does not ship"
+                )
+    return violations
+
+
+def dist_source_drift_violations(dist: pathlib.Path) -> list[str]:
+    """The committed CSS must be exactly what the sources compose — locally.
+
+    The workflow's drift check rebuilds the site and diffs; that needs Node, so
+    it cannot run in the Python-only suite. This is the cheap half of the same
+    check, and it is the half a hand-edit trips: each page's inlined CSS must
+    equal the modules *that page's own front matter declares*, whitespace and
+    comments folded. A page that ships a module it did not declare, or a `dist`
+    edited by hand, fails here without a browser or a build step.
+    """
+    front_matter = re.compile(r"^cssModules:\s*\[([^\]]*)\]", re.M)
+    modules = re.compile(r'"([a-z0-9-]+)"')
+    routes = {
+        "index.njk": "/",
+        "features.njk": "/features/",
+        "ui.njk": "/ui/",
+        "404.njk": "/404.html",
+    }
+    violations: list[str] = []
+    for source_name, route in routes.items():
+        source = SOURCE_DIR / source_name
+        if not source.is_file():
+            violations.append(f"{source_name} is missing from the sources")
+            continue
+        declared = modules.findall(front_matter.search(source.read_text(encoding="utf-8")).group(1)) if front_matter.search(source.read_text(encoding="utf-8")) else []
+        if not declared:
+            violations.append(f"{source_name}: no cssModules declared")
+            continue
+        expected = "\n".join(
+            (SOURCE_DIR.parent / "css" / f"{name}.css").read_text(encoding="utf-8").strip()
+            for name in declared
+        )
+        built = page_stylesheet(dist, route)
+        if _fold_css(expected) != _fold_css(built):
+            violations.append(
+                f"{route}: the committed CSS is not the composition of "
+                f"{', '.join(declared)} — the build is stale, or dist was edited by hand"
+            )
+    return violations
+
+
+def _fold_css(css: str) -> str:
+    """Fold every difference minification is allowed to introduce.
+
+    Same normalisation `website/tools/verify-minify.mjs` applies — comments and
+    whitespace removed, `;}` collapsed — so the two checks agree about what
+    "unchanged" means. Comments go first: a comment removed by compaction would
+    change a selector's bytes otherwise.
+    """
+    without_comments = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return _compact(without_comments).replace(";}", "}")
+
+
 def crawlability_violations(dist: pathlib.Path) -> list[str]:
     violations: list[str] = []
     robots = dist / "robots.txt"
@@ -1280,6 +1395,9 @@ CHECKS = (
     ("page metadata", metadata_violations),
     ("structured data", structured_data_violations),
     ("crawlability", crawlability_violations),
+    ("sitemap well-formedness", sitemap_violations),
+    ("referenced files exist", asset_reference_violations),
+    ("dist matches its sources", dist_source_drift_violations),
     ("responsive rules", responsive_violations),
     ("print stylesheet", print_style_violations),
     ("forced-colours fallback", forced_colors_violations),

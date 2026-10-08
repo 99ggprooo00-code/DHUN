@@ -1024,3 +1024,93 @@ class MetadataConsistency(DistCopyMixin):
         )
         violations = quality.metadata_violations(dist)
         self.assertTrue(any("og:url should be" in v for v in violations), violations)
+
+
+class SitemapWellFormedness(DistCopyMixin):
+    """A regex can find a `<loc>` inside malformed XML; a parser cannot."""
+
+    def test_the_real_sitemap_parses(self):
+        self.assertEqual(quality.sitemap_violations(DIST), [])
+
+    def test_an_unclosed_urlset_fails(self):
+        dist = self.copy_dist()
+        sitemap = dist / "sitemap.xml"
+        sitemap.write_text(sitemap.read_text(encoding="utf-8").replace("</urlset>", ""), encoding="utf-8")
+        violations = quality.sitemap_violations(dist)
+        self.assertTrue(any("not well-formed" in v for v in violations), violations)
+
+    def test_a_duplicate_url_fails(self):
+        dist = self.copy_dist()
+        sitemap = dist / "sitemap.xml"
+        sitemap.write_text(
+            sitemap.read_text(encoding="utf-8").replace(
+                "</urlset>", "<url><loc>https://99ggprooo00-code.github.io/DHUN/</loc></url></urlset>"
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.sitemap_violations(dist)
+        self.assertTrue(any("twice" in v for v in violations), violations)
+
+    def test_an_off_origin_url_fails(self):
+        dist = self.copy_dist()
+        sitemap = dist / "sitemap.xml"
+        sitemap.write_text(
+            sitemap.read_text(encoding="utf-8").replace(
+                "</urlset>", "<url><loc>https://example.com/</loc></url></urlset>"
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.sitemap_violations(dist)
+        self.assertTrue(any("not under" in v for v in violations), violations)
+
+
+class ReferencedFilesExist(DistCopyMixin):
+    """Every attribute naming a site path must name a file the build ships."""
+
+    def test_the_real_site_resolves_every_attribute(self):
+        self.assertEqual(quality.asset_reference_violations(DIST), [])
+
+    def test_a_poster_naming_a_missing_file_fails(self):
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                "<h1", '<video poster="/assets/missing.jpg"></video><h1', 1
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.asset_reference_violations(dist)
+        self.assertTrue(any("missing.jpg" in v for v in violations), violations)
+
+    def test_a_data_uri_is_not_a_file_reference(self):
+        dist = self.copy_dist()
+        self.assertEqual(quality.asset_reference_violations(dist), [])
+
+
+class DistMatchesItsSources(DistCopyMixin):
+    """The cheap, Node-free half of the workflow's drift check."""
+
+    def test_the_committed_build_matches_the_sources(self):
+        self.assertEqual(quality.dist_source_drift_violations(DIST), [])
+
+    def test_a_hand_edited_page_fails(self):
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace("--accent:#bb86fc", "--accent:#ff0000"),
+            encoding="utf-8",
+        )
+        violations = quality.dist_source_drift_violations(dist)
+        self.assertTrue(any("/ui/" in v for v in violations), violations)
+
+    def test_a_page_carrying_a_module_it_did_not_declare_fails(self):
+        dist = self.copy_dist()
+        page = dist / "404.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                "</style>", ".token-swatch{color:red}</style>", 1
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.dist_source_drift_violations(dist)
+        self.assertTrue(any("/404.html" in v for v in violations), violations)
