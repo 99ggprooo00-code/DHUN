@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +58,7 @@ import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
+import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.TrackRow
@@ -178,6 +181,12 @@ private fun SearchBarSection(
     onSearchSubmit: () -> Unit,
     onClear: () -> Unit,
 ) {
+    val focusRegistry = LocalTextInputFocusRegistry.current
+    val focusToken = remember { Any() }
+    DisposableEffect(focusRegistry, focusToken) {
+        onDispose { focusRegistry?.setFocused(focusToken, false) }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -235,7 +244,9 @@ private fun SearchBarSection(
                 focusedPlaceholderColor = DhunColors.textHint,
                 unfocusedPlaceholderColor = DhunColors.textHint,
             ),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .onFocusChanged { focusRegistry?.setFocused(focusToken, it.isFocused) },
         )
         if (query.isNotBlank()) {
             DhunTextButton(onClick = onSearchSubmit) {

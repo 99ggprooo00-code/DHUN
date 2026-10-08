@@ -18,3 +18,7 @@ interface ConnectivityMonitor {
 object AlwaysOnlineConnectivityMonitor : ConnectivityMonitor {
     override val isOnline: StateFlow<Boolean> = MutableStateFlow(true)
 }
+
+/** A connected interface is not proof of internet access (captive portals count as connected). */
+internal fun isInternetValidated(hasInternetCapability: Boolean, hasValidatedCapability: Boolean): Boolean =
+    hasInternetCapability && hasValidatedCapability

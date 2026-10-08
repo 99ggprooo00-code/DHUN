@@ -1,108 +1,89 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/094f77e7-dhun` — reconcile PR #125 and qualify the S3 hardware report (2026-10-07)
+## Session `arena/094f77e7-dhun` — root-cause fixes for the S3 defects (2026-10-08)
 
-Updated **2026-10-07** · fixed work branch **`arena/094f77e7-dhun`** · current
-`main@f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5` (README-only change after the
-PR #125 merge at `b1dba0c0cec9c5cde7f910f04405b7fe81a25b0e`). The branch was
-fast-forwarded to current `main`; the pre-documentation worktree was clean.
+Updated **2026-10-08** · fixed branch `arena/094f77e7-dhun` · main baseline
+`f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5` · draft PR #127.
 
-### Completed upstream phase — PR #125 / S5 flake repair
+### Release baseline — not a corrected candidate
 
-- PR **#125** merged at **2026-10-06T03:58:26Z** as `b1dba0c`.
-- Post-merge CI **37411494455**, Build APK **37411494443**, and test-release
-  **37411494399** passed. The Windows MSI step ran the full install-over path,
-  `2.170.1 → 2.171.1`, preserving userdata/cache sentinels; the future-upgrade
-  guard and uninstall smoke also passed, with no skip.
-- The two formerly flaky `:shared:jvmTest` names remain absent in the observed
-  post-merge CI on `b1dba0c` and the later `f0225f4` main CI **37548884056**.
-  This is initial repetition evidence, not proof that a race can never recur.
-- Latest main CI **37548884056**, Build APK **37548884107**, and test-release
-  **37548884077** are green. The rolling `test` release is published against
-  `f0225f4` (2026-10-06T23:56:54Z): APK SHA-256
-  `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
-  **2.172.1**, SHA-256
-  `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`.
-  Release-asset download in the sandbox still returns EOF; hashes above are
-  from GitHub artifact-provenance annotations, while the downloaded release's
-  `.sha256` sidecars remain the device-side authority.
-- Separate signal: scheduled extraction-health run **37455619019** failed as
-  **`ENVIRONMENT_BLOCKED`** (“live health is unverified” on the hosted runner).
-  It is not the CI/build/test-release gate and is not evidence of a playback
-  regression; keep the residential playback evidence separate.
+The rolling `test` release still targets `f0225f4` (CI **37548884056**, Build
+APK **37548884107**, test-release **37548884077**). Its APK SHA-256 is
+`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
+2.172.1 SHA-256 is
+`c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. This is
+the old build the user cannot use to validate the fixes. PR #127 previously
+contained documentation only; the current worktree now adds product changes,
+regression tests and updated verification documentation. Changes are not yet
+pushed or CI-verified at this writing.
 
-### S3 — user report received 2026-10-07; status remains OPEN
+### Source trace — concrete defects found
 
-**Android:** Redmi Note 12 4G / Android 15 was reported. The supplied APK hash
-`21a5fe86…9cc2c` matches the current `f0225f4` release provenance and the
-byte-identical APK produced at `b1dba0c`. The user reports the broader playback,
-library/download, lyrics/settings, and steps 19–22 checks as working. Do not
-upgrade that to full S3 acceptance: `Go to album` was not found; the HTTP 403
-path was not exercised; offline streaming recovery had long buffering and no
-clear error message before working again after the network returned. Treat that
-error-feedback result as **partial**, not a clean offline pass. Lyrics are
-working; the user's future lyrics idea is explicitly out of scope until asked.
+- **Windows Jump List / COM threading:** `JumpList.update()` called `drain()`
+directly when the throttle delay was zero, despite the class contract promising
+a dedicated COM worker. Startup and later tray updates could therefore invoke
+COM on different caller threads while one instance-wide `comInitialized` flag
+made COM apartment state appear shared. This is a concrete source defect and a
+plausible cause of missing taskbar tasks; Windows shell identity/privacy policy
+still require hardware confirmation.
+- **Desktop Space shortcut:** the `Window.onKeyEvent` handler ran after focused
+children, so controls could consume Space before the global shortcut. It also
+had no explicit way to distinguish editable focus if moved to preview. The fix
+uses a shell preview handler plus a composition-local focus registry for both
+search and app text inputs, preserving typed spaces.
+- **Navigation hidden under FullPlayer:** FullPlayer remains intentionally
+immersive, but `Ctrl+F` and the album-name fallback selected Search without
+collapsing `playerExpanded`, so the new destination stayed hidden. Tab
+navigation now collapses the player first; the desktop shortcut, Android
+launcher shortcuts, and both artist/album fallback routes use that path.
+- **Android offline feedback:** the connectivity adapter treated
+`NET_CAPABILITY_INTERNET` alone as online (not proof of validated Internet),
+and the offline notice was drawn in the Scaffold beneath the full-screen
+player. It now requires both INTERNET and VALIDATED and moves the notice above
+FullPlayer. Playback remains retryable during transient outages so it can
+resume when connectivity returns.
+- **“Go to album”:** the menu can only offer navigation when a track has an
+album id or nonblank album name. The name-only fallback searched for the album
+but could remain hidden under FullPlayer; that path now collapses it. A track
+with no album metadata still has no honest destination and must not be claimed
+as fixed without testing a known album-linked track.
 
-**Windows:** Windows 11 was reported, but the exact build and VLC version were
-not recorded. The report describes a large/full-window player that blocks Home,
-Search and Playlists, missing DHUN Jump List tasks (only standard shell pin /
-unpin / close items visible), and a Space shortcut that did not respond. The
-reported MSI hash `c27175…3fe17d6` identifies the **current `f0225f4` MSI
-2.172.1**. The user also describes the test as based on `b1dba0c`; that merge's
-MSI was **2.171.1**, SHA-256
-`353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`. The
-report does not label the hash as pre- or post-upgrade, so the exact Windows
-install sequence is not yet bound to one artifact. `f0225f4` changed only the
-README after `b1dba0c`, so app source is identical, but installer identity and
-version still need to be recorded honestly.
+Lyrics are working and have not been modified.
 
-**Layout triage (no product fix justified yet):** source inspection confirms
-that the expanded `FullPlayer` intentionally fills the desktop window and
-covers the underlying shell; the docked `MiniPlayer` is a separate **72 dp**
-row. On Windows, `Escape` calls the shared back contract and collapses the
-expanded player first. Therefore the report could describe the expected
-expanded `FullPlayer`, or a real defect if the docked player still covers the
-shell after collapse. No screenshot or explicit post-collapse reproduction is
-recorded. Do not change layout until the device check distinguishes those
-states. The Space shortcut is a window `onKeyEvent` handler and receives only
-keys not consumed by the focused child; retest outside text fields/buttons.
-Jump List registration is packaged-only and logs its COM result/failure to
-`dhun-startup.log`; collect those lines before changing native code.
+### Verification and release gate
 
-### Current state and exact next step
+- New tests pin Jump List immediate/trailing commits to the dedicated worker,
+  Space shortcut/focus-suppression policy, text-input focus aggregation,
+  tab-navigation collapse, offline capability classification, and offline
+  banner placement. Existing menu-policy tests continue to pin the album-name
+  fallback.
+- This sandbox has no JDK; local Kotlin/Gradle tests cannot run. The changes
+  must pass required PR CI (shared JVM, Android unit/build, desktop JVM/compile,
+  APK/MSI packaging) before the PR is marked ready. Read test-release
+  annotations; PR-path `publish` is expected to skip.
+- Documentation is now updated locally in the handoff, limitations, roadmap,
+  hardware runbook and verification records. Include those edits in the PR and
+  ensure the published review includes them. After required tests and docs pass,
+  merge PR #127 to publish a **new corrected `test` APK/MSI**; do not tell the
+  user to test the old `f0225f4` release. Hardware acceptance remains OPEN until
+  the user retests the exact new hashes on Redmi Note 12 4G / Android 15 and
+  Windows 11. Do not represent CI as physical acceptance or assume AUMID/
+  taskbar settings are cleared.
+- For Windows, verify a running-app Jump List after a successful
+  `jump list: committed ...` startup-log line; record `winver`, installed MSI
+  version/hash and the Windows setting “Show recently opened items in Start,
+  Jump Lists, and File Explorer.” For offline Android testing, capture whether
+  the online banner appears with Wi-Fi connected but Internet unvalidated, plus
+  the time to recover. Full procedure: `docs/runbooks/s3-hardware-checklist.md`.
 
-- The documentation-only update is pushed on `arena/094f77e7-dhun` and open as
-  **draft PR #127**: <https://github.com/99ggprooo00-code/DHUN/pull/127>.
-  Local JDK-free tests and documentation checks passed; consult the live PR for
-  required GitHub check status. No product source was changed.
-- **Keep PR #127 unmerged** while the user-only S3 hardware retest remains
-  outstanding. A green docs PR is not device verification and does not close S3.
-- Physical retest: use the latest `test` release and verify both sidecars;
-  record Windows `winver`, MSI version, pre/post hashes and VLC version. Expand
-  FullPlayer, then press Escape or click Collapse; verify Home/Search/Playlists
-  are interactive and the docked player is only the 72 dp row. If it still
-  blocks after collapse, capture the full window plus display scale/resolution.
-  Test Space outside inputs/buttons, then confirm spaces still type in Search.
-  Play a track, wait two seconds, right-click the running/pinned DHUN icon; if
-  tasks are absent, include `jump list:` lines from
-  `<install-dir>/userdata/dhun-startup.log` (or `%TEMP%/dhun-startup.log`). On
-  Android, try `Go to album` on a known album-linked track and record an
-  uncached-stream offline attempt separately from downloaded-track playback.
-  Full steps: `docs/runbooks/s3-hardware-checklist.md`.
-- If hardware confirms a docked-layout or native-shortcut defect, make the
-  narrow product fix with a focused regression test, rerun CI, update the
-  documentation and repeat that device check. Keep S3 open until all remaining
-  checks are actually verified.
+**Local review complete:** the full diff was re-read; `git diff --check`, 31
+Python unit tests, 39-fixture validation, and Markdown fenced-block checks pass.
+Kotlin/Gradle tests remain unverified locally because Java is unavailable.
 
-**Blockers:** no Android/Windows hardware or JDK in this sandbox; the remaining
-layout/Jump List/key confirmation is user-device-only. The sandbox cannot fetch
-release-asset bytes, but current hashes are available from workflow provenance
-annotations. **No product source has been changed in this phase.**
-
-**Lifecycle:** operate only on `arena/094f77e7-dhun`; never infer S3 sign-off
-from green CI, packaging, or another user's report. Keep the session PR open
-until the physical S3 retest and any confirmed product fix are verified; only
-then merge after the final CI run and documentation review.
+**Immediate next steps:** commit/push only to `arena/094f77e7-dhun`, watch all PR
+checks, and merge only after the documented automated gate passes. Keep S3 open
+until the new candidate has been physically retested. PR #127 must not be merged
+in its old docs-only state; the new product-code head is the release candidate.
 
 ---
 

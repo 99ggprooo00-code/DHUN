@@ -99,10 +99,10 @@ import javax.swing.SwingUtilities
  *  - window geometry persisted to [SettingsKeys.WINDOW_GEOMETRY] ("x,y,w,h"
  *    px) — read from the live [WindowState] (position is kept current by the
  *    Compose window's component listener), restored via WindowPosition
- *  - keyboard shortcuts (window-scope [Window.onKeyEvent], receives only keys
- *    the focused node didn't consume): Space play/pause, ←/→ seek ±5 s,
- *    Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+Q quit, Escape back
- *    (collapse player → pop page → previous tab, the shared back contract)
+ *  - keyboard shortcuts: Space play/pause is handled by the shell's preview
+ *    layer with text-input focus tracking; window-scope [Window.onKeyEvent]
+ *    handles ←/→ seek ±5 s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+Q quit,
+ *    and Escape back (collapse player → pop page → previous tab)
  *
  * Phase 14 ruggedization — \"Failed to launch JVM\" investigation:
  *  - jpackage bundles a jlink-minimized runtime; missing JDK modules (notably
@@ -524,10 +524,9 @@ fun main(args: Array<String>) {
                 onCloseRequest = ::quit,
                 state = mainState,
                 title = "DHUN",
-                // Window-scope shortcuts. onKeyEvent (NOT onPreviewKeyEvent) receives
-                // only keys the focused node didn't consume — so typing Space /
-                // arrows in the search field stays untouched, while Ctrl-combos
-                // (not consumed by the field) always reach us.
+                // Window-scope commands run after child dispatch. The Space
+                // play/pause shortcut lives in DhunAppShell's preview handler,
+                // where editable-field focus is tracked explicitly.
                 onKeyEvent = { event ->
                     if (event.type != KeyEventType.KeyDown) return@Window false
                     when {
@@ -542,7 +541,7 @@ fun main(args: Array<String>) {
                             true
                         }
                         event.isCtrlPressed && event.key == Key.F -> {
-                            nav.selectedTab = AppTab.SEARCH
+                            nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = false)
                             true
                         }
                         event.isCtrlPressed && event.key == Key.DirectionLeft -> {
@@ -569,10 +568,6 @@ fun main(args: Array<String>) {
                             } else {
                                 false
                             }
-                        }
-                        event.key == Key.Spacebar && !event.isCtrlPressed -> {
-                            playerViewModel.togglePlay()
-                            true
                         }
                         else -> false
                     }

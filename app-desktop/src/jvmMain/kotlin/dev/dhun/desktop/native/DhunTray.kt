@@ -114,9 +114,10 @@ class DhunTray(
             trackItem = null
             playItem = null
         }
-        // Deliberately NOT clearing the jump list: it is user-facing shell
-        // state by design and must survive the process (the taskbar reads it
-        // while the app is closed). See JumpList's KDoc.
+        jumpList?.stop()
+        jumpList = null
+        // Stopping the worker does NOT clear the user-facing Jump List: the
+        // taskbar retains that shell state while the app is closed.
     }
 
     /**

@@ -129,6 +129,25 @@ class AppNavStateTest {
     // ------------------------------------------------- tab back (Phase 16)
 
     @Test
+    fun tabNavigationCollapsesTheFullPlayerBeforeRevealingTheDestination() {
+        val nav = AppNavState()
+        nav.push(DetailRoute.AlbumPage("MPREalbum"))
+        nav.playerExpanded = true
+
+        assertTrue(nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = true))
+        assertFalse(nav.playerExpanded, "the destination must not remain hidden under FullPlayer")
+        assertEquals(AppTab.SEARCH, nav.selectedTab)
+        assertEquals(1, nav.detailStack.size, "two-pane navigation keeps the detail route")
+
+        // Re-tapping the same tab while the player was covering it only
+        // collapses the player; it must not also pop a page in the same action.
+        nav.playerExpanded = true
+        assertTrue(nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = true))
+        assertFalse(nav.playerExpanded)
+        assertEquals(1, nav.detailStack.size)
+    }
+
+    @Test
     fun backFromSearchReturnsToHomeInsteadOfExitingTheApp() {
         // The reported Android bug: Search is a tab, not a stack entry, so
         // BACK used to find nothing to close and handed the gesture straight to

@@ -13,6 +13,20 @@ the new MSI; preserve the docked MiniPlayer and do not re-add a second window.
 The branch was retained after the authorised merge; no unrelated Arena
 session-finalizing control or old-branch cleanup was used.
 
+## Current user-report follow-up — 2026-10-08 (draft PR #127)
+
+The user later reported missing Jump List tasks, an unresponsive Space shortcut,
+and FullPlayer appearing to block Home/Search/Playlists. Source tracing found
+three concrete causes relevant to this document: JumpList's immediate update
+path bypassed its COM worker; Space was handled after focused child dispatch;
+and Ctrl+F changed tabs without collapsing the overlay. The local PR #127
+candidate addresses those paths and adds regression tests, but is not yet pushed
+or CI-verified. The corrected MSI is not yet published or hardware-tested;
+Windows privacy policy and the default shortcut/process AppUserModelID remain
+explicit hardware checks. FullPlayer remains an immersive
+surface by design, but tab-navigation actions now collapse it before presenting
+the destination.
+
 ## Installer-specific PR verification — 2026-09-06
 
 PR #30 at `b6d47bd`: native run **34030730743** passes MSI **1.34.1** packaging,
@@ -31,7 +45,8 @@ User-machine/full runtime acceptance below remains open.
 | System tray: icon (playing/paused variants), menu (track title / play-pause / next / prev / open / quit) | `app-desktop/.../desktop/native/DhunTray.kt` — AWT `SystemTray` + `TrayIcon` (JDK standard, no dependency; Win/Linux/macOS, silently degraded on headless); menu exactly per spec — non-selectable track-title row + Play/Pause (verb swaps) + Next + Previous + Open DHUN + Quit; icon swaps `TrayIcons.playing()` (accent triangle) ↔ `TrayIcons.paused()` (accent bars); all mutators EDT-marshaled (thread-safe); `start()` returns false on headless so the app degrades instead of crashing |
 | Tray icons (no binary assets yet) | `app-desktop/.../desktop/native/TrayIcons.kt` — 32×32 ARGB `BufferedImage` drawn in code (dark rounded tile + accent glyph, `setAutoSize` for 16/48 DPI). Replaced by a real `.ico` in the jpackage step if a design asset lands |
 | Mini-player window: ~~320×88 always-on-top; artwork, title, transport, progress; draggable; click opens main~~ **REMOVED 2026-09-06 (ADR-004, user decision)** | Was `app-desktop/.../desktop/ui/MiniPlayerWindow.kt` — `MiniPlayerContent` (56 dp `ArtworkImage`, title/artist, ⏸/▶ + ⏭, 2 dp accent progress line) hosted in `Main.kt` as a second Compose `Window` (`alwaysOnTop=true`, `resizable=false`), draggable via JNA `SetWindowPos`, click → `showMainWindow()`, Ctrl+M toggle. The user judged it redundant next to the docked in-app MiniPlayer (Phase 08) and it always showed in the taskbar (no `skipTaskbar` in Compose Desktop 1.8.2). The window, its toggle, and the `Smct.moveWindow` helper were deleted; `Main.kt` now opens exactly one window |
-| Keyboard shortcuts: Space, ←/→ seek 5 s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+Q quit | `Main.kt` — root `Modifier.onKeyEvent` (NOT preview: fires only for keys the focused node didn't consume, so Space/←/→ typing in the search field stays untouched); `EventType.Press`-only (no auto-repeat); Ctrl+F → `nav.selectedTab = AppTab.SEARCH` (jumps to the Search tab — auto-focus into the field is a follow-up); Ctrl+Q → `quit()` (the one clean-exit path, shared with tray Quit: save geometry → tray.stop → persistence.stop → player.release → scope.cancel → `System.exit(0)` — no zombies). Ctrl+M was removed with the mini-player window (ADR-004) |
+| Keyboard shortcuts: Space, ←/→ seek 5 s, Ctrl+←/→ prev/next, Ctrl+F search, Ctrl+Q quit | Space is handled by `DhunAppShell.kt`'s root `onPreviewKeyEvent` through `DesktopShortcutPolicy`; `TextInputFocusRegistry` tracks Search and `DhunTextField` focus so Space toggles playback outside editable controls but remains typable inside them. `Main.kt` handles arrows and Ctrl-combos after child dispatch; Ctrl+F calls `nav.selectTab(SEARCH)`, which collapses FullPlayer before showing Search. Focus policy and tracker have JVM regression tests. Hardware behavior still requires Windows retest. Ctrl+M was removed with the mini-player window (ADR-004) |
+| Windows taskbar Jump List (recent tracks, Play/Pause, Open DHUN) | `desktop/native/JumpList.kt` writes one `AddUserTasks` batch. All immediate and throttled commits now execute on the dedicated worker; COM is initialized/cleaned up on that same thread. `JumpListExecutionTest` asserts both commit paths use the worker. It still relies on the default shell identity (no `SetAppID`); taskbar privacy settings, shortcut identity and actual task visibility remain hardware checks |
 | Close-to-tray setting (default on), remembered window state | `Main.kt` — `closeToTray` read once at startup from `SettingsKeys.CLOSE_TO_TRAY` (default `true`); main window `onCloseRequest` → hide to tray (after saving geometry) or `quit()`; geometry persisted as `"x,y,w,h"` in `SettingsKeys.WINDOW_GEOMETRY` (Phase 05 DB) on close-to-tray and quit, restored into `rememberWindowState(position=…)` at startup. The mini frame reference went away with the removed mini-player window (ADR-004) |
 | SMTC spike (time-boxed 3 days): now-playing tile, artwork, media keys; if stable → integrate, else documented fallback | `app-desktop/.../desktop/smct/Smct.kt` — **phase 2 code**: startup activation after the AWT window exists, `GetForWindow(HWND, IID 99FA3FF4-1742-42A6-902E-087D41F965EC)`, `DisplayUpdater` → `MusicProperties` title/artist/album, remote `RandomAccessStreamReference` thumbnail, playback-state and previous/next state updates, and `ButtonPressed` registration through a retained JNA COM callback (`0557e996-7b23-5bae-aa81-ea0d671143a4`). The exact Windows.Media vtable order is encoded from the Windows SDK/windows-rs ABI; `IsEnabled` is the liveness check at slot 10. Native failures are HRESULT-logged and leave the AWT tray/keyboard fallback active; `-Ddhun.smct=false` disables. Hardware round-trip is still OPEN. |
 | Packaging: jpackage `.msi` with app icon; clean-VM install test | `app-desktop/build.gradle.kts` `compose.desktop { application { nativeDistributions { targetFormats(Dmg, Msi, Deb) } } }` already active (Phase 04) — the Compose packager drives jpackage; published baseline uses 1.0.5; the LOCAL candidate uses a positive-major, increasing internal MSI sequence (`scripts/installer_version.py`), separate from app semver. App icon + clean-VM install test: OPEN (needs Windows machine + a real `.ico`) |
@@ -77,7 +92,18 @@ phase-2 readiness requirements.
 - [ ] **Window geometry**: resize/move the main window → close-to-tray → relaunch → window returns at the same size+position (`window_geometry` row in `dhun.db` = "x,y,w,h")
 - [x] **Single-window startup after manual reinstall** — user-confirmed 2026-09-06 following the latest `test` recommendation; ADR-004 removal is on GitHub in PR #28. This closes only the reported one-window check, not installer upgrade, native controls, playback or checksum identity.
 - [ ] **Remaining window/native checks** — no unwanted taskbar entry; docked MiniPlayer expands/controls playback; tray hide/restore works; no removed Ctrl+M window behavior. Do not reintroduce the separate always-on-top mini-player.
-- [ ] **Keyboard shortcuts** (main window focused): Space toggles play/pause; ←/→ seek ±5 s (position bar moves); Ctrl+← / Ctrl+→ = previous/next track; Ctrl+F lands on the Search tab; Ctrl+Q exits clean (same zombie check as tray Quit). **Negative check**: typing "Bohemian  Rhapsody" (space) in the search field types a space — shortcuts don't steal keys from the text field
+- [ ] **Keyboard shortcuts** (main window focused): Space toggles play/pause
+      on non-editable content; Search and playlist-name fields still accept a
+      space without toggling playback. Ctrl+F while FullPlayer is expanded
+      collapses it and reveals Search; ←/→ seek ±5 s, Ctrl+← / Ctrl+→ previous/
+      next, Ctrl+Q exits clean (same zombie check as tray Quit).
+- [ ] **Jump List:** with Windows' “Show recently opened items in Start, Jump
+      Lists, and File Explorer” enabled, play a track and wait for
+      `jump list: committed ...`; right-click the running/pinned DHUN icon.
+      Verify Play/Pause, Open DHUN and a recent task. If only standard Windows
+      items appear, record the menu, installed MSI identity, setting state and
+      all Jump List startup-log lines. A COM commit alone is not taskbar
+      acceptance.
 - [ ] **SMTC probe + phase 2**: console shows `SMTC probe PASS — …` with `hwnd`, `abi`, `activate-factory`, `get-for-window`, `is-enabled`, and `phase2=ok`; use the Windows tile to verify title/artist/artwork and press Play/Pause/Next/Previous media keys → record the exact line and round-trip below
 - [ ] **jpackage**: `./gradlew :app-desktop:packageMsi` (Windows) → installer builds with app icon; install on a clean Windows user/VM → launches, plays, tray works → record version/any issues
 - [ ] **Soak**: 30-min mixed use (queue skips, tray use, shortcuts) — zero crashes; tray state never desyncs from the player (icon/verb always match)
@@ -122,9 +148,12 @@ phase-2 readiness requirements.
   must be recorded here rather than treated as a silent success.
 - No app icon yet (tray uses the in-code glyph; jpackage uses the
   Compose-packager default until a `.ico` lands).
-- Ctrl+F jumps to the Search tab but doesn't move focus into the field
-  (Compose Desktop focus request on a specific `TextField` is a small
-  follow-up; typing works immediately after one click).
+- Ctrl+F jumps to Search and collapses FullPlayer, but does not move focus into
+  the Search field (Compose Desktop focus request on a specific `TextField` is
+  still a separate follow-up; typing works after one click).
+- The Jump List intentionally does not call `SetAppID`; if the worker logs a
+  successful commit but tasks remain absent, verify the Windows Jump List
+  privacy setting and jpackage shortcut/process identity before changing AUMID.
 - (Removed with the mini-player window, ADR-004: the two-window
   close-interaction note — DHUN now has a single window, so close-to-tray +
   tray Quit is the only window pattern.)

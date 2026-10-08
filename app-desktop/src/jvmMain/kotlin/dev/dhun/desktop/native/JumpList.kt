@@ -9,6 +9,7 @@ import com.sun.jna.Structure
 import com.sun.jna.WString
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -68,14 +69,19 @@ import java.util.concurrent.atomic.AtomicBoolean
  *    wins), so fast track changes collapse into one shell write.
  *  - `-Ddhun.jump-list=false` disables, matching the `-Ddhun.smct` /
  *    `-Ddhun.single-instance` convention.
- *  - The worker is a single daemon thread with its own COM apartment
- *    (`CoInitializeEx` STA, never uninitialized — process-lifetime thread),
- *    so the EDT never blocks on the shell and AWT's COM state is untouched.
+ *  - Every shell transaction is queued on one daemon worker. COM is
+ *    initialized and uninitialized on that worker only; callers (including
+ *    the Swing EDT) never execute a COM method or share apartment state.
  *  - The list is NOT removed on quit: jump lists are user-facing shell state
  *    by design and must survive the process (the taskbar reads them even
  *    while the app is closed).
  */
-class JumpList(private val log: (String) -> Unit = {}) {
+internal class JumpList(
+    private val log: (String) -> Unit = {},
+    private val windowsPlatform: Boolean = JumpList.isWindows,
+    private val packagedExePath: () -> String? = { JumpList.resolveExePath() },
+    private val commitOverride: ((List<JumpListEntry>) -> Unit)? = null,
+) {
 
     companion object {
 
@@ -148,7 +154,7 @@ class JumpList(private val log: (String) -> Unit = {}) {
     private var pending: List<JumpListEntry>? = null
     private var lastRunAt = 0L
     private var executor: ScheduledExecutorService? = null
-    private var trailingQueued = false
+    private var drainScheduled = false
     @Volatile
     private var lastCommitted: List<JumpListEntry>? = null
 
@@ -158,7 +164,7 @@ class JumpList(private val log: (String) -> Unit = {}) {
      * the app continues without a jump list.
      */
     fun start(): Boolean {
-        if (!isWindows) {
+        if (!windowsPlatform) {
             log("jump list: skipped (not Windows)")
             return false
         }
@@ -166,16 +172,14 @@ class JumpList(private val log: (String) -> Unit = {}) {
             log("jump list: disabled (-$FLAG=false)")
             return false
         }
-        if (resolveExePath() == null) {
+        if (packagedExePath() == null) {
             log("jump list: disabled (not a packaged install — no jpackage.app-path)")
             return false
         }
         synchronized(lock) {
             if (executor == null) {
                 lastRunAt = System.currentTimeMillis() - MIN_INTERVAL_MS
-                executor = Executors.newSingleThreadScheduledExecutor { r ->
-                    Thread(r, "dhun-jumplist").apply { isDaemon = true }
-                }
+                executor = newWorker()
             }
         }
         log("jump list: enabled")
@@ -184,45 +188,84 @@ class JumpList(private val log: (String) -> Unit = {}) {
 
     /**
      * Requests a rewrite with the given task list; safe from any thread.
-     * Runs immediately if the throttle window has elapsed, otherwise queues a
-     * single trailing run. Identical content is dropped (the shell already
-     * shows it).
+     * The latest batch replaces any not-yet-committed batch. Even an immediate
+     * update is scheduled on the dedicated worker: no caller is ever allowed
+     * to enter COM, which keeps `CoInitializeEx` and every COM pointer on one
+     * apartment thread.
      */
     fun update(entries: List<JumpListEntry>) {
-        if (disabled.get() || executor == null) return
-        if (entries == lastCommitted) return
-        val delayMs: Long
-        synchronized(lock) {
+        val scheduled = synchronized(lock) {
+            if (disabled.get() || entries == lastCommitted) return
+            val worker = executor ?: return
             pending = entries
-            delayMs = nextDelayMs(System.currentTimeMillis(), lastRunAt, MIN_INTERVAL_MS)
-        }
-        if (delayMs == 0L) {
-            drain()
-        } else {
-            val queue = synchronized(lock) {
-                if (trailingQueued) false else { trailingQueued = true; true }
+            if (drainScheduled) {
+                null
+            } else {
+                drainScheduled = true
+                val delayMs = nextDelayMs(System.currentTimeMillis(), lastRunAt, MIN_INTERVAL_MS)
+                worker to delayMs
             }
-            if (queue) {
-                executor?.schedule({
-                    synchronized(lock) { trailingQueued = false }
-                    drain()
-                }, delayMs, TimeUnit.MILLISECONDS)
+        }
+        scheduled?.let { (worker, delayMs) ->
+            try {
+                worker.schedule({ drain() }, delayMs, TimeUnit.MILLISECONDS)
+            } catch (t: RejectedExecutionException) {
+                synchronized(lock) {
+                    // stop() may have detached this worker and a concurrent
+                    // start()/update() may already own a fresh pending batch.
+                    if (executor === worker) {
+                        drainScheduled = false
+                        pending = null
+                    }
+                }
+                log("jump list: worker rejected update: $t")
             }
         }
     }
 
-    /** Runs on the worker; takes the latest pending batch and commits it. */
+    /** Takes the latest pending batch and commits it on the COM-owning worker. */
     private fun drain() {
         val entries = synchronized(lock) {
-            pending.also { pending = null }
+            drainScheduled = false
+            if (disabled.get()) {
+                pending = null
+                null
+            } else {
+                pending.also {
+                    pending = null
+                    if (it != null) lastRunAt = System.currentTimeMillis()
+                }
+            }
         } ?: return
-        lastCommitted = entries
-        val startedAt = System.currentTimeMillis()
-        synchronized(lock) { lastRunAt = startedAt }
-        runCatching { commit(entries) }.onFailure { t ->
+
+        runCatching {
+            commitOverride?.invoke(entries) ?: commit(entries)
+            if (!disabled.get()) lastCommitted = entries
+        }.onFailure { t ->
             disable("native call trapped: $t")
         }
     }
+
+    /** Stops scheduling without deleting the shell-owned Jump List. */
+    fun stop() {
+        val worker = synchronized(lock) {
+            pending = null
+            drainScheduled = false
+            executor.also { executor = null }
+        }
+        worker?.shutdownNow()
+    }
+
+    private fun newWorker(): ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor { task ->
+            Thread({
+                try {
+                    task.run()
+                } finally {
+                    uninitializeComOnCurrentThread()
+                }
+            }, "dhun-jumplist").apply { isDaemon = true }
+        }
 
     private fun disable(reason: String) {
         if (disabled.compareAndSet(false, true)) {
@@ -281,6 +324,7 @@ class JumpList(private val log: (String) -> Unit = {}) {
     /** Minimal ole32 surface (base JNA; no jna-platform). */
     private interface Ole32Lib : Library {
         fun CoInitializeEx(pvReserved: Pointer?, dwCoInit: Int): Int
+        fun CoUninitialize()
         fun CoCreateInstance(
             clsid: ComGuid?,
             pUnkOuter: Pointer?,
@@ -295,15 +339,42 @@ class JumpList(private val log: (String) -> Unit = {}) {
     private val ole32 by lazy {
         Native.load("ole32", Ole32Lib::class.java)
     }
-    private val comInitialized = AtomicBoolean(false)
+    /** COM apartment state is per-thread, never per JumpList instance. */
+    private val comInitialized = ThreadLocal.withInitial { false }
+    private val ownsComInitialization = ThreadLocal.withInitial { false }
 
-    /** STA apartment for this worker thread's lifetime; never uninitialized. */
+    /** Initialize an STA on the dedicated worker before its first COM call. */
     private fun ensureCom(): Boolean {
         if (comInitialized.get()) return true
         val hr = ole32.CoInitializeEx(null, COINIT_APARTMENTTHREADED or COINIT_DISABLE_OLE1DDE)
-        val usable = hr == S_OK || hr == S_FALSE || hr == RPC_E_CHANGED_MODE
-        if (usable) comInitialized.set(true) else disable("CoInitializeEx HRESULT=${hrHex(hr)}")
-        return usable
+        when (hr) {
+            S_OK, S_FALSE -> {
+                comInitialized.set(true)
+                ownsComInitialization.set(true)
+                return true
+            }
+            RPC_E_CHANGED_MODE -> {
+                // COM was initialized by another component on this thread;
+                // it remains usable, but this instance must not uninitialize it.
+                comInitialized.set(true)
+                ownsComInitialization.set(false)
+                return true
+            }
+            else -> {
+                disable("CoInitializeEx HRESULT=${hrHex(hr)}")
+                return false
+            }
+        }
+    }
+
+    /** Pair a successful CoInitializeEx with CoUninitialize on the same worker. */
+    private fun uninitializeComOnCurrentThread() {
+        if (ownsComInitialization.get()) {
+            runCatching { ole32.CoUninitialize() }
+                .onFailure { log("jump list: CoUninitialize failed: $it") }
+        }
+        comInitialized.remove()
+        ownsComInitialization.remove()
     }
 
     private fun guidFrom(iid: String): ComGuid {
@@ -377,7 +448,7 @@ class JumpList(private val log: (String) -> Unit = {}) {
     /** One BeginList → AddUserTasks → CommitList transaction. */
     private fun commit(entries: List<JumpListEntry>) {
         if (!ensureCom()) return
-        val exe = resolveExePath() ?: run { disable("exe path vanished"); return }
+        val exe = packagedExePath() ?: run { disable("exe path vanished"); return }
 
         val listOut = pointerOut()
         val hrList = ole32.CoCreateInstance(

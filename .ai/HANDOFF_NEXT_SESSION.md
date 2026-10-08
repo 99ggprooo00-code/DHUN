@@ -1,76 +1,66 @@
-# HANDOFF — next session (and hardware re-test script)
+# HANDOFF — root-cause fixes and corrected test candidate
 
-Created **2026-09-21, session `arena/01a0c174-dhun`** (the file this message
-thread referred to as "`.ai/HANDOFF_NEXT_SESSION.md` §Round 2 results" was
-never committed by the earlier session — its content survived in the session
-message and is transcribed verbatim below, now in-repo).
+Updated **2026-10-08**, session `arena/094f77e7-dhun`.
 
-## CURRENT STATE — S3 report is qualified; Windows player/native retest remains user-only (2026-10-07)
+## Current state — implementation added locally; PR verification pending
 
-**Worktree:** fixed branch `arena/094f77e7-dhun`, fast-forwarded to
-`main@f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5`. No product code change is
-justified yet. PR #125 is no longer open: it merged as `b1dba0c` on
-2026-10-06T03:58:26Z.
+- Baseline `main` is `f0225f4`; draft PR #127 is on the fixed branch
+  `arena/094f77e7-dhun`. The rolling `test` release still targets `f0225f4`:
+  APK SHA-256 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`,
+  MSI 2.172.1 SHA-256
+  `c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. It is
+  too old to validate any fix. The current worktree adds product changes,
+  focused tests and docs to PR #127's former docs-only state; it is not yet
+  pushed or CI-verified in this snapshot.
+- **Confirmed source defects and fixes:** (1) Jump List's immediate update path
+  ran COM synchronously on whichever caller invoked it, while COM initialization
+  was stored per instance instead of per thread. Every commit is now queued on
+  the dedicated worker with per-thread CoInitializeEx/CoUninitialize; a test
+  pins immediate and delayed commits to that worker. (2) Space was handled at
+  the window after focused children, so controls could consume it. It now runs
+  in a shell preview handler, suppressed by tracked focus in Search and all
+  DHUN text inputs. (3) Ctrl+F and the album-name search fallback changed tabs
+  under an expanded FullPlayer. Tab selection now collapses that overlay, and
+  desktop/Android shortcut paths plus album/artist fallbacks use the shared
+  method. (4) Android offline detection used INTERNET without VALIDATED and its
+  notice sat behind FullPlayer; both are corrected and policy tests were added.
+- `Go to album` still legitimately needs album metadata. A name-only fallback
+  now reveals Search after collapsing FullPlayer; a track with no album name or
+  id cannot be routed and is not claimed as fixed without a known-track test.
+- Lyrics have not been changed.
 
-**Verified CI/release state:** PR #125 post-merge CI **37411494455**, Build APK
-**37411494443**, test-release **37411494399** all passed; the Windows install-
-over smoke fully ran `2.170.1 → 2.171.1`, with userdata/cache sentinels,
-future-upgrade guard and uninstall smoke passing. Current `f0225f4` CI
-**37548884056**, Build APK **37548884107**, and test-release **37548884077** are
-also green. Current published `test` target is `f0225f4`; provenance notices
-identify APK SHA-256 `21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`
-and MSI **2.172.1** SHA-256
-`c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. Release
-asset downloads return EOF in this sandbox; the live `.sha256` sidecars remain
-the device verification authority. Separate scheduled extraction-health run
-**37455619019** classified `ENVIRONMENT_BLOCKED` (hosted runner could not verify
-live health); do not report it as a production pass or a CI regression.
+## Next actions — single agent, sequential
 
-**User S3 report received 2026-10-07 (test execution date not recorded):**
-- Android: Redmi Note 12 4G / Android 15; reported APK hash
-  `21a5fe86…9cc2c` matches current provenance and the byte-identical APK at
-  `b1dba0c`. General playback/library/download, lyrics/settings, and steps
-  19–22 were reported as working. `Go to album` was not found; HTTP 403 was
-  not tested; offline streaming buffered for a long time without clear error
-  feedback and recovered after the network returned. This remains partial S3,
-  not a blanket pass. Do not change lyrics; the user's idea is deferred.
-- Windows: Windows 11, exact OS build/VLC version absent. The reported MSI hash
-  `c27175…3fe17d6` is the `f0225f4` 2.172.1 package, while the `b1dba0c`
-  MSI was 2.171.1 SHA-256
-  `353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`. The
-  report calls the test `b1dba0c` but does not label whether the hash is
-  pre- or post-upgrade; preserve that identity ambiguity. Reported issues:
-  missing DHUN Jump List tasks, Space not responding, and a player view filling
-  the window and blocking Home/Search/Playlists.
-- Static layout trace: the expanded `FullPlayer` is deliberately full-window
-  and covers the shell; the docked `MiniPlayer` is a fixed 72 dp row. `Escape`
-  or the collapse control closes the expanded surface first. The issue may be
-  expected expanded-player behavior, not a docked-player defect. Space is a
-  window `onKeyEvent` shortcut and only sees unconsumed keys. Jump List is
-  packaged-only; native failure/commit lines are in `dhun-startup.log`.
-  No product fix until a hardware retest isolates a defect.
+1. **Completed locally:** full diff re-read; `git diff --check`, 31 Python unit
+   tests, fixture validation (39 JSON fixtures), and Markdown fenced-block
+   checks pass. No JDK/Java is installed, so Kotlin/Gradle tests must be verified
+   by PR CI.
+2. Commit and push only to `arena/094f77e7-dhun`; watch CI, Build APK and
+   test-release to completion. Read annotations: PR-path publishing is expected
+   to skip, but APK and MSI package jobs must pass. Keep the PR draft until
+   required checks and documentation are complete.
+3. After automated tests and docs pass, merge PR #127 to publish the corrected
+   rolling `test` APK/MSI. Hardware acceptance stays **OPEN** until the user
+   tests the *new* hashes; never ask them to test the old `f0225f4` assets or
+   claim CI as hardware acceptance.
+4. Give exact retest steps from `docs/runbooks/s3-hardware-checklist.md`:
+   - Android: install the new APK after verifying its sidecar; test `Go to album`
+     on a known album-linked track; test offline streaming with Wi-Fi connected
+     but no validated Internet and with airplane mode; confirm the offline
+     banner is visible over FullPlayer, downloaded tracks remain available, and
+     playback recovers when Internet returns.
+   - Windows: record `winver`, version/hash, VLC, resolution and scale; test
+     Ctrl+F while FullPlayer is expanded, Escape/collapse, Space play/pause, and
+     spaces in Search. Right-click DHUN after playback and verify Play/Pause,
+     Open DHUN and recents. If tasks are absent, capture the `jump list:` log
+     line and check Settings → Personalization → Start → “Show recently opened
+     items in Start, Jump Lists, and File Explorer”.
+5. Keep S3 open for any unresolved hardware result; fix confirmed defects with
+   tests and repeat the exact corrected-package check. Do not modify lyrics.
 
-**Exact next actions:** see `docs/runbooks/s3-hardware-checklist.md` and
-`docs/verification/15-test-build-gate.md`. On the verified Windows package,
-play a track, expand FullPlayer, press Escape/collapse, and check whether the
-72 dp dock is the only player surface and the three pages are interactive. If
-not, attach a full-window screenshot with `winver`, display resolution/scale,
-MSI version, and pre/post installer hashes. Retest Space once with focus on
-blank non-text content and once in Search (where spaces must still type). For
-the Jump List, play a track, wait two seconds, right-click the running/pinned
-DHUN taskbar icon; if app tasks remain absent, attach a screenshot and the
-`jump list:` lines from `<install-dir>/userdata/dhun-startup.log` (or
-`%TEMP%/dhun-startup.log` fallback). On Android, check `Go to album` against a
-known album-linked track and record streaming-offline feedback separately from
-playing a downloaded file offline.
-
-**Merge gate:** documentation is pushed in draft **PR #127**
-(<https://github.com/99ggprooo00-code/DHUN/pull/127>); local JDK-free checks
-passed. Consult the live PR for required CI/build results, but keep it
-**unmerged** until the physical S3 retest is complete. If hardware confirms a
-docked-layout, key or Jump List defect, add a focused product fix and regression
-test, repeat that device check, update the evidence, and merge only after the
-final verification. Full history below is retained.
+**Blockers:** no JDK or physical Android/Windows devices in this sandbox.
+Release assets downloaded inside this environment may return EOF; publisher
+provenance plus the user's current `.sha256` sidecars identify the exact files.
 
 ## HISTORICAL STATE — PR #125: shared-test flake fix (merged 2026-10-06, session `arena/cf69112a-dhun`)
 

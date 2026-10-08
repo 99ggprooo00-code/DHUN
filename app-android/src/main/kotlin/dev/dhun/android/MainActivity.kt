@@ -171,12 +171,10 @@ class MainActivity : ComponentActivity() {
                             nav.playerExpanded = true
                         }
                         ShortcutAction.SEARCH -> {
-                            nav.selectedTab = AppTab.SEARCH
-                            nav.detailStack.clear()
+                            nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = false)
                         }
                         ShortcutAction.LIBRARY -> {
-                            nav.selectedTab = AppTab.LIBRARY
-                            nav.detailStack.clear()
+                            nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = false)
                         }
                         ShortcutAction.RESUME -> {
                             // Restore is launched during attach; give it a

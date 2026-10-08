@@ -22,6 +22,13 @@ future-upgrade guard and uninstall smoke. The asset blob could not be downloaded
 in the sandbox; these values are from GitHub publisher annotations. The live
 release `.sha256` sidecars are still required to verify the exact device files.
 
+**This is the old baseline, not the corrected candidate.** The local PR #127
+candidate now contains source fixes and regression tests; this worktree still
+needs to be pushed and pass verification. PR-path test-release does not publish
+the rolling `test` tag. After the PR passes and merges, download again and verify
+the new APK/MSI sidecars before doing the targeted retest below. Do not use the
+`f0225f4` package to validate these fixes.
+
 `f0225f4` changes only the README after the PR #125 merge `b1dba0c`; its APK is
 byte-identical to the PR #125 APK. The `b1dba0c` MSI was **2.171.1**,
 112,947,200 B, SHA-256
@@ -64,41 +71,50 @@ bound to the older MSI until the installed version and sequence are confirmed.
 Reported issues: DHUN Jump List tasks absent, Space not responding, and a
 full-window player surface preventing Home/Search/Playlists interaction.
 
-Static source trace: expanded `FullPlayer` intentionally fills the desktop
-window; docked `MiniPlayer` is a separate fixed **72 dp** row. The expanded
-surface covers the shell until the user collapses it. `Escape` invokes the
-shared back contract and collapses it first. No post-collapse result is recorded,
-so no layout defect is confirmed yet. Space's window handler only receives keys
-not consumed by the focused child. Jump List code is enabled only for packaged
-Windows builds and logs native failures/commits. Do not change UI/native code
-until the following reproduction distinguishes a product defect from focus or
-expected expanded-player behavior. Detailed ledger: `docs/verification/14-release.md`.
+Source trace found several code defects, now addressed in the local PR #127
+candidate (push, CI and hardware verification still pending): Jump List's
+zero-delay path called COM on the caller despite the dedicated-worker contract;
+Space ran after child key dispatch; Ctrl+F and the album-name search fallback
+could select a page beneath FullPlayer; Android checked INTERNET without
+VALIDATED and drew the offline banner behind FullPlayer. FullPlayer remains
+intentionally immersive and the docked MiniPlayer remains a separate fixed
+**72 dp** row. Tab-navigation commands now collapse the expanded surface. The
+default AppUserModelID is not changed without evidence of an installer/process
+identity mismatch; Windows privacy/policy can still suppress Jump Lists. S3
+remains **OPEN** until the new candidate is tested on hardware. Detailed ledger:
+`docs/verification/14-release.md`.
 
 ### Windows retest — exact reproduction and evidence
 
-1. Record `winver`, display resolution/scale, installed DHUN version, VLC
-   version (or “not installed”), and both pre-upgrade and post-upgrade MSI file
-   hashes. Verify the MSI against the current `test` release sidecar.
-2. Start a track, expand FullPlayer, then press **Escape** or click its
-   **Collapse player** control. Home, Search and Playlists must become
-   interactive; the remaining docked MiniPlayer should be the 72 dp strip. If
-   that strip still covers the window after collapse, capture a full-window
-   screenshot showing it and note the navigation step used.
-3. Test **Space** with focus on blank, non-text content (not a field or transport
-   button) and confirm playback toggles. Then focus Search and type spaces; they
-   must remain text. Record which focus state failed.
-4. While packaged DHUN is running, play a track and wait at least two seconds
-   for the coalesced shell update. Right-click the running/pinned DHUN taskbar
-   icon. Expected app tasks include **Play / Pause** and **Open DHUN** (plus
-   recent tracks after playback). If only Windows pin/unpin/close items appear,
-   capture the menu and the `jump list:` lines from
-   `<install-dir>\userdata\dhun-startup.log`; if that file is unavailable,
-   check `%TEMP%\dhun-startup.log`. Sanitize personal paths before sharing.
-5. On Android, try `Go to album` on a known album-linked track (record title,
-   artist and destination). Test uncached-stream offline feedback separately
-   from playing a downloaded track offline; record the wait duration, visible
-   message and recovery action. HTTP 403 remains “not tested” unless a safe,
-   reproducible response is available.
+1. Install only the new post-merge candidate. Record `winver`, display
+   resolution/scale, installed DHUN version, VLC version (or “not installed”),
+   and pre/post-upgrade MSI file hashes. Verify the MSI against the current
+   `test` release sidecar.
+2. Start a track, expand FullPlayer, then press **Ctrl+F**. Search must become
+   visible because the shortcut also collapses the expanded player. Press
+   **Escape** or the **Collapse player** control as a separate check; Home,
+   Search and Playlists must then be interactive, with only the fixed 72 dp
+   docked MiniPlayer remaining. Capture a full-window screenshot if any page
+   remains covered.
+3. Test **Space** with focus on non-editable content and confirm playback
+   toggles. Focus Search and type spaces; they must remain text and must not
+   toggle playback. Repeat once while a DHUN name field is focused if available.
+4. In Windows Settings → Personalization → Start, turn on **“Show recently
+   opened items in Start, Jump Lists, and File Explorer”** (record if policy
+   locks it off). While packaged DHUN is running, play a track and wait for
+   `jump list: committed ...` in `dhun-startup.log`; then right-click the
+   running/pinned taskbar icon. Expected app tasks include **Play / Pause** and
+   **Open DHUN** (plus recent tracks after playback). If only Windows
+   pin/unpin/close items appear, capture the menu and all `jump list:` log lines
+   from `<install-dir>\userdata\dhun-startup.log` or `%TEMP%\dhun-startup.log`.
+   Sanitize personal paths before sharing.
+5. On Android, use a known album-linked track and record `Go to album`'s
+   destination; also try a name-only album track if available. Test uncached
+   streaming offline both with Wi-Fi connected but no validated Internet and in
+   airplane mode, while FullPlayer is open. Confirm the offline message remains
+   visible above the player, downloaded tracks remain available, and streaming
+   resumes when Internet returns. Record the wait and recovery time. HTTP 403
+   remains “not tested” unless a safe reproducible response is available.
 
 ## S3 hardware round 1 — partial report received 2026-10-05
 
@@ -170,20 +186,25 @@ not re-litigated, with scope stated honestly — everything else below is still 
 - [ ] Separately, clean-install on a disposable Windows profile/VM.
 - [ ] On that disposable installation only, verify ordinary uninstall removes
       test userdata (intentional, unlike upgrade); never use personal data here.
-- [ ] Launch → Home loads; search + play. Test Space with focus outside
-      text fields/buttons, then confirm a focused Search field still accepts
-      spaces. Test ←/→/Ctrl+←/→ separately.
-- [ ] Expand FullPlayer, then press Escape or use its Collapse control. Home,
-      Search and Playlists must be interactive again; docked MiniPlayer is the
-      fixed 72 dp row. If not, screenshot the entire window (see retest above).
+- [ ] Launch → Home loads; search + play. Test Space with focus on
+      non-editable content, then focus Search and a DHUN name field and verify
+      spaces type normally without toggling playback. Test ←/→/Ctrl+←/→ separately.
+- [ ] Expand FullPlayer, then use **Ctrl+F**: Search must appear and FullPlayer
+      must collapse. Also test Escape and the Collapse control. Home, Search and
+      Playlists must be interactive afterward; docked MiniPlayer is the fixed
+      72 dp row. If not, screenshot the entire window (see retest above).
 - [ ] Double-launch `DHUN.exe` while running → no second window (the
       existing one surfaces).
-- [ ] **Jump-list verb (S4):** after playing a track, wait two seconds and
-      right-click the running/pinned taskbar icon. **Play / Pause** toggles
-      playback WITHOUT surfacing the window; **Open DHUN** surfaces it; a recent
-      track task appears. If only standard Windows pin/unpin/close items appear,
-      screenshot the menu and collect the `jump list:` lines from the startup
-      log path above; record `winver` and the installed MSI version.
+- [ ] **Jump-list verb (S4):** first verify Windows' “Show recently opened
+      items in Start, Jump Lists, and File Explorer” setting is on. After playing
+      a track, wait for `jump list: committed ...` and right-click the running/
+      pinned taskbar icon. **Play / Pause** toggles playback WITHOUT surfacing
+      the window; **Open DHUN** surfaces it; a recent task appears. If only
+      standard pin/unpin/close items appear, screenshot the menu and collect all
+      `jump list:` lines from the startup log path above; record `winver` and MSI
+      version. An explicit AppUserModelID has not been introduced; if commit is
+      logged but tasks remain absent, report the shortcut identity and Windows
+      setting state rather than treating the COM call as hardware acceptance.
 - [ ] **Close/minimize contract:** window **X always exits and stops playback**;
       the separate minimize control leaves the app/tray playback running; tray
       **Quit** exits. Do not expect X to hide to tray (the old close-to-tray
