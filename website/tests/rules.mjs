@@ -212,22 +212,34 @@ export function markerPerceivable(style) {
  * edge, the header's bottom edge, and the viewport height. Returns a message or
  * null — the same shape as the other rules here.
  */
-export function anchorLandingProblem({ hash, targetTop, headerBottom, viewportHeight }) {
+export function anchorLandingProblem({
+  hash,
+  targetTop,
+  headerBottom,
+  viewportHeight,
+  scrollPaddingTop,
+}) {
   if (!Number.isFinite(targetTop) || !Number.isFinite(headerBottom)) {
     return `#${hash} is not in the document after the jump, or has no header to measure against`;
   }
   if (targetTop < headerBottom - 1) {
     const hidden = Math.round(headerBottom - targetTop);
+    const padding = Number.isFinite(scrollPaddingTop)
+      ? `, scroll-padding-top ${Math.round(scrollPaddingTop)}px`
+      : "";
     return (
       `#${hash} lands ${hidden}px behind the sticky header (top ${Math.round(targetTop)}px, ` +
-      `header bottom ${Math.round(headerBottom)}px) — its first line is covered`
+      `header bottom ${Math.round(headerBottom)}px${padding}) — its first line is covered`
     );
   }
   if (targetTop > viewportHeight - 1) {
     const overshoot = Math.round(targetTop - viewportHeight);
+    const padding = Number.isFinite(scrollPaddingTop)
+      ? ` (scroll-padding-top ${Math.round(scrollPaddingTop)}px)`
+      : "";
     return (
       `#${hash} sits ${overshoot}px below the bottom of the viewport after the jump — the ` +
-      `scroll overshot the target`
+      `scroll overshot the target${padding}`
     );
   }
   return null;

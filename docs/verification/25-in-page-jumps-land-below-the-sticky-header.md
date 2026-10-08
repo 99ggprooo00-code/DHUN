@@ -14,78 +14,85 @@ scrollport: `grep -rn 'scroll-margin\|scroll-padding' website/css/` returned onl
 `scroll-behavior: auto !important` line inside the reduced-motion block. The
 site's only in-page jumps are the skip link's `#main` (every page) and four
 footnote links on `/`, so each of them scrolled its target flush with the top of
-the viewport — behind the header. On a viewport narrow enough for the header to
-wrap, the header is **104px** tall, read off the page's own `:root` block:
-`--target` 44px + `--sp-4` 16px + `--target` 44px; for a footnote link the covered
-first line *is* the footnote.
+the viewport — behind the header. The header's height, read off the page's own
+`:root` block (`--target` 44px, `--sp-4` 16px):
+
+| Viewport | Header | Height |
+|---|---|---|
+| ≥ 480px, navigation on one line | wordmark row + nav row | 104px = 2 × 44 + 16 |
+| < 480px, navigation wraps to two lines | wordmark row + two nav lines | 164px = 3 × 44 + 2 × 16 |
+
+For a footnote link the covered first line *is* the footnote.
 
 ## The fix
 
 ```css
-:root { scroll-padding-top: 7rem; }   /* 112px = 104px worst case + 8px slack */
+:root { scroll-padding-top: 12rem; }                                 /* 192px ≥ 164px */
+@media (min-width: 480px) { :root { scroll-padding-top: 7rem; } }    /* 112px ≥ 104px */
 ```
 
 in `website/css/base.css`, next to the sticky header it exists for, with the
 arithmetic and the reason for `rem` (a visitor who raises the browser default font
-size gets a larger offset, not a smaller one) written above it.
+size gets a larger offset, not a smaller one) written above it. Mobile-first, like
+the rest of the sheet: the narrow case is the base, the wide case is the
+`min-width` override.
 
 ## What now asserts it
 
 | Layer | Rule | Proves |
 |---|---|---|
-| Static (local) | `anchor_landing_violations` in `scripts/website_quality.py` (check count 27 → 28) | every `href="#…"` in a built page has a matching `id`; and a page whose own CSS makes its `<header>` sticky, and which has an in-page jump, declares `scroll-padding-top` on `:root`/`html` of at least the two-row floor — re-derived from that page's `--target` and `--sp-4`, not hard-coded |
-| Rendered (CI only) | `anchors land below the header` in `website/tests/browser.mjs` | at 1280×800 and at 380×800 (header wraps): after each in-page jump the target's top edge is below the header's bottom edge and inside the viewport |
-| Decision logic (local) | `anchorLandingProblem()` in `website/tests/rules.mjs`, 4 tests | covered target, landed target, overshot target, missing target/unmeasurable header — must-pass and must-fail halves |
+| Static (local) | `anchor_landing_violations` in `scripts/website_quality.py` (check count 27 → 28) | every `href="#…"` in a built page has a matching `id`; and a page whose own CSS makes its `<header>` sticky, and which has an in-page jump, declares `scroll-padding-top` on `:root`/`html` **outside any conditional group** (a `@media`-only declaration is not a base) with no declared value below the two-row floor — re-derived from that page's `--target` and `--sp-4`, never hard-coded |
+| Rendered (CI only) | `anchors land below the header` in `website/tests/browser.mjs` | at 1280×800, 380×800 and 280×653 — after each in-page jump the target's top edge is below the header's bottom edge and inside the viewport, and the record prints the effective `scroll-padding-top` |
+| Decision logic (local) | `anchorLandingProblem()` in `website/tests/rules.mjs`, 4 tests | covered target, landed target, overshot target, missing target/unmeasurable header — must-pass and must-fail halves, with the padding in the message |
 
 ## Mutation proofs (all read from tool output this session)
 
-| Mutation on a copy of the real build | Verdict |
-|---|---|
-| Delete `:root{scroll-padding-top:7rem}` from `/` | `/: the header sticks to the top and the page jumps to in-page anchors, but no scroll-padding-top is declared, so the target's first line lands behind the header` |
-| Shrink it to `4rem` on `/features/` | `/features/: scroll-padding-top is 64px, but the header is two rows (44px + 16px + 44px = 104px) on a narrow viewport, so in-page jumps land partly behind it` |
-| Break a footnote target's `id` (rename `id="fn-a"`) | `/: links to #fn-a, which no element on the page has — the jump goes nowhere` |
-| Move the declaration onto `.wrap` instead of `:root` | `/404.html: the header sticks to the top and the page jumps to in-page anchors, but no scroll-padding-top is declared …` (the scrollport belongs to the root element, so a declaration elsewhere does not count) |
-| Remove every in-page jump from `/ui/` *and* the padding | no violation — a page with nothing to land has nothing to pad (unit test `test_a_page_with_no_in_page_anchors_is_exempt`) |
+Against disposable copies of the committed build (`AnchorLandings` in
+`scripts/test_website_quality.py`) and a mutated copy of `dist`:
 
-The same four mutations exist as Python tests in `AnchorLandings`
-(`scripts/test_website_quality.py`) against disposable copies of the committed
-build, so the rule cannot silently stop firing.
+| Mutation | Verdict (message) |
+|---|---|
+| Remove the base declaration *and* the override from `/` | `/: the header sticks to the top and the page jumps to in-page anchors, but no scroll-padding-top is declared, so the target's first line lands behind the header` |
+| Keep only the `@media`-only declaration (move the base onto `.wrap`) | `/404.html: scroll-padding-top is declared only inside a conditional group, so it does not apply at every viewport — and the header sticks at every viewport` |
+| Shrink the ≥480px override to `4rem` on `/features/` | `/features/: scroll-padding-top falls to 64px at some viewport, but the header is two rows (44px + 16px + 44px = 104px) on a narrow one, so in-page jumps land partly behind it` |
+| Rename the skip-link target (`id="main"`) | `/ui/: links to #main, which no element on the page has — the jump goes nowhere` |
+| Remove every in-page jump from `/ui/` *and* the padding | no violation — a page with nothing to land has nothing to pad (`test_a_page_with_no_in_page_anchors_is_exempt`) |
 
 ## Measured (this session, from tool output)
 
-| Route | Before this phase (committed `a67f9ac`) | After | Δ |
+| Route | Before this phase (committed `9e31320`) | After | Δ |
 |---|---|---|---|
-| `/` | 51,601 | **51,631** | +30 |
-| `/features/` | 48,309 | **48,339** | +30 |
-| `/ui/` | 49,798 | **49,828** | +30 |
-| `/404.html` | 13,102 | **13,132** | +30 |
+| `/` | 51,631 | **51,688** | +57 |
+| `/features/` | 48,339 | **48,396** | +57 |
+| `/ui/` | 49,828 | **49,885** | +57 |
+| `/404.html` | 13,132 | **13,189** | +57 |
 
-Inlined CSS per route after the build: `/` 20,680 B, `/features/` 16,059 B,
-`/ui/` 19,345 B. The pruner's own line is unchanged at
-`pruned 4 page(s): 27693 bytes of CSS no page can use` — the rule added here has no
-class selector, so the pruner keeps it on every route; the ratchet baseline was
+The pruner's own line is unchanged at
+`pruned 4 page(s): 27693 bytes of CSS no page can use` — the two new declarations
+have no class selector, so every route keeps them; the ratchet baseline was
 regenerated in the same commit.
 
 | Gate | Result |
 |---|---|
-| `npm run build` | `pruned 4 page(s): 27693 bytes of CSS no page can use` · `minified: saved 48282 bytes` |
-| `npm run verify:minify` | `OK: every built file matches a fresh unminified build ignoring whitespace (48392 bytes saved by minification).` |
+| `npm run build` | `pruned 4 page(s): 27693 bytes of CSS no page can use` · `minified: saved 49418 bytes` |
+| `npm run verify:minify` | `OK: every built file matches a fresh unminified build ignoring whitespace (49544 bytes saved by minification).` |
 | `npm run test:rules` | `# tests 33 # pass 33 # fail 0` |
 | `python3 scripts/website_quality.py website/dist` | `OK: 28 quality checks pass on website/dist.` |
-| `python3 scripts/website_claims.py website/dist` | `OK: 4 built page(s) pass the honesty contract (…)` |
-| `npx html-validate "dist/**/*.html"` | exit 0, no output |
-| `python3 -m unittest discover -s scripts -p 'test_*.py'` | `Ran 263 tests in 7.985s` → `OK` (257 before this phase) |
+| `python3 -m unittest discover -s scripts -p 'test_*.py'` | `Ran 264 tests in 8.061s` → `OK` (263 before the rewrite) |
 
 ## Not verified here
 
 - **The rendered landing** (the CI-only half above): the sandbox has no browser
   (record 23), so the numbers the browser check will print — target top, header
-  bottom, at both widths — have not been read yet. The *decision* half is
-  mutation-proven locally; the *gathering* half (`getBoundingClientRect` after the
-  fragment jump, six animation frames to settle) is not.
+  bottom, effective padding, at three widths — have not been read yet. The
+  *decision* half is mutation-proven locally; the *gathering* half
+  (`getBoundingClientRect` after the fragment jump, six animation frames to settle,
+  `getComputedStyle(document.documentElement).scrollPaddingTop`) is not.
+- **The 280×653 header height.** 164px is arithmetic from the tokens and the
+  documented wrapping, not a measurement; if the header is taller than 192px there,
+  the browser check fails and names the number to raise.
 - **`scroll-padding-top` in browsers other than Chromium.** The property is
   standard and the CI job runs one engine; no other engine was measured here.
-- **Whether 112px is *always* enough.** It covers the two-row header measured from
-  the page's own tokens (104px); a user font size large enough to wrap the *nav
-  into two lines* would make the header three rows. The browser check is what would
-  catch that, at the two widths it runs.
+- **A user font size large enough to wrap the navigation at ≥480px.** That is the
+  three-row case the base value exists for; the browser check runs at default font
+  size only.

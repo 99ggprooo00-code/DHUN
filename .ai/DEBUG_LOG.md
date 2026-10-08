@@ -4240,13 +4240,6 @@ accessibility floor checked that the skip link exists and is reachable by Tab, n
 that what it jumps to is readable; the responsive rules checked that breakpoints
 exist, not that their height was accounted for after a jump.
 
-**Fix.** `:root { scroll-padding-top: 7rem }` in base.css, next to the sticky
-header it exists for, with the arithmetic written down (104px worst case + 8px, in
-`rem` so it scales with the visitor's font size). `anchor_landing_violations`
-asserts it for sticky-headed pages with in-page jumps, re-deriving the floor from
-the page's `--target` and `--sp-4`, and asserts that every `href="#…"` has a
-matching `id`; when the declaration was moved onto `.wrap` instead of `:root` the
-check still failed, because the scrollport belongs to the root element. The
-rendered half is the new browser check, measured at two widths (the narrow one
+**Fix.** A mobile-first pair in base.css, next to the sticky header they exist for: `:root { scroll-padding-top: 12rem }` (192px, covering the 164px three-row worst case below 480px, where the navigation itself wraps to two lines) and `@media (min-width: 480px) { :root { scroll-padding-top: 7rem } }` (112px for the 104px two-row case), both in `rem` so they scale with the visitor's font size. `anchor_landing_violations` asserts the base declaration exists *outside* any conditional group (a `@media`-only declaration applies nowhere else) and that no declared value falls below the two-row floor, re-derived from the page's `--target` and `--sp-4`; moving the declaration onto `.wrap` was still caught. The rendered half is the new browser check, measured at three widths — 1280×800, 380×800 and the 280×653 cover-screen class where the navigation wraps too — and it reports the effective `scroll-padding-top`, so a failure names the number to change instead of just being red.
 where the header is two rows) instead of trusting the arithmetic.
 

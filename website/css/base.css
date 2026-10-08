@@ -125,14 +125,19 @@ hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--sp-8) 0; }
    moves the scrollport's top edge down for every jump and for the focus scroll
    of the skip link.
 
-   7rem = 112px covers the worst case read off this stylesheet: two header rows
-   at the 44px target floor plus the 16px row gap (2 * 44 + 16 = 104px), with 8px
-   slack. It is in `rem` so a visitor who raises their browser's default font
-   size gets a proportionally larger offset rather than less of it.
-   `anchor_landing_violations` re-derives that floor from this page's own
-   `--target` and `--sp-4`, and the browser check `anchors land below the header`
-   measures the real header height instead of trusting the arithmetic. */
-:root { scroll-padding-top: 7rem; }
+   Two heights, read off this stylesheet. Up to 479px the navigation itself can
+   wrap, so the header is the wordmark row plus up to two nav lines: 3 * 44px of
+   targets and 2 * 16px of gaps = 164px, and 12rem (192px) covers it. From 480px
+   the header is at most two rows — a 44px row plus a 44px row = 104px — and 7rem
+   (112px) covers that with 8px of slack. Both are in `rem` so a visitor who
+   raises the browser's default font size gets a proportionally larger offset
+   rather than less of it. `anchor_landing_violations` re-derives the two-row
+   floor from this page's own `--target` and `--sp-4` and refuses any declaration
+   below it; the browser check `anchors land below the header` measures the real
+   header height at 280x653, 380x800 and 1280x800 instead of trusting the
+   arithmetic. */
+:root { scroll-padding-top: 12rem; }
+@media (min-width: 480px) { :root { scroll-padding-top: 7rem; } }
 
 /* ------------------------------------------------------------------ hero -- */
 .hero { padding: var(--sp-8) 0 var(--sp-6); }

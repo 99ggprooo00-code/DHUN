@@ -405,26 +405,32 @@ deliberately. Reversal cost: delete the two `{% if %}` clauses, the CSS rule, th
 
 **D20 — an in-page jump lands below the sticky header, and every anchor target exists.**
 The header is `position: sticky` (base.css) and its row is 64px tall with a 44px
-target floor inside it, so on a narrow viewport it wraps to two rows: measured from
-the page's own `:root` block, `--target` 44px + `--sp-4` 16px + `--target` 44px =
-**104px**. Nothing in the CSS pushed the scrollport down, so the skip link's `#main`
-and the footnote links on `/` (the site's only in-page jumps) landed with their
-first line *behind* the header — a defect with no symptom until a visitor clicks.
-Fixed with `:root { scroll-padding-top: 7rem }` (112px: worst case 104px + 8px,
-written in `rem` so a visitor who raises their default font size gets a larger
-offset, not a smaller one). The new static check
-(`anchor_landing_violations`, check count 27 → 28) asserts both directions of the
-landing: every `href="#…"` on a page has a matching `id`, and a page that is
-sticky-headed *and* has an in-page jump must declare a `scroll-padding-top` on
-`:root`/`html` of at least the two-row floor, re-derived from the page's own
-tokens rather than trusted as 104. The rendered half — target's real position under
-the real header, at 1280×800 and at 380×800 where the header is two rows — is the
-browser check `anchors land below the header`, decided by the mutation-proven
-`anchorLandingProblem()` (placeholder-`NaN` guards included). Cost: **+30 B per
-route** (measured: `/` 51,601 → 51,631 B, `/features/` 48,309 → 48,339 B, `/ui/`
-49,798 → 49,828 B, `/404.html` 13,102 → 13,132 B), recorded in the ratchet.
-Reversal cost: delete the CSS rule, the check and its registration; ~10 minutes,
-and the jump defect returns.
+target floor inside it, so it wraps as the viewport narrows: measured off the
+page's own `:root` block, `--target` 44px + `--sp-4` 16px + `--target` 44px =
+**104px** for the two-row header, and **164px** (3 × 44 + 2 × 16) where the
+navigation itself wraps to two lines. Nothing pushed the scrollport down, so the
+skip link's `#main` and the footnote links on `/` — the site's only in-page jumps —
+landed with their first line *behind* the header; for a footnote the covered line
+is the whole footnote. Fixed with a mobile-first pair: `:root { scroll-padding-top:
+12rem }` (192px, covering the 164px three-row worst case up to 479px) and
+`@media (min-width: 480px) { :root { scroll-padding-top: 7rem } }` (112px for the
+104px two-row case, 8px slack). Both are in `rem` so a visitor who raises the
+browser's default font size gets a proportionally larger offset, not a smaller one.
+The new static check (`anchor_landing_violations`, check count 27 → 28) asserts
+both directions of the landing: every `href="#…"` on a page has a matching `id`,
+and a page that is sticky-headed *and* has an in-page jump must declare
+`scroll-padding-top` on `:root`/`html` **outside any conditional group** (a
+`@media`-only declaration is not a base) with no declared value below the two-row
+floor — both numbers re-derived from the page's own tokens rather than trusted as
+104. The rendered half — the target's real position under the real header, at
+1280×800, 380×800 and 280×653 (the smallest display class the site supports, where
+the navigation can wrap) — is the browser check `anchors land below the header`,
+decided by the mutation-proven `anchorLandingProblem()`, which also reports the
+effective `scroll-padding-top` so a failure names the number to change. Cost:
+**+57 B per route** (measured: `/` 51,631 → 51,688 B, `/features/` 48,339 →
+48,396 B, `/ui/` 49,828 → 49,885 B, `/404.html` 13,132 → 13,189 B), recorded in
+the ratchet. Reversal cost: delete the two CSS declarations, the check and its
+registration; ~10 minutes, and the jump defect returns.
 
 ## 11. Work plan, execution and honest status
 

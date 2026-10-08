@@ -746,15 +746,11 @@ def anchor_landing_violations(dist: pathlib.Path) -> list[str]:
         css = page_stylesheet(dist, route)
         # Where the value takes effect, not merely where it is written: the
         # scrollport belongs to the root element, so the padding and the two
-        # tokens the floor is re-derived from must be declared on `:root`/`html`.
-        declarations: dict[str, str] = {}
-        for prelude, body in re.findall(r"([^{}]*)\{([^{}]*)\}", css):
-            if ":root" not in prelude and not re.search(r"(?:^|[,\s])html(?:[,\s]|$)", prelude):
-                continue
-            for part in body.split(";"):
-                if ":" in part:
-                    prop, _, value = part.partition(":")
-                    declarations[prop.strip()] = value.strip()
+        # tokens the floor is re-derived from must be declared on `:root`/`html`,
+        # and the padding must hold at *every* viewport — a declaration that only
+        # applies inside a `@media` block is not a base, and an override that is
+        # smaller than the two-row floor is a hole at that width.
+        declarations, overrides = _root_declarations(css_units(css))
         header = re.search(r"<header\b[^>]*>", markup, re.I)
         header_classes = (
             re.findall(r'class="([^"]*)"', header.group(0)) if header else []
@@ -767,14 +763,32 @@ def anchor_landing_violations(dist: pathlib.Path) -> list[str]:
                 sticky = True
         if not sticky:
             continue
-        offset = _length_px(declarations.get("scroll-padding-top", ""))
-        if offset is None:
-            violations.append(
-                f"{route}: the header sticks to the top and the page jumps to in-page "
-                f"anchors, but no scroll-padding-top is declared, so the target's first "
-                f"line lands behind the header"
-            )
+        if "scroll-padding-top" not in declarations:
+            if "scroll-padding-top" in overrides:
+                violations.append(
+                    f"{route}: scroll-padding-top is declared only inside a conditional "
+                    f"group, so it does not apply at every viewport — and the header sticks "
+                    f"at every viewport"
+                )
+            else:
+                violations.append(
+                    f"{route}: the header sticks to the top and the page jumps to in-page "
+                    f"anchors, but no scroll-padding-top is declared, so the target's first "
+                    f"line lands behind the header"
+                )
             continue
+        declared = _length_px(declarations["scroll-padding-top"])
+        smallest = min(
+            [
+                value
+                for value in (
+                    [_length_px(declarations["scroll-padding-top"])]
+                    + [_length_px(value) for value in overrides.values()]
+                )
+                if value is not None
+            ]
+            or [None]
+        )
         target = _length_px(declarations.get("--target", ""))
         gap = _length_px(declarations.get("--sp-4", ""))
         if target is None or gap is None:
@@ -785,13 +799,48 @@ def anchor_landing_violations(dist: pathlib.Path) -> list[str]:
             )
             continue
         floor = 2 * target + gap
-        if offset < floor:
+        if declared is None:
             violations.append(
-                f"{route}: scroll-padding-top is {offset:g}px, but the header is two rows "
-                f"({target:g}px + {gap:g}px + {target:g}px = {floor:g}px) on a narrow "
-                f"viewport, so in-page jumps land partly behind it"
+                f"{route}: scroll-padding-top is "
+                f"{declarations['scroll-padding-top']!r}, which is not a px or rem length "
+                f"this rule can check against the {floor:g}px two-row header"
+            )
+            continue
+        if smallest is not None and smallest < floor:
+            violations.append(
+                f"{route}: scroll-padding-top falls to {smallest:g}px at some viewport, but "
+                f"the header is two rows ({target:g}px + {gap:g}px + {target:g}px = "
+                f"{floor:g}px) on a narrow one, so in-page jumps land partly behind it"
             )
     return violations
+
+
+def _root_declarations(units: list[dict]) -> tuple[dict[str, str], dict[str, str]]:
+    """Declarations written on the root element: (unconditional, conditional).
+
+    `units` is `css_units(css)`. A custom property or `scroll-padding-top` read
+    from a rule inside `@media`/`@supports`/`@container`/`@layer` only applies
+    where that condition holds, so the two are kept apart: the base is what holds
+    at every viewport, and the overrides are what a narrow (or wide) viewport gets
+    instead.
+    """
+    base: dict[str, str] = {}
+    conditional: dict[str, str] = {}
+    for unit in units:
+        if unit["kind"] == "at":
+            nested, _ = _root_declarations(unit["children"])
+            conditional.update(nested)
+            continue
+        if unit["kind"] != "rule":
+            continue
+        prelude = unit["prelude"]
+        if ":root" not in prelude and not re.search(r"(?:^|[,\s])html(?:[,\s]|$)", prelude):
+            continue
+        for part in unit["body"].split(";"):
+            if ":" in part:
+                prop, _, value = part.partition(":")
+                base[prop.strip()] = value.strip()
+    return base, conditional
 
 
 # Keys that must never appear in the site's structured data. Each one is a claim

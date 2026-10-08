@@ -1306,10 +1306,10 @@ class DistMatchesItsSources(DistCopyMixin):
 class AnchorLandings(DistCopyMixin):
     """In-page jumps land on something, and below the sticky header.
 
-    The header is sticky and, on a narrow viewport, two rows tall; nothing else
-    in the gate table notices that a jump lands behind it. The browser half of
-    the landing measurement is `website/tests/browser.mjs`; these are the
-    mutations that need no browser.
+    The header is sticky and, on a narrow viewport, two or three rows tall;
+    nothing else in the gate table notices that a jump lands behind it. The
+    browser half of the landing measurement is `website/tests/browser.mjs`; these
+    are the mutations that need no browser.
     """
 
     def test_the_committed_site_lands_its_jumps_below_the_header(self):
@@ -1331,9 +1331,28 @@ class AnchorLandings(DistCopyMixin):
         )
 
     def test_a_page_without_scroll_padding_fails(self):
-        violations = self.mutate("index.html", ":root{scroll-padding-top:7rem}", "")
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        # Both the base declaration and the narrow-viewport override.
+        markup = markup.replace(":root{scroll-padding-top:12rem}", "", 1)
+        markup = markup.replace(":root{scroll-padding-top:7rem}", "", 1)
+        page.write_text(markup, encoding="utf-8")
+        violations = quality.anchor_landing_violations(dist)
         self.assertTrue(
             any(v.startswith("/:") and "no scroll-padding-top" in v for v in violations),
+            violations,
+        )
+
+    def test_padding_only_inside_a_conditional_group_fails(self):
+        """A `@media`-only declaration is not a base: it is absent at other widths."""
+        violations = self.mutate(
+            "ui/index.html", ":root{scroll-padding-top:12rem}", ".wrap{scroll-padding-top:12rem}"
+        )
+        self.assertTrue(
+            any(
+                "/ui/" in v and "only inside a conditional group" in v for v in violations
+            ),
             violations,
         )
 
@@ -1350,9 +1369,13 @@ class AnchorLandings(DistCopyMixin):
         )
 
     def test_padding_written_off_the_root_selector_does_not_count(self):
-        violations = self.mutate(
-            "404.html", ":root{scroll-padding-top:7rem}", ".wrap{scroll-padding-top:7rem}"
-        )
+        dist = self.copy_dist()
+        page = dist / "404.html"
+        markup = page.read_text(encoding="utf-8")
+        markup = markup.replace(":root{scroll-padding-top:12rem}", ".wrap{scroll-padding-top:12rem}", 1)
+        markup = markup.replace(":root{scroll-padding-top:7rem}", ".wrap{scroll-padding-top:7rem}", 1)
+        page.write_text(markup, encoding="utf-8")
+        violations = quality.anchor_landing_violations(dist)
         self.assertTrue(
             any("/404.html" in v and "no scroll-padding-top" in v for v in violations),
             violations,
@@ -1364,10 +1387,8 @@ class AnchorLandings(DistCopyMixin):
         page = dist / "ui" / "index.html"
         markup = page.read_text(encoding="utf-8")
         self.assertIn('href="#main"', markup)
-        page.write_text(
-            markup.replace('href="#main"', 'href="/"', 1).replace(
-                ":root{scroll-padding-top:7rem}", ""
-            ),
-            encoding="utf-8",
-        )
+        markup = markup.replace('href="#main"', 'href="/"', 1)
+        markup = markup.replace(":root{scroll-padding-top:12rem}", "", 1)
+        markup = markup.replace(":root{scroll-padding-top:7rem}", "", 1)
+        page.write_text(markup, encoding="utf-8")
         self.assertEqual(quality.anchor_landing_violations(dist), [])

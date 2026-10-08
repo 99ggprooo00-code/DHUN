@@ -236,8 +236,10 @@ test("anchor landings: a target under the header fails with the hidden height", 
     targetTop: 18,
     headerBottom: 105,
     viewportHeight: 800,
+    scrollPaddingTop: 112,
   });
   assert.match(problem, /87px behind the sticky header/);
+  assert.match(problem, /scroll-padding-top 112px/);
   assert.match(problem, /first line is covered/);
 });
 

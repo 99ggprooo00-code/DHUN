@@ -1124,9 +1124,13 @@ async function checkPreferences(browser) {
  * below are self-contained because `page.evaluate` serialises them into the page.
  */
 async function checkAnchorLanding(browser) {
+  // 280×653 is the smallest display class the site supports (Galaxy Fold cover
+  // screen) and the width where the navigation itself can wrap, making the header
+  // three rows; 380×800 is the ordinary phone width, where it is two.
   const cases = [
     { name: "1280×800", viewport: { width: 1280, height: 800 } },
     { name: "380×800 (header wraps to two rows)", viewport: { width: 380, height: 800 } },
+    { name: "280×653 (navigation can wrap too)", viewport: { width: 280, height: 653 } },
   ];
   for (const testCase of cases) {
     const context = await browser.newContext({
@@ -1155,7 +1159,8 @@ async function checkAnchorLanding(browser) {
           record(
             `anchors ${route} @ ${testCase.name}`,
             `#${hash} lands at ${Math.round(metrics.targetTop)}px, clear of the header ` +
-              `bottom at ${Math.round(metrics.headerBottom)}px`,
+              `bottom at ${Math.round(metrics.headerBottom)}px ` +
+              `(scroll-padding-top ${Math.round(metrics.scrollPaddingTop)}px)`,
           );
         }
       }
@@ -1193,6 +1198,9 @@ function landingReport(hash) {
       resolve({
         targetTop: target.getBoundingClientRect().top,
         headerBottom: header ? header.getBoundingClientRect().bottom : 0,
+        scrollPaddingTop: Number.parseFloat(
+          window.getComputedStyle(document.documentElement).scrollPaddingTop,
+        ),
       });
     };
     window.requestAnimationFrame(measure);

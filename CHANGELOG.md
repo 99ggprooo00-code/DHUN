@@ -29,13 +29,16 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 - The header sticks to the top of the viewport, so the skip link's `#main` and the
   footnote links on `/` scrolled their target to the very top, where the first
   line — the whole footnote line — sat *under* the header. `scroll-padding-top`
-  now pads the scrollport by the two-row header height read off the page's own
-  tokens (44px target + 16px gap + 44px = 104px), as `7rem` so it grows with a
-  visitor's default font size. A new static check asserts both halves (every
-  `href="#…"` has an `id`; a sticky-headed page with in-page jumps pads the
-  scrollport by at least the two-row floor, re-derived from its own CSS), and a
-  new browser check measures the landing at 1280×800 and at 380×800, where the
-  header wraps to two rows. Measured cost: +30 B per route.
+  now pads the scrollport with two mobile-first values read off the page's own
+  tokens: `12rem` up to 479px, where the navigation can wrap and the header can be
+  three rows (3 × 44px + 2 × 16px = 164px), and `7rem` from 480px, where the header
+  is at most two rows (104px). `rem` is deliberate: a visitor who raises their
+  default font size gets a larger offset, not a smaller one. A new static check
+  asserts both halves — every `href="#…"` has an `id`, and a sticky-headed page
+  with in-page jumps declares a base `scroll-padding-top` with no value below the
+  two-row floor, re-derived from its own CSS — and a new browser check measures the
+  landing at 1280×800, 380×800 and 280×653, reporting the effective padding so a
+  failure names the number to change. Measured cost: +57 B per route.
 
 ### Accessibility — the header says which page you are on, and the 404 is noindex (2026-10-08, session `arena/af3e7f66-dhun`)
 
