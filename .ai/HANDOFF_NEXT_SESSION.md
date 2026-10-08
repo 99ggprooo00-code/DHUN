@@ -2,7 +2,9 @@
 
 Updated **2026-10-08**, session `arena/8be68e2c-dhun`. `main` =
 `6f1e6ba730e590cca693c4735a558556cd8378ae` (PR #134, merged 2026-10-08T09:53:02Z).
-PR **#135** is open on `arena/8be68e2c-dhun`, head `a66b342`, CI green.
+PR **#135** is open on `arena/8be68e2c-dhun`: code head `a66b342`, docs head
+`f027dfc`, plus the trailing ledger commit that records `f027dfc`'s own runs
+(same pattern as PR #134's `5931bf2`). All four workflows green on `f027dfc`.
 
 ## Current state
 

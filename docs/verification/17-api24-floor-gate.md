@@ -92,7 +92,13 @@ cannot:
 **Revert:** `a66b342` deletes the probe file. `git diff --stat 46583a4 a66b342`
 is **empty** — the tree is byte-identical to the pre-probe head — and CI
 pull_request **37766214968** is green on it, 14/14 steps with step 10
-**success**. That is the head PR #135 asks to merge.
+**success**.
+
+**Head PR #135 asks to merge:** `f027dfc` (the ledger above, on top of
+`a66b342`) plus the trailing commit that records `f027dfc`'s own runs — no code
+change since `a66b342`. All four workflows green on `f027dfc`: CI pull_request
+**37767256325** (14/14, step 10 success), CI push **37767248647**, Build APK
+**37767256472**, test-release **37767256281**.
 
 ## Contract tests (runnable without a JDK)
 
