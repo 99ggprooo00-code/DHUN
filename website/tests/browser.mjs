@@ -45,7 +45,7 @@
  * `scripts/website_smoke.py`'s job, and it can only run where the site is
  * actually served.
  */
-import { mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
@@ -61,6 +61,8 @@ import {
   headingOrderProblem,
   targetProblem,
 } from "./rules.mjs";
+
+import { MESSAGE_BUDGET, clipMessage, packReport, renderAllReports } from "./annotation-report.mjs";
 
 const BASE = process.env.SITE_BASE || "http://127.0.0.1:8080";
 const ROUTES = ["/", "/features/", "/ui/"];
@@ -132,46 +134,48 @@ function group(entries) {
   return grouped;
 }
 
-const clip = (text, limit = 4000) => (text.length > limit ? `${text.slice(0, limit)} …(truncated)` : text);
+const clip = clipMessage;
 
-// GitHub's annotation API is the only channel this environment can substitute a
-// browser for, and it returns annotations per level with a practical cap around
-// ten. So: one annotation per category, at most eight, and a ninth that carries
-// *everything* suppressed rather than a count of it. Five notices were silently
-// lost to an earlier six-notice cap — including every axe scan — so a dropped
-// measurement is a bug in this file, not a display detail.
-const ANNOTATION_CAP = 8;
-
-// The carry annotation holds everything the cap pushed out, so it is clipped far
-// more generously than a single category: with the viewport matrix, forced
-// colours, increased contrast and print added, more than half of the
-// measurements can land here, and a truncated carry is the same silent loss the
-// cap exists to prevent. GitHub accepts annotation messages of tens of KB; a
-// category is clipped at 4 KB because it is one finding, and the leftover pile
-// at 24 KB because it is many.
-const CARRY_CLIP = 24000;
-
+/**
+ * One annotation per category is not enough and one carry annotation is worse:
+ * GitHub clips a message at roughly 4 KB, so the old 24 KB carry silently
+ * dropped everything past its first screenful — both axe scans among it. Every
+ * message is now packed to a measured budget, the budget is spent across as
+ * many annotations as the ~10-per-step cap allows, and whatever still does not
+ * fit is *named* by category and count instead of disappearing.
+ *
+ * The record is the job log and the run summary, not the annotation: the full
+ * report is written to both before any annotation is emitted.
+ */
 function emitReport(grouped, level, label) {
-  const entries = [...grouped.entries()];
-  for (const [key, items] of entries.slice(0, ANNOTATION_CAP)) {
-    annotate(level, `${key} — ${items.length} ${label}(s)`, clip(items.join(" || ")));
-  }
-  const rest = entries.slice(ANNOTATION_CAP);
-  if (rest.length) {
-    const suppressed = rest.flatMap(([, items]) => items);
-    annotate(
-      level,
-      `${rest.length} more categor(y|ies) — ${suppressed.length} ${label}(s)`,
-      clip(suppressed.join(" || "), CARRY_CLIP),
-    );
+  const { annotations } = packReport([...grouped.entries()], label, { messageBudget: MESSAGE_BUDGET });
+  for (const { title, body } of annotations) {
+    annotate(level, title, clip(body, MESSAGE_BUDGET));
   }
 }
 
 function emitAnnotations() {
+  // The full report goes where nothing is capped. Guarded: a failing step must
+  // never die because a summary file was unavailable.
+  const full = renderAllReports({
+    failures: [...group(failures).entries()],
+    warnings: [...group(warnings).entries()],
+    measurements: [...group(measurements).entries()],
+  });
+  console.log(full);
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryPath) {
+    try {
+      appendFileSync(summaryPath, `${full}\n`);
+    } catch (error) {
+      warn("job summary unavailable", error instanceof Error ? error.message : String(error));
+    }
+  }
+
   if (failures.length) emitReport(group(failures), "error", "problem");
   if (warnings.length) emitReport(group(warnings), "warning", "note");
   // Measurements are the deliverable, not a courtesy: they go through the same
-  // cap-and-carry path as findings so that none can be dropped on the floor.
+  // packing as findings so none can be dropped on the floor.
   if (measurements.length) emitReport(group(measurements), "notice", "measurement");
 }
 
