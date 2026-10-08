@@ -1,3 +1,104 @@
+# HANDOFF — PR #136 merged; ADR-008 B1 is BLOCKED and closed; B2 is a separate user decision
+
+Updated **2026-10-08**, session `arena/45db02aa-dhun`. Fixed session branch:
+`arena/45db02aa-dhun`. Current base and GitHub `main`:
+**`2a20024d4b626b3f40ae95776cefb6b1e49cfdca`** (PR #136 merge, 2026-10-08T13:19:49Z,
+authorized explicitly by the user). This session's only deliverable is a
+**docs-only** ledger synchronization — the post-merge state plus the canonical
+B1 result — on one small follow-up PR. No code, workflow, extraction, client
+profile or web asset changed.
+
+## Current state
+
+- **PR #136 is merged and post-merge green.** CI **37783500689**, Build APK
+  **37783500620**, test-release **37783500838** and Pages **37783499138** all
+  concluded `success` on `main@2a20024`. `aab` and `release_draft` skipped in
+  test-release on a push, as designed.
+- **Pages is verified at the merged commit.** The Pages API reports
+  `build_type=legacy`, `source=main:/`, `status=built`, `https_enforced=true`;
+  the build is `built` with no error for the **exact** commit `2a20024`. Pages
+  artifact **11552239018** (1,171,094 B) exists, but its archive redirected to an
+  external blob host that was unavailable — it was **never inspected** and is not
+  browser evidence.
+- **The probe is live at the canonical URL.**
+  `https://99ggprooo00-code.github.io/DHUN/web-spike/` serves probe revision
+  `b1-v1`.
+- **ADR-008 B1 ran and is BLOCKED.** The user confirmed the probe UI rendered and
+  ran it in **Brave `1.96.61`** (Chromium `154.0.8037.98`, Official Build,
+  64-bit — Chromium family, not stock Chrome/Chromium). Anonymous metadata
+  **PASS** (values discarded). The player request **FAILED** — blocked before a
+  readable response — so direct-URL, byte-range, codec/media, `playing` and
+  audible-playback stages were **not reached**. No sanitized JSON, screenshot or
+  DevTools trace was supplied. Firefox and Safari were **unavailable**, not
+  inferred failures. Full detail: `docs/verification/19-browser-feasibility-spike.md`.
+- **Do not narrow the failure.** With no trace, it must not be attributed to a
+  specific HTTP status, an `OPTIONS` preflight rejection, extension/Shield
+  behavior or a network policy.
+- **No Web-support claim is permitted** anywhere. B1 stops here. Do not restart
+  B1; do not add a proxy/backend; do not change extraction or client profiles; do
+  not adopt Kotlin/JS, Wasm, TypeScript or any production browser stack; do not
+  implement the static Option-A fallback.
+- **Rolling `test` release at `2a20024`:** id **406857108**, published
+  2026-10-08T13:25:17Z. Universal APK 18,405,859 B
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`; arm64
+  18,355,786 B `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  v7a 18,352,944 B `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`;
+  MSI **2.215.1** 112,971,776 B
+  `fec11d502962f16928582c83363f08a7c316d47f02fb046668c2226900928f21`. The APK
+  bytes are unchanged from the earlier publish; the MSI digest changed. Split
+  APKs still differ from universal.
+- **Hosted MSI smoke is packaging-only.** It proves `2.213.1 → 2.215.1`
+  install-over, userdata/cache sentinels, the future-upgrade guard and uninstall.
+  It does **not** prove launch, playback or visuals.
+- **S3 remains open and user-gated.** Round 4 (Android landscape + Windows
+  fullscreen: compact **docked** mini-player bar with Home/Search/Library visible
+  above it) and round 5 (API 24–25 hardware: launcher icon, launch, search, play,
+  background audio; record device model, OS/API, APK filename and installed APK
+  SHA-256) are user-only. S6 remains blocked on S3.
+- **AAB staging remains user-only.** One `test-release` dispatch with
+  `build_only=true`, `build_release_candidate=true` still has to exercise the
+  `aab` job's `stage_artifact.py` path; the automatic CI gate only compiles.
+- **The closed session's local-only commit is gone.** `6161f50 docs: record
+  post-merge B1 blocked result` was never pushed and is not fetchable here
+  (`git cat-file -t 6161f50` → invalid object). Its substance is recreated in the
+  synchronized ledger instead.
+
+## Next actions — in order
+
+1. **S3 device rounds first.** Rounds 4 and 5 are the long-standing user-only
+   gates; use the exact hashes above and record device/OS/APK hash. Capture
+   licence-safe screenshots with provenance (the W3 asset path).
+2. **User-only:** dispatch the AAB release-candidate staging path once.
+3. **Stop before B2.** Do not restart B1. Bring the blocked evidence to the user
+   and take an explicit ADR-008 B2 decision — which may be “stop / static Option
+   A”. No stack, proxy or Option-A implementation is authorized meanwhile.
+4. If the user later supplies the missing sanitized JSON/screenshot/trace, record
+   it as a refinement of record 19 — it still stops at B2.
+5. Do not merge the current docs-only follow-up PR without explicit user
+   authorization.
+
+## Do not
+
+- Do not restart B1, widen ADR-008, or begin any B2 implementation.
+- Do not add a proxy/backend, or change extraction/probe semantics or production
+  client profiles.
+- Do not adopt Kotlin/JS, Wasm, TypeScript or any production browser stack.
+- Do not implement the static Option-A fallback as an implied selection.
+- Do not merge/close PR #54 or implement ADR-007 without explicit approval.
+- Do not touch Android, Windows, FullPlayer (ADR-002), lyrics or ABI splits.
+- Do not cite the uninspected Pages artifact archive as browser evidence.
+- Do not call CI, hosted MSI smoke, a static lint gate or a rendered Pages page
+  hardware or playback acceptance.
+
+**Environment:** no local JDK/Gradle/Android SDK/display. Local executable gates:
+`python3 -m unittest discover -s scripts -p 'test_*.py'` (55 tests) and
+`node --check web-spike/probe.js`. Action-log archives and release bodies remain
+blocked; check-run annotations and asset `digest` fields are the evidence source.
+
+---
+
+# HISTORICAL — PR #136 before merge (superseded by the handoff above)
+
 # HANDOFF — PR #136 rebased; ADR-008 B1 candidate awaits canonical-origin evidence
 
 Updated **2026-10-08**, session `arena/ae65f1a5-dhun`. Fixed session branch:

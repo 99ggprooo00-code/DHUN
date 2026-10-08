@@ -1,6 +1,136 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/ae65f1a5-dhun` — reconcile PR #135, plan the DHUN web presence, and implement only ADR-008 B1 (2026-10-08)
+## Session `arena/45db02aa-dhun` — record the post-merge B1 blocked result; do not restart B1, do not start B2 (2026-10-08)
+
+Updated **2026-10-08** · fixed session branch `arena/45db02aa-dhun` · current base
+and GitHub `main` **`2a20024d4b626b3f40ae95776cefb6b1e49cfdca`** (PR #136 merge).
+The working tree was clean at boot and this branch had no remote ref before the
+sync work began. The only pre-existing open repository PR is #54 (ADR-007
+research; unchanged, out of scope). This session's one working PR is the
+docs-only follow-up on `arena/45db02aa-dhun`.
+
+### Phase, scope and boundary
+
+**Stage S3 stays open and user-gated.** The user's instruction for this session
+was explicit: *do not restart ADR-008 B1, do not implement B2 yet*. The entire
+deliverable is one small docs-only ledger synchronization — record the
+post-merge verified state and the canonical B1 result, repair the formatting
+defect in verification record 19, and leave every independent gate open.
+No code, workflows, extraction, client profiles or web assets were touched.
+
+The closed session's local-only commit `6161f50 docs: record post-merge B1
+blocked result` was never pushed and is not fetchable in this checkout
+(`git cat-file -t 6161f50` → not a valid object), so its substance is recreated
+here from the user-supplied verified state rather than assumed available.
+
+### PR #136 post-merge — GitHub verified, not expected
+
+| Item | State | Evidence |
+|---|---|---|
+| PR #136 merge | ✅ **merged with explicit user authorization** | 2026-10-08T13:19:49Z, merge `2a20024d4b626b3f40ae95776cefb6b1e49cfdca`, by `99ggprooo00-code` |
+| `main` tip | ✅ **contains the merge** | `origin/main = 2a20024`; verified as an ancestor from this checkout |
+| CI | ✅ success | run **37783500689** on `2a20024` |
+| Build APK | ✅ success | run **37783500620** |
+| test-release | ✅ success | run **37783500838**; `aab` + `release_draft` skipped on a push, as designed |
+| Pages | ✅ success | run **37783499138**; build `built` with no error at exact commit `2a20024` |
+| Pages API | ✅ legacy / `main:/` / `built` | `https_enforced=true`; canonical front door renders the README |
+| Pages artifact | ⚠️ **exists but never inspected** | artifact **11552239018** (1,171,094 B); its archive redirects to an external blob host that was unavailable, so it is **not** browser evidence |
+| Probe on the canonical origin | ✅ deployed | `https://99ggprooo00-code.github.io/DHUN/web-spike/` serves probe revision `b1-v1` |
+
+### Rolling `test` release at `2a20024`
+
+Published pre-release at **2026-10-08T13:25:17Z**, release id **406857108**,
+`target_commitish=2a20024…`. GitHub asset digests and test-release provenance
+annotations agree:
+
+| Asset | Bytes | SHA-256 |
+|---|---:|---|
+| `dhun-test.apk` (universal) | **18,405,859** | **`9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`** |
+| `dhun-test-arm64-v8a.apk` | **18,355,786** | **`23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`** |
+| `dhun-test-armeabi-v7a.apk` | **18,352,944** | **`7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`** |
+| `dhun-test.msi` (**2.215.1**) | **112,971,776** | **`fec11d502962f16928582c83363f08a7c316d47f02fb046668c2226900928f21`** |
+
+The three APK digests and sizes are **byte-identical** to the earlier
+`8a8d6c5`/`fddc436` publish because the merged content did not change shipped
+sources. The MSI advanced to **2.215.1** (previous `2.213.1` digest
+`f4d5677b…`), so its digest changed. The APK split digests still **DIFFER** from
+universal — do not remove the splits. Hosted MSI smoke is packaging-only:
+`2.213.1 → 2.215.1` upgrade, userdata/cache sentinels, future-upgrade guard and
+uninstall passed, and the annotation explicitly claims **no** app launch,
+playback or visuals.
+
+### Canonical B1 run — BLOCKED for the available browser
+
+The user confirmed the probe UI was visible at the canonical URL and reported
+the manual result below. Recorded in full in verification record 19.
+
+| Card | Result |
+|---|---|
+| Page (canonical origin) | ✅ rendered |
+| 01 Anonymous metadata | ✅ PASS — non-empty title/author metadata returned; values discarded |
+| 02 Player response | ❌ FAIL — browser/CORS blocked the request **before a readable response** |
+| 03 CORS + byte range | ➖ not reached |
+| 04 Browser media / `playing` / audible playback | ➖ not reached |
+| Overall UI | **Player path blocked** |
+
+Browser: **Brave `1.96.61`**, based on Chromium `154.0.8037.98`, Official Build,
+64-bit — Chromium-family, **not** a stock Chrome/Chromium test. **Firefox and
+Safari were unavailable, not inferred failures.**
+
+Honest classification: **BLOCKED for the available Brave/Chromium-family run;
+cross-browser coverage unavailable; no Web-support claim.** No sanitized JSON,
+screenshot or DevTools network trace was supplied, so the failure must **not** be
+narrowed to a specific HTTP response, a preflight rejection, extension/Shield
+behavior or a network policy. The uninspected Pages archive must not be used as
+browser evidence.
+
+### Current gates
+
+| Gate | State | Next evidence |
+|---|---|---|
+| S3 round 4 | 🔴 **missing, user-only** | Android landscape + Windows fullscreen: compact **docked** mini-player bar with Home/Search/Library visible and usable above it |
+| S3 round 5 | 🔴 **missing, user-only** | API 24–25 hardware: launcher icon, launch, search, play, background audio; record device model, OS/API level, APK filename and installed APK SHA-256 (current universal `9665b75f…`) |
+| S6 | ⏳ **blocked on S3** | no release acceptance until both rounds and the remaining S6 gates close |
+| Dispatch-only AAB staging | 🔴 **agent-blocked, user-only** | one `test-release` dispatch with `build_only=true`, `build_release_candidate=true`; inspect the staged `app-android-debug.aab` |
+| Website ADR-008 B1 | ⛔ **BLOCKED (run recorded)** | B1 stops here. Do not restart it, do not add a proxy, do not change extraction; a continuation is a separate **ADR-008 B2 user decision** (which may be “stop”) |
+| Website ADR-008 B2 | ⏸ **not started by instruction** | requires an explicit user decision; no stack selection is made |
+
+### Exact next actions
+
+1. **S3 first.** Rounds 4 and 5 above are user-only; use the current rolling
+   assets and record device/OS/hash. Only licence-safe screenshots with recorded
+   provenance may enter Git.
+2. **User-only:** dispatch the release-candidate AAB staging path once
+   (`build_only=true`, `build_release_candidate=true`).
+3. **Stop before B2.** Do not restart B1, do not implement or preselect any B2
+   option, and do not implement the static Option-A fallback. Bring the blocked
+   evidence to the user and take an explicit B2 decision.
+4. Keep the ledger and verification record 19 consistent if the user supplies the
+   missing sanitized JSON or a DevTools trace later — that would refine the
+   failure mode, but it still stops at B2.
+
+### Blockers and boundaries
+
+- No JDK / Gradle / Android SDK / display locally; CI is the Kotlin verifier.
+- Locally runnable gate:
+  `python3 -m unittest discover -s scripts -p 'test_*.py'` (**55 tests**), plus
+  `node --check web-spike/probe.js`.
+- Action-log archives and artifact/release bodies remain unavailable here;
+  check-run annotations and GitHub asset `digest` fields are the evidence used.
+- Do not touch Android, Windows, FullPlayer (ADR-002), lyrics, extraction/probe
+  semantics or ABI splits. Never implement ADR-007 without explicit approval.
+  ADR-008 authorized B1 only; B1 is now closed as BLOCKED, and nothing in that
+  result widens the ADR.
+
+---
+
+## Previous session — `arena/ae65f1a5-dhun`: PR #135 reconciled, web presence planned, ADR-008 B1 implemented (2026-10-08) — *superseded by PR #136's merge; historical detail below*
+
+> Everything in this block predates the PR #136 merge recorded above. Its
+> “canonical evidence missing” status is now closed as BLOCKED; keep the block
+> for history only.
+
+### Historical session detail — `arena/ae65f1a5-dhun` (as written before the PR #136 merge)
 
 Updated **2026-10-08** · fixed session branch `arena/ae65f1a5-dhun` · current
 base and GitHub `main` **`fddc4361bfeff7757c8ee706de6f249f14751d9a`** (direct
@@ -1811,8 +1941,11 @@ split — but do not plan for it now.)
 Source: retired trajectory candidates + open issues + recorded
 follow-ups. None are designed, stubbed, or promised.
 
-- Web/PWA evaluation (likely "no" — PO/SABR blocks third-party
-  browser streaming; a written "no" is a valid completion)
+- Web/PWA evaluation — **ADR-008 B1 ran and is BLOCKED** (metadata readable;
+  player request blocked in the available Chromium-family browser; Firefox and
+  Safari unavailable). Likely "no" for third-party browser streaming; a written
+  "no" is a valid completion and is now the leading B2 option. Any continuation
+  is a separate B2 user decision.
 - Android Auto · Cast · cross-device sync (explicitly experimental)
 - Optional cookie sign-in (issue #60 direction; ADR + user sign-off
   required; core stays guest-first)

@@ -1,11 +1,15 @@
 # DHUN web presence — research and gated implementation plan
 
-> **Status (2026-10-08): RESEARCH / PLAN ONLY. W0 answers are recorded;
-> the user selected a browser player and separately accepted ADR-008 for its B1
-> deployed-origin feasibility spike only. A dependency-free probe candidate now
-> exists in `web-spike/`, but it is not on the canonical Pages origin and has no
-> playback verdict.** There is no production `website/` directory, site
-> dependency, Pages workflow change, or web-target application code.
+> **Status (2026-10-08): RESEARCH / PLAN ONLY. W0 answers are recorded; the
+> user selected a browser player and separately accepted ADR-008 for its B1
+> deployed-origin feasibility spike only. B1 has now run and is BLOCKED: the
+> dependency-free probe in `web-spike/` is deployed at the canonical Pages
+> origin, anonymous metadata was readable, and the player request was blocked
+> before a readable response in the only available browser
+> (Brave/Chromium-family; Firefox and Safari unavailable). No Web-support claim
+> is permitted, and the next step is a separate ADR-008 B2 user decision.**
+> There is no production `website/` directory, site dependency, Pages workflow
+> change, or web-target application code.
 >
 > Standing instruction: research first, compare several approaches, preserve
 > the analysis in a `.md` file, and plan when to implement rather than rushing
@@ -26,15 +30,16 @@ DHUN therefore has two materially different options:
 | Option | Meaning | Architectural effect | Status |
 |---|---|---|---|
 | **A — marketing/download site** | A static public site describing the existing Android and Desktop applications, linking the rolling release and source | New deployment workstream, but not a new application target; does not contradict the accepted Android/Desktop architecture | **Not selected; retained as fallback** |
-| **B — DHUN web player** | A browser-playable third application target | Contradicts the prior Web deferral/cut and Android+JVM-only stack; accepted ADR-008 now permits only a B1 feasibility spike before any product architecture choice | **Selected; B1 candidate implemented, canonical evidence open** |
+| **B — DHUN web player** | A browser-playable third application target | Contradicts the prior Web deferral/cut and Android+JVM-only stack; accepted ADR-008 permitted only a B1 feasibility spike before any product architecture choice | **Selected; B1 ran at the canonical origin and is BLOCKED — B2 decision pending** |
 
 The research recommendation remains **Option A** because it addresses the
 public presence without reopening a rejected platform target. The user instead
 selected **Option B** after the distinction was restated in simple terms. That
 choice was recorded separately from architecture approval. The user then
 accepted `docs/decisions/ADR-008-browser-web-player-target.md` for its B1
-feasibility spike only. No production player, backend/proxy, extraction change
-or B2 stack selection is approved.
+feasibility spike only, and B1 has now run to a **BLOCKED** result (see §1.1).
+No production player, backend/proxy, extraction change or B2 stack selection is
+approved, and B1 must not be restarted.
 
 ### 1.1 W0 answers recorded on 2026-10-08
 
@@ -48,10 +53,14 @@ or B2 stack selection is approved.
 | README line 2 | **Correct now** | Updated to the canonical `-code` hostname in this session |
 
 W0 is answered and ADR-008 B1 is explicitly accepted. The smallest static
-candidate is now implemented in `web-spike/` and contract-tested, but a local or
-Arena preview is preflight only. B1 remains open until the exact candidate is
-run from the canonical Pages origin in the required browsers; a full web-player
-architecture remains unapproved.
+candidate is implemented in `web-spike/`, contract-tested, merged via PR #136
+(`2a20024`) and now deployed at the canonical Pages origin
+(`https://99ggprooo00-code.github.io/DHUN/web-spike/`, revision `b1-v1`). The
+canonical manual run is complete and classified **BLOCKED**: metadata passed,
+the player response was blocked before a readable response, and the media/audio
+stages were never reached. Firefox and Safari were unavailable. A full
+web-player architecture remains unapproved, no Web-support claim is permitted,
+and any continuation is a separate B2 user decision.
 
 ## 2. Verified baseline — repository, Pages and the advertised URL
 
@@ -603,23 +612,28 @@ never instead of S3.
   viewport; canonical github.io URL; English-only v1; correct README now.
 - ✅ ADR-008 written and separately **accepted for B1 feasibility only**.
 - ✅ Dependency-free B1 candidate implemented in `web-spike/`; static contract
-  and JavaScript syntax pass locally.
-- ⏳ Canonical-origin Chromium/Firefox/Safari evidence is missing. No production
-  site/player scaffold, backend/proxy, extraction change or B2 stack is
-  authorized.
+  and JavaScript syntax pass locally (55-test suite).
+- ✅ B1 merged (PR #136 → `2a20024`), deployed to the canonical origin, and run
+  manually by the user.
+- ⛔ **B1 result: BLOCKED** for the available Brave/Chromium-family run;
+  cross-browser coverage unavailable. No production site/player scaffold,
+  backend/proxy, extraction change or B2 stack is authorized.
 
-**Gate:** W0/B0 complete; B1 implementation review/deploy/manual evidence open.
+**Gate:** W0/B0 complete; B1 closed as BLOCKED. W1–W6 for the unselected
+Option-A fallback stay unstarted; B2 is a separate user decision.
 
 ### W1 — Diagnose Pages and front-door link
 
 - ✅ Diagnose actual Pages settings and canonical URL.
 - ✅ Disprove the empty-artifact/source-misconfiguration hypothesis.
 - ✅ Applied the user-approved README correction to the canonical `-code` URL.
-- ⏳ Decide migration/rollback steps only after ADR-008 B1 and the later browser
-  architecture gate determine what is deployable.
+- ⏳ Decide migration/rollback steps only after the B2 decision determines what,
+  if anything, is deployable. B1 has reported BLOCKED and settled nothing about
+  deployment architecture.
 
-**Gate:** canonical URL and README now agree; product deployment architecture
-remains blocked on B1 evidence and B2 selection.
+**Gate:** canonical URL and README now agree, and the deployed probe lives at
+`/DHUN/web-spike/`; any product deployment architecture remains blocked on an
+explicit B2 user decision (which may be “stop”).
 
 ### W2 — Comparable research
 
@@ -643,9 +657,10 @@ remains blocked on B1 evidence and B2 selection.
 **Gate:** at least one legal, current Android visual and one Windows visual, or
 explicit approval for labelled CSS schematics.
 
-For the selected Option B, the ADR-008 B1 candidate is implemented; review,
-canonical deployment and manual browser evidence remain. W4–W6 below describe
-only the unselected static Option-A fallback.
+For the selected Option B, the ADR-008 B1 probe is implemented, deployed and
+run; the canonical run is **BLOCKED**, so no browser playback visual exists and
+none may be implied. W4–W6 below describe only the unselected static Option-A
+fallback, which is not authorized for implementation.
 
 ### W4 — Scaffold (Option-A fallback only)
 
@@ -692,8 +707,13 @@ W0 answers are complete:
 5. **Language:** English-only v1.
 6. **README now:** corrected to the canonical `-code` URL.
 
-**Architecture state:** ADR-008 is accepted for B1 only. The static candidate
-exists, but deployed-origin/browser evidence is still missing. Record that
-result before choosing B2.1 Kotlin browser, B2.2 TypeScript, B2.3 a separately
-approved backend/proxy, or B2.4 stop/fallback. No production Web claim is
-approved.
+**Architecture state:** ADR-008 was accepted for B1 only, and B1 is now closed
+as **BLOCKED** — deployed at the canonical origin, metadata readable, player
+request blocked before a readable response, media/audio never reached, Firefox
+and Safari unavailable, and no sanitized JSON/screenshot/trace supplied, so the
+failure mode must not be narrowed. No production Web claim is approved, and
+nothing downstream is authorized. Before choosing **B2.1** Kotlin browser,
+**B2.2** TypeScript, **B2.3** a separately approved backend/proxy, or **B2.4**
+stop/fallback, the user must make an explicit B2 decision; “stop” is a
+legitimate and currently acceptable outcome. B1 is not to be restarted, and the
+static Option-A fallback is not to be implemented as if it had been selected.

@@ -1,6 +1,54 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
-## 2026-10-08 — ADR-008 B1: a working static page is not deployed-origin evidence (session `arena/ae65f1a5-dhun`)
+## 2026-10-08 — ADR-008 B1: the canonical run is BLOCKED at the player request, and the evidence is too thin to name a cause (session `arena/45db02aa-dhun`)
+
+**What happened.** PR #136 merged with explicit authorization as `2a20024`, so
+legacy Pages began serving the probe at
+`https://99ggprooo00-code.github.io/DHUN/web-spike/` (revision `b1-v1`). All four
+post-merge workflows succeeded (CI **37783500689**, Build APK **37783500620**,
+test-release **37783500838**, Pages **37783499138**), and the Pages API reports
+`legacy`, `main:/`, `built`, no error at the exact commit. The user then ran the
+probe from that canonical origin. The UI rendered, and the **anonymous metadata
+card passed** — a non-empty title/author response was read and its values were
+discarded as designed. The **player-response card failed**: the browser blocked
+the request before any readable response, so the byte-range, media and
+audible-playback cards were never reached. Recorded in
+`docs/verification/19-browser-feasibility-spike.md`.
+
+**Why no root cause is recorded.** This log exists to record causes, and the
+honest entry here is that the cause is *not* established. The run supplied no
+sanitized JSON, no screenshot and no DevTools network trace — therefore there is
+no status code, no `type: "opaque"`/`TypeError` distinction, no preflight result
+and no request timing. A `TypeError: Failed to fetch` is consistent with several
+different causes, and the probe's card-02 failure message is deliberately
+generic. Naming CORS, an `OPTIONS` rejection, Brave Shields, an extension, a
+DNS/VPN policy proxy or an upstream refusal would each be an invention.
+
+**Trap 1 — collapsing distinct failures.** The verification record explicitly
+separates a blocked/unreadable response from an HTTP or playability answer. Do
+not merge those rows to make the result look diagnosed.
+
+**Trap 2 — laundering deployment bookkeeping into browser evidence.** Pages
+artifact **11552239018** exists, but its archive redirected to an external blob
+host that was unavailable in the previous environment; it was never inspected.
+A deployment artifact is not CORS, media or audio evidence, and the deployed
+page's markup says nothing about playback.
+
+**Trap 3 — browser substitution.** The only available browser was **Brave
+`1.96.61`** based on Chromium `154.0.8037.98`, Official Build, 64-bit. Brave is
+Chromium-family, not a stock Chrome/Chromium test, and Firefox and Safari were
+**unavailable** rather than failing. `B1 PASS` requires audible playback in
+current Chromium *and* Firefox, so this attempt cannot pass on any reading.
+
+**Consequence.** B1 is classified **BLOCKED for the available
+Brave/Chromium-family run, cross-browser coverage unavailable, no Web-support
+claim**. B1 stops here: no proxy/backend, no extraction or client-profile change,
+no browser-stack adoption (Kotlin/JS, Wasm, TypeScript), no static Option-A
+implementation. The next step is a separate **ADR-008 B2 user decision**, which
+may legitimately be “stop”. The independent S3 round-4/round-5 and S6 gates, and
+the user-only AAB staging dispatch, are unaffected and stay open.
+
+## 2026-10-08 — ADR-008 B1: a working static page is not deployed-origin evidence (session `arena/ae65f1a5-dhun`) — *superseded by the entry above; the probe is now deployed and the canonical run is recorded*
 
 **Constraint exposed before implementation.** GitHub Pages is still legacy
 `main:/`. A PR branch has no canonical preview URL, and changing Pages source to

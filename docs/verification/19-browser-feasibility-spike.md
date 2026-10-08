@@ -1,11 +1,20 @@
 # 19 — ADR-008 B1 browser feasibility spike
 
-> **Status: IMPLEMENTED FOR REVIEW, NOT DEPLOYED TO THE CANONICAL ORIGIN, NO
-> PLAYBACK VERDICT.** The static probe candidate is `web-spike/`. A local/Arena
-> preview is useful only for UI and early CORS behavior; ADR-008 requires the
-> final run from `https://99ggprooo00-code.github.io/DHUN/web-spike/` after the
-> containing commit reaches the Pages source. Do not report Web support from
-> this document.
+> **Status: DEPLOYED AND RUN — RESULT «BLOCKED» FOR THE AVAILABLE
+> BRAVE/CHROMIUM-FAMILY RUN. CROSS-BROWSER COVERAGE UNAVAILABLE. NO WEB-SUPPORT
+> CLAIM PERMITTED. B1 STOPS HERE; B2 REQUIRES A SEPARATE USER DECISION.**
+>
+> PR #136 merged as `2a20024d4b626b3f40ae95776cefb6b1e49cfdca`, so legacy Pages
+> now serves the probe from the canonical origin
+> `https://99ggprooo00-code.github.io/DHUN/web-spike/`. The user ran the
+> canonical test in Brave `1.96.61` (Chromium `154.0.8037.98`, Official Build,
+> 64-bit). Anonymous metadata passed; the player request was blocked before a
+> readable response, so the direct-URL, byte-range, codec/media, `playing`-event
+> and audible-playback stages were **not reached**. No sanitized JSON,
+> screenshot or DevTools network trace was supplied, so the failure **must not**
+> be narrowed to a specific HTTP response, a preflight rejection,
+> extension/Shield behavior or a network policy. Firefox and Safari were
+> unavailable — that is not an inferred failure.
 
 ## Scope
 
@@ -24,9 +33,10 @@ The candidate is intentionally not a product:
 - no search, library, queue or product navigation;
 - `noindex, nofollow`, a strict CSP and a visible “not a Web player” boundary.
 
-Legacy Pages already publishes `main:/`. Once the files are on `main`, Jekyll
-can copy this plain static directory to `/DHUN/web-spike/` without changing
-Pages settings or replacing the rendered README front page.
+Legacy Pages publishes `main:/`, so once the files reached `main` (PR #136),
+Jekyll copied this plain static directory to `/DHUN/web-spike/` without any
+Pages-settings change and without replacing the rendered README front page. No
+Pages workflow, source-set change or site scaffold was added.
 
 ## Request contract
 
@@ -35,7 +45,8 @@ video ID. It makes these fixed, credential-omitting requests:
 
 1. `GET https://www.youtube.com/oembed` for minimum anonymous metadata (a
    non-empty title and author must exist, but their values are immediately
-   discarded);2. one `POST https://music.youtube.com/youtubei/v1/player?prettyPrint=false`
+   discarded);
+2. one `POST https://music.youtube.com/youtubei/v1/player?prettyPrint=false`
    using the current repository's WEB_REMIX fallback identity (`67`,
    `1.20250310.01.00`);
 3. only if the response contains a direct HTTPS `*.googlevideo.com` candidate,
@@ -118,20 +129,72 @@ A preflight result must not fill the canonical-origin row below.
 6. Repeat in current Chromium and Firefox. Record Safari as tested or explicitly
    unavailable/unsupported; do not infer it.
 
-## Evidence ledger — intentionally open
+## Post-merge deployment provenance
 
-| Field | Chromium | Firefox | Safari |
+| Item | Evidence |
+|---|---|
+| Merge | PR #136 merged with explicit user authorization at **2026-10-08T13:19:49Z** as **`2a20024d4b626b3f40ae95776cefb6b1e49cfdca`** |
+| `main` tip | `2a20024` (merge commit; verified as an ancestor of `origin/main` from this checkout) |
+| CI | run **37783500689** — success |
+| Build APK | run **37783500620** — success |
+| test-release | run **37783500838** — success (`aab` and `release_draft` skipped on a push, as designed) |
+| Pages | run **37783499138** — success; build `built` with no error at commit `2a20024` |
+| Pages API | `build_type=legacy`, `source=main:/`, `status=built`, https enforced |
+| Pages artifact | artifact **11552239018** exists (1,171,094 bytes). Its archive redirects to a blob host that was unavailable in the previous session, so the archive was **never inspected** — it is not browser evidence and must not be cited as such |
+| Canonical probe | `https://99ggprooo00-code.github.io/DHUN/web-spike/` serves the probe page (`b1-v1`) |
+
+## Canonical B1 run — recorded result (2026-10-08)
+
+User-confirmed manual run from the canonical origin. Browser: **Brave 1.96.61**,
+based on Chromium **154.0.8037.98**, Official Build, 64-bit (Chromium family —
+**not** a stock Chrome/Chromium run).
+
+| Probe card | Result | What the user reported |
+|---|---|---|
+| Page | PASS | The probe UI rendered at the canonical URL |
+| 01 Anonymous metadata | PASS | Non-empty title/author metadata returned; the values were discarded |
+| 02 Player response | FAIL | The browser/CORS layer blocked the player request before a readable response |
+| 03 CORS + byte range | not reached | Blocked behind card 02 |
+| 04 Browser media | not reached | Blocked behind card 02 |
+| Direct-URL candidate / `playing` event / audible playback | not reached | No playback stage was reached; no "I heard audio" confirmation exists |
+
+Overall UI verdict as reported by the user: **Player path blocked.**
+
+### What this evidence does and does not establish
+
+- It establishes that the deployed probe loaded and that anonymous metadata
+  could be read from the canonical origin in this one browser session.
+- It does **not** identify the failing HTTP response, because the request failed
+  before a readable response. Do not narrow it to an HTTP status, an `OPTIONS`
+  preflight rejection, an extension/Shield cause, or a network/ISP/VPN policy;
+  none of those was observed or supplied.
+- No sanitized JSON, screenshot or DevTools network trace was supplied. The
+  report therefore stays at card granularity and is **unreproducible in
+  CI/local environments**.
+- Brave is Chromium-family; Firefox and Safari were **unavailable**, not
+  failed. Cross-browser coverage is therefore **unavailable**, and no
+  `B1 PASS` (which requires audible playback in current Chromium **and**
+  Firefox) is possible.
+- Honest outcome: **B1 BLOCKED for the available Brave/Chromium-family run**,
+  with cross-browser coverage unavailable.
+
+## Evidence ledger — closed for this B1 attempt
+
+| Field | Brave (Chromium family) | Firefox | Safari |
 |---|---|---|---|
-| Browser/version | ⏳ | ⏳ | ⏳ tested / unavailable |
-| Origin exactly canonical | ⏳ | ⏳ | ⏳ |
-| Deployed commit / Pages build | ⏳ | ⏳ | ⏳ |
-| Anonymous metadata | ⏳ | ⏳ | ⏳ |
-| Readable player response | ⏳ | ⏳ | ⏳ |
-| Direct URL candidate | ⏳ | ⏳ | ⏳ |
-| CORS byte range | ⏳ | ⏳ | ⏳ |
-| Media `playing` event | ⏳ | ⏳ | ⏳ |
-| Tester heard audio | ⏳ | ⏳ | ⏳ |
-| Sanitized JSON attached/reviewed | ⏳ | ⏳ | ⏳ |
+| Browser/version | ✅ `1.96.61` / Chromium `154.0.8037.98` Official 64-bit | ⛔ unavailable | ⛔ unavailable |
+| Origin exactly canonical | ✅ `https://99ggprooo00-code.github.io` (`b1-v1` served) | ⛔ unavailable | ⛔ unavailable |
+| Deployed commit / Pages build | ✅ `2a20024`, build `built`, no error, run 37783499138 | ⛔ unavailable | ⛔ unavailable |
+| Anonymous metadata | ✅ pass (values discarded) | ⛔ unavailable | ⛔ unavailable |
+| Readable player response | ❌ **fail — blocked before a readable response** | ⛔ unavailable | ⛔ unavailable |
+| Direct URL candidate | ➖ not reached | ⛔ unavailable | ⛔ unavailable |
+| CORS byte range | ➖ not reached | ⛔ unavailable | ⛔ unavailable |
+| Media `playing` event | ➖ not reached | ⛔ unavailable | ⛔ unavailable |
+| Tester heard audio | ➖ not reached | ⛔ unavailable | ⛔ unavailable |
+| Sanitized JSON attached/reviewed | ❌ not supplied | ⛔ unavailable | ⛔ unavailable |
+
+`✅` verified · `❌` verified failure · `➖` not reached · `⛔` browser
+unavailable (not a failure)
 
 ## Decision rule
 
@@ -145,3 +208,21 @@ A preflight result must not fill the canonical-origin row below.
   select “stop / static Option A”; a backend remains a separate ADR.
 
 Any result stops at B2. It cannot close Android/Windows S3 or S6.
+
+## Recorded disposition (2026-10-08)
+
+This run is classified **B1 BLOCKED**, closest to the blocked branch: the
+player request never produced a readable response, so no downstream stage could
+be measured. The disposition is intentionally narrow:
+
+- B1 **stops here**. No further B1 probing is authorized by this record.
+- Do **not** add a proxy or backend; that requires its own ADR.
+- Do **not** change extraction or production client profiles to make the probe
+  pass.
+- Do **not** adopt Kotlin/JS, Wasm, TypeScript or any production browser stack
+  on the strength of this record.
+- Do **not** implement the static Option-A fallback as if it had been selected.
+- Any continuation is a **separate ADR-008 B2 user decision**. A B2 decision may
+  also be “stop”.
+- No Web-support claim is permitted anywhere (README/site/CHANGELOG), because
+  no browser completed the playback path.

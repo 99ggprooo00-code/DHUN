@@ -107,18 +107,42 @@ network trace, browser versions, deployed commit and result. A local dev-server
 pass is insufficient. Failure is a valid result and must not trigger extraction
 changes.
 
-#### B1 implementation status — candidate only
+#### B1 implementation status — deployed, run, and stopped as BLOCKED
 
-PR #136 now contains a dependency-free candidate in `web-spike/`, pinned by
-`scripts/test_web_spike.py` and documented in
-`docs/verification/19-browser-feasibility-spike.md`. It is deliberately unlinked,
-`noindex`, credential-free, allow-listed and labelled as an engineering probe.
-It has **not** reached the canonical Pages origin, so B1 has no CORS, media or
-audible-playback verdict yet. Local/Arena preview behavior is preflight only.
+PR #136 merged with explicit user authorization at 2026-10-08T13:19:49Z as
+`2a20024d4b626b3f40ae95776cefb6b1e49cfdca`, so legacy Pages now publishes the
+dependency-free probe at the canonical origin
+`https://99ggprooo00-code.github.io/DHUN/web-spike/`. It is still deliberately
+unlinked, `noindex`, credential-free, allow-listed and labelled as an
+engineering probe, and is fixed at revision `b1-v1`.
+
+The canonical manual run is recorded in
+`docs/verification/19-browser-feasibility-spike.md`. In the one browser that was
+available — **Brave 1.96.61 (Chromium 154.0.8037.98, Official Build, 64-bit)**
+— the UI rendered and anonymous metadata passed, but the player request was
+blocked before a readable response. Direct-URL, byte-range, codec/media,
+`playing`-event and audible-playback stages were never reached. No sanitized
+JSON, screenshot or network trace was supplied, so the failure is **not
+narrowed** to a specific HTTP response, a preflight rejection, extension/Shield
+behavior or a network policy. Firefox and Safari were unavailable, not inferred
+failures.
+
+**Recorded outcome: B1 BLOCKED for the available Brave/Chromium-family run;
+cross-browser coverage unavailable; no Web-support claim.** Brave is
+Chromium-family rather than stock Chrome/Chromium, so it cannot satisfy B1's
+current-Chromium-and-Firefox requirement on its own. B1 ends
+here. Nothing in this outcome authorizes a proxy/backend, an extraction or
+client-profile change, an adopted browser stack, or the static Option-A
+fallback; the next step is a separate B2 user decision.
 
 ### B2 — Architecture selection after evidence
 
-Choose one only after B1:
+Choose one only after B1. B1 has now reported **BLOCKED** from the canonical
+origin in the only available browser (Brave/Chromium family), with Firefox and
+Safari unavailable. That evidence is thinner than a cross-browser verdict, so
+B2 must be decided explicitly by the user and may legitimately be “stop”. This
+ADR does not preselect any B2 option, and a decision to continue would not by
+itself authorize B2.3's service.
 
 | Option | Shape | Benefit | Blocking risk |
 |---|---|---|---|
@@ -187,5 +211,11 @@ it cannot be presented as functional product evidence.
 - W0 product direction: **browser player selected by user, 2026-10-08**.
 - ADR-008 acceptance: **ACCEPTED FOR B1 ONLY — user, 2026-10-08**.
 - Authorized next implementation: **B1 deployed-browser feasibility spike**.
-- Not authorized: production player, backend/proxy, extraction changes, or B2
-  stack selection.
+- B1 merge authorization: **granted by user; PR #136 merged 2026-10-08T13:19:49Z
+  as `2a20024d4b626b3f40ae95776cefb6b1e49cfdca`**.
+- B1 outcome: **BLOCKED in the available Brave/Chromium-family run; Firefox and
+  Safari unavailable; no Web-support claim** (see verification record 19).
+- B2: **not decided**. Requires a separate explicit user decision; may be
+  “stop / static Option A”.
+- Not authorized: production player, backend/proxy, extraction changes, B2
+  stack selection, or implementation of the static Option-A fallback.

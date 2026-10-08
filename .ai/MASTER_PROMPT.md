@@ -44,8 +44,11 @@ release hardening.**
 
 - **Platforms:** Android (primary) and Desktop (Windows first;
   Linux/macOS free via JVM). Production Web remains deferred; accepted ADR-008
-  permits only an isolated deployed-origin browser feasibility spike (B1), not
-  a product target or stack choice.
+  authorized only the isolated B1 deployed-origin feasibility spike. B1 has now
+  run from the canonical Pages origin and is **BLOCKED** in the only available
+  browser (Brave/Chromium family; Firefox and Safari unavailable). That is not a
+  product target or a stack choice — B2 remains an open user decision and may be
+  “stop”.
 - **Current surface:** Home, Search, Library (Playlists / Favorites /
   History / Downloads), Artist / Album / Playlist pages, MiniPlayer +
   immersive FullPlayer (Lyrics | Queue | Related), synced lyrics,
@@ -146,11 +149,16 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
   unverified), jump lists, single-instance guard, close-to-tray,
   keyboard shortcuts, per-user unsigned MSI (test-grade until release
   signing is decided).
-- **Web:** production target still cut. ADR-008 is the narrow exception: one
-  isolated B1 deployed-origin feasibility spike is accepted. A dependency-free
-  candidate exists in `web-spike/`, but canonical-origin/browser evidence is
-  open. No shared browser source set, backend/proxy, production player or
-  Web-support claim is approved.
+- **Web:** production target still cut. ADR-008 was the narrow exception: one
+  isolated B1 deployed-origin feasibility spike. That spike is now **complete
+  and BLOCKED** — the dependency-free probe in `web-spike/` is deployed at
+  `https://99ggprooo00-code.github.io/DHUN/web-spike/`, anonymous metadata was
+  readable, and the player request was blocked before a readable response in the
+  available Chromium-family browser; Firefox and Safari were unavailable (see
+  `docs/verification/19-browser-feasibility-spike.md`). Do not restart B1. No
+  shared browser source set, backend/proxy, production player, adopted browser
+  stack, Option-A implementation or Web-support claim is approved; B2 is a
+  separate user decision that may be “stop”.
 
 ### Music source
 - YouTube Music via the revised doctrine above. No paid API. No keys.
@@ -213,9 +221,11 @@ re-opened without a written ADR proving a blocking defect.
 
 **Still explicitly rejected for product adoption:** Flutter,
 Electron/Tauri, separate backend, Compose for Web / Kotlin-JS, Room, Hilt,
-account sign-in for core playback (guest-first per #60). ADR-008 B1 may use only
-the minimum disposable browser code needed to measure deployed-origin
-feasibility; it does not adopt a browser stack or relax the no-backend rule.
+account sign-in for core playback (guest-first per #60). ADR-008's B1 exception
+used only the minimum disposable browser code needed to measure deployed-origin
+feasibility; it adopted no browser stack and did not relax the no-backend rule.
+B1 is now closed as BLOCKED, so the rejection stands unqualified until a
+separate B2 user decision says otherwise.
 
 ---
 
@@ -232,7 +242,7 @@ DHUN/
 │   ├── PROMPT_SEQUENCE.md      # HISTORICAL: original 30-phase audit (do not rewrite)
 │   └── RISK_REGISTER.md        # extraction rot, drill, kill-switch criteria
 ├── docs/
-│   ├── decisions/              # ADRs 001–006 accepted; 007 proposed on PR #54; 008 accepted for B1 only
+│   ├── decisions/              # ADRs 001–006 accepted; 007 proposed on PR #54; 008 B1 closed BLOCKED, B2 undecided
 │   ├── research/               # spike findings (short, factual)
 │   └── verification/           # per-phase on-hardware logs (many gates OPEN)
 ├── shared/                     # KMP module (android+jvm)
@@ -256,7 +266,7 @@ DHUN/
 │                               # jump lists, single-instance, packaging
 ├── tools/playback-probe/       # Phase 01 CLI harness — STILL the rot drill's probe
 │                               # (+ OfflineMain deterministic check, SmokeMain)
-├── web-spike/                  # ADR-008 B1 static probe candidate; not a product target
+├── web-spike/                  # ADR-008 B1 static probe (deployed; run BLOCKED); not a product target
 ├── tests/fixtures/             # captured InnerTube JSON for parser tests
 ├── scripts/                    # python packaging/CI/Web-spike contracts (55 tests)
 └── .github/workflows/          # ci.yml · test-release.yml · build-apk.yml ·
@@ -427,7 +437,7 @@ acceptance gates the next. File-level tasking lives in
   go-ahead. Then and only then: tag + publish.
 
 ### Explicitly NOT in S1–S6 (v2 backlog — see ROADMAP)
-Production Web/PWA (ADR-008 B1 feasibility is the only exception) · Android
+Production Web/PWA (ADR-008 B1 ran and is BLOCKED; B2 is a user decision) · Android
 Auto · Cast · cross-device sync · optional cookie sign-in (#60) · EQ beyond S4
 · widgets beyond Quick Play · security
 hardening program (#63) · store releases · v1.0 GA · any ADR-007
