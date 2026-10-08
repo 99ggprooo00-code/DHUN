@@ -1,13 +1,18 @@
 # Phase 14 verification — Robustness, Rot-Drill, Release
 
-> **Superseding status (2026-10-08, session `arena/688214aa-dhun`).** The banner
-> below is historical (PR #127 / `f0225f4`). Rolling `test` now targets
-> **`4607e07`** (PR #130), published 2026-10-08T07:11:13Z from test-release
-> **37741393816**: APK 18,383,603 B `590bd34a4b61f004185248043b04058644e7f64ec4067ee2b1aaa0918b8ad023`,
-> MSI 2.189.1 112,971,776 B `ad036fffc1f41be428d1232580fb0632cc50bf2c6ac142d16ebd67596d8634a9`.
-> Still one APK. The minSdk-24 three-APK publish is **not** this release — record
-> its digests here only after a post-merge `publish` job, from that run, not
-> from a PR `buildOnly=true` artifact. Hardware gates remain OPEN.
+> **Superseding status (2026-10-08, session `arena/688214aa-dhun`).** Rolling
+> `test` targets **`1ee85b092aa1ad57c314b77c05ce0cf18a10e7e5`** (PR #131 merged
+> 2026-10-08T08:43:18Z), published **2026-10-08T08:50:21Z** from test-release
+> **37751721906** (`publish` ran, `buildOnly=false`). GitHub asset digests match
+> provenance. Universal APK **18,405,859 B**
+> `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+> arm64-v8a **18,355,786 B**
+> `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+> armeabi-v7a **18,352,944 B**
+> `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`
+> (not identical to the universal). MSI **2.193.1** **112,971,776 B**
+> `af3266953bd8f4756ef0352339c309b4358ce90353bb0d567eb6ea0488dca3e4`.
+> Hardware gates remain OPEN. The banner below is historical.
 
 > **Current status (2026-10-08 — product-code head CI-green; final-head and hardware gates remain).**
 > Draft PR #127's product-code head is `3071d1d6650291d51559f2884f4ac7734d3aac75`.
