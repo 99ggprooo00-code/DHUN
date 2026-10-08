@@ -935,45 +935,344 @@ def asset_reference_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
-def dist_source_drift_violations(dist: pathlib.Path) -> list[str]:
-    """The committed CSS must be exactly what the sources compose — locally.
+# --------------------------------------------------------------------------
+# CSS shape: the pruner (website/tools/prune-css.mjs) and its Python mirror
+# --------------------------------------------------------------------------
+#
+# Every route inlines the modules its front matter declares, and the build then
+# drops the rules that page cannot use (`website/tools/prune-css.mjs`). This
+# section re-derives that decision from the sources so the committed build can
+# be checked without Node: it parses both sides into units, prunes the source
+# composition with the same predicate, and compares the two sequences. A rule
+# that should have survived and is missing, a rule the page cannot use that
+# still ships, a reordering, or a hand-edited declaration all show up as a
+# difference — which is what the older, byte-equality version of this check
+# proved as well, plus pruning-awareness.
 
-    The workflow's drift check rebuilds the site and diffs; that needs Node, so
-    it cannot run in the Python-only suite. This is the cheap half of the same
-    check, and it is the half a hand-edit trips: each page's inlined CSS must
-    equal the modules *that page's own front matter declares*, whitespace and
-    comments folded. A page that ships a module it did not declare, or a `dist`
-    edited by hand, fails here without a browser or a build step.
+CONDITIONAL_AT_RULES = ("@media", "@supports", "@container", "@layer")
+
+
+def _skip_string(css: str, index: int) -> int:
+    quote = css[index]
+    cursor = index + 1
+    while cursor < len(css):
+        if css[cursor] == "\\":
+            cursor += 2
+        elif css[cursor] == quote:
+            return cursor + 1
+        else:
+            cursor += 1
+    return cursor
+
+
+def _matching_brace(css: str, index: int) -> int:
+    depth = 0
+    cursor = index
+    while cursor < len(css):
+        character = css[cursor]
+        if character in "\"'":
+            cursor = _skip_string(css, cursor)
+            continue
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return cursor
+        cursor += 1
+    return len(css)
+
+
+def _is_conditional_at_rule(prelude: str) -> bool:
+    head = prelude.strip().lower()
+    return any(
+        head.startswith(name) and head[len(name) : len(name) + 1] in (" ", "(", "")
+        for name in CONDITIONAL_AT_RULES
+    )
+
+
+def css_units(css: str, start: int = 0) -> list[dict]:
+    """Split a stylesheet into rules, conditional at-blocks and statements.
+
+    Comments are assumed to be already removed (the minifier removes them, and
+    `_fold_css` folds them); a body is kept as text, exactly as the pruner does.
     """
-    front_matter = re.compile(r"^cssModules:\s*\[([^\]]*)\]", re.M)
-    modules = re.compile(r'"([a-z0-9-]+)"')
-    routes = {
-        "index.njk": "/",
-        "features.njk": "/features/",
-        "ui.njk": "/ui/",
-        "404.njk": "/404.html",
-    }
+    units: list[dict] = []
+    index = start
+    item_start = start
+    while index < len(css):
+        character = css[index]
+        if character in "\"'":
+            index = _skip_string(css, index)
+            continue
+        if character == "{":
+            prelude = css[item_start:index]
+            close = _matching_brace(css, index)
+            body = css[index + 1 : close]
+            if prelude.lstrip().startswith("@") and _is_conditional_at_rule(prelude):
+                units.append({"kind": "at", "prelude": prelude, "children": css_units(body)})
+            else:
+                units.append({"kind": "rule", "prelude": prelude, "body": body})
+            index = close + 1
+            item_start = index
+            continue
+        if character == ";":
+            units.append({"kind": "statement", "text": css[item_start : index + 1]})
+            index += 1
+            item_start = index
+            continue
+        index += 1
+    tail = css[item_start:]
+    if tail.strip():
+        units.append({"kind": "statement", "text": tail})
+    return units
+
+
+def _strip_negations(selector: str) -> str:
+    """Remove the contents of `:not(...)`, whose classes are negative matches."""
+    out = ""
+    index = 0
+    while True:
+        at = selector.find(":not(", index)
+        if at == -1:
+            return out + selector[index:]
+        out += selector[index:at]
+        depth = 0
+        cursor = at + 4
+        while cursor < len(selector):
+            if selector[cursor] == "(":
+                depth += 1
+            elif selector[cursor] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            cursor += 1
+        index = cursor + 1
+
+
+def positive_classes(selector: str) -> set[str]:
+    """Classes whose presence the selector requires (see the pruner's docstring)."""
+    return set(re.findall(r"\.(-?[A-Za-z_][\w-]*)", _strip_negations(selector)))
+
+
+def _split_selectors(prelude: str) -> list[str]:
+    selectors: list[str] = []
+    depth = 0
+    start = 0
+    for index, character in enumerate(prelude):
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+        elif character == "," and depth == 0:
+            selectors.append(prelude[start:index])
+            start = index + 1
+    selectors.append(prelude[start:])
+    return selectors
+
+
+def _rule_can_match(prelude: str, used: set[str]) -> bool:
+    for selector in _split_selectors(prelude):
+        classes = positive_classes(selector)
+        if not classes or classes & used:
+            return True
+    return False
+
+
+def _kept_selectors(prelude: str, used: set[str]) -> list[str]:
+    """The selectors of one rule that can match, in order."""
+    return [
+        selector
+        for selector in _split_selectors(prelude)
+        if not (positive_classes(selector) and not positive_classes(selector) & used)
+    ]
+
+
+def _prune_units(units: list[dict], used: set[str]) -> list[dict]:
+    kept: list[dict] = []
+    for unit in units:
+        if unit["kind"] == "rule":
+            selectors = _split_selectors(unit["prelude"])
+            survivors = _kept_selectors(unit["prelude"], used)
+            if not survivors:
+                continue
+            # The pruner rebuilds a partially pruned selector list as the
+            # surviving selectors joined by a comma, and leaves a rule whose
+            # every selector survives byte-for-byte. Mirroring both branches is
+            # what lets the two implementations agree exactly.
+            prelude = (
+                unit["prelude"]
+                if len(survivors) == len(selectors)
+                else ",".join(selector.strip() for selector in survivors)
+            )
+            kept.append({"kind": "rule", "prelude": prelude, "body": unit["body"]})
+        elif unit["kind"] == "at":
+            children = _prune_units(unit["children"], used)
+            if children:
+                kept.append({"kind": "at", "prelude": unit["prelude"], "children": children})
+        else:
+            kept.append(unit)
+    return kept
+
+
+def _flatten_units(units: list[dict]) -> list[str]:
+    """One folded string per unit, in document order — the comparison surface."""
+    flat: list[str] = []
+    for unit in units:
+        if unit["kind"] == "rule":
+            flat.append("rule:" + _fold_css(unit["prelude"] + "{" + unit["body"] + "}"))
+        elif unit["kind"] == "at":
+            flat.append("at:" + _fold_css(unit["prelude"]))
+            flat.extend(_flatten_units(unit["children"]))
+            flat.append("end")
+        else:
+            flat.append("statement:" + _fold_css(unit["text"]))
+    return flat
+
+
+def markup_without_style(path: pathlib.Path) -> str:
+    """A page's markup with its stylesheet and scripts removed.
+
+    What a rule *styles* is not evidence of what the page *draws*: `.mock .device`
+    in the CSS must not count as a mockup on screen, or the print rule below could
+    never see a page that stopped drawing one.
+    """
+    return re.sub(
+        r"<(style|script)\b[^>]*>.*?</\1>",
+        " ",
+        path.read_text(encoding="utf-8"),
+        flags=re.S | re.I,
+    )
+
+
+def classes_used_by_page(markup: str) -> set[str]:
+    """The classes a built page uses, from `class` attributes only.
+
+    `<style>` and `<script>` bodies are removed first: the stylesheet lists class
+    *selectors*, and counting those would make every rule look used.
+    """
+    outside = re.sub(r"<(style|script)\b[^>]*>.*?</\1>", " ", markup, flags=re.S | re.I)
+    used: set[str] = set()
+    for value in re.findall(r"""\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')""", outside):
+        for name in (value[0] or value[1]).split():
+            used.add(name)
+    return used
+
+
+def without_css_comments(css: str) -> str:
+    """Comments removed, whitespace untouched.
+
+    A comment can sit between a descendant combinator and its selector, or
+    contain a brace; the minifier removes comments, so the comparison ignores
+    them — but *whitespace must stay*, because folding it would glue
+    `.site-nav ul` into a class name that no page has and every descendant rule
+    would look prunable. That was a real bug in this check's first version.
+    """
+    return re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+
+
+def page_css_units(dist: pathlib.Path, route: str) -> list[dict]:
+    """The units of the CSS that page actually ships."""
+    return css_units(without_css_comments(page_stylesheet(dist, route)))
+
+
+def prune_source_css(css: str, used: set[str]) -> str:
+    """The pruner's decision, in Python: for tests and for `choose_modules`."""
+    return "".join(_restore(_prune_units(css_units(without_css_comments(css)), used)))
+
+
+def _restore(units: list[dict]) -> list[str]:
+    out: list[str] = []
+    for unit in units:
+        if unit["kind"] == "rule":
+            out.append(unit["prelude"] + "{" + unit["body"] + "}")
+        elif unit["kind"] == "at":
+            out.append(unit["prelude"] + "{" + "".join(_restore(unit["children"])) + "}")
+        else:
+            out.append(unit["text"])
+    return out
+
+
+PAGE_SOURCES = {
+    "index.njk": "/",
+    "features.njk": "/features/",
+    "ui.njk": "/ui/",
+    "404.njk": "/404.html",
+}
+
+
+def declared_modules(source_name: str) -> list[str]:
+    """The CSS modules a page's front matter declares, in order."""
+    source = SOURCE_DIR / source_name
+    if not source.is_file():
+        return []
+    match = re.search(r"^cssModules:\s*\[([^\]]*)\]", source.read_text(encoding="utf-8"), re.M)
+    if not match:
+        return []
+    return re.findall(r'"([a-z0-9-]+)"', match.group(1))
+
+
+def dist_source_drift_violations(dist: pathlib.Path) -> list[str]:
+    """The committed CSS must be the *pruned* composition of its sources.
+
+    What this used to prove (until 2026-10-08): each page's inlined CSS equalled
+    the byte-for-byte composition of the modules its front matter declares, so a
+    hand-edit or a stale build was a red test.
+
+    What it proves now: the same thing, plus the pruning step. The sources are
+    parsed, pruned with the same predicate as `website/tools/prune-css.mjs`
+    (a selector survives when it has no positive class, or at least one class the
+    page uses), and compared with the built page unit by unit and in order — so a
+    rule the page *can* use that went missing, a rule it cannot use that still
+    ships, a reordering and a changed declaration are all differences. It runs
+    without Node, in app CI as well as the site workflow, which is the point:
+    app CI has to be able to tell a stale committed build from a fresh one.
+    """
     violations: list[str] = []
-    for source_name, route in routes.items():
-        source = SOURCE_DIR / source_name
-        if not source.is_file():
+    for source_name, route in PAGE_SOURCES.items():
+        if not (SOURCE_DIR / source_name).is_file():
             violations.append(f"{source_name} is missing from the sources")
             continue
-        declared = modules.findall(front_matter.search(source.read_text(encoding="utf-8")).group(1)) if front_matter.search(source.read_text(encoding="utf-8")) else []
-        if not declared:
+        modules = declared_modules(source_name)
+        if not modules:
             violations.append(f"{source_name}: no cssModules declared")
             continue
-        expected = "\n".join(
+        path = page_paths(dist).get(route)
+        if path is None:
+            violations.append(f"{route}: built page is missing")
+            continue
+        markup = path.read_text(encoding="utf-8")
+        used = classes_used_by_page(markup)
+        composed = "\n".join(
             (SOURCE_DIR.parent / "css" / f"{name}.css").read_text(encoding="utf-8").strip()
-            for name in declared
+            for name in modules
         )
-        built = page_stylesheet(dist, route)
-        if _fold_css(expected) != _fold_css(built):
-            violations.append(
-                f"{route}: the committed CSS is not the composition of "
-                f"{', '.join(declared)} — the build is stale, or dist was edited by hand"
-            )
+        expected = _flatten_units(
+            _prune_units(css_units(without_css_comments(composed)), used)
+        )
+        built = _flatten_units(page_css_units(dist, route))
+        if built == expected:
+            continue
+        detail = _first_difference(built, expected)
+        violations.append(
+            f"{route}: the committed CSS is not the pruned composition of "
+            f"{', '.join(modules)} — {detail} "
+            f"(built {len(built)} unit(s), expected {len(expected)}; "
+            f"run `npm run build` in website/ and commit the result)"
+        )
     return violations
+
+
+def _first_difference(built: list[str], expected: list[str]) -> str:
+    for index, (actual, wanted) in enumerate(zip(built, expected)):
+        if actual != wanted:
+            return (
+                f"unit {index + 1} differs: built {actual[:70]!r}, "
+                f"expected {wanted[:70]!r}"
+            )
+    if len(built) > len(expected):
+        return f"the build carries {len(built) - len(expected)} extra unit(s), first: {built[len(expected)][:70]!r}"
+    return f"the build is missing {len(expected) - len(built)} unit(s), first: {expected[len(built)][:70]!r}"
 
 
 def _fold_css(css: str) -> str:
@@ -1024,6 +1323,27 @@ def crawlability_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def _at_rule_block(css: str, marker: str) -> str:
+    """The body of the first at-rule whose prelude contains `marker`, or "".
+
+    The earlier version of both rules below sliced a fixed number of characters
+    after the marker and searched inside that — which runs past the end of the
+    block into whatever rules follow it. A rule for an element *outside* the
+    block could therefore satisfy a check about the block (a real false pass,
+    found by mutation on 2026-10-08: deleting `.mock .device { display: none }`
+    from the print block still passed because the mockup's own `.device` rule
+    comes later in the same sheet). Brace matching reads the block and nothing
+    else.
+    """
+    index = css.find(marker)
+    if index == -1:
+        return ""
+    brace = css.find("{", index)
+    if brace == -1:
+        return ""
+    return css[brace + 1 : _matching_brace(css, brace)]
+
+
 def print_style_violations(dist: pathlib.Path) -> list[str]:
     """Every route carries a print block that makes paper legible.
 
@@ -1033,6 +1353,14 @@ def print_style_violations(dist: pathlib.Path) -> list[str]:
     contrast still above the floors — and this rule keeps the block those
     measurements depend on from being deleted or from shipping on two routes out
     of three.
+
+    Changed 2026-10-08, when the build started pruning each page's CSS against
+    its own markup (`website/tools/prune-css.mjs`): the rule that the print block
+    must hide the mockup drawing is now asserted only for a page that *has* a
+    drawing (`class="device` in its markup). It used to be asserted for every
+    route, which was vacuous on `/404.html` and became impossible once the
+    unprunable-anywhere `.mock .device` rule stopped shipping there. The floor is
+    the same where the effect exists: a printed drawing is a page of ink.
     """
     violations: list[str] = []
     marker = "@mediaprint"
@@ -1044,14 +1372,20 @@ def print_style_violations(dist: pathlib.Path) -> list[str]:
                 f"the printed sheet is white text on white paper"
             )
             continue
-        block = compact.split(marker, 1)[1][:3000]
+        block = _at_rule_block(compact, marker)
+        markup = path.read_text(encoding="utf-8")
         for token in ("--text:", "--bg:"):
             if token not in block:
                 violations.append(
                     f"{route}: the @media print block does not redefine {token.rstrip(':')} "
                     f"for paper"
                 )
-        if ".device" not in block:
+        # The page *draws* a mockup when its markup uses the class — checked
+        # against class attributes, not against the string ".device", which is a
+        # selector and (measured 2026-10-08) never matches markup at all. That
+        # mistake made this rule unfailable, which is not a rule.
+        draws_mockup = "device" in classes_used_by_page(markup)
+        if draws_mockup and ".device" not in block:
             violations.append(
                 f"{route}: the @media print block does not hide the decorative mockup "
                 f"drawing, so printing spends a page of ink on a recreation"
@@ -1112,7 +1446,7 @@ def forced_colors_violations(dist: pathlib.Path) -> list[str]:
                 f"plain text"
             )
             continue
-        block = compact.split(marker, 1)[1].split("}}", 1)[0][:400]
+        block = _at_rule_block(compact, marker)
         markup = path.read_text(encoding="utf-8")
         if 'class="btn' in markup and ".btn" not in block:
             violations.append(

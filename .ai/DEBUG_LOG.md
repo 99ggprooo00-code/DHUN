@@ -4147,3 +4147,50 @@ Open, user-gated: re-download of the rolling `test` build carrying endless
 radio + an itemized hardware soak (leave a station running 30 min, watch
 for a gap at the first refill; related row still excludes the current
 track).
+
+## 2026-10-08 · The print rule's "hide the mockup" half could not fail, and neither could its replacement (session `arena/af3e7f66-dhun`)
+
+**Symptom.** While adding per-route CSS pruning, `print_style_violations` kept
+passing on `/404.html` even though the pruned 404 no longer ships the
+`.mock .device { display: none; }` rule its print block used to carry. The
+obvious read was "the check is out of date with the pruner". It was worse than
+that: the rule was **unfailable in that direction**, and had been since it was
+written.
+
+**Root cause 1 — the window.** The rule took the compact page CSS, split on the
+`@mediaprint` marker once, and searched the first 3000 characters *after* the
+marker for `.device`. Whatever follows the print block in the same inlined sheet
+therefore counted as part of it. Because the mockup module (`css/mockups.css`)
+comes after `base.css` in every composed sheet, the mockup's own
+`.device { container-type: inline-size; … }` rule sat inside that window: deleting
+`display: none` from the print block still passed. Mutation, not reasoning, found
+it — the mutation "remove the hiding rule from the source and rebuild" returned
+`OK: 26 quality checks pass`. Fixed with `_at_rule_block(compact, marker)`, which
+brace-matches the block body and reads nothing else; `forced_colors_violations`
+had the same shape (`split(marker)[1].split("}}")[0][:400]`) and now shares the
+helper. Regression test: `test_a_rule_after_the_block_cannot_satisfy_it`.
+
+**Root cause 2 — a selector string is not markup.** The replacement condition,
+"the page draws a mockup", was first written as `".device" in markup`. `.device`
+is CSS selector syntax; markup carries `class="device"`. The condition was
+therefore always false, and the adapted rule could not fire either — a second
+unfailable rule written the same afternoon. Fixed by asking the same helper the
+pruner's mirror uses, `classes_used_by_page(markup)`, and re-run as a mutation:
+removing the hiding rule from `css/base.css` and rebuilding now produces three
+violations (one per route that draws a mockup) and none on `/404.html`.
+
+**Lesson for the next session.** "The mutation failed to fail" is the only signal
+that distinguishes a rule from a comment. Both of these read as correct code and
+were reviewed as correct code; each was a `[:3000]` or a string comparison away
+from proving nothing. Two of the four checks touched in this session had to be
+fixed this way, and the fix was always a smaller window and a stricter reader.
+
+**Also in this session (same area, same cause).** The Python mirror of the pruner
+initially folded whitespace *before* parsing the CSS
+(`css_units(_fold_css(css))`). Folding glues `.site-nav ul` into the class name
+`site-navul`, so every descendant rule looked prunable and the expected sequence
+collapsed from 227 units to 27. The comparison now strips comments and keeps
+whitespace (`without_css_comments`), and `_fold_css` is applied per unit at
+comparison time only. Symptom to recognise: "expected 27 unit(s)" against a
+240-unit build.
+

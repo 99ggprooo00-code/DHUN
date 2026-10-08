@@ -821,6 +821,8 @@ class StyleBlocksForOtherOutputs(DistCopyMixin):
     """
 
     PRINT = "@media print { :root { --text: #000000; --bg: #ffffff; } .mock .device { display: none; } }"
+    # A page that draws a mockup, in the markup shapes the site really uses.
+    DRAWING = '<div class="mock"><div class="device">drawing</div></div>' 
     FORCED = "@media (forced-colors: active) { .btn { border-color: CanvasText; } }"
 
     def page(self, css: str, body: str = '<p><a class="btn" href="/">Go</a></p>') -> str:
@@ -831,10 +833,11 @@ class StyleBlocksForOtherOutputs(DistCopyMixin):
             f"{body}</main><footer>f</footer></body></html>"
         )
 
-    def site(self, css: str) -> Path:
+    def site(self, css: str, body: str | None = None) -> Path:
+        page = self.page(css) if body is None else self.page(css, body)
         return write_tree(
             Path(tmpdir()),
-            {rel: self.page(css) for rel in ("index.html", "features/index.html", "ui/index.html")},
+            {rel: page for rel in ("index.html", "features/index.html", "ui/index.html")},
         )
 
     def test_the_real_site_ships_both_blocks(self):
@@ -853,9 +856,39 @@ class StyleBlocksForOtherOutputs(DistCopyMixin):
 
     def test_a_print_block_without_paper_tokens_or_device_hiding_fails(self):
         css = "@media print { .card { break-inside: avoid; } }"
-        violations = quality.print_style_violations(self.site(css))
+        violations = quality.print_style_violations(self.site(css, body=self.DRAWING))
         self.assertTrue(any("--text" in v for v in violations), violations)
         self.assertTrue(any(".device" in v or "mockup" in v for v in violations), violations)
+
+    def test_device_hiding_is_required_only_of_a_page_that_draws_one(self):
+        """Changed 2026-10-08 with the per-route CSS pruner.
+
+        The rule used to demand the drawing-hiding declaration of *every* route,
+        which was vacuous on `/404.html` and impossible once the
+        unprunable-anywhere `.mock .device` rule stopped shipping there. It is now
+        conditional on the markup: a page that draws a mockup must hide it, a page
+        that draws nothing is not asked to hide nothing.
+        """
+        css = "@media print { :root { --text: #000000; --bg: #ffffff; } }" + self.FORCED
+        self.assertEqual(quality.print_style_violations(self.site(css)), [])
+        drawn = quality.print_style_violations(self.site(css, body=self.DRAWING))
+        self.assertTrue(any("mockup" in v or ".device" in v for v in drawn), drawn)
+
+    def test_a_rule_after_the_block_cannot_satisfy_it(self):
+        """The false pass mutation found on 2026-10-08.
+
+        The rule used to read 3000 characters after the `@media print` marker, so
+        a `.device` rule *following* the block satisfied a check about the block.
+        Brace matching reads the block itself, and this test is the regression:
+        the same sheet fails when the hiding rule lives after the block.
+        """
+        css = (
+            "@media print { :root { --text: #000000; --bg: #ffffff; } }"
+            + self.FORCED
+            + ".mock .device { display: none; }"
+        )
+        violations = quality.print_style_violations(self.site(css, body=self.DRAWING))
+        self.assertTrue(any("mockup" in v or ".device" in v for v in violations), violations)
 
     def test_a_print_block_with_tokens_and_device_hiding_passes(self):
         self.assertEqual(quality.print_style_violations(self.site(self.PRINT + self.FORCED)), [])
@@ -1087,6 +1120,50 @@ class ReferencedFilesExist(DistCopyMixin):
         self.assertEqual(quality.asset_reference_violations(dist), [])
 
 
+class CssPruningPredicate(unittest.TestCase):
+    """The Python mirror of `website/tools/prune-css.mjs`, unit by unit.
+
+    The pruner decides which rules a route ships, and this is the same decision
+    expressed in Python so app CI can check the committed build without Node.
+    Two implementations of one predicate is a real risk, so each half of the
+    predicate is pinned here with the case that distinguishes it.
+    """
+
+    def test_a_selector_with_no_class_can_always_match(self):
+        self.assertTrue(quality._rule_can_match("body", set()))
+        self.assertTrue(quality._rule_can_match("a:hover", set()))
+        self.assertTrue(quality._rule_can_match("*", set()))
+
+    def test_a_selector_with_a_used_class_can_match(self):
+        self.assertTrue(quality._rule_can_match(".card", {"card"}))
+        self.assertTrue(quality._rule_can_match(".card .title", {"title"}))
+        self.assertFalse(quality._rule_can_match(".card .title", {"other"}))
+
+    def test_a_class_inside_not_is_negative_and_keeps_the_rule(self):
+        self.assertTrue(quality._rule_can_match("a:not(.btn)", set()))
+        self.assertEqual(quality.positive_classes("a:not(.btn)"), set())
+        self.assertEqual(quality.positive_classes(":is(.a, .b)"), {"a", "b"})
+
+    def test_a_condition_group_is_pruned_inside_and_dropped_when_empty(self):
+        css = "@media print { .used { a: b; } .unused { c: d; } }"
+        pruned = quality.prune_source_css(css, {"used"})
+        self.assertIn(".used", pruned)
+        self.assertNotIn(".unused", pruned)
+        self.assertEqual(quality.prune_source_css(css, set()), "")
+
+    def test_pruning_the_real_css_for_one_page_leaves_a_prefix_of_its_rules(self):
+        """Every rule the pruner keeps must be one of the source's own rules."""
+        css = (quality.SOURCE_DIR.parent / "css" / "base.css").read_text(encoding="utf-8")
+        pruned = quality.prune_source_css(css, {"btn", "site-header"})
+        self.assertLess(len(pruned), len(css))
+        for unit in quality.css_units(quality.without_css_comments(pruned)):
+            if unit["kind"] == "rule":
+                self.assertTrue(
+                    quality._rule_can_match(unit["prelude"], {"btn", "site-header"}),
+                    unit["prelude"],
+                )
+
+
 class DistMatchesItsSources(DistCopyMixin):
     """The cheap, Node-free half of the workflow's drift check."""
 
@@ -1102,6 +1179,28 @@ class DistMatchesItsSources(DistCopyMixin):
         )
         violations = quality.dist_source_drift_violations(dist)
         self.assertTrue(any("/ui/" in v for v in violations), violations)
+
+    def test_a_reordered_sheet_fails(self):
+        """Order is part of the contract: the cascade depends on it."""
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        matches = list(re.finditer(r"\.(-?[A-Za-z_][\w-]*)\{[^{}]*\}", markup))
+        pair = next(
+            (first, second)
+            for first, second in zip(matches, matches[1:])
+            if second.start() == first.end() and first.group(1) != second.group(1)
+        )
+        first, second = pair
+        page.write_text(
+            markup[: first.start()] + second.group(0) + first.group(0) + markup[second.end() :],
+            encoding="utf-8",
+        )
+        violations = quality.dist_source_drift_violations(dist)
+        self.assertTrue(
+            any("/: the committed CSS is not the pruned composition" in v for v in violations),
+            violations,
+        )
 
     def test_a_page_carrying_a_module_it_did_not_declare_fails(self):
         dist = self.copy_dist()

@@ -119,12 +119,14 @@ jobs:
         working-directory: website
         run: node tools/verify-minify.mjs
 
-      # The decision logic behind the browser job's checks, mutation-proven
-      # (a must-pass and a must-fail case per rule). It needs Node and nothing
+      # Both halves of the build's own decision logic, mutation-proven (a
+      # must-pass and a must-fail case per rule): the predicates behind the
+      # browser job's checks (tests/rules.mjs) and the per-route CSS pruner
+      # (tools/prune-css.mjs, tests/prune.test.mjs). It needs Node and nothing
       # else — no browser, no server, no network — so it runs here, in the job
       # that already has Node, and a broken rule fails on the cheap runner
       # instead of waiting for a browser to be installed.
-      - name: Rule logic for the browser checks (node --test, no browser)
+      - name: Rule logic for the browser checks and the CSS pruner (node --test, no browser)
         working-directory: website
         run: npm run test:rules
 

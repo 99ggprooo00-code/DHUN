@@ -355,6 +355,34 @@ the artifact the deploy job publishes. Cost of the chosen path: publishing waits
 on a human with Pages write access; the wait is now visible in every run.
 Reversal cost: delete the step (its tests fail, by design).
 
+**D18 — a route ships only the CSS it can use, pruned at build time against its own markup.**
+Read the numbers in `docs/verification/23-per-route-css-pruning.md`; this is the
+decision record, not the evidence table. Modules are shared (`base.css` carries the
+header *and* the home hero; `components.css` carries the stat row *and* the 404
+block), so a route was shipping rules it could never match — measured at boot: 18
+unused classes on `/`, 52 on `/features/`, 53 on `/ui/`, 34 on `/404.html`.
+`website/tools/prune-css.mjs` now runs between Eleventy and the minifier and drops
+those rules per page: a selector survives when it has no positive class (so `body`,
+`*`, `[aria-current]` and `a:not(.btn)` are never touched) or at least one class
+the page uses; conditional groups are pruned recursively and dropped only when
+empty; `@keyframes`/`@font-face`/`@import` are kept verbatim. Tokens are
+deliberately **not** pruned — they are the design system's published contract
+(`/ui/` prints their values) — so the win is smaller than it could be and the
+sources stay one file per layer. Measured: `/` 53,554 → 51,311 B (−4.2 %),
+`/features/` 54,881 → 48,019 B (−12.5 %), `/ui/` 56,263 → 49,508 B (−12.0 %),
+`/404.html` 17,441 → 12,794 B (−26.6 %), with 0 bytes of client JavaScript and one
+request per route unchanged. `dist_source_drift_violations` was adapted rather than
+weakened — it now proves the committed CSS equals the *pruned* composition (same
+rule set, same order, no missing rule, no extra rule) with the predicate re-derived
+in Python, so app CI still needs no Node; `print_style_violations` now requires the
+print block to hide a mockup only on a page that draws one. Both adaptations and
+the two defects they exposed are mutation-proven (eight mutations, recorded in the
+verification record). Reversal cost: delete the `prune-css.mjs` step from the
+`build` script and rebuild — the drift check's expectation is the only other change
+to undo; ~15 minutes. Cost of keeping it: the pruning predicate exists twice (JS
+build, Python check), which the mutation table covers but no test can prove
+*equivalent*.
+
 ## 11. Work plan, execution and honest status
 
 | Phase | Deliverable | Status |

@@ -1885,3 +1885,33 @@ Limits found while building it. Each is a measured or code-verified fact;
   this session alone (35170942908, 35171317970 from PRs #76/#77;
   35174080320 from #79; 35175253985 from #80; 35176591866 from
   #81; plus one on PR A's branch push before delete).
+
+## 2026-10-08 — per-route CSS pruning: what the gates still do not prove (session `arena/af3e7f66-dhun`)
+
+The build now drops every CSS rule a route cannot match
+(`website/tools/prune-css.mjs`); the measurements are in
+`docs/verification/23-per-route-css-pruning.md`. What remains open:
+
+- **Rendered output is CI-measured, not locally verified.** No browser exists in
+  the maintenance sandbox, so the pruned sheets have never been *seen* here — no
+  screenshot, no Lighthouse run, no print emulation. The `browser` job measures
+  the committed `dist/` and its annotations are the only rendered evidence.
+- **The predicate exists twice.** `website/tools/prune-css.mjs` decides what the
+  build ships; `scripts/website_quality.py` re-derives the same decision to check
+  the committed build without Node (app CI is Python-only). Each side is
+  unit-tested and eight mutations prove each fires, but no test can prove the two
+  *equivalent*: a change to one that the other's tests do not cover would show up
+  as a red drift check in CI, not locally.
+- **A class added at runtime would break the page silently** if JavaScript ever
+  shipped. It does not (asserted per page), and `css_coverage_violations` fails
+  the build when a page uses a class its own sheet lacks — so the failure mode is
+  a missing rule for a class the build never saw, which is bounded but not zero.
+- **Unused custom properties still ship.** Token pruning was deliberately left
+  out: tokens are published contract (`/ui/` prints their values). Each route
+  therefore still carries tokens it does not use — unmeasured here, and the
+  remaining easy win if a future session wants it.
+- **`/404.html`'s print block now carries no mockup rule**, because the page
+  draws no mockup. That is correct, and it means the print rule's drawing clause
+  is asserted on three routes, not four; the paper-token and contrast clauses are
+  still asserted on all four.
+

@@ -24,6 +24,37 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Performance — each route ships only the CSS it can use (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- **Measured page weight, not argued.** The site inlines one stylesheet per route
+  from shared CSS modules, so a route carried rules it could never match
+  (52 unused classes on `/features/`, 53 on `/ui/`, 34 on `/404.html`, 18 on `/`
+  at boot). `website/tools/prune-css.mjs`, a new dependency-free step between
+  Eleventy and the minifier, drops those rules per page — decided against the
+  page's own `class` attributes, never against a hand-maintained list. Route
+  weight: `/` 53,554 → **51,311 B** (−4.2 %), `/features/` 54,881 → **48,019 B**
+  (−12.5 %), `/ui/` 56,263 → **49,508 B** (−12.0 %), `/404.html` 17,441 →
+  **12,794 B** (−26.6 %). Still one request per route, still **0 bytes** of
+  client-side JavaScript, and the CSS sources stay one file per layer: tokens are
+  deliberately never pruned (they are the design system's published contract).
+- **The drift check got stronger, not looser.** It used to require each page's
+  inlined CSS to equal the byte-for-byte composition of its declared modules. It
+  now requires it to equal that composition *pruned the same way the build prunes
+  it* — every rule the page can use present, no rule it cannot use shipped, source
+  order preserved, changed declarations caught — with the predicate re-derived in
+  Python (`scripts/website_quality.py`), so app CI still checks the committed
+  build without Node. `print_style_violations` now demands the drawing-hiding
+  declaration of a page that *draws* a mockup (three routes) instead of every
+  route, where it was vacuous on `/404.html`.
+- **Two rules that could not fail, found by mutation and fixed.** The print rule
+  read 3000 characters *after* the `@media print` marker, so a `.device` rule
+  later in the same sheet satisfied a check about the block; and the drawing test
+  searched the markup for the string `.device`, which is a selector and never
+  appears in markup. Both now read what they claim to (`_at_rule_block`,
+  `classes_used_by_page`), with regression tests. Root causes in
+  `.ai/DEBUG_LOG.md`; evidence in
+  `docs/verification/23-per-route-css-pruning.md`.
+
 ### Changed — the canonical URL is not the site yet, and now every run says so (2026-10-08, session `arena/37ec95ed-dhun`)
 
 - **A silence, fixed.** GitHub Pages is configured `build_type: legacy` with the

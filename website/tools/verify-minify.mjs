@@ -17,6 +17,8 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
+import { pruneHtmlDocument } from "./prune-css.mjs";
+
 const WEBSITE = new URL("../", import.meta.url).pathname;
 const DIST = join(WEBSITE, "dist");
 const TMP = mkdtempSync(join(tmpdir(), "dhun-minify-"));
@@ -53,8 +55,16 @@ try {
     stdio: "inherit",
   });
 
-  const built = walk(DIST);
+  // The build prunes each page's CSS against its own markup before minifying
+  // (tools/prune-css.mjs). This script rebuilds with Eleventy alone, so the same
+  // step has to be applied here — otherwise it would compare a pruned build with
+  // an unpruned one and report a difference minification never made.
   const fresh = walk(TMP);
+  for (const [name, text] of fresh) {
+    if (name.endsWith(".html")) fresh.set(name, pruneHtmlDocument(text));
+  }
+
+  const built = walk(DIST);
   const problems = [];
 
   for (const [name, text] of fresh) {
