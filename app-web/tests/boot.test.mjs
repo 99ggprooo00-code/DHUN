@@ -115,6 +115,21 @@ test("deep links open the matching detail page", async (t) => {
   assert.ok(app.nav.detailStack.some((route) => route.kind === "album"));
 });
 
+test("the overflow sheet offers Add to playlist, and the sheet lists playlists", async (t) => {
+  // Sheets are appended to <body>, not to the mount: they are overlays.
+  const { body, store, app } = await boot(t);
+  const track = app.catalog.sample.allTracks()[0];
+
+  store.set({ sheet: { kind: "overflow", trackId: track.id } });
+  app.render();
+  assert.match(body.innerHTML, /Add to playlist/);
+
+  store.set({ sheet: { kind: "add", trackId: track.id } });
+  app.render();
+  assert.match(body.innerHTML, /data-action="confirm-add-to-playlist"/);
+  assert.match(body.innerHTML, /Liked Songs/, "Liked Songs is a playlist in the app's own model");
+});
+
 /** Lets the home-feed promise and the live probe settle. */
 async function settle(store, rounds = 6) {
   for (let i = 0; i < rounds; i += 1) await Promise.resolve();

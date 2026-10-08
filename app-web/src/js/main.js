@@ -534,6 +534,29 @@ export function boot({ root, audio = null, AudioContextCtor = null, storage = tr
         render();
         break;
 
+      case "confirm-add-to-playlist": {
+        const trackId = s.sheet?.trackId;
+        const playlistId = target.dataset.playlistId;
+        const playlist = s.playlists.find((entry) => entry.id === playlistId);
+        if (!trackId || !playlist) break;
+        if (playlist.isLikedFolder) {
+          // The app treats Liked Songs as a folder inside Playlists, so adding
+          // to it is favouriting the track.
+          if (!s.favourites.includes(trackId)) {
+            store.set({ favourites: [...s.favourites, trackId] });
+          }
+        } else if (!playlist.trackIds.includes(trackId)) {
+          store.set({
+            playlists: s.playlists.map((entry) =>
+              entry.id === playlistId ? { ...entry, trackIds: [...entry.trackIds, trackId] } : entry,
+            ),
+          });
+        }
+        closeSheet();
+        render();
+        break;
+      }
+
       case "close-sheet":
         closeSheet();
         break;

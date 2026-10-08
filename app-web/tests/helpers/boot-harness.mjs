@@ -77,12 +77,13 @@ function makeElement(tagName = "div") {
 export async function boot(t = null, options = {}) {
   const mount = makeElement("div");
   const documentElement = makeElement("html");
+  const body = makeElement("body");
   const storage = new Map();
   const globalAny = globalThis;
 
   globalAny.document = {
     documentElement,
-    body: makeElement("body"),
+    body,
     createElement: makeElement,
     addEventListener() {},
     querySelector: (selector) => (selector === "#app" ? mount : null),
@@ -131,6 +132,7 @@ export async function boot(t = null, options = {}) {
 
   return {
     mount,
+    body,
     app,
     store: app.store,
     setHash(hash) {

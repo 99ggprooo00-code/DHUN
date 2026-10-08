@@ -672,6 +672,11 @@ export function trackOverflowSheet(track, { inFavourites }) {
         </button>
       </li>
       <li>
+        <button class="dhun-menu__row" type="button" data-action="add-to-playlist">
+          ${icon("QueueMusic")} Add to playlist
+        </button>
+      </li>
+      <li>
         <button class="dhun-menu__row" type="button" data-action="go-to-artist">
           ${icon("Person")} Go to artist
         </button>
@@ -696,7 +701,12 @@ export function addToPlaylistSheet(track, playlists) {
         playlists
           .map(
             (playlist) => html`<li>
-              <button class="dhun-menu__row" type="button" data-action="add-to-playlist" data-playlist-id="${playlist.id}">
+              <button
+                class="dhun-menu__row"
+                type="button"
+                data-action="confirm-add-to-playlist"
+                data-playlist-id="${playlist.id}"
+              >
                 ${icon("QueueMusic")} ${playlist.name}
               </button>
             </li>`,
