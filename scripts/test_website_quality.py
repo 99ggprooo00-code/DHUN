@@ -413,7 +413,18 @@ class BuiltSite(unittest.TestCase):
                 r"<link[^>]*rel=\"stylesheet\"",
                 f"{route} links a stylesheet, which costs a render-blocking request",
             )
-            self.assertNotRegex(markup, r"<script", f"{route} ships a script tag")
+            # The one `<script>` allowed is the JSON-LD data block: it has no
+            # `src`, nothing evaluates it, and `javascript_violations` parses it
+            # as JSON so it cannot carry code. Every other script tag is still a
+            # failure here, `src` included.
+            self.assertNotRegex(
+                markup,
+                r"<script(?![^>]*type=\"application/ld\+json\")",
+                f"{route} ships a script tag that is not a JSON-LD data block",
+            )
+            self.assertNotRegex(
+                markup, r"<script[^>]*\bsrc=", f"{route} fetches a script"
+            )
 
     def test_inlined_css_is_minified(self):
         css = quality.site_stylesheet(DIST)
@@ -873,3 +884,143 @@ class StyleBlocksForOtherOutputs(DistCopyMixin):
         css = self.PRINT + "@media (forced-colors: active) { .card { border-color: CanvasText; } }"
         violations = quality.forced_colors_violations(self.site(css))
         self.assertTrue(any(".btn" in v for v in violations), violations)
+
+
+class StructuredData(DistCopyMixin):
+    """One `SoftwareApplication` block, and only claims the repository supports.
+
+    Structured data is the part of a page a machine repeats without the caveats
+    around it, so an over-claim travels furthest from here — a rating, a
+    version, an offer or a download URL would each be repeated as fact.
+    """
+
+    JSON_LD = (
+        '<script type="application/ld+json">'
+        '{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DHUN",'
+        '"isAccessibleForFree":true,"license":"https://github.com/99ggprooo00-code/DHUN/blob/main/LICENSE",'
+        '"url":"https://99ggprooo00-code.github.io/DHUN/",'
+        '"codeRepository":"https://github.com/99ggprooo00-code/DHUN"}'
+        "</script>"
+    )
+
+    def page(self, block: str = None) -> str:
+        return minimal_site()["index.html"].replace("</head>", f"{block if block is not None else self.JSON_LD}</head>")
+
+    def site(self, block: str = None) -> Path:
+        markup = self.page(block)
+        return write_tree(
+            Path(tmpdir()),
+            {
+                "index.html": markup,
+                "features/index.html": markup,
+                "ui/index.html": markup,
+                "404.html": markup,
+                "robots.txt": "Sitemap: https://99ggprooo00-code.github.io/DHUN/sitemap.xml\n",
+                "sitemap.xml": "<urlset></urlset>",
+            },
+        )
+
+    def test_the_real_site_is_clean(self):
+        self.assertEqual(quality.structured_data_violations(DIST), [])
+
+    def test_an_invented_rating_fails(self):
+        block = self.JSON_LD.replace(
+            '"isAccessibleForFree":true',
+            '"aggregateRating":{"ratingValue":"4.9"},"isAccessibleForFree":true',
+        )
+        violations = quality.structured_data_violations(self.site(block))
+        self.assertTrue(any("aggregateRating" in v for v in violations), violations)
+
+    def test_an_invented_version_or_offer_fails(self):
+        for key, value in (("softwareVersion", '"9.9.9"'), ("offers", '"free"')):
+            block = self.JSON_LD.replace('"name":"DHUN"', f'"name":"DHUN","{key}":{value}')
+            violations = quality.structured_data_violations(self.site(block))
+            self.assertTrue(any(key in v for v in violations), (key, violations))
+
+    def test_the_wrong_type_fails(self):
+        block = self.JSON_LD.replace("SoftwareApplication", "WebSite")
+        violations = quality.structured_data_violations(self.site(block))
+        self.assertTrue(any("@type" in v for v in violations), violations)
+
+    def test_a_block_without_a_licence_fails(self):
+        block = self.JSON_LD.replace('"license":"https://github.com/99ggprooo00-code/DHUN/blob/main/LICENSE",', "")
+        violations = quality.structured_data_violations(self.site(block))
+        self.assertTrue(any("licence" in v for v in violations), violations)
+
+    def test_a_missing_block_fails(self):
+        violations = quality.structured_data_violations(self.site(""))
+        self.assertTrue(any("exactly one JSON-LD block" in v for v in violations), violations)
+
+
+class NoJavaScriptStillHolds(unittest.TestCase):
+    """The JSON-LD exception must not become a hole in the no-JS rule."""
+
+    def page(self, head: str) -> dict[str, str]:
+        markup = minimal_site()["index.html"].replace("</head>", f"{head}</head>")
+        files = minimal_site()
+        files["index.html"] = markup
+        return files
+
+    def test_json_ld_alone_is_not_client_side_javascript(self):
+        block = (
+            '<script type="application/ld+json">{"@type":"SoftwareApplication"}</script>'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), self.page(block))
+            self.assertEqual(quality.javascript_violations(root), [])
+
+    def test_json_ld_that_is_not_json_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(
+                Path(tmp),
+                self.page('<script type="application/ld+json">{oops}</script>'),
+            )
+            self.assertTrue(
+                any("not valid JSON" in v for v in quality.javascript_violations(root))
+            )
+
+    def test_a_typed_script_tag_is_still_a_violation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(
+                Path(tmp),
+                self.page('<script type="text/javascript">x()</script>'),
+            )
+            self.assertTrue(quality.javascript_violations(root))
+
+    def test_an_inline_event_handler_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            files = minimal_site()
+            files["index.html"] = files["index.html"].replace(
+                "<h1>t</h1>", '<h1 onclick="run()">t</h1>'
+            )
+            root = write_tree(Path(tmp), files)
+            violations = quality.javascript_violations(root)
+            self.assertTrue(any("event handler" in v for v in violations), violations)
+
+
+class MetadataConsistency(DistCopyMixin):
+    def test_the_real_site_passes(self):
+        self.assertEqual(quality.metadata_violations(DIST), [])
+
+    def test_a_page_missing_a_theme_colour_fails(self):
+        dist = self.copy_dist()
+        page = dist / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace('media="(prefers-color-scheme: light)"', 'media="print"'),
+            encoding="utf-8",
+        )
+        violations = quality.metadata_violations(dist)
+        self.assertTrue(any("light-scheme theme-color" in v for v in violations), violations)
+
+    def test_og_url_that_disagrees_with_the_canonical_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                'property="og:url" content="https://99ggprooo00-code.github.io/DHUN/features/"',
+                'property="og:url" content="https://example.com/features/"',
+            ),
+            encoding="utf-8",
+        )
+        violations = quality.metadata_violations(dist)
+        self.assertTrue(any("og:url should be" in v for v in violations), violations)

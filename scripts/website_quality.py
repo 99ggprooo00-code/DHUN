@@ -88,8 +88,9 @@ STALE_FACT_PATTERNS = (
     (re.compile(r"\bbuild \d{3,}\b", re.I), "build number"),
 )
 STALE_FACT_ALLOWLIST: frozenset[str] = frozenset()
+REPOSITORY_URL = "https://github.com/99ggprooo00-code/DHUN"
 ALLOWED_EXTERNAL_ORIGINS = (
-    "https://github.com/99ggprooo00-code/DHUN",
+    REPOSITORY_URL,
     "https://99ggprooo00-code.github.io/DHUN",
 )
 # The site's routes. /download/ was removed by decision (the site is not a
@@ -273,15 +274,40 @@ def weight_violations(dist: pathlib.Path) -> list[str]:
 
 
 def javascript_violations(dist: pathlib.Path) -> list[str]:
-    """The site ships no client-side JavaScript at all."""
+    """The site ships no client-side JavaScript at all.
+
+    JSON-LD is the one exception, and it is not JavaScript: it is a `<script>`
+    of type `application/ld+json` whose body is data that no engine evaluates.
+    It is admitted by *type* — the body is parsed as JSON below, so a `<script>`
+    that is anything else is still a violation, including one that claims the
+    JSON-LD type and carries code. `on*` event-handler attributes are banned
+    here too: they are the other way to run script without a `<script>` tag, and
+    a rule about "no client-side JavaScript" that only looked for tags would miss
+    them.
+    """
     violations: list[str] = []
     scripts = [p for p in _files(dist) if p.suffix in {".js", ".mjs", ".cjs"}]
     for path in scripts:
         violations.append(f"{path.relative_to(dist)}: the site ships no client-side JavaScript")
     for route, path in page_paths(dist).items():
         markup = path.read_text(encoding="utf-8")
-        for match in re.finditer(r"<script\b[^>]*>", markup, re.I):
+        for match in re.finditer(r"<script\b([^>]*)>", markup, re.I):
+            attributes = match.group(1)
+            if re.search(r'\btype\s*=\s*"application/ld\+json"', attributes, re.I):
+                continue
             violations.append(f"{route}: inline <script> tag found: {match.group(0)[:70]}")
+        for match in re.finditer(r"<script\b[^>]*\btype=\"application/ld\+json\"[^>]*>(.*?)</script>", markup, re.I | re.S):
+            try:
+                json.loads(match.group(1).strip())
+            except ValueError as error:
+                violations.append(
+                    f"{route}: the JSON-LD block is not valid JSON ({error}) — it is "
+                    f"treated as data, so it has to be data"
+                )
+        for match in re.finditer(r"<[a-z][a-z0-9]*\b[^>]*?(\son[a-z]+)\s*=", markup, re.I):
+            violations.append(
+                f"{route}: inline event handler attribute found: {match.group(1).strip()}"
+            )
     return violations
 
 
@@ -594,6 +620,86 @@ def accessibility_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+# Keys that must never appear in the site's structured data. Each one is a claim
+# this repository cannot support: no stable release exists, so there is no
+# version; the project has never collected a rating; and an `offers`/`price` or
+# download URL would turn a description into an advertisement or a distribution
+# channel (see `distribution_boundary_violations`).
+STRUCTURED_DATA_BANNED = (
+    "aggregateRating",
+    "review",
+    "ratingValue",
+    "offers",
+    "price",
+    "softwareVersion",
+    "datePublished",
+    "dateModified",
+    "downloadUrl",
+    "installUrl",
+    "fileSize",
+)
+
+
+def structured_data_violations(dist: pathlib.Path) -> list[str]:
+    """One honest `SoftwareApplication` block per route, and nothing more.
+
+    Structured data is the part of a page a machine repeats without a human
+    reading the surrounding caveats, so it is where an over-claim travels
+    furthest. The facts below are the ones the repository supports (free,
+    GPL-3.0, Android 7.0+ and Windows, no sign-in); everything that would need a
+    release, a rating or a store is asserted *absent* rather than merely
+    unmentioned.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        blocks = re.findall(
+            r"<script\b[^>]*\btype=\"application/ld\+json\"[^>]*>(.*?)</script>",
+            markup,
+            re.I | re.S,
+        )
+        if len(blocks) != 1:
+            violations.append(
+                f"{route}: expected exactly one JSON-LD block, found {len(blocks)}"
+            )
+            continue
+        try:
+            data = json.loads(blocks[0].strip())
+        except ValueError as error:
+            violations.append(f"{route}: JSON-LD is not valid JSON ({error})")
+            continue
+        if data.get("@type") != "SoftwareApplication":
+            violations.append(
+                f"{route}: JSON-LD @type is {data.get('@type')!r}, expected 'SoftwareApplication'"
+            )
+        for key in STRUCTURED_DATA_BANNED:
+            if key in data:
+                violations.append(
+                    f"{route}: JSON-LD claims '{key}', which this repository cannot "
+                    f"support (no stable release, no ratings, no store listings)"
+                )
+        if data.get("isAccessibleForFree") is not True:
+            violations.append(
+                f"{route}: JSON-LD does not state isAccessibleForFree, and the app is GPL-3.0"
+            )
+        # The repository's own LICENSE file, which the footer links and
+        # `footer_licence_violations` asserts — reused here rather than
+        # re-spelled, so the two cannot disagree.
+        expected_licence = f"{REPOSITORY_URL}/blob/main/LICENSE"
+        if data.get("license") != expected_licence:
+            violations.append(
+                f"{route}: JSON-LD licence is {data.get('license')!r}, expected the "
+                f"repository's own LICENSE file ({expected_licence})"
+            )
+        if data.get("url") != f"{CANONICAL_ORIGIN}/":
+            violations.append(
+                f"{route}: JSON-LD url is {data.get('url')!r}, expected the canonical origin"
+            )
+        if data.get("codeRepository") not in ALLOWED_EXTERNAL_ORIGINS:
+            violations.append(f"{route}: JSON-LD codeRepository is not the repository itself")
+    return violations
+
+
 def metadata_violations(dist: pathlib.Path) -> list[str]:
     violations: list[str] = []
     for route in ROUTES:
@@ -615,6 +721,24 @@ def metadata_violations(dist: pathlib.Path) -> list[str]:
             violations.append(f"{route}: missing twitter:card")
         if '<link rel="icon"' not in markup:
             violations.append(f"{route}: missing favicon link")
+        # The browser chrome takes its colour from these; both schemes are
+        # asserted because a page with only the dark one shows the wrong bar in
+        # a light-mode browser.
+        for scheme, value in (("dark", "#161616"), ("light", "#F6F4F1")):
+            needed = f'<meta name="theme-color" content="{value}" media="(prefers-color-scheme: {scheme})">'
+            if needed not in markup:
+                violations.append(
+                    f"{route}: missing the {scheme}-scheme theme-color ({value})"
+                )
+        # og:url and the canonical URL are the same fact in two vocabularies; a
+        # page whose canonical moved without its og:url following says two
+        # different things about where it lives.
+        og_url = re.search(r'<meta[^>]*property="og:url"[^>]*content="([^"]+)"', markup, re.I)
+        if not og_url or og_url.group(1) != expected:
+            violations.append(
+                f"{route}: og:url should be {expected} (it is "
+                f"{og_url.group(1) if og_url else 'absent'})"
+            )
     return violations
 
 
@@ -1154,6 +1278,7 @@ CHECKS = (
     ("nothing ships unreferenced", unreferenced_file_violations),
     ("accessibility floor", accessibility_violations),
     ("page metadata", metadata_violations),
+    ("structured data", structured_data_violations),
     ("crawlability", crawlability_violations),
     ("responsive rules", responsive_violations),
     ("print stylesheet", print_style_violations),
