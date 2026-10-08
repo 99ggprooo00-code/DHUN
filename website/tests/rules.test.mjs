@@ -11,6 +11,7 @@ import { test } from "node:test";
 
 import {
   INLINE_TARGET_FLOOR,
+  anchorLandingProblem,
   currentPageProblem,
   markerPerceivable,
   TARGET_FLOOR,
@@ -216,3 +217,57 @@ test("marker perceivability: a decoration or a frame survives forced colours", (
   );
 });
 
+
+test("anchor landings: a target below the header and on screen passes", () => {
+  assert.equal(
+    anchorLandingProblem({ hash: "fn-a", targetTop: 120, headerBottom: 65, viewportHeight: 800 }),
+    null,
+  );
+  // Exactly at the header's bottom edge is a landing, not a collision.
+  assert.equal(
+    anchorLandingProblem({ hash: "main", targetTop: 65, headerBottom: 65, viewportHeight: 800 }),
+    null,
+  );
+});
+
+test("anchor landings: a target under the header fails with the hidden height", () => {
+  const problem = anchorLandingProblem({
+    hash: "fn-a",
+    targetTop: 18,
+    headerBottom: 105,
+    viewportHeight: 800,
+  });
+  assert.match(problem, /87px behind the sticky header/);
+  assert.match(problem, /first line is covered/);
+});
+
+test("anchor landings: a target scrolled past the viewport fails", () => {
+  const problem = anchorLandingProblem({
+    hash: "main",
+    targetTop: 900,
+    headerBottom: 65,
+    viewportHeight: 800,
+  });
+  assert.match(problem, /100px below the bottom of the viewport/);
+});
+
+test("anchor landings: a missing target or an unmeasurable header fails", () => {
+  assert.match(
+    anchorLandingProblem({
+      hash: "main",
+      targetTop: Number.NaN,
+      headerBottom: 65,
+      viewportHeight: 800,
+    }),
+    /not in the document/,
+  );
+  assert.match(
+    anchorLandingProblem({
+      hash: "main",
+      targetTop: 120,
+      headerBottom: Number.NaN,
+      viewportHeight: 800,
+    }),
+    /no header to measure against/,
+  );
+});

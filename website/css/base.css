@@ -117,6 +117,23 @@ hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--sp-8) 0; }
 }
 .ext { font-size: 0.8em; opacity: 0.8; }
 
+/* --------------------------------------------------------- anchor landings -- */
+
+/* The header sticks to the top, so anything the browser scrolls to — the skip
+   link's `#main`, the footnote links, any future table of contents — would
+   otherwise land with its first line behind the header. `scroll-padding-top`
+   moves the scrollport's top edge down for every jump and for the focus scroll
+   of the skip link.
+
+   7rem = 112px covers the worst case read off this stylesheet: two header rows
+   at the 44px target floor plus the 16px row gap (2 * 44 + 16 = 104px), with 8px
+   slack. It is in `rem` so a visitor who raises their browser's default font
+   size gets a proportionally larger offset rather than less of it.
+   `anchor_landing_violations` re-derives that floor from this page's own
+   `--target` and `--sp-4`, and the browser check `anchors land below the header`
+   measures the real header height instead of trusting the arithmetic. */
+:root { scroll-padding-top: 7rem; }
+
 /* ------------------------------------------------------------------ hero -- */
 .hero { padding: var(--sp-8) 0 var(--sp-6); }
 .hero-split { display: grid; gap: var(--sp-6); grid-template-columns: 1fr; }

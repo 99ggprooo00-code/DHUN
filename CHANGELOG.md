@@ -24,6 +24,19 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Fixed — in-page jumps no longer land behind the sticky header (2026-10-08, session `arena/af3e7f66-dhun`)
+
+- The header sticks to the top of the viewport, so the skip link's `#main` and the
+  footnote links on `/` scrolled their target to the very top, where the first
+  line — the whole footnote line — sat *under* the header. `scroll-padding-top`
+  now pads the scrollport by the two-row header height read off the page's own
+  tokens (44px target + 16px gap + 44px = 104px), as `7rem` so it grows with a
+  visitor's default font size. A new static check asserts both halves (every
+  `href="#…"` has an `id`; a sticky-headed page with in-page jumps pads the
+  scrollport by at least the two-row floor, re-derived from its own CSS), and a
+  new browser check measures the landing at 1280×800 and at 380×800, where the
+  header wraps to two rows. Measured cost: +30 B per route.
+
 ### Accessibility — the header says which page you are on, and the 404 is noindex (2026-10-08, session `arena/af3e7f66-dhun`)
 
 - **Navigation state, marked twice.** No page marked itself as the current page

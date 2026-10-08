@@ -22,6 +22,8 @@
  *     visible change when it takes focus (the ring is not one element's job);
  *   - a heading level skipped in the rendered document (h2 → h4);
  *   - one link text naming two different destinations (WCAG 2.4.4);
+ *   - an in-page jump (the skip link's `#main`, a footnote) that lands its target
+ *     behind the sticky header, or past the bottom of the viewport;
  *   - any console error, page error, or same-origin 4xx/5xx response;
  *   - rendered contrast below 4.5:1 for body text / 3:1 for large text and
  *     non-text affordances, in `prefers-color-scheme: dark` and `light`;
@@ -49,6 +51,7 @@ import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 import {
+  anchorLandingProblem,
   caveatsHiddenInPrint,
   currentPageProblem,
   markerPerceivable,
@@ -1111,6 +1114,91 @@ async function checkPreferences(browser) {
  * in the print media, because a reader can print the page and the printed copy
  * is what someone else reads.
  */
+/**
+ * In-page jumps land on their target, below the sticky header.
+ *
+ * Two failure modes that no static check can see: the header is `position:
+ * sticky`, so a fragment jump can leave the target's first line behind it (the
+ * skip link and the footnote links are the only in-page jumps today), and a page
+ * padded past a short target can scroll it off the bottom. The page functions
+ * below are self-contained because `page.evaluate` serialises them into the page.
+ */
+async function checkAnchorLanding(browser) {
+  const cases = [
+    { name: "1280×800", viewport: { width: 1280, height: 800 } },
+    { name: "380×800 (header wraps to two rows)", viewport: { width: 380, height: 800 } },
+  ];
+  for (const testCase of cases) {
+    const context = await browser.newContext({
+      viewport: testCase.viewport,
+      colorScheme: "dark",
+    });
+    for (const route of ROUTES) {
+      const page = await context.newPage();
+      await page.goto(url(route), { waitUntil: "load" });
+      const hashes = await page.evaluate(inPageHashes);
+      if (!hashes.length) {
+        record(`anchors ${route} @ ${testCase.name}`, "no in-page anchors");
+        await page.close();
+        continue;
+      }
+      for (const hash of hashes) {
+        const metrics = await page.evaluate(landingReport, hash);
+        const problem = anchorLandingProblem({
+          hash,
+          viewportHeight: testCase.viewport.height,
+          ...metrics,
+        });
+        if (problem) {
+          fail(`anchors ${route} @ ${testCase.name}`, problem);
+        } else {
+          record(
+            `anchors ${route} @ ${testCase.name}`,
+            `#${hash} lands at ${Math.round(metrics.targetTop)}px, clear of the header ` +
+              `bottom at ${Math.round(metrics.headerBottom)}px`,
+          );
+        }
+      }
+      await page.close();
+    }
+    await context.close();
+  }
+}
+
+function inPageHashes() {
+  const hashes = new Set();
+  for (const link of document.querySelectorAll("a[href^='#']")) {
+    const hash = (link.getAttribute("href") || "").slice(1);
+    if (hash) hashes.add(hash);
+  }
+  return [...hashes];
+}
+
+function landingReport(hash) {
+  return new Promise((resolve) => {
+    const target = document.getElementById(hash);
+    if (!target) {
+      resolve({ targetTop: Number.NaN, headerBottom: Number.NaN });
+      return;
+    }
+    window.scrollTo(0, 0);
+    window.location.hash = hash;
+    let frames = 0;
+    const measure = () => {
+      if (++frames < 6) {
+        window.requestAnimationFrame(measure);
+        return;
+      }
+      const header = document.querySelector(".site-header");
+      resolve({
+        targetTop: target.getBoundingClientRect().top,
+        headerBottom: header ? header.getBoundingClientRect().bottom : 0,
+      });
+    };
+    window.requestAnimationFrame(measure);
+  });
+}
+
 async function checkPrint(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   for (const route of ROUTES) {
@@ -1240,6 +1328,7 @@ const CHECKS = [
   ["structure", () => checkStructure(browser)],
   ["tab stops", () => checkTabStops(browser)],
   ["current page", () => checkCurrentPage(browser)],
+  ["anchor landings", () => checkAnchorLanding(browser)],
   ["contrast", () => checkContrast(browser)],
   ["reduced motion", () => checkReducedMotion(browser)],
   ["preferences", () => checkPreferences(browser)],

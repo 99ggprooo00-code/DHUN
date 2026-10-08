@@ -3,21 +3,21 @@
   "tolerance": 0.05,
   "routes": {
     "/": {
-      "htmlCss": 51601,
-      "html": 51601,
-      "cssInlined": 20650,
+      "htmlCss": 51631,
+      "html": 51631,
+      "cssInlined": 20680,
       "cssLinked": 0
     },
     "/features/": {
-      "htmlCss": 48309,
-      "html": 48309,
-      "cssInlined": 16029,
+      "htmlCss": 48339,
+      "html": 48339,
+      "cssInlined": 16059,
       "cssLinked": 0
     },
     "/ui/": {
-      "htmlCss": 49798,
-      "html": 49798,
-      "cssInlined": 19315,
+      "htmlCss": 49828,
+      "html": 49828,
+      "cssInlined": 19345,
       "cssLinked": 0
     }
   }

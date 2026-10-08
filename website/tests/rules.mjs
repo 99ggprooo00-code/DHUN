@@ -201,3 +201,34 @@ export function markerPerceivable(style) {
   return style.outlineStyle !== "none" && width(style.outlineWidth) > 0;
 }
 
+
+/**
+ * Whether a jump landed where a visitor can actually read it.
+ *
+ * The header is sticky, so a target whose top edge is above the header's bottom
+ * edge is partly covered; and a target scrolled past the bottom of the viewport
+ * has not landed at all (the scrollport was padded past it, usually on a short
+ * page). `metrics` is measured by a real engine in CSS pixels: the target's top
+ * edge, the header's bottom edge, and the viewport height. Returns a message or
+ * null — the same shape as the other rules here.
+ */
+export function anchorLandingProblem({ hash, targetTop, headerBottom, viewportHeight }) {
+  if (!Number.isFinite(targetTop) || !Number.isFinite(headerBottom)) {
+    return `#${hash} is not in the document after the jump, or has no header to measure against`;
+  }
+  if (targetTop < headerBottom - 1) {
+    const hidden = Math.round(headerBottom - targetTop);
+    return (
+      `#${hash} lands ${hidden}px behind the sticky header (top ${Math.round(targetTop)}px, ` +
+      `header bottom ${Math.round(headerBottom)}px) — its first line is covered`
+    );
+  }
+  if (targetTop > viewportHeight - 1) {
+    const overshoot = Math.round(targetTop - viewportHeight);
+    return (
+      `#${hash} sits ${overshoot}px below the bottom of the viewport after the jump — the ` +
+      `scroll overshot the target`
+    );
+  }
+  return null;
+}

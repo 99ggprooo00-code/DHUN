@@ -688,6 +688,112 @@ def navigation_state_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+# The sticky header covers the top of the viewport, so a jump to an in-page
+# anchor lands with its target behind the header unless the scrollport is padded.
+# `_LENGTHS` resolves the two token spellings this site allows; the value of the
+# 44px target token and the 16px row gap are read from the page's own `:root`
+# block rather than trusted as constants, so changing either token moves the
+# floor. 1rem = 16px because nothing in this site sets the root font size.
+def _length_px(value: str) -> float | None:
+    """Resolve a CSS length this site can write: px, rem, or bare zero."""
+    match = re.fullmatch(r"\s*(-?\d*\.?\d+)\s*(px|rem)?\s*", value or "")
+    if not match:
+        return None
+    number = float(match.group(1))
+    if match.group(2) == "rem":
+        return number * 16.0
+    return number
+
+
+def anchor_landing_violations(dist: pathlib.Path) -> list[str]:
+    """Every in-page jump lands somewhere real, and below the sticky header.
+
+    Two failure modes, both invisible until a visitor clicks: a link to an anchor
+    `id` that no longer exists (usually a renamed section), and a jump whose
+    target scrolls to the very top of the page and hides behind the sticky header
+    — the skip link's `#main` is on every page and the footnote links are on `/`,
+    and on a narrow viewport the header is two rows tall. The second is asserted
+    against the header's *own* declarations: if the page's stylesheet makes the
+    header stick to the top and the page has an in-page anchor, the page must pad
+    the scrollport (`scroll-padding-top` on `:root`/`html`) by at least two rows
+    at the target floor plus the row gap, re-derived here from the page's own
+    `--target` and `--sp-4`. If the header is not sticky, no padding is required
+    and none is demanded.
+
+    Sprite `<use href="#i-play">` references are not navigations and are checked
+    by `sprite_violations`; only `<a href="#…">` counts here. The rendered half of
+    the landing measurement — the target's real position under the real header, at
+    two viewport widths — is `website/tests/browser.mjs` (`anchors land below the
+    header`), decided by mutation-proven logic in `website/tests/rules.mjs`.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        anchors = [
+            href
+            for tag in re.findall(r"<a\b[^>]*>", markup, re.I)
+            for href in re.findall(r'href="#([^"]+)"', tag)
+        ]
+        if not anchors:
+            continue
+        ids = set(re.findall(r'\bid="([^"]+)"', markup))
+        for anchor in dict.fromkeys(anchors):
+            if anchor not in ids:
+                violations.append(
+                    f"{route}: links to #{anchor}, which no element on the page has "
+                    f"— the jump goes nowhere"
+                )
+        css = page_stylesheet(dist, route)
+        # Where the value takes effect, not merely where it is written: the
+        # scrollport belongs to the root element, so the padding and the two
+        # tokens the floor is re-derived from must be declared on `:root`/`html`.
+        declarations: dict[str, str] = {}
+        for prelude, body in re.findall(r"([^{}]*)\{([^{}]*)\}", css):
+            if ":root" not in prelude and not re.search(r"(?:^|[,\s])html(?:[,\s]|$)", prelude):
+                continue
+            for part in body.split(";"):
+                if ":" in part:
+                    prop, _, value = part.partition(":")
+                    declarations[prop.strip()] = value.strip()
+        header = re.search(r"<header\b[^>]*>", markup, re.I)
+        header_classes = (
+            re.findall(r'class="([^"]*)"', header.group(0)) if header else []
+        )
+        sticky = False
+        for prelude, body in re.findall(r"([^{}]*)\{([^{}]*)\}", css):
+            if not any(f".{cls}" in prelude for group in header_classes for cls in group.split()):
+                continue
+            if "position:sticky" in _compact(body) or "position:fixed" in _compact(body):
+                sticky = True
+        if not sticky:
+            continue
+        offset = _length_px(declarations.get("scroll-padding-top", ""))
+        if offset is None:
+            violations.append(
+                f"{route}: the header sticks to the top and the page jumps to in-page "
+                f"anchors, but no scroll-padding-top is declared, so the target's first "
+                f"line lands behind the header"
+            )
+            continue
+        target = _length_px(declarations.get("--target", ""))
+        gap = _length_px(declarations.get("--sp-4", ""))
+        if target is None or gap is None:
+            violations.append(
+                f"{route}: cannot re-derive the header's height: --target "
+                f"({declarations.get('--target', 'missing')}) or --sp-4 "
+                f"({declarations.get('--sp-4', 'missing')}) is not a px or rem length"
+            )
+            continue
+        floor = 2 * target + gap
+        if offset < floor:
+            violations.append(
+                f"{route}: scroll-padding-top is {offset:g}px, but the header is two rows "
+                f"({target:g}px + {gap:g}px + {target:g}px = {floor:g}px) on a narrow "
+                f"viewport, so in-page jumps land partly behind it"
+            )
+    return violations
+
+
 # Keys that must never appear in the site's structured data. Each one is a claim
 # this repository cannot support: no stable release exists, so there is no
 # version; the project has never collected a rating; and an `offers`/`price` or
@@ -1810,6 +1916,7 @@ CHECKS = (
     ("nothing ships unreferenced", unreferenced_file_violations),
     ("accessibility floor", accessibility_violations),
     ("current page is marked", navigation_state_violations),
+    ("in-page anchors land below the header", anchor_landing_violations),
     ("page metadata", metadata_violations),
     ("structured data", structured_data_violations),
     ("crawlability", crawlability_violations),

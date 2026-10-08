@@ -4223,3 +4223,30 @@ logic is in `tests/rules.mjs` with must-pass and must-fail cases, so the CI-only
 half is mutation-proven without a browser — the same split the repository already
 uses for touch targets, heading order and print caveats.
 
+## 2026-10-08 · In-page jumps landed behind the sticky header (session `arena/af3e7f66-dhun`)
+
+**Symptom.** Nothing visible in a screenshot and nothing a gate asked about: the
+header is `position: sticky` (base.css) and `scroll-padding-top` was declared
+nowhere (grep over `website/css/` returned only a `scroll-behavior` line inside the
+reduced-motion block). So the skip link's `#main` and the four footnote links on
+`/` scrolled their target flush with the top of the viewport, and on a narrow
+viewport — where the header wraps to two rows, 104px measured from the page's own
+`:root` (`--target` 44 + `--sp-4` 16 + `--target` 44) — the first line of the
+target, which for a footnote is the whole footnote, sat *under* the header.
+
+**Why no check could have caught it.** Every rule in the table read the CSS and the
+HTML separately; none of them modelled *where the scrollport lands*. The
+accessibility floor checked that the skip link exists and is reachable by Tab, not
+that what it jumps to is readable; the responsive rules checked that breakpoints
+exist, not that their height was accounted for after a jump.
+
+**Fix.** `:root { scroll-padding-top: 7rem }` in base.css, next to the sticky
+header it exists for, with the arithmetic written down (104px worst case + 8px, in
+`rem` so it scales with the visitor's font size). `anchor_landing_violations`
+asserts it for sticky-headed pages with in-page jumps, re-deriving the floor from
+the page's `--target` and `--sp-4`, and asserts that every `href="#…"` has a
+matching `id`; when the declaration was moved onto `.wrap` instead of `:root` the
+check still failed, because the scrollport belongs to the root element. The
+rendered half is the new browser check, measured at two widths (the narrow one
+where the header is two rows) instead of trusting the arithmetic.
+

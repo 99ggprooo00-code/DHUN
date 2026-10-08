@@ -1301,3 +1301,73 @@ class DistMatchesItsSources(DistCopyMixin):
         )
         violations = quality.dist_source_drift_violations(dist)
         self.assertTrue(any("/404.html" in v for v in violations), violations)
+
+
+class AnchorLandings(DistCopyMixin):
+    """In-page jumps land on something, and below the sticky header.
+
+    The header is sticky and, on a narrow viewport, two rows tall; nothing else
+    in the gate table notices that a jump lands behind it. The browser half of
+    the landing measurement is `website/tests/browser.mjs`; these are the
+    mutations that need no browser.
+    """
+
+    def test_the_committed_site_lands_its_jumps_below_the_header(self):
+        self.assertEqual(quality.anchor_landing_violations(DIST), [])
+
+    def mutate(self, relative: str, old: str, new: str) -> list[str]:
+        dist = self.copy_dist()
+        page = dist / relative
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn(old, markup)
+        page.write_text(markup.replace(old, new, 1), encoding="utf-8")
+        return quality.anchor_landing_violations(dist)
+
+    def test_a_missing_anchor_target_fails(self):
+        violations = self.mutate("index.html", 'id="fn-a"', 'id="fn-renamed"')
+        self.assertTrue(
+            any("#fn-a" in v and "no element on the page has" in v for v in violations),
+            violations,
+        )
+
+    def test_a_page_without_scroll_padding_fails(self):
+        violations = self.mutate("index.html", ":root{scroll-padding-top:7rem}", "")
+        self.assertTrue(
+            any(v.startswith("/:") and "no scroll-padding-top" in v for v in violations),
+            violations,
+        )
+
+    def test_padding_smaller_than_the_two_row_header_fails(self):
+        violations = self.mutate(
+            "features/index.html", "scroll-padding-top:7rem", "scroll-padding-top:4rem"
+        )
+        self.assertTrue(
+            any(
+                "/features/" in v and "64px" in v and "104px" in v and "two rows" in v
+                for v in violations
+            ),
+            violations,
+        )
+
+    def test_padding_written_off_the_root_selector_does_not_count(self):
+        violations = self.mutate(
+            "404.html", ":root{scroll-padding-top:7rem}", ".wrap{scroll-padding-top:7rem}"
+        )
+        self.assertTrue(
+            any("/404.html" in v and "no scroll-padding-top" in v for v in violations),
+            violations,
+        )
+
+    def test_a_page_with_no_in_page_anchors_is_exempt(self):
+        """Nothing to land means nothing to pad — the rule must not demand it."""
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn('href="#main"', markup)
+        page.write_text(
+            markup.replace('href="#main"', 'href="/"', 1).replace(
+                ":root{scroll-padding-top:7rem}", ""
+            ),
+            encoding="utf-8",
+        )
+        self.assertEqual(quality.anchor_landing_violations(dist), [])
