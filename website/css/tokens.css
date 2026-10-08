@@ -1,0 +1,104 @@
+/* ============================================================================
+   DHUN marketing site — one stylesheet, no client-side JavaScript.
+
+   Colour, shape, spacing and type values are read out of the app's Compose
+   design system in shared/src/commonMain/kotlin/dev/dhun/design/:
+     DhunAppearance.kt (dark + light token sets, accent ramps)
+     DhunTypography.kt (type scale)  DhunShapes.kt  DhunSpacing.kt
+   The dark set is the default; the light set mirrors the app's light scheme.
+   Every paired colour below was checked for >= 4.5:1 text contrast; the
+   assertions live in scripts/website_quality.py.
+   ========================================================================== */
+
+:root {
+  /* Surfaces — dark (DhunTokens defaults) */
+  --bg: #161616;
+  --surface: #1e1e1e;
+  --surface-variant: #262626;
+  --surface-elevated: #303030;
+  --surface-highest: #363636;
+  --surface-card: #2a2a2a;
+
+  /* Glass (translucent fills + 10% white hairline) */
+  --glass: rgba(22, 22, 30, 0.70);
+  --glass-strong: rgba(18, 18, 24, 0.82);
+  --glass-bar-top: rgba(28, 28, 38, 0.78);
+  --glass-edge: rgba(255, 255, 255, 0.22);
+  --hairline: rgba(255, 255, 255, 0.10);
+  --hairline-strong: rgba(255, 255, 255, 0.20);
+
+  /* Text ladder (white alpha ladder in dark) */
+  --text: #ffffff;
+  --text-2: rgba(255, 255, 255, 0.80);
+  --text-3: rgba(255, 255, 255, 0.62);
+  /* Kept for non-text affordances only: 0.45-alpha white is ~3.9:1 and
+     fails the 4.5:1 body-text floor, so no text uses it. */
+  --text-4: rgba(255, 255, 255, 0.45);
+
+  /* Accent — DhunAccent.BRAND dark ramp */
+  --accent: #bb86fc;
+  --on-accent: #000000;
+  --accent-container: #3a2a5a;
+  --on-accent-container: #e8d5ff;
+
+  /* Semantic */
+  --warning: #ffb74d;
+  --success: #4caf50;
+  --error: #d5798a;
+
+  /* Shapes — DhunShapes */
+  --r-xs: 4px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 28px;
+  --r-xxl: 32px;
+  --r-full: 999px;
+
+  /* Spacing — DhunSpacing */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+  --target: 44px;
+
+  --wrap: 1120px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    monospace;
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f4f1;
+    --surface: #ffffff;
+    --surface-variant: #efece8;
+    --surface-elevated: #ffffff;
+    --surface-highest: #e9e5e0;
+    --surface-card: #ffffff;
+    --glass: rgba(255, 255, 255, 0.72);
+    --glass-strong: rgba(255, 255, 255, 0.86);
+    --glass-bar-top: rgba(255, 255, 255, 0.90);
+    --glass-edge: rgba(0, 0, 0, 0.16);
+    --hairline: rgba(0, 0, 0, 0.08);
+    --hairline-strong: rgba(0, 0, 0, 0.18);
+    --text: #1a1714;
+    --text-2: rgba(26, 23, 20, 0.78);
+    --text-3: rgba(26, 23, 20, 0.62);
+    --text-4: rgba(26, 23, 20, 0.42);
+    --accent: #6750a4;
+    --on-accent: #ffffff;
+    --accent-container: #eaddff;
+    --on-accent-container: #21005d;
+    --warning: #8a5300;
+    --success: #1b7a3d;
+    --error: #b00020;
+    --shadow: 0 18px 48px rgba(26, 23, 20, 0.14);
+  }
+}

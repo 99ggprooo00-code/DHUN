@@ -33,7 +33,17 @@ function walk(dir, base = dir, out = new Map()) {
 // `normalize` folds every difference the minifier is allowed to make.
 function normalize(text, kind) {
   let out = text.replace(/<!--[\s\S]*?-->/g, "");
-  if (kind === "css") out = out.replace(/\/\*[\s\S]*?\*\//g, "");
+  if (kind === "css") {
+    out = out.replace(/\/\*[\s\S]*?\*\//g, "");
+  } else {
+    // The stylesheet is inlined per route, so an HTML page carries CSS that the
+    // CSS pass (not the HTML passes) minifies — including its comment removal.
+    // Only comments inside <style> blocks are folded, so a `/* */` in visible
+    // text would still be a difference.
+    out = out.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (_match, open, css, close) =>
+      open + css.replace(/\/\*[\s\S]*?\*\//g, "") + close,
+    );
+  }
   return out.replace(/\s+/g, "").replace(/;}/g, "}");
 }
 

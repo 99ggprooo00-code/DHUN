@@ -1,14 +1,14 @@
 {#- Hand-written recreation of DHUN's Library → Downloads surface (ADR-006):
     offline badges on the rows, and download actions that survive the app
     closing. -#}
-<figure class="mock mock--phone" id="mock-downloads-phone">
+<figure class="mock" id="mock-downloads-phone">
   <div class="device" aria-hidden="true">
     <div class="screen">
       <div class="statusbar">
         <span>9:41</span>
         <span class="statusbar-icons">{% icon "speaker" %}{% icon "offline" %}</span>
       </div>
-      <div class="app app--library">
+      <div class="app">
         <p class="app-brand">Library</p>
         <div class="chips">
           <span class="chip chip--pill">Playlists</span>
@@ -17,8 +17,8 @@
           <span class="chip chip--pill is-active">Downloads</span>
         </div>
         <ul class="rows">
-          <li class="row is-downloaded"><span class="thumb art-a"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="offline-pill">{% icon "check" %}Offline</span></li>
-          <li class="row is-downloaded"><span class="thumb art-c"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="offline-pill">{% icon "check" %}Offline</span></li>
+          <li class="row"><span class="thumb art-a"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="offline-pill">{% icon "check" %}Offline</span></li>
+          <li class="row"><span class="thumb art-c"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="offline-pill">{% icon "check" %}Offline</span></li>
           <li class="row"><span class="thumb art-b"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-progress"><span class="row-progress-fill"></span></span></li>
           <li class="row"><span class="thumb art-a"></span><span class="row-text"><span class="row-title">Track title</span><span class="row-sub">Artist name</span></span><span class="row-trail">{% icon "download" %}</span></li>
         </ul>

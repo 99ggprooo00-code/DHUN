@@ -10,7 +10,14 @@ and the screenshot backlog marker that keeps the mockups replaceable.
 
 Everything here reads the **built** output (`website/dist/`), so it runs in
 app CI step 1 with no Node, no network and no browser. The checks that need a
-real browser (Lighthouse/axe) run in `.github/workflows/website.yml`.
+real browser (Lighthouse/axe/Playwright) run in `.github/workflows/website.yml`.
+
+**Where the CSS lives.** The stylesheet is inlined into each page's `<head>`
+(one request per route — see `website/eleventy.config.js`), so the rules below
+read `<style>` blocks as well as any standalone `.css` file: `_read_css` returns
+the union, and `page_stylesheet` returns one page's own CSS. The rules
+themselves are unchanged, which is the point of the adaptation — a rule that only
+ever read a linked file would have proven nothing about the bytes that ship.
 
 Run directly for a report:  python3 scripts/website_quality.py [dist-dir]
 """
@@ -18,6 +25,7 @@ Run directly for a report:  python3 scripts/website_quality.py [dist-dir]
 from __future__ import annotations
 
 import html
+import json
 import pathlib
 import re
 import sys
@@ -31,6 +39,10 @@ KB = 1024
 HTML_CSS_BUDGET = 60 * KB
 JS_BUDGET = 10 * KB
 ASSET_BUDGET = 150 * KB
+
+# How much a route's HTML+CSS may grow over the committed baseline before the
+# ratchet fails (Part A §10.2). Growth is allowed, silently is not.
+RATCHET_TOLERANCE = 0.05
 
 CANONICAL_ORIGIN = "https://99ggprooo00-code.github.io/DHUN"
 ALLOWED_EXTERNAL_ORIGINS = (
@@ -99,12 +111,83 @@ def _compact(text: str) -> str:
     return re.sub(r"\s+", "", text)
 
 
+STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style>", re.S | re.I)
+STYLESHEET_LINK = re.compile(
+    r"<link\b(?=[^>]*\brel=\"stylesheet\")(?=[^>]*\bhref=\"([^\"]+)\")[^>]*>", re.I
+)
+
+
+def inline_styles(dist: pathlib.Path) -> dict[str, str]:
+    """route -> the CSS in that page's own `<style>` blocks, if any."""
+    styles: dict[str, str] = {}
+    for route, path in page_paths(dist).items():
+        css = "\n".join(STYLE_BLOCK.findall(path.read_text(encoding="utf-8")))
+        if css.strip():
+            styles[route] = css
+    return styles
+
+
+def external_css(dist: pathlib.Path) -> dict[str, str]:
+    assets = dist / "assets"
+    if not assets.is_dir():
+        return {}
+    return {p.name: p.read_text(encoding="utf-8") for p in sorted(assets.glob("*.css")) if p.is_file()}
+
+
 def _read_css(dist: pathlib.Path) -> dict[str, str]:
-    return {
-        p.name: p.read_text(encoding="utf-8")
-        for p in (dist / "assets").glob("*.css")
-        if p.is_file()
-    } if (dist / "assets").is_dir() else {}
+    """Every stylesheet the site ships, whatever shape it ships in.
+
+    External files keep their own names; inlined CSS is merged under the
+    logical name `styles.css`, which is what the rule bodies below ask for.
+    The site currently inlines one composed sheet per route, so this returns
+    every module the site uses, in route order.
+    """
+    sheets = external_css(dist)
+    inline = inline_styles(dist)
+    if inline and "styles.css" not in sheets:
+        sheets["styles.css"] = "\n".join(inline[route] for route in page_paths(dist) if route in inline)
+    return sheets
+
+
+def site_stylesheet(dist: pathlib.Path) -> str:
+    """The whole site's CSS, from wherever it lives (see `_read_css`)."""
+    return _read_css(dist).get("styles.css", "")
+
+
+def linked_stylesheets(dist: pathlib.Path, route: str) -> list[pathlib.Path]:
+    """The stylesheets a page links, resolved to files that exist in `dist`."""
+    path = page_paths(dist).get(route)
+    if path is None:
+        return []
+    files: list[pathlib.Path] = []
+    for href in STYLESHEET_LINK.findall(path.read_text(encoding="utf-8")):
+        reference = href.split("?", 1)[0].split("#", 1)[0]
+        if reference.startswith(("http://", "https://", "data:")):
+            continue
+        candidate = dist / reference.lstrip("/") if reference.startswith("/") else path.parent / reference
+        if candidate.is_file():
+            files.append(candidate)
+    return files
+
+
+def page_weight_bytes(dist: pathlib.Path, route: str, path: pathlib.Path) -> int:
+    """Bytes on the wire for one route: its HTML plus any stylesheet it links.
+
+    Inlined CSS is already inside the HTML, so it is never counted twice.
+    """
+    total = path.stat().st_size
+    total += sum(f.stat().st_size for f in linked_stylesheets(dist, route))
+    return total
+
+
+def page_stylesheet(dist: pathlib.Path, route: str) -> str:
+    """The CSS that page actually ships: its inline blocks, or its linked file."""
+    inline = inline_styles(dist).get(route)
+    if inline:
+        return inline
+    return "\n".join(
+        f.read_text(encoding="utf-8") for f in linked_stylesheets(dist, route)
+    )
 
 
 # --------------------------------------------------------------------------
@@ -114,8 +197,6 @@ def _read_css(dist: pathlib.Path) -> dict[str, str]:
 
 def weight_violations(dist: pathlib.Path) -> list[str]:
     violations: list[str] = []
-    css = _read_css(dist)
-    css_bytes = sum(len(v.encode("utf-8")) for v in css.values())
     pages = page_paths(dist)
 
     for route in ROUTES:
@@ -124,11 +205,14 @@ def weight_violations(dist: pathlib.Path) -> list[str]:
             violations.append(f"{route}: built page is missing")
             continue
         html_bytes = path.stat().st_size
-        total = html_bytes + css_bytes
+        linked = sum(f.stat().st_size for f in linked_stylesheets(dist, route))
+        total = html_bytes + linked
         if total > HTML_CSS_BUDGET:
+            where = f"HTML {html_bytes} B (CSS inlined)" if not linked else (
+                f"HTML {html_bytes} B + linked CSS {linked} B"
+            )
             violations.append(
-                f"{route}: HTML+CSS is {total} B, over the {HTML_CSS_BUDGET} B budget "
-                f"(HTML {html_bytes} B + CSS {css_bytes} B)"
+                f"{route}: HTML+CSS is {total} B, over the {HTML_CSS_BUDGET} B budget ({where})"
             )
 
     js_bytes = sum(
@@ -425,6 +509,159 @@ def footer_licence_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def css_coverage_violations(dist: pathlib.Path) -> list[str]:
+    """Every class a page uses must be defined in the CSS that page ships.
+
+    This is the safety net for the module split (eleventy.config.js): a route
+    declares its modules in front matter, and if a page starts using a class
+    from a module it does not carry — or a rule is moved between modules and
+    missed — the page would render unstyled with no other check noticing. It
+    also catches a class that is only defined but never used anywhere, because
+    each page is checked against its own sheet.
+    """
+    violations: list[str] = []
+    defined_by_route = {
+        route: set(re.findall(r"\.([a-zA-Z_][\w-]*)", page_stylesheet(dist, route)))
+        for route in page_paths(dist)
+    }
+    used_anywhere: set[str] = set()
+    for route, path in page_paths(dist).items():
+        markup = re.sub(r"<!--.*?-->", " ", path.read_text(encoding="utf-8"), flags=re.S)
+        for value in re.findall(r'\bclass="([^"]*)"', markup):
+            used_anywhere.update(value.split())
+    # The other direction: a rule no page uses is bytes shipped for nothing.
+    # This is what "prune dead CSS" means as a rule rather than a one-off edit.
+    dead = sorted(set().union(*defined_by_route.values()) - used_anywhere if defined_by_route else [])
+    if dead:
+        violations.append(
+            f"CSS defines {len(dead)} class(es) no built page uses (dead CSS): {', '.join(dead[:8])}"
+        )
+
+    for route, path in page_paths(dist).items():
+        markup = re.sub(r"<!--.*?-->", " ", path.read_text(encoding="utf-8"), flags=re.S)
+        used: set[str] = set()
+        for value in re.findall(r'\bclass="([^"]*)"', markup):
+            used.update(value.split())
+        missing = sorted(used - defined_by_route[route])
+        if missing:
+            violations.append(
+                f"{route}: {len(missing)} class(es) used but not defined in this page's CSS "
+                f"(add the module to its cssModules front matter): {', '.join(missing[:8])}"
+            )
+    return violations
+
+
+def sprite_violations(dist: pathlib.Path) -> list[str]:
+    """Icons are `<use>` references into a per-page `<symbol>` sprite.
+
+    The sprite is assembled by an Eleventy transform, so it can be wrong in two
+    ways that are invisible to every other check: a reference with no definition
+    (an icon that renders as nothing) and a definition with no reference (bytes
+    shipped for no reason). Both directions are asserted, per page.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        used = set(re.findall(r'<use\b[^>]*\bhref="#i-([^"]+)"', markup, re.I))
+        defined = set(re.findall(r'<symbol\b[^>]*\bid="i-([^"]+)"', markup, re.I))
+        for name in sorted(used - defined):
+            violations.append(f"{route}: <use> points at icon ‘{name}’, which this page does not define")
+        for name in sorted(defined - used):
+            violations.append(f"{route}: icon ‘{name}’ is defined in the sprite but never used")
+        if defined and '<svg class="sprite"' not in markup:
+            violations.append(f"{route}: icon symbols are present without the hidden sprite container")
+        for match in re.finditer(r"<use\b([^>]*)>", markup, re.I):
+            if not re.search(r'\bhref="#i-', match.group(1)):
+                violations.append(f"{route}: <use> without an internal #i- reference: {match.group(0)[:60]}")
+    return violations
+
+
+def _baseline_path() -> pathlib.Path:
+    return REPO_ROOT / "website" / "budget-baseline.json"
+
+
+def budget_ratchet_violations(
+    dist: pathlib.Path, baseline_path: pathlib.Path | None = None
+) -> list[str]:
+    """The weight budget, ratcheted against the committed baseline.
+
+    The absolute budget (60 KB HTML+CSS per route) is generous enough that a
+    content edit could double a page and still pass. Page sizes here are
+    deterministic — same input, same bytes, on any machine — so growth can be
+    policed exactly: a route may not exceed its committed baseline by more than
+    RATCHET_TOLERANCE. Legitimate growth is a deliberate act: regenerate the
+    baseline (python3 scripts/website_quality.py --write-baseline) so the diff
+    shows the new number and a reviewer sees what changed.
+
+    A missing or unreadable baseline is a violation, not a silent pass: a
+    ratchet nobody can fail is decoration.
+    """
+    baseline_path = baseline_path or _baseline_path()
+    if not baseline_path.is_file():
+        return [
+            f"budget baseline {baseline_path} is missing — regenerate it with "
+            f"python3 scripts/website_quality.py --write-baseline"
+        ]
+    try:
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    except ValueError as error:
+        return [f"budget baseline {baseline_path} is not valid JSON: {error}"]
+
+    violations: list[str] = []
+    routes = baseline.get("routes")
+    if not isinstance(routes, dict) or not routes:
+        return [f"budget baseline {baseline_path} has no routes table"]
+
+    pages = page_paths(dist)
+    for route, entry in routes.items():
+        path = pages.get(route)
+        if path is None:
+            violations.append(f"{route}: budgeted route is missing from the built site")
+            continue
+        recorded = int(entry["htmlCss"])
+        measured = page_weight_bytes(dist, route, path)
+        limit = int(recorded * (1 + RATCHET_TOLERANCE))
+        if measured > limit:
+            violations.append(
+                f"{route}: HTML+CSS grew from the committed {recorded} B baseline to "
+                f"{measured} B (+{measured - recorded} B, {100 * (measured - recorded) / recorded:.1f}%), "
+                f"over the {int(RATCHET_TOLERANCE * 100)}% ratchet. Regenerate the baseline if this "
+                f"growth is intended."
+            )
+    for route in ROUTES:
+        if route not in routes:
+            violations.append(f"{route}: route is not in the budget baseline")
+    return violations
+
+
+def write_baseline(dist: pathlib.Path, baseline_path: pathlib.Path | None = None) -> pathlib.Path:
+    """Record the current per-route weight as the ratchet's reference point."""
+    baseline_path = baseline_path or _baseline_path()
+    pages = page_paths(dist)
+    document = {
+        "_comment": (
+            "Committed page weights (uncompressed bytes on the wire) so that growth is "
+            "deliberate. Written by scripts/website_quality.py --write-baseline; asserted by "
+            "budget_ratchet_violations() in the same module."
+        ),
+        "tolerance": RATCHET_TOLERANCE,
+        "routes": {
+            route: {
+                "htmlCss": page_weight_bytes(dist, route, pages[route]),
+                "html": pages[route].stat().st_size,
+                "cssInlined": len(
+                    "".join(STYLE_BLOCK.findall(pages[route].read_text(encoding="utf-8")))
+                ),
+                "cssLinked": sum(f.stat().st_size for f in linked_stylesheets(dist, route)),
+            }
+            for route in ROUTES
+            if route in pages
+        },
+    }
+    baseline_path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    return baseline_path
+
+
 CHECKS = (
     ("page weight budget", weight_violations),
     ("no client-side JavaScript", javascript_violations),
@@ -436,6 +673,9 @@ CHECKS = (
     ("responsive rules", responsive_violations),
     ("token contrast", contrast_violations),
     ("licence notice", footer_licence_violations),
+    ("class coverage", css_coverage_violations),
+    ("icon sprite integrity", sprite_violations),
+    ("page-weight ratchet", budget_ratchet_violations),
 )
 
 
@@ -451,6 +691,12 @@ def run_checks(dist: pathlib.Path = DEFAULT_DIST) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if "--write-baseline" in argv:
+        argv = [name for name in argv if name != "--write-baseline"]
+        dist = pathlib.Path(argv[0]) if argv else DEFAULT_DIST
+        written = write_baseline(dist)
+        print(f"wrote {written} from {dist}")
+        return 0
     dist = pathlib.Path(argv[0]) if argv else DEFAULT_DIST
     violations = run_checks(dist)
     if violations:

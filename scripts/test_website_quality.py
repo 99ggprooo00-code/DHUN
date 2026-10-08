@@ -234,6 +234,133 @@ class AccessibilityFloor(unittest.TestCase):
         self.assertEqual(quality.accessibility_violations(self.make(self.BASE)), [])
 
 
+class ClassCoverage(unittest.TestCase):
+    def page(self, css: str, body: str) -> str:
+        return (
+            "<!DOCTYPE html><html lang=\"en\"><head><style>"
+            + css
+            + "</style></head><body>"
+            + body
+            + '<main id="main"><h1>t</h1></main></body></html>'
+        )
+
+    def test_class_without_a_rule_fails(self):
+        markup = self.page(".used{color:red}", '<p class="used orphaned">x</p>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            violations = quality.css_coverage_violations(root)
+            self.assertTrue(any("orphaned" in v for v in violations), violations)
+
+    def test_dead_css_fails(self):
+        markup = self.page(".used{color:red}.never{color:blue}", '<p class="used">x</p>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            violations = quality.css_coverage_violations(root)
+            self.assertTrue(any("dead CSS" in v and "never" in v for v in violations), violations)
+
+    def test_per_page_modules_are_checked_separately(self):
+        """A class defined on another route is not defined on this one."""
+        index = self.page(".used{color:red}", '<p class="used">x</p>')
+        download = self.page(".other{color:red}", '<p class="missing-here">x</p>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": index, "download/index.html": download})
+            violations = quality.css_coverage_violations(root)
+            self.assertTrue(
+                any("/download/" in v and "missing-here" in v for v in violations), violations
+            )
+
+    def test_clean_site_passes(self):
+        markup = self.page(".used{color:red}", '<p class="used">x</p>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            self.assertEqual(quality.css_coverage_violations(root), [])
+
+
+class IconSprite(unittest.TestCase):
+    SPRITE = '<svg class="sprite" aria-hidden="true"><symbol id="i-play" viewBox="0 0 24 24"/></svg>'
+
+    def page(self, sprite: str, uses: str) -> str:
+        return (
+            '<!DOCTYPE html><html lang="en"><head></head><body>'
+            + sprite
+            + uses
+            + '<main id="main"><h1>t</h1></main></body></html>'
+        )
+
+    def test_dangling_use_fails(self):
+        markup = self.page(self.SPRITE, '<svg class="i" aria-hidden="true"><use href="#i-play"/><use href="#i-missing"/></svg>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            violations = quality.sprite_violations(root)
+            # the rule reports the bare icon name (the `i-` prefix is the
+            # sprite's namespace, and both directions strip it identically)
+            self.assertTrue(
+                any("does not define" in v and "‘missing’" in v for v in violations), violations
+            )
+
+    def test_unused_symbol_fails(self):
+        sprite = '<svg class="sprite" aria-hidden="true"><symbol id="i-play"/><symbol id="i-unused"/></svg>'
+        markup = self.page(sprite, '<svg class="i" aria-hidden="true"><use href="#i-play"/></svg>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            violations = quality.sprite_violations(root)
+            self.assertTrue(any("never used" in v for v in violations), violations)
+
+    def test_symbols_without_the_sprite_container_fail(self):
+        markup = self.page('<symbol id="i-play"/>', '<svg class="i" aria-hidden="true"><use href="#i-play"/></svg>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            self.assertTrue(any("sprite container" in v for v in quality.sprite_violations(root)))
+
+    def test_consistent_sprite_passes(self):
+        markup = self.page(self.SPRITE, '<svg class="i" aria-hidden="true"><use href="#i-play"/></svg>')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            self.assertEqual(quality.sprite_violations(root), [])
+
+
+class BudgetRatchet(unittest.TestCase):
+    def site(self, root: Path, size: int) -> Path:
+        return write_tree(root, {"index.html": "x" * size, "features/index.html": "x" * size,
+                                 "download/index.html": "x" * size})
+
+    def test_growth_beyond_tolerance_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.site(Path(tmp) / "dist", 1000)
+            baseline = Path(tmp) / "baseline.json"
+            quality.write_baseline(root, baseline)
+            growth = int(1000 * (1 + quality.RATCHET_TOLERANCE)) + 1
+            (root / "index.html").write_text("x" * growth, encoding="utf-8")
+            violations = quality.budget_ratchet_violations(root, baseline)
+            self.assertTrue(any("ratchet" in v for v in violations), violations)
+
+    def test_growth_within_tolerance_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.site(Path(tmp) / "dist", 1000)
+            baseline = Path(tmp) / "baseline.json"
+            quality.write_baseline(root, baseline)
+            (root / "index.html").write_text("x" * 1040, encoding="utf-8")
+            self.assertEqual(quality.budget_ratchet_violations(root, baseline), [])
+
+    def test_missing_baseline_is_a_violation_not_a_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.site(Path(tmp) / "dist", 1000)
+            violations = quality.budget_ratchet_violations(root, Path(tmp) / "absent.json")
+            self.assertTrue(any("baseline" in v for v in violations), violations)
+
+    def test_inlined_css_is_not_counted_twice(self):
+        """A page's inline CSS is inside its bytes; the weight must not double it."""
+        title = ".skip-link{color:red}"
+        markup = (
+            '<!DOCTYPE html><html lang="en"><head><style>' + title + "</style></head><body>"
+            '<a class="skip-link" href="#main">s</a><main id="main"><h1>t</h1></main></body></html>'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = write_tree(Path(tmp), {"index.html": markup})
+            measured = quality.page_weight_bytes(root, "/", root / "index.html")
+            self.assertEqual(measured, (root / "index.html").stat().st_size)
+
+
 class BuiltSite(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -264,6 +391,35 @@ class BuiltSite(unittest.TestCase):
                 f"{route} is {total} B with a {quality.HTML_CSS_BUDGET} B budget",
             )
 
+    def test_every_route_is_a_single_request(self):
+        """One request per route: the CSS is inlined, nothing is linked.
+
+        This is the Tier-A decision (Part A §10.1) stated as a rule, so a
+        future edit cannot quietly reintroduce a render-blocking stylesheet or
+        a second `<style>` block (which would duplicate CSS across modules).
+        """
+        for route, relative in (
+            ("/", "index.html"),
+            ("/features/", "features/index.html"),
+            ("/download/", "download/index.html"),
+            ("/404.html", "404.html"),
+        ):
+            markup = (DIST / relative).read_text(encoding="utf-8")
+            self.assertEqual(
+                markup.count("<style"), 1, f"{route} should inline exactly one stylesheet"
+            )
+            self.assertNotRegex(
+                markup,
+                r"<link[^>]*rel=\"stylesheet\"",
+                f"{route} links a stylesheet, which costs a render-blocking request",
+            )
+            self.assertNotRegex(markup, r"<script", f"{route} ships a script tag")
+
+    def test_inlined_css_is_minified(self):
+        css = quality.site_stylesheet(DIST)
+        self.assertNotIn("/*", css, "the inlined CSS still carries comments")
+        self.assertNotRegex(css, r"\s\{\s", "the inlined CSS is not whitespace-collapsed")
+
     def test_no_release_digest_is_quoted_on_the_download_page(self):
         markup = (DIST / "download" / "index.html").read_text(encoding="utf-8")
         self.assertNotRegex(markup, r"\b[0-9a-f]{64}\b")
@@ -276,7 +432,12 @@ class BuiltSite(unittest.TestCase):
         Lighthouse reported accessibility 95 on /features/ and /download/, where
         the faint "traceable source" line and the list markers used it.
         """
-        css = (DIST / "assets" / "styles.css").read_text(encoding="utf-8")
+        # The stylesheet is inlined into the pages now, so this reads the CSS
+        # through the same helper the checks use: `assets/styles.css` no longer
+        # exists in dist, and the rule must follow the bytes rather than the
+        # file layout. The rule itself is unchanged.
+        css = quality.site_stylesheet(DIST)
+        self.assertTrue(css, "no CSS found in the built site at all")
         offenders = re.findall(r"[^}{]*\{[^}]*color:\s*var\(--text-4\)[^}]*\}", css)
         self.assertEqual(
             offenders,
@@ -290,7 +451,10 @@ class BuiltSite(unittest.TestCase):
         here it is asserted directly, because the gate must not pass by luck."""
         markup = (DIST / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("\n      ", markup)
-        css = (DIST / "assets" / "styles.css").read_text(encoding="utf-8")
+        # Same adaptation as the contrast rule above: read the CSS where the
+        # site ships it (inline), not where it used to ship it (a linked file).
+        css = quality.site_stylesheet(DIST)
+        self.assertTrue(css, "no CSS found in the built site at all")
         self.assertNotIn("/*", css)
 
 

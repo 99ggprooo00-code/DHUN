@@ -21,18 +21,23 @@
 <meta name="twitter:title" content="{{ ogTitle or title }}">
 <meta name="twitter:description" content="{{ description }}">
 <link rel="icon" href="/assets/dhun-favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/styles.css">
+{#- One request per route: the stylesheet the page needs is inlined here from
+    the modules its front matter declares (see eleventy.config.js). -#}
+<style>{{ cssModules | inlineCss | safe }}</style>
 {%- if extraHead %}
 {{ extraHead | safe }}
 {%- endif %}
 </head>
 <body>
+{#- Icon geometry, once per page: every {% icon %} below is a <use> reference.
+    The transform in eleventy.config.js fills this slot from the document itself. -#}
+<!--icon-sprite-->
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="wrap header-inner">
     <a class="wordmark" href="/" aria-label="DHUN home">
       <span class="wordmark-mark" aria-hidden="true">{% icon "play" %}</span>
-      <span class="wordmark-text">DHUN</span>
+      <span>DHUN</span>
     </a>
     <nav class="site-nav" aria-label="Main">
       <ul>
@@ -43,7 +48,7 @@
     </nav>
   </div>
 </header>
-<main id="main">
+<main id="main" tabindex="-1">
 {{ content | safe }}
 </main>
 <footer class="site-footer">
