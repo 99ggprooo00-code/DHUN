@@ -78,6 +78,9 @@ hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--sp-8) 0; }
 }
 .wordmark {
   display: inline-flex; align-items: center; gap: var(--sp-2);
+  /* Browser-measured: the wordmark link was 90.9x28, under the 44px target
+     floor. The header row keeps its height; the hit area grows to the token. */
+  min-height: var(--target);
   color: var(--text); text-decoration: none; font-weight: 700;
   letter-spacing: 0.18em; font-size: 0.85rem;
 }
@@ -171,6 +174,7 @@ section { padding: var(--sp-8) 0; }
 .footer-links a { display: inline-flex; align-items: center; min-height: var(--target); color: var(--text-2); }
 
 pre {
+  max-width: 100%;
   background: var(--surface-variant); border: 1px solid var(--hairline);
   border-radius: var(--r-md); padding: var(--sp-4); overflow-x: auto;
   font-family: var(--mono); font-size: 0.85rem; color: var(--text);

@@ -1,7 +1,8 @@
 /* -------------------------------------------------------------- downloads -- */
 .asset-list { list-style: none; padding: 0; display: grid; gap: var(--sp-4); }
-.asset-list li { margin: 0; }
+.asset-list li { margin: 0; min-width: 0; }
 .asset {
+  min-width: 0;
   border: 1px solid var(--hairline); border-radius: var(--r-lg);
   padding: var(--sp-5); background: var(--surface);
 }
@@ -25,7 +26,7 @@
   font-size: 0.86rem;
 }
 .steps { counter-reset: step; list-style: none; padding: 0; display: grid; gap: var(--sp-5); }
-.steps li { margin: 0; padding-left: 3rem; position: relative; }
+.steps li { margin: 0; min-width: 0; padding-left: 3rem; position: relative; }
 .steps li::before {
   counter-increment: step; content: counter(step);
   position: absolute; left: 0; top: 0;

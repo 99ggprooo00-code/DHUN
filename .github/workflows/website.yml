@@ -210,23 +210,52 @@ jobs:
       # Three samples, gate on the median. One Lighthouse run on a shared runner
       # swings by double digits for a page that did not change; the median is
       # what makes the gate about the site rather than about the runner.
+      # Three samples, gate on the median. One Lighthouse run on a shared runner
+      # swings by double digits for a page that did not change; the median is
+      # what makes the gate about the site rather than about the runner.
+      #
+      # A sample that fails is retried once and then *reported as an annotation*
+      # with the tail of its own log: the first version of this step exited 1 on
+      # an unreproducible second-route failure and said nothing, and Actions log
+      # archives are not retrievable from the environment this repository is
+      # maintained in. Silence is not evidence.
       - name: Lighthouse (three samples per route)
         if: steps.browser.outputs.available == 'true'
         run: |
           mkdir -p reports
+          failed=0
           for route in "/" "/features/" "/download/"; do
             name=$(echo "$route" | tr -c 'a-zA-Z0-9' '_')
+            reports=""
             for sample in 1 2 3; do
-              npx --yes lighthouse@13.5.0 "http://127.0.0.1:8080$route" \
-                --quiet --output=json --output=html \
-                --output-path="reports/${name}-${sample}" \
-                --chrome-flags="--headless=new --no-sandbox --disable-dev-shm-usage" || exit 1
+              log="reports/${name}-${sample}.log"
+              ok=0
+              for attempt in 1 2; do
+                if npx --yes lighthouse@13.5.0 "http://127.0.0.1:8080$route" \
+                    --quiet --output=json --output=html \
+                    --output-path="reports/${name}-${sample}" \
+                    --chrome-flags="--headless=new --no-sandbox --disable-dev-shm-usage" >"$log" 2>&1; then
+                  ok=1
+                  break
+                fi
+                if [ "$attempt" = 1 ]; then
+                  echo "::warning title=Lighthouse ${route} sample ${sample}::first attempt failed, retrying once (runner noise is common; a silent retry is not)."
+                fi
+              done
+              if [ "$ok" = 1 ]; then
+                reports="$reports reports/${name}-${sample}.report.json"
+              else
+                failed=1
+                echo "::error title=Lighthouse ${route} sample ${sample}::lighthouse failed twice. Last output: $(tail -c 700 "$log" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | tr '\n' ' ')"
+              fi
             done
-            python3 scripts/report_lighthouse.py "$route" \
-              "reports/${name}-1.report.json" \
-              "reports/${name}-2.report.json" \
-              "reports/${name}-3.report.json" || exit 1
+            if [ -n "$reports" ]; then
+              python3 scripts/report_lighthouse.py "$route" $reports || failed=1
+            else
+              echo "::error title=Lighthouse ${route}::no sample produced a report for this route, so no score is claimed for it."
+            fi
           done
+          exit $failed
 
       - name: Upload Lighthouse reports
         if: always()

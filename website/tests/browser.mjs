@@ -53,6 +53,7 @@ const SHOTS = fileURLToPath(new URL("./screenshots/", import.meta.url));
 
 const failures = [];
 const measurements = [];
+const warnings = [];
 
 function escape(value) {
   return String(value).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
@@ -62,14 +63,61 @@ function annotate(level, title, message) {
   console.log(`::${level} title=${escape(title)}::${escape(message)}`);
 }
 
+// Findings are *collected*, not annotated one by one. GitHub caps the
+// annotations the API returns (about ten per level), so a per-viewport
+// annotation would push the real numbers out of the only channel this
+// environment can read. Everything is printed to stdout in full and the tail
+// of this script emits one annotation per category.
 function fail(title, message) {
   failures.push(`${title}: ${message}`);
-  annotate("error", title, message);
 }
 
 function record(title, message) {
   measurements.push(`${title}: ${message}`);
-  annotate("notice", title, message);
+}
+
+function warn(title, message) {
+  warnings.push(`${title}: ${message}`);
+}
+
+const category = (title) => title.split(/\s+[/@]/)[0].trim() || title;
+
+function group(entries) {
+  const grouped = new Map();
+  for (const entry of entries) {
+    const key = category(entry);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(entry);
+  }
+  return grouped;
+}
+
+const clip = (text, limit = 4000) => (text.length > limit ? `${text.slice(0, limit)} …(truncated)` : text);
+
+function emitReport(grouped, level, label) {
+  let emitted = 0;
+  for (const [key, entries] of grouped) {
+    if (emitted >= 8) {
+      annotate(level, `${label}: ${grouped.size - emitted} more categor(y|ies)`, clip(entries.join(" || ")));
+      break;
+    }
+    annotate(level, `${key} — ${entries.length} ${label}(s)`, clip(entries.join(" || ")));
+    emitted += 1;
+  }
+}
+
+function emitAnnotations() {
+  if (failures.length) emitReport(group(failures), "error", "problem");
+  if (warnings.length) emitReport(group(warnings), "warning", "note");
+  if (measurements.length) {
+    const byCategory = group(measurements);
+    let emitted = 0;
+    for (const [key, entries] of byCategory) {
+      if (emitted >= 6) break;
+      annotate("notice", `measured: ${key}`, clip(entries.join(" || "), 3500));
+      emitted += 1;
+    }
+  }
 }
 
 const url = (route) => `${BASE}${route}`;
@@ -169,18 +217,24 @@ function contrastReport() {
 /** Target sizes, with WCAG 2.5.8's inline-in-a-sentence exception applied. */
 function targetReport() {
   const results = [];
-  const standaloneContainers = ".site-nav, .footer-links, .cta-row, .asset-links, nav, footer, .skip-link";
+  // Link rows are laid out as discrete targets even when their markup is
+  // inside a list; `footer` is deliberately NOT here, because a footer also
+  // contains ordinary prose and a link inside that prose is inline in a
+  // sentence (WCAG 2.5.8's inline exception), not a standalone control.
+  const standaloneContainers = ".site-nav, .footer-links, .cta-row, .asset-links, nav, .skip-link";
   for (const element of document.querySelectorAll("a, button, [role=\"button\"]")) {
     const rect = element.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) continue;
     const style = getComputedStyle(element);
     if (style.display === "none" || style.visibility === "hidden") continue;
-    const parentText = element.parentElement
-      ? element.parentElement.textContent.replace(element.textContent, "").trim()
-      : "";
+    // Inline in a sentence means the *block* the target sits in has other
+    // text, not merely its immediate parent: a footnote marker lives in a
+    // <sup> of its own inside a <span> that is full of words.
+    const block = element.closest("p, li, dd, dt, figcaption, blockquote, td, th, h1, h2, h3, h4, h5, h6, .stat-label, .notice, .risk");
+    const blockText = block ? block.textContent.replace(element.textContent, "").trim() : "";
     const inlineInText =
       style.display.startsWith("inline") &&
-      parentText.length > 0 &&
+      blockText.length > 0 &&
       !element.closest(standaloneContainers);
     results.push({
       element: `${element.tagName.toLowerCase()}.${String(element.className || "").split(/\s+/)[0] || "no-class"}`,
@@ -220,11 +274,32 @@ function overflowReport() {
       left: Math.round(rect.left),
     });
   }
+  // The scrollable region can also exceed every border box (a nowrap run of
+  // text inside a box that is itself inside the viewport, for instance), which
+  // is exactly the case the loop above cannot see. Anything whose own content
+  // is wider than its box and which is *not* a scroll container is spilling.
+  const spilling = [];
+  for (const element of document.querySelectorAll("body *")) {
+    const overflowX = getComputedStyle(element).overflowX;
+    if (overflowX !== "visible") continue;
+    const spill = element.scrollWidth - element.clientWidth;
+    if (spill > 1 && element.clientWidth > 0) {
+      spilling.push({
+        element: element.tagName.toLowerCase(),
+        className: String(element.className || "").slice(0, 60),
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      });
+    }
+  }
   return {
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
     innerWidth: viewport,
     offenders: offenders.slice(0, 5),
+    spilling: spilling
+      .sort((a, b) => b.scrollWidth - b.clientWidth - (a.scrollWidth - a.clientWidth))
+      .slice(0, 5),
   };
 }
 
@@ -336,6 +411,15 @@ async function checkViewports(browser) {
           `overflow ${route} @ ${viewport.name}`,
           `${overflow.offenders.length} element(s) extend past the viewport: ` +
             overflow.offenders.map((o) => `${o.element}.${o.className} right=${o.right}`).join(", "),
+        );
+      }
+      if (overflow.spilling.length) {
+        fail(
+          `overflow ${route} @ ${viewport.name}`,
+          `content wider than its box: ` +
+            overflow.spilling
+              .map((o) => `${o.element}.${o.className} ${o.scrollWidth}>${o.clientWidth}`)
+              .join(", "),
         );
       }
       if (consoleErrors.length) {
@@ -518,7 +602,7 @@ async function checkAxe(browser) {
         fail(`axe ${route} (${scheme})`, `serious/critical: ${summary(serious)}`);
       }
       if (other.length) {
-        annotate("warning", `axe ${route} (${scheme}) minor`, summary(other));
+        warn(`axe ${route} (${scheme}) minor`, summary(other));
       }
       await page.close();
     }
@@ -564,7 +648,10 @@ try {
   await browser.close();
 }
 
-console.log(`\n${measurements.length} measurement(s), ${failures.length} failure(s).`);
+console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
+console.error(measurements.map((line) => `  · ${line}`).join("\n"));
+if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
+emitAnnotations();
 if (failures.length) {
   console.error(failures.map((line) => `  - ${line}`).join("\n"));
   process.exitCode = 1;

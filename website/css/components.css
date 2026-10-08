@@ -20,6 +20,15 @@
 }
 .footnotes li { margin-bottom: var(--sp-2); }
 .footnotes .fn-mark { color: var(--accent); font-weight: 700; }
+/* The superscript footnote links are inline in a sentence, so WCAG 2.5.8's
+   inline exception applies — but they were 6.4x14 px, which is too small to
+   hit even deliberately. This gives each one a 24x24 box while the glyph stays
+   a superscript. (Measured, not argued: scripts/website_quality.py holds the
+   static floor, website/tests/browser.mjs the rendered one.) */
+.fn-mark a {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; min-height: 24px;
+}
 
 /* -------------------------------------------------------------- feature -- */
 .feature {
@@ -36,6 +45,7 @@
 .card {
   background: var(--surface); border: 1px solid var(--hairline);
   border-radius: var(--r-lg); padding: var(--sp-5);
+  min-width: 0;
 }
 .card h3 { margin-bottom: var(--sp-2); }
 .card p:last-child { margin-bottom: 0; }
@@ -71,6 +81,7 @@
   border-left: 3px solid var(--accent); color: var(--text-2); font-size: 0.95rem;
 }
 .faq { display: grid; gap: var(--sp-4); }
+.faq > * { min-width: 0; }
 .faq h3 { margin-bottom: var(--sp-1); }
 
 @media (min-width: 640px) {
