@@ -20,7 +20,10 @@
 .asset p { color: var(--text-2); font-size: 0.94rem; }
 .asset-links { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; }
 .asset-links .btn { min-height: var(--target); padding: 0 var(--sp-5); font-size: 0.95rem; }
-.asset-links .sha { font-size: 0.86rem; }
+.asset-links .sha {
+  display: inline-flex; align-items: center; min-height: var(--target);
+  font-size: 0.86rem;
+}
 .steps { counter-reset: step; list-style: none; padding: 0; display: grid; gap: var(--sp-5); }
 .steps li { margin: 0; padding-left: 3rem; position: relative; }
 .steps li::before {

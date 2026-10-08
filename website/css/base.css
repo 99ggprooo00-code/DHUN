@@ -57,6 +57,7 @@ hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--sp-8) 0; }
 
 .skip-link {
   position: absolute; left: var(--sp-4); top: -3rem; z-index: 30;
+  display: inline-flex; align-items: center; min-height: var(--target);
   background: var(--accent); color: var(--on-accent);
   padding: var(--sp-2) var(--sp-4); border-radius: var(--r-sm); font-weight: 600;
   transition: top 120ms ease-out;
