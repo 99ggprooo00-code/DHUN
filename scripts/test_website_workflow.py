@@ -143,6 +143,13 @@ class BuildJob(WorkflowText):
         job = self.job("build")
         self.assertIn("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", job)
 
+    def test_build_proves_the_browser_rules_without_a_browser(self):
+        """The browser job's decision logic must be mutation-proven in the job
+        that has Node and no browser: a rule that stops firing has to fail
+        somewhere cheap, not only on a runner that installs Chromium."""
+        job = self.job("build")
+        self.assertIn("npm run test:rules", job)
+
     def test_build_runs_every_local_gate(self):
         job = self.job("build")
         for command in (

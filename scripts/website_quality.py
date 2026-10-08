@@ -785,6 +785,104 @@ def crawlability_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def print_style_violations(dist: pathlib.Path) -> list[str]:
+    """Every route carries a print block that makes paper legible.
+
+    The site has no background colours on paper (browsers drop them) and a dark
+    default palette, so a page without print rules prints white-on-white. The
+    *effect* is measured in the browser job — caveats still rendered, print-media
+    contrast still above the floors — and this rule keeps the block those
+    measurements depend on from being deleted or from shipping on two routes out
+    of three.
+    """
+    violations: list[str] = []
+    marker = "@mediaprint"
+    for route, path in page_paths(dist).items():
+        compact = _compact(page_stylesheet(dist, route))
+        if marker not in compact:
+            violations.append(
+                f"{route}: no `@media print` block ships in this page's own CSS, so "
+                f"the printed sheet is white text on white paper"
+            )
+            continue
+        block = compact.split(marker, 1)[1][:3000]
+        for token in ("--text:", "--bg:"):
+            if token not in block:
+                violations.append(
+                    f"{route}: the @media print block does not redefine {token.rstrip(':')} "
+                    f"for paper"
+                )
+        if ".device" not in block:
+            violations.append(
+                f"{route}: the @media print block does not hide the decorative mockup "
+                f"drawing, so printing spends a page of ink on a recreation"
+            )
+        # The paper palette is checked for the one thing that makes the block
+        # worth having: the printed text must be readable against the printed
+        # background. Without this, `--text:#ffffff` on a white `--bg` shipped
+        # green here and could only be caught by a browser run — a mutation that
+        # proved the rule was too shallow (2026-10-08), now computed locally with
+        # the same WCAG maths the token rule uses.
+        tokens = dict(re.findall(r"(--[a-z0-9-]+):([^;}]+)", block))
+        if "--text" in tokens and "--bg" in tokens:
+            foreground = _colour(tokens["--text"], tokens["--bg"])
+            background = _colour(tokens["--bg"])
+            if foreground is None or background is None:
+                violations.append(
+                    f"{route}: cannot resolve the print palette ({tokens['--text']} on "
+                    f"{tokens['--bg']})"
+                )
+            else:
+                lighter, darker = sorted(
+                    (_relative_luminance(foreground), _relative_luminance(background)),
+                    reverse=True,
+                )
+                ratio = (lighter + 0.05) / (darker + 0.05)
+                if ratio < 4.5:
+                    violations.append(
+                        f"{route}: print --text on --bg is {ratio:.2f}:1, below the 4.5:1 "
+                        f"floor — the sheet would be unreadable"
+                    )
+    return violations
+
+
+def forced_colors_violations(dist: pathlib.Path) -> list[str]:
+    """The site must say what it looks like when the OS picks the colours.
+
+    `forced-colors: active` is Windows High Contrast. Chromium removes author
+    backgrounds there, and an `<a>` styled as a button gets no control border
+    (a real `<button>` does), so without an explicit rule the site's primary
+    action renders as plain text. The *effect* is measured in a real browser —
+    the `forced colors` check in `website/tests/browser.mjs`, whose decision
+    logic is mutation-proven without a browser in `website/tests/rules.mjs` —
+    and this rule keeps the mechanism it measures from being deleted.
+    """
+    marker = "@media(forced-colors:active)"
+    violations: list[str] = []
+    # Per route, not over the union of every page's CSS. The first version of
+    # this rule read `site_stylesheet()`, which concatenates all three routes, so
+    # deleting the block from one page still passed — a mutation that has to be
+    # run to be believed, and it failed to fire (see the session's verification
+    # record). A route ships its own <style>, so it is checked on its own.
+    for route, path in page_paths(dist).items():
+        compact = _compact(page_stylesheet(dist, route))
+        if marker not in compact:
+            violations.append(
+                f"{route}: no `@media (forced-colors: active)` block ships in this "
+                f"page's own CSS: Windows High Contrast would draw its buttons as "
+                f"plain text"
+            )
+            continue
+        block = compact.split(marker, 1)[1].split("}}", 1)[0][:400]
+        markup = path.read_text(encoding="utf-8")
+        if 'class="btn' in markup and ".btn" not in block:
+            violations.append(
+                f"{route}: @media (forced-colors: active) does not mention .btn, so "
+                f"the control border the forced-colors check measures is not restored"
+            )
+    return violations
+
+
 def responsive_violations(dist: pathlib.Path) -> list[str]:
     violations: list[str] = []
     css = _read_css(dist).get("styles.css", "")
@@ -1058,6 +1156,8 @@ CHECKS = (
     ("page metadata", metadata_violations),
     ("crawlability", crawlability_violations),
     ("responsive rules", responsive_violations),
+    ("print stylesheet", print_style_violations),
+    ("forced-colours fallback", forced_colors_violations),
     ("token contrast", contrast_violations),
     ("licence notice", footer_licence_violations),
     ("class coverage", css_coverage_violations),

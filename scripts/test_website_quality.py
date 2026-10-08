@@ -798,3 +798,78 @@ class NothingShipsUnreferenced(DistCopyMixin):
         self.assertTrue((dist / "robots.txt").is_file())
         self.assertTrue((dist / "sitemap.xml").is_file())
         self.assertTrue((dist / "404.html").is_file())
+
+
+class StyleBlocksForOtherOutputs(DistCopyMixin):
+    """Print and forced-colours rules: the mechanism each browser check measures.
+
+    The browser job measures *effects* (`print` and `forced colors` in
+    `website/tests/browser.mjs`). Neither can run without a browser, so the
+    mechanism those measurements depend on is asserted here, per route, in the
+    cheap Python-only suite — and both rules are mutation-proven below.
+    """
+
+    PRINT = "@media print { :root { --text: #000000; --bg: #ffffff; } .mock .device { display: none; } }"
+    FORCED = "@media (forced-colors: active) { .btn { border-color: CanvasText; } }"
+
+    def page(self, css: str, body: str = '<p><a class="btn" href="/">Go</a></p>') -> str:
+        return (
+            '<!DOCTYPE html><html lang="en"><head><meta name="viewport" content="width=device-width">'
+            f"<style>{css}</style></head><body><header><nav>m</nav></header>"
+            '<a class="skip-link" href="#main">s</a><main id="main"><h1>t</h1>'
+            f"{body}</main><footer>f</footer></body></html>"
+        )
+
+    def site(self, css: str) -> Path:
+        return write_tree(
+            Path(tmpdir()),
+            {rel: self.page(css) for rel in ("index.html", "features/index.html", "ui/index.html")},
+        )
+
+    def test_the_real_site_ships_both_blocks(self):
+        self.assertEqual(quality.print_style_violations(DIST), [])
+        self.assertEqual(quality.forced_colors_violations(DIST), [])
+
+    def test_a_page_without_a_print_block_fails(self):
+        dist = self.copy_dist()
+        page = dist / "ui" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        start = markup.index("@media print{")
+        end = markup.index("}}", start) + 2
+        page.write_text(markup.replace(markup[start:end], ""), encoding="utf-8")
+        violations = quality.print_style_violations(dist)
+        self.assertTrue(any("/ui/" in v and "@media print" in v for v in violations), violations)
+
+    def test_a_print_block_without_paper_tokens_or_device_hiding_fails(self):
+        css = "@media print { .card { break-inside: avoid; } }"
+        violations = quality.print_style_violations(self.site(css))
+        self.assertTrue(any("--text" in v for v in violations), violations)
+        self.assertTrue(any(".device" in v or "mockup" in v for v in violations), violations)
+
+    def test_a_print_block_with_tokens_and_device_hiding_passes(self):
+        self.assertEqual(quality.print_style_violations(self.site(self.PRINT + self.FORCED)), [])
+
+    def test_a_print_palette_that_cannot_be_read_on_paper_fails(self):
+        """The mutation that proved the first version too shallow: a print block
+        with `--text:#ffffff` on a white `--bg` passed it, because the rule only
+        checked that the tokens were *mentioned*. It now computes the ratio."""
+        css = self.PRINT.replace("--text: #000000", "--text: #ffffff") + self.FORCED
+        violations = quality.print_style_violations(self.site(css))
+        self.assertTrue(any("unreadable" in v for v in violations), violations)
+
+    def test_a_page_without_a_forced_colours_block_fails(self):
+        dist = self.copy_dist()
+        page = dist / "features" / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        start = markup.index("@media (forced-colors:active){")
+        end = markup.index("}}", start) + 2
+        page.write_text(markup.replace(markup[start:end], ""), encoding="utf-8")
+        violations = quality.forced_colors_violations(dist)
+        self.assertTrue(
+            any("/features/" in v and "forced-colors" in v for v in violations), violations
+        )
+
+    def test_a_forced_colours_block_that_forgets_the_button_fails(self):
+        css = self.PRINT + "@media (forced-colors: active) { .card { border-color: CanvasText; } }"
+        violations = quality.forced_colors_violations(self.site(css))
+        self.assertTrue(any(".btn" in v for v in violations), violations)

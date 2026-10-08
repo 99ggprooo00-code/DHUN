@@ -75,6 +75,15 @@ jobs:
         working-directory: website
         run: node tools/verify-minify.mjs
 
+      # The decision logic behind the browser job's checks, mutation-proven
+      # (a must-pass and a must-fail case per rule). It needs Node and nothing
+      # else — no browser, no server, no network — so it runs here, in the job
+      # that already has Node, and a broken rule fails on the cheap runner
+      # instead of waiting for a browser to be installed.
+      - name: Rule logic for the browser checks (node --test, no browser)
+        working-directory: website
+        run: npm run test:rules
+
       # The committed mirror in website/dist/ is what app CI's step 1 checks.
       # If a rebuild changes it, one of the two is stale and the PR must fix it.
       - name: Committed build must match a fresh build (drift check)
