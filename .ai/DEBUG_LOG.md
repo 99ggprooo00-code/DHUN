@@ -1,5 +1,46 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-08 — the site's own gates caught three of its claims while it was being built (session `arena/fc918d37-dhun`)
+
+**This entry records defects the honesty/quality gates found, not app incidents.**
+They are here because each one is a trap that a later session will hit again.
+
+1. **A blanket `sync` rule flagged a real feature.** The first version of the
+   "no cross-device sync" rule matched every occurrence of *sync*, which made
+   the truthful line *"Synced lyrics from LRCLIB"* a build failure. The rule now
+   reads `(?<!lyrics )(?<!lyric )\bsync(s|ed|ing)?\b(?!\s+lyrics?\b)`, so
+   synced lyrics pass and "syncs your library across devices" fails. The
+   Android permission constant `FOREGROUND_SERVICE_DATA_SYNC` deliberately does
+   not match either — `_` is a word character — which is why the downloads page
+   names the constant instead of paraphrasing it.
+2. **Negation was allowed one clause too far.** The first rule accepted a
+   negation anywhere in the previous clause, so *"DHUN has no accounts. Sync
+   across devices is coming next year."* read as honest. A negation cue must now
+   sit in the **same** clause as the mention.
+3. **The quality script failed against the minified build.** String checks like
+   `@media (min-width: 480px)` and `--target: 44px` do not survive
+   minification (`@media(min-width:480px)`, `--target:44px`). The checks now
+   compare a whitespace-free copy, so they pass before *and* after minification
+   — otherwise the gate would only ever have proven something about the
+   unminified tree nobody serves.
+4. **A contrast assertion numerically passed while being inverted.** The ratio
+   was computed as `fg / bg` instead of lighter-over-darker, so black-on-violet
+   reported 0.13:1. Fixed by sorting the two luminances; the real numbers are
+   18.10:1 down to 5.71:1.
+5. **Two `data-caveat` mistakes were caught by the mutation proof**, which is
+   exactly what it is for: removing the `borrowed-time` attribute (and
+   rewording its heading) failed the required-caveat rule, and a pasted SHA-256
+   failed the digest rule both in the sources and in the built page. Both were
+   reverted; the transcripts are in `docs/verification/20-marketing-site.md`.
+
+**Environment traps re-confirmed for the site work:** Eleventy exposes
+shortcodes to Nunjucks as **tag** syntax (`{% icon "play" %}`), not as
+expression calls (`{{ icon("play") }}` — that fails with "Unable to call
+`icon`"), and Nunjucks `{% include %}` cannot concatenate its path, so the
+mockup include names are data, not derived strings. There is still no browser
+and no display in this sandbox, so Lighthouse/axe cannot run here at all and
+no score may be quoted from this machine.
+
 ## 2026-10-08 — ADR-008 B1: the canonical run is BLOCKED at the player request, and the evidence is too thin to name a cause (session `arena/45db02aa-dhun`)
 
 **What happened.** PR #136 merged with explicit authorization as `2a20024`, so

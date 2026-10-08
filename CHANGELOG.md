@@ -24,6 +24,33 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Added — a static marketing site at the project's GitHub Pages URL (2026-10-08, session `arena/fc918d37-dhun`)
+
+- **`website/`** — three static routes (`/`, `/features/`, `/download/`), a real
+  404, `robots.txt` and `sitemap.xml`, built with Eleventy (pinned, lockfile
+  committed) to plain files with **zero client-side JavaScript**, no third-party
+  runtime asset and no webfont. Dark-first palette, type scale, shapes and
+  spacing read from the shared Compose design system; the light scheme mirrors
+  the app's.
+- **Four hand-written CSS mockups** of the real Android and Windows UI, each
+  labelled as an illustrative recreation. The repository contains no images, so
+  none is fabricated; `.ai/WEBSITE_PLAN.md` §9 lists the real captures that
+  should replace them.
+- **Honesty gates that run in CI**: forbidden-claim rules (no iOS, no web
+  player, no sync, no import, no FLAC or bitrate, no store channel, no unshipped
+  platform), required front-page caveats (rolling unverified build, borrowed
+  time, open hardware gates) and a rule against baked digests or byte sizes —
+  because the rolling `test` assets change on every push to `main`.
+- **Page-weight budget**: HTML+CSS ≤ 60 KB per route, JS ≤ 10 KB, no asset
+  > 150 KB, asserted against the built output.
+- **`.github/workflows/website.yml`** — builds, proves minification lossless,
+  fails on drift between `website/src` and the committed `website/dist`, runs
+  the checks and `html-validate`, reports Lighthouse/axe numbers as annotations
+  on `ubuntu-latest`, and deploys to Pages from `main` only.
+- **`docs/decisions/ADR-009-marketing-site.md` (PROPOSED)** — a static marketing
+  site is the only public web property; it authorizes no player, no PWA, no
+  `app.` host and does not widen ADR-008.
+
 ### Changed — Android minSdk is 24, and the test release publishes three APKs (2026-10-08, session `arena/688214aa-dhun`)
 
 - **minSdk 26 → 24** (Android 7.0) in the app and the shared module. Android 5–6

@@ -177,10 +177,10 @@ Landing-page order (abstracted from the verified Volta pattern in Part B §3,
 with DHUN substitutions): skip link → header → badge row
 `FREE · GPL-3.0 · NO SIGN-IN · NO ADS` → 4-word H1 → one-sentence value prop →
 **exactly two CTAs** (`Download` → `/download`; `Source on GitHub` →
-repository) → platform strip → hero mockup trio → 4-up stat row
+repository) → platform strip → hero visual (Home) → 4-up stat row
 (`0` accounts · `GPL-3.0` free forever · `Android 24+` / desktop via the JVM
 build · `0` trackers) → **honesty footnote under the stats** → three feature
-sections (**NO SIGN-IN / OFFLINE / DESKTOP**) each kicker + promise + mockup →
+sections (**NO SIGN-IN / OFFLINE / DESKTOP**) each kicker + promise + its own mockup (player / downloads / desktop window — four distinct screens in total, so no screen is repeated) →
 "borrowed time" risk section → closing CTA repeating both buttons → footer
 with the GPL-3.0 notice, source link and `THIRD_PARTY.md`.
 
@@ -212,8 +212,11 @@ There is no raster or vector artwork in the repository (verified in Part B
 - **Forbidden:** stock photos, third-party album art, other projects'
   screenshots, AI-generated imagery, and any mockup showing a feature DHUN
   does not have.
-- Every mockup carries a visible caption **and** an `aria-label` saying it is
-  an illustrative recreation, not a screenshot.
+- Every mockup carries a visible `<figcaption>` that says it is an illustrative
+  recreation, **not a screenshot**, plus a screen-reader description of what the
+  recreation shows; the drawing itself is `aria-hidden`, so assistive tech never
+  reads placeholder UI text as if it were content. `scripts/website_quality.py`
+  fails the build if a mockup loses either the label or its §9 backlog id.
 - §9 lists exactly which real captures should replace each mockup.
 
 ## 9. Screenshot capture backlog (D4 follow-through)
@@ -226,7 +229,7 @@ recreation.
 |---|---|---|---|
 | 1 | `mock-home-phone` | Android Home, portrait | rail layout, now-playing backdrop, bottom nav + docked mini-player |
 | 2 | `mock-player-phone` | Android FullPlayer, portrait | blurred artwork backdrop, Lyrics tab, transport row, play disc |
-| 3 | `mock-library-phone` | Android Library → Downloads | downloaded rows with offline badges, storage row |
+| 3 | `mock-downloads-phone` | Android Library → Downloads | downloaded rows with offline badges, in-progress row |
 | 4 | `mock-desktop-window` | Windows desktop window, 1200×780 | rails layout, tray-adjacent mini-player, EQ or queue panel open |
 | 5 | `mock-widget` | Android home screen with the Quick Play widget | widget on a launcher, not the app |
 | 6 | `mock-lyrics` | Android FullPlayer → Lyrics, mid-song | a line highlighted against real synced lyrics |
@@ -258,16 +261,17 @@ page's technical footnote rather than claimed as optimised.
 | Phase | Deliverable | Status |
 |---|---|---|
 | P0 | this plan; ROADMAP current-task correction; PR #135 verdicts read | ✅ done (commit `2e0dcf8`, this file) |
-| P1 | comparative research retained from Part B §4 with URLs, plus 3 adopted / 2 rejected techniques (§12) | see §12 |
-| P2 | Pages diagnosis recorded (§2, §6) | ✅ diagnosed; source switch pending (§6) |
-| P3 | `website/` scaffold builds locally; own workflow | see §11 table below |
-| P4 | design tokens from the Compose source | pending |
-| P5 | CSS/SVG mockups | pending |
-| P6 | `/`, `/download`, `/features` | pending |
-| P7 | quality pass (weight, a11y, HTML validity, links, meta) | pending |
-| P8 | the three D5 tests, CI wiring, mutation proof | pending |
-| P9 | CI results read once, root-cause fixes | pending |
-| P10 | docs: ROADMAP, DEBUG_LOG, KNOWN_LIMITATIONS, verification record, README, THIRD_PARTY, CHANGELOG | pending |
+| P1 | comparative research retained from Part B §4 with URLs, plus 3 adopted / 2 rejected techniques (§12) | ✅ done (§12) |
+| P2 | Pages diagnosis recorded (§2, §6) | ✅ diagnosed — `legacy` `main:/` renders the README; the source switch is applied at the end of the session and its outcome recorded in the PR |
+| P3 | `website/` scaffold builds locally; own workflow | ✅ done — `npm ci && npm run build`, workflow added |
+| P4 | design tokens from the Compose source | ✅ done — dark + light token sets mirrored in `styles.css` |
+| P5 | CSS/SVG mockups | ✅ done — 4 mockups, labelled, ids matching §9 |
+| P6 | `/`, `/download`, `/features` | ✅ done — plus a real 404, robots.txt, sitemap.xml |
+| P7 | quality pass (weight, a11y, HTML validity, links, meta) | ✅ done locally — budget 50,455 B worst route, html-validate clean, 12 contrast pairs pass, no third-party origin |
+| P8 | the three D5 tests, CI wiring, mutation proof | ✅ done — 47 tests in CI step 1, 3 mutations proven red then green after revert |
+| P9 | CI results read once, root-cause fixes | ✅ read at the finish sequence; verdicts recorded in the PR comment |
+| P10 | docs: ROADMAP, DEBUG_LOG, KNOWN_LIMITATIONS, verification record, README, THIRD_PARTY, CHANGELOG | ✅ done |
+| P11 | **post-merge only**: `website.yml` on `main`, the Pages source, the canonical URL | ⏳ cannot be observed from inside the merging session |
 
 **Unverified as of P0 (deliberately listed rather than glossed):** the CI
 verdicts for any commit of this branch; the drift check; the Actions Pages

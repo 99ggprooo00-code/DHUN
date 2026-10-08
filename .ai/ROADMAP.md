@@ -1,85 +1,95 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/fc918d37-dhun` — build the Option-A marketing site at the canonical Pages URL (2026-10-08)
+## Session `arena/fc918d37-dhun` — the Option-A marketing site is built, gated by tests, and awaiting the merge (2026-10-08)
 
 Updated **2026-10-08** · fixed session branch `arena/fc918d37-dhun` · branch
-point and current GitHub `main` **`ae44c7a74191950c00385f705e9617b3ef71658c`**
-(PR #137 merge). The working tree was clean at boot, the branch had no remote
-ref, and the only pre-existing open PR is #54 (ADR-007 research; unchanged and
-out of scope). This session's one working PR is the website workstream.
+point **`ae44c7a74191950c00385f705e9617b3ef71658c`** (PR #137 merge, which is
+what GitHub `main` was at boot). Working tree clean at boot; the branch had no
+remote ref. Only pre-existing open PR: #54 (unchanged, out of scope). This
+session's working PR is **#138**.
 
 ### Correcting a stale ledger claim, and reading a leftover verdict
 
-- **`main` is `ae44c7a`, not `2a20024`** — two merges (#136, #137) landed after
-  the block above was written. The stale “PR #135 awaits merge authorization”
-  wording is already corrected in the block below and needed no further edit;
-  the live defect was this file's *current base* claim, corrected here.
-- **PR #135's post-merge verdicts, left unread by the session that merged it,
-  were read this session** and are recorded below: CI **37772063324**,
-  test-release **37772063364**, Build APK **37772063380** and pages
-  **37772062338** all **success** on `8a8d6c5`. No further re-verification.
+- **`main` is `ae44c7a`, not `2a20024`** — two merges landed after the block
+  below was written. The stale “PR #135 awaits merge authorization” wording was
+  already corrected there; the live defect was this file's *current base*
+  claim, fixed here.
+- **PR #135's post-merge verdicts, never read by the session that merged it,
+  were read this session**: CI **37772063324**, test-release **37772063364**,
+  Build APK **37772063380** and pages **37772062338**, all **success** on
+  `8a8d6c5`. Not re-verified.
 
-### Task
+### What shipped
 
-The user's standing instruction for this session: build the **Option-A static
-marketing site** for the existing Android/desktop applications, deploy it at the
-canonical Pages URL, and encode the site's truthfulness in tests instead of
-prose. Options B (web player), PWA and `app.`-style properties are **forbidden**
-by the same instruction and by MASTER_PROMPT lines 46/421 — a player would need
-a new ADR, so only a **PROPOSED ADR-009** (marketing site) is written.
+A three-route static marketing site — `/`, `/features/`, `/download/`, plus a
+real 404, `robots.txt` and `sitemap.xml` — in `website/` (Eleventy 3.1.6
+pinned, one build command, **zero client-side JavaScript**, no third-party
+runtime asset, system font stack, GPL-3.0 notice in the footer). Its own
+workflow is `.github/workflows/website.yml`; the four app workflows, every
+Gradle file, `shared/`, `app-android/` and `app-desktop/` are untouched, and a
+site build failure cannot redden app CI (app CI step 1 reads the committed
+built HTML with Python only).
 
-### Decisions already made (not re-opened this session)
+Truthfulness is enforced by tests, not prose:
 
-Option A scope; a new top-level `website/` directory with its **own** workflow;
-Astro or Eleventy (Eleventy 3.1.6 chosen, pinned, lockfile committed); no
-images exist so every visual is a hand-written CSS/SVG mockup of the real
-Compose UI, labelled as a recreation; exactly three routes (`/`, `/download`,
-`/features`), English only; GPL-3.0, no third-party runtime asset, system font
-stack; the rolling `test` release linked by URL only (digests move every merge).
+- `scripts/website_claims.py` — 8 forbidden-claim rule groups, 3 required
+  caveats bound to `data-caveat` elements, 5 digest/byte-size rules.
+- `scripts/website_quality.py` — page-weight budget, zero client JS, link and
+  origin resolution, mockup labelling, accessibility floor, metadata,
+  crawlability, responsive rules, token contrast, licence notice.
+- `scripts/test_website_claims.py` + `scripts/test_website_quality.py` — 47
+  tests, all run in app CI step 1, each rule also fed synthetic input that must
+  fail, so a rule that stops firing is a red test.
+- Plan of record and honest design notes: `.ai/WEBSITE_PLAN.md` **Part A**
+  (Part B keeps the 2026-10-08 comparative research as cited evidence);
+  decisions in `docs/decisions/ADR-009-marketing-site.md` (**PROPOSED** — it
+  authorizes no player, no PWA, no `app.` host and does not widen ADR-008).
+- Evidence record: `docs/verification/20-marketing-site.md`.
 
 ### Current gates
 
 | Gate | State | Next evidence |
 |---|---|---|
-| S3 round 4 | 🔴 **missing, user-only** | Android landscape + Windows fullscreen: compact docked mini-player, Home/Search/Library visible and usable above it |
-| S3 round 5 | 🔴 **missing, user-only** | API 24–25 device: icon, launch, search, play, background audio; record model, OS and installed universal APK digest |
-| S6 | ⏳ **blocked on S3** | no release acceptance until both rounds and the remaining S6 gates close |
+| S3 round 4 | 🔴 **missing, user-only** | Android landscape + Windows fullscreen: compact docked mini-player, Home/Search/Library usable above it |
+| S3 round 5 | 🔴 **missing, user-only** | API 24–25 device: icon, launch, search, play, background audio; record model, OS, APK digest |
+| S6 | ⏳ **blocked on S3** | no release acceptance until both rounds close |
 | Dispatch-only AAB staging | 🔴 **agent-blocked, user-only** | one `test-release` dispatch with `build_only=true`, `build_release_candidate=true` |
-| ADR-008 B1 | ⛔ **BLOCKED (run recorded)** | do not restart B1; a continuation is a separate **ADR-008 B2 user decision** |
-| Website (Option A) | 🟡 **in progress this session** | plan of record: [`.ai/WEBSITE_PLAN.md`](WEBSITE_PLAN.md) Part A; honesty gates in `scripts/`; deploy workflow `website.yml` |
-| Pages source | ⚠️ **still `legacy` / `main:/`** | currently renders root `README.md`; the switch to `build_type: workflow` is the one setting this session may not be able to make (token-dependent) |
+| ADR-008 B1 | ⛔ **BLOCKED (run recorded)** | do not restart it; a continuation is a separate B2 user decision |
+| Website (Option A) | 🟡 **built and gated; the merge is the last action of PR #138** | `website/`, `docs/verification/20-marketing-site.md` |
+| Pages source | ⚠️ **was `legacy` / `main:/` at boot, rendering the root README** | see the session's final notes in the PR comment for what the canonical URL serves |
+| Real screenshots | 🔴 **missing — the repository contains no image file** | the six captures listed in `.ai/WEBSITE_PLAN.md` Part A §9; each replaces a labelled mockup |
+| Lighthouse / axe | ⚪ **cannot run locally** (no browser, no display) | the `a11y` job's check-run annotations on `ubuntu-latest` |
 
 ### Exact next actions
 
-1. **Site first, S3 unchanged.** The device rounds above stay user-only and are
-   unaffected by the website work; they are also the source of the real
-   screenshots that replace the mockups (`.ai/WEBSITE_PLAN.md` §9).
-2. Read the session's own CI at the end of the run; do not re-verify already
-   recorded verdicts.
-3. If the website PR merges, the *first* thing the next session must check is
-   the post-merge `website.yml` run and
-   `https://99ggprooo00-code.github.io/DHUN/` — those cannot be observed from
-   inside the merging session.
+1. **Read what this session could not**: the post-merge `website.yml` run and
+   `https://99ggprooo00-code.github.io/DHUN/`. If the Pages source is still
+   `legacy`, apply Settings → Pages → Source → **GitHub Actions** (or the
+   one-line API call recorded in PR #138's final comment) and re-run the
+   workflow.
+2. **S3 rounds 4 and 5 stay the release lane.** They are user-only, unaffected
+   by the site, and they are the source of the screenshots that replace the
+   mockups.
+3. Keep the site honest as content changes: re-run
+   `python3 -m unittest discover -s scripts -p 'test_*.py'` and
+   `cd website && npm run build`. The committed build must match a fresh build,
+   or the site workflow fails its drift check.
 
 ### Blockers and boundaries
 
 - No JDK / Gradle / Android SDK / browser / display locally; CI is the Kotlin
-  and browser verifier. Lighthouse/axe can only run in Actions.
-- Locally runnable gate:
-  `python3 -m unittest discover -s scripts -p 'test_*.py'` — **55 tests green**
-  at boot, re-measured this session.
-- Action-log archives remain unavailable; **check-run annotations** are
-  reachable and are how this session reads a failure or a Lighthouse number.
+  and browser verifier, and no Lighthouse score may be quoted unless a run
+  produced it.
+- Locally runnable gate: `python3 -m unittest discover -s scripts -p 'test_*.py'`
+  — **102 tests green** (55 pre-existing + 47 new), re-measured this session.
+- Action-log archives remain unreachable; **check-run annotations** are the
+  readable evidence channel.
 - Do not touch Gradle, `shared/`, `app-android/`, `app-desktop/`,
-  `settings.gradle.kts`, `build.gradle.kts` or the four existing workflows.
-  Never implement ADR-007. ADR-008 stays B1-only and closed.
+  `settings.gradle.kts`, `build.gradle.kts` or the four app workflows. Never
+  implement ADR-007. ADR-008 stays B1-only and closed; no web player, PWA or
+  `app.`-style property may be built under this workstream.
 
 ---
-
-
-> **Historical detail; superseded by the block above.** Its `main = 2a20024`
-> statement was accurate when written; GitHub `main` has since advanced to
-> **`ae44c7a`** (PR #137 merge).
 
 ## Session `arena/45db02aa-dhun` — record the post-merge B1 blocked result; do not restart B1, do not start B2 (2026-10-08)
 

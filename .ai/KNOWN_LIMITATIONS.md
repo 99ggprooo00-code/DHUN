@@ -2,6 +2,44 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — `arena/fc918d37-dhun`: the marketing site is real, and so are its gaps
+
+- **The site ships; its public hosting is not proven yet.** Pages was
+  `legacy` / `main:/` at boot, so the canonical URL rendered the root README.
+  Whether this session's token could switch the source to
+  `build_type: workflow`, and what the canonical URL serves after that, is
+  recorded in PR #138's final comment — the point of this entry is that a
+  successful `website.yml` **build** is not evidence that the site is published.
+- **No Lighthouse or axe number exists from this machine.** There is no browser
+  and no display in the sandbox. Any score quoted anywhere must come from a CI
+  run's annotations; there is no local measurement to fall back on.
+- **No real screenshot exists.** The repository contains no image file at all,
+  so every visual on the site is a hand-written CSS mockup labelled
+  "not a screenshot", with the capture that should replace it listed in
+  `.ai/WEBSITE_PLAN.md` Part A §9. This is a content gap, not a styling choice.
+- **The mockups are recreations of layout, not fidelity tests.** They read the
+  real tokens (colours, type scale, shapes, spacing) out of the Compose design
+  system, but nobody has compared them side by side with the running app —
+  because nobody can, without a display.
+- **Responsive behaviour is reasoned and asserted, not observed.** Breakpoints,
+  clamp() type, the ban on fixed widths above 320 px and the 44 px touch-target
+  token are all checked mechanically; no browser has rendered the pages.
+- **The site is English only, with no i18n built.** Copy is centralised in
+  `website/src/_data/site.js` so translation could be additive later.
+- **`website/dist/` is committed on purpose** so app CI can assert the honesty
+  contract with Python only (no Node, no network). It is therefore possible to
+  edit source without rebuilding; the site workflow's drift check is what makes
+  that a red build rather than a silent divergence — and that check is
+  **not verified pre-merge**, because the workflow only exists on `main` after
+  the merge.
+- **The download page never prints a digest or a size.** That is deliberate —
+  the rolling `test` assets are replaced on every push to `main` — but it means
+  the page cannot help a user identify a specific build beyond its URL and the
+  sidecar.
+- **Desktop Linux/macOS remain untested on hardware**, and the site says so in
+  the platform strip and in the footnote under the numbers rather than
+  implying support.
+
 ## 2026-10-08 — `main@2a20024`: ADR-008 B1 ran from the canonical origin and is BLOCKED; the browser question is unresolved, not answered
 
 - **PR #136 is merged and verified, but the browser question is not.** Merge
