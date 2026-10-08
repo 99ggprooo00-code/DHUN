@@ -39,6 +39,12 @@ jobs:
       - name: Android debug build
         run: ./gradlew :app-android:assembleDebug --no-daemon
 
+      # minSdk is 24 (Android 7.0). Nothing else in CI compiles against that
+      # floor: assembleDebug happily links API-26+ calls that crash on API 24-25.
+      # NewApi (scoped in app-android/build.gradle.kts) fails the build on them.
+      - name: "Android Lint — API 24 floor (NewApi)"
+        run: ./gradlew :app-android:lintDebug --no-daemon
+
       - name: Probe compiles
         run: ./gradlew :tools:playback-probe:compileKotlin --no-daemon
 
