@@ -34,7 +34,7 @@ Updated every phase. Nothing hidden.
   not a production pass. S1 residential evidence remains separate; no T1/T2
   trigger or extraction change follows from this run.
 
-## 2026-10-08 — session `arena/ae65f1a5-dhun`: the advertised Pages 404 is a hostname typo, not a failed deployment; website scope is undecided
+## 2026-10-08 — session `arena/ae65f1a5-dhun`: Pages hostname repaired; browser player selected, with only B1 feasibility approved
 
 - **Diagnosis corrected.** `https://99ggprooo00.github.io/DHUN/` 404s because
   the repository owner is `99ggprooo00-code`. GitHub's Pages API reports the
@@ -43,18 +43,19 @@ Updated every phase. Nothing hidden.
   README. Post-merge Pages run **37772062338** and build **1269157028** both
   succeeded. The earlier “empty artifact / misconfigured source” theory is
   disproven.
-- **The front door is still defective.** README line 2 omits `-code`, so a user
-  following the advertised link gets a 404 even though the correct site works.
-  The canonical site is currently an engineering README, not a product landing
-  page. Link correction/removal is an explicit W0 user decision and was not
-  guessed this session.
-- **No web product has been approved.** A static marketing site is compatible
-  with the accepted architecture; a browser player contradicts MASTER_PROMPT's
-  Web cut/defer decisions and requires a new ADR. `.ai/WEBSITE_PLAN.md` records
-  the research and staged gates; no scaffold or Pages workflow has been added.
-- **There are no image assets in this repository.** A Volta-like image-led page
-  cannot honestly be built from current files. S3 captures, legally safe test
-  content, or clearly labelled CSS mockups must be selected before W4. Live
+- **The bad front-door link is repaired, but the page is not a product.** W0
+  authorized correcting README line 2 to the canonical `-code` URL, and that
+  edit is applied. It now opens the live rendered engineering README. This is a
+  link fix, not browser-player deployment evidence.
+- **The user selected a browser player, not a static download site.** That
+  reverses MASTER_PROMPT's prior Web cut and the locked Android+JVM-only stack.
+  The user separately accepted ADR-008 for **B1 feasibility only**. B1 has not
+  started. A production player, shared browser source set, adopted stack,
+  backend/proxy, extraction change and public Web-support claim all remain
+  unapproved; success would still stop at the B2 architecture decision.
+- **There are still no image assets in this repository.** The user selected real
+  S3 Android/Windows captures instead of CSS mockups. Those captures do not
+  exist yet and must use legally safe content with recorded provenance. Live
   album artwork and lyrics are third-party copyrighted content and cannot be
   committed merely because DHUN displayed them.
 - **The legacy auto-created Pages workflow has platform noise.** Run

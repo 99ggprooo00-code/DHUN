@@ -1,10 +1,10 @@
 # DHUN web presence — research and gated implementation plan
 
-> **Status (2026-10-08): RESEARCH / PLAN ONLY. Nothing here authorizes a
-> website implementation or a DHUN web player.** The first gate is a product
-> decision by the user. Until that decision, there is no `website/` directory,
-> no site dependency, no Pages workflow change, and no web-target application
-> code.
+> **Status (2026-10-08): RESEARCH / PLAN ONLY. W0 answers are recorded;
+> the user selected a browser player and separately accepted ADR-008 for its B1
+> deployed-origin feasibility spike only. This session remains plan-only: B1 has
+> not started.** There is no `website/` directory, site dependency, Pages
+> workflow change, or web-target application code.
 >
 > Standing instruction: research first, compare several approaches, preserve
 > the analysis in a `.md` file, and plan when to implement rather than rushing
@@ -24,21 +24,39 @@ DHUN therefore has two materially different options:
 
 | Option | Meaning | Architectural effect | Status |
 |---|---|---|---|
-| **A — marketing/download site** | A static public site describing the existing Android and Desktop applications, linking the rolling release and source | New deployment workstream, but not a new application target; does not contradict the accepted Android/Desktop architecture | **Awaiting user choice** |
-| **B — DHUN web player** | A browser-playable third application target | Contradicts `.ai/MASTER_PROMPT.md` §1 (`Web is deferred … likely "no"`), §3 (`Web: cut`) and §7 (Web/PWA explicitly outside S1–S6); requires a new ADR and explicit user approval before any scaffold | **Awaiting user choice; blocked on ADR if selected** |
+| **A — marketing/download site** | A static public site describing the existing Android and Desktop applications, linking the rolling release and source | New deployment workstream, but not a new application target; does not contradict the accepted Android/Desktop architecture | **Not selected; retained as fallback** |
+| **B — DHUN web player** | A browser-playable third application target | Contradicts the prior Web deferral/cut and Android+JVM-only stack; accepted ADR-008 now permits only a B1 feasibility spike before any product architecture choice | **Selected; ADR-008 B1 accepted but not started** |
 
-This plan recommends **Option A** because it addresses the requested public
-presence without silently reopening a rejected platform target. That is a
-recommendation, not a decision. If the user chooses B, stop after writing and
-approving a new ADR; do not reinterpret this file as approval.
+The research recommendation remains **Option A** because it addresses the
+public presence without reopening a rejected platform target. The user instead
+selected **Option B** after the distinction was restated in simple terms. That
+choice was recorded separately from architecture approval. The user then
+accepted `docs/decisions/ADR-008-browser-web-player-target.md` for its B1
+feasibility spike only. No production player, backend/proxy, extraction change
+or B2 stack selection is approved.
+
+### 1.1 W0 answers recorded on 2026-10-08
+
+| Question | User choice | Consequence |
+|---|---|---|
+| Product | **Play music inside the website (Option B)** | ADR-008 B1 is accepted as the next evidence gate; full product work remains blocked |
+| Hero visuals | **Real screenshots captured during S3** | W3 waits for Android/Windows captures with safe content and provenance |
+| Warning placement | **Product-first headline; warning lower on the first screen** | The unofficial/upstream-breakage notice remains on the first viewport, not only in a footer |
+| URL | **Canonical GitHub Pages URL** | Use `https://99ggprooo00-code.github.io/DHUN/`; no custom-domain work |
+| Languages | **English only for v1** | No locale-prefixed routes initially; structure may remain translation-ready |
+| README line 2 | **Correct now** | Updated to the canonical `-code` hostname in this session |
+
+W0 is answered and ADR-008 B1 is explicitly accepted. The next Web action is
+the small deployed-origin feasibility spike described there. It has not started
+in this plan-only session; a full web-player architecture remains unapproved.
 
 ## 2. Verified baseline — repository, Pages and the advertised URL
 
 Verified on 2026-10-08 against GitHub and the checked-out repository:
 
-### 2.1 The advertised URL is wrong, while Pages itself is working
+### 2.1 The advertised URL was wrong; W0 authorized the correction while Pages kept working
 
-`README.md` line 2 advertises:
+Before the W0 correction, `README.md` line 2 advertised:
 
 - <https://99ggprooo00.github.io/DHUN/> — **404**, “There isn't a GitHub Pages
   site here.”
@@ -67,9 +85,9 @@ fault is a missing `-code` in the README hostname. There is still a product
 problem: the canonical site is a rendered engineering README, not the planned
 public experience.
 
-**Pending user decision:** correct line 2 to the canonical URL now, remove it
-until W4, or leave it untouched until the replacement site is ready. Do not
-silently choose.
+**W0 outcome:** the user chose to correct line 2 immediately. It now points
+to the canonical `-code` URL. This repairs the link; it does not turn the
+rendered README into a product site or web player.
 
 ### 2.2 Asset inventory
 
@@ -88,7 +106,9 @@ required by S3 rounds 4 and 5. Asset alternatives are:
 3. CSS-only device frames and schematic UI mockups are used, with no claim that
    they are literal screenshots.
 
-No option is selected yet.
+The user selected **real screenshots captured during S3**. CSS schematics
+remain an unselected fallback if safe/current captures cannot be produced and
+the user approves that substitution.
 
 ### 2.3 Toolchain measured in this sandbox
 
@@ -401,7 +421,7 @@ not only in a footer. `/download` should carry the expanded prerequisites,
 checksum instructions, signing warning, current S3 state and stable GitHub
 source/release links.
 
-## 6. Proposed Option-A experience (not yet approved)
+## 6. Option-A experience (not selected; retained as fallback/reference)
 
 ### 6.1 Audience and job
 
@@ -499,7 +519,11 @@ permission is established.
 - width/height declared to prevent layout shift;
 - dark and small-screen readability reviewed.
 
-## 8. Generator and deployment analysis
+## 8. Option-A generator and deployment analysis
+
+This section applies to the static marketing-site fallback. **Astro is not a
+web-player architecture decision.** Option B must follow ADR-008 and its
+browser feasibility evidence before choosing any client stack.
 
 ### 8.1 Candidates
 
@@ -571,21 +595,25 @@ never instead of S3.
 
 ### W0 — Decide
 
-- User selects Option A or B.
-- If B: stop and write a new ADR; no site/player scaffold until accepted.
-- Decide screenshot vs CSS schematic, notice tone/prominence, URL/custom domain,
-  v1 i18n, and immediate README-link disposition.
+- ✅ User selected **Option B: browser player**.
+- ✅ Real S3 screenshots; product-first tone with the warning lower on the first
+  viewport; canonical github.io URL; English-only v1; correct README now.
+- ✅ ADR-008 written and separately **accepted for B1 feasibility only**.
+- ⏳ B1 has not started. No production site/player scaffold, backend/proxy,
+  extraction change or B2 browser stack is authorized.
 
-**Gate:** explicit user answers recorded in this file.
+**Gate:** W0/B0 complete; B1 deployed-origin evidence is next.
 
 ### W1 — Diagnose Pages and front-door link
 
 - ✅ Diagnose actual Pages settings and canonical URL.
 - ✅ Disprove the empty-artifact/source-misconfiguration hypothesis.
-- ⏳ Apply the user-approved README action.
-- ⏳ Decide migration/rollback steps for the selected site scope.
+- ✅ Applied the user-approved README correction to the canonical `-code` URL.
+- ⏳ Decide migration/rollback steps only after ADR-008 B1 and the later browser
+  architecture gate determine what is deployable.
 
-**Gate:** canonical URL and README no longer disagree.
+**Gate:** canonical URL and README now agree; product deployment architecture
+remains blocked on B1 evidence and B2 selection.
 
 ### W2 — Comparable research
 
@@ -599,7 +627,8 @@ never instead of S3.
 
 ### W3 — Assets and claims
 
-- Capture or design the agreed hero path.
+- ✅ User selected real S3 screenshots rather than CSS mockups.
+- Capture the agreed hero path during S3.
 - Record provenance/licence before committing each asset.
 - Build a final claim-to-evidence ledger from current main and the latest S3
   report.
@@ -608,7 +637,10 @@ never instead of S3.
 **Gate:** at least one legal, current Android visual and one Windows visual, or
 explicit approval for labelled CSS schematics.
 
-### W4 — Scaffold
+For the selected Option B, ADR-008 B1 is accepted and is the next Web work item.
+W4–W6 below describe only the unselected static Option-A fallback.
+
+### W4 — Scaffold (Option-A fallback only)
 
 - Create `website/` with the selected static generator.
 - Add its own PR build workflow.
@@ -618,7 +650,7 @@ explicit approval for labelled CSS schematics.
 
 **Gate:** one content-complete page at the canonical URL; no app CI regression.
 
-### W5 — Build out
+### W5 — Build out (Option-A fallback only)
 
 - Add `/download/` and `/features/`.
 - Generate artifact links from stable rolling-release URLs, never scrape an
@@ -628,7 +660,7 @@ explicit approval for labelled CSS schematics.
 
 **Gate:** every visible product claim maps to the claim ledger.
 
-### W6 — Accept
+### W6 — Accept (Option-A fallback only)
 
 - keyboard-only and screen-reader landmark review;
 - WCAG AA contrast and visible focus;
@@ -641,17 +673,19 @@ explicit approval for labelled CSS schematics.
 
 **Gate:** user approval. Site acceptance does not close S3 or S6.
 
-## 10. Open decisions — do not infer answers
+## 10. W0 decisions and the remaining approval
 
-1. **Product:** Option A static marketing/download site, or Option B browser
-   player? Option B requires a new ADR.
-2. **Hero evidence:** screenshots captured during S3, or labelled CSS mockups?
-3. **Voice:** cautious engineering voice with a prominent unofficial/may-break
-   notice, or a more confident headline with the same notice lower on the first
-   viewport?
-4. **URL:** stay on `99ggprooo00-code.github.io/DHUN/`, or plan a custom domain?
-5. **Language:** English-only v1, or locale-prefixed routes from v1?
-6. **README now:** correct line 2 to the canonical `-code` URL, remove it, or
-   wait until W4 replaces the rendered README?
+W0 answers are complete:
 
-Until these are answered, W0 is open and implementation is blocked.
+1. **Product:** browser player (Option B).
+2. **Hero evidence:** real screenshots captured during S3.
+3. **Voice:** product-first headline, with the unofficial/may-break notice lower
+   on the first viewport.
+4. **URL:** `https://99ggprooo00-code.github.io/DHUN/`.
+5. **Language:** English-only v1.
+6. **README now:** corrected to the canonical `-code` URL.
+
+**Architecture state:** ADR-008 is accepted for B1 only. The B1 deployed-origin
+feasibility spike is next but not started. Its result must be recorded before
+choosing B2.1 Kotlin browser, B2.2 TypeScript, B2.3 a separately approved
+backend/proxy, or B2.4 stop/fallback. No production Web claim is approved.

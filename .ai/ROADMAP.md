@@ -6,8 +6,8 @@ Updated **2026-10-08** · fixed session branch `arena/ae65f1a5-dhun` · base and
 actual GitHub `main` **`8a8d6c5adc536f34c8b677c9b20e5245747ed2e9`** (PR #135,
 merged 2026-10-08T11:44:32Z by `99ggprooo00-code`). The working tree was clean
 at boot; this session branch had no remote ref and no PR before the documentation
-work began. The only open repository PR is #54 (ADR-007 research; unchanged and
-out of scope).
+work began. The only pre-existing open repository PR was #54 (ADR-007 research;
+unchanged and out of scope). This session's one working PR is **#136**.
 
 ### Phase and scope
 
@@ -15,8 +15,14 @@ out of scope).
 read the post-merge runs the previous session left queued, read the rolling
 `test` release, and inspect the exact extraction-health annotation before
 repeating its classification. The second lane is the requested DHUN web
-presence, **research and plan only**. No website, web target, Pages workflow or
-README link change is authorized yet; W0 has consequential user decisions.
+presence, **research and plan only**. W0 is now answered: the user selected a
+browser player, real S3 screenshots, product-first wording with the warning
+lower on the first viewport, canonical github.io, English-only v1, and an
+immediate README correction. The link correction is applied. The user then
+separately accepted ADR-008 for its B1 deployed-origin feasibility spike only.
+B1 has not started in this plan-only session; no production web player,
+backend/proxy, extraction change, B2 stack or public Web-support claim is
+approved.
 
 ### PR #135 post-merge verdict — now read, not expected
 
@@ -77,10 +83,20 @@ The earlier Pages diagnosis was wrong in an important way:
   serving the root README through legacy Pages (`main:/`);
 - post-merge Pages build **1269157028** / run **37772062338** succeeded.
 
-So Pages is not an empty-artifact black hole. The broken front-door link omits
-`-code` from the owner name. The canonical site is nevertheless only a rendered
-engineering README, not the requested public experience. README disposition is
-left to the user as instructed.
+So Pages is not an empty-artifact black hole. The broken front-door link omitted
+`-code` from the owner name. W0 authorized correction and README line 2 now uses
+the canonical URL. The canonical site is nevertheless only a rendered
+engineering README, not a browser player.
+
+W0 selected **Option B** after it was restated as “play music inside the
+website.” That reverses MASTER_PROMPT's prior Web cut. Accepted
+**ADR-008** records the conflict and a deployed-origin B1 feasibility gate.
+The user separately accepted B1 after the safe-test plan was restated in simple
+words. B1 is now the only authorized Web implementation scope and has not
+started. No production player, backend/proxy, extraction change, B2 stack or
+public Web-support claim is approved. The other W0 choices are real S3
+screenshots, the unofficial warning lower on the first viewport, canonical
+GitHub Pages, and English-only v1.
 
 ### Current gates
 
@@ -90,20 +106,21 @@ left to the user as instructed.
 | S3 round 5 | 🔴 **missing, user-only** | API 24–25 device: icon, launch, search, play, background audio; record model, OS and installed universal APK digest `9665b75f…` |
 | S6 | ⏳ **blocked on S3** | no release acceptance until both rounds and remaining S6 gates close |
 | Dispatch-only AAB staging | 🔴 **agent-blocked, user-only** | one `test-release` dispatch with `build_only=true`, `build_release_candidate=true`; inspect staged `app-android-debug.aab` |
-| Website W0 | ⏳ **awaiting user decision** | Option A marketing site vs Option B web player (B requires a new ADR), assets, tone, URL/i18n and README action |
+| Website W0 / ADR-008 | 🟡 **W0 + B0 complete; B1 not started** | browser-player direction selected; ADR-008 accepted for the small deployed-origin feasibility spike only; record B1 evidence before any B2 architecture choice |
 
 ### Exact next actions
 
-1. Record the user's W0 website decisions. Do not scaffold before that. Option B
-   stops at a new ADR until explicitly approved.
+1. In a later Web work unit, execute only ADR-008 B1: the smallest isolated
+   test from the deployed Pages origin. Record browser versions, network result,
+   audible playback or exact failure. Do not turn the spike into a product port.
 2. Keep S3 first in the device lane. Use the current rolling assets above for
-   rounds 4 and 5; screenshots may serve W3 only if the user chooses that asset
-   path and their content/licence is safe.
+   rounds 4 and 5. The user selected those sessions as the screenshot source;
+   only legally safe content with recorded provenance may enter Git.
 3. User-only: dispatch the release-candidate AAB path once; the automatic bundle
    compile gate does not execute `stage_artifact.py`.
-4. After W0, execute only the approved next stage in `.ai/WEBSITE_PLAN.md`.
-   The recommended Option-A order is W1 link disposition → W3 legal assets → W4
-   isolated static-site workflow. Site work never closes S3/S6.
+4. After B1, stop for the B2 architecture decision. Failure may choose stop or
+   Option A. Success does not silently authorize Kotlin/JS, TypeScript or a
+   backend. Web work never closes S3/S6.
 
 ### Blockers and boundaries
 
@@ -113,7 +130,8 @@ left to the user as instructed.
 - Action log archives and release asset bodies remain unavailable here;
   check-run annotations and GitHub asset `digest` fields are the evidence used.
 - Do not touch extraction/probe semantics, ADR-002 FullPlayer, lyrics or ABI
-  splits. Never implement ADR-007 without explicit approval.
+  splits. Never implement ADR-007. ADR-008 authorizes B1 only; do not widen it
+  into production code, a backend/proxy or B2 stack selection.
 
 ---
 

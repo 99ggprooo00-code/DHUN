@@ -25,11 +25,13 @@ legacy Jekyll build. Post-PR-#135 Pages run **37772062338** succeeded on
 the successful workflow was honest: it deployed to the URL GitHub configured.
 The 404 was the wrong hostname on the project's front door.
 
-**Residual issue, deliberately not auto-fixed.** The live canonical page is an
-engineering README, not the requested product site, and the user explicitly
-reserved the README-line disposition as a decision. `.ai/WEBSITE_PLAN.md`
-records correction/removal/defer as W0 options. No README, Pages setting,
-workflow or site scaffold changed in this diagnosis.
+**Residual issue and later W0 resolution.** The live canonical page is an
+engineering README, not the requested product site. The diagnosis did not guess
+the link disposition. Later in this session the user chose “correct now,” so
+README line 2 was changed to the canonical `-code` URL. No Pages setting,
+workflow, site scaffold or browser-player code changed. The link is fixed; the
+product surface is still absent. The user later accepted ADR-008 for the B1
+feasibility spike only; that spike has not started.
 
 **Workflow noise found while reading the actual annotation.** The legacy Pages
 build uses `actions/upload-artifact@v4`, which GitHub now warns targets deprecated

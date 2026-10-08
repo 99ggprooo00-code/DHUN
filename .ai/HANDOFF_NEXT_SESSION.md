@@ -1,10 +1,10 @@
-# HANDOFF — PR #135 merged; rolling release verified; website W0 awaits user decisions
+# HANDOFF — PR #135 verified; ADR-008 accepted for browser feasibility B1 only
 
 Updated **2026-10-08**, session `arena/ae65f1a5-dhun`. Fixed session branch:
 `arena/ae65f1a5-dhun`. Base and GitHub `main`:
 `8a8d6c5adc536f34c8b677c9b20e5245747ed2e9` (PR #135 merge). This session
-recovered post-merge evidence and recreated/extended the stranded website plan;
-it did not implement a site or web player.
+recovered post-merge evidence and recreated/extended the stranded website plan.
+Its one working PR is **#136**. It did not implement a site or web player.
 
 ## Current state
 
@@ -37,43 +37,51 @@ it did not implement a site or web player.
 ## Website research and corrected Pages diagnosis
 
 Read **`.ai/WEBSITE_PLAN.md`** before any web work. It is the durable W0–W6
-research/plan and includes Volta plus eight comparable projects. No scaffold is
-approved.
+research/plan and includes Volta plus eight comparable projects. No production
+scaffold exists; the accepted B1 feasibility spike has not started.
 
-- Broken advertised URL:
-  `https://99ggprooo00.github.io/DHUN/` (README line 2) → 404.
-- Actual canonical Pages URL:
+- The formerly advertised URL
+  `https://99ggprooo00.github.io/DHUN/` → 404. The user chose “correct now,”
+  so README line 2 now uses the actual canonical Pages URL:
   `https://99ggprooo00-code.github.io/DHUN/` → live, rendering the README.
 - Pages API: legacy source `main:/`, status `built`; build 1269157028 and run
   37772062338 succeeded. The failure is the missing `-code` in the advertised
   hostname, **not** an empty artifact or bad Pages source.
-- Repository still has zero raster/vector image files. Assets are a gated
-  dependency; live music artwork/lyrics cannot be committed without rights.
-- Option A static marketing/download site does not contradict accepted app
-  architecture. Option B browser player does and requires a new ADR before code.
+- W0 answers: **browser player**; real screenshots captured during S3;
+  product-first wording with the unofficial warning lower on the first viewport;
+  canonical github.io; English-only v1; README corrected now.
+- Repository still has zero raster/vector image files. Real S3 captures are a
+  gated dependency; live music artwork/lyrics cannot be committed without
+  rights.
+- The selected browser player contradicts MASTER_PROMPT's prior Web cut and
+  Android+JVM-only stack. The user separately accepted **ADR-008 for B1 only**:
+  one small deployed-origin feasibility spike. B1 has not started. No production
+  player, adopted browser stack, backend/proxy, extraction change or Web-support
+  claim is approved.
 
 ## Next actions — in order
 
-1. Get the user's W0 decisions: A vs B; S3 screenshots vs labelled CSS mockups;
-   tone/notice prominence; github.io vs custom domain; English-only vs i18n;
-   correct/remove/defer README line 2.
-2. Do **not** scaffold while W0 is open. If B is selected, write the ADR and
-   stop for explicit approval.
-3. Keep S3 device rounds ahead of optional site implementation. Use the exact
-   current hashes above and record device/OS/hash.
-4. User-only: dispatch the AAB release-candidate staging path once.
-5. If Option A is approved, follow `.ai/WEBSITE_PLAN.md`: approved README action,
-   licence-safe assets/claim ledger, then an isolated static-site workflow. A
-   website failure must never redden app CI.
+1. In a later Web work unit, execute only ADR-008 B1: the smallest isolated
+   deployed-origin browser test. Record browser versions, network behavior and
+   audible playback or exact failure. Do not start the full player.
+2. Keep S3 device rounds ahead of optional Web work. Use the exact current
+   hashes above and record device/OS/hash. Capture licence-safe screenshots with
+   provenance because that is the selected W3 asset path.
+3. User-only: dispatch the AAB release-candidate staging path once.
+4. After B1, stop for B2. A pass does not choose Kotlin/JS, TypeScript or a
+   backend; a failure may choose stop or the researched static Option-A fallback.
 
 ## Do not
 
 - Do not merge/close PR #54 or implement ADR-007.
+- ADR-008 authorizes B1 only. Do not widen it into a proxy/backend, adopted
+  browser stack or production player.
 - Do not touch extraction/probe semantics, FullPlayer (ADR-002), lyrics, or ABI
   splits.
 - Do not call CI, hosted MSI smoke, a static lint gate or a marketing site
   hardware acceptance.
-- Do not copy Volta claims/assets or claim Web/iOS/sync/import/lossless quality.
+- Do not copy Volta claims/assets or claim working Web/iOS/sync/import/lossless
+  quality.
 - Do not use third-party APK sites as official distribution evidence.
 
 **Environment:** no local JDK/Gradle/Android SDK/display. Local executable gate:
