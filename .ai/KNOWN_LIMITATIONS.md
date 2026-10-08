@@ -1917,3 +1917,41 @@ The build now drops every CSS rule a route cannot match
   is asserted on three routes, not four; the paper-token and contrast clauses are
   still asserted on all four.
 
+---
+
+## 2026-10-09 — session `arena/967513fd-dhun`: what `app-web/` does not prove
+
+- **No audio plays, ever, in this build.** No stream is reachable from a browser
+  origin (the B1 spike in `web-spike/` was blocked before a readable response —
+  verification record 19) and this sandbox reaches github.com, npm and pypi only.
+  The transport therefore advances a *labelled clock*: the seek bar, queue,
+  lyrics highlight and equaliser all work, nothing is audible, and the page says
+  so in a persistent notice. That notice is asserted by a node test and a Python
+  test so it cannot quietly disappear.
+- **The catalogue on screen is fictional.** `app-web/src/js/data/sample-catalog.js`
+  and `sample-lyrics.js` are invented titles bundled so the interface can be seen
+  and tested without an upstream. The live InnerTube source is attempted first and
+  reports its own failure verbatim; while it fails, a permanent on-screen notice
+  says the data is a sample.
+- **Layout, paint, touch and pointer input are unverified.** No browser exists in
+  this environment and no browser binary can be fetched. `tests/boot.test.mjs`
+  drives `boot()` against a hand-written DOM stub: it proves the module graph
+  loads, the first render produces the app's real markup, and the player state
+  machine works. It cannot see a pixel, a hover, a focus ring or a scroll.
+- **The token mirror is byte-checked, not eye-checked.** Every colour in
+  `css/tokens.css` is asserted to exist in `DhunAppearance.kt` and every icon
+  vector in `js/icons.js` to match `DhunIcons.kt`. That proves provenance, not
+  appearance: nothing has compared a rendered web screen against a rendered
+  Android screen.
+- **Downloads are absent by design, not unfinished.** A browser has no equivalent
+  of ADR-006's device-side store, so the Downloads tab renders the app's two
+  sections empty with the reason on screen.
+- **The equaliser is a mapping, not libVLC.** The 18 presets, the ten band
+  frequencies and the ±20 dB range are libVLC's values; the engine is a Web Audio
+  chain of one `BiquadFilterNode` per band (lowshelf / peaking ×8 / highshelf),
+  which is the nearest honest equivalent, not the same filter topology.
+- **The annotation-carry fix is unverified in a live run.** Its budget, cap and
+  accounting are proven by eight node tests, but the reason it exists —
+  measurements vanishing from a green CI run — can only be observed in CI.
+- **`app-web/` is not deployed.** It is `noindex` and unlinked; it is served only
+  by `node tools/serve.mjs` inside this environment.

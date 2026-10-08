@@ -1,5 +1,58 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/967513fd-dhun` — the app's interface in a browser, and the harness bug that was hiding measurements (2026-10-09)
+
+Updated **2026-10-09** · fixed session branch `arena/967513fd-dhun` · branch point
+and GitHub `main` at boot **`d82aa190b702cd0e3fe42dbff34c7a0c6e84e2cc`** (PR #143
+merge). Working tree clean at boot. This session opened **PR #145** (five
+commits: `134388d`, `754c101`, `e726ec8`, `c50e78b`, `ba4e362`).
+
+The branch also absorbed PR #144's `.ai/AUTONOMY_PROMPT.md` (commits `782da56`,
+`8f39b0a`) because this session cannot push to another branch; PR #144 is
+retitled **SUPERSEDED** and left open rather than closed.
+
+### Recon (every line read from a tool output)
+
+| Fact | State | Evidence |
+|---|---|---|
+| Branch / tree | `arena/967513fd-dhun`, clean at boot | `git status --short`, `git branch --show-current` |
+| Python suite at boot | **272 tests, 1 failure** → **295 green** | `python3 -m unittest discover -s scripts -p 'test_*.py'` |
+| Node suites | **60 pass / 0 fail** (`app-web`), **41 pass / 0 fail** (`website`) | `npm test`, `node --test tests/*.test.mjs` |
+| `app-web` build | 14 files, **83,741 bytes** | `node tools/build.mjs` |
+| `main` CI at boot | run **37831998519** red at *Packaging and fixture helper tests* | `gh run list --branch main` |
+| Pages | `build_type=workflow`, `status=built` | `gh api repos/99ggprooo00-code/DHUN/pages` |
+| Network from this sandbox | github.com / api.github.com / npm / pypi only | the InnerTube probe fails; the app falls back to the sample catalogue and says so |
+
+### What this session changed
+
+| # | Item | Result | Evidence |
+|---|---|---|---|
+| 1 | `docs/runbooks/publishing-the-site.md` regained its legacy-recovery section | the only red test on `main` is green again (272 → 272 green) | `scripts/test_website_workflow.py::PublishingRunbook` |
+| 2 | **`app-web/`** — the app's interface in a browser | 3 screens + browse + settings + both players + queue + LRC + 10-band EQ; **60 node tests**; **23 Python contract assertions** | `docs/verification/29-web-app-mirror.md` |
+| 3 | Design tokens mirrored, not retyped | every colour in `css/tokens.css` asserted to exist in `DhunAppearance.kt`; icons generated from `DhunIcons.kt` | `tests/tokens.test.mjs`, `tools/gen-icons.mjs --check` |
+| 4 | `website/tests/browser.mjs` measurement loss | the 24 KB carry clipped at ~4 KB and dropped both axe scans; messages are now budgeted, capped, named, and mirrored to the job log and `$GITHUB_STEP_SUMMARY` | `website/tests/annotation-report.mjs` + 8 tests |
+| 5 | ADR-008 amendment | B2 decided (separate client, no dependency), B3 plan table, boundaries intact | `docs/decisions/ADR-008-…md` |
+
+### Exact next actions for the next session
+
+1. **Prove or disprove playback from a deployed origin.** `app-web/` is not
+   deployed to Pages: the marketing workflow owns the single Pages artifact, and
+   a second workflow publishing to the same environment would race it. The
+   decision needs its own ADR-amendment paragraph, or the site workflow needs to
+   publish `app-web/dist` alongside `website/dist` with its path filters updated.
+2. **Run `app-web` in a real browser.** Layout, paint, touch and pointer input
+   are unverified — no browser exists in this sandbox and no browser binary can
+   be fetched. The `boot.test.mjs` DOM stub proves wiring, not rendering.
+3. **InnerTube search** (`js/catalog.js` `createLiveSource().search`) is
+   deliberately unimplemented: the browse-response → Track/Album/Artist mapping
+   needs its own module and its own tests.
+4. Verify the annotation fix in a live CI run and read the numbers it used to
+   lose (both axe scans, the increase-contrast set).
+5. The §9 screenshot backlog on the marketing site is unchanged.
+
+---
+
+
 ## Session `arena/af3e7f66-dhun` — per-route CSS, a marked current page, anchor landings that clear the header, byte-true sizes, and an honoured increase-contrast preference (2026-10-08)
 
 Updated **2026-10-08** · fixed session branch `arena/af3e7f66-dhun` · branch point
