@@ -92,8 +92,25 @@ android {
         // here is what the merged manifest actually enforces.
         minSdk = 24
     }
+    // API-floor gate for minSdk 24 — this module's half.
+    //
+    // WHY THIS EXISTS: Android Lint analyses the module it runs in, and does
+    // NOT walk into a module's library dependencies unless `checkDependencies`
+    // is set. `:app-android:lintDebug` (added in PR #134) therefore covered
+    // only `app-android/src`; every file under `shared/src/androidMain` — the
+    // expect/actual Android implementations: AndroidConnectivityMonitor,
+    // BlurSupport, DownloadHttpClient, DatabaseDriverFactory, StorageSpace,
+    // CurrentOffset — sat outside the NewApi gate. `abortOnError` was also
+    // false here, so even a run of this module's lint could not fail.
+    //
+    // `checkOnly` keeps the gate to NewApi, so unrelated warnings cannot turn
+    // the build red. `checkReleaseBuilds = false` keeps lintVitalRelease out of
+    // release assembly. CI runs `./gradlew :shared:lintDebug` as its own step;
+    // lint is not part of assembleDebug, so packaging jobs are unaffected.
     lint {
-        abortOnError = false
+        checkOnly += setOf("NewApi")
+        abortOnError = true
+        checkReleaseBuilds = false
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

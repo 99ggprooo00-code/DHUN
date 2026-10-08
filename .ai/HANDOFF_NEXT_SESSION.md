@@ -1,4 +1,76 @@
-# HANDOFF — PR #131 merged and published; PR #132 closed; S3 rounds 4 and 5 open
+# HANDOFF — PR #135: the API-24 lint gate now covers both Android modules; S3 rounds 4 and 5 open
+
+Updated **2026-10-08**, session `arena/8be68e2c-dhun`. `main` =
+`6f1e6ba730e590cca693c4735a558556cd8378ae` (PR #134, merged 2026-10-08T09:53:02Z).
+PR **#135** is open on `arena/8be68e2c-dhun`: code head `a66b342`, docs head
+`f027dfc`, plus the trailing ledger commit that records `f027dfc`'s own runs
+(same pattern as PR #134's `5931bf2`). All four workflows green on `f027dfc`.
+
+## Current state
+
+- **`main` = `6f1e6ba`.** Post-merge CI **37759720823**, Build APK
+  **37759720747**, test-release **37759720804** (`msi` 113252913512, `apk`
+  113252913644, `publish` 113255119265; `aab`/`release_draft` skipped). Rolling
+  `test` published **2026-10-08T09:59:21Z** at that SHA, `isDraft=false`,
+  prerelease. APK **18,405,859 B**
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97` (unchanged
+  from `1ee85b0` — PR #134 changed no app code); arm64-v8a **18,355,786 B**
+  `23903dd6…`; armeabi-v7a **18,352,944 B** `7e4f80ad…`. MSI **2.202.1**
+  **112,971,776 B** `45e9ab72f365cfdfa87fe632ec17fd733ba67344c2df024b79eadd92566eb0d1`,
+  upgrade `2.196.1 → 2.202.1` vs baseline `b9141084…`, sentinels preserved.
+- **What PR #135 fixes.** PR #134's `NewApi` gate ran only in `:app-android`,
+  and Android Lint analyses the module it runs in — AGP does not lint a module's
+  library dependencies without `checkDependencies` (not set here). All 7
+  expect/actual Android files under `shared/src/androidMain` were outside the
+  floor gate, and `:shared`'s lint block had `abortOnError = false`. Both are
+  fixed; `scripts/test_ci_workflow.py` (39 → 45) pins it.
+- **Proven, not assumed.** Probe `5f74af3` reddened exactly
+  `Android Lint — shared androidMain API 24 floor (NewApi)` (CI **37765481344**),
+  naming `LintMutationProbe.kt:18` and `Execution failed for task
+  ':shared:lintDebug'`; reverted in `a66b342`, which is CI-green
+  (**37766214968**, 14/14). Full record: `docs/verification/17-api24-floor-gate.md`.
+- **Second gap closed on the same PR: the App Bundle.** S6 needs a clean-installed
+  AAB, but `test-release.yml`'s `aab` job is `workflow_dispatch`-gated and this
+  token gets **HTTP 403** on dispatch (verified — workflow id **347450723**), so
+  `:app-android:bundleDebug` had no automated coverage while PR #131's
+  `splits { abi }` block sat untested against it. `ci.yml` now runs it as
+  `Android App Bundle compiles (S6 AAB gate)`; CI **37769519510** step 9 is
+  **success** — AGP 8.7.2 tolerates the splits block. Compile only: not an
+  install, not the `aab` staging path, not Play-ready.
+  `docs/verification/18-aab-bundle-gate.md`.
+- **Green CI is not hardware acceptance.** Rounds 4 and 5 are open.
+
+## Next actions — single agent, sequential
+
+1. **Ask the user for merge approval on PR #135.** After merge, record the
+   post-merge CI / Build APK / test-release run IDs and the republished rolling
+   `test` digests. The APK digest should **not** move (no app code changed);
+   the MSI ProductVersion will.
+2. Hardware only, against the rolling `test` release. Install `dhun-test.apk`
+   (universal, `9665b75f…`) and the MSI. Round 4: Android landscape / Windows
+   fullscreen mini-player dock. Round 5: API 24–25 icon, launch, search, play,
+   background audio. Record device, OS, and the SHA-256 actually installed.
+3. Do not drop the ABI split (the splits are not byte-identical). Do not modify
+   the full-screen player (ADR-002) or lyrics. `extraction-health`
+   `ENVIRONMENT_BLOCKED` is still the accepted steady state.
+4. If the `:shared` lint gate ever needs to widen (e.g. `commonMain`), note that
+   `checkDependencies` was deliberately left off — it would pull third-party
+   analysis into the app-module run.
+5. **User-only:** one `workflow_dispatch` of `test-release` with `build_only=true`
+   and `build_release_candidate=true` to exercise the `aab` job's staging path,
+   which the new CI gate does not execute. Agents get 403 on dispatch.
+
+**Blockers:** no JDK / Gradle / Android SDK / display in the sandbox — `java` is
+not on PATH and the SDK host is outside the network allowlist, so CI is the only
+Kotlin verifier. The one locally runnable gate is
+`python3 -m unittest discover -s scripts -p 'test_*.py'`. Actions log archives
+are unreachable (`results-receiver…` → EOF); check-run annotations are reachable
+and are the evidence source. **Do not:** `git clean`, `reset --hard`, switch
+branches, or merge without explicit authorization.
+
+---
+
+# HISTORICAL — PR #131 merged and published; PR #132 closed; S3 rounds 4 and 5 open
 
 Updated **2026-10-08**, session `arena/688214aa-dhun`. `main` =
 `1ee85b092aa1ad57c314b77c05ce0cf18a10e7e5` (PR #131, merged 2026-10-08T08:43:18Z).

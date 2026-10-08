@@ -2,6 +2,79 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — session `arena/8be68e2c-dhun`: both Android modules are now lint-gated at API 24; a static gate is still not a device
+
+- **What changed.** `:shared` now runs Android Lint's `NewApi` rule as an error
+  (`checkOnly`, `abortOnError`, `checkReleaseBuilds = false`), as its own CI step
+  `Android Lint — shared androidMain API 24 floor (NewApi)`. Before this,
+  `shared/src/androidMain` was outside the API-24 floor gate entirely: Android
+  Lint analyses the module it runs in, AGP does not lint a module's library
+  dependencies without `checkDependencies` (not set here), and `:shared`'s own
+  lint block had `abortOnError = false`.
+- **This corrects the previous entry's hedge.** The `arena/dd43b627-dhun` block
+  below says shared coverage "is an expectation, not a checked fact". It is now
+  a checked fact, and the expectation as written was wrong — `:app-android` lint
+  was *not* covering `shared`. Proven, not assumed: probe `5f74af3` reddened
+  exactly that step with
+  `LintMutationProbe.kt:18: Error: Call requires API level 26 (current min is 24) …
+  Execution failed for task ':shared:lintDebug'`, reverted in `a66b342`. See
+  `docs/verification/17-api24-floor-gate.md`.
+- **What it still does not prove.** `NewApi` is static. It cannot see a
+  reflection call, a manifest attribute, or a resource that inflates differently
+  on API 24–25. It says nothing about an actual Android 7.0/7.1 device. **S3
+  round 5 stays open and user-gated.**
+- **`commonMain` is not lint-covered — by design.** Lint sees `androidMain`;
+  `commonMain` cannot reference Android APIs at all because the KMP compiler
+  rejects it. Do not "fix" that by adding Android source dirs to lint.
+- **`checkDependencies` was deliberately not enabled.** The per-module lint task
+  is the mechanism that was proven. Turning on `checkDependencies` would also
+  pull third-party analysis into the app-module run, slowing it and widening the
+  red surface for code this repo does not own.
+- **The contract is only as good as CI step 1.** `scripts/test_ci_workflow.py`
+  (39 → 45 tests) pins both lint steps and both Gradle lint blocks, plus that
+  both modules keep `minSdk = 24` — the merged manifest enforces the *higher* of
+  the two, so a one-sided bump would silently raise the real floor while the
+  gate keeps checking 24. It is mutation-proven locally (3 tests go red when the
+  shared step and its `checkOnly`/`abortOnError` pair are removed).
+- **Lint is not in `assembleDebug`.** `Build APK` and `test-release` do not run
+  it; only `ci.yml` does. A red floor violation therefore blocks the CI job, not
+  artifact production — the same separation that already applied to
+  `:app-android`.
+
+## 2026-10-08 — session `arena/8be68e2c-dhun` (part 2): the App Bundle now compiles in CI; it is still not installed, staged, or Play-ready
+
+- **What changed.** `ci.yml` runs `./gradlew :app-android:bundleDebug` as its own
+  step, `Android App Bundle compiles (S6 AAB gate)`. Before this, the only job
+  that built an AAB was `test-release.yml`'s `aab`, which is
+  `workflow_dispatch`-gated — so `bundleDebug` had **no automated coverage at
+  all**, and PR #131 had added a `splits { abi }` block to `:app-android` after
+  that job last ran.
+- **Answered question:** AGP 8.7.2 **tolerates** `splits { abi }` when building a
+  debug bundle — CI **37769519510** step 9 is green. Do not "fix" a splits/bundle
+  conflict that does not exist.
+- **The `workflow_dispatch` block is now a checked fact, not a handoff
+  parenthetical.** `gh workflow run test-release.yml --ref arena/8be68e2c-dhun …`
+  returns `HTTP 403: Resource not accessible by integration` (workflow id
+  **347450723**). An agent therefore cannot exercise the `aab` job, the
+  `release_draft` job, or the v0.1.0 draft. Those are **user-only**, and no
+  agent claim about them is verifiable.
+- **Compile ≠ install.** The gate proves the Gradle task succeeds. It does not
+  run `bundletool`, does not install anything, and does not execute the `aab`
+  job's staging path (`scripts/stage_artifact.py` over
+  `app-android/build/outputs/bundle/debug/app-android-debug.aab`). S6's
+  "clean-target install of APK + AAB + MSI" is still open.
+- **The AAB is not a store artifact.** It is signed with the committed public
+  `testBuild` debug keystore, same as the debug APK. Release signing (Play key?
+  Authenticode?) is an open user decision; until it is made, artifacts stay
+  test-grade.
+- **Bundle contents are unasserted.** Nothing checks which splits the AAB
+  carries, or whether AGP honoured vs ignored the `splits` block for the bundle.
+  If that ever matters, inspect it with `bundletool dump` on a machine that has
+  it — do not infer it from a green compile.
+- **CI cost.** The step adds roughly a minute to a 7–10 minute run and reuses the
+  Gradle cache from the preceding `assembleDebug`. Acceptable for a release-path
+  gate; revisit if the suite grows past ~15 minutes.
+
 ## 2026-10-08 — session `arena/dd43b627-dhun`: the API-24 floor is now lint-gated in CI; it is still not device-proven
 
 - **What changed.** `minSdk 24` used to be checked only by compilation, and
@@ -13,10 +86,13 @@ Updated every phase. Nothing hidden.
   runtime behaviour (a reflection call, a missing manifest attribute, a
   resource that inflates differently), and it does not check behaviour on a
   real API 24–25 device. Those remain S3 round 5, user-only.
-- **Lint coverage of `shared`.** `shared/src/androidMain` is analysed only
+- **Lint coverage of `shared`.** ~~`shared/src/androidMain` is analysed only
   through `:app-android` lint over its library classes. That is an expectation,
-  not a checked fact, until CI's lint output shows it. The mutation proof in
-  the ROADMAP ledger checks the app-module path.
+  not a checked fact, until CI's lint output shows it.~~ **SUPERSEDED
+  2026-10-08 by the `arena/8be68e2c-dhun` entry above — and the expectation was
+  wrong.** `:app-android` lint was *not* covering `shared`: AGP does not lint a
+  module's library dependencies without `checkDependencies`. `:shared` now has
+  its own `NewApi` gate and CI step, mutation-proven on probe `5f74af3`.
 - **Static audit result.** A grep of app and shared for API>24 calls found no
   unguarded call. Checked: `NotificationChannel`, `ShortcutManager`,
   `BrowseParsers.removeFirst` (on Kotlin `ArrayDeque`, safe), `java.time`,
