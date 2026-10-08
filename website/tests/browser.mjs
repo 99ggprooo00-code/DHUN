@@ -430,39 +430,6 @@ function structureReport() {
   return { headings, links };
 }
 
-/** The style of the currently focused element, and of one we deliberately blur. */
-function focusStyleReport() {
-  const element = document.activeElement;
-  if (!element || element === document.body) return null;
-  const style = getComputedStyle(element);
-  return {
-    key: `${element.tagName.toLowerCase()}#${element.id}.${String(element.className || "").split(/\s+/)[0]}`,
-    text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 30),
-    style: {
-      outlineStyle: style.outlineStyle,
-      outlineWidth: style.outlineWidth,
-      outlineColor: style.outlineColor,
-      boxShadow: style.boxShadow,
-      borderColor: style.borderColor,
-    },
-  };
-}
-
-/** Blur whatever has focus and report its style, so `:focus-visible` can be compared. */
-function idleStyleReport() {
-  const element = document.activeElement;
-  if (!element || element === document.body) return null;
-  if (typeof element.blur === "function") element.blur();
-  const style = getComputedStyle(element);
-  return {
-    outlineStyle: style.outlineStyle,
-    outlineWidth: style.outlineWidth,
-    outlineColor: style.outlineColor,
-    boxShadow: style.boxShadow,
-    borderColor: style.borderColor,
-  };
-}
-
 /** Controls that must keep a boundary when the OS forces the colour palette. */
 function forcedColorsReport() {
   const read = (element) => {

@@ -35,6 +35,13 @@
   no screen reader, no touch hardware, no real Windows High Contrast session, and
   a 200 %-zoom *emulation* is a layout-viewport approximation, not a browser's
   own zoom implementation.
+- **No lint guards the browser harness against dead code.** `tests/browser.mjs`
+  is executed by CI but never parsed by anything local except `node --check`
+  (syntax only), so two helpers left over from the focus-ring refactor survived a
+  whole session and were found by a four-line script this session, not by a gate.
+  A "no top-level helper is referenced only once" rule is cheap and would have to
+  be mutation-proved like the others; parked here with that reasoning rather than
+  half-added at the end of the session.
 
 ## 2026-10-08 — session `arena/9b791057-dhun`: the site is a product site now, and its interface page has never been rendered
 
