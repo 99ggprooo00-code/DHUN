@@ -147,8 +147,10 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
   keyboard shortcuts, per-user unsigned MSI (test-grade until release
   signing is decided).
 - **Web:** production target still cut. ADR-008 is the narrow exception: one
-  isolated B1 deployed-origin feasibility spike is accepted. No shared browser
-  source set, backend/proxy, production player or Web-support claim is approved.
+  isolated B1 deployed-origin feasibility spike is accepted. A dependency-free
+  candidate exists in `web-spike/`, but canonical-origin/browser evidence is
+  open. No shared browser source set, backend/proxy, production player or
+  Web-support claim is approved.
 
 ### Music source
 - YouTube Music via the revised doctrine above. No paid API. No keys.
@@ -254,8 +256,9 @@ DHUN/
 │                               # jump lists, single-instance, packaging
 ├── tools/playback-probe/       # Phase 01 CLI harness — STILL the rot drill's probe
 │                               # (+ OfflineMain deterministic check, SmokeMain)
+├── web-spike/                  # ADR-008 B1 static probe candidate; not a product target
 ├── tests/fixtures/             # captured InnerTube JSON for parser tests
-├── scripts/                    # python packaging/CI-contract gates (29 tests)
+├── scripts/                    # python packaging/CI/Web-spike contracts (55 tests)
 └── .github/workflows/          # ci.yml · test-release.yml · build-apk.yml ·
                                 # extraction-health.yml (id 360655315 — the
                                 # restored daily drill; superseded the deleted

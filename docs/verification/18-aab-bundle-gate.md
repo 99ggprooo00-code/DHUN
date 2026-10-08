@@ -48,7 +48,9 @@ it.
 step and its position after `assembleDebug`, so a shared compile break fails
 `Android debug build` rather than masquerading as a bundle failure. Both are
 mutation-proven locally: deleting the step's `run:` line turns **2** tests red
-(`FAILED (failures=1, errors=1)`); restoring returns **47/47 OK**.
+(`FAILED (failures=1, errors=1)`); restoring returned the then-current suite to
+**47/47 OK**. The current repository-wide suite is **55/55 OK** after ADR-008
+B1 added eight unrelated Web-spike contract tests.
 
 ## The verdict — AGP tolerates `splits { abi }` alongside a bundle
 

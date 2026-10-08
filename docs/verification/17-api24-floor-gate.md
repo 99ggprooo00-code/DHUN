@@ -112,8 +112,9 @@ remains open.
 
 `scripts/test_ci_workflow.py` (executed by CI step 1,
 `python3 -m unittest discover -s scripts -p 'test_*.py'`) gained six tests for
-this gate (39 → 45 at that change; the suite is now 47 after the separate AAB
-contract). The six API-floor tests pin:
+this gate (39 → 45 at that change; the suite reached 47 after the separate AAB
+contract). The repository-wide suite is now **55** after ADR-008 B1 added eight
+independent Web-spike contract tests. The six API-floor tests pin:
 
 - both lint steps exist in `ci.yml`, with their distinct honest names, app module
   first;
@@ -126,7 +127,9 @@ contract). The six API-floor tests pin:
 Mutation-proven locally: removing the `:shared` lint step together with the
 `checkOnly`/`abortOnError` pair turns **3** of the new tests red
 (`FAILED (failures=2, errors=1)`); restoring returned **45/45 OK** at the gate
-commit (the current full suite is **47/47 OK**).
+commit; after the separate AAB contract the then-current suite was **47/47
+OK**. The current repository-wide suite is **55/55 OK**; the eight later tests
+belong to ADR-008 B1, not this gate.
 
 ## Static read of `shared/src/androidMain` (7 files)
 

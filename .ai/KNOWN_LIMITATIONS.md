@@ -2,6 +2,35 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — latest session state: `main@fddc436`, rolling MSI 2.213.1, and B1 exists without a browser verdict
+
+- **Main moved after the earlier entries below.** The user committed the approved
+  README hostname correction directly as `fddc436`. CI **37778666069**, Build
+  APK **37778666083**, test-release **37778666170** and Pages **37778665529**
+  succeeded. This branch is rebased onto it; PR #136 remains the only working
+  PR for this session.
+- **The rolling APKs are still byte-identical to the recorded `8a8d6c5`
+  publish.** Universal remains
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+  arm64 `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  v7a `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`.
+  MSI advanced to **2.213.1**, 112,971,776 B,
+  `f4d5677b61b9f471cd8fba7b3b6f4b73b79a9c9529732e4fe34816bb64c8c52d`.
+  Hosted smoke is still packaging-only (`2.210.1 → 2.213.1`); no playback or
+  visual acceptance follows.
+- **ADR-008 B1 is implemented only as a candidate.** `web-spike/` is a
+  dependency-free, noindex, credential-free diagnostic route with no proxy,
+  persistence, remote assets or product navigation. Its local contract and JS
+  syntax pass; that does not prove CORS, media ranges, codecs or sound.
+- **Canonical-origin evidence is blocked on review/merge plus a real browser.**
+  Legacy Pages serves `main:/`, so PR code cannot appear at
+  `/DHUN/web-spike/` before an authorized merge. Arena preview is a different
+  origin and is preflight only. Chromium and Firefox audible evidence plus
+  Safari tested/unavailable must be recorded in verification record 19.
+- **No B2 choice is implied.** A B1 pass does not authorize Kotlin/Wasm/JS,
+  TypeScript, a backend/proxy or a production player. A failure does not
+  authorize extraction changes. Either result stops for the B2 user decision.
+
 ## 2026-10-08 — session `arena/ae65f1a5-dhun`: PR #135 is merged and green; the remaining gates did not become hardware evidence
 
 - **Post-merge verification is complete.** PR #135 merged as `8a8d6c5`.
@@ -49,8 +78,9 @@ Updated every phase. Nothing hidden.
   link fix, not browser-player deployment evidence.
 - **The user selected a browser player, not a static download site.** That
   reverses MASTER_PROMPT's prior Web cut and the locked Android+JVM-only stack.
-  The user separately accepted ADR-008 for **B1 feasibility only**. B1 has not
-  started. A production player, shared browser source set, adopted stack,
+  The user separately accepted ADR-008 for **B1 feasibility only**. The static
+  candidate now exists, but canonical/browser evidence is open. A production
+  player, shared browser source set, adopted stack,
   backend/proxy, extraction change and public Web-support claim all remain
   unapproved; success would still stop at the B2 architecture decision.
 - **There are still no image assets in this repository.** The user selected real

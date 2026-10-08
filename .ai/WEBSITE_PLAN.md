@@ -2,9 +2,10 @@
 
 > **Status (2026-10-08): RESEARCH / PLAN ONLY. W0 answers are recorded;
 > the user selected a browser player and separately accepted ADR-008 for its B1
-> deployed-origin feasibility spike only. This session remains plan-only: B1 has
-> not started.** There is no `website/` directory, site dependency, Pages
-> workflow change, or web-target application code.
+> deployed-origin feasibility spike only. A dependency-free probe candidate now
+> exists in `web-spike/`, but it is not on the canonical Pages origin and has no
+> playback verdict.** There is no production `website/` directory, site
+> dependency, Pages workflow change, or web-target application code.
 >
 > Standing instruction: research first, compare several approaches, preserve
 > the analysis in a `.md` file, and plan when to implement rather than rushing
@@ -25,7 +26,7 @@ DHUN therefore has two materially different options:
 | Option | Meaning | Architectural effect | Status |
 |---|---|---|---|
 | **A — marketing/download site** | A static public site describing the existing Android and Desktop applications, linking the rolling release and source | New deployment workstream, but not a new application target; does not contradict the accepted Android/Desktop architecture | **Not selected; retained as fallback** |
-| **B — DHUN web player** | A browser-playable third application target | Contradicts the prior Web deferral/cut and Android+JVM-only stack; accepted ADR-008 now permits only a B1 feasibility spike before any product architecture choice | **Selected; ADR-008 B1 accepted but not started** |
+| **B — DHUN web player** | A browser-playable third application target | Contradicts the prior Web deferral/cut and Android+JVM-only stack; accepted ADR-008 now permits only a B1 feasibility spike before any product architecture choice | **Selected; B1 candidate implemented, canonical evidence open** |
 
 The research recommendation remains **Option A** because it addresses the
 public presence without reopening a rejected platform target. The user instead
@@ -46,9 +47,11 @@ or B2 stack selection is approved.
 | Languages | **English only for v1** | No locale-prefixed routes initially; structure may remain translation-ready |
 | README line 2 | **Correct now** | Updated to the canonical `-code` hostname in this session |
 
-W0 is answered and ADR-008 B1 is explicitly accepted. The next Web action is
-the small deployed-origin feasibility spike described there. It has not started
-in this plan-only session; a full web-player architecture remains unapproved.
+W0 is answered and ADR-008 B1 is explicitly accepted. The smallest static
+candidate is now implemented in `web-spike/` and contract-tested, but a local or
+Arena preview is preflight only. B1 remains open until the exact candidate is
+run from the canonical Pages origin in the required browsers; a full web-player
+architecture remains unapproved.
 
 ## 2. Verified baseline — repository, Pages and the advertised URL
 
@@ -599,10 +602,13 @@ never instead of S3.
 - ✅ Real S3 screenshots; product-first tone with the warning lower on the first
   viewport; canonical github.io URL; English-only v1; correct README now.
 - ✅ ADR-008 written and separately **accepted for B1 feasibility only**.
-- ⏳ B1 has not started. No production site/player scaffold, backend/proxy,
-  extraction change or B2 browser stack is authorized.
+- ✅ Dependency-free B1 candidate implemented in `web-spike/`; static contract
+  and JavaScript syntax pass locally.
+- ⏳ Canonical-origin Chromium/Firefox/Safari evidence is missing. No production
+  site/player scaffold, backend/proxy, extraction change or B2 stack is
+  authorized.
 
-**Gate:** W0/B0 complete; B1 deployed-origin evidence is next.
+**Gate:** W0/B0 complete; B1 implementation review/deploy/manual evidence open.
 
 ### W1 — Diagnose Pages and front-door link
 
@@ -637,8 +643,9 @@ remains blocked on B1 evidence and B2 selection.
 **Gate:** at least one legal, current Android visual and one Windows visual, or
 explicit approval for labelled CSS schematics.
 
-For the selected Option B, ADR-008 B1 is accepted and is the next Web work item.
-W4–W6 below describe only the unselected static Option-A fallback.
+For the selected Option B, the ADR-008 B1 candidate is implemented; review,
+canonical deployment and manual browser evidence remain. W4–W6 below describe
+only the unselected static Option-A fallback.
 
 ### W4 — Scaffold (Option-A fallback only)
 
@@ -685,7 +692,8 @@ W0 answers are complete:
 5. **Language:** English-only v1.
 6. **README now:** corrected to the canonical `-code` URL.
 
-**Architecture state:** ADR-008 is accepted for B1 only. The B1 deployed-origin
-feasibility spike is next but not started. Its result must be recorded before
-choosing B2.1 Kotlin browser, B2.2 TypeScript, B2.3 a separately approved
-backend/proxy, or B2.4 stop/fallback. No production Web claim is approved.
+**Architecture state:** ADR-008 is accepted for B1 only. The static candidate
+exists, but deployed-origin/browser evidence is still missing. Record that
+result before choosing B2.1 Kotlin browser, B2.2 TypeScript, B2.3 a separately
+approved backend/proxy, or B2.4 stop/fallback. No production Web claim is
+approved.
