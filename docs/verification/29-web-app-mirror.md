@@ -83,3 +83,17 @@ not done.
   node tests), and the full report also goes to the job log and to
   `$GITHUB_STEP_SUMMARY`, which are not capped. **Not verified in a live run** —
   its effect is only observable in CI.
+
+## Fixes found after the first `app-web` commit
+
+All four were found by re-reading the diff, not by a browser: there is no engine
+here, so a visual bug is caught by reading or not at all.
+
+| Defect | Fix | Verified |
+|---|---|---|
+| `.dhun-rail` named both the large-screen navigation rail and the horizontal quick-picks shelf; the later rule won and the rail rendered as a row | the shelf is now `.dhun-shelf` | rules are distinct; **not** verified in a browser |
+| `.dhun-tracklist > li` had no `display:flex`, so a row button and its 48 dp overflow button stacked | the list item is a flex row; row times got `labelSmall` | same |
+| `Add to playlist` rows reused the entry-point action, so choosing a playlist re-opened the same sheet | rows use `data-action="confirm-add-to-playlist"`; adding to *Liked Songs* is favouriting, matching the app's model | boot test asserts the sheet renders the confirm action and the Liked Songs row; the state change itself is untested (the DOM stub cannot click) |
+| the full player's artwork was an `<img>` painted over its own gradient | it is a `<span>`, like every other piece of artwork in the app | boot test renders the full player |
+
+Each is also recorded in `.ai/DEBUG_LOG.md`.
