@@ -489,7 +489,7 @@ export default {
 
   install: {
     permissions:
-      "Android permissions: internet, notifications, foreground media playback (the FOREGROUND_SERVICE_DATA_SYNC service type, used only while a download is running), wake lock, and a one-shot battery-optimisation exemption dialog. No contacts, SMS, location, camera, microphone, shared storage, overlay or accessibility access.",
+      "Android permissions: internet, notifications, media playback and downloads as foreground services (each declared only while it is running), wake lock, and a one-shot battery-optimisation exemption dialog. No contacts, SMS, location, camera, microphone, shared storage, overlay or accessibility access. The full list is in the app manifest, one file in the repository.",
     source: "app-android/src/main/AndroidManifest.xml",
     privacy:
       "No analytics, no telemetry, no crash reporting, no advertising SDK. This website loads nothing from a third-party origin — no CDN, no font service, no analytics script.",

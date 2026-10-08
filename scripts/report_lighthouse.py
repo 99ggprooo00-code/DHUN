@@ -71,19 +71,18 @@ def main(argv: list[str]) -> int:
     report = reports[index]
     scores = runs[index]
 
+    summary = " · ".join(
+        f"{key}={value * 100:.0f}" for key, value in scores.items() if value is not None
+    )
+    print(f"{route}: {summary}")
+    combined = [summary]
     if len(runs) > 1:
         per_run = " · ".join(
             f"run {n + 1}: {runs[n].get('performance') * 100:.0f}"
             for n in range(len(runs))
             if runs[n].get("performance") is not None
         )
-        print(f"::notice title=Lighthouse {route} samples::{per_run} (gate uses the median)")
-
-    summary = " · ".join(
-        f"{key}={value * 100:.0f}" for key, value in scores.items() if value is not None
-    )
-    print(f"::notice title=Lighthouse {route}::{summary}")
-    print(f"{route}: {summary}")
+        combined.append(f"samples {per_run} (gate uses the median)")
     if not summary:
         print(f"::error title=Lighthouse {route}::the report contained no category scores")
         return 1
@@ -110,7 +109,7 @@ def main(argv: list[str]) -> int:
     if requests:
         measured.append(f"requests={len(requests)}")
     if measured:
-        print(f"::notice title=Lighthouse {route} metrics::" + " · ".join(measured))
+        combined.append(" · ".join(measured))
         print(f"{route} metrics: " + " · ".join(measured))
 
     # The largest measured savings, so the next run can confirm an improvement
@@ -121,10 +120,7 @@ def main(argv: list[str]) -> int:
         if overall and overall > 0:
             savings.append((overall, audit_id, (audit.get("title") or "").strip()))
     for overall, audit_id, title in sorted(savings, reverse=True)[:4]:
-        print(
-            f"::notice title=Lighthouse {route} opportunity::"
-            f"{audit_id} — {title} (about {overall:.0f} ms)"
-        )
+        print(f"{route} opportunity: {audit_id} — {title} (about {overall:.0f} ms)")
 
     # Insights that carry no score but say whether the page still blocks on
     # requests; these are the ones Tier A set out to remove.
@@ -134,13 +130,11 @@ def main(argv: list[str]) -> int:
             continue
         items = audit.get("details", {}).get("items", [])
         state = "none" if not items else f"{len(items)} item(s)"
-        print(
-            f"::notice title=Lighthouse {route} insight::{audit_id} — "
-            f"{(audit.get('displayValue') or state)}"
-        )
+        combined.append(f"{audit_id}: {audit.get('displayValue') or state}")
 
     # Name the audits that failed, so the failure is actionable from the
     # annotations alone.
+    categories = report.get("categories", {})
     for key in ("accessibility", "performance"):
         category = categories.get(key, {})
         for ref in category.get("auditRefs", []):
@@ -156,6 +150,8 @@ def main(argv: list[str]) -> int:
                     f"{ref['id']} — {detail}"
                 )
 
+    print(f"::notice title=Lighthouse {route}::" + " || ".join(combined))
+
     failures = []
     for key, minimum in GATES.items():
         score = scores.get(key)
@@ -168,4 +164,14 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv))
+    try:
+        raise SystemExit(main(sys.argv))
+    except SystemExit:
+        raise
+    except Exception as error:  # noqa: BLE001 — a silent crash is the defect
+        # This script has already failed once with an undefined name: the
+        # notices printed, the process exited 1, and nothing said why. Any
+        # exception is now an annotation.
+        route = sys.argv[1] if len(sys.argv) > 1 else "?"
+        print(f"::error title=Lighthouse {route}::report_lighthouse.py crashed: {error!r}")
+        raise SystemExit(1)

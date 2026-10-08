@@ -73,7 +73,10 @@
   color: #fff; font-size: 0.9em;
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
-.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45em; }
+/* Browser-measured: `auto` grid columns size to max-content, so a nowrap row
+   could push the list wider than its box (`ul.rows 103>98` at 1440 px).
+   `minmax(0, 1fr)` lets the track — and the text inside it — shrink. */
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45em; grid-template-columns: minmax(0, 1fr); }
 .row {
   display: flex; align-items: center; gap: 0.6em; margin: 0;
   padding: 0.3em 0.35em; border-radius: 0.6em; background: var(--glass);
@@ -81,7 +84,7 @@
 .row.is-current { border: 1px solid var(--glass-edge); }
 .thumb { display: block; width: 2.4em; height: 2.4em; border-radius: 0.5em; flex: none; }
 .thumb--sm { width: 2em; height: 2em; }
-.row-text { display: grid; gap: 0.1em; min-width: 0; flex: 1; }
+.row-text { display: grid; gap: 0.1em; min-width: 0; flex: 1; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
 .row-title {
   font-size: 0.82em; font-weight: 500; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
