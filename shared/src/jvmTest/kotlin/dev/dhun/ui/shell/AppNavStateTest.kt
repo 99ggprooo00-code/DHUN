@@ -321,4 +321,15 @@ class AppNavStateTest {
         assertTrue(nav.detailStack.isEmpty())
         assertFalse(nav.playerExpanded)
     }
+    @Test
+    fun navRailSelectTabCollapsesExpandedFullPlayer() {
+        val nav = AppNavState()
+        
+        AppTab.userTabs.forEach { tab ->
+            nav.playerExpanded = true
+            nav.selectTab(tab)
+            assertEquals(tab, nav.selectedTab)
+            assertFalse(nav.playerExpanded, "Selecting tab $tab must collapse FullPlayer")
+        }
+    }
 }

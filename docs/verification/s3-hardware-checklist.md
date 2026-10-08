@@ -1,20 +1,17 @@
 # S3 Hardware Verification Checklist
 
 > **Purpose:** Device-side acceptance for the rolling `test` build. Release metadata
-> currently points to **`73b88b60b647120662812a5d33b233876acad283`** (PR #119),
-> published **2026-09-28T18:48:23Z**. APK: 18,367,219 bytes; MSI: 112,934,912
-> bytes; ProductVersion **2.137.1**.
+> currently points to the PR #127 merge commit `1a88ee380df5f68f1769213dddc133eec04ee9fd`,
+> published **2026-10-08**. APK: 18,383,603 bytes; MSI: 112,963,584
+> bytes; ProductVersion **2.178.1**.
 >
-> **Digest status:** the #119 SHA-256 values have not been independently verified.
-> Do not use the PR #118 hashes previously printed here; they are not a verified
-> checksum for this publish. Follow `15-test-build-gate.md` §1 and verify each
-> downloaded file against its matching release `.sha256` sidecar **before**
-> installing. Equal sizes do not prove identical bytes.
+> **Digest status:** The MSI SHA-256 `0c67d2bf2c870e4209757da6296ca8bb0c68a5c921f17d4679b1096366e1d721`
+> has been successfully verified by the user. The Android APK SHA-256 `75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`
+> still needs user hardware verification.
 >
 > **Rule:** Upgrade in place; do not uninstall existing data. Screenshot every
-> FAIL plus steps 5 and 10 regardless. Round 1 report status is in
-> `14-release.md` (received 2026-10-05); required build/device metadata and
-> four screenshots have now been visually reviewed, but the step mapping and failure details remain outstanding.
+> FAIL. Follow `15-test-build-gate.md` §1 and verify each downloaded file against
+> its matching release `.sha256` sidecar **before** installing.
 
 ---
 
@@ -22,12 +19,27 @@
 
 | Field | Android | Windows |
 |---|---|---|
-| Device model | | |
-| OS version | Android ___ | Windows build ____ (run `winver`) |
-| Previous build installed | | |
-| Date + local time started | | |
+| Device model | Redmi Note 12 4G | |
+| OS version | Android 15 | Windows 11 (build pending `winver`) |
+| Previous build installed | | 2.172.1 |
+| Date + local time started | 2026-10-08 | 2026-10-08 |
 
 ---
+
+## Round 2 result status (report received 2026-10-08)
+
+**Windows 11 Test (MSI 2.178.1)**
+- **SHA-256 confirmed:** `0c67d2bf2c870e4209757da6296ca8bb0c68a5c921f17d4679b1096366e1d721`
+- **Resolution:** 1920x1200, scale 125%
+- Space shortcut regression is **FIXED**. Spaces type correctly in text inputs without triggering playback.
+- **NEW DEFECT:** Enter key does not submit search in the Search input field.
+- **NEW DEFECT:** Navigation Rail obscured/unreachable underneath the FullPlayer immersive view.
+
+**Android Test (APK SHA-256 pending)**
+- **Status reported:** "android all ✓" (all retests passed)
+- **Pending Verification:** Needs exact APK SHA-256 confirmation before marking as formally PASSED for this release build.
+- **NEW OBSERVATION:** Screenshots reveal an Android landscape layout displaying apparent duplicated/ghosted content. User must confirm if this visual artifact persists after layout animation settles or if it is a transient rotation snapshot.
+
 
 ## Round 1 result status (report received 2026-10-05)
 

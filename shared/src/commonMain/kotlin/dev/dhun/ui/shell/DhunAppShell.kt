@@ -245,7 +245,8 @@ fun DhunAppShell(
         // phones. At and above it, a detail route opts into a real second pane;
         // an empty stack keeps the master full-width instead of reserving a
         // permanent "Nothing open" half-screen placeholder.
-        val layout = DhunShellPolicy.layoutAt(maxWidth)
+        val shellMaxWidth = maxWidth
+        val layout = DhunShellPolicy.layoutAt(shellMaxWidth)
         val useNavigationRail = layout == DhunShellLayout.TwoPane
         // Phase 14 error taxonomy: offline banner. Rendered in the Scaffold
         // topBar slot so innerPadding pushes content down while it shows.
@@ -310,11 +311,16 @@ fun DhunAppShell(
                     ),
             )
         }
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
+        Row(modifier = Modifier.fillMaxSize()) {
+            if (useNavigationRail) {
+                AppNavigationRail(nav = nav, layout = layout)
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
             topBar = {
-                AnimatedVisibility(
+                TopLevelAnimatedVisibility(
                     visible = offlineBannerPlacement == OfflineBannerPlacement.ScaffoldTopBar,
                     enter = slideInVertically { -it } + fadeIn(DhunAnimations.mediumTween()),
                     exit = slideOutVertically { -it } + fadeOut(DhunAnimations.fastTween()),
@@ -350,8 +356,8 @@ fun DhunAppShell(
             )
             val panes = if (showDetailPane) {
                 DhunShellPolicy.panes(
-                    shellWidth = maxWidth,
-                    contentWidth = maxWidth - horizontalInsets,
+                    shellWidth = shellMaxWidth,
+                    contentWidth = shellMaxWidth - horizontalInsets,
                     hasRail = useNavigationRail,
                 )
             } else {
@@ -362,9 +368,6 @@ fun DhunAppShell(
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
-                if (useNavigationRail) {
-                    AppNavigationRail(nav = nav, layout = layout)
-                }
                 if (panes == null || detailRoute == null) {
                     // Phone / narrow window, or a large screen with no route:
                     // unchanged content wiring, with the master using all of the
@@ -516,7 +519,7 @@ fun DhunAppShell(
                 .fillMaxSize()
                 .zIndex(FULL_PLAYER_LAYER_Z_INDEX),
         ) {
-            AnimatedVisibility(
+            TopLevelAnimatedVisibility(
                 visible = nav.playerExpanded && currentTrack != null,
                 enter = slideInVertically(DhunAnimations.mediumTween()) { it } +
                     fadeIn(DhunAnimations.mediumTween()),
@@ -547,7 +550,7 @@ fun DhunAppShell(
         }
         // The Scaffold's top bar is behind the immersive player. Re-layer the
         // same offline status above FullPlayer so buffering cannot look silent.
-        AnimatedVisibility(
+        TopLevelAnimatedVisibility(
             visible = offlineBannerPlacement == OfflineBannerPlacement.AboveFullPlayer,
             enter = slideInVertically { -it } + fadeIn(DhunAnimations.mediumTween()),
             exit = slideOutVertically { -it } + fadeOut(DhunAnimations.fastTween()),
@@ -559,6 +562,9 @@ fun DhunAppShell(
             OfflineStatusBanner(modifier = Modifier.safeDrawingPadding())
         }
 
+            } // Close Box(weight=1f)
+        } // Close Row
+        
         // ---------------- dialogs (topmost) ---------------------------------------
         overflowTrack?.let { track ->
             TrackOverflowDialog(
@@ -1036,4 +1042,21 @@ private fun TabContent(
             )
         }
     }
+}
+
+@Composable
+private fun TopLevelAnimatedVisibility(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    enter: androidx.compose.animation.EnterTransition = androidx.compose.animation.fadeIn(),
+    exit: androidx.compose.animation.ExitTransition = androidx.compose.animation.fadeOut(),
+    content: @Composable androidx.compose.animation.AnimatedVisibilityScope.() -> Unit
+) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = enter,
+        exit = exit,
+        content = content
+    )
 }
