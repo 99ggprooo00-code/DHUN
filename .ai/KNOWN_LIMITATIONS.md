@@ -2,6 +2,53 @@
 
 Updated every phase. Nothing hidden.
 
+## 2026-10-08 — session `arena/19a284df-dhun`: what the real Search-Enter test does and does not prove (PR #129, commit `643298a`)
+
+- **What is now covered that was not.** At `main@ca6d006` the rule that decides
+  "does Enter submit the search?" existed twice: inline in `SearchScreen`'s
+  `onKeyEvent` and, unused, in `SearchInputPolicy`. `SearchInputPolicyTest`
+  asserted a private copy of it, so nothing in CI could fail if the shipped
+  predicate broke. Now there is one rule, the UI calls it, and the test builds
+  real `KeyEvent`s against it — Enter-down submits, Enter-up does not, numpad
+  Enter submits, Space/letters/digits/arrows/Escape never do. Executed on CI at
+  `:shared:jvmTest` (step 6 of runs **37732411763**/**37732439056** on
+  `643298a` and **37732962973**/**37732965756** on `27fe90f`), with step 8
+  compiling the rewired `SearchScreen` for Android.
+- **What is still *not* proven.** Green `:shared:jvmTest` proves the predicate
+  returns the right verdicts for constructed events. It does **not** prove that
+  a physical Enter press reaches the field and submits on a real window:
+  focus routing, IME vs. hardware-key precedence, and Compose's own
+  AWT→Compose key mapping are all outside this test. That is the S3 device
+  retest, still open. Do not describe the unit test as the fix being accepted.
+- **The test uses Compose-internal API on purpose.** On the JVM target
+  `NativeKeyEvent` is `Any` and the AWT→Compose conversion
+  (`toComposeEvent()`, `InternalKeyEvent`) is `internal`, so there is no public
+  way to construct a `KeyEvent`; the `@InternalComposeUiApi` factory is the
+  supported path and is pinned to the project's Compose 1.8.2 (verified against
+  `compose-multiplatform-core` tag `v1.8.2`). A future Compose bump can move or
+  rename it — if `:shared:jvmTest` starts failing to *compile* in
+  `SearchInputPolicyTest`, that is the likely cause, and the answer is to
+  re-check the factory at the new tag, **not** to fall back to testing a copy.
+- **Behaviour change worth naming:** numpad Enter now submits the query too
+  (previously only the main Enter key did). This matches
+  `isTransportActivationKey`, which already accepts both.
+- **The audit was one session, one fingerprint.** All 65 `shared` test files
+  plus `app-android`/`app-desktop` were scanned for test-private functions
+  shadowing production names; only `SearchInputPolicyTest` was a real copy
+  (`DhunThemeContrastTest`'s WCAG math is an independent spec oracle, and the
+  rest are fixtures or wrappers that call production). That is a scan, not a
+  proof: a test can also be vacuous by asserting something trivially true, and
+  no automated check here catches that.
+- **No local Kotlin verification exists in this sandbox** (no `java`, no
+  `/usr/lib/jvm`; `api.adoptium.net`, Maven Central and
+  `release-assets.githubusercontent.com` are all unreachable, so neither a JDK
+  nor the Compose classpath can be fetched). CI is the first compile of any
+  Kotlin change; a change can be locally "clean" and still red there.
+- **Release sidecars are still not readable in-sandbox.** The digests quoted in
+  the ROADMAP ledger come from the test-release run's provenance notices; the
+  user must confirm them against the release's own `.sha256` assets before
+  device testing.
+
 ## 2026-10-08 — session `arena/5ba66cdb-dhun` S3 regression fixes
 
 - **Desktop Space vs Enter shortcuts:** The previous fix for Space playback toggling worked correctly, but `SearchScreen` still lacked physical Enter key handling and IME action bindings, preventing search submission. This is now fixed via direct `.onKeyEvent` capturing `Key.Enter` and `KeyEventType.KeyDown`. Space remains preserved for typing.

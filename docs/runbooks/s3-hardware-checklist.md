@@ -9,41 +9,36 @@ Builds: the rolling [`test` pre-release](https://github.com/99ggprooo00-code/DHU
 Always re-download after the merge you are qualifying, and note the
 `main@<sha>` you tested.
 
-**Build identity (rechecked 2026-10-07):** rolling `test` is a published
-pre-release targeting **`f0225f4d68c1dfcfb3dfcb798ca8e3b95aaaafe5`**, published
-**2026-10-06T23:56:54Z** from test-release run **37548884077**. CI
-**37548884056** and Build APK **37548884107** also passed. Current artifacts:
-APK **18,367,219 B**, provenance SHA-256
-`21a5fe862b0c948fbc038417e156310e9eaab74bf9ea2f59214b9807f8c9cc2c`; MSI
-**112,947,200 B**, ProductVersion **2.172.1**, provenance SHA-256
-`c27175cecca8cc071364f76704e67faa04ec290d1afd58710b48ff3643fe17d6`. The MSI
-run completed the full `2.171.1 → 2.172.1` install-over, sentinel preservation,
-future-upgrade guard and uninstall smoke. The asset blob could not be downloaded
-in the sandbox; these values are from GitHub publisher annotations. The live
-release `.sha256` sidecars are still required to verify the exact device files.
+**Build identity (rechecked 2026-10-08):** rolling `test` is a published
+pre-release targeting **`ca6d00684f3cf00fed101273e449bebc2fb76a05`** (PR #128,
+merged 2026-10-08T05:12:57Z), published **2026-10-08T05:19:05Z** from
+test-release run **37731260236**. CI **37731260148** (12/12 steps) and Build
+APK **37731260114** also passed on that SHA. Current artifacts: APK
+**18,383,603 B**, provenance SHA-256
+`ff454398bbfb16139b64ef13c9339ef192461b41453eaa8d62a55e9490142b07`; MSI
+**112,967,680 B**, ProductVersion **2.182.1**, provenance SHA-256
+`aa3ff19c2e3c1102cca17ecd7f0129c4e4a5b689af99f8a1761794d1fd454db7`. The MSI
+run completed the full `2.178.1 → 2.182.1` install-over (sentinels preserved,
+future-upgrade guard and uninstall smoke passed, **no skip**). Those values come
+from GitHub publisher annotations — the asset blobs and the `.sha256` sidecars
+are not downloadable in the maintenance sandbox, so **verify the release's own
+sidecars before installing** and record what you actually downloaded.
 
-**This is the old baseline, not the corrected candidate.** Product-code head
-`3071d1d6650291d51559f2884f4ac7734d3aac75` on draft PR #127 passed push CI
-**37710630655**, PR CI **37710634901**, Build APK **37710634909**, and
-PR test-release **37710634914**. Its PR artifacts are `buildOnly=true`, not the
-rolling release: APK 18,383,603 B / SHA-256
-`75c9da37e5e4beeda31306e9f834d4855d17c14a21888c8e142cb77d6d3659d2`; MSI
-2.176.1 / SHA-256
-`18bfc43e0fda45978f7fbe2d280c9c6cfd580786e9d801bc301f94840bdf67a0`. The
-hosted MSI install-over passed `2.172.1 → 2.176.1`, preserving userdata/cache
-sentinels and passing future-upgrade/uninstall checks. The rolling `test` tag
-still does not contain these fixes. Verify the status-sync documentation commit
-also passes the required checks on the final PR head; after merge, download the
-new `test` assets and verify their own sidecars before targeted retest. Do not
-use the `f0225f4` package to validate these fixes.
-
-`f0225f4` changes only the README after the PR #125 merge `b1dba0c`; its APK is
-byte-identical to the PR #125 APK. The `b1dba0c` MSI was **2.171.1**,
-112,947,200 B, SHA-256
-`353cfa107a61114890386696d012e61f5dd6d562f7aa27f59428a25088244020`. The MSI
-version/hash therefore matters when labelling a Windows upgrade report. Use
-`docs/verification/15-test-build-gate.md` §1 to verify current sidecars; run the
-18-check walkthrough and steps 19–22 before the standing checks below. The
+**This package contains the round-2 fixes but has never been on a device.**
+It carries PR #127 (`1a88ee3`: Jump List COM worker, Space preview handler with
+text-input focus tracking, FullPlayer-collapse on navigation/shortcuts, Android
+INTERNET+VALIDATED detection with the offline banner layered above FullPlayer)
+and PR #128 (`ca6d006`: Search Enter + IME action, `NavigationRail` moved out
+of the `Scaffold` so FullPlayer no longer covers it, UI logic tests). It does
+**not** yet contain draft PR #129 (`643298a`), which wires the search-Enter
+rule through `SearchInputPolicy` and replaces its copy-asserting test with one
+that calls the shipped policy; merging #129 republishes this release and **moves
+both digests**. Whichever build you install, record its SHA-256 first and use
+that value in the report — do not reuse the older `f0225f4` package (APK
+`21a5fe86…9cc2c`, MSI 2.172.1 `c27175…3fe17d6`) or PR #127's build-only
+artifacts (APK `75c9da37…`, MSI 2.176.1 `18bfc43e…`) to validate these fixes.
+Use `docs/verification/15-test-build-gate.md` §1 to verify current sidecars; run
+the 18-check walkthrough and steps 19–22 before the standing checks below. The
 rolling release changes on every `main` push, so re-download and record the
 actual target, version and hashes immediately before testing.
 
