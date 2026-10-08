@@ -1,33 +1,34 @@
 # Publishing the site
 
-**Status: Step 1 done, Step 2 pending (2026-10-08).** The Pages source has been
-switched to GitHub Actions (`build_type: workflow`), but the marketing site is
-not live yet because the original push-to-main run that activated the setting
-(#37822182040, head `62c81a9`) executed its deploy job while `build_type` was
-still `legacy`, so the publish steps were skipped. A fresh run is needed.
+**Status: published (2026-10-08).** The marketing site is live at
+<https://99ggprooo00-code.github.io/DHUN/>. Pages `build_type` is `workflow`,
+the `deploy` and `served` jobs both succeeded on run #33 (push to main, head
+`b2889dfb`), and the served-site smoke check verified the published bytes.
 
-What has been done:
+Verification (this session):
 
-- `build_type` is `workflow` (confirmed via `gh api repos/…/DHUN/pages`).
-- The `website` workflow's deploy and served jobs now also accept
-  `workflow_dispatch` (in addition to `push`) so an operator can trigger a
-  deploy from the Actions UI without pushing to main.
+```text
+gh api repos/99ggprooo00-code/DHUN/pages --jq .build_type   → workflow
+gh api repos/99ggprooo00-code/DHUN/pages --jq .status        → built
+gh api repos/99ggprooo00-code/DHUN/pages/builds --jq '.[0]'  → status: built
+gh run view 37831474600 → all 5 jobs succeeded (Build, Lighthouse, Browser, Deploy, Served)
+Deploy job steps: configure-pages ✓, upload-pages-artifact ✓, deploy-pages ✓ — none skipped
+Served job: passed (scripts/website_smoke.py verified the three required caveats)
+```
 
-What remains:
+## How it works
 
-- Trigger a new `website` workflow run on main — either:
-  1. **Re-run** run #37822182040 from the Actions UI (**Actions → website →
-     #37822182040 → Re-run all jobs**). If the `github-pages` environment
-     requires approval, approve it. The run's `build_type` check will now
-     read `workflow` and the deploy steps will execute.
-  2. **Merge a PR** that touches a file in the workflow's `paths:` list (e.g.
-     this runbook or `.github/workflows/website.yml`). The merge push triggers
-     the workflow, which deploys automatically.
-  3. **Run workflow** from the Actions UI (**Actions → website → Run workflow**
-     on `main`). The workflow now accepts `workflow_dispatch` for the deploy
-     and served jobs.
+The `website` workflow (`.github/workflows/website.yml`) triggers on pushes to
+`main` that touch `website/**` or related paths, and on `workflow_dispatch`.
+The `deploy` job uploads a Pages artifact via `actions/deploy-pages`; the
+`served` job fetches the live site and re-runs the honesty contract
+(`scripts/website_smoke.py`) against the published bytes.
 
-## How to tell whether it worked, without a browser
+The `deploy` and `served` jobs accept both `push` and `workflow_dispatch` events
+on main, so an operator can trigger a deploy from the Actions UI without pushing
+to main directly (e.g. after changing a repository setting).
+
+## How to tell whether it still works, without a browser
 
 ```bash
 gh api repos/99ggprooo00-code/DHUN/pages --jq .build_type      # workflow
@@ -45,34 +46,6 @@ stays skipped (`skipped`, not green) until a publish has actually happened —
 Annotations are the readable channel in this repository: the `build` job opens
 every run by reporting `build_type` and the URL in the run summary and as a
 `::warning::` while it is not `workflow`.
-
-## Previous status (before this session)
-
-The site was not published. As of earlier on 2026-10-08 the Pages API reported
-`build_type: legacy`, `source: main:/`, `status: errored`, so
-<https://99ggprooo00-code.github.io/DHUN/> served Jekyll's rendering of the
-repository's root `README.md`, not the marketing site.
-
-## The fix (needs Pages write access — a human)
-
-Either:
-
-1. **Web UI:** repository → **Settings** → **Pages** → **Build and deployment** →
-   **Source** → **GitHub Actions**. No branch selection, no folder selection:
-   the workflow supplies the artifact.
-2. **CLI**, with a token that has Pages write (a repository admin PAT, not the
-   integration token this workspace authenticates with):
-
-   ```bash
-   gh api -X PUT repos/99ggprooo00-code/DHUN/pages -f build_type=workflow
-   ```
-
-Then trigger a new run (see "What remains" above). On the next `website` run:
-
-- `build` builds `website/dist` and runs every gate (unchanged);
-- `deploy` sees `build_type == workflow` and actually uploads and publishes;
-- `served` stops being skipped and re-runs the honesty contract against the
-  bytes a visitor gets, at the canonical URL.
 
 ## What does *not* need doing (and why)
 
