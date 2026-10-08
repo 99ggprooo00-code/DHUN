@@ -41,6 +41,40 @@ Updated every phase. Nothing hidden.
   artifact production — the same separation that already applied to
   `:app-android`.
 
+## 2026-10-08 — session `arena/8be68e2c-dhun` (part 2): the App Bundle now compiles in CI; it is still not installed, staged, or Play-ready
+
+- **What changed.** `ci.yml` runs `./gradlew :app-android:bundleDebug` as its own
+  step, `Android App Bundle compiles (S6 AAB gate)`. Before this, the only job
+  that built an AAB was `test-release.yml`'s `aab`, which is
+  `workflow_dispatch`-gated — so `bundleDebug` had **no automated coverage at
+  all**, and PR #131 had added a `splits { abi }` block to `:app-android` after
+  that job last ran.
+- **Answered question:** AGP 8.7.2 **tolerates** `splits { abi }` when building a
+  debug bundle — CI **37769519510** step 9 is green. Do not "fix" a splits/bundle
+  conflict that does not exist.
+- **The `workflow_dispatch` block is now a checked fact, not a handoff
+  parenthetical.** `gh workflow run test-release.yml --ref arena/8be68e2c-dhun …`
+  returns `HTTP 403: Resource not accessible by integration` (workflow id
+  **347450723**). An agent therefore cannot exercise the `aab` job, the
+  `release_draft` job, or the v0.1.0 draft. Those are **user-only**, and no
+  agent claim about them is verifiable.
+- **Compile ≠ install.** The gate proves the Gradle task succeeds. It does not
+  run `bundletool`, does not install anything, and does not execute the `aab`
+  job's staging path (`scripts/stage_artifact.py` over
+  `app-android/build/outputs/bundle/debug/app-android-debug.aab`). S6's
+  "clean-target install of APK + AAB + MSI" is still open.
+- **The AAB is not a store artifact.** It is signed with the committed public
+  `testBuild` debug keystore, same as the debug APK. Release signing (Play key?
+  Authenticode?) is an open user decision; until it is made, artifacts stay
+  test-grade.
+- **Bundle contents are unasserted.** Nothing checks which splits the AAB
+  carries, or whether AGP honoured vs ignored the `splits` block for the bundle.
+  If that ever matters, inspect it with `bundletool dump` on a machine that has
+  it — do not infer it from a green compile.
+- **CI cost.** The step adds roughly a minute to a 7–10 minute run and reuses the
+  Gradle cache from the preceding `assembleDebug`. Acceptable for a release-path
+  gate; revisit if the suite grows past ~15 minutes.
+
 ## 2026-10-08 — session `arena/dd43b627-dhun`: the API-24 floor is now lint-gated in CI; it is still not device-proven
 
 - **What changed.** `minSdk 24` used to be checked only by compilation, and

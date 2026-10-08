@@ -1,6 +1,6 @@
 # CURRENT ACTIVE TASK
 
-## Session `arena/8be68e2c-dhun` — API-24 floor gate, part 2: `shared/src/androidMain` was outside the gate (2026-10-08)
+## Session `arena/8be68e2c-dhun` — release-path gates the sandbox can actually check: `shared` API-24 lint + the S6 App Bundle (2026-10-08)
 
 Updated **2026-10-08** · session branch `arena/8be68e2c-dhun` · base
 **`main@6f1e6ba730e590cca693c4735a558556cd8378ae`** (PR #134 merged
@@ -47,12 +47,31 @@ block had `abortOnError = false`, so even a run there could not have failed.
 2. `ci.yml`: new step **`Android Lint — shared androidMain API 24 floor
    (NewApi)`** → `./gradlew :shared:lintDebug --no-daemon`, placed right after
    the app-module step so a red floor violation keeps an honest module name.
-3. `scripts/test_ci_workflow.py`: **+6 contract tests** (39 → 45) pinning both
-   lint steps *and* both Gradle lint blocks. A workflow step naming a task whose
-   gate is switched off is green theater — exactly the failure mode this file
-   exists to catch. Includes a `minSdk` drift check (both modules must stay 24:
-   the merged manifest enforces the higher of the two, so drift would silently
-   raise the real floor and leave the gate checking the wrong API level).
+3. `scripts/test_ci_workflow.py`: **+8 contract tests** (39 → 47) pinning both
+   lint steps *and* both Gradle lint blocks, plus the bundle step. A workflow
+   step naming a task whose gate is switched off is green theater — exactly the
+   failure mode this file exists to catch. Includes a `minSdk` drift check (both
+   modules must stay 24: the merged manifest enforces the higher of the two, so
+   drift would silently raise the real floor and leave the gate checking the
+   wrong API level).
+
+### Part 2 — the App Bundle had no automated coverage at all
+
+Found while looking for the next gap. S6 requires a clean-target install of
+**APK + AAB + MSI**, but the only job that builds an AAB is
+`test-release.yml`'s `aab`, gated on
+`github.event_name == 'workflow_dispatch'`. **Verified this session, not
+assumed:** `gh workflow run test-release.yml …` returns
+`HTTP 403: Resource not accessible by integration` for this token. So
+`:app-android:bundleDebug` never ran automatically — and **PR #131 added a
+`splits { abi }` block** to `:app-android` *after* that job last ran, leaving
+"does AGP tolerate ABI splits when building a bundle" as an unanswered question
+on the release path.
+
+**Answer, from CI:** it does. New step `Android App Bundle compiles (S6 AAB
+gate)` → `./gradlew :app-android:bundleDebug`, placed after `Android debug
+build` so a shared compile break keeps its honest step name. Evidence:
+`docs/verification/18-aab-bundle-gate.md`.
 
 ### Status ledger
 
@@ -61,12 +80,14 @@ block had `abortOnError = false`, so even a run there could not have failed.
 | PR #134 `NewApi` gate for `:app-android` | ✅ **merged and published** | merge `6f1e6ba` (2026-10-08T09:53:02Z); post-merge CI **37759720823**, Build APK **37759720747**, test-release **37759720804** (`msi` 113252913512, `apk` 113252913644, `publish` 113255119265; `aab`/`release_draft` skipped) |
 | Rolling `test` at the merge | ✅ **GitHub verified** | published **2026-10-08T09:59:21Z**, `targetCommitish=6f1e6ba`, `isDraft=false`, prerelease. APK **18,405,859 B** `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97` (**unchanged** from `1ee85b0` — PR #134 changed no app code); arm64-v8a **18,355,786 B** `23903dd6…`; armeabi-v7a **18,352,944 B** `7e4f80ad…`. MSI **2.202.1** **112,971,776 B** `45e9ab72f365cfdfa87fe632ec17fd733ba67344c2df024b79eadd92566eb0d1`, upgrade `2.196.1 → 2.202.1` vs baseline `b914108483b171020b67bad2e886fa614ef8091e020ddf4c49161198a36e34eb`, sentinels preserved, uninstall + future-upgrade smokes PASS |
 | `shared/src/androidMain` covered by the floor gate | ✅ **CI-green** on code head `46583a4` | CI pull_request **37764256149** — 14/14 steps, step 10 `Android Lint — shared androidMain API 24 floor (NewApi)` **success**; push CI **37764251898** ✅; Build APK **37764255902** ✅; test-release **37764255892** ✅ |
-| Contract tests locally mutation-proven | ✅ done | Removing the `:shared` lint step + `checkOnly`/`abortOnError` from `shared/build.gradle.kts` turns **3** of the new tests red (`FAILED (failures=2, errors=1)`); restoring them returns **45/45 OK** via `python3 -m unittest discover -s scripts -p 'test_*.py'` (the same command CI step 1 runs) |
+| Contract tests locally mutation-proven | ✅ done | Removing the `:shared` lint step + `checkOnly`/`abortOnError` from `shared/build.gradle.kts` turns **3** of the new tests red (`FAILED (failures=2, errors=1)`); dropping the bundle step's `run:` line turns **2** more red (`FAILED (failures=1, errors=1)`); restoring returns **47/47 OK** via `python3 -m unittest discover -s scripts -p 'test_*.py'` (the same command CI step 1 runs) |
 | `:shared:lintDebug` exists and analyses `androidMain` | ✅ **proven by the probe, not assumed** | The probe failure names the file path *inside* `shared/src/androidMain` and reports `current min is 24`, then aborts task `:shared:lintDebug`. A task that did not exist, or a lint run that analysed nothing, cannot produce that message |
 | Mutation proof (shared gate goes red on a violation) | ✅ **proven** | Probe commit `5f74af3` (new file `shared/src/androidMain/kotlin/dev/dhun/LintMutationProbe.kt`, unguarded `NotificationChannel` = API 26): CI pull_request **37765481344** failed on **step 10 only** (steps 1–9 success, 11–14 skipped); push **37765475775** failed. Annotation from job **113271981287**: `Lint found 1 errors, 0 warnings … LintMutationProbe.kt:18: Error: Call requires API level 26 (current min is 24): android.app.NotificationChannel() [NewApi]` … `Execution failed for task ':shared:lintDebug'`. Build APK **37765481328** and test-release **37765481508** stayed **green** — the probe compiles, and lint is not part of `assembleDebug` — so the failure was isolated to the gate. Revert `a66b342`; `git diff --stat 46583a4 a66b342` is **empty** |
 | Revert head `a66b342` | ✅ **CI-green, 14/14 steps** | CI pull_request **37766214968** — step 10 `Android Lint — shared androidMain API 24 floor (NewApi)` **success**; push CI **37766211053**. `git diff --stat 46583a4 a66b342` empty, so this is the exact pre-probe tree |
-| **PR #135 head to merge** (`f027dfc`, docs on top of `a66b342`) | ✅ **GitHub verified — all four workflows green** | CI pull_request **37767256325** (14/14, step 10 **success**), CI push **37767248647**, Build APK **37767256472**, test-release **37767256281**. **Code head is unchanged since `a66b342`**; the commits on top are this ledger and the trailing one that records it |
-| Verification doc | ✅ written from CI output | `docs/verification/17-api24-floor-gate.md` — both halves of the gate, the probe transcript, and what the gate does *not* prove |
+| **PR #135 head** — `f027dfc`, then `59ac12f` | ✅ **GitHub verified — all four workflows green** | On `59ac12f`: CI pull_request **37769519510** (18/18 steps, incl. step 9 `Android App Bundle compiles (S6 AAB gate)` and step 11 `Android Lint — shared androidMain API 24 floor (NewApi)` — both **success**), CI push **37769514613**, Build APK **37769519324**, test-release **37769519439**. On the earlier `f027dfc`: **37768228127** / **37768223104** / **37768228169** / **37768228160**, all ✅. **No app code changed** — only `ci.yml`, the two Gradle lint blocks and the Python contract test |
+| `workflow_dispatch` for `test-release` | 🔴 **agent-blocked (now a checked fact, not a doc claim)** | `gh workflow run test-release.yml --ref arena/8be68e2c-dhun …` → `HTTP 403: Resource not accessible by integration` (workflow id **347450723**). The `aab` / `release_draft` / v0.1.0-draft paths stay **user-only** |
+| `:app-android:bundleDebug` with `splits { abi }` present | ✅ **CI-verified (compilation only)** | CI **37769519510** step 9 success under AGP 8.7.2 / Gradle 8.14.2 / JDK 17. **Not** an install — `bundletool` + a device is still S6, and the bundle is debug-keystore-signed, not Play-ready |
+| Verification docs | ✅ written from CI output, not from intent | `docs/verification/17-api24-floor-gate.md` — both halves of the lint gate, the probe transcript verbatim, and what the gate does *not* prove. `docs/verification/18-aab-bundle-gate.md` — the dispatch 403, the bundle verdict, and the four things the gate does not prove |
 | `extraction-health` scheduled drill | 🟡 **ENVIRONMENT_BLOCKED (accepted steady state)** | run **37611927562** (2026-10-07T11:07:12Z, `main@f0225f4`) failed on step `Keep the check non-zero when live health is unverified` — runner datacenter gating, not an extraction regression |
 | API 24–25 device (icon, launch, play, background audio) | 🔴 **not verified** | S3 round 5 — user device, against the rolling `test` universal APK `9665b75f…` |
 | Mini-player docked on a device | 🔴 **not verified** | S3 round 4 — user device |
@@ -83,13 +104,19 @@ block had `abortOnError = false`, so even a run there could not have failed.
    step 10 only, naming the probe file inside `shared/src/androidMain`;
    `a66b342` reverts it and the tree is byte-identical to `46583a4`.
 4. ~~Confirm the revert head is green.~~ **DONE** — CI pull_request
-   **37766214968** green, 14/14 steps, and the docs head **`f027dfc`** is green
-   on all four workflows (**37767256325** / **37767248647** / **37767256472** /
-   **37767256281**). **The only remaining gate is the user's merge
-   authorization** for PR #135. After merge: record the post-merge runs and the
-   republished rolling `test` digests — the APK digest should **not** move (no
-   app code changed), the MSI ProductVersion will.
-5. Hardware (user): `docs/runbooks/s3-hardware-checklist.md` against the rolling
+   **37766214968** green, 14/14 steps; docs head `f027dfc` green on all four
+   workflows; and `59ac12f` (the S6 bundle gate) green on all four
+   (**37769519510** / **37769514613** / **37769519324** / **37769519439**).
+   **The only remaining gate for PR #135 is the user's merge authorization.**
+   After merge: record the post-merge runs and the republished rolling `test`
+   digests — the APK digest should **not** move (no app code changed), the MSI
+   ProductVersion will.
+5. ~~Give the App Bundle a merge gate.~~ **DONE** — step 9 of CI. The remaining
+   AAB work is **user-only**: one `workflow_dispatch` of `test-release` with
+   `build_only=true`, `build_release_candidate=true` to exercise the `aab` job's
+   staging path (`stage_artifact.py` over `app-android-debug.aab`), which this
+   gate does not execute.
+6. Hardware (user): `docs/runbooks/s3-hardware-checklist.md` against the rolling
    `test` APK `9665b75f…` (universal) and MSI `45e9ab72…` (**2.202.1**). Round 4
    is landscape + Windows fullscreen. Round 5 is an API 24–25 device.
 

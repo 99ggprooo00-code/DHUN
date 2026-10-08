@@ -54,6 +54,46 @@ there. Actions **log archives** are still unreachable
 (`results-receiver.actions.githubusercontent.com` → EOF), but check-run
 **annotations** are reachable over REST and carried the lint message above.
 
+## 2026-10-08 — the S6 App Bundle path had zero automated coverage (session `arena/8be68e2c-dhun`, part 2)
+
+**How it was found.** Looking for the next agent-lane gap after the lint gate,
+the ledger row that mattered was not a test result but an *absence*: on the main
+push run **37759720804** the `aab` job is **skipped**, as it is on every PR.
+Reading `test-release.yml` shows why —
+`if: ${{ github.event_name == 'workflow_dispatch' && (inputs.build_release_candidate == true || inputs.publish_v010_draft == true) }}`.
+S6 requires a clean-installed AAB, and nothing was building one.
+
+**Turned the handoff's parenthetical into a fact.** Sessions had been carrying
+"agents get 403 on dispatch" as folklore. Tested directly:
+
+```
+$ gh workflow run test-release.yml --ref arena/8be68e2c-dhun \
+    -f build_only=true -f build_release_candidate=true -f publish_v010_draft=false
+could not create workflow dispatch event: HTTP 403: Resource not accessible by
+integration (…/actions/workflows/347450723/dispatches)
+```
+
+So the AAB path is unreachable from the agent lane by construction. The fix had
+to move it into a workflow that *does* run automatically.
+
+**The latent risk.** PR #131 added `splits { abi { include("arm64-v8a",
+"armeabi-v7a"); isUniversalApk = true } }` to `:app-android` — after the `aab`
+job had last executed. Whether AGP ignores, tolerates or rejects ABI splits when
+building an App Bundle was therefore an unanswered question on the release path,
+with the failure scheduled for release day.
+
+**Fix + answer.** `ci.yml` gained
+`Android App Bundle compiles (S6 AAB gate)` → `:app-android:bundleDebug`, after
+`assembleDebug` so a shared compile break keeps its honest step name; two
+contract tests pin it. CI pull_request **37769519510** on `59ac12f`:
+18/18 steps, **step 9 success**. AGP 8.7.2 tolerates the splits block for a
+debug bundle. Evidence in `docs/verification/18-aab-bundle-gate.md`.
+
+**What it still is not.** Not an install (`bundletool` + device = S6), not the
+`aab` job's staging path (`stage_artifact.py` over `app-android-debug.aab`, still
+dispatch-only), not Play-readiness (debug keystore), and it asserts nothing about
+the bundle's split contents.
+
 ## 2026-10-08 — lower-Android commits `5151774` / `b5c349a` were not recoverable (session `arena/688214aa-dhun`)
 
 **What was claimed.** The previous session committed `minSdk` 26 → 24, legacy

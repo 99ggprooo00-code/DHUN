@@ -29,6 +29,15 @@ PR **#135** is open on `arena/8be68e2c-dhun`: code head `a66b342`, docs head
   naming `LintMutationProbe.kt:18` and `Execution failed for task
   ':shared:lintDebug'`; reverted in `a66b342`, which is CI-green
   (**37766214968**, 14/14). Full record: `docs/verification/17-api24-floor-gate.md`.
+- **Second gap closed on the same PR: the App Bundle.** S6 needs a clean-installed
+  AAB, but `test-release.yml`'s `aab` job is `workflow_dispatch`-gated and this
+  token gets **HTTP 403** on dispatch (verified — workflow id **347450723**), so
+  `:app-android:bundleDebug` had no automated coverage while PR #131's
+  `splits { abi }` block sat untested against it. `ci.yml` now runs it as
+  `Android App Bundle compiles (S6 AAB gate)`; CI **37769519510** step 9 is
+  **success** — AGP 8.7.2 tolerates the splits block. Compile only: not an
+  install, not the `aab` staging path, not Play-ready.
+  `docs/verification/18-aab-bundle-gate.md`.
 - **Green CI is not hardware acceptance.** Rounds 4 and 5 are open.
 
 ## Next actions — single agent, sequential
@@ -47,6 +56,9 @@ PR **#135** is open on `arena/8be68e2c-dhun`: code head `a66b342`, docs head
 4. If the `:shared` lint gate ever needs to widen (e.g. `commonMain`), note that
    `checkDependencies` was deliberately left off — it would pull third-party
    analysis into the app-module run.
+5. **User-only:** one `workflow_dispatch` of `test-release` with `build_only=true`
+   and `build_release_candidate=true` to exercise the `aab` job's staging path,
+   which the new CI gate does not execute. Agents get 403 on dispatch.
 
 **Blockers:** no JDK / Gradle / Android SDK / display in the sandbox — `java` is
 not on PATH and the SDK host is outside the network allowlist, so CI is the only
