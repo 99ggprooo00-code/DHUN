@@ -44,13 +44,14 @@ with a universal APK, three published names.
   file, copied to `dhun-test.apk`, `dhun-test-arm64-v8a.apk`,
   `dhun-test-armeabi-v7a.apk`. The job prints size + SHA-256 and whether each
   per-ABI APK is byte-identical to the universal. **Identity is reported, not
-  enforced.** DHUN bundles no native libraries (`System.loadLibrary` / jniLibs /
-  `.so` / ndk: none), so identical bytes are expected. Publish attaches all
-  three APKs and their `.sha256` sidecars. The v0.1.0 draft path does the same
-  under `dhun-v0.1.0*.apk` names.
+  enforced.** The repo source has no `System.loadLibrary` / jniLibs / ndk, but
+  the first CI measurement showed the APKs are **not** byte-identical (ledger).
+  Publish attaches all three APKs and their `.sha256` sidecars. The v0.1.0
+  draft path does the same under `dhun-v0.1.0*.apk` names.
 - Dropping the split back to one universal APK is removing the `splits { abi }`
-  block in `app-android/build.gradle.kts`, **only if the user confirms** the
-  per-ABI APKs are redundant.
+  block in `app-android/build.gradle.kts`. That is **not** justified by
+  identical bytes — CI showed they differ. Do it only if the user explicitly
+  wants a single APK anyway (the size win of a split is ~50 KB).
 
 ### Status ledger (GitHub evidence)
 
@@ -62,16 +63,15 @@ with a universal APK, three published names.
 | MSI hosted upgrade on `4607e07` | ✅ **GitHub verified (hosted, not hardware)** | `2.186.1 → 2.189.1`, baseline `b15da5091254be81fb8a92e3201adc29bbf040342053b22edc51901e3b6d5e1c`, sentinels preserved; future-upgrade + uninstall smokes PASS |
 | `extraction-health` scheduled drill | 🟡 **ENVIRONMENT_BLOCKED (accepted steady state)** | runner datacenter IP gating. Not an extraction regression. Escalate only on `FAIL` or a residential failure |
 | Mini-player docked on a device | 🔴 **not verified** | S3 round 4 vs the **current** rolling `test` (`4607e07` / APK `590bd34a…`) — that package contains `6ef48e9` |
-| This session's minSdk 24 + three-APK change | 🟡 **in this PR, not merged, not published** | reconstructed (lost local commits were not recoverable). CI on this head is the compiler. Do not install a three-APK release until post-merge publish records new digests |
+| This session's minSdk 24 + three-APK change | 🟡 **PR #131, code head CI-green, not merged, not published** | reconstructed (lost commits not recoverable). Code head `5ed50eb`. Push CI **37748346397**. PR CI **37748365000** (12/12, including Android debug build). Build APK **37748365178**. test-release **37748364969** — `apk` job 113215222450 step `Stage three split APKs` ✅ (each glob matched one file: `app-android-universal-debug.apk`, `app-android-arm64-v8a-debug.apk`, `app-android-armeabi-v7a-debug.apk`); `msi` ✅ `2.189.1 → 2.190.1` vs baseline `ad036ffc…`, no skip; `publish`/`aab`/`release_draft` skipped (PR path). PR artifacts are `buildOnly=true`, source SHA `93e90875` (the pull_request merge ref, not `5ed50eb`) |
 | API 24–25 device (icon, launch, play, background audio) | 🔴 **not verified** | S3 round 5, after this change is on the rolling `test` release |
 
 ### Exact next technical step
 
-1. Push `arena/688214aa-dhun`, open the one working PR, watch CI / Build APK /
-   test-release. The `apk` job must build all three splits; each glob matches
-   exactly one file; the digest notice says whether the per-ABI APKs equal the
-   universal. Fix any red. Record the run IDs from that head (PR comment if a
-   docs commit would only create another head).
+1. ~~Push, open PR #131, watch CI.~~ **DONE on code head `5ed50eb`** — all four
+   workflows green; splits are **not** byte-identical (see KNOWN_LIMITATIONS).
+   This docs commit is a new head; its own CI is the final-head check and is
+   recorded in the PR comment, not by another docs commit.
 2. **Ask for merge authorization.** Do not merge without an explicit yes.
 3. After merge: verify post-merge CI + that the rolling `test` release carries
    **three APKs**, and record the real target commit, sizes, and SHA-256.

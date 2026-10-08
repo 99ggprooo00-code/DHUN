@@ -37,10 +37,11 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   adaptive icon.
 - **Three Android APKs on every test release:** `dhun-test.apk` (universal —
   install this), `dhun-test-arm64-v8a.apk`, `dhun-test-armeabi-v7a.apk`, each
-  with a `.sha256` sidecar. DHUN bundles no native libraries, so the per-ABI
-  APKs are expected to match the universal; the apk job prints size + SHA-256
-  so that is confirmed rather than assumed. Not a Play multi-APK (version codes
-  are not overridden).
+  with a `.sha256` sidecar. The apk job prints size + SHA-256. On the first CI
+  measurement they are **not** byte-identical (universal 18,405,859 B, arm64
+  18,355,786 B, v7a 18,352,944 B — PR test-release **37748364969**,
+  `buildOnly=true`, not a published release). Not a Play multi-APK (version
+  codes are not overridden).
 - **Not yet on the rolling `test` release.** The published release at `4607e07`
   is still the single APK. API 24–25 install is the S3 round-5 retest after
   this change is merged and republished. CI compile is not that retest.

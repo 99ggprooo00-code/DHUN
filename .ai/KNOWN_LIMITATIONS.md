@@ -14,14 +14,25 @@ Updated every phase. Nothing hidden.
   resource did not. A launcher that cannot inflate a vector/layer-list could
   still draw a generic icon; the round-5 check is "renders, not blank/default,"
   and a failure there is a real defect, not a docs miss.
-- **ABI splits are expected to be redundant.** The repo bundles no native
-  libraries. The per-ABI APKs are published anyway so the digest report can
-  confirm identity instead of assuming it. They are **not** a reason to install
-  a different file on an API 24 phone — install `dhun-test.apk` (universal).
-  Dropping the `splits { abi }` block is a one-line change, only after the user
-  confirms the splits are redundant. Version codes are intentionally the same;
-  do not add Play-style per-ABI version overrides without an ADR-level decision
-  (they would make the bytes differ and can block installing the universal over
+- **ABI splits are not byte-identical.** Source has no `System.loadLibrary` /
+  jniLibs / ndk, and the handoff expected identical APKs. CI disproved that
+  (test-release **37748364969**, apk job 113215222450, `buildOnly=true`,
+  source SHA `93e90875` = the PR merge ref, not a published release):
+  universal `dhun-test.apk` **18,405,859 B**
+  `9665b75f9201d2953e278af155da19ea9b140f4facc82e7490acde5155efed97`;
+  arm64-v8a **18,355,786 B**
+  `23903dd610a796d98ab6240e730e02bbb19e91cd531706685e03f91012300896`;
+  armeabi-v7a **18,352,944 B**
+  `7e4f80ad1c43b9d7a85fe5bc796cf2fe7451e012e63354eb268bd2b3c23e2baf`.
+  The size gaps (universal − arm64 = 50,073; universal − v7a = 52,915;
+  those two gaps differ by 2,842, which is also arm64 − v7a) fit "universal
+  contains both ABI payloads, each split contains one." The artifact zip could
+  not be downloaded here (EOF), so the entry name is **not** identified — do
+  not invent a `.so` name. Install `dhun-test.apk` (universal) unless you are
+  specifically testing a split. Do not drop the `splits` block on an
+  identical-bytes theory; that theory is false. Version codes stay the same;
+  do not add Play-style per-ABI version overrides without a decision (they
+  would widen the byte difference and can block installing the universal over
   a split).
 - **The lost local commits were not recoverable.** `5151774` / `b5c349a` are not
   on origin and were not in this clone. This tree reconstructs the specified

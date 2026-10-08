@@ -22,9 +22,10 @@ android {
 
     // ABI splits plus a universal APK. The rolling release publishes all three:
     // dhun-test.apk (universal) + dhun-test-arm64-v8a.apk + dhun-test-armeabi-v7a.apk.
-    // DHUN bundles no native libraries, so the per-ABI APKs are expected to be
-    // byte-identical to the universal — the apk job prints each size + SHA-256
-    // rather than assuming that. Version codes are intentionally NOT overridden:
+    // Do not assume the per-ABI APKs match the universal. The repo has no
+    // jniLibs, but test-release 37748364969 measured them ~50KB apart (the
+    // apk job prints size + SHA-256; a difference does not fail the build).
+    // Version codes are intentionally NOT overridden:
     // these are sideload alternatives of one build, not Play multi-APK, and a
     // version override would make the bytes differ and could block installing
     // the universal over a split.

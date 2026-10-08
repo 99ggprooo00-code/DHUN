@@ -23,9 +23,18 @@ on this branch. **Do not merge without an explicit user yes.**
   `dhun-test.apk` + `dhun-test-arm64-v8a.apk` + `dhun-test-armeabi-v7a.apk`.
   No native libraries, so per-ABI bytes are expected to match the universal;
   the apk job prints size + SHA-256 and does not fail on a difference.
-- **CI on this head is the compiler.** No JDK here. Do not claim the three-APK
-  release exists until post-merge `gh release view test` shows three APKs and
-  their digests are recorded.
+- **Code head `5ed50eb` is CI-green (PR #131).** Push CI **37748346397**, PR CI
+  **37748365000** (12/12), Build APK **37748365178**, test-release
+  **37748364969** (`apk` + `msi` green; `publish` skipped). Globs each matched
+  one file. Digests (`buildOnly=true`, source `93e90875` = PR merge ref):
+  universal **18,405,859 B** `9665b75f…ed97` **DIFFERS** from arm64
+  **18,355,786 B** `23903dd6…0896` and v7a **18,352,944 B** `7e4f80ad…2baf`.
+  Artifact zip was not downloadable (EOF) — do not name a `.so`. MSI on that
+  run: 2.190.1, `e38507dd…`, upgrade `2.189.1 → 2.190.1` against the published
+  release MSI `ad036ffc…`, no skip. These are **not** the published release.
+- **CI on a head is the compiler, not hardware acceptance.** No JDK here. Do not
+  claim the three-APK release exists until post-merge `gh release view test`
+  shows three APKs and their digests are recorded from that publish run.
 
 ## Next actions — single agent, sequential
 
