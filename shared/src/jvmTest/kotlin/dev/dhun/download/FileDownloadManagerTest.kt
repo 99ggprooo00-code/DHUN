@@ -166,6 +166,9 @@ class FileDownloadManagerTest {
 
             assertNull(repo.get("v6"))
             assertFalse(storage.exists(path))
+            withTimeout(5_000) {
+                while (manager.downloads.value.isNotEmpty()) delay(10)
+            }
             assertTrue(manager.downloads.value.isEmpty())
         } finally { managerScope.cancel() }
     }
