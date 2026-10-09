@@ -15,16 +15,16 @@
 
 **Scope:** Downloads, history, cache, playlists and other bulk/destructive actions.
 
-**Confirmed defect:** `LibraryScreen.kt` calls `onClearAll()`, clears selection and dismisses the dialog immediately. `LibraryViewModel.clearDownloads()` launches `dm.clearAll()` and wraps it in `runCatching` without exposing the outcome. The user can see the dialog close even if deletion fails; the exception is hidden. Treat this as a real UX/data-trust bug, not a cosmetic issue.
+**Confirmed defects:** Clear all downloads dismissed immediately and hid `dm.clearAll()` failures; batch deletion also cleared selection/closed immediately while the ViewModel swallowed per-item failures; clear history closed its dialog while the ViewModel swallowed persistence failures. Treat these as UX/data-trust bugs, not cosmetic issues.
 
 Tasks:
-1. Introduce observable operation state/result for clear operations (idle/pending/success/failure with typed error); do not swallow the error.
+1. **Implemented in this branch:** expose pending/success/failure for clear downloads; batch-delete and history-clear now await their suspend operations, keep confirmations open on failure, show retryable error copy and only close/clear selection on success. CI verification is still pending.
 2. Define the exact scope: completed files, active jobs, queued/paused/failed jobs, partial files and DB rows.
 3. Prevent duplicate submissions and race conditions with new downloads while clearing.
-4. Keep the confirmation visible or replace it with a progress state until completion.
+4. **Implemented in this branch:** keep the clear, batch-delete and history-clear confirmations visible during the operation and disable repeated submits/dismissal while pending.
 5. On success, refresh the list and storage summary, clear selection, remove temporary files and show the empty state.
-6. On failure, keep remaining items visible and show an actionable error/retry.
-7. Apply the same pattern to clear history, batch deletion, remove-download, playlist deletion, cache clear and preference reset.
+6. **Implemented in this branch:** show actionable retry copy on failure and preserve remaining selection/data; test filesystem/database failure cases and partial-delete retry on CI.
+7. **Implemented here:** clear history and batch download deletion use result-driven confirmation state. **Remaining follow-up:** single-item remove, playlist deletion, cache clearing and preference reset still need the same failure-visibility audit.
 8. Add tests for cancel/no mutation, confirm once, repeated tap, active job, partial file, filesystem/DB failure, stale row, process restart and retry.
 
 **Exit gate:** no user-triggered destructive operation silently fails; all success/failure paths have test evidence.
