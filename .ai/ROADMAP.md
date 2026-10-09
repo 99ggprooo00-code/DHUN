@@ -1,5 +1,60 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/90cb6d2c-dhun` — the deployed site's dead links, and "See the interface" pointing at the real thing (2026-10-09)
+
+Updated **2026-10-09** · fixed session branch `arena/90cb6d2c-dhun` · branch
+point and GitHub `main` at boot **`8b35dcf1c9a6808ed6720ff44179d72bf4e2cc96`**
+(PR #145 merge). Working tree clean at boot.
+
+**User direction for this session (verbatim, 2026-10-09):** make the web app
+the destination of the site's "See the interface" call to action, make all the
+other buttons work, and improvise the overall website — autonomously, with the
+session ending in a merged PR.
+
+### Recon (every line read from a tool output)
+
+| Fact | State | Evidence |
+|---|---|---|
+| Branch / tree | `arena/90cb6d2c-dhun`, clean at boot | `git status --short`, `git branch --show-current` |
+| Clone | **shallow** (`git rev-list --count HEAD` → 1) | `git rev-list --count HEAD` |
+| Python suite at boot | **295 tests, 0 failures** | `python3 -m unittest discover -s scripts -p 'test_*.py'` → `Ran 295 tests … OK` |
+| `app-web` Node suite | **61 pass / 0 fail**; build 17 files, 165,921 B | `cd app-web && npm test`, `node tools/build.mjs` |
+| Site build | `minified: saved 53466 bytes`; 5 files, 0.16 s; `verify-minify` OK (53,616 B) | `npm ci`, `npm run build`, `node tools/verify-minify.mjs` |
+| Honesty + quality gates | claims OK (8 forbidden-claim, 3 caveat, 5 digest, 12 telemetry rules); **29 quality checks** | `python3 scripts/website_claims.py website/dist`, `…/website_quality.py website/dist` |
+| Drift | a fresh build leaves `website/dist` byte-identical to the committed mirror | `git status --porcelain -- website/dist` empty |
+| Pages | `build_type=workflow`, `status=built`, source `main:/` | `gh api repos/99ggprooo00-code/DHUN/pages` |
+| `main` CI at boot (run 37849181…) | CI · Build APK · test-release · website **all success** on `8b35dcf` | `gh run list --branch main` |
+| Canonical URL | serves the real site (fetched live) | `fetch_page https://99ggprooo00-code.github.io/DHUN/` |
+| Open PRs | **#144** (retitled SUPERSEDED, head `arena/5defb1ff-dhun`) and **#54** (ADR-007 research, out of scope) | `gh pr list --state open` |
+
+**The finding that orders this session: every internal navigation link on the
+deployed site is dead.** The site is a GitHub **project** page, published at
+the sub-path `https://99ggprooo00-code.github.io/DHUN/`, but the built HTML
+uses **root-absolute** hrefs (`/`, `/features/`, `/ui/`). A browser resolves
+those against the *origin*, so the live nav — the wordmark, "Features",
+"Interface", the "See the interface" CTA and the footer's "Features"/"Interface"
+— all point at `https://99ggprooo00-code.github.io/features/` and friends:
+**verified 404** (`fetch_page https://99ggprooo00-code.github.io/ui/` →
+"Site not found"). No gate could see it: the CI browser and Lighthouse jobs
+serve the build at a local origin's **root**, where root-absolute links happen
+to work, and the served-job's link resolver joins `base + href` as *strings*
+(`…/DHUN` + `/ui/`), which is not how a browser resolves.
+
+### What this session changes (working through it; statuses below are live)
+
+| # | Item | Status |
+|---|---|---|
+| W1 | **Fix the deployed link structure.** One `path` value in `site.js` prefixes every internal link (`/DHUN/…`); the quality checker resolves and asserts the base path instead of the root; the smoke test resolves links the way a browser does; CI serves the site under the real `/DHUN/` sub-path so browser and Lighthouse measure the structure a visitor gets. | in flight |
+| W2 | **Deploy `app-web` at `/app/` through the site workflow** (the single owner of the Pages artifact) and point the primary CTA "See the interface" at the live interface. ADR-008 gets a deployment amendment superseding B3 row 15 ("unlinked from the marketing site") — that was the previous session's placeholder decision, and the user's direction now is the decision. The web app keeps its `noindex` and its on-page honesty notices. | pending |
+| W3 | **Every button on the site resolves.** Full link audit over the built pages under the `/DHUN/` base, asserted by the static gates and by the served job (marketing routes **and** `/app/`). | pending |
+| W4 | **Honest copy around the live interface** (what the CTA delivers, what it does not), docs, verification record, CHANGELOG. | pending |
+
+Boundaries unchanged: no backend, no proxy, no fourth marketing route (the
+web app is not a marketing route — it is the mirror, `noindex`, linked from
+the CTA), no app-code changes, the four app workflows untouched.
+
+---
+
 ## Session `arena/967513fd-dhun` — the app's interface in a browser, and the harness bug that was hiding measurements (2026-10-09)
 
 Updated **2026-10-09** · fixed session branch `arena/967513fd-dhun` · branch point
