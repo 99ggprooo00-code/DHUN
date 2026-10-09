@@ -92,7 +92,12 @@ process.on("uncaughtException", (error) => {
   try {
     appendFileSync(SUMMARY, `\n**UNCAUGHT EXCEPTION (process level):** ${where}\n`);
   } catch {
-    /* the summary is gone; the stderr line below is all that remains */
+    /* the summary is gone; the lines below are all that remain */
+  }
+  try {
+    annotate("error", "crash", `uncaught exception killed the run: ${where}`);
+  } catch {
+    /* the annotation channel is gone too */
   }
   console.error(`UNCAUGHT EXCEPTION: ${where}`);
   throw error; // keep the crash semantics; the record above already exists
@@ -160,13 +165,21 @@ function annotate(level, title, message) {
 // environment can read. Everything is printed to stdout in full and the tail
 // of this script emits one annotation per category.
 // Findings are still *collected* for the packed annotations, but each one is
-// also written to the step summary the moment it happens, so a process that
-// dies part-way through (or at the very end) leaves a growing, readable
-// record instead of none at all.
+// also written to the step summary and emitted as an annotation the moment
+// it happens. The packed emission at the tail remains the full report; the
+// immediate ones exist because the job log is not retrievable from the
+// sandbox that maintains this repository, and a process that dies before the
+// tail (observed on three consecutive runs, 2026-10-09) must not get to
+// decide which problems are on record.
 function fail(title, message) {
   const entry = `${title}: ${message}`;
   failures.push(entry);
   summaryLine(`- ${entry}`);
+  try {
+    annotate("error", "problem", clip(entry, MESSAGE_BUDGET));
+  } catch {
+    /* the summary line above already recorded it */
+  }
 }
 
 function record(title, message) {
@@ -1578,8 +1591,14 @@ try {
     summaryLine(`- check started: **${name}**`);
     await guard(name, run);
     summaryLine(`- check finished: ${name}`);
+    // One short progress annotation per check. The API view caps annotations
+    // per level, so these are deliberately minimal: they exist to answer
+    // "how far did the run get?" when the process dies before the packed
+    // report is emitted (three consecutive runs did, 2026-10-09).
+    annotate("notice", "progress", `check finished: ${name} (${failures.length} problem(s) so far)`);
   }
   summaryLine(`\nAll ${CHECKS.length} checks finished; emitting the packed report.\n`);
+  annotate("notice", "progress", `all ${CHECKS.length} checks finished — emitting the packed report`);
 } catch (error) {
   fail("browser launch", `${error && error.message ? error.message : error}`);
 } finally {
@@ -1623,4 +1642,12 @@ try {
     console.error(failures.map((line) => `  - ${line}`).join("\n"));
     process.exitCode = 1;
   }
+  // The last thing the script ever writes: without this marker in the
+  // annotations, a run that reached the end of the script and then died is
+  // indistinguishable from one that never got here.
+  annotate(
+    "notice",
+    "progress",
+    `script finished cleanly: ${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s), exit ${process.exitCode ?? 0}`,
+  );
 }
