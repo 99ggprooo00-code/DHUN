@@ -30,14 +30,19 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   site is a project page at `…/DHUN/` but its links were root-absolute, so a
   browser resolved them at the origin root — a different, empty site (verified
   live: the nav 404'd while every local gate was green, because CI served the
-  build at a root and the smoke test joined `base + href` as strings). All
-  internal links now carry the base path from one value in
-  `website/src/_data/site.js`; a new quality rule fails any internal link that
-  forgot it; the smoke test now resolves links against the origin like a
-  browser (pinned by a test on the exact shape of the bug); and the browser and
-  Lighthouse jobs serve the build under the published `/DHUN/` sub-path, where
-  all three routes measured 100/100/100/100 at `requests=1` (website run
-  37863859204).
+  build at a root and the smoke test joined `base + href` as strings). The
+  shipped fix (PR #149, merged mid-session with this PR's mirror work): every
+  internal link in the site sources routes through the `sitePath` filter —
+  the committed `website/dist` stays rooted, the target of every local gate,
+  while the workflow builds a second, `/DHUN`-prefixed Pages artifact and
+  verifies every prefixed link resolves, including the CTA's. The quality rule
+  `root_relative_violations` fails any internal link that is not rooted in the
+  committed tree (a prefixed link would 404 locally and double-prefix on the
+  host); the smoke test resolves served links against the origin the way a
+  browser does, pinned by a test on the exact shape of the bug; and all three
+  routes measured 100/100/100/100 at `requests=1` (website run 37863859204,
+  taken on this session's first-attempt prefixed build — the diagnosis that
+  ordered the fix is unchanged).
 - **Added: the interface mirror is published and linked.** `app-web/` deploys
   at `/app/` through the site workflow (which stays the single owner of the
   Pages artifact), the site's primary call to action "See the interface" and
@@ -69,6 +74,23 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   `text-overflow: ellipsis` have no effect on non-replaced inline boxes —
   dead CSS that also let the two lines flow as one. Both are now `display:
   block` (stacked, clipping, like the Android TrackRow).
+- **Fixed: the track rows' overflow was escaped markup, not layout.** The
+  `display: block` fix above shipped and the *identical* 491 px overflow came
+  back — and the spilling row's only element child was the container itself,
+  so the CSS theory was dead. Rendering the templates in Node showed why: the
+  `html` tag in `app-web/src/js/dom.js` escapes every interpolated value not
+  wrapped in `raw()`, and thirteen nested templates in
+  `app-web/src/js/views.js` (plus one `Array.join("")` coercion in
+  `loadingState`) interpolated plain, so their markup rendered as a visible
+  text node — including the track row's overflow button, which had never
+  existed in the DOM. The escaped markup string *was* the 491 px
+  non-breaking run; the same bug class had silently text-ified the
+  error/empty states, section hints, search result grids, the playlists list,
+  the downloads notice and the artist albums grid. All thirteen sites now
+  wrap their nested templates in `raw()` (the convention already used at sixty
+  other interpolation points), and `app-web/tests/escaping.test.mjs` renders
+  every view in Node and fails on any escaped angle bracket — the bug class
+  is gated without a browser.
 - **Added: a CI evidence channel that survives a dying run.** The browser
   job's findings are now written to the step summary and emitted as
   annotations as they happen (plus per-check progress and a final

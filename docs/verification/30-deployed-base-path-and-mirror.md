@@ -129,3 +129,34 @@ the genuine findings above all along.
   dependency.
 - **Lighthouse/axe scores for the mirror** — deliberately not run (it is a JS
   application, not a marketing route; see `.ai/KNOWN_LIMITATIONS.md`).
+
+## Amendment (2026-10-09, later in the same session): the shipped mechanism
+
+Mid-session, PR #149 merged to `main` carrying a fix for this same bug with a
+cleaner mechanism than this record's item 1. This branch absorbed it (merge
+`01f66ab`) and the *shipped* design is:
+
+| # | Item (as shipped) | State | Evidence |
+|---|---|---|---|
+| A1 | Every internal `href` in the `.njk` sources routes through the `sitePath` filter (`website/eleventy.config.js`); the filter is a no-op unless `DHUN_SITE_PATH_PREFIX` is set | **verified** | rooted build: `grep` of built pages shows `href="/"`, `href="/app/"`, `href="/features/"`, `href="/ui/"` — zero prefixes in the committed tree |
+| A2 | The committed `website/dist` is the **rooted** build (drift-checked, the target of every local gate); the workflow builds a second, `/DHUN`-prefixed artifact for the Pages deploy | **verified** | two builds of the same sources (env set/unset); the prefixed build emits `href="/DHUN/"` … `href="/DHUN/app/"` |
+| A3 | The workflow's "Verify GitHub Pages internal links" step runs against the **assembled** `pages-deploy` (prefixed site + mirror at `app/`), so the CTA's `/DHUN/app/` link is proven to resolve, not just be prefixed | **verified locally, CI-verification pending on the merge head** | local simulation of the exact step: 4 site files pass with every prefixed link resolving; `app/index.html` and `app/js/main.js` present in the assembled tree |
+| A4 | The local test artifact (`dhun-site`) is the rooted site + mirror at `/app/`; the browser and Lighthouse jobs serve it at a root and measure `/`, `/features/`, `/ui/` and `/app/` | **verified locally, CI-verification pending** | workflow reads back as wired (YAML parsed, artifact names checked); layout/behaviour is URL-structure-invariant — the prefix is a byte-level href transform |
+| A5 | The committed-build rule flips to `root_relative_violations`: internal links must be rooted; a prefixed or protocol-relative link in the tree now fails | **verified** | mutation tests: `href="/DHUN/features/"` and `href="//example.com/x"` fail, rooted links pass; 312/312 Python suite green |
+
+Consequence for this record's items 1 and 3: they described the *first*
+attempt (a `path` value spelling the prefix into the committed build and a
+matching `base_path_violations` rule). The diagnosis in this record's opening
+table is unchanged and is what ordered the fix; the mechanism shipped is
+#149's, and the mirror work (items 2, 5, 6) now rides on it: the mirror is
+assembled into **both** artifacts, rooted next to the site for local tests and
+prefixed at `/DHUN/app/` for the deploy.
+
+The phone-viewport overflow that blocked the mirror's browser gate on the
+earlier heads was not layout at all: thirteen nested templates in
+`app-web/src/js/views.js` were interpolated without `raw()`, so the
+`html` tag escaped their markup and the track-row overflow button rendered
+as a text node — the escaped string was the 491 px run. Fixed in `fc0bfe7`
+(`raw()` at all thirteen sites, `loadingState`'s `Array.join` coercion
+included) with the regression guard `app-web/tests/escaping.test.mjs`
+(every view rendered in Node, failing on any escaped angle bracket).
