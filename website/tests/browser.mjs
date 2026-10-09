@@ -64,6 +64,51 @@ import {
 
 import { MESSAGE_BUDGET, clipMessage, packReport, renderAllReports } from "./annotation-report.mjs";
 
+// ---------------------------------------------------------------------------
+// immediate evidence channel
+// ---------------------------------------------------------------------------
+// The summary and the annotations used to be written only at the very end of
+// the run. Two consecutive runs (website 37864947840 and 37870564524)
+// completed the whole suite — the screenshot artifacts prove it — and then
+// the process died before the final emission: zero annotations, an empty
+// step summary, and the job log is not retrievable from the sandbox that
+// maintains this repository. A dying process must not get to decide what is
+// recorded: every finding is now appended to the step summary the moment it
+// happens, and process-level handlers put JS-level escapes on the record.
+// (An external SIGKILL is still uncatchable; if the summary stops
+// mid-run, that is the verdict.)
+const SUMMARY = process.env.GITHUB_STEP_SUMMARY || "";
+let summaryBroken = false;
+function summaryLine(line) {
+  if (!SUMMARY || summaryBroken) return;
+  try {
+    appendFileSync(SUMMARY, `${line}\n`);
+  } catch {
+    summaryBroken = true;
+  }
+}
+process.on("uncaughtException", (error) => {
+  const where = (error && error.stack ? error.stack : String(error)).replace(/\s+/g, " ").slice(0, 800);
+  try {
+    appendFileSync(SUMMARY, `\n**UNCAUGHT EXCEPTION (process level):** ${where}\n`);
+  } catch {
+    /* the summary is gone; the stderr line below is all that remains */
+  }
+  console.error(`UNCAUGHT EXCEPTION: ${where}`);
+  throw error; // keep the crash semantics; the record above already exists
+});
+process.on("unhandledRejection", (reason) => {
+  const where = (reason && reason.stack ? reason.stack : String(reason)).replace(/\s+/g, " ").slice(0, 800);
+  try {
+    appendFileSync(SUMMARY, `\n**UNHANDLED REJECTION (process level):** ${where}\n`);
+  } catch {
+    /* recorded on stderr instead */
+  }
+  console.error(`UNHANDLED REJECTION: ${where}`);
+  // Deliberately not rethrown: the run continues and the rejection is on
+  // record. A rejection that would have killed the process is now a finding.
+});
+
 const BASE = process.env.SITE_BASE || "http://127.0.0.1:8080";
 // The routes are the site's *published* paths: the host serves the site under
 // the /DHUN/ sub-path (project page), and the workflow serves the build the
@@ -114,16 +159,26 @@ function annotate(level, title, message) {
 // annotation would push the real numbers out of the only channel this
 // environment can read. Everything is printed to stdout in full and the tail
 // of this script emits one annotation per category.
+// Findings are still *collected* for the packed annotations, but each one is
+// also written to the step summary the moment it happens, so a process that
+// dies part-way through (or at the very end) leaves a growing, readable
+// record instead of none at all.
 function fail(title, message) {
-  failures.push(`${title}: ${message}`);
+  const entry = `${title}: ${message}`;
+  failures.push(entry);
+  summaryLine(`- ${entry}`);
 }
 
 function record(title, message) {
-  measurements.push(`${title}: ${message}`);
+  const entry = `${title}: ${message}`;
+  measurements.push(entry);
+  summaryLine(`· ${entry}`);
 }
 
 function warn(title, message) {
-  warnings.push(`${title}: ${message}`);
+  const entry = `${title}: ${message}`;
+  warnings.push(entry);
+  summaryLine(`! ${entry}`);
 }
 
 const category = (title) => title.split(/\s+[/@]/)[0].trim() || title;
@@ -1518,9 +1573,13 @@ const CHECKS = [
 let browser;
 try {
   browser = await chromium.launch();
+  summaryLine(`\n## Browser measurements — progress\n`);
   for (const [name, run] of CHECKS) {
+    summaryLine(`- check started: **${name}**`);
     await guard(name, run);
+    summaryLine(`- check finished: ${name}`);
   }
+  summaryLine(`\nAll ${CHECKS.length} checks finished; emitting the packed report.\n`);
 } catch (error) {
   fail("browser launch", `${error && error.message ? error.message : error}`);
 } finally {
@@ -1539,10 +1598,17 @@ try {
   }
   // The summary and the annotations are emitted even when a check above threw:
   // the annotations are the only channel this repository can read from CI, so
-  // losing them is losing the evidence itself.
-  console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
-  console.error(measurements.map((line) => `  · ${line}`).join("\n"));
-  if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
+  // losing them is losing the evidence itself. The stdout writes are guarded
+  // too: if the runner's log pipe is already gone, emitAnnotations() must
+  // still run, because the summary file (written as findings happen) and the
+  // annotations are what remain.
+  try {
+    console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
+    console.error(measurements.map((line) => `  · ${line}`).join("\n"));
+    if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
+  } catch {
+    /* stdout is gone; the summary and the annotations carry the record */
+  }
   try {
     emitAnnotations();
   } catch (error) {
