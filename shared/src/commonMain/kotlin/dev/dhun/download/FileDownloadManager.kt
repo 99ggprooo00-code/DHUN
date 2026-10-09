@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -101,10 +102,15 @@ class FileDownloadManager(
     }
 
     override suspend fun clearAll(): Unit {
-        jobsLock.withLock {
-            jobs.values.forEach { it.cancel() }
-            jobs.clear()
+        // Stop and join workers before deleting their files. Cancelling without
+        // joining allowed a worker to finish a write after the cleanup passed,
+        // leaving a partial file behind after the UI reported success.
+        val jobsToStop = jobsLock.withLock {
+            jobs.values.toList().also { jobs.values.forEach { job -> job.cancel() } }
+                .also { jobs.clear() }
         }
+        jobsToStop.joinAll()
+
         repository.getAll().forEach { row ->
             storage.delete(row.localAudioPath)
             row.localArtworkPath?.let { art -> storage.delete(art) }
