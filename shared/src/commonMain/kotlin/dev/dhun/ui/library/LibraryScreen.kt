@@ -704,7 +704,7 @@ private fun DownloadsTab(
     storage: dev.dhun.presentation.library.StorageSummary,
     onPlay: (Track) -> Unit,
     onRemove: (String) -> Unit,
-    onRemoveBatch: (Collection<String>) -> Unit,
+    onRemoveBatch: suspend (Collection<String>) -> Unit,
     onClearAll: () -> Unit,
     clearState: ClearDownloadsUiState,
     onConsumeClearResult: () -> Unit,
@@ -719,6 +719,9 @@ private fun DownloadsTab(
     var showBatchConfirm by remember { mutableStateOf(false) }
     // Selection lives across LIST/MANAGE so batch delete targets the same set.
     val selected = remember { mutableStateOf(setOf<String>()) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var isDeletingSelected by remember { mutableStateOf(false) }
+    var batchDeleteError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(clearState.succeeded) {
         if (clearState.succeeded) {
             showClearConfirm = false
@@ -857,11 +860,28 @@ private fun DownloadsTab(
     if (showBatchConfirm) {
         DeleteSelectedConfirmDialog(
             count = selected.value.size,
-            onDismiss = { showBatchConfirm = false },
+            isDeleting = isDeletingSelected,
+            errorMessage = batchDeleteError,
+            onDismiss = { if (!isDeletingSelected) showBatchConfirm = false },
             onConfirm = {
-                onRemoveBatch(selected.value.toList())
-                selected.value = emptySet()
-                showBatchConfirm = false
+                if (!isDeletingSelected) {
+                    isDeletingSelected = true
+                    batchDeleteError = null
+                    val idsToDelete = selected.value.toList()
+                    scope.launch {
+                        try {
+                            onRemoveBatch(idsToDelete)
+                            selected.value = emptySet()
+                            showBatchConfirm = false
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            batchDeleteError = "Could not delete all selected downloads. Your remaining selection is available to retry."
+                        } finally {
+                            isDeletingSelected = false
+                        }
+                    }
+                }
             },
         )
     }
@@ -1321,8 +1341,14 @@ private fun DownloadRow(
 }
 
 @Composable
-private fun DeleteSelectedConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit, count: Int) {
-    Dialog(onDismissRequest = onDismiss) {
+private fun DeleteSelectedConfirmDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    count: Int,
+    isDeleting: Boolean,
+    errorMessage: String?,
+) {
+    Dialog(onDismissRequest = { if (!isDeleting) onDismiss() }) {
         GlassCard(
             modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
             shape = DhunShapes.large,
@@ -1334,11 +1360,17 @@ private fun DeleteSelectedConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> 
                 Text("Delete $count download${if (count == 1) "" else "s"}?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.sm))
                 Text("Selected tracks and their downloaded files will be removed from this device. This can't be undone.", style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                    Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
+                }
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
+                    DhunTextButton(onClick = onDismiss, enabled = !isDeleting) { Text("Cancel") }
                     Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                    DhunButton(onClick = onConfirm) { Text("Delete") }
+                    DhunButton(onClick = onConfirm, enabled = !isDeleting) {
+                        Text(if (isDeleting) "Deleting…" else if (errorMessage != null) "Try again" else "Delete")
+                    }
                 }
             }
         }
@@ -1411,9 +1443,13 @@ private fun HistoryTab(
     onPlayEntry: (HistoryEntry) -> Unit,
     onPlayDay: (HistoryDay, Int) -> Unit,
     onRemoveEntry: (Long) -> Unit,
-    onClearAll: () -> Unit,
+    onClearAll: suspend () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showClearConfirm by remember { mutableStateOf(false) }
+    val historyScope = androidx.compose.runtime.rememberCoroutineScope()
+    var isClearingHistory by remember { mutableStateOf(false) }
+    var clearHistoryError by remember { mutableStateOf<String?>(null) }
     if (groupedHistory.isEmpty()) {
         EmptyView(
             title = "No history yet",
@@ -1422,7 +1458,6 @@ private fun HistoryTab(
         )
         return
     }
-    var showClearConfirm by remember { mutableStateOf(false) }
     val nowMs = dev.dhun.data.EpochClock.System.nowMs()
     val offsetMs = currentUtcOffsetMs()
 
@@ -1466,8 +1501,27 @@ private fun HistoryTab(
     }
     if (showClearConfirm) {
         ClearHistoryConfirmDialog(
-            onDismiss = { showClearConfirm = false },
-            onConfirm = { onClearAll(); showClearConfirm = false },
+            isClearing = isClearingHistory,
+            errorMessage = clearHistoryError,
+            onDismiss = { if (!isClearingHistory) showClearConfirm = false },
+            onConfirm = {
+                if (!isClearingHistory) {
+                    isClearingHistory = true
+                    clearHistoryError = null
+                    historyScope.launch {
+                        try {
+                            onClearAll()
+                            showClearConfirm = false
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            clearHistoryError = "Could not clear playback history. Please try again."
+                        } finally {
+                            isClearingHistory = false
+                        }
+                    }
+                }
+            },
         )
     }
 }
@@ -1522,8 +1576,13 @@ private fun HistoryRow(
 }
 
 @Composable
-private fun ClearHistoryConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
+private fun ClearHistoryConfirmDialog(
+    isClearing: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Dialog(onDismissRequest = { if (!isClearing) onDismiss() }) {
         GlassCard(
             modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
             shape = DhunShapes.large,
@@ -1535,11 +1594,17 @@ private fun ClearHistoryConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Un
                 Text("Clear history?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.sm))
                 Text("This removes all playback history. Favorites and playlists stay.", style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                    Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
+                }
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
+                    DhunTextButton(onClick = onDismiss, enabled = !isClearing) { Text("Cancel") }
                     Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                    DhunButton(onClick = onConfirm) { Text("Clear") }
+                    DhunButton(onClick = onConfirm, enabled = !isClearing) {
+                        Text(if (isClearing) "Clearing…" else if (errorMessage != null) "Try again" else "Clear")
+                    }
                 }
             }
         }
