@@ -1,0 +1,88 @@
+# 30 — The deployed base path, and the interface mirror at `/app/`
+
+Session `arena/90cb6d2c-dhun`, 2026-10-09. Branch point and GitHub `main` at
+boot `8b35dcf1c9a6808ed6720ff44179d72bf4e2cc96` (PR #145 merge).
+
+Status vocabulary: **verified** = read out of a tool output in this session;
+**not verified** = explicitly unchecked; **expected** = plausible but unchecked.
+
+## The bug: every internal link on the deployed site was dead
+
+The site is a GitHub **project** page: its documents live at
+`https://99ggprooo00-code.github.io/DHUN/`, not at the origin's root. The
+built pages used root-absolute `href`s (`/`, `/features/`, `/ui/`), which a
+browser resolves against the origin — a different, empty site.
+
+| Fact | State | Evidence (this session) |
+|---|---|---|
+| The live nav 404s | **verified** | `fetch_page https://99ggprooo00-code.github.io/ui/` → GitHub Pages "Site not found" (404); `…/DHUN/` → the real site |
+| CI could not see it | **verified** | browser/Lighthouse jobs serve the build at a local origin **root** (where root-absolute links work); the served job's resolver did `f"{base}{href}"` — string join, not URL resolution |
+
+Three independent gates all missed it. That is the incident's real lesson: a
+check that serves the artifact at a different URL structure than the host
+measures a site that does not exist, and string-joining URLs in a test is a
+test of the test.
+
+## What this session changed, and the evidence
+
+| # | Item | State | Evidence |
+|---|---|---|---|
+| 1 | One `path` value (`/DHUN`) in `website/src/_data/site.js` prefixes every internal link (wordmark, nav, CTAs, footer, 404, `/ui/` surface links) | **verified** | `grep` of the built pages: zero root-absolute internal `href`s; all prefixed |
+| 2 | `_resolve_internal` strips the base path before mapping onto the deploy tree, and resolves `/app/…` against `app-web/src` (the mirror's build is a byte copy, so source == deploy) | **verified** | `BasePath` test class (7 tests) incl. dead/valid `/app/` links |
+| 3 | New quality rule `base_path_violations`: any internal link without the prefix fails the build | **verified** | mutation: wordmark back to `href="/"` → red on two rules (`missing the /DHUN base path` + `current-page marker points at /, not at … /DHUN/`); green on revert |
+| 4 | Smoke test resolves served links against the origin with `urllib.parse.urljoin`, like a browser | **verified** | the fixed check run against the **old** bytes served under `/DHUN/`: `/: served page links /features/, which returns HTTP 404` (the old string-join logic passed the same bytes); pinned by `RootRelativeResolution` (3 tests) |
+| 5 | CI serves under the published `/DHUN/` sub-path (browser + Lighthouse jobs) | **CI-verified** | website run **37863859204** (head `8e60298`): all jobs green; Lighthouse `/DHUN/` **100/100/100/100** (samples 95·100·100, median-gated) · `/DHUN/features/` **100/100/100/100** · `/DHUN/ui/` **100/100/100/100`, all `TBT=0ms · CLS=0.000 · requests=1`, 52.0/48.7/50.2 kB; browser job: current-page markers `→ /DHUN/…` on all three routes, touch targets smallest standalone **44 px** at all nine viewports, skip link + Enter-to-`<main>` + focus rings clean |
+| 6 | `app-web` deploys at `/app/` through the site workflow (single owner of the Pages artifact, no second workflow); ADR-008 amendment 2026-10-09 (2) records the decision and supersedes B3 row 15 | **verified locally, served-verification pending merge** | local deploy simulation: assembled tree (site + 17-file mirror) served under `/DHUN/` — `/` 52,233 B · `/features/` 48,513 B · `/ui/` 50,127 B · `/app/` 200 (1,747 B shell) · `/app/js/main.js` 200 (27,789 B) · `/app/css/tokens.css` 200 (16,559 B) · `/app/css/app.css` 200 (33,876 B); `OK: 3 served route(s) … and the mirror at /app/ serves the application shell with its CSP intact.` |
+| 7 | Primary CTA "See the interface" + 404's button → `/app/`; `/ui/`'s primary CTA → "Open the live interface"; one honest line under the hero CTA (worded around the honesty contract's forbidden claims) | **verified** | `grep` of built pages; claims checker green on the copy (8 forbidden-claim rules) |
+| 8 | `browser` job: guarded Playwright pass on `/DHUN/app/` (both schemes, 1280×800 + 390×844): boot, engineering-preview notice, nav, no unhandled errors, no overflow; which catalogue answered is recorded, not gated | **verified — and it did its job** | first run (website run 37864321503, head `6376b6d`) **failed**: `#app` empty, notice absent, 0 nav items, all four viewport/scheme combinations, no unhandled or console error — the app had never booted in a real browser (incident below); green run on the fix head closes this row |
+| 9 | `served` job: fetches `/app/` and asserts the shell, `noindex`, strict CSP, and the module + stylesheets over the wire | **verified locally** (item 6); served execution happens after the merge to `main` | `ServedWebApp` test class (5 tests) offline |
+
+### Mutation proofs (break → red → revert → green)
+
+1. Old dist (pre-fix) served under `/DHUN/` through the fixed smoke check →
+   red, naming the dead links; the old logic on the same bytes → green.
+2. Wordmark mutated back to `href="/"` → red on `base_path_violations` and the
+   published-href navigation rule; revert → 30/30 checks green.
+3. `/DHUN/app/js/nope.js` as a link → red (`dead internal link` + `names a
+   file the build does not ship`); `/DHUN/app/` → resolves.
+4. Rename `/app/js/main.js` away in the assembled tree → smoke check red with
+   `the page's js/main.js returns HTTP 404`; restore → green.
+5. Delete the top-level `boot();` call from `app-web/src/js/main.js` →
+   `test_the_entry_module_actually_boots` red; restore → green.
+
+## The incident the new check caught: the mirror never booted
+
+The first real browser measurement of `/DHUN/app/` (website run
+37864321503, head `6376b6d`) reported, on all four viewport/scheme
+combinations: `#app` empty, the engineering-preview notice absent, zero nav
+items — and **no unhandled error and no console error**. The failure mode is
+silent by construction: `src/index.html` loads `main.js` as the page's only
+script, and `main.js` *defined and exported* `boot` without ever calling it.
+A module that exports its entry point but has no top-level side effect loads
+cleanly, defines everything, and paints nothing. Nothing previously could see
+this — the 61 DOM-stub boot tests import the module and call `boot`
+themselves through `tests/helpers/boot-harness.mjs`, the module graph is
+valid, there is no error of any kind, and no static check can distinguish
+"booted" from "exported". This is exactly the failure class record 29 called
+unprovable without a browser, and the first browser run found it.
+
+Fix: a top-level `boot();` in `main.js` (the stub harness's explicit `boot()`
+then simply re-renders idempotently — all 61 tests green), plus a Python
+contract test in `scripts/test_app_web.py`
+(`test_the_entry_module_actually_boots`) that asserts the call exists, so the
+regression is caught in the browser-free CI step even before a browser
+exists. The follow-up run on the fix head is the first green browser
+measurement of the mirror.
+
+## Not verified (this session)
+
+- The **served public origin** at `/app/` — the `served` job runs only after
+  the merge to `main`; until then the deployment claim rests on the assembled
+  bytes above, which are byte-identical to what the deploy job uploads.
+- A **human looking at the mirror**. First-ever browser render is CI's
+  Chromium; the captures are CI artifacts (`browser-evidence`), never
+  committed (the repository contains no image files on purpose).
+- **Audio playback from a browser origin** — B1's finding stands; the labelled
+  clock and the on-page notice are the honest state, unchanged by deployment.
+- **Lighthouse/axe scores for the mirror** — deliberately not run (it is a JS
+  application, not a marketing route; see `.ai/KNOWN_LIMITATIONS.md`).

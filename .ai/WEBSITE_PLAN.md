@@ -451,6 +451,50 @@ route**, ratcheted. Reversal cost: delete the block, the check and its
 registration, the five tests; ~10 minutes, and the readers who asked for more
 contrast are back to 4.83:1.
 
+### Dated amendment — 2026-10-09 (session `arena/90cb6d2c-dhun`): the deployed base path, and the mirror at `/app/`
+
+Read the evidence in `docs/verification/30-deployed-base-path-and-mirror.md`;
+this is the decision record.
+
+**D13 — the site is served under a base path, and that is a rule now.** The
+site is a project page at `https://99ggprooo00-code.github.io/DHUN/`, but the
+built pages shipped root-absolute internal links, which a browser resolves at
+the origin root — a different, empty site. The deployed nav 404'd while every
+local gate stayed green (verified live 2026-10-09). One `path` value in
+`website/src/_data/site.js` now prefixes every internal link; the quality
+checker gains `base_path_violations` (any internal link without the prefix
+fails) and `_resolve_internal` strips the prefix before mapping onto the
+deploy tree; the smoke test resolves served links with `urljoin` against the
+origin instead of string-joining `base + href`; and the browser and Lighthouse
+jobs serve the build under the published `/DHUN/` sub-path so they measure the
+URL structure a visitor gets. The "exactly three routes" information
+architecture is unchanged: the routes are the same, only their *published*
+form gained the prefix. Evidence: website run 37863859204 — all three routes
+100/100/100/100 at `requests=1` on the prefixed paths.
+
+**D14 — the interface mirror deploys at `/app/`, and the CTA reaches it.**
+`app-web/` (the app's interface in a browser, ADR-008 B2.2) is deployed to the
+same Pages origin under `/app/` by the marketing workflow, which stays the
+single owner of the Pages artifact — no second workflow, no race. Its build is
+a byte copy of `app-web/src`, so the deploy assembles it without a bundler and
+the Python-only link checker resolves `/app/…` against the source tree. The
+site's primary call to action "See the interface" (and the 404's button) now
+points at the live mirror instead of the drawn pages; `/ui/` keeps its design-
+system role and links the live interface too; one line under the hero CTA
+states what the CTA delivers and what it does not (audio playback from this
+origin is unproven; the page says so). The mirror stays `noindex` and out of
+the sitemap: a preview, not a marketing route, and the three-route
+information architecture of *this* site is untouched. Its first browser
+measurements run in the `browser` job (boot, honesty notice, no unhandled
+errors, no overflow — both schemes, desktop and phone; which catalogue
+answered is recorded, not gated), and the `served` job re-asserts the shell,
+`noindex`, strict CSP and the module + stylesheets on the public origin after
+each publish. ADR-008 amendment 2026-10-09 (2) is the authority; it supersedes
+that amendment's B3 row 15 ("unlinked from the marketing site"), which was a
+placeholder for exactly this user decision. Quality gates: **30** static
+checks (was 29, `internal links carry the base path` added); the honesty
+contract is unchanged and still green on the new copy.
+
 ## 11. Work plan, execution and honest status
 
 | Phase | Deliverable | Status |

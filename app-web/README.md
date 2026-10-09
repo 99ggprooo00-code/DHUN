@@ -53,8 +53,12 @@ a strict CSP, and the honesty notices.
 - **No verification of layout or paint.** No browser exists in this
   environment; `tests/boot.test.mjs` drives the app against a DOM stub, which
   proves wiring, not pixels.
-- **Not deployed.** The marketing workflow owns the single Pages artifact; see
-  `docs/verification/29-web-app-mirror.md`.
+- **Deployed, at `/app/`, under the same origin as the marketing site** —
+  <https://99ggprooo00-code.github.io/DHUN/app/> — by the site workflow, which
+  stays the single owner of the Pages artifact (ADR-008 amendment,
+  2026-10-09 (2); `docs/verification/29-web-app-mirror.md`). It is `noindex`
+  and out of the sitemap: a preview linked from the site's call to action, not
+  a product surface.
 
 ## Layout
 

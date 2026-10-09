@@ -24,6 +24,48 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Website — the deployed site's dead links, and "See the interface" reaches the live interface (2026-10-09, session `arena/90cb6d2c-dhun`)
+
+- **Fixed: every internal navigation link on the deployed site was dead.** The
+  site is a project page at `…/DHUN/` but its links were root-absolute, so a
+  browser resolved them at the origin root — a different, empty site (verified
+  live: the nav 404'd while every local gate was green, because CI served the
+  build at a root and the smoke test joined `base + href` as strings). All
+  internal links now carry the base path from one value in
+  `website/src/_data/site.js`; a new quality rule fails any internal link that
+  forgot it; the smoke test now resolves links against the origin like a
+  browser (pinned by a test on the exact shape of the bug); and the browser and
+  Lighthouse jobs serve the build under the published `/DHUN/` sub-path, where
+  all three routes measured 100/100/100/100 at `requests=1` (website run
+  37863859204).
+- **Added: the interface mirror is published and linked.** `app-web/` deploys
+  at `/app/` through the site workflow (which stays the single owner of the
+  Pages artifact), the site's primary call to action "See the interface" and
+  the 404's button now open the live interface, and the `/ui/` page's primary
+  CTA is "Open the live interface". The hero states what the CTA delivers and
+  what it does not — audio playback from this origin is unproven, and the page
+  says so. ADR-008 amendment 2026-10-09 (2) records the deployment decision and
+  supersedes its B3 row 15.
+- **Added: the mirror gets its first browser measurements and served checks.**
+  The `browser` job runs a guarded Playwright pass on `/app/` (both schemes,
+  desktop and phone: it must boot, carry the engineering-preview notice, throw
+  nothing unhandled, not overflow; which catalogue answered is recorded, not
+  gated), and the `served` job now fetches `/app/` and re-asserts the shell,
+  `noindex`, strict CSP and the module and stylesheets the page depends on.
+- **Fixed: the interface mirror never booted in a real browser — found by its
+  own first browser check.** The new `browser` job's first pass on `/app/`
+  (website run 37864321503) reported `#app` empty on every viewport with no
+  error of any kind: `app-web/src/js/main.js` defined and exported `boot` but
+  never called it, and the page loads that module as its only script — a
+  module with no top-level side effect defines everything and paints nothing,
+  silently. The 61 DOM-stub boot tests could not see it (they import the
+  module and call `boot` themselves). The module now boots itself, and a
+  browser-free contract test asserts the call exists, so the failure mode is
+  gated even before a browser is involved.
+- The deployed page weights moved with the copy: `/` 51,768 → 52,233 B,
+  `/features/` 48,476 → 48,513 B, `/ui/` 49,965 → 50,127 B (uncompressed,
+  measured against the served tree locally; inside the ratchet's 5 %).
+
 ### Accessibility — "increase contrast" now increases contrast (2026-10-08, session `arena/af3e7f66-dhun`)
 
 - The sheet met the 4.5:1 body floor everywhere and stopped there, so a visitor

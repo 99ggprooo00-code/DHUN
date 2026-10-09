@@ -28,18 +28,29 @@ Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
 
 `website/dist/` is a static marketing site for the applications above: three
 routes (`/`, `/features/`, `/ui/`), no client-side JavaScript, no analytics and
-no third-party runtime asset.
+no third-party runtime asset. Its canonical URL,
+<https://99ggprooo00-code.github.io/DHUN/>, is a GitHub Actions deployment
+(`build_type: workflow`; switched from `legacy` by a human on 2026-10-09 — until
+then the URL served Jekyll's rendering of this README, which is why the
+previous version of this section warned against trusting the URL). What to check
+when the serving changes at all: `docs/runbooks/publishing-the-site.md`.
 
-**Where it is served — read this before trusting the URL.** Its canonical URL is
-<https://99ggprooo00-code.github.io/DHUN/>, but as of 2026-10-08 that URL does
-**not** serve this site: Pages is configured `build_type: legacy` / source
-`main:/`, so Jekyll renders *this README* there instead. The site itself is
-built, checked and committed — publishing is one repository setting away, and
-the automation cannot change it (`PUT .../pages` → HTTP 403). Every `website`
-workflow run reports the current `build_type` in its summary and as a warning.
-**Fix: Settings → Pages → Build and deployment → Source → GitHub Actions** — the
-full runbook, with what to check afterwards, is
-`docs/runbooks/publishing-the-site.md`.
+**"See the interface" opens the real interface.** The site's primary call to
+action links to <https://99ggprooo00-code.github.io/DHUN/app/> — the `app-web/`
+mirror running from the same origin (next section) — rather than the
+hand-drawn pages. The line under the button states what it delivers and what
+it does not (audio playback from this origin is unproven; the page says so),
+and the honesty contract forbids the copy from claiming more than that.
+
+**Served under a base path — and that is checked.** The site is a *project*
+page, so its documents live at `/DHUN/...`, not at the origin's root. Every
+internal link therefore carries that prefix (one `path` value in
+`website/src/_data/site.js`); a quality check fails on any internal link that
+forgot it; and the browser and Lighthouse jobs serve the build under the same
+`/DHUN/` sub-path, so they measure the URL structure a visitor gets. The rule
+exists because the prefix was once missing: the whole deployed nav 404'd while
+every local gate stayed green (found 2026-10-09, session
+`arena/90cb6d2c-dhun`).
 
 **It is not a distribution channel.** The site describes the software and shows
 its interface; it does not hand out builds, digests, sizes or installation
@@ -55,9 +66,15 @@ fails the build if a page ever links an artifact directly.
   `/ui/` and 17.4 KB to 12.8 KB on `/404.html`, with one request per route and no
   client-side JavaScript — see
   `docs/verification/23-per-route-css-pruning.md`.
-- Deployment: `.github/workflows/website.yml` publishes the built artifact to
-  GitHub Pages from `main` only; a session branch can build and check but never
-  overwrite the public site.
+- Deployment: `.github/workflows/website.yml` publishes the deploy to GitHub
+  Pages from `main` only — the checked site at the root **plus** the `app-web/`
+  mirror at `/app/` (its build is a byte copy, so the deploy assembles it
+  without a bundler). This workflow stays the single owner of the Pages
+  artifact, so the mirror cannot be published by a racing second workflow; a
+  session branch can build and check but never overwrite the public site.
+  After a publish, the `served` job fetches the live origin and re-runs the
+  honesty contract, every internal link (resolved the way a browser does) and
+  the mirror's shell over the wire.
 - Its claims are enforced by tests, not by review: forbidden claims (iOS, a web
   player, sync, import, FLAC or any bitrate, store channels, unshipped
   platforms), required front-page caveats (rolling unverified build, borrowed
@@ -77,14 +94,43 @@ fails the build if a page ever links an artifact directly.
   640×512 layout viewport (a 1280×1024 window at 200 % zoom) — for overflow,
   touch targets, every tab stop's focus ring, rendered headings, link text,
   contrast in dark and light, `forced-colors: active`, `prefers-contrast: more`,
-  print and reduced motion, in the `browser` job. The decisions behind those
-  checks are pure functions in `website/tests/rules.mjs`, mutation-proven by
-  `node --test` in the build job, where no browser is needed. Lighthouse gates
-  the median of three samples per route in the `lighthouse` job.
+  print and reduced motion, in the `browser` job. The same job carries the
+  mirror's first browser measurements: `/app/` must boot, carry its
+  engineering-preview notice, throw nothing unhandled and not overflow, at
+  desktop and phone widths in both colour schemes. The decisions behind the
+  marketing checks are pure functions in `website/tests/rules.mjs`,
+  mutation-proven by `node --test` in the build job, where no browser is
+  needed. Lighthouse gates the median of three samples per route in the
+  `lighthouse` job.
 - **One request per route.** The stylesheet and the tab icon are inlined (the
   icon as a `data:` URI built from `website/src/assets/dhun-favicon.svg`), so a
   visit fetches exactly one document; a rule asserts the inlined icon is still
   the source file, and another fails on any built file no page references.
+
+## Web preview (`app-web/`)
+
+The app's interface, mirrored in a browser: Home, Search, Library, Settings,
+the mini and full player, queue, LRC lyrics and the 10-band equaliser. It is an
+**engineering preview, not a product surface** — published `noindex` at
+<https://99ggprooo00-code.github.io/DHUN/app/> by the site workflow (ADR-008
+amendment, 2026-10-09 (2)) and linked from the site's primary call to action:
+
+- **No runtime dependency**: vanilla ES modules, two hand-written stylesheets
+  (every colour traced to `DhunAppearance.kt`), icons generated from
+  `DhunIcons.kt`, no framework, no bundler, no CDN.
+- **No audio.** No stream is reachable from this origin, so the transport
+  advances a *labelled clock*: the seek bar, queue, lyrics sync and equaliser
+  all respond, nothing is audible, and a persistent on-page notice says so.
+  Adding a proxy would breach ADR-008 and has not been done.
+- **Sample data, labelled.** The metadata is a fictional bundled catalogue
+  unless the anonymous live source answers; the page says which one served it.
+- The trace is enforced, not conventional: `app-web/tests/*.test.mjs` (61
+  tests, no install) and `scripts/test_app_web.py` (app CI step 1, Node-free)
+  assert the token mirror, the no-third-party-asset rule, `noindex`, the strict
+  CSP and the honesty notices.
+
+Run it locally: `cd app-web && node tools/serve.mjs 4173`, then open
+<http://localhost:4173/>.
 
 ## License
 

@@ -1,5 +1,76 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-09 — the deployed nav that 404'd while every gate was green (session `arena/90cb6d2c-dhun`)
+
+**1. Root-absolute links on a project page: the deployed site's navigation was
+dead, and no check could see it.** The site publishes at
+`https://99ggprooo00-code.github.io/DHUN/` (a project page, sub-path `/DHUN/`),
+but every internal `href` in the built pages was root-absolute (`/`, `/features/`,
+`/ui/`). A browser resolves those against the *origin*, i.e.
+`https://99ggprooo00-code.github.io/features/` — a different, empty site:
+**verified 404** by live fetch. Three independent gates all missed it: the
+browser and Lighthouse jobs serve the build at a local origin's **root**, where
+root-absolute links happen to work; the served job's link resolver did
+`f"{base}{href}"` — string concatenation, not URL resolution — so `/ui/`
+checked as `…/DHUN/ui/` (200) instead of `…/ui/` (404); and the static link
+checker mapped `/ui/` straight onto the dist tree. Fix (all honest, no rule
+loosened): one `path` value in `site.js` prefixes every internal link;
+`_resolve_internal` strips the base path (and resolves `/app/` against
+`app-web/src`, the deploy's byte-identical source); a new `base_path_violations`
+rule fails any internal link missing the prefix; the smoke test resolves with
+`urllib.parse.urljoin` against the origin; CI serves under `/DHUN/`.
+Verification: the fixed smoke check run against the *old* bytes served under
+`/DHUN/` goes red (`links /features/, which returns HTTP 404`) where the old
+logic passed them; a wordmark mutated back to `href="/"` goes red on two rules
+and green on revert; after the fix, website run **37863859204** is green with
+Lighthouse 100/100/100/100 on all three routes at `requests=1`. Lesson: a check
+that serves the artifact at a different URL structure than the host measures a
+site that does not exist; string-joining URLs in a test is a test of the test.
+
+**2. Nunjucks has no ternary operator.** First W1 build died with a parser
+error: the nav used `href="{{ item.external ? item.href : … }}"`. Fix: an
+`{% if %}` around the two `href` forms. Lesson: this template engine is smaller
+than the one the habit assumes — when a build fails, read the parser line.
+
+**3. Local deploy simulation served a stale tree from a dead man's port.** The
+first local run of the new smoke check reported the *old* build (old sha,
+`/app/` 404) even though the tree on disk was new. Root cause: a `python3 -m
+http.server` started for an earlier mutation proof had not actually died
+(`kill $(cat pid)` in a `;` chain after a `pkill` that had matched nothing),
+held port 8091, and answered the new requests from the old directory. The
+follow-up `pkill -f "http.server 8091"` then matched *the running shell's own
+command line* and killed the session's bash (exit -1, empty output) — twice.
+Fix: kill by scanning `/proc` for `python3` exes whose cmdline carries the
+port (never `pkill -f` on a string that is also in your own command), verify
+the port is free, restart, re-run. Verification: the re-run served the new
+bytes (sha-matched the dist file) and went green. Lesson: in a sandbox, the
+process you think is dead is the one that is serving, and `pkill -f` is a
+loaded gun when the pattern appears in your own invocation.
+
+## 2026-10-09 — the app that defined its entry point and never called it: caught by the first real browser pass (session `arena/90cb6d2c-dhun`)
+
+**4. The `/DHUN/app/` mirror rendered nothing in a real browser — and no
+error of any kind fired.** The first CI run carrying the new browser pass on
+the mirror (website run 37864321503, head `6376b6d`) reported, on all four
+viewport/scheme combinations: `#app` empty, engineering-preview notice absent,
+0 nav items — with **no unhandled error and no console error**. Root cause:
+`app-web/src/js/main.js` *defined and exported* `boot` but never called it,
+and `src/index.html` loads that module as the page's only script. A module
+with no top-level side effect loads cleanly, defines everything, and paints
+nothing; the missing call has a completely silent failure signature. Nothing
+previously could see it: the 61 DOM-stub boot tests import the module and
+call `boot` themselves (through `tests/helpers/boot-harness.mjs`), the module
+graph is valid, there is no console noise, and no static check can tell
+"exported" from "booted". This is the exact failure class that record 29
+(verification) declared unprovable without a browser. Fix: a top-level
+`boot();` in `main.js` (the stub harness's explicit `boot()` then just
+re-renders idempotently — 61/61 green), plus a browser-free contract guard in
+`scripts/test_app_web.py` (`test_the_entry_module_actually_boots`) that
+asserts the call exists, mutation-proven (delete the call → red). Lesson:
+for a browser entry module, *exporting* the boot function is not booting; the
+page imports nothing, so the module must carry the side effect itself — and a
+check that never loads the artifact the way a user does will never find it.
+
 ## 2026-10-09 — the red trunk, the duplicated class, and the action that re-opened its own sheet (session `arena/967513fd-dhun`)
 
 **1. `main` was red before any of this session's code existed.**

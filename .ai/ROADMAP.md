@@ -44,14 +44,29 @@ to work, and the served-job's link resolver joins `base + href` as *strings*
 
 | # | Item | Status |
 |---|---|---|
-| W1 | **Fix the deployed link structure.** One `path` value in `site.js` prefixes every internal link (`/DHUN/…`); the quality checker resolves and asserts the base path instead of the root; the smoke test resolves links the way a browser does; CI serves the site under the real `/DHUN/` sub-path so browser and Lighthouse measure the structure a visitor gets. | in flight |
-| W2 | **Deploy `app-web` at `/app/` through the site workflow** (the single owner of the Pages artifact) and point the primary CTA "See the interface" at the live interface. ADR-008 gets a deployment amendment superseding B3 row 15 ("unlinked from the marketing site") — that was the previous session's placeholder decision, and the user's direction now is the decision. The web app keeps its `noindex` and its on-page honesty notices. | pending |
-| W3 | **Every button on the site resolves.** Full link audit over the built pages under the `/DHUN/` base, asserted by the static gates and by the served job (marketing routes **and** `/app/`). | pending |
-| W4 | **Honest copy around the live interface** (what the CTA delivers, what it does not), docs, verification record, CHANGELOG. | pending |
+| W1 | **Fix the deployed link structure.** One `path` value in `site.js` prefixes every internal link (`/DHUN/…`); the quality checker resolves and asserts the base path instead of the root; the smoke test resolves links the way a browser does; CI serves the site under the real `/DHUN/` sub-path so browser and Lighthouse measure the structure a visitor gets. | **done** (commit `8e60298`) — CI-verified: website run **37863859204** green, all three routes Lighthouse **100/100/100/100** at `requests=1` on the prefixed paths; mutation proofs in record 30 |
+| W2 | **Deploy `app-web` at `/app/` through the site workflow** (the single owner of the Pages artifact) and point the primary CTA "See the interface" at the live interface. ADR-008 gets a deployment amendment superseding B3 row 15 ("unlinked from the marketing site") — that was the previous session's placeholder decision, and the user's direction now is the decision. The web app keeps its `noindex` and its on-page honesty notices. | **done** (commit `6376b6d`) — locally verified on the assembled deploy tree; CI on `6376b6d` read at the finish sequence; the served-origin verification happens in the `served` job after the merge to `main` |
+| W3 | **Every button on the site resolves.** Full link audit over the built pages under the `/DHUN/` base, asserted by the static gates and by the served job (marketing routes **and** `/app/`). | **done** — the `base_path` rule + browser-like smoke resolution + the local deploy simulation (all seven fetches 200, every link resolved) |
+| W4 | **Honest copy around the live interface** (what the CTA delivers, what it does not), docs, verification record, CHANGELOG. | **done** — one line under the hero CTA (worded around the honesty contract), README rewritten for the live state, record **30** in `docs/verification/`, KNOWN_LIMITATIONS, WEBSITE_PLAN D13/D14, DEBUG_LOG, CHANGELOG |
+| W5 | **The first real browser run of the mirror found it never booted: fix + gate.** The new `browser` job's first pass (website run 37864321503 on `6376b6d`) reported `#app` empty on all four viewports with no error of any kind — `app-web/src/js/main.js` exported `boot` without ever calling it, and the page loads the module as its only script. Fixed with a top-level `boot();` (61/61 DOM-stub tests still green) and a browser-free contract test that asserts the call exists (mutation-proven). | **done** (fix commit on this branch) — the green browser run on the fix head closes W2's "CI read at the finish sequence" |
 
 Boundaries unchanged: no backend, no proxy, no fourth marketing route (the
 web app is not a marketing route — it is the mirror, `noindex`, linked from
-the CTA), no app-code changes, the four app workflows untouched.
+the CTA), the four app workflows untouched. One planned boundary was broken
+on purpose: "no `app-web` source changes" — the W5 fix is a one-line source
+change in `app-web/src/js/main.js` (plus its comment), made because the first
+real browser check proved the page could not load without it.
+
+### Exact next actions for the next session (post-merge)
+
+1. Read the `served` job on `main` for this merge: the first served
+   verification of `/app/` (shell, noindex, CSP, module + stylesheets over the
+   wire) and of the marketing routes' links resolved the browser way.
+2. Look at the `browser-evidence` artifact: first human eyes on the mirror's
+   rendered layout (CI's Chromium measured boot/notice/console/overflow; a
+   person has not looked at it).
+3. The §9 screenshot backlog on the marketing site is unchanged: a real
+   capture is still the only thing that replaces a mockup.
 
 ---
 
