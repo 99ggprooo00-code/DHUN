@@ -1044,7 +1044,7 @@ recorded in the PR comment the same turn — never pre-claimed here.
   `#222222` is 2.97:1 on artwork-derived controls.
 - Related list uses the lyrics material. Queue rows do not.
 - Thumbs stay 64dp and borderless. Light theme untouched.
-- Still Material 3 blur + a veil. Not Liquid Glass.
+- Historical at the time of this 2026-10-08 snapshot: Material 3 blur + veil. Superseded on 2026-10-09 by the binding translucent frosted-glass contract in `.ai/MASTER_PROMPT.md`.
 
 **Do not download yet if you want this look.** Rolling `test` right now
 targets **`7fcadbe`** (PR #111 merge), published **2026-09-22T02:58:26Z**:
