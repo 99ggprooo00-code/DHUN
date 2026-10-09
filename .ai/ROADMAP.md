@@ -1799,7 +1799,7 @@ CI-green until the checks on this commit finish, and the merge / rolling
   that veil (list cards above the dock unchanged); Related list carries one
   blurred-artwork layer plus that veil (queue rows unchanged); mini-player
   is a lighter acrylic on the phone dock and on the rail / two-pane card.
-  Material 3 blur + a veil — not Liquid Glass, not a platform Acrylic API.
+  Historical visual description for that 2026-09-22 session: Material 3 blur + a veil. Superseded as the visual-target statement by the 2026-10-09 frosted-glass contract at the top of this file; cached blur and lightweight-rendering constraints remain.
 - `d2a9045` — the overlays that were still at the old darkness. Full-player
   black dim **0.52/0.16 → 0.40/0.08**. Ambient scrim stops lowered again;
   the bottom stop sits on the **≥0.85** floor (`PlayerSheetLayoutTest`),
