@@ -1,14 +1,12 @@
 # CURRENT ACTIVE TASK
 
-# CURRENT ACTIVE TASK
-
 ## Session — urgent UI correctness, website navigation, and instruction reconciliation (2026-10-09)
 
 **State: IN PROGRESS; not merged, not verified green.** Working branch: `fix/ui-download-feedback-website-links`, based on the current `main` source. This task supersedes the previous active-task snapshot below; that snapshot is historical context, not the next step.
 
 ### Confirmed source-level defects and changes in this branch
 
-1. **Clear all downloads (P0):** the old ViewModel swallowed `clearAll()` failures and the UI closed the confirmation immediately. The current change exposes pending/success/failure state, blocks duplicate submits, keeps the dialog open on failure, shows a retry path, and clears selection/closes only after success. A JVM regression test covers failure then retry. Still needs CI confirmation and Android/desktop interaction verification.
+1. **Clear all downloads (P0):** the old ViewModel swallowed `clearAll()` failures and the UI closed the confirmation immediately. The current change exposes pending/success/failure state, blocks duplicate submits, keeps the dialog open on failure, shows a retry path, and clears selection/closes only after success. The manager serializes enqueue/resume/removal with clear-all and joins cancelled workers before deleting files. JVM tests cover failure/retry and successful file/row cleanup. Still needs CI confirmation and Android/desktop interaction verification.
 2. **GitHub Pages internal links (P1):** templates emitted root URLs such as `/`, `/features/` and `/ui/` although the canonical project site is hosted beneath `/DHUN/`. A `sitePath` filter preserves root-hosted local tests and prefixes internal paths for a separate Pages artifact build. The Pages workflow now builds and smoke-checks that artifact separately from the root-built artifact used by browser tests.
 3. **Design-system drift:** the current visual direction is **translucent frosted glass**, artwork-led, with cached/lightweight blur, tint/scrim and accessible fallback. Material libraries may be implementation primitives; “Material 3 only” is stale and must not direct new work.
 4. **AI operating-file drift:** update this file, MASTER_PROMPT, KNOWN_LIMITATIONS, DEBUG_LOG, WEBSITE_PLAN, HANDOFF and README together. Preserve old session notes as history; never present their old branch/commit/status or “do not touch FullPlayer” restrictions as current instructions.
@@ -18,7 +16,7 @@
 
 - [ ] Finish reconciling .ai current instructions and historical notes.
 - [ ] Verify all templates route internal hrefs through `sitePath`; verify Pages artifact build uses `DHUN_SITE_PATH_PREFIX=/DHUN`.
-- [ ] Add/adjust automated tests for clear failure/retry and the project-prefix artifact.
+- [ ] Review automated tests for clear failure/retry and the project-prefix artifact; fix any CI failures.
 - [ ] Check the diff for accidental architecture or product-scope changes.
 - [ ] Wait for GitHub Actions; report each workflow's actual final result, not an assumption.
 - [ ] Only mark complete after CI is green; record real-device and canonical-origin checks as separate gates if unavailable.
