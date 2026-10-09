@@ -21,9 +21,9 @@
 - [ ] Wait for GitHub Actions; report each workflow's actual final result, not an assumption.
 - [ ] Only mark complete after CI is green; record real-device and canonical-origin checks as separate gates if unavailable.
 
-### Verification truth
+### Verification truth (updated 2026-10-09)
 
-The source-level defect was confirmed from `LibraryScreen.kt`, `LibraryViewModel.kt`, `website/src/_includes/base.njk`, `website/src/ui.njk` and `website/src/404.njk`. No native build, website build, deployed-origin click-through or hardware run has yet been executed by this session. Do not describe any of those as passed.
+The source-level defect was confirmed from `LibraryScreen.kt`, `LibraryViewModel.kt`, `FileDownloadManager.kt`, and the website templates. On code-equivalent commit `650a65e`, the APK build passed and the website build/prefix smoke check plus browser measurements passed. On current docs head `90bee52`, GitHub Actions run `37869983686` (Build APK) is green; run `37869983672` has build/quality/prefix-smoke and browser jobs green while Lighthouse is still running; run `37869983670` has shared-domain and Robolectric tests green but the overall CI job is still running; run `37869983669` has its APK job green and MSI build running. A documentation-only update is being applied, so the final-head workflows may rerun. The PR's deploy and served-origin smoke jobs are skipped by design; **the canonical origin after merge and Android/Windows hardware interactions remain unverified**.
 
 ---
 
