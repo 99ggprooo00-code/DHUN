@@ -64,6 +64,8 @@ class LibraryDownloadsViewModelTest {
     /** Recording fake: records calls so we can assert VM delegation. */
     private class FakeDownloadManager : DownloadManager {
         val state = MutableStateFlow<List<DownloadedTrack>>(emptyList())
+        var failClear = false
+        var failRemove = false
         val progress = MutableStateFlow<Map<String, DownloadProgress>>(emptyMap())
         override val downloads = state
 
@@ -84,8 +86,8 @@ class LibraryDownloadsViewModelTest {
         override suspend fun pause(trackId: String) { paused.add(trackId) }
         override suspend fun resume(trackId: String) { resumed.add(trackId) }
         override suspend fun cancel(trackId: String) { cancelled.add(trackId) }
-        override suspend fun remove(trackId: String) { removed.add(trackId) }
-        override suspend fun clearAll() { cleared++; state.value = emptyList() }
+        override suspend fun remove(trackId: String) { if (failRemove) error("remove failure"); removed.add(trackId) }
+        override suspend fun clearAll() { cleared++; if (failClear) error("storage failure"); state.value = emptyList() }
     }
 
     private class NoopPlayer : DhunPlayer {
@@ -214,6 +216,55 @@ class LibraryDownloadsViewModelTest {
     }
 
     @Test
+    fun clearDownloadsExposesFailureAndAllowsRetry(): Unit = runBlocking {
+        val dm = FakeDownloadManager().apply { failClear = true }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val vm = LibraryViewModel(
+                dataLayer = dataLayer(), player = NoopPlayer(), scope = scope,
+                downloadManager = dm,
+            )
+            vm.clearDownloads()
+            eventually { vm.clearDownloadsUiState.value.errorMessage != null }
+
+            assertEquals(1, dm.cleared)
+            assertFalse(vm.clearDownloadsUiState.value.isClearing)
+            assertFalse(vm.clearDownloadsUiState.value.succeeded)
+
+            dm.failClear = false
+            vm.clearDownloads()
+            eventually { vm.clearDownloadsUiState.value.succeeded }
+
+            assertEquals(2, dm.cleared)
+            assertNull(vm.clearDownloadsUiState.value.errorMessage)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun batchDeletePropagatesFailureToTheConfirmationUi(): Unit = runBlocking {
+        val dm = FakeDownloadManager().apply { failRemove = true }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val vm = LibraryViewModel(
+                dataLayer = dataLayer(), player = NoopPlayer(), scope = scope,
+                downloadManager = dm,
+            )
+            var observedMessage: String? = null
+            try {
+                vm.removeDownloads(listOf("a", "b"))
+            } catch (error: IllegalStateException) {
+                observedMessage = error.message
+            }
+            assertEquals("remove failure", observedMessage)
+            assertTrue(dm.removed.isEmpty())
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun progressForPassesThroughPerTrackFlow(): Unit = runBlocking {
         val dm = FakeDownloadManager()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
@@ -318,19 +369,26 @@ class LibraryDownloadsViewModelTest {
     }
 
     @Test
-    fun nullDownloadManagerDegradesGracefully(): Unit = runBlocking {
+    fun nullDownloadManagerReportsUnavailableStorageForDestructiveActions(): Unit = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         try {
             val vm = LibraryViewModel(dataLayer = dataLayer(), player = NoopPlayer(), scope = scope)
             assertFalse(vm.hasDownloads)
             eventually { vm.downloads.value.isEmpty() }
-            // Summary still emits (empty), actions are no-ops, progress flow is idle.
+            // Read-only state and non-destructive actions degrade gracefully.
             assertEquals(0, vm.storageSummary.value.totalTracks)
-            vm.removeDownloads(listOf("a"))
+            var observedMessage: String? = null
+            try {
+                vm.removeDownloads(listOf("a"))
+            } catch (error: IllegalStateException) {
+                observedMessage = error.message
+            }
+            assertEquals("Download storage is unavailable.", observedMessage)
             vm.pauseDownload("a")
             vm.resumeDownload("a")
             vm.cancelDownload("a")
             vm.clearDownloads()
+            assertTrue(vm.clearDownloadsUiState.value.errorMessage != null)
             assertNull(vm.progressFor("a").first())
         } finally {
             scope.cancel()

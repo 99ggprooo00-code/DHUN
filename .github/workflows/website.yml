@@ -158,6 +158,66 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      # The root-built artifact above is the one tested in the local browser.
+      # GitHub Pages hosts this repository at /DHUN/, so build a second artifact
+      # with project-base-aware internal links only after those root tests pass.
+      - name: Build the GitHub Pages project-path artifact
+        working-directory: website
+        env:
+          DHUN_SITE_PATH_PREFIX: /DHUN
+        run: npm run build
+
+      - name: Verify GitHub Pages internal links
+        run: |
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+          import { join } from 'node:path';
+          const root = 'website/dist';
+          const files = [];
+          function walk(dir) {
+            for (const name of readdirSync(dir)) {
+              const path = join(dir, name);
+              if (statSync(path).isDirectory()) walk(path);
+              else if (path.endsWith('.html')) files.push(path);
+            }
+          }
+          walk(root);
+          const failures = [];
+          for (const file of files) {
+            const html = readFileSync(file, 'utf8');
+            for (const match of html.matchAll(/<(?:a|link)[^>]*?href="([^"]+)"/gi)) {
+              const href = match[1];
+              if (href.startsWith('http:') || href.startsWith('https:') ||
+                  href.startsWith('mailto:') || href.startsWith('tel:') ||
+                  href.startsWith('data:') || href.startsWith('#') || href.startsWith('//')) continue;
+              if (!href.startsWith('/DHUN/')) {
+                failures.push(file + ': internal URL does not use /DHUN/: ' + href);
+                continue;
+              }
+              const localPath = href.split(/[?#]/, 1)[0].slice('/DHUN/'.length);
+              let target = join(root, localPath || 'index.html');
+              if (existsSync(target) && statSync(target).isDirectory()) target = join(target, 'index.html');
+              if (!existsSync(target)) failures.push(file + ': prefixed internal URL has no target: ' + href);
+            }
+            if (!html.includes('href="/DHUN/"') || !html.includes('href="/DHUN/features/"') || !html.includes('href="/DHUN/ui/"')) {
+              failures.push(file + ': missing project-prefixed home/features/interface navigation');
+            }
+          }
+          if (failures.length) {
+            console.error(failures.join('\n'));
+            process.exit(1);
+          }
+          console.log('Verified project-prefixed internal navigation in ' + files.length + ' HTML files.');
+          NODE
+
+      - name: Upload the GitHub Pages artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: dhun-pages-site
+          path: website/dist
+          retention-days: 7
+          if-no-files-found: error
+
   browser:
     name: "Browser measurements (Playwright: viewports, keyboard, contrast, motion, axe)"
     needs: build
@@ -357,7 +417,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v7
         with:
-          name: dhun-site
+          name: dhun-pages-site
           path: dist
 
       # Pages has to be set to the Actions build type for a workflow to be able

@@ -1,5 +1,34 @@
 # CURRENT ACTIVE TASK
 
+## Session — urgent UI correctness, website navigation, and instruction reconciliation (2026-10-09)
+
+**State: IN PROGRESS; not merged, not verified green.** Working branch: `fix/ui-download-feedback-website-links`, based on the current `main` source. This task supersedes the previous active-task snapshot below; that snapshot is historical context, not the next step.
+
+### Confirmed source-level defects and changes in this branch
+
+1. **Destructive download/history actions (P0):** clear-all used to hide failures and dismiss early; batch deletion and clear history had the same issue. This branch makes all three result-driven: pending disables duplicate submits, failures stay visible with retry, and confirmation/selection resets only after success. The manager serializes download mutations with clear-all and joins workers before deleting final/partial files. JVM tests cover clear-all failure/retry and successful file/row cleanup. Still needs CI confirmation and Android/desktop interaction verification.
+2. **GitHub Pages internal links (P1):** templates emitted root URLs such as `/`, `/features/` and `/ui/` although the canonical project site is hosted beneath `/DHUN/`. A `sitePath` filter preserves root-hosted local tests and prefixes internal paths for a separate Pages artifact build. The Pages workflow now builds and smoke-checks that artifact separately from the root-built artifact used by browser tests.
+3. **Design-system drift:** the current visual direction is **translucent frosted glass**, artwork-led, with cached/lightweight blur, tint/scrim and accessible fallback. Material libraries may be implementation primitives; “Material 3 only” is stale and must not direct new work.
+4. **AI operating-file drift:** update this file, MASTER_PROMPT, KNOWN_LIMITATIONS, DEBUG_LOG, WEBSITE_PLAN, HANDOFF and README together. Preserve old session notes as history; never present their old branch/commit/status or “do not touch FullPlayer” restrictions as current instructions.
+5. **Product specs:** reconcile PRD, TRD, app flow, UI/UX, data schema and implementation plan with current source and this accepted contract. Separate native app, static marketing site and experimental `app-web/`; no production browser player or new backend is implied.
+
+### Exact next steps
+
+- [ ] Finish reconciling .ai current instructions and historical notes.
+- [ ] Verify all templates route internal hrefs through `sitePath`; verify Pages artifact build uses `DHUN_SITE_PATH_PREFIX=/DHUN`.
+- [ ] Review automated tests for clear failure/retry and the project-prefix artifact; fix any CI failures.
+- [ ] Check the diff for accidental architecture or product-scope changes.
+- [ ] Wait for GitHub Actions; report each workflow's actual final result, not an assumption.
+- [ ] Only mark complete after CI is green; record real-device and canonical-origin checks as separate gates if unavailable.
+
+### Verification truth (updated 2026-10-09)
+
+The source-level defect was confirmed from `LibraryScreen.kt`, `LibraryViewModel.kt`, `FileDownloadManager.kt`, and the website templates. On code-equivalent commit `650a65e`, the APK build passed and the website build/prefix smoke check plus browser measurements passed. On current docs head `90bee52`, GitHub Actions run `37869983686` (Build APK) is green; run `37869983672` has build/quality/prefix-smoke and browser jobs green while Lighthouse is still running; run `37869983670` has shared-domain and Robolectric tests green but the overall CI job is still running; run `37869983669` has its APK job green and MSI build running. Subsequent commits added result-driven batch-delete/history handling and selection reconciliation after partial failure, so those earlier results do not cover the latest application code. Fresh final-head workflows are required; no final-head green verdict is claimed. The PR's deploy and served-origin smoke jobs are skipped by design; **the canonical origin after merge and Android/Windows hardware interactions remain unverified**.
+
+---
+
+## Historical snapshot — previous active task, superseded 2026-10-09
+
 ## Session `arena/967513fd-dhun` — the app's interface in a browser, and the harness bug that was hiding measurements (2026-10-09)
 
 Updated **2026-10-09** · fixed session branch `arena/967513fd-dhun` · branch point
@@ -1770,7 +1799,7 @@ CI-green until the checks on this commit finish, and the merge / rolling
   that veil (list cards above the dock unchanged); Related list carries one
   blurred-artwork layer plus that veil (queue rows unchanged); mini-player
   is a lighter acrylic on the phone dock and on the rail / two-pane card.
-  Material 3 blur + a veil — not Liquid Glass, not a platform Acrylic API.
+  Historical visual description for that 2026-09-22 session: Material 3 blur + a veil. Superseded as the visual-target statement by the 2026-10-09 frosted-glass contract at the top of this file; cached blur and lightweight-rendering constraints remain.
 - `d2a9045` — the overlays that were still at the old darkness. Full-player
   black dim **0.52/0.16 → 0.40/0.08**. Ambient scrim stops lowered again;
   the bottom stop sits on the **≥0.85** floor (`PlayerSheetLayoutTest`),

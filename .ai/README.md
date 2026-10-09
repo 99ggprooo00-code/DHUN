@@ -23,6 +23,21 @@ directory — the content is branch-ready as-is.
    AI behavior rules. `.ai/PROMPT_SEQUENCE.md` — the original 30-phase
    prompt audit (where "Phase 15–30" ambitions come from).
 
+## Current binding UI/navigation correction (2026-10-09)
+
+Before acting on old session notes, read the current active task at the top of
+`ROADMAP.md` and the binding correction in `MASTER_PROMPT.md`. The current
+visual target is translucent frosted glass, not “Material 3 only”. Old handoff
+restrictions and old branch/commit snapshots are historical unless the current
+active task explicitly adopts them. The native KMP app, static `website/`
+marketing site, and experimental `app-web/` mirror are separate products/surfaces.
+
+Destructive operations must expose pending/success/failure and must not dismiss
+confirmation or clear selection before success. GitHub Pages internal links must
+be generated for the `/DHUN/` project base; root-hosted local browser tests are
+not proof of deployed-path correctness. Keep source, tests, CI, hardware, and
+canonical-origin verification states separate.
+
 ## Permanent maintenance contract
 
 - **Every phase / every session:** update `.ai/ROADMAP.md` (CURRENT ACTIVE

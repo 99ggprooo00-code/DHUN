@@ -1,5 +1,19 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-09 — destructive actions hid errors; Pages links escaped the project base; stale design lock
+
+**1. Clear all downloads, batch deletion and history clear hid operation failures.** Clear-all dismissed its confirmation before the ViewModel's asynchronous operation completed; batch deletion cleared selection and closed immediately while per-item errors were swallowed; history clear closed immediately while persistence errors were swallowed. Fix in branch `fix/ui-download-feedback-website-links`: clear-all exposes pending/success/error state; batch deletion and history clear await suspend operations; confirmations stay open during work, show retryable errors and reset selection/close only after success. The download manager serializes enqueue/resume/pause/cancel/remove with clear-all and joins cancelled workers before deleting final and partial files. JVM tests cover clear-all failure/retry, batch-delete failure propagation, and successful file/row cleanup. **Final-head CI and hardware verification remain pending.**
+
+**2. Marketing-site links were root-absolute on a project site.** The canonical origin includes `/DHUN/`, but shared header/footer, UI CTA and 404 links emitted `/`, `/features/`, `/ui/`. Local root-hosted browser tests cannot catch this deployment-only mismatch. Fix in this branch: templates use the `sitePath` filter; the normal root artifact remains the browser-test target, and a separate `DHUN_SITE_PATH_PREFIX=/DHUN` artifact is built and smoke-checked for Pages. **Verification: pending workflow; the live canonical origin has not been re-clicked by this change.**
+
+**3. Current visual direction contradicted the old lock.** A 2026-09-05 note called Material 3 the visual target. The current user direction is translucent frosted glass, artwork-led, with lightweight cached blur, tint/scrim and accessible fallback. The correction is now binding in `.ai/MASTER_PROMPT.md`; old notes are explicitly historical. Material libraries may remain implementation primitives. This does not authorize React/Tauri migration or a production browser player.
+
+**CI evidence at the latest check (2026-10-09):** the website build/quality/prefix smoke and Playwright browser jobs passed on run `37869983672`; Lighthouse is still running. Build APK run `37869983686` passed. CI run `37869983670` has shared-domain and Robolectric steps green but has not completed; release test run `37869983669` has its APK job green and MSI still running. The Pages deploy and served-origin jobs are skipped on a PR, so this does not prove the live URL has changed.
+
+**Lesson:** destructive UI actions must be result-driven, deployment paths must be tested separately from local-root navigation, and historical session notes must never override the current master contract.
+
+---
+
 ## 2026-10-09 — the red trunk, the duplicated class, and the action that re-opened its own sheet (session `arena/967513fd-dhun`)
 
 **1. `main` was red before any of this session's code existed.**
