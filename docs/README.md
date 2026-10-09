@@ -10,6 +10,7 @@ These documents describe the current Kotlin Multiplatform product, the static ma
 - [UI/UX design](ui-ux-design.md) — translucent frosted-glass visual contract, player/lyrics behavior, accessibility and website structure.
 - [Backend and data schema](backend-schema.md) — local persistence and data consistency; confirms no custom backend is currently authorized.
 - [Implementation plan](implementation-plan.md) — prioritized defect fixes, test strategy and release verification.
+- [UI/UX audit](ux-audit.md) — source-grounded severity-ranked findings, evidence, required fixes and verification checklist.
 
 ## Binding references
 
