@@ -48,6 +48,16 @@ RATCHET_TOLERANCE = 0.05
 
 CANONICAL_ORIGIN = "https://99ggprooo00-code.github.io/DHUN"
 
+# The site is a GitHub project page, published at the sub-path `/DHUN/` — not
+# at the origin's root. A browser resolves `href="/features/"` against the
+# origin, which on this host is a *different, empty* site: every internal
+# link on the page must therefore carry this prefix. `website/src/_data/site.js`
+# spells the same value as `path` and emits it on every internal link; the two
+# cannot disagree, and `base_path_violations` fails a link that forgot it.
+# (Found live 2026-10-09: the whole deployed nav 404'd until this existed.)
+SITE_PATH = "/DHUN"
+assert CANONICAL_ORIGIN.endswith(SITE_PATH), "origin and base path must agree"
+
 # Copy that must never reach a visitor, whatever produced it: a leaked Markdown
 # backtick, an HTML tag that was escaped instead of rendered, a link that goes
 # nowhere, or a placeholder word. The site has no stubs by policy, so this is a
@@ -313,6 +323,14 @@ def javascript_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+# The deployed tree is this dist plus `app/`, and `app/` is a byte-for-byte
+# copy of `app-web/src` (the web app's build is a copy —
+# `app-web/tools/build.mjs` — no minification, no rewriting), so the deployed
+# web app resolves against the source directory. That keeps this checker
+# Python-only and network-free while still seeing what the deploy ships.
+APP_WEB_SRC = REPO_ROOT / "app-web" / "src"
+
+
 def _resolve_internal(dist: pathlib.Path, reference: str) -> bool:
     if reference.startswith("#") or reference.startswith("mailto:"):
         return True
@@ -326,10 +344,55 @@ def _resolve_internal(dist: pathlib.Path, reference: str) -> bool:
     path = reference.split("#", 1)[0].split("?", 1)[0]
     if not path.startswith("/"):
         return True  # relative links are not used by this site's markup
-    candidate = dist / path.lstrip("/")
+    # The site is served under the base path SITE_PATH, not at the origin's
+    # root: strip it before mapping onto the deployed tree. A reference that
+    # *forgot* the prefix does not resolve here — that is exactly the failure
+    # mode a visitor hits, and `base_path_violations` names it.
+    if path == SITE_PATH:
+        path = "/"
+    elif path.startswith(SITE_PATH + "/"):
+        path = "/" + path[len(SITE_PATH) + 1:]
+    if path == "/app":
+        candidate = APP_WEB_SRC
+    elif path.startswith("/app/"):
+        candidate = APP_WEB_SRC / path[len("/app/"):]
+    else:
+        candidate = dist / path.lstrip("/")
     if candidate.is_dir():
         candidate = candidate / "index.html"
     return candidate.is_file()
+
+
+def base_path_violations(dist: pathlib.Path) -> list[str]:
+    """Every internal link carries the `/DHUN` base path — or it 404s live.
+
+    The local gates serve the build at a root, where `href="/features/"`
+    happens to work; the host serves it at `https://99ggprooo00-code.github.io/DHUN/`,
+    where the same href resolves to `https://99ggprooo00-code.github.io/features/`
+    and dies. The prefix is therefore a rule, not a convention: any reference
+    that is internal (not a fragment, not `mailto:`, not `data:`, not an
+    absolute http(s) URL) must start with SITE_PATH.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for match in re.finditer(
+            r"""<(?:a|link|img|script)\b[^>]*?\b(?:href|src)="([^"]+)\"""",
+            markup,
+            re.I,
+        ):
+            reference = match.group(1)
+            if reference.startswith(
+                ("#", "mailto:", "data:", "http://", "https://")
+            ) or reference == SITE_PATH or reference.startswith(SITE_PATH + "/"):
+                continue
+            if not reference.startswith("/"):
+                continue  # relative references are not part of the markup
+            violations.append(
+                f"{route}: internal link {reference} is missing the {SITE_PATH} base "
+                f"path — on the host it resolves to a different site and 404s"
+            )
+    return violations
 
 
 def link_violations(dist: pathlib.Path) -> list[str]:
@@ -658,11 +721,15 @@ def navigation_state_violations(dist: pathlib.Path) -> list[str]:
                 f"{route}: expected exactly one aria-current=\"page\", found {len(markers)}"
             )
             continue
+        # The published link carries the base path (`/DHUN/features/`); the
+        # route key does not. Compare against the published form.
+        expected_href = f"{SITE_PATH}/{route.lstrip('/')}"
         href = re.search(r'href="([^"]+)"', markers[0])
-        if not href or href.group(1) != route:
+        if not href or href.group(1) != expected_href:
             violations.append(
                 f"{route}: the current-page marker points at "
-                f"{href.group(1) if href else 'no href'}, not at this route"
+                f"{href.group(1) if href else 'no href'}, not at this route's "
+                f"published link {expected_href}"
             )
         css = page_stylesheet(dist, route)
         marker_rules = [
@@ -2104,6 +2171,7 @@ CHECKS = (
     ("page weight budget", weight_violations),
     ("no client-side JavaScript", javascript_violations),
     ("internal links resolve", link_violations),
+    ("internal links carry the base path", base_path_violations),
     ("mockups are labelled", mockup_violations),
     ("icon is inlined and true to its source", favicon_violations),
     ("nothing ships unreferenced", unreferenced_file_violations),

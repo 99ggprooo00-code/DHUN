@@ -21,7 +21,7 @@ cssModules: ["tokens", "base", "components", "mockups"]
       <p class="hero-lead">{{ site.lead }}</p>
       <!-- Exactly two calls to action. Download and source are separate destinations. -->
       <div class="cta-row">
-        <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
+        <a class="btn btn--primary" href="{{ site.path }}{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
         <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
       </div>
     </div>
@@ -130,7 +130,7 @@ cssModules: ["tokens", "base", "components", "mockups"]
     <p>{{ site.closing.body }}</p>
     <!--{{ site.closing.source }}-->
     <div class="cta-row">
-      <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
+      <a class="btn btn--primary" href="{{ site.path }}{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
       <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
     </div>
   </section>

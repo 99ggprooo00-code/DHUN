@@ -38,10 +38,13 @@ def write_tree(root: Path, files: dict[str, str]) -> Path:
 
 def minimal_site(**overrides) -> dict[str, str]:
     """A tiny but rule-clean site, used as the baseline for mutation tests."""
+    # The icon link carries the /DHUN base path like every other internal
+    # reference: the fixture is rule-clean under all of the checks, which is
+    # what the mutation tests that mutate around it depend on.
     page = (
         "<!DOCTYPE html><html lang=\"en\"><head>"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-        "<link rel=\"icon\" href=\"/assets/favicon.svg\">"
+        "<link rel=\"icon\" href=\"/DHUN/assets/favicon.svg\">"
         "</head><body><header><nav>menu</nav></header>"
         "<a class=\"skip-link\" href=\"#main\">Skip</a>"
         "<main id=\"main\"><h1>t</h1></main><footer>f</footer></body></html>"
@@ -125,6 +128,104 @@ class Links(unittest.TestCase):
             )
             root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
             self.assertEqual(quality.link_violations(root), [])
+
+
+class BasePath(unittest.TestCase):
+    """Internal links carry the `/DHUN` base path, or they 404 on the host.
+
+    The deployed failure this exists for: the built pages shipped root-absolute
+    hrefs, and every local gate serves the build at a root, where those links
+    work. Nothing was red while the whole deployed nav 404'd (verified live
+    2026-10-09). The prefix is now a rule: a link without it fails, a link
+    with it must still resolve, and the current-page marker must point at the
+    *published* form of the route.
+    """
+
+    def test_a_link_without_the_base_path_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>", '<h1>t</h1><a href="/features/">f</a>'
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertTrue(
+                any("base path" in v for v in quality.base_path_violations(root))
+            )
+
+    def test_prefixed_internal_links_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>",
+                '<h1>t</h1><a href="/DHUN/">h</a>'
+                '<a href="/DHUN/features/">f</a>'
+                '<a href="/DHUN/ui/">u</a>'
+                '<a href="#main">s</a>'
+                '<a href="data:text/plain,x">d</a>',
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertEqual(quality.base_path_violations(root), [])
+
+    def test_prefixed_link_resolves_to_the_site_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>", '<h1>t</h1><a href="/DHUN/features/">f</a>'
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertEqual(quality.link_violations(root), [])
+
+    def test_prefixed_dead_link_still_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>", '<h1>t</h1><a href="/DHUN/nope/">gone</a>'
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertTrue(
+                any("dead internal link" in v for v in quality.link_violations(root))
+            )
+
+    def test_web_app_links_resolve_against_app_web_src(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>",
+                '<h1>t</h1><a href="/DHUN/app/">app</a>'
+                '<a href="/DHUN/app/js/main.js">m</a>',
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertEqual(quality.link_violations(root), [])
+
+    def test_dead_web_app_link_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>", '<h1>t</h1><a href="/DHUN/app/js/nope.js">gone</a>'
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertTrue(
+                any("dead internal link" in v for v in quality.link_violations(root))
+            )
+
+    def test_navigation_marker_uses_the_published_href(self):
+        marker = (
+            '<style>[aria-current="page"]{text-decoration:underline}</style>'
+            '<nav><a href="__HREF__" aria-current="page">here</a>'
+            '<a href="/DHUN/">home</a></nav>'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = (
+                minimal_site()["features/index.html"]
+                .replace("<h1>t</h1>", marker.replace("__HREF__", "/DHUN/features/"))
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"features/index.html": markup}))
+            self.assertNotIn(
+                "points at", "\n".join(quality.navigation_state_violations(root))
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = (
+                minimal_site()["features/index.html"]
+                .replace("<h1>t</h1>", marker.replace("__HREF__", "/features/"))
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"features/index.html": markup}))
+            self.assertTrue(
+                any("points at" in v for v in quality.navigation_state_violations(root))
+            )
 
 
 class MockupLabelling(unittest.TestCase):
@@ -509,14 +610,14 @@ class DistributionBoundary(DistCopyMixin):
     def test_a_direct_apk_link_fails(self):
         violations = self.mutate(
             "features/index.html",
-            'href="/ui/"',
+            'href="/DHUN/ui/"',
             'href="https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk"',
         )
         self.assertTrue(any("artifact" in v for v in violations), violations)
 
     def test_a_release_download_path_fails(self):
         violations = self.mutate(
-            "features/index.html", 'href="/ui/"', 'href="https://github.com/x/releases/download/test/a"'
+            "features/index.html", 'href="/DHUN/ui/"', 'href="https://github.com/x/releases/download/test/a"'
         )
         self.assertTrue(any("artifact" in v for v in violations), violations)
 
@@ -571,7 +672,7 @@ class CopyHygiene(DistCopyMixin):
         self.assertTrue(any("escaped markup" in v for v in violations), violations)
 
     def test_a_link_to_nowhere_fails(self):
-        violations = self.mutate("features/index.html", 'href="/ui/"', 'href="#"')
+        violations = self.mutate("features/index.html", 'href="/DHUN/ui/"', 'href="#"')
         self.assertTrue(any("goes nowhere" in v for v in violations), violations)
 
     def test_a_placeholder_word_fails(self):
@@ -735,14 +836,14 @@ class InlinedIcon(DistCopyMixin):
 
     def page_with(self, icon_tag: str) -> str:
         return minimal_site()["index.html"].replace(
-            '<link rel="icon" href="/assets/favicon.svg">', icon_tag
+            '<link rel="icon" href="/DHUN/assets/favicon.svg">', icon_tag
         )
 
     def test_the_real_build_inlines_the_icon(self):
         self.assertEqual(quality.favicon_violations(DIST), [])
 
     def test_a_separate_icon_file_fails(self):
-        markup = self.page_with('<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">')
+        markup = self.page_with('<link rel="icon" href="/DHUN/assets/favicon.svg" type="image/svg+xml">')
         violations = quality.favicon_violations(self.site(markup))
         self.assertTrue(
             any("second HTTP request" in v for v in violations), violations
@@ -756,7 +857,7 @@ class InlinedIcon(DistCopyMixin):
 
     def test_a_missing_icon_link_fails(self):
         markup = minimal_site()["index.html"].replace(
-            '<link rel="icon" href="/assets/favicon.svg">', ""
+            '<link rel="icon" href="/DHUN/assets/favicon.svg">', ""
         )
         violations = quality.favicon_violations(self.site(markup))
         self.assertTrue(any("exactly one" in v for v in violations), violations)
@@ -1192,7 +1293,7 @@ class CurrentPageIsMarked(DistCopyMixin):
         page = dist / "ui" / "index.html"
         page.write_text(
             page.read_text(encoding="utf-8").replace(
-                '<a class="wordmark" href="/"', '<a aria-current="page" class="wordmark" href="/"', 1
+                '<a class="wordmark" href="/DHUN/"', '<a aria-current="page" class="wordmark" href="/DHUN/"', 1
             ),
             encoding="utf-8",
         )
@@ -1200,12 +1301,15 @@ class CurrentPageIsMarked(DistCopyMixin):
         self.assertTrue(any("/ui/" in v and "found 2" in v for v in violations), violations)
 
     def test_a_marker_pointing_at_another_route_fails(self):
+        # The published form of the link carries the /DHUN base path; the
+        # mutation swaps it for another route's published form.
         dist = self.copy_dist()
         page = dist / "features" / "index.html"
         markup = page.read_text(encoding="utf-8")
-        start = markup.index('<a href="/features/" aria-current="page"')
+        old = '<a href="/DHUN/features/" aria-current="page"'
+        self.assertIn(old, markup)
         page.write_text(
-            markup.replace(markup[start : start + 35], '<a href="/ui/" aria-current="page"', 1),
+            markup.replace(old, '<a href="/DHUN/ui/" aria-current="page"', 1),
             encoding="utf-8",
         )
         violations = quality.navigation_state_violations(dist)
@@ -1216,8 +1320,8 @@ class CurrentPageIsMarked(DistCopyMixin):
         page = dist / "404.html"
         page.write_text(
             page.read_text(encoding="utf-8").replace(
-                '<a class="btn btn--primary" href="/ui/"',
-                '<a class="btn btn--primary" aria-current="page" href="/ui/"',
+                '<a class="btn btn--primary" href="/DHUN/ui/"',
+                '<a class="btn btn--primary" aria-current="page" href="/DHUN/ui/"',
                 1,
             ),
             encoding="utf-8",

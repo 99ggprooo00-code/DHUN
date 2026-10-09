@@ -53,14 +53,14 @@
         href is this page's URL. Exactly one per page, asserted by
         `navigation_state_violations` in scripts/website_quality.py and measured,
         including in Windows High Contrast, in website/tests/browser.mjs. -#}
-    <a class="wordmark" href="/" aria-label="DHUN home"{% if page.url == "/" %} aria-current="page"{% endif %}>
+    <a class="wordmark" href="{{ site.path }}/" aria-label="DHUN home"{% if page.url == "/" %} aria-current="page"{% endif %}>
       <span class="wordmark-mark" aria-hidden="true">{% icon "play" %}</span>
       <span>DHUN</span>
     </a>
     <nav class="site-nav" aria-label="Main">
       <ul>
         {%- for item in site.nav %}
-        <li><a href="{{ item.href }}"{% if item.external %} rel="noopener"{% endif %}{% if item.href == page.url %} aria-current="page"{% endif %}>{{ item.label }}{% if item.external %}<span class="ext" aria-hidden="true">{% icon "external" %}</span><span class="sr-only"> (opens in a new tab)</span>{% endif %}</a></li>
+        <li><a {% if item.external %}href="{{ item.href }}"{% else %}href="{{ site.path + item.href }}"{% endif %}{% if item.external %} rel="noopener"{% endif %}{% if item.href == page.url %} aria-current="page"{% endif %}>{{ item.label }}{% if item.external %}<span class="ext" aria-hidden="true">{% icon "external" %}</span><span class="sr-only"> (opens in a new tab)</span>{% endif %}</a></li>
         {%- endfor %}
       </ul>
     </nav>
@@ -80,8 +80,8 @@
       </div>
       <nav aria-label="Footer">
         <ul class="footer-links">
-          <li><a href="/features/">Features</a></li>
-          <li><a href="/ui/">Interface</a></li>
+          <li><a href="{{ site.path }}/features/">Features</a></li>
+          <li><a href="{{ site.path }}/ui/">Interface</a></li>
           <li><a href="{{ site.repo }}" rel="noopener">Source</a></li>
           <li><a href="{{ site.issues }}" rel="noopener">Issues</a></li>
           <li><a href="{{ site.changelog }}" rel="noopener">Changelog</a></li>

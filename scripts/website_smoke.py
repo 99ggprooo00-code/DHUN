@@ -34,6 +34,7 @@ import pathlib
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -129,12 +130,27 @@ def smoke_problems(fetched: dict[str, tuple[int, str]]) -> list[str]:
     return problems
 
 
+def resolved_url(base: str, href: str) -> str:
+    """Resolve `href` against `base` the way a browser does.
+
+    Root-absolute references anchor at the origin, *not* at the site's path:
+    on `https://host/DHUN/` the link `/ui/` means `https://host/ui/`. The old
+    string join (`base + href`) meant `https://host/DHUN/ui/`, so a link that
+    404s for every real visitor sailed through this check — the deployed nav
+    was dead for a week before 2026-10-09 because of exactly this.
+    """
+    parts = urllib.parse.urlsplit(base)
+    return urllib.parse.urljoin(f"{parts.scheme}://{parts.netloc}/", href)
+
+
 def link_problems(
     base: str, fetched: dict[str, tuple[int, str]], fetch_one=fetch
 ) -> list[str]:
     """Every root-relative link on the served pages must resolve on the server.
 
-    `fetch_one` is injectable so the rule can be exercised without a network.
+    Resolution is browser-like (`resolved_url`), not string concatenation —
+    see its docstring for why that distinction is the whole point. `fetch_one`
+    is injectable so the rule can be exercised without a network.
     """
     problems: list[str] = []
     seen: dict[str, int] = {}
@@ -145,7 +161,7 @@ def link_problems(
         for href in internal_links(markup):
             if href in seen:
                 continue
-            link_status, _ = fetch_one(f"{base}{href}")
+            link_status, _ = fetch_one(resolved_url(base, href))
             seen[href] = link_status
             if link_status != 200:
                 problems.append(f"{route}: served page links {href}, which returns HTTP {link_status}")

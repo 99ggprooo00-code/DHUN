@@ -186,16 +186,23 @@ jobs:
         working-directory: website
         run: npx playwright install --with-deps chromium
 
-      - name: Serve the built site
+      # The production host serves the site at https://99ggprooo00-code.github.io/DHUN/
+      # — a project page under the sub-path `/DHUN/`, not at the origin's root.
+      # The local server must publish it the same way: served at a root,
+      # root-absolute links happen to work and the link-structure bug shipped
+      # dead for a week (2026-10-09) while every gate stayed green.
+      - name: Serve the built site under its published path
         run: |
-          nohup python3 -m http.server 8080 --directory dist --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
+          mkdir -p /tmp/dhun-origin/DHUN
+          cp -r dist/. /tmp/dhun-origin/DHUN/
+          nohup python3 -m http.server 8080 --directory /tmp/dhun-origin --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            if curl -sf -o /dev/null http://127.0.0.1:8080/; then
+            if curl -sf -o /dev/null http://127.0.0.1:8080/DHUN/; then
               echo "server up after ${attempt}s"; exit 0
             fi
             sleep 1
           done
-          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080"; cat /tmp/site-server.log; exit 1
+          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080/DHUN/"; cat /tmp/site-server.log; exit 1
 
       # Every number is printed as a check-run annotation: Actions log archives
       # are not retrievable from the environment this repository is maintained
@@ -254,17 +261,22 @@ jobs:
             echo "::warning title=Lighthouse::no Chrome on this runner — Lighthouse did not run; no score is claimed."
           fi
 
-      - name: Serve the built site
+      # Same published-path staging as the browser job: the numbers below have
+      # to describe the URL structure a visitor gets, including the /DHUN/
+      # sub-path (see the browser job's note on why serving at a root lied).
+      - name: Serve the built site under its published path
         if: steps.browser.outputs.available == 'true'
         run: |
-          nohup python3 -m http.server 8080 --directory dist --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
+          mkdir -p /tmp/dhun-origin/DHUN
+          cp -r dist/. /tmp/dhun-origin/DHUN/
+          nohup python3 -m http.server 8080 --directory /tmp/dhun-origin --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            if curl -sf -o /dev/null http://127.0.0.1:8080/; then
+            if curl -sf -o /dev/null http://127.0.0.1:8080/DHUN/; then
               echo "server up after ${attempt}s"; exit 0
             fi
             sleep 1
           done
-          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080"; cat /tmp/site-server.log; exit 1
+          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080/DHUN/"; cat /tmp/site-server.log; exit 1
 
       # Three samples, gate on the median. One Lighthouse run on a shared runner
       # swings by double digits for a page that did not change; the median is
@@ -283,7 +295,7 @@ jobs:
         run: |
           mkdir -p reports
           failed=0
-          for route in "/" "/features/" "/ui/"; do
+          for route in "/DHUN/" "/DHUN/features/" "/DHUN/ui/"; do
             name=$(echo "$route" | tr -c 'a-zA-Z0-9' '_')
             reports=""
             for sample in 1 2 3; do

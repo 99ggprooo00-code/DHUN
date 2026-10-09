@@ -12,7 +12,7 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
     <p class="hero-lead">{{ site.ui.lead }}</p>
     <!--{{ site.ui.source }}-->
     <div class="cta-row">
-      <a class="btn btn--primary" href="/features/">What it can do</a>
+      <a class="btn btn--primary" href="{{ site.path }}/features/">What it can do</a>
       <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
     </div>
   </section>
@@ -88,7 +88,7 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
           {%- endfor %}
         </ul>
         {%- if surface.note %}
-        <p class="traceable">{{ surface.note }} <a href="{{ surface.href }}">Open the {{ surface.hrefLabel }}</a></p>
+        <p class="traceable">{{ surface.note }} <a href="{{ site.path }}{{ surface.href }}">Open the {{ surface.hrefLabel }}</a></p>
         {%- endif %}
       </div>
       {%- if surface.mockFile %}

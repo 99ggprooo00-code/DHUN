@@ -65,7 +65,11 @@ import {
 import { MESSAGE_BUDGET, clipMessage, packReport, renderAllReports } from "./annotation-report.mjs";
 
 const BASE = process.env.SITE_BASE || "http://127.0.0.1:8080";
-const ROUTES = ["/", "/features/", "/ui/"];
+// The routes are the site's *published* paths: the host serves the site under
+// the /DHUN/ sub-path (project page), and the workflow serves the build the
+// same way. A measurement taken at the origin root would be a measurement of
+// a URL that does not exist (2026-10-09: the root-absolute link bug).
+const ROUTES = ["/DHUN/", "/DHUN/features/", "/DHUN/ui/"];
 
 // `touch` marks the viewports where a touch-target floor applies: phones in
 // either orientation, plus the fold-class cover screen. A 200 %-zoom layout
@@ -684,7 +688,7 @@ async function checkViewports(browser) {
 async function checkKeyboard(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
-  await page.goto(url("/"), { waitUntil: "load" });
+  await page.goto(url("/DHUN/"), { waitUntil: "load" });
 
   await page.keyboard.press("Tab");
   // The skip link animates in over 120 ms. Measuring inside the first frame
@@ -725,7 +729,7 @@ async function checkKeyboard(browser) {
 
   // Fresh load: the primary navigation must be reachable from the top and show
   // a visible focus ring while it is.
-  await page.goto(url("/"), { waitUntil: "load" });
+  await page.goto(url("/DHUN/"), { waitUntil: "load" });
   let reachedNav = null;
   for (let press = 0; press < 8 && !reachedNav; press += 1) {
     await page.keyboard.press("Tab");
@@ -941,7 +945,7 @@ async function checkStructure(browser) {
  * by a blur), and fails on: an element that cannot be reached at all, and an
  * element that takes focus without any visible change.
  */
-async function checkTabStops(browser, route = "/") {
+async function checkTabStops(browser, route = "/DHUN/") {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
   await page.goto(url(route), { waitUntil: "load" });
@@ -1346,7 +1350,7 @@ async function captureScreenshots(browser) {
       for (const route of ROUTES) {
         const page = await context.newPage();
         await page.goto(url(route), { waitUntil: "load" });
-        const name = `${route === "/" ? "home" : route.replace(/\//g, "")}-${shot.label}-${scheme}.png`;
+        const name = `${route === "/DHUN/" ? "home" : route.replace(/\//g, "")}-${shot.label}-${scheme}.png`;
         await page.screenshot({ path: `${SHOTS}${name}`, fullPage: true });
         await page.close();
       }

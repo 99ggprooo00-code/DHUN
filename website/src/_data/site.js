@@ -12,12 +12,21 @@
 
 const REPO = "https://github.com/99ggprooo00-code/DHUN";
 const SITE = "https://99ggprooo00-code.github.io/DHUN";
+// The site is a GitHub **project** page: its documents live at the sub-path
+// `/DHUN/`, not at the origin's root. A browser resolves a root-absolute
+// `href="/features/"` against the *origin*, which on this host is a different
+// (empty) site — so every internal link on the page must carry this prefix,
+// or it 404s for a real visitor while every local check (which serves the
+// build at a root) stays green. `scripts/website_quality.py` asserts the
+// prefix on every internal link; the value is spelled in one place, here.
+const PATH = "/DHUN";
 // Rolling pre-release tag `test`. Assets are replaced on every push to main,
 // so they are linked by URL only: never by digest or size (Part A §4.3).
 const TEST_RELEASE = `${REPO}/releases/download/test`;
 
 export default {
   url: SITE,
+  path: PATH,
   repo: REPO,
   issues: `${REPO}/issues`,
   changelog: `${REPO}/blob/main/CHANGELOG.md`,
@@ -32,6 +41,10 @@ export default {
     "DHUN is a free, open-source YouTube Music client for Android and Windows. No sign-in, no cookies, no ads, no telemetry — and downloads that stay on your device.",
   ogType: "website",
 
+  // The hrefs are the site's root-relative routes; the templates emit them
+  // prefixed with `path` (see above), which is where they live on the host.
+  // `aria-current` in the base template compares the *unprefixed* route, so
+  // the two stay the same shape.
   nav: [
     { href: "/features/", label: "Features" },
     { href: "/ui/", label: "Interface" },

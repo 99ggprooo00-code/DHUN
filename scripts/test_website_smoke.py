@@ -113,6 +113,48 @@ class ServedLinks(unittest.TestCase):
         self.assertEqual(problems, [])
 
 
+class RootRelativeResolution(unittest.TestCase):
+    """Links resolve against the origin, like a browser — not by string join.
+
+    The site is a project page under `/DHUN`, so a link that forgot its base
+    path (`href="/ui/"`) lives at `https://host/ui/` for a visitor: a 404.
+    The string-join resolver saw `https://host/DHUN/ui/` instead and passed it.
+    These tests pin the browser-like behaviour on the exact shape of that bug.
+    """
+
+    BASE = "https://example.test/DHUN"
+
+    def test_resolution_is_against_the_origin_not_the_site_path(self):
+        self.assertEqual(
+            smoke.resolved_url(self.BASE, "/ui/"), "https://example.test/ui/"
+        )
+        self.assertEqual(
+            smoke.resolved_url(self.BASE, "/DHUN/ui/"),
+            "https://example.test/DHUN/ui/",
+        )
+
+    def test_a_link_that_misses_the_base_path_is_flagged(self):
+        markup = page("/").replace("<h1>DHUN</h1>", '<h1>DHUN</h1><a href="/ui/">u</a>')
+
+        def fetch_one(url: str) -> tuple[int, str]:
+            # The site's own page exists; the origin-root one is a 404 —
+            # the deployed reality as of 2026-10-09.
+            return (200, "<html></html>") if "/DHUN/" in url else (404, "")
+
+        problems = smoke.link_problems(self.BASE, served(**{"/": (200, markup)}), fetch_one)
+        self.assertTrue(
+            any("/ui/" in p and "404" in p for p in problems),
+            f"the un-prefixed link must be flagged, got: {problems}",
+        )
+
+    def test_a_link_with_the_base_path_passes(self):
+        markup = page("/").replace("<h1>DHUN</h1>", '<h1>DHUN</h1><a href="/DHUN/ui/">u</a>')
+        problems = smoke.link_problems(
+            self.BASE, served(**{"/": (200, markup)}), lambda url: (200, "")
+        )
+        self.assertEqual(problems, [])
+
+
 class CommittedBuild(unittest.TestCase):
     """Feed the real committed build through the served-site rules.
 

@@ -16,7 +16,7 @@ cssModules: ["tokens", "base", "components", "mockups"]
       closest alternatives do.
     </p>
     <div class="cta-row">
-      <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
+      <a class="btn btn--primary" href="{{ site.path }}{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
       <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
     </div>
     <!-- Phase 06–15 (.ai/ROADMAP.md): every item listed below is implemented in the tree this site is built from; the negative list is checked by scripts/website_claims.py. -->
@@ -187,7 +187,7 @@ cssModules: ["tokens", "base", "components", "mockups"]
     <p><a href="{{ site.testReleasePage }}" rel="noopener">The rolling test pre-release</a>
     · <a href="{{ site.plan }}" rel="noopener">How this site is built and checked</a></p>
     <div class="cta-row">
-      <a class="btn btn--primary" href="{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
+      <a class="btn btn--primary" href="{{ site.path }}{{ site.ctaPrimary.href }}">{{ site.ctaPrimary.label }}</a>
       <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
     </div>
   </section>
