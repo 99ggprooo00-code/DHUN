@@ -83,6 +83,15 @@ function readModule(name) {
 }
 
 export default function (eleventyConfig) {
+  // GitHub Pages project sites are mounted below /DHUN/, unlike local test
+  // servers. Set DHUN_SITE_PATH_PREFIX=/DHUN only for the Pages artifact build;
+  // the ordinary checked build remains rooted at / for browser/quality tests.
+  const sitePathPrefix = (process.env.DHUN_SITE_PATH_PREFIX || "").split("/").filter(Boolean).join("/");
+  eleventyConfig.addFilter("sitePath", function (value) {
+    if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return value;
+    if (!sitePathPrefix) return value;
+    return "/" + sitePathPrefix + (value === "/" ? "/" : value);
+  });
   // No `addPassthroughCopy`: the site ships no separate asset files. The one
   // asset it has (`src/assets/dhun-favicon.svg`) is inlined into every page as
   // a `data:` URI by `src/_data/favicon.js`, which is why each route is a
