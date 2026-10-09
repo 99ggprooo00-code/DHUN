@@ -64,6 +64,7 @@ class LibraryDownloadsViewModelTest {
     /** Recording fake: records calls so we can assert VM delegation. */
     private class FakeDownloadManager : DownloadManager {
         val state = MutableStateFlow<List<DownloadedTrack>>(emptyList())
+        var failClear = false
         val progress = MutableStateFlow<Map<String, DownloadProgress>>(emptyMap())
         override val downloads = state
 
@@ -85,7 +86,7 @@ class LibraryDownloadsViewModelTest {
         override suspend fun resume(trackId: String) { resumed.add(trackId) }
         override suspend fun cancel(trackId: String) { cancelled.add(trackId) }
         override suspend fun remove(trackId: String) { removed.add(trackId) }
-        override suspend fun clearAll() { cleared++; state.value = emptyList() }
+        override suspend fun clearAll() { cleared++; if (failClear) error("storage failure"); state.value = emptyList() }
     }
 
     private class NoopPlayer : DhunPlayer {
@@ -208,6 +209,33 @@ class LibraryDownloadsViewModelTest {
             vm.removeDownloads(emptyList())
             delay(50)
             assertEquals(2, dm.removed.size)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun clearDownloadsExposesFailureAndAllowsRetry(): Unit = runBlocking {
+        val dm = FakeDownloadManager().apply { failClear = true }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val vm = LibraryViewModel(
+                dataLayer = dataLayer(), player = NoopPlayer(), scope = scope,
+                downloadManager = dm,
+            )
+            vm.clearDownloads()
+            eventually { vm.clearDownloadsUiState.value.errorMessage != null }
+
+            assertEquals(1, dm.cleared)
+            assertFalse(vm.clearDownloadsUiState.value.isClearing)
+            assertFalse(vm.clearDownloadsUiState.value.succeeded)
+
+            dm.failClear = false
+            vm.clearDownloads()
+            eventually { vm.clearDownloadsUiState.value.succeeded }
+
+            assertEquals(2, dm.cleared)
+            assertNull(vm.clearDownloadsUiState.value.errorMessage)
         } finally {
             scope.cancel()
         }
