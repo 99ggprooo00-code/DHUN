@@ -189,6 +189,26 @@ class PageHygieneAndHonesty(unittest.TestCase):
         for phrase in ("DHUN web player", "listen in your browser", "play music in your browser"):
             self.assertNotIn(phrase, self.views, f"'{phrase}' would overstate this build")
 
+    def test_the_entry_module_actually_boots(self) -> None:
+        """The module is the entry point, so it must call itself to life.
+
+        `index.html` loads `main.js` as the page's only script; exporting
+        `boot` (which the DOM-stub tests call explicitly) is not booting. On
+        2026-10-09 the first real browser pass in CI found the app loading,
+        defining everything and rendering nothing — `#app` empty on every
+        viewport — because nothing ever invoked `boot()`. The stub tests
+        cannot see that (they call the export themselves), so the call is
+        asserted here, in the gate that runs on every push without a browser.
+        """
+        main_js = _read(JS_DIR / "main.js")
+        self.assertRegex(
+            main_js,
+            r"(?m)^boot\(\);\s*$",
+            "main.js does not call boot() at top level — the browser loads the "
+            "module and then gets an empty #app (first caught by the CI browser "
+            "pass, 2026-10-09)",
+        )
+
 
 @unittest.skipUnless(APP_WEB.is_dir(), "app-web/ does not exist")
 class IconsMatchTheAppSource(unittest.TestCase):

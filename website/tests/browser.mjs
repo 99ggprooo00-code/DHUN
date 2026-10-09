@@ -64,7 +64,74 @@ import {
 
 import { MESSAGE_BUDGET, clipMessage, packReport, renderAllReports } from "./annotation-report.mjs";
 
+// ---------------------------------------------------------------------------
+// immediate evidence channel
+// ---------------------------------------------------------------------------
+// The summary and the annotations used to be written only at the very end of
+// the run. Two consecutive runs (website 37864947840 and 37870564524)
+// completed the whole suite — the screenshot artifacts prove it — and then
+// the process died before the final emission: zero annotations, an empty
+// step summary, and the job log is not retrievable from the sandbox that
+// maintains this repository. A dying process must not get to decide what is
+// recorded: every finding is now appended to the step summary the moment it
+// happens, and process-level handlers put JS-level escapes on the record.
+// (An external SIGKILL is still uncatchable; if the summary stops
+// mid-run, that is the verdict.)
+const SUMMARY = process.env.GITHUB_STEP_SUMMARY || "";
+let summaryBroken = false;
+function summaryLine(line) {
+  // The step log (tee'd to /tmp/browser-step.log by the workflow and posted
+  // to issue #150 by a later step) is the readable copy: the step summary
+  // file is per-step and the job log archive is not retrievable from the
+  // sandbox that maintains this repository.
+  try {
+    console.log(`[summary] ${line.replace(/\n/g, " ")}`);
+  } catch {
+    /* the file write below is the other copy */
+  }
+  if (!SUMMARY || summaryBroken) return;
+  try {
+    appendFileSync(SUMMARY, `${line}\n`);
+  } catch {
+    summaryBroken = true;
+  }
+}
+process.on("uncaughtException", (error) => {
+  const where = (error && error.stack ? error.stack : String(error)).replace(/\s+/g, " ").slice(0, 800);
+  try {
+    appendFileSync(SUMMARY, `\n**UNCAUGHT EXCEPTION (process level):** ${where}\n`);
+  } catch {
+    /* the summary is gone; the lines below are all that remain */
+  }
+  try {
+    annotate("error", "crash", `uncaught exception killed the run: ${where}`);
+  } catch {
+    /* the annotation channel is gone too */
+  }
+  console.error(`UNCAUGHT EXCEPTION: ${where}`);
+  throw error; // keep the crash semantics; the record above already exists
+});
+process.on("unhandledRejection", (reason) => {
+  const where = (reason && reason.stack ? reason.stack : String(reason)).replace(/\s+/g, " ").slice(0, 800);
+  try {
+    appendFileSync(SUMMARY, `\n**UNHANDLED REJECTION (process level):** ${where}\n`);
+  } catch {
+    /* recorded on stderr instead */
+  }
+  console.error(`UNHANDLED REJECTION: ${where}`);
+  // Deliberately not rethrown: the run continues and the rejection is on
+  // record. A rejection that would have killed the process is now a finding.
+});
+
 const BASE = process.env.SITE_BASE || "http://127.0.0.1:8080";
+// The routes are the site's rooted paths: the committed build is the
+// root-hosted one (the /DHUN/ prefix is applied by the sitePath filter only
+// in the workflow's Pages artifact, which the prefixed-link step verifies
+// separately), so the local gate serves it at a root and measures it there.
+// Layout, contrast, keyboard and overflow behave identically under either
+// URL structure — the prefix is a byte-level href transformation, not a
+// layout one — while link *resolution* on the host is what the prefixed
+// artifact's check is for (2026-10-09: the root-absolute link bug).
 const ROUTES = ["/", "/features/", "/ui/"];
 
 // `touch` marks the viewports where a touch-target floor applies: phones in
@@ -110,16 +177,34 @@ function annotate(level, title, message) {
 // annotation would push the real numbers out of the only channel this
 // environment can read. Everything is printed to stdout in full and the tail
 // of this script emits one annotation per category.
+// Findings are still *collected* for the packed annotations, but each one is
+// also written to the step summary and emitted as an annotation the moment
+// it happens. The packed emission at the tail remains the full report; the
+// immediate ones exist because the job log is not retrievable from the
+// sandbox that maintains this repository, and a process that dies before the
+// tail (observed on three consecutive runs, 2026-10-09) must not get to
+// decide which problems are on record.
 function fail(title, message) {
-  failures.push(`${title}: ${message}`);
+  const entry = `${title}: ${message}`;
+  failures.push(entry);
+  summaryLine(`- ${entry}`);
+  try {
+    annotate("error", "problem", clip(entry, MESSAGE_BUDGET));
+  } catch {
+    /* the summary line above already recorded it */
+  }
 }
 
 function record(title, message) {
-  measurements.push(`${title}: ${message}`);
+  const entry = `${title}: ${message}`;
+  measurements.push(entry);
+  summaryLine(`· ${entry}`);
 }
 
 function warn(title, message) {
-  warnings.push(`${title}: ${message}`);
+  const entry = `${title}: ${message}`;
+  warnings.push(entry);
+  summaryLine(`! ${entry}`);
 }
 
 const category = (title) => title.split(/\s+[/@]/)[0].trim() || title;
@@ -343,12 +428,28 @@ function overflowReport() {
     if (overflowX !== "visible") continue;
     const spill = element.scrollWidth - element.clientWidth;
     if (spill > 1 && element.clientWidth > 0) {
+      // debug: added 2026-10-09 after five spilling <li> reported with
+      // identical widths through two fixes — the finding named the element
+      // but not its internals, and the fix could not be reasoned from the
+      // markup alone. Children with their rendered widths make the geometry
+      // legible in the record.
+      let debug = "";
+      try {
+        const kids = [...element.children].map(
+          (c) =>
+            `${c.tagName.toLowerCase()}.${String(c.className || "").split(" ").slice(0, 2).join(".")} w=${Math.round(c.getBoundingClientRect().width)}`,
+        );
+        debug = `children=[${kids.join(", ")}]`;
+      } catch {
+        /* the widths are the point; the dump is a bonus */
+      }
       spilling.push({
         element: element.tagName.toLowerCase(),
         className: String(element.className || "").slice(0, 60),
         text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40),
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,
+        debug,
       });
     }
   }
@@ -360,6 +461,26 @@ function overflowReport() {
     spilling: spilling
       .sort((a, b) => b.scrollWidth - b.clientWidth - (a.scrollWidth - a.clientWidth))
       .slice(0, 5),
+  };
+}
+
+// The web mirror's state, gathered in the page (page scope only: this function
+// must stay self-contained — see the harness guard in
+// scripts/test_website_workflow.py). It gathers; Node decides.
+function webAppReport() {
+  const state = (selector) => {
+    const el = document.querySelector(selector);
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return { visible: rect.width > 0 && rect.height > 0, text: (el.textContent || "").trim().slice(0, 60) };
+  };
+  return {
+    mounted: (document.querySelector("#app") || { children: [] }).children.length > 0,
+    navItems: document.querySelectorAll(".dhun-nav-item").length,
+    title: document.title,
+    previewNotice: state('[data-testid="preview-notice"]'),
+    sampleDataNotice: state('[data-testid="sample-data-notice"]'),
+    backendNotice: state('[data-testid="backend-notice"]'),
   };
 }
 
@@ -600,10 +721,19 @@ async function checkViewports(browser) {
     for (const route of ROUTES) {
       const page = await context.newPage();
       const consoleErrors = [];
+      // Handlers must never throw: an exception here is an uncaughtException
+      // in Node, which kills the process before the finally block emits the
+      // annotations — the run dies with no readable channel at all.
       page.on("console", (message) => {
-        if (message.type() === "error") consoleErrors.push(message.text().slice(0, 120));
+        try {
+          if (message.type() === "error") consoleErrors.push(String(message.text()).slice(0, 120));
+        } catch {
+          /* a handler failure is noise, not a finding */
+        }
       });
-      page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message.slice(0, 120)}`));
+      page.on("pageerror", (error) =>
+        consoleErrors.push(`pageerror: ${String((error && error.message) || error).slice(0, 120)}`),
+      );
       const badResponses = [];
       page.on("response", (response) => {
         if (response.status() >= 400 && response.url().startsWith(BASE)) {
@@ -1301,6 +1431,100 @@ async function checkPrint(browser) {
   await context.close();
 }
 
+// The web mirror, deployed at /app/ under the same published path (ADR-008
+// amendment 2026-10-09 (2)). Its gates are deliberately narrower than the
+// marketing site's — it is a JavaScript application, not a static document,
+// and it is noindex: it must boot, it must say what it is (the engineering-
+// preview notice is honesty, not decoration), nothing unhandled may throw,
+// and it must not overflow. Which catalogue answered (live or sample) is
+// recorded, not gated: on a runner with no upstream, the app falls back and
+// says so, and that fallback is the correct behaviour.
+const NETWORK_NOISE = /Failed to load resource|net::ERR_|ERR_NAME_NOT_RESOLVED/i;
+async function checkWebApp(browser) {
+  const viewports = [
+    { name: "desktop", width: 1280, height: 800 },
+    { name: "phone", width: 390, height: 844 },
+  ];
+  for (const scheme of SCHEMES) {
+    for (const viewport of viewports) {
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        colorScheme: scheme,
+      });
+      const page = await context.newPage();
+      // Handlers must never throw: an exception here is an uncaughtException
+      // in Node, which kills the process before the finally block emits the
+      // annotations — the run dies with no readable channel at all.
+      const consoleErrors = [];
+      page.on("console", (message) => {
+        try {
+          if (message.type() === "error" && !NETWORK_NOISE.test(message.text())) {
+            consoleErrors.push(String(message.text()).slice(0, 120));
+          }
+        } catch {
+          /* a handler failure is noise, not a finding */
+        }
+      });
+      const pageErrors = [];
+      page.on("pageerror", (error) =>
+        pageErrors.push(String((error && error.message) || error).slice(0, 120)),
+      );
+
+      await page.goto(url("/app/"), { waitUntil: "load" });
+      const report = await page.evaluate(webAppReport);
+      const overflow = await page.evaluate(overflowReport);
+      const label = `/app/ (${scheme}, ${viewport.name})`;
+
+      if (!report.mounted) {
+        fail(`web app ${label}`, "the application did not render: #app is empty");
+      } else {
+        const source = report.sampleDataNotice
+          ? "sample catalogue (the live source did not answer, and the page says so)"
+          : "live source answered";
+        record(
+          `web app ${label}`,
+          `mounted, ${report.navItems} nav item(s), ${report.title ? report.title : "no title"}, ${source}` +
+            (report.backendNotice ? `; backend notice: ${report.backendNotice.text}` : ""),
+        );
+      }
+      if (!report.previewNotice || !report.previewNotice.text) {
+        fail(`web app ${label}`, "the engineering-preview notice is absent — the mirror may be claiming more than it proves");
+      }
+      if (report.navItems < 3) {
+        fail(`web app ${label}`, `only ${report.navItems} nav item(s); the shell mirrors Home/Search/Library(+Settings)`);
+      }
+      if (pageErrors.length) {
+        fail(`web app ${label} unhandled`, pageErrors.join(" | "));
+      }
+      if (consoleErrors.length) {
+        fail(`web app ${label} console`, consoleErrors.join(" | "));
+      }
+      if (overflow.scrollWidth > overflow.innerWidth + 1) {
+        fail(`web app ${label} overflow`, `scrollWidth ${overflow.scrollWidth} > innerWidth ${overflow.innerWidth}`);
+      }
+      if (overflow.offenders.length || overflow.spilling.length) {
+        // Spilling entries carry the text and the widths: the first run that
+        // found a spilling li (2026-10-09) reported "li. spilling" with no
+        // way to say which li, so the record had to name the element.
+        fail(
+          `web app ${label} overflow`,
+          [
+            ...overflow.offenders.map((o) => `${o.element}.${o.className} right=${o.right}`),
+            ...overflow.spilling.map(
+              (o) => `${o.element}.${o.className} “${o.text}” ${o.scrollWidth}>${o.clientWidth} spilling${o.debug ? ` (${o.debug})` : ""}`,
+            ),
+          ].join(", "),
+        );
+      }
+      if (scheme === "dark") {
+        await page.screenshot({ path: `${SHOTS}webapp-${viewport.name}-${scheme}.png`, fullPage: true });
+      }
+      await page.close();
+      await context.close();
+    }
+  }
+}
+
 async function checkAxe(browser) {
   for (const scheme of SCHEMES) {
     const context = await browser.newContext({
@@ -1389,28 +1613,75 @@ const CHECKS = [
   ["preferences", () => checkPreferences(browser)],
   ["print", () => checkPrint(browser)],
   ["axe", () => checkAxe(browser)],
+  ["web app", () => checkWebApp(browser)],
   ["screenshots", () => captureScreenshots(browser)],
 ];
 
 let browser;
 try {
   browser = await chromium.launch();
+  summaryLine(`\n## Browser measurements — progress\n`);
   for (const [name, run] of CHECKS) {
+    summaryLine(`- check started: **${name}**`);
     await guard(name, run);
+    summaryLine(`- check finished: ${name}`);
+    // One short progress annotation per check. The API view caps annotations
+    // per level, so these are deliberately minimal: they exist to answer
+    // "how far did the run get?" when the process dies before the packed
+    // report is emitted (three consecutive runs did, 2026-10-09).
+    annotate("notice", "progress", `check finished: ${name} (${failures.length} problem(s) so far)`);
   }
+  summaryLine(`\nAll ${CHECKS.length} checks finished; emitting the packed report.\n`);
+  annotate("notice", "progress", `all ${CHECKS.length} checks finished — emitting the packed report`);
 } catch (error) {
   fail("browser launch", `${error && error.message ? error.message : error}`);
 } finally {
-  if (browser) await browser.close();
+  // Closing the browser can itself reject (the process dies mid-teardown and
+  // the protocol errors on close). That used to escape the finally block and
+  // skip emitAnnotations() entirely — a full run of measurements reduced to
+  // "exit code 1" with no annotation and no summary (observed in website run
+  // 37864947840). A teardown error is a finding, not a reason to lose the
+  // evidence: record it and still emit.
+  if (browser) {
+    try {
+      await browser.close();
+    } catch (error) {
+      fail("browser teardown", `${error && error.message ? error.message : error}`);
+    }
+  }
   // The summary and the annotations are emitted even when a check above threw:
   // the annotations are the only channel this repository can read from CI, so
-  // losing them is losing the evidence itself.
-  console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
-  console.error(measurements.map((line) => `  · ${line}`).join("\n"));
-  if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
-  emitAnnotations();
+  // losing them is losing the evidence itself. The stdout writes are guarded
+  // too: if the runner's log pipe is already gone, emitAnnotations() must
+  // still run, because the summary file (written as findings happen) and the
+  // annotations are what remain.
+  try {
+    console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
+    console.error(measurements.map((line) => `  · ${line}`).join("\n"));
+    if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
+  } catch {
+    /* stdout is gone; the summary and the annotations carry the record */
+  }
+  try {
+    emitAnnotations();
+  } catch (error) {
+    // The renderer must not be able to eat the evidence either: fall back to
+    // raw lines, one annotation each, no packing.
+    for (const line of [...failures, ...warnings, ...measurements].slice(0, 20)) {
+      annotate("error", "report", line);
+    }
+    annotate("error", "report", `the report renderer itself failed: ${error && error.message ? error.message : error}`);
+  }
   if (failures.length) {
     console.error(failures.map((line) => `  - ${line}`).join("\n"));
     process.exitCode = 1;
   }
+  // The last thing the script ever writes: without this marker in the
+  // annotations, a run that reached the end of the script and then died is
+  // indistinguishable from one that never got here.
+  annotate(
+    "notice",
+    "progress",
+    `script finished cleanly: ${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s), exit ${process.exitCode ?? 0}`,
+  );
 }

@@ -38,6 +38,11 @@ def write_tree(root: Path, files: dict[str, str]) -> Path:
 
 def minimal_site(**overrides) -> dict[str, str]:
     """A tiny but rule-clean site, used as the baseline for mutation tests."""
+    # The icon link is rooted like every other internal reference: the
+    # committed build is the root-hosted one (the Pages artifact's prefix is
+    # applied by the sitePath filter at build time, not in this tree). The
+    # fixture is rule-clean under all of the checks, which is what the
+    # mutation tests that mutate around it depend on.
     page = (
         "<!DOCTYPE html><html lang=\"en\"><head>"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -125,6 +130,117 @@ class Links(unittest.TestCase):
             )
             root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
             self.assertEqual(quality.link_violations(root), [])
+
+
+class RootedInternalLinks(unittest.TestCase):
+    """The committed build is rooted, and stays rooted.
+
+    The deployed failure this exists for: the built pages shipped root-absolute
+    hrefs, and every local gate serves the build at a root, where those links
+    work — while the host serves the site under /DHUN/ and the whole deployed
+    nav 404'd (verified live 2026-10-09). The shipped fix (PR #149) applies the
+    prefix at build time with the `sitePath` filter, so the prefix must not
+    appear in this tree: locally it would 404, and on the host it would
+    double-prefix. Rooted links pass; prefixed and protocol-relative links
+    fail; rooted links must still resolve (the /app/ mirror against
+    app-web/src); the current-page marker points at the rooted route.
+    """
+
+    def test_prefixed_link_in_committed_build_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>", '<h1>t</h1><a href="/DHUN/features/">f</a>'
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertTrue(
+                any("base path" in v for v in quality.root_relative_violations(root))
+            )
+
+    def test_protocol_relative_link_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>", '<h1>t</h1><a href="//example.com/x">x</a>'
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertTrue(
+                any("protocol-relative" in v for v in quality.root_relative_violations(root))
+            )
+
+    def test_rooted_internal_links_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>",
+                '<h1>t</h1><a href="/">h</a>'
+                '<a href="/features/">f</a>'
+                '<a href="/ui/">u</a>'
+                '<a href="#main">s</a>'
+                '<a href="data:text/plain,x">d</a>',
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertEqual(quality.root_relative_violations(root), [])
+
+    def test_rooted_link_resolves_to_the_site_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>", '<h1>t</h1><a href="/features/">f</a>'
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertEqual(quality.link_violations(root), [])
+
+    def test_rooted_dead_link_still_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>", '<h1>t</h1><a href="/nope/">gone</a>'
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertTrue(
+                any("dead internal link" in v for v in quality.link_violations(root))
+            )
+
+    def test_web_app_links_resolve_against_app_web_src(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>",
+                '<h1>t</h1><a href="/app/">app</a>'
+                '<a href="/app/js/main.js">m</a>',
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertEqual(quality.link_violations(root), [])
+
+    def test_dead_web_app_link_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = minimal_site()["index.html"].replace(
+                "<h1>t</h1>", '<h1>t</h1><a href="/app/js/nope.js">gone</a>'
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+            self.assertTrue(
+                any("dead internal link" in v for v in quality.link_violations(root))
+            )
+
+    def test_navigation_marker_uses_the_rooted_href(self):
+        marker = (
+            '<style>[aria-current="page"]{text-decoration:underline}</style>'
+            '<nav><a href="__HREF__" aria-current="page">here</a>'
+            '<a href="/">home</a></nav>'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = (
+                minimal_site()["features/index.html"]
+                .replace("<h1>t</h1>", marker.replace("__HREF__", "/features/"))
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"features/index.html": markup}))
+            self.assertNotIn(
+                "points at", "\n".join(quality.navigation_state_violations(root))
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            markup = (
+                minimal_site()["features/index.html"]
+                .replace("<h1>t</h1>", marker.replace("__HREF__", "/DHUN/features/"))
+            )
+            root = write_tree(Path(tmp), minimal_site(**{"features/index.html": markup}))
+            self.assertTrue(
+                any("points at" in v for v in quality.navigation_state_violations(root))
+            )
 
 
 class MockupLabelling(unittest.TestCase):
@@ -1200,12 +1316,15 @@ class CurrentPageIsMarked(DistCopyMixin):
         self.assertTrue(any("/ui/" in v and "found 2" in v for v in violations), violations)
 
     def test_a_marker_pointing_at_another_route_fails(self):
+        # The committed build is rooted; the mutation swaps the marker for
+        # another route's href.
         dist = self.copy_dist()
         page = dist / "features" / "index.html"
         markup = page.read_text(encoding="utf-8")
-        start = markup.index('<a href="/features/" aria-current="page"')
+        old = '<a href="/features/" aria-current="page"'
+        self.assertIn(old, markup)
         page.write_text(
-            markup.replace(markup[start : start + 35], '<a href="/ui/" aria-current="page"', 1),
+            markup.replace(old, '<a href="/ui/" aria-current="page"', 1),
             encoding="utf-8",
         )
         violations = quality.navigation_state_violations(dist)
@@ -1214,12 +1333,12 @@ class CurrentPageIsMarked(DistCopyMixin):
     def test_a_marker_on_the_404_fails(self):
         dist = self.copy_dist()
         page = dist / "404.html"
+        markup = page.read_text(encoding="utf-8")
+        # Anchor on whatever the 404's primary button points at: the rule is
+        # "a 404 marks no page", not "the 404 links a specific route".
+        anchor = re.search(r'<a class="btn btn--primary" href="([^"]+)"', markup).group(0)
         page.write_text(
-            page.read_text(encoding="utf-8").replace(
-                '<a class="btn btn--primary" href="/ui/"',
-                '<a class="btn btn--primary" aria-current="page" href="/ui/"',
-                1,
-            ),
+            markup.replace(anchor, anchor.replace('href=', 'aria-current="page" href=', 1), 1),
             encoding="utf-8",
         )
         violations = quality.navigation_state_violations(dist)

@@ -24,6 +24,91 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Website — the deployed site's dead links, and "See the interface" reaches the live interface (2026-10-09, session `arena/90cb6d2c-dhun`)
+
+- **Fixed: every internal navigation link on the deployed site was dead.** The
+  site is a project page at `…/DHUN/` but its links were root-absolute, so a
+  browser resolved them at the origin root — a different, empty site (verified
+  live: the nav 404'd while every local gate was green, because CI served the
+  build at a root and the smoke test joined `base + href` as strings). The
+  shipped fix (PR #149, merged mid-session with this PR's mirror work): every
+  internal link in the site sources routes through the `sitePath` filter —
+  the committed `website/dist` stays rooted, the target of every local gate,
+  while the workflow builds a second, `/DHUN`-prefixed Pages artifact and
+  verifies every prefixed link resolves, including the CTA's. The quality rule
+  `root_relative_violations` fails any internal link that is not rooted in the
+  committed tree (a prefixed link would 404 locally and double-prefix on the
+  host); the smoke test resolves served links against the origin the way a
+  browser does, pinned by a test on the exact shape of the bug; and all three
+  routes measured 100/100/100/100 at `requests=1` (website run 37863859204,
+  taken on this session's first-attempt prefixed build — the diagnosis that
+  ordered the fix is unchanged).
+- **Added: the interface mirror is published and linked.** `app-web/` deploys
+  at `/app/` through the site workflow (which stays the single owner of the
+  Pages artifact), the site's primary call to action "See the interface" and
+  the 404's button now open the live interface, and the `/ui/` page's primary
+  CTA is "Open the live interface". The hero states what the CTA delivers and
+  what it does not — audio playback from this origin is unproven, and the page
+  says so. ADR-008 amendment 2026-10-09 (2) records the deployment decision and
+  supersedes its B3 row 15.
+- **Added: the mirror gets its first browser measurements and served checks.**
+  The `browser` job runs a guarded Playwright pass on `/app/` (both schemes,
+  desktop and phone: it must boot, carry the engineering-preview notice, throw
+  nothing unhandled, not overflow; which catalogue answered is recorded, not
+  gated), and the `served` job now fetches `/app/` and re-asserts the shell,
+  `noindex`, strict CSP and the module and stylesheets the page depends on.
+- **Fixed: the interface mirror never booted in a real browser — found by its
+  own first browser check.** The new `browser` job's first pass on `/app/`
+  (website run 37864321503) reported `#app` empty on every viewport with no
+  error of any kind: `app-web/src/js/main.js` defined and exported `boot` but
+  never called it, and the page loads that module as its only script — a
+  module with no top-level side effect defines everything and paints nothing,
+  silently. The 61 DOM-stub boot tests could not see it (they import the
+  module and call `boot` themselves). The module now boots itself, and a
+  browser-free contract test asserts the call exists, so the failure mode is
+  gated even before a browser is involved.
+- **Fixed: track titles and subtitles that could not ellipsize.** The first
+  booting browser pass then found five home-feed rows spilling
+  (`scrollWidth 491 > clientWidth 350`) on the phone viewport only:
+  `.dhun-track__title`/`__subtitle` are `<span>`s, and `overflow: hidden` +
+  `text-overflow: ellipsis` have no effect on non-replaced inline boxes —
+  dead CSS that also let the two lines flow as one. Both are now `display:
+  block` (stacked, clipping, like the Android TrackRow).
+- **Fixed: the track rows' overflow was escaped markup, not layout.** The
+  `display: block` fix above shipped and the *identical* 491 px overflow came
+  back — and the spilling row's only element child was the container itself,
+  so the CSS theory was dead. Rendering the templates in Node showed why: the
+  `html` tag in `app-web/src/js/dom.js` escapes every interpolated value not
+  wrapped in `raw()`, and thirteen nested templates in
+  `app-web/src/js/views.js` (plus one `Array.join("")` coercion in
+  `loadingState`) interpolated plain, so their markup rendered as a visible
+  text node — including the track row's overflow button, which had never
+  existed in the DOM. The escaped markup string *was* the 491 px
+  non-breaking run; the same bug class had silently text-ified the
+  error/empty states, section hints, search result grids, the playlists list,
+  the downloads notice and the artist albums grid. All thirteen sites now
+  wrap their nested templates in `raw()` (the convention already used at sixty
+  other interpolation points), and `app-web/tests/escaping.test.mjs` renders
+  every view in Node and fails on any escaped angle bracket — the bug class
+  is gated without a browser. The first post-fix browser run then exposed the
+  layout bug the escaped markup had masked: the row button's `width: 100%`
+  plus the trailing icon button ran 378 px in the 350 px list on the phone
+  viewport. The row is now a proper flex pair — the row button takes the
+  remaining space (`flex: 1 1 auto; min-width: 0`, so the text finally
+  ellipsizes) and the trailing button keeps its fixed size (`flex: 0 0
+  auto`) — covering every row in the home feed, history and playlists.
+- **Added: a CI evidence channel that survives a dying run.** The browser
+  job's findings are now written to the step summary and emitted as
+  annotations as they happen (plus per-check progress and a final
+  clean-finish marker), the step log is tee'd to a file, and an
+  `if: always()` step posts the full record as a comment on issue #150 —
+  necessary because the job log archive and the CI artifacts are not
+  retrievable from the sandbox that maintains this repository, and that is
+  the channel through which both findings above were actually read.
+- The deployed page weights moved with the copy: `/` 51,768 → 52,233 B,
+  `/features/` 48,476 → 48,513 B, `/ui/` 49,965 → 50,127 B (uncompressed,
+  measured against the served tree locally; inside the ratchet's 5 %).
+
 ### Accessibility — "increase contrast" now increases contrast (2026-10-08, session `arena/af3e7f66-dhun`)
 
 - The sheet met the 4.5:1 body floor everywhere and stopped there, so a visitor

@@ -1,8 +1,93 @@
 # CURRENT ACTIVE TASK
 
-## Session — urgent UI correctness, website navigation, and instruction reconciliation (2026-10-09)
+## Session `arena/90cb6d2c-dhun` — the deployed site's dead links, and "See the interface" pointing at the real thing (2026-10-09)
 
-**State: IN PROGRESS; not merged, not verified green.** Working branch: `fix/ui-download-feedback-website-links`, based on the current `main` source. This task supersedes the previous active-task snapshot below; that snapshot is historical context, not the next step.
+Updated **2026-10-09** · fixed session branch `arena/90cb6d2c-dhun` · branch
+point and GitHub `main` at boot **`8b35dcf1c9a6808ed6720ff44179d72bf4e2cc96`**
+(PR #145 merge). Working tree clean at boot.
+
+**User direction for this session (verbatim, 2026-10-09):** make the web app
+the destination of the site's "See the interface" call to action, make all the
+other buttons work, and improvise the overall website — autonomously, with the
+session ending in a merged PR.
+
+### Recon (every line read from a tool output)
+
+| Fact | State | Evidence |
+|---|---|---|
+| Branch / tree | `arena/90cb6d2c-dhun`, clean at boot | `git status --short`, `git branch --show-current` |
+| Clone | **shallow** (`git rev-list --count HEAD` → 1) | `git rev-list --count HEAD` |
+| Python suite at boot | **295 tests, 0 failures** | `python3 -m unittest discover -s scripts -p 'test_*.py'` → `Ran 295 tests … OK` |
+| `app-web` Node suite | **61 pass / 0 fail**; build 17 files, 165,921 B | `cd app-web && npm test`, `node tools/build.mjs` |
+| Site build | `minified: saved 53466 bytes`; 5 files, 0.16 s; `verify-minify` OK (53,616 B) | `npm ci`, `npm run build`, `node tools/verify-minify.mjs` |
+| Honesty + quality gates | claims OK (8 forbidden-claim, 3 caveat, 5 digest, 12 telemetry rules); **29 quality checks** | `python3 scripts/website_claims.py website/dist`, `…/website_quality.py website/dist` |
+| Drift | a fresh build leaves `website/dist` byte-identical to the committed mirror | `git status --porcelain -- website/dist` empty |
+| Pages | `build_type=workflow`, `status=built`, source `main:/` | `gh api repos/99ggprooo00-code/DHUN/pages` |
+| `main` CI at boot (run 37849181…) | CI · Build APK · test-release · website **all success** on `8b35dcf` | `gh run list --branch main` |
+| Canonical URL | serves the real site (fetched live) | `fetch_page https://99ggprooo00-code.github.io/DHUN/` |
+| Open PRs | **#144** (retitled SUPERSEDED, head `arena/5defb1ff-dhun`) and **#54** (ADR-007 research, out of scope) | `gh pr list --state open` |
+
+**Mid-session, PR #149 merged to main** (result-driven destructive
+actions in the Android/desktop app, and the `sitePath` base-path design for
+the website — the fix for the finding below, with a cleaner mechanism than
+this session's first attempt). This branch absorbed it and its website design
+is now the base this PR builds on; the two sessions' website work is one
+design, not two.
+
+**The finding that orders this session: every internal navigation link on the
+deployed site is dead.** The site is a GitHub **project** page, published at
+the sub-path `https://99ggprooo00-code.github.io/DHUN/`, but the built HTML
+uses **root-absolute** hrefs (`/`, `/features/`, `/ui/`). A browser resolves
+those against the *origin*, so the live nav — the wordmark, "Features",
+"Interface", the "See the interface" CTA and the footer's "Features"/"Interface"
+— all point at `https://99ggprooo00-code.github.io/features/` and friends:
+**verified 404** (`fetch_page https://99ggprooo00-code.github.io/ui/` →
+"Site not found"). No gate could see it: the CI browser and Lighthouse jobs
+serve the build at a local origin's **root**, where root-absolute links happen
+to work, and the served-job's link resolver joins `base + href` as *strings*
+(`…/DHUN` + `/ui/`), which is not how a browser resolves.
+
+### What this session changes (working through it; statuses below are live)
+
+| # | Item | Status |
+|---|---|---|
+| W1 | **Fix the deployed link structure.** Shipped via PR #149 (merged to main mid-session): every internal `href` in the `.njk` sources routes through the `sitePath` filter — a no-op in the committed, root-hosted `website/dist` (the target of every local gate) and a `/DHUN` prefix in the second, Pages-only artifact the workflow builds with `DHUN_SITE_PATH_PREFIX=/DHUN` and verifies link-by-link. This PR's job was the diagnosis that ordered it, plus the quality checker resolving `/app/` links against `app-web/src` and the smoke test resolving links the way a browser does. | **done** (merged as PR #149) — the prefixed-artifact verification step runs on every website workflow run |
+| W2 | **Deploy `app-web` at `/app/` through the site workflow** (the single owner of the Pages artifact) and point the primary CTA "See the interface" at the live interface. ADR-008 gets a deployment amendment superseding B3 row 15 ("unlinked from the marketing site") — that was the previous session's placeholder decision, and the user's direction now is the decision. The web app keeps its `noindex` and its on-page honesty notices. | **done** (commit `6376b6d`) — locally verified on the assembled deploy tree; CI on `6376b6d` read at the finish sequence; the served-origin verification happens in the `served` job after the merge to `main` |
+| W3 | **Every button on the site resolves.** Full link audit over the built pages at the local root **and** over the prefixed Pages artifact, asserted by the static gates, the workflow's prefixed-link step and the served job (marketing routes **and** `/app/`). | **done** — internal-link resolution in `website_quality.py` (with `/app/` resolved against `app-web/src`) + browser-like smoke resolution + the workflow's prefixed-link verification |
+| W4 | **Honest copy around the live interface** (what the CTA delivers, what it does not), docs, verification record, CHANGELOG. | **done** — one line under the hero CTA (worded around the honesty contract), README rewritten for the live state, record **30** in `docs/verification/`, KNOWN_LIMITATIONS, WEBSITE_PLAN D13/D14, DEBUG_LOG, CHANGELOG |
+| W5 | **The first real browser run of the mirror found it never booted: fix + gate.** The new `browser` job's first pass (website run 37864321503 on `6376b6d`) reported `#app` empty on all four viewports with no error of any kind — `app-web/src/js/main.js` exported `boot` without ever calling it, and the page loads the module as its only script. Fixed with a top-level `boot();` (61/61 DOM-stub tests still green) and a browser-free contract test that asserts the call exists (mutation-proven). | **done** (commit `5f1f2c6`) — the first booting run's record closes W2's "CI read at the finish sequence" |
+| W6 | **The first booting run's real finding: five track rows spilling on the phone viewport.** `overflow: hidden` + ellipsis on the inline `<span>` title/subtitle was dead CSS (no effect on non-replaced inline boxes) — rows with a long "Artist • Album" ran 491 px wide in a 350 px box, phone only (dark and light); desktop clean. Fixed with `display: block` on both classes (stacked, clipping, like the Android TrackRow); the web app overflow finding now names the text and widths, matching the marketing check. | **done** (fix on this branch; the green browser run on the fix head is the verification) |
+| W8 | **The W6 overflow's real root cause: the track-row button was never in the DOM.** The `display: block` fix shipped and the byte-identical 491 px overflow returned, with the row's only element child at container width — the inline-span theory was dead. Node-rendering the templates (no browser, no CI) showed `trackRow` emitting `&lt;button class=&quot;dhun-icon-button&quot;…`: the `html` tag in `app-web/src/js/dom.js` escapes every interpolated value not wrapped in `raw()`, and thirteen nested templates in `views.js` (plus one `Array.join("")` in `loadingState`) interpolated plain, so their markup rendered as a visible text node — the escaped string *is* the 491 px non-breaking run. Same bug class had silently text-ified the error/empty states, section hints, search grids, playlists list, downloads notice and artist albums grid. Fixed with `raw()` at all thirteen sites and `tests/escaping.test.mjs` (every view rendered in Node, failing on any escaped angle bracket). The first post-fix browser run (37875677135) then exposed the layout bug the escaped markup had masked: the row button's `width: 100%` plus the trailing icon button ran 378 px in the 350 px list (incident 8) — fixed with the scoped flex-pair rules (`flex: 1 1 auto; min-width: 0` on the row button, `flex: 0 0 auto` on the trailing button), which also let the text finally ellipsize. | **done** (commits `fc0bfe7` + the flex-pair CSS) — the green browser run on the fix head is the verification |
+| W7 | **The CI evidence channel: the record must survive a dying run.** Four consecutive runs failed with zero annotations and an empty step summary while their screenshot artifacts proved the suite had completed; the job log archive and artifact hosts are outside the sandbox's egress allowlist, and the check-run API does not expose step summaries. Fix: findings + per-check progress written to the step summary and emitted as annotations immediately, a process-level crash annotation, a final clean-finish marker, and an `if: always()` step posting the full step log to issue #150 (browser job granted `issues: write`). | **done** — the first readable record (run 37872180179) proved the script had finished cleanly all along and carried the W6 finding; the annotation-retention anomaly is recorded as not verified in record 30 |
+
+Boundaries unchanged: no backend, no proxy, no fourth marketing route (the
+web app is not a marketing route — it is the mirror, `noindex`, linked from
+the CTA), the four app workflows untouched. One planned boundary was broken
+on purpose: "no `app-web` source changes" — the W5 fix is a one-line source
+change in `app-web/src/js/main.js` (plus its comment), made because the first
+real browser check proved the page could not load without it, W6 is a
+CSS-only source change in `app-web/src/css/app.css`, made because that same
+first booting check proved two of the shipped rows could not clip their text
+on a phone, and W8 is a source change in `app-web/src/js/views.js` (plus its
+regression test), made because the first Node render of the rows proved the
+overflow was escaped markup, not layout.
+
+### Exact next actions for the next session (post-merge)
+
+1. Read the `served` job on `main` for this merge: the first served
+   verification of `/app/` (shell, noindex, CSP, module + stylesheets over the
+   wire) and of the marketing routes' links resolved the browser way.
+2. Look at the `browser-evidence` artifact: first human eyes on the mirror's
+   rendered layout (CI's Chromium measured boot/notice/console/overflow; a
+   person has not looked at it).
+3. The §9 screenshot backlog on the marketing site is unchanged: a real
+   capture is still the only thing that replaces a mockup.
+
+---
+
+## Session — urgent UI correctness, website navigation, and instruction reconciliation (2026-10-09) — **merged to main as PR #149**
+
+**State: MERGED 2026-10-09; historical from this session's point of view.** Working branch: `fix/ui-download-feedback-website-links`, based on the current `main` source. This task supersedes the previous active-task snapshot below; that snapshot is historical context, not the next step.
 
 ### Confirmed source-level defects and changes in this branch
 
@@ -28,7 +113,6 @@ The source-level defect was confirmed from `LibraryScreen.kt`, `LibraryViewModel
 ---
 
 ## Historical snapshot — previous active task, superseded 2026-10-09
-
 ## Session `arena/967513fd-dhun` — the app's interface in a browser, and the harness bug that was hiding measurements (2026-10-09)
 
 Updated **2026-10-09** · fixed session branch `arena/967513fd-dhun` · branch point

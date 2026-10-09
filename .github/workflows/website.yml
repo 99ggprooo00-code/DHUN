@@ -12,6 +12,9 @@ on:
     branches: [main]
     paths:
       - "website/**"
+      # The mirror deploys at /app/ through this workflow (ADR-008 amendment
+      # 2026-10-09 (2)); an edit to it must start it.
+      - "app-web/**"
       - "scripts/website_claims.py"
       - "scripts/website_quality.py"
       - "scripts/website_smoke.py"
@@ -25,6 +28,9 @@ on:
   pull_request:
     paths:
       - "website/**"
+      # The mirror deploys at /app/ through this workflow (ADR-008 amendment
+      # 2026-10-09 (2)); an edit to it must start it.
+      - "app-web/**"
       - "scripts/website_claims.py"
       - "scripts/website_quality.py"
       - "scripts/website_smoke.py"
@@ -150,11 +156,30 @@ jobs:
         working-directory: website
         run: npx html-validate "dist/**/*.html"
 
-      - name: Upload the built site
+      # The Pages deploy also carries the web mirror (ADR-008 amendment,
+      # 2026-10-09 (2)): /app/ is a byte-for-byte copy of app-web/src, and this
+      # workflow stays the single owner of the Pages artifact — a second
+      # workflow publishing to the same environment would race it. Its build
+      # needs no install (the module is dependency-free) and its node tests are
+      # the wiring gate; the Python contract for the mirror runs in app CI.
+      - name: Build the web app (deploys at /app/)
+        working-directory: app-web
+        run: |
+          node tools/build.mjs
+          npm test
+
+      - name: Assemble the local test artifact (site at the root, the mirror at /app/)
+        run: |
+          rm -rf deploy
+          mkdir -p deploy/app
+          cp -r website/dist/. deploy/
+          cp -r app-web/dist/. deploy/app/
+
+      - name: Upload the local test artifact
         uses: actions/upload-artifact@v6
         with:
           name: dhun-site
-          path: website/dist
+          path: deploy
           retention-days: 7
           if-no-files-found: error
 
@@ -167,16 +192,31 @@ jobs:
           DHUN_SITE_PATH_PREFIX: /DHUN
         run: npm run build
 
+      # The deploy carries the mirror at /app/ too (ADR-008 amendment,
+      # 2026-10-09 (2)): the CTA's /app/ link must resolve for a visitor, so
+      # the verification below sees the assembled tree, not the site alone.
+      - name: Assemble the Pages deploy (prefixed site at the root, the mirror at /app/)
+        run: |
+          rm -rf pages-deploy
+          mkdir -p pages-deploy/app
+          cp -r website/dist/. pages-deploy/
+          cp -r app-web/dist/. pages-deploy/app/
+
       - name: Verify GitHub Pages internal links
         run: |
           node --input-type=module <<'NODE'
           import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
           import { join } from 'node:path';
-          const root = 'website/dist';
+          const root = 'pages-deploy';
           const files = [];
           function walk(dir) {
             for (const name of readdirSync(dir)) {
               const path = join(dir, name);
+              // The mirror is not the site: its files reference each other
+              // relatively (./css/app.css, ./js/main.js) by design and work
+              // under any mount path — checking them here would fail on
+              // relative refs the site never uses.
+              if (name === 'app' && dir === root) continue;
               if (statSync(path).isDirectory()) walk(path);
               else if (path.endsWith('.html')) files.push(path);
             }
@@ -214,7 +254,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: dhun-pages-site
-          path: website/dist
+          path: pages-deploy
           retention-days: 7
           if-no-files-found: error
 
@@ -222,6 +262,13 @@ jobs:
     name: "Browser measurements (Playwright: viewports, keyboard, contrast, motion, axe)"
     needs: build
     runs-on: ubuntu-latest
+    # issues: write is the one extra the job needs, and only for the final
+    # step: the readable record (full step log) is posted as a comment on
+    # issue #150, because the job log archive and the artifacts of this run
+    # are not retrievable from the sandbox that maintains this repository.
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v7
@@ -246,6 +293,12 @@ jobs:
         working-directory: website
         run: npx playwright install --with-deps chromium
 
+      # The local test artifact is the rooted build (the /DHUN/ prefix exists
+      # only in the Pages artifact, verified by the prefixed-link step), so the
+      # local server publishes it at a root — where the browser measures layout
+      # and behaviour, and where the /app/ mirror sits beside the site.
+      # (The link-structure bug of 2026-10-09 was a *resolution* bug; resolution
+      # on the host is the prefixed artifact's check's job, not this one's.)
       - name: Serve the built site
         run: |
           nohup python3 -m http.server 8080 --directory dist --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
@@ -272,7 +325,17 @@ jobs:
         working-directory: website
         env:
           SITE_BASE: http://127.0.0.1:8080
-        run: node tests/browser.mjs
+        # The step log is tee'd to a file so the next step can post it where
+        # it is readable: the job log archive and the artifacts of this run
+        # are not retrievable from the sandbox that maintains this repository
+        # (results-receiver and the artifact blob host are outside its egress
+        # allowlist). On 2026-10-09 three consecutive runs died before the
+        # tail emission with zero annotations, and there was no channel left
+        # to say what the run had recorded. pipefail keeps the node exit
+        # code authoritative through the pipe.
+        run: |
+          set -o pipefail
+          node tests/browser.mjs 2>&1 | tee /tmp/browser-step.log
 
       # Full-page captures for a human to eyeball later. CI artifacts, never
       # committed: the repository contains no image files on purpose, because
@@ -285,6 +348,43 @@ jobs:
           path: website/tests/screenshots
           retention-days: 7
           if-no-files-found: warn
+
+      # The readable record for this run: the full step log, posted as a
+      # comment on the dedicated issue #150 (do not close it — it is
+      # load-bearing for the CI evidence chain). `if: always()` so the
+      # record lands whether the measurements passed, failed, or the
+      # process died before speaking.
+      - name: Post the readable record (step log)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Build the comment body in Python: decode the log lossily (a log
+          # that was cut mid-write may carry invalid UTF-8), keep the *tail*
+          # (the packed report is emitted last), and stay under the 65536
+          # issue-comment character limit by counting characters, not bytes.
+          python3 - <<'PY'
+          import os, pathlib
+          limit = 65000
+          header = ("### Browser job record — run "
+                    f"{os.environ.get('GITHUB_RUN_ID','?')} @ "
+                    f"`{os.environ.get('GITHUB_SHA','?')}`\n\n"
+                    "## Step log (full output of `node tests/browser.mjs`, "
+                    "including `[summary]` progress lines)\n\n```\n")
+          footer = "\n```"
+          try:
+              raw = pathlib.Path("/tmp/browser-step.log").read_bytes()
+              log = raw.decode("utf-8", "replace")
+          except Exception as e:  # the file being absent is itself a finding
+              log = f"(step log not captured: {e!r} — the step died before tee wrote anything)"
+          budget = max(0, limit - len(header) - len(footer))
+          log = log[-budget:]
+          pathlib.Path("/tmp/browser-record.md").write_text(header + log + footer, encoding="utf-8")
+          print(f"record body ready: {len(header + log + footer)} chars, log was {len(log)} chars")
+          PY
+          gh issue comment 150 --repo "$GITHUB_REPOSITORY" --body-file /tmp/browser-record.md \
+            || echo "::warning title=Readable record::posting the step log to issue #150 failed; the annotations are the fallback"
 
   lighthouse:
     name: Lighthouse (three samples per route, gate on the median)
@@ -314,6 +414,9 @@ jobs:
             echo "::warning title=Lighthouse::no Chrome on this runner — Lighthouse did not run; no score is claimed."
           fi
 
+      # Rooted staging, same reasoning as the browser job: the numbers describe
+      # the pages themselves; the /DHUN/ prefix is a byte-level href
+      # transformation applied to the Pages artifact only.
       - name: Serve the built site
         if: steps.browser.outputs.available == 'true'
         run: |

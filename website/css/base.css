@@ -155,6 +155,7 @@ hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--sp-8) 0; }
 }
 .hero-lead { font-size: clamp(1.02rem, 2vw, 1.18rem); color: var(--text-2); max-width: 62ch; }
 .cta-row { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: var(--sp-6) 0 var(--sp-5); }
+.cta-note { margin: 0; font-size: 0.85rem; color: var(--text-2); max-width: 52ch; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5em;
   min-height: 48px; padding: 0 var(--sp-6); border-radius: var(--r-full);

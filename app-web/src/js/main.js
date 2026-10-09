@@ -897,3 +897,12 @@ function defaultPlaylists(catalog) {
 }
 
 export { escapeHtml, BACKEND };
+
+// This module IS the entry point: `src/index.html` loads it as the page's
+// only script, so it must boot itself — exporting `boot` (which the DOM-stub
+// boot tests import and call explicitly) was never enough, because nothing in
+// the browser ever invoked it. First caught by the CI browser pass on
+// 2026-10-09: the module loaded, defined everything, and rendered nothing.
+// Under the stub harness the same import self-boots once against the stub
+// document and the harness's explicit `boot()` re-renders idempotently.
+boot();

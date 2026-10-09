@@ -48,6 +48,20 @@ RATCHET_TOLERANCE = 0.05
 
 CANONICAL_ORIGIN = "https://99ggprooo00-code.github.io/DHUN"
 
+# The site is a GitHub project page, published at the sub-path `/DHUN/` — not
+# at the origin's root. The *committed* build is rooted (root-absolute hrefs):
+# that is the target of every local gate, and a browser served at a root
+# resolves exactly those. The prefix a visitor actually gets is applied at
+# build time by the `sitePath` filter in `website/eleventy.config.js` when the
+# workflow builds the Pages artifact with `DHUN_SITE_PATH_PREFIX=/DHUN`, and
+# the workflow's "Verify GitHub Pages internal links" step fails any prefixed
+# link that has no target. This file checks the rooted form; `SITE_PATH` is
+# kept so the canonical origin and the base the host mounts the site at cannot
+# drift apart silently. (Found live 2026-10-09: the whole deployed nav 404'd
+# while every rooted gate was green — the diagnosis is in .ai/DEBUG_LOG.md.)
+SITE_PATH = "/DHUN"
+assert CANONICAL_ORIGIN.endswith(SITE_PATH), "origin and base path must agree"
+
 # Copy that must never reach a visitor, whatever produced it: a leaked Markdown
 # backtick, an HTML tag that was escaped instead of rendered, a link that goes
 # nowhere, or a placeholder word. The site has no stubs by policy, so this is a
@@ -313,6 +327,14 @@ def javascript_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+# The deployed tree is this dist plus `app/`, and `app/` is a byte-for-byte
+# copy of `app-web/src` (the web app's build is a copy —
+# `app-web/tools/build.mjs` — no minification, no rewriting), so the deployed
+# web app resolves against the source directory. That keeps this checker
+# Python-only and network-free while still seeing what the deploy ships.
+APP_WEB_SRC = REPO_ROOT / "app-web" / "src"
+
+
 def _resolve_internal(dist: pathlib.Path, reference: str) -> bool:
     if reference.startswith("#") or reference.startswith("mailto:"):
         return True
@@ -326,10 +348,58 @@ def _resolve_internal(dist: pathlib.Path, reference: str) -> bool:
     path = reference.split("#", 1)[0].split("?", 1)[0]
     if not path.startswith("/"):
         return True  # relative links are not used by this site's markup
-    candidate = dist / path.lstrip("/")
+    # The committed build is rooted: map the reference straight onto the
+    # deploy tree. The `/app/` mirror is a byte copy of `app-web/src`, so
+    # mirror links resolve against the source, not the (absent) dist.
+    if path == "/app":
+        candidate = APP_WEB_SRC
+    elif path.startswith("/app/"):
+        candidate = APP_WEB_SRC / path[len("/app/"):]
+    else:
+        candidate = dist / path.lstrip("/")
     if candidate.is_dir():
         candidate = candidate / "index.html"
     return candidate.is_file()
+
+
+def root_relative_violations(dist: pathlib.Path) -> list[str]:
+    """Every internal link is rooted (starts with `/`) — no relative, no
+    protocol-relative, no base-path prefix in the committed build.
+
+    The committed `website/dist` is the root-hosted build: local gates serve
+    it at a root, the browser job measures it at a root, and the Pages
+    artifact's prefix is applied by the `sitePath` filter at build time
+    (verified in CI, not in this tree). A prefixed link in this tree would
+    404 locally and would double-prefix on the host; a relative link would
+    break the single-request, single-source invariants the rest of this file
+    measures.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for match in re.finditer(
+            r"""<(?:a|link|img|script)\b[^>]*?\b(?:href|src)="([^"]+)\"""",
+            markup,
+            re.I,
+        ):
+            reference = match.group(1)
+            if reference.startswith(
+                ("#", "mailto:", "data:", "http://", "https://")
+            ):
+                continue
+            if reference.startswith("//"):
+                violations.append(
+                    f"{route}: protocol-relative internal link {reference} "
+                    f"escapes the origin — the committed build is rooted"
+                )
+                continue
+            if reference.startswith(SITE_PATH + "/") or reference == SITE_PATH:
+                violations.append(
+                    f"{route}: internal link {reference} carries the {SITE_PATH} "
+                    f"base path in the committed build — the prefix belongs to "
+                    f"the Pages artifact only (sitePath filter, CI)"
+                )
+    return violations
 
 
 def link_violations(dist: pathlib.Path) -> list[str]:
@@ -658,11 +728,15 @@ def navigation_state_violations(dist: pathlib.Path) -> list[str]:
                 f"{route}: expected exactly one aria-current=\"page\", found {len(markers)}"
             )
             continue
+        # The committed build is rooted: the marker's href is the route itself.
+        # (The Pages artifact prefixes every href uniformly at build time, so
+        # the marker keeps pointing at the same document on the host.)
+        expected_href = route
         href = re.search(r'href="([^"]+)"', markers[0])
-        if not href or href.group(1) != route:
+        if not href or href.group(1) != expected_href:
             violations.append(
                 f"{route}: the current-page marker points at "
-                f"{href.group(1) if href else 'no href'}, not at this route"
+                f"{href.group(1) if href else 'no href'}, not at {expected_href}"
             )
         css = page_stylesheet(dist, route)
         marker_rules = [
@@ -2104,6 +2178,7 @@ CHECKS = (
     ("page weight budget", weight_violations),
     ("no client-side JavaScript", javascript_violations),
     ("internal links resolve", link_violations),
+    ("internal links are rooted", root_relative_violations),
     ("mockups are labelled", mockup_violations),
     ("icon is inlined and true to its source", favicon_violations),
     ("nothing ships unreferenced", unreferenced_file_violations),

@@ -19,11 +19,14 @@ cssModules: ["tokens", "base", "components", "mockups"]
       <p>{{ site.mutationClaim }}</p>
       <!--{{ site.leadSource }}-->
       <p class="hero-lead">{{ site.lead }}</p>
-      <!-- Exactly two calls to action. Download and source are separate destinations. -->
+      <!-- Exactly two calls to action: the live interface and the source,
+           separate destinations. -->
       <div class="cta-row">
         <a class="btn btn--primary" href="{{ site.ctaPrimary.href | sitePath }}">{{ site.ctaPrimary.label }}</a>
         <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
       </div>
+      <p class="cta-note">{{ site.ctaNote }}</p>
+      <!--{{ site.ctaNoteSource }}-->
     </div>
     <div class="hero-visual">
       {% include "mockups/home-phone.njk" %}

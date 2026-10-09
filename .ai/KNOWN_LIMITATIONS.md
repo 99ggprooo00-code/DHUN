@@ -7,6 +7,63 @@
 - **Website project-base navigation (P1, fix in progress):** the canonical GitHub Pages URL is beneath `/DHUN/`, while root-hosted local tests run at `/`. The source now has a `sitePath` filter and the workflow builds a separate prefixed Pages artifact. On run `37869983672`, the build/quality/prefix-link smoke job and browser-measurement job passed; Lighthouse is still running. The deploy and served-origin smoke jobs are skipped on pull requests, so the live canonical site must still be verified after merge.
 - **Visual target (current):** DHUN's product identity is translucent frosted glass, artwork-led and dark-first. Use lightweight/cached 2D blur, translucent tint, gradients/scrims, restrained highlights and accessible fallbacks. Material/Compose components may be implementation primitives but Material 3 is not the visual target. The 2026-09-05 “Material 3 only” note below is superseded.
 - **Evidence boundary:** source changes are not the same as unit-tested, CI-green, hardware-verified or canonical-origin-verified. Record each separately.
+## 2026-10-09 — session `arena/90cb6d2c-dhun`: the mirror is published, and what publication does not prove
+
+- **The `/app/` deployment is proven on the assembled bytes, not on the public
+  origin, until `main` merges.** This session verified the deploy tree (the
+  checked site plus a byte copy of `app-web/src` at `/app/`): every internal
+  link resolves, the honesty contract holds, and the smoke check's new
+  `/app/` assertions pass on those bytes. With the sitePath design merged
+  from #149, the committed `website/dist` is rooted (local gates serve at a
+  root and `/app/` sits beside the site), and the Pages artifact is the
+  second, `/DHUN`-prefixed build with the mirror at `/DHUN/app/` — verified
+  by the workflow's prefixed-link step. The *served* verification of the
+  public origin happens in the `served` job after the merge to `main` — the
+  same two-step that has applied to every other publish of this site.
+- **The web app's layout was measured for the first time in this session — in
+  CI, not by a person.** The `browser` job now boots `/app/` in Chromium on
+  the runner at desktop and phone widths in both colour schemes (boot,
+  honesty notice, no unhandled errors, no overflow). A human has not looked at
+  it; the full-page captures are CI artifacts (`browser-evidence`), never
+  committed, because the repository still contains no image files on purpose.
+- **Audio playback from the deployed origin remains unproven.** B1's finding
+  is unchanged: no stream is reachable from a browser origin, so the transport
+  advances a labelled clock and the page says it makes no sound. Publishing
+  the mirror changed where the preview is seen, not what it proves. ADR-008
+  boundary 4 (no Web-support claim before proof) is enforced by the page's own
+  notice, by `scripts/test_app_web.py` on the source, and now by the served
+  check on the bytes a visitor gets.
+- **The served check of `/app/` is shape-only.** It asserts the shell, the
+  `noindex`, the strict CSP, and that the module and stylesheets return 200 —
+  it does not execute the application (the `served` job has no JS engine).
+  What the app *does* is measured by the `browser` job, what its *source*
+  promises is measured by `scripts/test_app_web.py`, and what the *bytes* are
+  is measured by the served job. The gap between "bytes are the mirror" and
+  "the bytes behave like the mirror" is the browser job's job, on the same
+  commit — not a hole, but the division is worth stating.
+- **The browser job's readable record now travels through issue #150, and
+  check-run annotations from this sandbox are not a reliable channel.** The
+  job log archive (`results-receiver…`) and the CI artifacts (blob host) are
+  outside the sandbox's egress allowlist, and the check-run API does not
+  expose step summaries; annotations emitted by recent runs also read back as
+  zero through the API (earlier the same day they read fine). The browser
+  job therefore tees its full step log and posts it as a comment on the
+  dedicated issue #150 (`if: always()`), and writes findings/progress to the
+  step summary as they happen. That comment is the authoritative readable
+  record for the browser job from this environment; annotations are a bonus.
+- **No Lighthouse or axe numbers exist for the mirror, by decision.** It is a
+  JavaScript application, not a static marketing route, and its gates are the
+  boot/honesty/console/overflow pass plus its own 61 node tests. Running
+  Lighthouse on it and quoting the scores as evidence of *the site* would
+  measure the wrong thing; it is recorded here rather than argued elsewhere.
+- **The web app's console gate filters network noise.** Failed upstream fetches
+  log "Failed to load resource" to the console as an error; that is the
+  *expected* behaviour when the live catalogue is unreachable (the app catches
+  it, falls back to the labelled sample catalogue, and says so on screen). The
+  check therefore excludes that pattern and fails on everything else an
+  unhandled app bug would log. Corollary: an app bug that logs an error string
+  matching the noise pattern would pass this gate — caught (or not) by the
+  `pageerror` gate and the node tests instead.
 
 ## 2026-10-08 — session `arena/37ec95ed-dhun`: what one request, print and High Contrast still do not prove
 

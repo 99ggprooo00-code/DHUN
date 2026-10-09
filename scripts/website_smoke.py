@@ -34,6 +34,7 @@ import pathlib
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -106,6 +107,34 @@ def page_problems(route: str, status: int, markup: str) -> list[str]:
     return problems
 
 
+# The web mirror deploys at /app/ under the same origin (ADR-008 amendment,
+# 2026-10-09 (2)). It is not a marketing route — noindex, out of the sitemap —
+# so the marketing honesty contract does not bind its copy; its own contract
+# (engineering-preview and sample-data notices) is asserted against the source
+# by scripts/test_app_web.py. What the *served* bytes must still show: the
+# page is the application shell, it stays unindexable, its CSP is intact and
+# the bytes the page depends on are actually there.
+APP_ROUTE = "/app/"
+APP_ASSETS = ("js/main.js", "css/tokens.css", "css/app.css")
+
+
+def app_problems(status: int, markup: str) -> list[str]:
+    if status != 200:
+        return [f"{APP_ROUTE}: served HTTP {status}"]
+    if not markup.strip():
+        return [f"{APP_ROUTE}: served an empty body"]
+    problems: list[str] = []
+    if '<meta name="robots" content="noindex' not in markup:
+        problems.append(
+            f"{APP_ROUTE}: no longer noindex — the mirror is a preview, not a product surface"
+        )
+    if "default-src 'none'" not in markup:
+        problems.append(f"{APP_ROUTE}: the strict CSP is missing from the served page")
+    if '<div id="app">' not in markup:
+        problems.append(f"{APP_ROUTE}: the application mount point is missing — not the mirror")
+    return problems
+
+
 def caveat_problems(pages: dict[str, str]) -> list[str]:
     """The three required disclosures must survive publication.
 
@@ -129,12 +158,27 @@ def smoke_problems(fetched: dict[str, tuple[int, str]]) -> list[str]:
     return problems
 
 
+def resolved_url(base: str, href: str) -> str:
+    """Resolve `href` against `base` the way a browser does.
+
+    Root-absolute references anchor at the origin, *not* at the site's path:
+    on `https://host/DHUN/` the link `/ui/` means `https://host/ui/`. The old
+    string join (`base + href`) meant `https://host/DHUN/ui/`, so a link that
+    404s for every real visitor sailed through this check — the deployed nav
+    was dead for a week before 2026-10-09 because of exactly this.
+    """
+    parts = urllib.parse.urlsplit(base)
+    return urllib.parse.urljoin(f"{parts.scheme}://{parts.netloc}/", href)
+
+
 def link_problems(
     base: str, fetched: dict[str, tuple[int, str]], fetch_one=fetch
 ) -> list[str]:
     """Every root-relative link on the served pages must resolve on the server.
 
-    `fetch_one` is injectable so the rule can be exercised without a network.
+    Resolution is browser-like (`resolved_url`), not string concatenation —
+    see its docstring for why that distinction is the whole point. `fetch_one`
+    is injectable so the rule can be exercised without a network.
     """
     problems: list[str] = []
     seen: dict[str, int] = {}
@@ -145,7 +189,7 @@ def link_problems(
         for href in internal_links(markup):
             if href in seen:
                 continue
-            link_status, _ = fetch_one(f"{base}{href}")
+            link_status, _ = fetch_one(resolved_url(base, href))
             seen[href] = link_status
             if link_status != 200:
                 problems.append(f"{route}: served page links {href}, which returns HTTP {link_status}")
@@ -156,13 +200,21 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     base = (argv[0] if argv else DEFAULT_BASE).rstrip("/")
     fetched = {route: fetch(f"{base}{route}") for route in ROUTES}
+    app_status, app_markup = fetch(f"{base}{APP_ROUTE}")
 
     for route in ROUTES:
         status, markup = fetched[route]
         print(f"{route}: HTTP {status}, {served_size(markup)} bytes, sha256:{digest(markup)}")
+    print(f"{APP_ROUTE}: HTTP {app_status}, {served_size(app_markup)} bytes, sha256:{digest(app_markup)}")
 
     problems = smoke_problems(fetched)
     problems += link_problems(base, fetched)
+    problems += app_problems(app_status, app_markup)
+    for asset in APP_ASSETS:
+        status, body = fetch(f"{base}{APP_ROUTE}{asset}")
+        print(f"{APP_ROUTE}{asset}: HTTP {status}, {served_size(body)} bytes, sha256:{digest(body)}")
+        if status != 200:
+            problems.append(f"{APP_ROUTE}: the page's {asset} returns HTTP {status}")
     if problems:
         print(f"FAIL: {len(problems)} served-site problem(s):", file=sys.stderr)
         for problem in problems:
@@ -170,7 +222,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(
         f"OK: {len(ROUTES)} served route(s) carry the three required caveats, "
-        f"trip no forbidden-claim rule, and every internal link resolves."
+        f"trip no forbidden-claim rule, every internal link resolves, "
+        f"and the mirror at {APP_ROUTE} serves the application shell with its CSP intact."
     )
     return 0
 

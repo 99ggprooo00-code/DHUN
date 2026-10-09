@@ -13,6 +13,88 @@
 **Lesson:** destructive UI actions must be result-driven, deployment paths must be tested separately from local-root navigation, and historical session notes must never override the current master contract.
 
 ---
+## 2026-10-09 — the deployed nav that 404'd while every gate was green (session `arena/90cb6d2c-dhun`)
+
+**1. Root-absolute links on a project page: the deployed site's navigation was
+dead, and no check could see it.** The site publishes at
+`https://99ggprooo00-code.github.io/DHUN/` (a project page, sub-path `/DHUN/`),
+but every internal `href` in the built pages was root-absolute (`/`, `/features/`,
+`/ui/`). A browser resolves those against the *origin*, i.e.
+`https://99ggprooo00-code.github.io/features/` — a different, empty site:
+**verified 404** by live fetch. Three independent gates all missed it: the
+browser and Lighthouse jobs serve the build at a local origin's **root**, where
+root-absolute links happen to work; the served job's link resolver did
+`f"{base}{href}"` — string concatenation, not URL resolution — so `/ui/`
+checked as `…/DHUN/ui/` (200) instead of `…/ui/` (404); and the static link
+checker mapped `/ui/` straight onto the dist tree. Fix as shipped (PR #149, merged to main 2026-10-09 before this PR):
+every internal `href` in the `.njk` sources carries the `sitePath` filter
+(registered in `website/eleventy.config.js`); the filter is a no-op unless
+`DHUN_SITE_PATH_PREFIX` is set, so the committed `website/dist` stays
+rooted — the target of every local gate — and the workflow builds a second,
+`/DHUN`-prefixed artifact for the Pages deploy and verifies every prefixed
+link resolves (the "Verify GitHub Pages internal links" step). This PR adds
+the `/app/` web mirror to that deploy and points the site's primary CTA at
+it; `website_quality.py` resolves `/app/` links against `app-web/src`, the
+mirror's byte-identical source. The diagnosis above stands: a check that
+serves the artifact at a different URL structure than the host measures a
+site that does not exist; string-joining URLs in a test is a test of the
+test. Lesson: a check
+that serves the artifact at a different URL structure than the host measures a
+site that does not exist; string-joining URLs in a test is a test of the test.
+
+**2. Nunjucks has no ternary operator.** First W1 build died with a parser
+error: the nav used `href="{{ item.external ? item.href : … }}"`. Fix: an
+`{% if %}` around the two `href` forms. Lesson: this template engine is smaller
+than the one the habit assumes — when a build fails, read the parser line.
+
+**3. Local deploy simulation served a stale tree from a dead man's port.** The
+first local run of the new smoke check reported the *old* build (old sha,
+`/app/` 404) even though the tree on disk was new. Root cause: a `python3 -m
+http.server` started for an earlier mutation proof had not actually died
+(`kill $(cat pid)` in a `;` chain after a `pkill` that had matched nothing),
+held port 8091, and answered the new requests from the old directory. The
+follow-up `pkill -f "http.server 8091"` then matched *the running shell's own
+command line* and killed the session's bash (exit -1, empty output) — twice.
+Fix: kill by scanning `/proc` for `python3` exes whose cmdline carries the
+port (never `pkill -f` on a string that is also in your own command), verify
+the port is free, restart, re-run. Verification: the re-run served the new
+bytes (sha-matched the dist file) and went green. Lesson: in a sandbox, the
+process you think is dead is the one that is serving, and `pkill -f` is a
+loaded gun when the pattern appears in your own invocation.
+
+## 2026-10-09 — the five track rows that only overflowed on a phone, and the evidence channel that had to be built to find them (session `arena/90cb6d2c-dhun`)
+
+**5. `overflow: hidden` on a `<span>` is a no-op, and the app's track rows proved it.** The first browser run of the mirror that actually booted (website run 37872180179) failed on two findings: on the 390×844 viewport, five `<li>` track rows in the home feed were *spilling* — `scrollWidth 491 > clientWidth 350`, identical 141 px on all five, phone only, dark and light. The five were exactly the rows whose "Artist • Album" subtitle is long ("Bamboo Wireless — The Koshi Sessions • Terai", "Night Bus to Biratnagar — Bhanu & the Lowlands • …"). Root cause: `.dhun-track__title` and `.dhun-track__subtitle` are `<span>`s (inline), and `overflow` — with `text-overflow: ellipsis` — **has no effect on non-replaced inline boxes** per spec: the computed overflow stays `visible`, so the rule that looked like a working ellipsis was dead CSS. The same rule also let title and subtitle flow on *one line* (inline flow), which is why the row content was title+subtitle as a single nowrap run wider than the phone. Desktop never showed it because the wider column swallowed the text. The stub DOM tests cannot see any of this (no layout engine, scrollWidth is 0). Fix: `display: block` on both classes — they stack as the Android TrackRow intends and the ellipsis actually engages. Lesson: when a CSS rule "does nothing", check the *display type* the property requires before doubting the selector; and a layout bug that only exists below a width is invisible to every gate that does not render at that width.
+
+**6. The CI evidence was invisible, and the failure looked like a phantom.** For four consecutive runs (37864947840, 37870564524, 37871151804, 37871543586, 37871836106) the browser job failed with **zero annotations and an empty step summary**, in ~28 s, on different runners — while its `browser-evidence` artifact carried the complete, byte-identical screenshot set, proving the whole suite had run. The job log archive (`results-receiver.actions.githubusercontent.com`) and the artifacts (blob host) are outside this sandbox's egress allowlist (TLS resets, verified with curl), and the check-run API does not expose step summaries at all — so there was no channel left to read what the run had recorded. The work to restore the channel, in order: (1) guard the three finally-block paths that could skip the final emission; (2) write every finding to the step summary *as it happens* plus per-check progress lines; (3) emit progress/problem/crash annotations immediately instead of only at the tail; (4) when those annotations still read back as zero through the API — while the log proved they were emitted — add a workflow step that **tees the step's full stdout/stderr to a file and posts it as a comment on dedicated issue #150** (`if: always()`, body built in Python for lossy-UTF-8 safety and the 65536-char limit). The first post failed with "Resource not accessible by integration" — the workflow's top-level `permissions: contents: read` had stripped `issues: write` from the job token; the browser job now declares the two scopes it uses. That single comment (run 37872180179) ended the saga: the script had **finished cleanly every time** (`script finished cleanly: 93 measurement(s), …, exit 1` was the last line) — there was never a crash; the job was red on the two genuine overflow findings of incident 5, and the annotations had simply stopped being readable through the API (they had read fine on the 6376b6d run earlier the same day; the retention behaviour from this sandbox is unexplained and is recorded as not verified in record 30). Lesson: when the only evidence channel is one you cannot reach, build a channel you can — a growing, per-finding record plus a final clean-finish marker turns "the run died silently" into "the run did X, then Y" in one run; and a red CI job with no readable findings is a *measurement* problem to fix before it becomes a trust problem.
+
+**7. The overflow's real cause: nested templates rendered as escaped text — the CSS theory was wrong.** The display-block fix from incident 5 shipped (website run 37873443440) and the *identical* five-row overflow came back, byte-identical (`scrollWidth 491 > clientWidth 350`), with the row's only element child `button.dhun-track` at the container width — which ruled the inline-span theory out entirely: there was no overflowing span in the DOM at all. Rendered the templates in Node (no browser, no CI): `trackRow`'s output contained `&lt;button class=&quot;dhun-icon-button&quot;…` — the overflow (⋮) button had never existed as an element. Root cause: the `html` tag in `app-web/src/js/dom.js` escapes every interpolated value not wrapped in `raw()`, and *thirteen* nested `html` templates in `views.js` (and one `Array.join("")` coercion in `loadingState`) relied on plain interpolation, so their markup rendered as a visible text node. The escaped markup string — including the track title inside an `aria-label` — was the 491 px non-breaking run: one long text with no break opportunities, exactly 141 px over on every affected row, desktop never spilling. The same bug class had been silently text-ifying the error/empty states, section hints, search result grids, the playlists list, the downloads notice and the artist albums grid — none of them measured by any gate. Fix: `raw()` at all thirteen sites (the convention already used at sixty other interpolation points), plus `tests/escaping.test.mjs`, which renders every view in Node with representative sample data and fails on any escaped angle bracket. Lesson: when a "layout" measurement is a constant you cannot explain, and the element you expect to be there is *not in the DOM*, stop measuring pixels and start reading the rendered string; a text node is a box too, and `scrollWidth` does not distinguish markup from its escaped corpse.
+
+**8. Behind the escaped markup was a real flex bug — the first run after the fix exposed it.** The first browser run after incident 7's fix (website run 37875677135, merge head `01f66ab`) was red on the same five rows, now `378 > 350` with the row's element children finally visible in the debug: `button.dhun-track w=350, button.dhun-icon-button w=24`. The overflow button had existed in the DOM all along as a text node; the *real* layout bug it had masked was a textbook flex-pair failure: `.dhun-tracklist > li` is a flex row of the row button and a trailing icon button, but `.dhun-track` carried `width: 100%` — the row button claimed the full 350 px list width and the 24/48 px icon added on top, spilling 28 px. Fix: scoped rules in `app-web/src/css/app.css` — the row button becomes a proper flex item (`flex: 1 1 auto; min-width: 0`, so it takes the remaining space and its text can finally ellipsize as incident 5's `display: block` fix intended) and the trailing button keeps its fixed size (`flex: 0 0 auto`). The same rule covers every flex-pair row in the app (home feed, history, playlists). Lesson: a fix that removes a *mask* (here: markup rendered as text) can change the measured geometry without changing the defect beneath it — when a number changes but the failure persists, re-derive the mechanism from the new reading instead of concluding the fix was wrong.
+
+## 2026-10-09 — the app that defined its entry point and never called it: caught by the first real browser pass (session `arena/90cb6d2c-dhun`)
+
+**4. The `/DHUN/app/` mirror rendered nothing in a real browser — and no
+error of any kind fired.** The first CI run carrying the new browser pass on
+the mirror (website run 37864321503, head `6376b6d`) reported, on all four
+viewport/scheme combinations: `#app` empty, engineering-preview notice absent,
+0 nav items — with **no unhandled error and no console error**. Root cause:
+`app-web/src/js/main.js` *defined and exported* `boot` but never called it,
+and `src/index.html` loads that module as the page's only script. A module
+with no top-level side effect loads cleanly, defines everything, and paints
+nothing; the missing call has a completely silent failure signature. Nothing
+previously could see it: the 61 DOM-stub boot tests import the module and
+call `boot` themselves (through `tests/helpers/boot-harness.mjs`), the module
+graph is valid, there is no console noise, and no static check can tell
+"exported" from "booted". This is the exact failure class that record 29
+(verification) declared unprovable without a browser. Fix: a top-level
+`boot();` in `main.js` (the stub harness's explicit `boot()` then just
+re-renders idempotently — 61/61 green), plus a browser-free contract guard in
+`scripts/test_app_web.py` (`test_the_entry_module_actually_boots`) that
+asserts the call exists, mutation-proven (delete the call → red). Lesson:
+for a browser entry module, *exporting* the boot function is not booting; the
+page imports nothing, so the module must carry the side effect itself — and a
+check that never loads the artifact the way a user does will never find it.
 
 ## 2026-10-09 — the red trunk, the duplicated class, and the action that re-opened its own sheet (session `arena/967513fd-dhun`)
 
