@@ -16,6 +16,7 @@ import dev.dhun.domain.GetHistoryUseCase
 import dev.dhun.domain.HistoryDay
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.NowPlayingPersistence
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -188,6 +189,13 @@ private const val STORAGE_REFRESH_INTERVAL_MS = 30_000L
  */
 expect fun currentUtcOffsetMs(): Long
 
+/** Observable result of the destructive Clear all downloads action. */
+data class ClearDownloadsUiState(
+    val isClearing: Boolean = false,
+    val succeeded: Boolean = false,
+    val errorMessage: String? = null,
+)
+
 class LibraryViewModel(
     private val playlists: PlaylistRepository,
     private val library: LibraryRepository,
@@ -222,6 +230,17 @@ class LibraryViewModel(
     )
 
     private val historyUseCase = GetHistoryUseCase(history)
+
+    private val _clearDownloadsUiState = MutableStateFlow(ClearDownloadsUiState())
+    val clearDownloadsUiState: StateFlow<ClearDownloadsUiState> = _clearDownloadsUiState.asStateFlow()
+
+    /** Consume the one-shot success result after the UI closes its confirmation. */
+    fun consumeClearDownloadsResult() {
+        if (_clearDownloadsUiState.value.succeeded) {
+            _clearDownloadsUiState.value = ClearDownloadsUiState()
+        }
+    }
+
 
     private val _selectedTab = MutableStateFlow(LibraryTab.PLAYLISTS)
     val selectedTab: StateFlow<LibraryTab> = _selectedTab.asStateFlow()
@@ -369,8 +388,30 @@ class LibraryViewModel(
     }
 
     fun clearDownloads() {
-        val dm = downloadManager ?: return
-        scope.launch { runCatching { dm.clearAll() } }
+        // The UI may be tapped repeatedly before Compose receives the next state.
+        if (_clearDownloadsUiState.value.isClearing) return
+        val dm = downloadManager
+        if (dm == null) {
+            _clearDownloadsUiState.value = ClearDownloadsUiState(
+                errorMessage = "Downloads could not be cleared because download storage is unavailable.",
+            )
+            return
+        }
+        _clearDownloadsUiState.value = ClearDownloadsUiState(isClearing = true)
+        scope.launch {
+            try {
+                dm.clearAll()
+                _clearDownloadsUiState.value = ClearDownloadsUiState(succeeded = true)
+            } catch (cancelled: CancellationException) {
+                _clearDownloadsUiState.value = ClearDownloadsUiState()
+                throw cancelled
+            } catch (_: Exception) {
+                // Keep the rows visible and the confirmation open so the user can retry.
+                _clearDownloadsUiState.value = ClearDownloadsUiState(
+                    errorMessage = "Could not clear all downloads. Some files may remain; please try again.",
+                )
+            }
+        }
     }
 
     fun playDownloaded(track: Track) {
