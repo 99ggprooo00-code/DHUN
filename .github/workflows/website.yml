@@ -185,9 +185,11 @@ jobs:
           const failures = [];
           for (const file of files) {
             const html = readFileSync(file, 'utf8');
-            for (const match of html.matchAll(/<(?:a|link)\\b[^>]*?\\bhref="([^"]+)"/gi)) {
+            for (const match of html.matchAll(/<(?:a|link)[^>]*?href="([^"]+)"/gi)) {
               const href = match[1];
-              if (/^(?:https?:|mailto:|tel:|data:|#|\\/\\/)/i.test(href)) continue;
+              if (href.startsWith('http:') || href.startsWith('https:') ||
+                  href.startsWith('mailto:') || href.startsWith('tel:') ||
+                  href.startsWith('data:') || href.startsWith('#') || href.startsWith('//')) continue;
               if (href.startsWith('/') && !href.startsWith('/DHUN/')) {
                 failures.push(file + ': unprefixed internal URL ' + href);
               }
@@ -197,7 +199,7 @@ jobs:
             }
           }
           if (failures.length) {
-            console.error(failures.join('\\n'));
+            console.error(failures.join('\n'));
             process.exit(1);
           }
           console.log('Verified project-prefixed internal navigation in ' + files.length + ' HTML files.');
