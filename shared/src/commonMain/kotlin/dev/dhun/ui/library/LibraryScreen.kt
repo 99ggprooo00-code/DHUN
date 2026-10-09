@@ -729,6 +729,12 @@ private fun DownloadsTab(
             onConsumeClearResult()
         }
     }
+    LaunchedEffect(downloads.all, batchDeleteError) {
+        if (batchDeleteError != null) {
+            val stillAvailable = downloads.all.map { it.trackId }.toSet()
+            selected.value = selected.value.intersect(stillAvailable)
+        }
+    }
     fun toggle(id: String) {
         selected.value = if (id in selected.value) selected.value - id else selected.value + id
     }
