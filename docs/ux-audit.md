@@ -6,7 +6,7 @@
 
 ## Remediation status on `fix/ui-download-feedback-website-links`
 
-- **Clear all downloads:** the ViewModel now exposes clearing/success/error state, prevents concurrent clears, and rethrows coroutine cancellation. The dialog stays open while work is pending, reports a retryable failure, and dismisses/clears selection only after success. A JVM failure-and-retry test was added. **Not yet CI-verified.**
+- **Clear all downloads, batch download deletion and clear history:** clear-all now exposes clearing/success/error state; batch deletion and history clear await their suspend operations rather than swallowing failures. Confirmations remain open while pending, show retryable failures and only close/clear selection after success. The manager serializes download mutations with clear-all and joins workers before deleting final/partial files. JVM tests cover clear-all failure/retry and file/row cleanup. **Not yet CI-verified on the final head.**
 - **Website base path:** templates now route internal links through the `sitePath` filter. The website workflow builds a root artifact for existing local browser/quality tests and a second `/DHUN/`-prefixed artifact for Pages, with a prefix smoke check. **Not yet workflow-verified or confirmed at the deployed origin.**
 - **AI instructions:** current visual target and active task are reconciled in `.ai/MASTER_PROMPT.md`, `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`, `.ai/WEBSITE_PLAN.md`, `.ai/HANDOFF_NEXT_SESSION.md` and `.ai/README.md`. Older notes are retained as history, not current restrictions.
 - No claim is made that the native build, full website workflow, Android/desktop hardware checks, or post-deployment route checks have passed. Those require their actual evidence.
@@ -24,7 +24,7 @@ On code-equivalent commit `650a65e`, Build APK succeeded and the website build/p
 
 ## Findings
 
-### P0 — Clear all downloads hides failure
+### P0 — Destructive download/history actions hid failures
 
 **Evidence**
 - `shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt`: the confirmation's `onConfirm` calls `onClearAll()`, clears selection and sets `showClearConfirm = false` immediately.
