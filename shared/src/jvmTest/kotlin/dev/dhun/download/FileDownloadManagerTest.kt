@@ -148,6 +148,29 @@ class FileDownloadManagerTest {
     }
 
     @Test
+    fun clearAllDeletesMediaAndRows(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream("v6"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            manager.enqueue(track("v6"))
+            assertEquals(DownloadState.COMPLETED, awaitTerminal(repo, "v6"))
+            val path = repo.get("v6")!!.localAudioPath
+            assertTrue(storage.exists(path))
+
+            manager.clearAll()
+
+            assertNull(repo.get("v6"))
+            assertFalse(storage.exists(path))
+            assertTrue(manager.downloads.value.isEmpty())
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
     fun pauseOnCompletedIsNoop(): Unit = runBlocking {
         val storage = TestDownloadStorage()
         val repo = repository()
