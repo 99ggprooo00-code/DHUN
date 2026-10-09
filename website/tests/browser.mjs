@@ -80,6 +80,15 @@ import { MESSAGE_BUDGET, clipMessage, packReport, renderAllReports } from "./ann
 const SUMMARY = process.env.GITHUB_STEP_SUMMARY || "";
 let summaryBroken = false;
 function summaryLine(line) {
+  // The step log (tee'd to /tmp/browser-step.log by the workflow and posted
+  // to issue #150 by a later step) is the readable copy: the step summary
+  // file is per-step and the job log archive is not retrievable from the
+  // sandbox that maintains this repository.
+  try {
+    console.log(`[summary] ${line.replace(/\n/g, " ")}`);
+  } catch {
+    /* the file write below is the other copy */
+  }
   if (!SUMMARY || summaryBroken) return;
   try {
     appendFileSync(SUMMARY, `${line}\n`);

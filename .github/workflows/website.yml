@@ -244,7 +244,17 @@ jobs:
         working-directory: website
         env:
           SITE_BASE: http://127.0.0.1:8080
-        run: node tests/browser.mjs
+        # The step log is tee'd to a file so the next step can post it where
+        # it is readable: the job log archive and the artifacts of this run
+        # are not retrievable from the sandbox that maintains this repository
+        # (results-receiver and the artifact blob host are outside its egress
+        # allowlist). On 2026-10-09 three consecutive runs died before the
+        # tail emission with zero annotations, and there was no channel left
+        # to say what the run had recorded. pipefail keeps the node exit
+        # code authoritative through the pipe.
+        run: |
+          set -o pipefail
+          node tests/browser.mjs 2>&1 | tee /tmp/browser-step.log
 
       # Full-page captures for a human to eyeball later. CI artifacts, never
       # committed: the repository contains no image files on purpose, because
@@ -257,6 +267,25 @@ jobs:
           path: website/tests/screenshots
           retention-days: 7
           if-no-files-found: warn
+
+      # The readable record for this run: the full step log, posted as a
+      # comment on the dedicated issue #150 (do not close it — it is
+      # load-bearing for the CI evidence chain). `if: always()` so the
+      # record lands whether the measurements passed, failed, or the
+      # process died before speaking.
+      - name: Post the readable record (step log)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Browser job record — run ${{ github.run_id }} @ \`${{ github.sha }}\`"
+            echo ""
+            echo '## Step log (full output of `node tests/browser.mjs`, including `[summary]` progress lines)'
+            echo '```'
+            if [ -f /tmp/browser-step.log ]; then tail -c 58000 /tmp/browser-step.log; else echo "(not captured — the step died before tee wrote anything)"; fi
+            echo '```'
+          } | gh issue comment 150 --repo ${{ github.repository }} --body-file -
 
   lighthouse:
     name: Lighthouse (three samples per route, gate on the median)
