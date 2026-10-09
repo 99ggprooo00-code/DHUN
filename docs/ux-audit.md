@@ -13,7 +13,7 @@
 
 ### Latest verification evidence (2026-10-09)
 
-On code-equivalent commit `650a65e`, Build APK succeeded and the website build/prefix smoke and browser-measurement jobs passed. On current documentation head `90bee52`, run `37869983686` (Build APK) is green; run `37869983672` has the build/quality/prefix-smoke and browser jobs green while Lighthouse remains in progress; run `37869983670` has shared-domain and Robolectric steps green while overall CI remains in progress. Run `37869983669` has the APK job green and MSI still running. PR deploy and served-origin checks are skipped; post-merge canonical-origin verification and native hardware checks remain open. These results are workflow snapshots, not claims that every job has passed.
+On code-equivalent commit `650a65e`, Build APK succeeded and the website build/prefix smoke and browser-measurement jobs passed. On the preceding code-equivalent documentation head `90bee52` (before this status-note commit), run `37869983686` (Build APK) was green; run `37869983672` has the build/quality/prefix-smoke and browser jobs green while Lighthouse remains in progress; run `37869983670` has shared-domain and Robolectric steps green while overall CI remains in progress. Run `37869983669` has the APK job green and MSI still running. PR deploy and served-origin checks are skipped; post-merge canonical-origin verification and native hardware checks remain open. This status note advances the documentation head, so fresh final-head workflows are expected; the earlier results are evidence for unchanged code, not a green verdict for the new head. These are workflow snapshots, not claims that every job has passed.
 
 ## Severity definitions
 
