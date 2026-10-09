@@ -424,12 +424,28 @@ function overflowReport() {
     if (overflowX !== "visible") continue;
     const spill = element.scrollWidth - element.clientWidth;
     if (spill > 1 && element.clientWidth > 0) {
+      // debug: added 2026-10-09 after five spilling <li> reported with
+      // identical widths through two fixes — the finding named the element
+      // but not its internals, and the fix could not be reasoned from the
+      // markup alone. Children with their rendered widths make the geometry
+      // legible in the record.
+      let debug = "";
+      try {
+        const kids = [...element.children].map(
+          (c) =>
+            `${c.tagName.toLowerCase()}.${String(c.className || "").split(" ").slice(0, 2).join(".")} w=${Math.round(c.getBoundingClientRect().width)}`,
+        );
+        debug = `children=[${kids.join(", ")}]`;
+      } catch {
+        /* the widths are the point; the dump is a bonus */
+      }
       spilling.push({
         element: element.tagName.toLowerCase(),
         className: String(element.className || "").slice(0, 60),
         text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40),
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,
+        debug,
       });
     }
   }
@@ -1491,7 +1507,7 @@ async function checkWebApp(browser) {
           [
             ...overflow.offenders.map((o) => `${o.element}.${o.className} right=${o.right}`),
             ...overflow.spilling.map(
-              (o) => `${o.element}.${o.className} “${o.text}” ${o.scrollWidth}>${o.clientWidth} spilling`,
+              (o) => `${o.element}.${o.className} “${o.text}” ${o.scrollWidth}>${o.clientWidth} spilling${o.debug ? ` (${o.debug})` : ""}`,
             ),
           ].join(", "),
         );
