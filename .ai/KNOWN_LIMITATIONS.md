@@ -1,5 +1,12 @@
 # KNOWN_LIMITATIONS
 
+## 2026-10-09 — current UI/navigation defects and verification state
+
+- **Clear all downloads (P0, fix in progress):** source previously swallowed `DownloadManager.clearAll()` errors and the UI dismissed the confirmation before the operation completed. This branch now exposes pending/success/failure state and a retry path; CI must confirm the change, and Android/desktop interaction still needs hardware verification.
+- **Website project-base navigation (P1, fix in progress):** the canonical GitHub Pages URL is beneath `/DHUN/`, while root-hosted local tests run at `/`. The source now has a `sitePath` filter and the workflow builds a separate prefixed Pages artifact. The workflow and deployed-origin smoke check have not yet passed in this branch; do not claim the canonical site is fixed until then.
+- **Visual target (current):** DHUN's product identity is translucent frosted glass, artwork-led and dark-first. Use lightweight/cached 2D blur, translucent tint, gradients/scrims, restrained highlights and accessible fallbacks. Material/Compose components may be implementation primitives but Material 3 is not the visual target. The 2026-09-05 “Material 3 only” note below is superseded.
+- **Evidence boundary:** source changes are not the same as unit-tested, CI-green, hardware-verified or canonical-origin-verified. Record each separately.
+
 ## 2026-10-08 — session `arena/37ec95ed-dhun`: what one request, print and High Contrast still do not prove
 
 - **The single-request claim is now measured, not just architectural.**
@@ -767,7 +774,7 @@ Updated every phase. Nothing hidden.
 - **PR #113 code head `d2a9045` is CI-green and not merged at this writing.** Push CI **35685053236**, PR CI **35685055740**, Build APK **35685055672**, test-release **35685055772** (apk + msi, including hosted install-over; `aab` / `publish` / `release_draft` skipped because this is a PR). No local JDK — those runs are the compiler. The docs commit that records this is not itself a green check until its own CI finishes, and the post-merge rolling `test` identity is not known yet.
 - **The current rolling `test` download does not contain this restyle.** It targets **`7fcadbe`** (PR #111), published **2026-09-22T02:58:26Z**: APK **18,350,835 B**, MSI **112,914,432 B** _(Superseded later the same day: #113 merged and the rolling release moved to `03a27b1` — see the section above.)_ Re-download only after #113's merge republishes; do not treat byte size alone as identity (the APK size has been stable across recent docs-only publishes).
 - **Dark surfaces were not lifted another rung, on purpose.** Home / Search / Library already share `#161616` with the full player (the #107 lift). Artwork-derived controls measure **3.12:1** on `#1E1E1E` and **2.97:1** on `#222222` — the second fails the WCAG 1.4.11 3:1 pin in `DhunThemeContrastTest`. What changed is the artwork overlays: player dim **0.40/0.08**, ambient scrim bottom on the **≥0.85** floor, shell dim **0.40**, shell scrim **0.50/0.32/0.44/0.62**. Light theme untouched.
-- **Glass is a veil, not a platform material.** Like/more/back discs, the tab band under the mini-player, and the Related list use the lyrics-card background alphas over one blurred artwork layer. The mini-player is a lighter milky frost. Still Material 3 `Modifier.blur` + a translucent fill — not Liquid Glass, not Windows Acrylic, not Android 12 window blur. Android &lt;12 still suppresses the unblurred artwork (existing `supportsRealtimeBlur` guard). List cards above the dock, and queue rows, are unchanged.
+- **Glass is a veil, not a platform material.** Like/more/back discs, the tab band under the mini-player, and the Related list use the lyrics-card background alphas over one blurred artwork layer. The mini-player is a lighter milky frost. At the time of this entry, the implementation used `Modifier.blur` + a translucent fill; this is implementation history, not the current visual-target decision. Android &lt;12 still suppresses the unblurred artwork (existing `supportsRealtimeBlur` guard). List cards above the dock, and queue rows, are unchanged.
 - **No hardware eyeball of this look.** CI cannot see whether the acrylic reads as glass, whether body text stays readable on a bright cover, or whether 64dp borderless thumbs clip a rail. That is the user's gate after the republish.
 - **S2 drill watch for 2026-09-22 was not observed here.** Latest scheduled `extraction-health` run is still **35561269411** (2026-09-21, `414cd79`). A missing 04:17 UTC fire would mean the #111 workflow edit wedged the registration — attempt-5 fresh-file re-registration stays the next session's first task if that is what the run list shows.
 - **The Node-20 deprecation warning was not fully cleared by the v6 bump.** Publish job of post-#111 run **35681131229** (check-run **106598929094**) still annotates `actions/download-artifact@v6` as targeting Node.js 20 while being forced onto Node.js 24. Not a product failure. `ubuntu-latest` → Ubuntu 26 still begins **2026-10-19**.
@@ -1669,12 +1676,14 @@ See `docs/verification/12-desktop-native.md` and `14-release.md` for evidence.
   separate user-provided executable/module (PATH or `DHUN_YTDLP`); it is not
   installed with VLC. Missing fallback is diagnosed in the candidate, not
   silently classified as an offline network.
-- **Visual system lock (2026-09-05):** Material 3 only. **No Liquid Glass**
-  renderer, no continuous full-res reblur. Atmosphere = **glass-morphism**
-  tokens (translucent multi-stop fills, sheen, hairline edge) on chrome;
-  content stays sharp. Real backdrop blur only on FullPlayer artwork layer
-  (once-per-track via `BlurredArtworkCache`) + lightweight shell ambient
-  wash from now-playing seed colors.
+- **Historical visual-system note (2026-09-05; superseded 2026-10-09):** this
+  entry recorded the former “Material 3 only” direction. The current visual
+  target is translucent frosted glass as specified at the top of this file and
+  in the binding correction in `.ai/MASTER_PROMPT.md`. The lightweight
+  implementation constraint remains: cached/once-per-track artwork blur,
+  translucent multi-stop fills, restrained sheen/hairline edges, legibility
+  scrims and a fallback on unsupported hardware; no continuous full-resolution
+  reblur or heavyweight Liquid Glass renderer.
 - Design system (Phase 06): `GlassCard` uses `Modifier.blur()` / `RenderEffect`
   on Android 12+ (API 31+) and Desktop Skiko; below that floor it degrades to
   a translucent scrim (`DhunColors.glass` 60% #99111111 + 10% white border) — still
