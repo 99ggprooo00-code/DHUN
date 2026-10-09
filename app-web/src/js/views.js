@@ -23,8 +23,12 @@ export function icon(name, { size = 24, className = "" } = {}) {
 
 /** SectionHeader — titleLarge over a row of content. */
 export function sectionHeader(title, hint = "") {
+  // Nested templates must be raw(): the html tag escapes anything that is
+  // not explicitly marked, and an escaped <p> renders as literal text
+  // (2026-10-09: the same bug escaped the trackRow overflow button, which
+  // then rendered as a line of text that overflowed phone rows).
   return html`<h2 class="dhun-section__header">${title}</h2>
-    ${hint ? html`<p class="dhun-section__hint">${hint}</p>` : ""}`;
+    ${hint ? raw(html`<p class="dhun-section__hint">${hint}</p>`) : ""}`;
 }
 
 /** The persistent honesty notice. Required by ADR-008 boundary 4 and asserted
@@ -54,7 +58,7 @@ export function errorState({ title = "Something went wrong", body = "", actionLa
   return html`<div class="dhun-state" role="alert">
     ${icon("Error", { size: 32, className: "dhun-state__icon" })}
     <h2 class="dhun-state__title">${title}</h2>
-    ${body ? html`<p class="dhun-state__body">${body}</p>` : ""}
+    ${body ? raw(html`<p class="dhun-state__body">${body}</p>`) : ""}
     <button class="dhun-button dhun-button--tonal" type="button" data-action="retry">${actionLabel}</button>
   </div>`;
 }
@@ -63,21 +67,23 @@ export function emptyState({ title, body = "", iconName = "Album" } = {}) {
   return html`<div class="dhun-state">
     ${icon(iconName, { size: 32, className: "dhun-state__icon" })}
     <h2 class="dhun-state__title">${title}</h2>
-    ${body ? html`<p class="dhun-state__body">${body}</p>` : ""}
+    ${body ? raw(html`<p class="dhun-state__body">${body}</p>`) : ""}
   </div>`;
 }
 
 /** LoadingShimmer — three skeleton rows at the app's skeleton widths. */
 export function loadingState(rows = 3) {
   return html`<div class="dhun-tracklist" aria-busy="true" aria-live="polite">
-    ${Array.from({ length: rows }, () => html`
+    ${raw(
+      Array.from({ length: rows }, () => html`
       <div class="dhun-track" aria-hidden="true">
         <div class="dhun-track__art dhun-shimmer"></div>
         <div class="dhun-track__meta">
           <div class="dhun-shimmer" style="height:var(--dhun-space-md-plus);width:60%;border-radius:var(--dhun-shape-small)"></div>
           <div class="dhun-shimmer" style="height:var(--dhun-space-sm-plus);width:40%;margin-top:var(--dhun-space-sm);border-radius:var(--dhun-shape-small)"></div>
         </div>
-      </div>`)}
+      </div>`).join(""),
+    )}
   </div>`;
 }
 
@@ -99,7 +105,7 @@ export function trackRow(track, { index = null, playing = false, overflow = true
       <span class="dhun-track__time">${formatDuration(track.durationMs)}</span>
     </button>
     ${overflow
-      ? html`<button
+      ? raw(html`<button
           class="dhun-icon-button"
           type="button"
           data-action="track-overflow"
@@ -107,7 +113,7 @@ export function trackRow(track, { index = null, playing = false, overflow = true
           aria-label="More actions for ${track.title}"
         >
           ${icon("MoreVert")}
-        </button>`
+        </button>`)
       : ""}
   </li>`;
 }
@@ -176,7 +182,7 @@ export function searchScreen({ query, results, source, recentSearches, status })
   if (query.trim() === "") {
     return html`
       ${raw(dataSourceNotice(source))}
-      ${recentSearches.length > 0
+      ${raw(recentSearches.length > 0
         ? html`<section class="dhun-section">
             ${raw(sectionHeader("Recent searches"))}
             <div class="dhun-tracklist">
@@ -207,7 +213,7 @@ export function searchScreen({ query, results, source, recentSearches, status })
             title: "Search",
             body: "Search for songs, albums, artists and playlists.",
             iconName: "Search",
-          })}
+          }))}
     `;
   }
 
@@ -219,13 +225,13 @@ export function searchScreen({ query, results, source, recentSearches, status })
 
   return html`
     ${raw(dataSourceNotice(source))}
-    ${tracks.length
+    ${raw(tracks.length
       ? html`<section class="dhun-section">
           ${raw(sectionHeader("Songs"))}
           ${raw(trackList(tracks))}
         </section>`
-      : ""}
-    ${artists.length
+      : "")}
+    ${raw(artists.length
       ? html`<section class="dhun-section">
           ${raw(sectionHeader("Artists"))}
           <ul class="dhun-grid">
@@ -244,8 +250,8 @@ export function searchScreen({ query, results, source, recentSearches, status })
             )}
           </ul>
         </section>`
-      : ""}
-    ${albums.length
+      : "")}
+    ${raw(albums.length
       ? html`<section class="dhun-section">
           ${raw(sectionHeader("Albums"))}
           <ul class="dhun-grid">
@@ -264,8 +270,8 @@ export function searchScreen({ query, results, source, recentSearches, status })
             )}
           </ul>
         </section>`
-      : ""}
-    ${playlists.length
+      : "")}
+    ${raw(playlists.length
       ? html`<section class="dhun-section">
           ${raw(sectionHeader("Playlists"))}
           <ul class="dhun-grid">
@@ -284,7 +290,7 @@ export function searchScreen({ query, results, source, recentSearches, status })
             )}
           </ul>
         </section>`
-      : ""}
+      : "")}
   `;
 }
 
@@ -320,7 +326,7 @@ function playlistsPane({ playlists, favourites }) {
   return html`
     <section class="dhun-section">
       ${raw(sectionHeader("Your Playlists"))}
-      ${playlists.length === 0
+      ${raw(playlists.length === 0
         ? emptyState({
             title: "No playlists yet — create one below.",
             iconName: "QueueMusic",
@@ -347,7 +353,7 @@ function playlistsPane({ playlists, favourites }) {
                 })
                 .join(""),
             )}
-          </ul>`}
+          </ul>`)}
       <form class="dhun-search" data-action="new-playlist" style="margin-top:var(--dhun-space-lg)">
         <input type="text" name="name" placeholder="My playlist" aria-label="New playlist name" maxlength="60" />
         <button class="dhun-button dhun-button--tonal" type="submit">New playlist</button>
@@ -358,7 +364,7 @@ function playlistsPane({ playlists, favourites }) {
 
 function downloadsPane({ downloadsAvailable }) {
   return html`
-    ${downloadsAvailable
+    ${raw(downloadsAvailable
       ? ""
       : html`<div class="dhun-notice" role="note">
           <p>
@@ -367,7 +373,7 @@ function downloadsPane({ downloadsAvailable }) {
             has no equivalent private store, so the two sections below are shown empty rather than filled
             with something that cannot be played offline.
           </p>
-        </div>`}
+        </div>`)}
     <section class="dhun-section">
       ${raw(sectionHeader("Active downloads"))}
       ${raw(emptyState({ title: "Nothing downloading", body: "Downloads started in the app do not appear here.", iconName: "Pending" }))}
@@ -429,7 +435,7 @@ export function artistScreen({ artist, tracks, albums }) {
         ${icon("Play")} Play
       </button>
     </div>
-    ${albums.length
+    ${raw(albums.length
       ? html`<section class="dhun-section">
           ${raw(sectionHeader("Albums"))}
           <ul class="dhun-grid">
@@ -448,7 +454,7 @@ export function artistScreen({ artist, tracks, albums }) {
             )}
           </ul>
         </section>`
-      : ""}
+      : "")}
     <section class="dhun-section">${raw(sectionHeader("Songs"))} ${raw(trackList(tracks))}</section>
   `;
 }
