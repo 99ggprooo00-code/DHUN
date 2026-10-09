@@ -74,6 +74,40 @@ regression is caught in the browser-free CI step even before a browser
 exists. The follow-up run on the fix head is the first green browser
 measurement of the mirror.
 
+### The second finding: five track rows that only overflowed on a phone
+
+With the mirror booting, the next browser run (37872180179) failed on two
+findings — and both were the same defect: on the 390×844 viewport, five
+`<li>` track rows in the home feed were spilling
+(`scrollWidth 491 > clientWidth 350`, identical 141 px on all five; the
+desktop viewport was clean). The five were exactly the rows whose
+"Artist • Album" subtitle is long. `.dhun-track__title` /
+`.dhun-track__subtitle` are `<span>`s, and `overflow: hidden` +
+`text-overflow: ellipsis` have no effect on non-replaced inline boxes —
+the rule that looked like a working ellipsis was dead CSS, and the
+title/subtitle also flowed on one line. Fixed with `display: block` on both
+classes (stacking as the Android TrackRow intends; ellipsis engages).
+The first finding could not be named by the check ("`li.` spilling" with no
+text), so the web app overflow finding now reports the text and the widths,
+matching the marketing check's format.
+
+### The evidence channel had to be built before either finding could be read
+
+The runs between the boot fix and the readable record failed with zero
+annotations and an empty step summary while their `browser-evidence`
+artifacts carried the complete screenshot set — the suite was running to
+completion, but nothing of its record survived to be read from this sandbox
+(the job log archive and the artifact hosts are outside the egress allowlist;
+the check-run API does not expose step summaries). The record now travels on
+a channel that is: every finding is written to the step summary and emitted
+as an annotation the moment it happens; per-check progress lines; a
+process-level crash annotation; a final "script finished cleanly" marker;
+and a workflow step (issue #150, `if: always()`, the browser job's
+`issues: write` scope) that posts the full step log as a comment. The
+record for run 37872180179 — the first readable one — showed the script
+finishing cleanly: there was never a process death; the job had been red on
+the genuine findings above all along.
+
 ## Not verified (this session)
 
 - The **served public origin** at `/app/` — the `served` job runs only after
@@ -84,5 +118,14 @@ measurement of the mirror.
   committed (the repository contains no image files on purpose).
 - **Audio playback from a browser origin** — B1's finding stands; the labelled
   clock and the on-page notice are the honest state, unchanged by deployment.
+- **Check-run annotation retention from this sandbox** — the 6376b6d run's 12
+  browser annotations read fine ~15 minutes after completion (and were still
+  readable after the branch advanced), but annotations from every later run
+  read back as zero through the check-run API even while that run was the
+  branch head and even though its step log (read via the issue #150 record)
+  shows the `::error`/`::notice` lines were emitted. The mechanism is not
+  determinable from this sandbox; the issue #150 step-log record is now the
+  authoritative readable channel, and annotations are a bonus, not a
+  dependency.
 - **Lighthouse/axe scores for the mirror** — deliberately not run (it is a JS
   application, not a marketing route; see `.ai/KNOWN_LIMITATIONS.md`).

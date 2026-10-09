@@ -62,6 +62,21 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   module and call `boot` themselves). The module now boots itself, and a
   browser-free contract test asserts the call exists, so the failure mode is
   gated even before a browser is involved.
+- **Fixed: track titles and subtitles that could not ellipsize.** The first
+  booting browser pass then found five home-feed rows spilling
+  (`scrollWidth 491 > clientWidth 350`) on the phone viewport only:
+  `.dhun-track__title`/`__subtitle` are `<span>`s, and `overflow: hidden` +
+  `text-overflow: ellipsis` have no effect on non-replaced inline boxes —
+  dead CSS that also let the two lines flow as one. Both are now `display:
+  block` (stacked, clipping, like the Android TrackRow).
+- **Added: a CI evidence channel that survives a dying run.** The browser
+  job's findings are now written to the step summary and emitted as
+  annotations as they happen (plus per-check progress and a final
+  clean-finish marker), the step log is tee'd to a file, and an
+  `if: always()` step posts the full record as a comment on issue #150 —
+  necessary because the job log archive and the CI artifacts are not
+  retrievable from the sandbox that maintains this repository, and that is
+  the channel through which both findings above were actually read.
 - The deployed page weights moved with the copy: `/` 51,768 → 52,233 B,
   `/features/` 48,476 → 48,513 B, `/ui/` 49,965 → 50,127 B (uncompressed,
   measured against the served tree locally; inside the ratchet's 5 %).

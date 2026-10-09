@@ -31,6 +31,16 @@
   is measured by the served job. The gap between "bytes are the mirror" and
   "the bytes behave like the mirror" is the browser job's job, on the same
   commit — not a hole, but the division is worth stating.
+- **The browser job's readable record now travels through issue #150, and
+  check-run annotations from this sandbox are not a reliable channel.** The
+  job log archive (`results-receiver…`) and the CI artifacts (blob host) are
+  outside the sandbox's egress allowlist, and the check-run API does not
+  expose step summaries; annotations emitted by recent runs also read back as
+  zero through the API (earlier the same day they read fine). The browser
+  job therefore tees its full step log and posts it as a comment on the
+  dedicated issue #150 (`if: always()`), and writes findings/progress to the
+  step summary as they happen. That comment is the authoritative readable
+  record for the browser job from this environment; annotations are a bonus.
 - **No Lighthouse or axe numbers exist for the mirror, by decision.** It is a
   JavaScript application, not a static marketing route, and its gates are the
   boot/honesty/console/overflow pass plus its own 61 node tests. Running
