@@ -1483,11 +1483,16 @@ async function checkWebApp(browser) {
         fail(`web app ${label} overflow`, `scrollWidth ${overflow.scrollWidth} > innerWidth ${overflow.innerWidth}`);
       }
       if (overflow.offenders.length || overflow.spilling.length) {
+        // Spilling entries carry the text and the widths: the first run that
+        // found a spilling li (2026-10-09) reported "li. spilling" with no
+        // way to say which li, so the record had to name the element.
         fail(
           `web app ${label} overflow`,
           [
             ...overflow.offenders.map((o) => `${o.element}.${o.className} right=${o.right}`),
-            ...overflow.spilling.map((o) => `${o.element}.${o.className} spilling`),
+            ...overflow.spilling.map(
+              (o) => `${o.element}.${o.className} “${o.text}” ${o.scrollWidth}>${o.clientWidth} spilling`,
+            ),
           ].join(", "),
         );
       }
