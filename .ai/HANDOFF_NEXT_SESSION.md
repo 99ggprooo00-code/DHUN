@@ -1,5 +1,13 @@
 # HANDOFF — PR #136 merged; ADR-008 B1 is BLOCKED and closed; B2 is a separate user decision
 
+> **Historical snapshot warning (superseded 2026-10-09):** The handoff below describes
+> the state as of 2026-10-08 and is not the current active task. In particular,
+> its old “Do not touch Android, Windows, FullPlayer (ADR-002), lyrics or ABI
+> splits” restriction belongs to that previous session only and is superseded
+> by the user's current request to fix UI flaws and align the design contract.
+> Follow the current `.ai/ROADMAP.md` active task and the binding UI correction
+> in `.ai/MASTER_PROMPT.md`; do not copy the old branch/commit/status as live facts.
+
 Updated **2026-10-08**, session `arena/45db02aa-dhun`. Fixed session branch:
 `arena/45db02aa-dhun`. Current base and GitHub `main`:
 **`2a20024d4b626b3f40ae95776cefb6b1e49cfdca`** (PR #136 merge, 2026-10-08T13:19:49Z,
