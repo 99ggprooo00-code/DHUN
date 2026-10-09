@@ -717,6 +717,8 @@ private fun DownloadsTab(
     var view by remember { mutableStateOf(DownloadsView.LIST) }
     var showClearConfirm by remember { mutableStateOf(false) }
     var showBatchConfirm by remember { mutableStateOf(false) }
+    // Selection lives across LIST/MANAGE so batch delete targets the same set.
+    val selected = remember { mutableStateOf(setOf<String>()) }
     LaunchedEffect(clearState.succeeded) {
         if (clearState.succeeded) {
             showClearConfirm = false
@@ -724,8 +726,6 @@ private fun DownloadsTab(
             onConsumeClearResult()
         }
     }
-    // Selection lives across LIST/MANAGE so batch delete targets the same set.
-    val selected = remember { mutableStateOf(setOf<String>()) }
     fun toggle(id: String) {
         selected.value = if (id in selected.value) selected.value - id else selected.value + id
     }
