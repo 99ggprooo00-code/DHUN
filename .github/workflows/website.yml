@@ -170,7 +170,7 @@ jobs:
       - name: Verify GitHub Pages internal links
         run: |
           node --input-type=module <<'NODE'
-          import { readFileSync, readdirSync, statSync } from 'node:fs';
+          import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
           import { join } from 'node:path';
           const root = 'website/dist';
           const files = [];
@@ -190,9 +190,14 @@ jobs:
               if (href.startsWith('http:') || href.startsWith('https:') ||
                   href.startsWith('mailto:') || href.startsWith('tel:') ||
                   href.startsWith('data:') || href.startsWith('#') || href.startsWith('//')) continue;
-              if (href.startsWith('/') && !href.startsWith('/DHUN/')) {
-                failures.push(file + ': unprefixed internal URL ' + href);
+              if (!href.startsWith('/DHUN/')) {
+                failures.push(file + ': internal URL does not use /DHUN/: ' + href);
+                continue;
               }
+              const localPath = href.split(/[?#]/, 1)[0].slice('/DHUN/'.length);
+              let target = join(root, localPath || 'index.html');
+              if (existsSync(target) && statSync(target).isDirectory()) target = join(target, 'index.html');
+              if (!existsSync(target)) failures.push(file + ': prefixed internal URL has no target: ' + href);
             }
             if (!html.includes('href="/DHUN/"') || !html.includes('href="/DHUN/features/"') || !html.includes('href="/DHUN/ui/"')) {
               failures.push(file + ': missing project-prefixed home/features/interface navigation');
