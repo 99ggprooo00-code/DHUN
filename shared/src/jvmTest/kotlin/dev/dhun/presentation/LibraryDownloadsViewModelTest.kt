@@ -30,6 +30,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 
 /**
  * Covers the ADR-006 download-management presentation layer: the storage
@@ -65,6 +66,7 @@ class LibraryDownloadsViewModelTest {
     private class FakeDownloadManager : DownloadManager {
         val state = MutableStateFlow<List<DownloadedTrack>>(emptyList())
         var failClear = false
+        var failRemove = false
         val progress = MutableStateFlow<Map<String, DownloadProgress>>(emptyMap())
         override val downloads = state
 
@@ -85,7 +87,7 @@ class LibraryDownloadsViewModelTest {
         override suspend fun pause(trackId: String) { paused.add(trackId) }
         override suspend fun resume(trackId: String) { resumed.add(trackId) }
         override suspend fun cancel(trackId: String) { cancelled.add(trackId) }
-        override suspend fun remove(trackId: String) { removed.add(trackId) }
+        override suspend fun remove(trackId: String) { if (failRemove) error("remove failure"); removed.add(trackId) }
         override suspend fun clearAll() { cleared++; if (failClear) error("storage failure"); state.value = emptyList() }
     }
 
@@ -236,6 +238,25 @@ class LibraryDownloadsViewModelTest {
 
             assertEquals(2, dm.cleared)
             assertNull(vm.clearDownloadsUiState.value.errorMessage)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun batchDeletePropagatesFailureToTheConfirmationUi(): Unit = runBlocking {
+        val dm = FakeDownloadManager().apply { failRemove = true }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val vm = LibraryViewModel(
+                dataLayer = dataLayer(), player = NoopPlayer(), scope = scope,
+                downloadManager = dm,
+            )
+            val error = assertFailsWith<IllegalStateException> {
+                vm.removeDownloads(listOf("a", "b"))
+            }
+            assertEquals("remove failure", error.message)
+            assertTrue(dm.removed.isEmpty())
         } finally {
             scope.cancel()
         }
