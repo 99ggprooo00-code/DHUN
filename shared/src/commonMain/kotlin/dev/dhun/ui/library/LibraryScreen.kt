@@ -62,6 +62,7 @@ import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.domain.HistoryDay
+import dev.dhun.presentation.library.ClearDownloadsUiState
 import dev.dhun.presentation.library.DownloadsListUi
 import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
@@ -97,6 +98,7 @@ fun LibraryScreen(
     val groupedHistory by viewModel.groupedHistory.collectAsState()
     val downloadsUi by viewModel.downloadsForUi.collectAsState()
     val storageSummary by viewModel.storageSummary.collectAsState()
+    val clearDownloadsState by viewModel.clearDownloadsUiState.collectAsState()
 
     // Keep day grouping fresh on zone changes (cheap ticker)
     LaunchedEffect(Unit) {
@@ -183,6 +185,8 @@ fun LibraryScreen(
                 onRemove = viewModel::removeDownload,
                 onRemoveBatch = viewModel::removeDownloads,
                 onClearAll = viewModel::clearDownloads,
+                clearState = clearDownloadsState,
+                onConsumeClearResult = viewModel::consumeClearDownloadsResult,
                 onPause = viewModel::pauseDownload,
                 onResume = viewModel::resumeDownload,
                 onCancel = viewModel::cancelDownload,
@@ -702,6 +706,8 @@ private fun DownloadsTab(
     onRemove: (String) -> Unit,
     onRemoveBatch: (Collection<String>) -> Unit,
     onClearAll: () -> Unit,
+    clearState: ClearDownloadsUiState,
+    onConsumeClearResult: () -> Unit,
     onPause: (String) -> Unit,
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
@@ -711,6 +717,13 @@ private fun DownloadsTab(
     var view by remember { mutableStateOf(DownloadsView.LIST) }
     var showClearConfirm by remember { mutableStateOf(false) }
     var showBatchConfirm by remember { mutableStateOf(false) }
+    LaunchedEffect(clearState.succeeded) {
+        if (clearState.succeeded) {
+            showClearConfirm = false
+            selected.value = emptySet()
+            onConsumeClearResult()
+        }
+    }
     // Selection lives across LIST/MANAGE so batch delete targets the same set.
     val selected = remember { mutableStateOf(setOf<String>()) }
     fun toggle(id: String) {
@@ -835,8 +848,10 @@ private fun DownloadsTab(
     if (showClearConfirm) {
         ClearDownloadsConfirmDialog(
             count = downloads.totalCount,
-            onDismiss = { showClearConfirm = false },
-            onConfirm = { onClearAll(); selected.value = emptySet(); showClearConfirm = false },
+            isClearing = clearState.isClearing,
+            errorMessage = clearState.errorMessage,
+            onDismiss = { if (!clearState.isClearing) showClearConfirm = false },
+            onConfirm = onClearAll,
         )
     }
     if (showBatchConfirm) {
@@ -1331,8 +1346,14 @@ private fun DeleteSelectedConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> 
 }
 
 @Composable
-private fun ClearDownloadsConfirmDialog(count: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
+private fun ClearDownloadsConfirmDialog(
+    count: Int,
+    isClearing: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Dialog(onDismissRequest = { if (!isClearing) onDismiss() }) {
         GlassCard(
             modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
             shape = DhunShapes.large,
@@ -1344,11 +1365,17 @@ private fun ClearDownloadsConfirmDialog(count: Int, onDismiss: () -> Unit, onCon
                 Text("Clear all downloads?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Spacer(modifier = Modifier.height(DhunSpacing.sm))
                 Text("This deletes all $count downloaded track${if (count == 1) "" else "s"} from this device. Offline playback will no longer work for them.", style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                    Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
+                }
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
+                    DhunTextButton(onClick = onDismiss, enabled = !isClearing) { Text("Cancel") }
                     Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                    DhunButton(onClick = onConfirm) { Text("Clear") }
+                    DhunButton(onClick = onConfirm, enabled = !isClearing) {
+                        Text(if (isClearing) "Clearing…" else if (errorMessage != null) "Try again" else "Clear")
+                    }
                 }
             }
         }
