@@ -42,6 +42,8 @@ class FileDownloadManager(
 
     private val semaphore = Semaphore(maxConcurrent.coerceAtLeast(1))
     private val jobsLock = Mutex()
+    // Serializes enqueue/resume/removal with clearAll so no new job can appear mid-clear.
+    private val mutationLock = Mutex()
     private val jobs = HashMap<String, Job>()
 
     private val _downloads = MutableStateFlow<List<DownloadedTrack>>(emptyList())
@@ -55,7 +57,11 @@ class FileDownloadManager(
 
     override fun observeProgress(trackId: String): Flow<DownloadProgress?> = _progress.map { it[trackId] }
 
-    override suspend fun enqueue(track: Track): Unit {
+    override suspend fun enqueue(track: Track): Unit = mutationLock.withLock {
+        enqueueLocked(track)
+    }
+
+    private suspend fun enqueueLocked(track: Track) {
         val existing = repository.get(track.id)
         if (existing?.isCompleted == true) return
         // Placeholder row so the download shows immediately; the real path and
@@ -64,25 +70,27 @@ class FileDownloadManager(
         launchWorker(track)
     }
 
-    override suspend fun enqueueAll(tracks: List<Track>): Unit = tracks.forEach { enqueue(it) }
+    override suspend fun enqueueAll(tracks: List<Track>): Unit = mutationLock.withLock {
+        tracks.forEach { enqueueLocked(it) }
+    }
 
-    override suspend fun pause(trackId: String): Unit {
-        val row = repository.get(trackId) ?: return
-        if (row.downloadState == DownloadState.COMPLETED) return
+    override suspend fun pause(trackId: String): Unit = mutationLock.withLock {
+        val row = repository.get(trackId) ?: return@withLock
+        if (row.downloadState == DownloadState.COMPLETED) return@withLock
         repository.updateState(trackId, DownloadState.PAUSED)
-        jobsLock.withLock { jobs.remove(trackId) }?.cancel()
+        stopJob(trackId)
         _progress.value = _progress.value - trackId
     }
 
-    override suspend fun resume(trackId: String): Unit {
-        val row = repository.get(trackId) ?: return
-        if (row.downloadState == DownloadState.COMPLETED) return
+    override suspend fun resume(trackId: String): Unit = mutationLock.withLock {
+        val row = repository.get(trackId) ?: return@withLock
+        if (row.downloadState == DownloadState.COMPLETED) return@withLock
         repository.updateState(trackId, DownloadState.QUEUED)
         launchWorkerFromRow(row)
     }
 
-    override suspend fun cancel(trackId: String): Unit {
-        jobsLock.withLock { jobs.remove(trackId) }?.cancel()
+    override suspend fun cancel(trackId: String): Unit = mutationLock.withLock {
+        stopJob(trackId)
         repository.get(trackId)?.let {
             storage.delete(storage.audioPath(trackId, it.mimeType) + ".part")
             storage.delete(storage.artPath(trackId) + ".part")
@@ -91,8 +99,8 @@ class FileDownloadManager(
         _progress.value = _progress.value - trackId
     }
 
-    override suspend fun remove(trackId: String): Unit {
-        jobsLock.withLock { jobs.remove(trackId) }?.cancel()
+    override suspend fun remove(trackId: String): Unit = mutationLock.withLock {
+        stopJob(trackId)
         repository.get(trackId)?.let {
             storage.delete(it.localAudioPath)
             it.localArtworkPath?.let { art -> storage.delete(art) }
@@ -101,13 +109,14 @@ class FileDownloadManager(
         _progress.value = _progress.value - trackId
     }
 
-    override suspend fun clearAll(): Unit {
-        // Stop and join workers before deleting their files. Cancelling without
-        // joining allowed a worker to finish a write after the cleanup passed,
-        // leaving a partial file behind after the UI reported success.
+    override suspend fun clearAll(): Unit = mutationLock.withLock {
+        // Stop and join workers before deleting their files. The mutation lock
+        // prevents a new enqueue/resume from starting until cleanup is complete.
         val jobsToStop = jobsLock.withLock {
-            jobs.values.toList().also { jobs.values.forEach { job -> job.cancel() } }
-                .also { jobs.clear() }
+            val snapshot = jobs.values.toList()
+            snapshot.forEach { it.cancel() }
+            jobs.clear()
+            snapshot
         }
         jobsToStop.joinAll()
 
@@ -120,6 +129,12 @@ class FileDownloadManager(
     }
 
     /* ---------------- internals ------------------------------------------ */
+
+    private suspend fun stopJob(trackId: String) {
+        val job = jobsLock.withLock { jobs.remove(trackId) }
+        job?.cancel()
+        job?.join()
+    }
 
     private fun placeholder(track: Track) = DownloadedTrack(
         trackId = track.id,
