@@ -8,6 +8,8 @@
 
 **3. Current visual direction contradicted the old lock.** A 2026-09-05 note called Material 3 the visual target. The current user direction is translucent frosted glass, artwork-led, with lightweight cached blur, tint/scrim and accessible fallback. The correction is now binding in `.ai/MASTER_PROMPT.md`; old notes are explicitly historical. Material libraries may remain implementation primitives. This does not authorize React/Tauri migration or a production browser player.
 
+**CI evidence at the latest check (2026-10-09):** the website build/quality/prefix smoke and Playwright browser jobs passed on run `37869983672`; Lighthouse is still running. Build APK run `37869983686` passed. CI run `37869983670` has shared-domain and Robolectric steps green but has not completed; release test run `37869983669` has its APK job green and MSI still running. The Pages deploy and served-origin jobs are skipped on a PR, so this does not prove the live URL has changed.
+
 **Lesson:** destructive UI actions must be result-driven, deployment paths must be tested separately from local-root navigation, and historical session notes must never override the current master contract.
 
 ---
