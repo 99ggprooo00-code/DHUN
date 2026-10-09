@@ -381,10 +381,12 @@ class LibraryViewModel(
      * Batch delete: [DownloadManager.remove] cancels any running job and deletes
      * media + artwork + DB row, so it is valid for every [DownloadState].
      */
-    fun removeDownloads(trackIds: Collection<String>) {
-        val dm = downloadManager ?: return
+    suspend fun removeDownloads(trackIds: Collection<String>) {
         if (trackIds.isEmpty()) return
-        scope.launch { trackIds.forEach { id -> runCatching { dm.remove(id) } } }
+        val dm = downloadManager ?: error("Download storage is unavailable.")
+        // Propagate failures to the confirmation UI. A partial failure leaves
+        // the selection available so the user can retry the remaining work.
+        trackIds.forEach { id -> dm.remove(id) }
     }
 
     fun clearDownloads() {
@@ -466,8 +468,9 @@ class LibraryViewModel(
         scope.launch { runCatching { history.remove(entryId) } }
     }
 
-    fun clearHistory() {
-        scope.launch { runCatching { history.clear() } }
+    suspend fun clearHistory() {
+        // Let the UI close its confirmation only after persistence succeeds.
+        history.clear()
     }
 
     // ---- Playback ----
