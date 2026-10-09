@@ -26,23 +26,24 @@ On code-equivalent commit `650a65e`, Build APK succeeded and the website build/p
 
 ### P0 — Destructive download/history actions hid failures
 
-**Evidence**
-- `shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt`: the confirmation's `onConfirm` calls `onClearAll()`, clears selection and sets `showClearConfirm = false` immediately.
-- `shared/src/commonMain/kotlin/dev/dhun/presentation/library/LibraryViewModel.kt`: `clearDownloads()` launches `dm.clearAll()` and wraps it in `runCatching` without exposing success/failure to the UI.
+**Evidence on the base commit `main` (before this branch):**
+- `LibraryScreen.kt`: Clear all downloads closed immediately and cleared selection; the batch-delete confirmation did the same after invoking its callback.
+- `LibraryViewModel.kt`: `clearDownloads()` and `removeDownloads()` ran asynchronous work with swallowed exceptions; `clearHistory()` also launched a swallowed clear operation and let the UI close its dialog immediately.
+- `FileDownloadManager.kt`: `clearAll()` cancelled workers without joining them before deleting files, allowing a late write/partial file race.
 
-**Impact:** the dialog can close and selection can clear even if the operation fails; the exception is not surfaced. The user cannot distinguish success from a failed or partial delete. Whether active/partial downloads and files are consistently removed also needs an explicit tested contract.
+**Impact:** users could see an action disappear or appear complete despite failed or partial filesystem/database work, and could not tell whether retry was needed.
 
-**Remediation in branch:** observable pending/success/failure state; duplicate-submit guard; retryable failure in the dialog; selection and dialog reset only on success. Remaining verification: test all states on CI and hardware, including active/queued/paused/failed/partial downloads and filesystem/database divergence.
+**Remediation in this branch:** clear-all now exposes pending/success/failure state; batch deletion and history clear await their suspend operations; confirmations remain open during work, show retryable errors, and only reset selection/close on success. The manager serializes mutations against clear-all, joins cancelled jobs and deletes tracked temporary paths. Remaining verification: final-head CI and hardware tests for active/queued/paused/failed/partial downloads and filesystem/database divergence.
 
 **Regression tests:** cancel is a no-op; confirm calls manager once; repeated tap is blocked; success refreshes list and storage; failure keeps remaining data visible; active job and partial-file cleanup; DB/file divergence; retry; restart recovery.
 
 ### P1 — Website internal links can escape the GitHub Pages project path
 
-**Evidence**
+**Evidence on the base commit `main` (before this branch):**
 - The public project URL is under `https://99ggprooo00-code.github.io/DHUN/`.
-- `website/src/_includes/base.njk` uses root-absolute internal links including `href="/"`, `/features/` and `/ui/`.
-- `website/src/ui.njk` and `website/src/404.njk` also contain root-absolute internal links.
-- A repository search did not find a `pathPrefix` / `basePath` helper. The static templates therefore need explicit base-path handling unless the actual build output proves an equivalent prefixing step exists.
+- `website/src/_includes/base.njk`, `website/src/ui.njk` and `website/src/404.njk` emitted root-absolute internal URLs without a project base helper.
+
+**Remediation in this branch:** the templates use Eleventy's `sitePath` filter. The workflow keeps a root-hosted artifact for local browser tests and builds a separate `/DHUN/`-prefixed Pages artifact; a smoke check rejects unprefixed internal links and checks that generated internal targets exist.
 
 **Impact:** a page may work in local root hosting but navigation from the deployed project site can send users to `github.io/features/` rather than `github.io/DHUN/features/`. This matches the symptom “the main page is not linked with the other pages” more closely than a missing nav component: the source already has a shared header/footer, but emitted URLs may be wrong.
 
