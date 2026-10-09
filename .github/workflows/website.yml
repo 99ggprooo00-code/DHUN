@@ -12,6 +12,9 @@ on:
     branches: [main]
     paths:
       - "website/**"
+      # The mirror deploys at /app/ through this workflow (ADR-008 amendment
+      # 2026-10-09 (2)); an edit to it must start it.
+      - "app-web/**"
       - "scripts/website_claims.py"
       - "scripts/website_quality.py"
       - "scripts/website_smoke.py"
@@ -25,6 +28,9 @@ on:
   pull_request:
     paths:
       - "website/**"
+      # The mirror deploys at /app/ through this workflow (ADR-008 amendment
+      # 2026-10-09 (2)); an edit to it must start it.
+      - "app-web/**"
       - "scripts/website_claims.py"
       - "scripts/website_quality.py"
       - "scripts/website_smoke.py"
@@ -150,11 +156,30 @@ jobs:
         working-directory: website
         run: npx html-validate "dist/**/*.html"
 
-      - name: Upload the built site
+      # The Pages deploy also carries the web mirror (ADR-008 amendment,
+      # 2026-10-09 (2)): /app/ is a byte-for-byte copy of app-web/src, and this
+      # workflow stays the single owner of the Pages artifact — a second
+      # workflow publishing to the same environment would race it. Its build
+      # needs no install (the module is dependency-free) and its node tests are
+      # the wiring gate; the Python contract for the mirror runs in app CI.
+      - name: Build the web app (deploys at /app/)
+        working-directory: app-web
+        run: |
+          node tools/build.mjs
+          npm test
+
+      - name: Assemble the Pages deploy (site at the root, the mirror at /app/)
+        run: |
+          rm -rf deploy
+          mkdir -p deploy/app
+          cp -r website/dist/. deploy/
+          cp -r app-web/dist/. deploy/app/
+
+      - name: Upload the Pages deploy
         uses: actions/upload-artifact@v6
         with:
           name: dhun-site
-          path: website/dist
+          path: deploy
           retention-days: 7
           if-no-files-found: error
 

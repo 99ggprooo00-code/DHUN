@@ -64,11 +64,20 @@ export default {
     "DHUN plays YouTube Music on Android and Windows through its own tokenless extraction chain. There is no sign-in to create, no cookie to hand over, and no PO token to solve — and what you save for offline listening stays on your device.",
   leadSource: "ADR-001 (extraction engine), ADR-003 (staged identity chain), ADR-006 (offline downloads)",
   // The site does not distribute binaries. Its primary call to action is the
-  // interface itself; the repository is where a build actually lives. Both
-  // hrefs are asserted by scripts/website_quality.py, which fails on any link
-  // to a release *asset*.
-  ctaPrimary: { href: "/ui/", label: "See the interface" },
+  // interface itself — since 2026-10-09 (user direction) that is the live
+  // mirror at /app/ (ADR-008 amendment, 2026-10-09 (2)); the repository is
+  // where a build actually lives. Both hrefs are asserted by
+  // scripts/website_quality.py, which fails on any link to a release *asset*.
+  ctaPrimary: { href: "/app/", label: "See the interface" },
   ctaSecondary: { href: REPO, label: "Source on GitHub", external: true },
+  // The one line that tells a visitor what the CTA delivers and what it does
+  // not. It is deliberately worded around the honesty contract's forbidden
+  // claims (no "web player", no "in your browser"): this is the app's
+  // interface, published for inspection, with the playback boundary stated.
+  ctaNote:
+    "The interface runs live from this site — the app's own screens, with sample data where the live catalogue is unreachable. Audio playback from this origin is unproven, and the page says so.",
+  ctaNoteSource:
+    "ADR-008 amendment 2026-10-09 (2) (deployment); docs/verification/29-web-app-mirror.md (labelled clock, sample catalogue)",
 
   // Platform strip: what actually ships, with the honest status of each.
   platforms: [

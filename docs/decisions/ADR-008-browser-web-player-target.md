@@ -282,3 +282,54 @@ would break boundary 1 and is not authorized by this amendment.
 `docs/verification/29-web-app-mirror.md` records what was measured, and the
 gates are: `app-web` node tests (60) and `scripts/test_app_web.py` (part of
 app CI step 1, so the mirror is enforced without Node on the runner).
+
+---
+
+## Amendment 2026-10-09 (2) — Deployment: the mirror is published and linked
+
+Appended, not rewritten: this records a change to **B3 row 15** ("Deployment:
+`noindex`, unlinked from the marketing site, reachable only by its own dev
+server within this environment"). Row 15 was the previous session's
+placeholder for a decision that needed a user, and the user made it on
+2026-10-09: the marketing site's "See the interface" call to action should
+reach the live mirror.
+
+### Decision
+
+- **Published.** `app-web` is deployed to the same GitHub Pages origin as the
+  marketing site, under the sub-path **`/app/`**, by the marketing workflow —
+  the single owner of the Pages artifact. A second workflow publishing to the
+  same environment would race it, so the decision is "the site workflow
+  publishes both", not a new workflow. The deploy tree is the checked
+  `website/dist` plus a byte-for-byte build of `app-web/src` (its build is a
+  copy), assembled in the `build` job and uploaded as the one `dhun-site`
+  artifact.
+- **Linked.** The site's primary call to action, "See the interface", points
+  at `/app/` — the real interface, not the drawn one. The `/ui/` route keeps
+  its role (design system, drawn surfaces) and links the live interface too.
+- **Not a marketing route.** `/app/` stays out of `sitemap.xml` and carries
+  the page's own `noindex, nofollow`; the "exactly three routes" constraint
+  (Part A §3) governs the *marketing* site and is unchanged.
+- **Boundaries untouched.** No backend, no proxy, no extraction change. The
+  mirror's on-page honesty notices (engineering preview, audio **not proven**
+  from this origin, sample data labelled) are unchanged and are now asserted
+  on the served bytes too, by the smoke check. Boundary 4 ("no Web-support
+  claim before proof") still holds: the site's copy names what the CTA
+  delivers — the interface — and says the playback part is unproven.
+
+### Cost, and how to reverse it
+
+Cost: the Pages artifact now carries the mirror (~166 KB), the served job
+checks one more URL, and a broken `app-web` build reddens the site workflow's
+build job (which is the point: it would have shipped broken). Reversal: drop
+the `/app/` assembly step and the CTA href in one commit; nothing else in the
+site depends on it.
+
+### Verification (as of this amendment)
+
+Deployment wiring is live in `.github/workflows/website.yml` (build job:
+`app-web` build + its 61 node tests + the combined artifact; browser job: a
+Playwright boot/honesty/console/overflow pass on `/app/`; served job: the
+smoke check fetches `/app/` and re-asserts the notices on the bytes a
+visitor gets). The first *served* verification happens on the merge to
+`main`, from the `served` job — not before.

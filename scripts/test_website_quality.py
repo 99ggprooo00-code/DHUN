@@ -1318,12 +1318,12 @@ class CurrentPageIsMarked(DistCopyMixin):
     def test_a_marker_on_the_404_fails(self):
         dist = self.copy_dist()
         page = dist / "404.html"
+        markup = page.read_text(encoding="utf-8")
+        # Anchor on whatever the 404's primary button points at: the rule is
+        # "a 404 marks no page", not "the 404 links a specific route".
+        anchor = re.search(r'<a class="btn btn--primary" href="([^"]+)"', markup).group(0)
         page.write_text(
-            page.read_text(encoding="utf-8").replace(
-                '<a class="btn btn--primary" href="/DHUN/ui/"',
-                '<a class="btn btn--primary" aria-current="page" href="/DHUN/ui/"',
-                1,
-            ),
+            markup.replace(anchor, anchor.replace('href=', 'aria-current="page" href=', 1), 1),
             encoding="utf-8",
         )
         violations = quality.navigation_state_violations(dist)

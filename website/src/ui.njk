@@ -12,7 +12,9 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
     <p class="hero-lead">{{ site.ui.lead }}</p>
     <!--{{ site.ui.source }}-->
     <div class="cta-row">
-      <a class="btn btn--primary" href="{{ site.path }}/features/">What it can do</a>
+      <!-- The drawn surfaces below are the design system; the primary
+           destination is the real thing, deployed at /app/. -->
+      <a class="btn btn--primary" href="{{ site.path }}/app/">Open the live interface</a>
       <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
     </div>
   </section>
