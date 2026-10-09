@@ -30,7 +30,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
-import kotlin.test.assertFailsWith
 
 /**
  * Covers the ADR-006 download-management presentation layer: the storage
@@ -252,10 +251,13 @@ class LibraryDownloadsViewModelTest {
                 dataLayer = dataLayer(), player = NoopPlayer(), scope = scope,
                 downloadManager = dm,
             )
-            val error = assertFailsWith<IllegalStateException> {
+            var observedMessage: String? = null
+            try {
                 vm.removeDownloads(listOf("a", "b"))
+            } catch (error: IllegalStateException) {
+                observedMessage = error.message
             }
-            assertEquals("remove failure", error.message)
+            assertEquals("remove failure", observedMessage)
             assertTrue(dm.removed.isEmpty())
         } finally {
             scope.cancel()
