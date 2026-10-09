@@ -90,7 +90,13 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   wrap their nested templates in `raw()` (the convention already used at sixty
   other interpolation points), and `app-web/tests/escaping.test.mjs` renders
   every view in Node and fails on any escaped angle bracket — the bug class
-  is gated without a browser.
+  is gated without a browser. The first post-fix browser run then exposed the
+  layout bug the escaped markup had masked: the row button's `width: 100%`
+  plus the trailing icon button ran 378 px in the 350 px list on the phone
+  viewport. The row is now a proper flex pair — the row button takes the
+  remaining space (`flex: 1 1 auto; min-width: 0`, so the text finally
+  ellipsizes) and the trailing button keeps its fixed size (`flex: 0 0
+  auto`) — covering every row in the home feed, history and playlists.
 - **Added: a CI evidence channel that survives a dying run.** The browser
   job's findings are now written to the step summary and emitted as
   annotations as they happen (plus per-check progress and a final

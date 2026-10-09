@@ -405,6 +405,21 @@ button {
   transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
 }
 
+/* The row is a flex pair: the row button takes the remaining space, the
+   trailing button keeps its fixed size. Without min-width: 0 on the row
+   button, its content floor wins and the pair spills the list — measured in
+   the 2026-10-09 browser run, the 100%-width row button plus the icon button
+   ran 378 px in a 350 px list on the phone viewport (and the row's escaped
+   markup, incident 7, had been hiding this exact spill before it). */
+.dhun-tracklist > li > .dhun-track {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dhun-tracklist > li > .dhun-icon-button {
+  flex: 0 0 auto;
+}
+
 .dhun-track:hover {
   background: var(--dhun-overlay-hover);
 }
