@@ -10,6 +10,16 @@ Status vocabulary used throughout: **verified** = I read the fact from a tool
 output in this session (git, `gh`, a build, a local command, a fetched URL);
 **expected** = plausible but unchecked; **not verified** = explicitly unchecked.
 
+## Current deployment correction (2026-10-09)
+
+GitHub Pages serves this project at `https://99ggprooo00-code.github.io/DHUN/`, not at the domain root. Root-hosted local tests at `http://127.0.0.1:8080/` are a different URL base and must not be treated as proof that deployed navigation works.
+
+The Eleventy `sitePath` filter leaves local/root builds unchanged and prefixes internal links when `DHUN_SITE_PATH_PREFIX=/DHUN` is set. The workflow must keep two artifacts distinct:
+- `dhun-site`: root-built artifact used by current local browser/quality checks.
+- `dhun-pages-site`: project-prefixed artifact used only for the GitHub Pages deployment, after a prefix smoke check.
+
+Canonical URLs and sitemap locations must remain under the canonical `/DHUN/` origin. External GitHub links and fragment-only anchors must not be prefixed. Do not claim this is deployed/fixed until the Pages workflow succeeds and the canonical origin is checked after deployment.
+
 ---
 
 ## 1. Scope — Option A marketing site (decided, not re-opened)

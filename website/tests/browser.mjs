@@ -124,11 +124,15 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const BASE = process.env.SITE_BASE || "http://127.0.0.1:8080";
-// The routes are the site's *published* paths: the host serves the site under
-// the /DHUN/ sub-path (project page), and the workflow serves the build the
-// same way. A measurement taken at the origin root would be a measurement of
-// a URL that does not exist (2026-10-09: the root-absolute link bug).
-const ROUTES = ["/DHUN/", "/DHUN/features/", "/DHUN/ui/"];
+// The routes are the site's rooted paths: the committed build is the
+// root-hosted one (the /DHUN/ prefix is applied by the sitePath filter only
+// in the workflow's Pages artifact, which the prefixed-link step verifies
+// separately), so the local gate serves it at a root and measures it there.
+// Layout, contrast, keyboard and overflow behave identically under either
+// URL structure — the prefix is a byte-level href transformation, not a
+// layout one — while link *resolution* on the host is what the prefixed
+// artifact's check is for (2026-10-09: the root-absolute link bug).
+const ROUTES = ["/", "/features/", "/ui/"];
 
 // `touch` marks the viewports where a touch-target floor applies: phones in
 // either orientation, plus the fold-class cover screen. A 200 %-zoom layout
@@ -810,7 +814,7 @@ async function checkViewports(browser) {
 async function checkKeyboard(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
-  await page.goto(url("/DHUN/"), { waitUntil: "load" });
+  await page.goto(url("/"), { waitUntil: "load" });
 
   await page.keyboard.press("Tab");
   // The skip link animates in over 120 ms. Measuring inside the first frame
@@ -851,7 +855,7 @@ async function checkKeyboard(browser) {
 
   // Fresh load: the primary navigation must be reachable from the top and show
   // a visible focus ring while it is.
-  await page.goto(url("/DHUN/"), { waitUntil: "load" });
+  await page.goto(url("/"), { waitUntil: "load" });
   let reachedNav = null;
   for (let press = 0; press < 8 && !reachedNav; press += 1) {
     await page.keyboard.press("Tab");
@@ -1067,7 +1071,7 @@ async function checkStructure(browser) {
  * by a blur), and fails on: an element that cannot be reached at all, and an
  * element that takes focus without any visible change.
  */
-async function checkTabStops(browser, route = "/DHUN/") {
+async function checkTabStops(browser, route = "/") {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
   await page.goto(url(route), { waitUntil: "load" });
@@ -1466,10 +1470,10 @@ async function checkWebApp(browser) {
         pageErrors.push(String((error && error.message) || error).slice(0, 120)),
       );
 
-      await page.goto(url("/DHUN/app/"), { waitUntil: "load" });
+      await page.goto(url("/app/"), { waitUntil: "load" });
       const report = await page.evaluate(webAppReport);
       const overflow = await page.evaluate(overflowReport);
-      const label = `/DHUN/app/ (${scheme}, ${viewport.name})`;
+      const label = `/app/ (${scheme}, ${viewport.name})`;
 
       if (!report.mounted) {
         fail(`web app ${label}`, "the application did not render: #app is empty");
@@ -1566,7 +1570,7 @@ async function captureScreenshots(browser) {
       for (const route of ROUTES) {
         const page = await context.newPage();
         await page.goto(url(route), { waitUntil: "load" });
-        const name = `${route === "/DHUN/" ? "home" : route.replace(/\//g, "")}-${shot.label}-${scheme}.png`;
+        const name = `${route === "/" ? "home" : route.replace(/\//g, "")}-${shot.label}-${scheme}.png`;
         await page.screenshot({ path: `${SHOTS}${name}`, fullPage: true });
         await page.close();
       }

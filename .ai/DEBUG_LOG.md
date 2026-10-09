@@ -1,5 +1,18 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-09 — destructive actions hid errors; Pages links escaped the project base; stale design lock
+
+**1. Clear all downloads, batch deletion and history clear hid operation failures.** Clear-all dismissed its confirmation before the ViewModel's asynchronous operation completed; batch deletion cleared selection and closed immediately while per-item errors were swallowed; history clear closed immediately while persistence errors were swallowed. Fix in branch `fix/ui-download-feedback-website-links`: clear-all exposes pending/success/error state; batch deletion and history clear await suspend operations; confirmations stay open during work, show retryable errors and reset selection/close only after success. The download manager serializes enqueue/resume/pause/cancel/remove with clear-all and joins cancelled workers before deleting final and partial files. JVM tests cover clear-all failure/retry, batch-delete failure propagation, and successful file/row cleanup. **Final-head CI and hardware verification remain pending.**
+
+**2. Marketing-site links were root-absolute on a project site.** The canonical origin includes `/DHUN/`, but shared header/footer, UI CTA and 404 links emitted `/`, `/features/`, `/ui/`. Local root-hosted browser tests cannot catch this deployment-only mismatch. Fix in this branch: templates use the `sitePath` filter; the normal root artifact remains the browser-test target, and a separate `DHUN_SITE_PATH_PREFIX=/DHUN` artifact is built and smoke-checked for Pages. **Verification: pending workflow; the live canonical origin has not been re-clicked by this change.**
+
+**3. Current visual direction contradicted the old lock.** A 2026-09-05 note called Material 3 the visual target. The current user direction is translucent frosted glass, artwork-led, with lightweight cached blur, tint/scrim and accessible fallback. The correction is now binding in `.ai/MASTER_PROMPT.md`; old notes are explicitly historical. Material libraries may remain implementation primitives. This does not authorize React/Tauri migration or a production browser player.
+
+**CI evidence at the latest check (2026-10-09):** the website build/quality/prefix smoke and Playwright browser jobs passed on run `37869983672`; Lighthouse is still running. Build APK run `37869983686` passed. CI run `37869983670` has shared-domain and Robolectric steps green but has not completed; release test run `37869983669` has its APK job green and MSI still running. The Pages deploy and served-origin jobs are skipped on a PR, so this does not prove the live URL has changed.
+
+**Lesson:** destructive UI actions must be result-driven, deployment paths must be tested separately from local-root navigation, and historical session notes must never override the current master contract.
+
+---
 ## 2026-10-09 — the deployed nav that 404'd while every gate was green (session `arena/90cb6d2c-dhun`)
 
 **1. Root-absolute links on a project page: the deployed site's navigation was
@@ -13,17 +26,19 @@ browser and Lighthouse jobs serve the build at a local origin's **root**, where
 root-absolute links happen to work; the served job's link resolver did
 `f"{base}{href}"` — string concatenation, not URL resolution — so `/ui/`
 checked as `…/DHUN/ui/` (200) instead of `…/ui/` (404); and the static link
-checker mapped `/ui/` straight onto the dist tree. Fix (all honest, no rule
-loosened): one `path` value in `site.js` prefixes every internal link;
-`_resolve_internal` strips the base path (and resolves `/app/` against
-`app-web/src`, the deploy's byte-identical source); a new `base_path_violations`
-rule fails any internal link missing the prefix; the smoke test resolves with
-`urllib.parse.urljoin` against the origin; CI serves under `/DHUN/`.
-Verification: the fixed smoke check run against the *old* bytes served under
-`/DHUN/` goes red (`links /features/, which returns HTTP 404`) where the old
-logic passed them; a wordmark mutated back to `href="/"` goes red on two rules
-and green on revert; after the fix, website run **37863859204** is green with
-Lighthouse 100/100/100/100 on all three routes at `requests=1`. Lesson: a check
+checker mapped `/ui/` straight onto the dist tree. Fix as shipped (PR #149, merged to main 2026-10-09 before this PR):
+every internal `href` in the `.njk` sources carries the `sitePath` filter
+(registered in `website/eleventy.config.js`); the filter is a no-op unless
+`DHUN_SITE_PATH_PREFIX` is set, so the committed `website/dist` stays
+rooted — the target of every local gate — and the workflow builds a second,
+`/DHUN`-prefixed artifact for the Pages deploy and verifies every prefixed
+link resolves (the "Verify GitHub Pages internal links" step). This PR adds
+the `/app/` web mirror to that deploy and points the site's primary CTA at
+it; `website_quality.py` resolves `/app/` links against `app-web/src`, the
+mirror's byte-identical source. The diagnosis above stands: a check that
+serves the artifact at a different URL structure than the host measures a
+site that does not exist; string-joining URLs in a test is a test of the
+test. Lesson: a check
 that serves the artifact at a different URL structure than the host measures a
 site that does not exist; string-joining URLs in a test is a test of the test.
 
@@ -52,6 +67,8 @@ loaded gun when the pattern appears in your own invocation.
 **5. `overflow: hidden` on a `<span>` is a no-op, and the app's track rows proved it.** The first browser run of the mirror that actually booted (website run 37872180179) failed on two findings: on the 390×844 viewport, five `<li>` track rows in the home feed were *spilling* — `scrollWidth 491 > clientWidth 350`, identical 141 px on all five, phone only, dark and light. The five were exactly the rows whose "Artist • Album" subtitle is long ("Bamboo Wireless — The Koshi Sessions • Terai", "Night Bus to Biratnagar — Bhanu & the Lowlands • …"). Root cause: `.dhun-track__title` and `.dhun-track__subtitle` are `<span>`s (inline), and `overflow` — with `text-overflow: ellipsis` — **has no effect on non-replaced inline boxes** per spec: the computed overflow stays `visible`, so the rule that looked like a working ellipsis was dead CSS. The same rule also let title and subtitle flow on *one line* (inline flow), which is why the row content was title+subtitle as a single nowrap run wider than the phone. Desktop never showed it because the wider column swallowed the text. The stub DOM tests cannot see any of this (no layout engine, scrollWidth is 0). Fix: `display: block` on both classes — they stack as the Android TrackRow intends and the ellipsis actually engages. Lesson: when a CSS rule "does nothing", check the *display type* the property requires before doubting the selector; and a layout bug that only exists below a width is invisible to every gate that does not render at that width.
 
 **6. The CI evidence was invisible, and the failure looked like a phantom.** For four consecutive runs (37864947840, 37870564524, 37871151804, 37871543586, 37871836106) the browser job failed with **zero annotations and an empty step summary**, in ~28 s, on different runners — while its `browser-evidence` artifact carried the complete, byte-identical screenshot set, proving the whole suite had run. The job log archive (`results-receiver.actions.githubusercontent.com`) and the artifacts (blob host) are outside this sandbox's egress allowlist (TLS resets, verified with curl), and the check-run API does not expose step summaries at all — so there was no channel left to read what the run had recorded. The work to restore the channel, in order: (1) guard the three finally-block paths that could skip the final emission; (2) write every finding to the step summary *as it happens* plus per-check progress lines; (3) emit progress/problem/crash annotations immediately instead of only at the tail; (4) when those annotations still read back as zero through the API — while the log proved they were emitted — add a workflow step that **tees the step's full stdout/stderr to a file and posts it as a comment on dedicated issue #150** (`if: always()`, body built in Python for lossy-UTF-8 safety and the 65536-char limit). The first post failed with "Resource not accessible by integration" — the workflow's top-level `permissions: contents: read` had stripped `issues: write` from the job token; the browser job now declares the two scopes it uses. That single comment (run 37872180179) ended the saga: the script had **finished cleanly every time** (`script finished cleanly: 93 measurement(s), …, exit 1` was the last line) — there was never a crash; the job was red on the two genuine overflow findings of incident 5, and the annotations had simply stopped being readable through the API (they had read fine on the 6376b6d run earlier the same day; the retention behaviour from this sandbox is unexplained and is recorded as not verified in record 30). Lesson: when the only evidence channel is one you cannot reach, build a channel you can — a growing, per-finding record plus a final clean-finish marker turns "the run died silently" into "the run did X, then Y" in one run; and a red CI job with no readable findings is a *measurement* problem to fix before it becomes a trust problem.
+
+**7. The overflow's real cause: nested templates rendered as escaped text — the CSS theory was wrong.** The display-block fix from incident 5 shipped (website run 37873443440) and the *identical* five-row overflow came back, byte-identical (`scrollWidth 491 > clientWidth 350`), with the row's only element child `button.dhun-track` at the container width — which ruled the inline-span theory out entirely: there was no overflowing span in the DOM at all. Rendered the templates in Node (no browser, no CI): `trackRow`'s output contained `&lt;button class=&quot;dhun-icon-button&quot;…` — the overflow (⋮) button had never existed as an element. Root cause: the `html` tag in `app-web/src/js/dom.js` escapes every interpolated value not wrapped in `raw()`, and *thirteen* nested `html` templates in `views.js` (and one `Array.join("")` coercion in `loadingState`) relied on plain interpolation, so their markup rendered as a visible text node. The escaped markup string — including the track title inside an `aria-label` — was the 491 px non-breaking run: one long text with no break opportunities, exactly 141 px over on every affected row, desktop never spilling. The same bug class had been silently text-ifying the error/empty states, section hints, search result grids, the playlists list, the downloads notice and the artist albums grid — none of them measured by any gate. Fix: `raw()` at all thirteen sites (the convention already used at sixty other interpolation points), plus `tests/escaping.test.mjs`, which renders every view in Node with representative sample data and fails on any escaped angle bracket. Lesson: when a "layout" measurement is a constant you cannot explain, and the element you expect to be there is *not in the DOM*, stop measuring pixels and start reading the rendered string; a text node is a box too, and `scrollWidth` does not distinguish markup from its escaped corpse.
 
 ## 2026-10-09 — the app that defined its entry point and never called it: caught by the first real browser pass (session `arena/90cb6d2c-dhun`)
 

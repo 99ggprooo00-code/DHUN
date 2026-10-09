@@ -27,6 +27,13 @@ session ending in a merged PR.
 | Canonical URL | serves the real site (fetched live) | `fetch_page https://99ggprooo00-code.github.io/DHUN/` |
 | Open PRs | **#144** (retitled SUPERSEDED, head `arena/5defb1ff-dhun`) and **#54** (ADR-007 research, out of scope) | `gh pr list --state open` |
 
+**Mid-session, PR #149 merged to main** (result-driven destructive
+actions in the Android/desktop app, and the `sitePath` base-path design for
+the website — the fix for the finding below, with a cleaner mechanism than
+this session's first attempt). This branch absorbed it and its website design
+is now the base this PR builds on; the two sessions' website work is one
+design, not two.
+
 **The finding that orders this session: every internal navigation link on the
 deployed site is dead.** The site is a GitHub **project** page, published at
 the sub-path `https://99ggprooo00-code.github.io/DHUN/`, but the built HTML
@@ -44,12 +51,13 @@ to work, and the served-job's link resolver joins `base + href` as *strings*
 
 | # | Item | Status |
 |---|---|---|
-| W1 | **Fix the deployed link structure.** One `path` value in `site.js` prefixes every internal link (`/DHUN/…`); the quality checker resolves and asserts the base path instead of the root; the smoke test resolves links the way a browser does; CI serves the site under the real `/DHUN/` sub-path so browser and Lighthouse measure the structure a visitor gets. | **done** (commit `8e60298`) — CI-verified: website run **37863859204** green, all three routes Lighthouse **100/100/100/100** at `requests=1` on the prefixed paths; mutation proofs in record 30 |
+| W1 | **Fix the deployed link structure.** Shipped via PR #149 (merged to main mid-session): every internal `href` in the `.njk` sources routes through the `sitePath` filter — a no-op in the committed, root-hosted `website/dist` (the target of every local gate) and a `/DHUN` prefix in the second, Pages-only artifact the workflow builds with `DHUN_SITE_PATH_PREFIX=/DHUN` and verifies link-by-link. This PR's job was the diagnosis that ordered it, plus the quality checker resolving `/app/` links against `app-web/src` and the smoke test resolving links the way a browser does. | **done** (merged as PR #149) — the prefixed-artifact verification step runs on every website workflow run |
 | W2 | **Deploy `app-web` at `/app/` through the site workflow** (the single owner of the Pages artifact) and point the primary CTA "See the interface" at the live interface. ADR-008 gets a deployment amendment superseding B3 row 15 ("unlinked from the marketing site") — that was the previous session's placeholder decision, and the user's direction now is the decision. The web app keeps its `noindex` and its on-page honesty notices. | **done** (commit `6376b6d`) — locally verified on the assembled deploy tree; CI on `6376b6d` read at the finish sequence; the served-origin verification happens in the `served` job after the merge to `main` |
-| W3 | **Every button on the site resolves.** Full link audit over the built pages under the `/DHUN/` base, asserted by the static gates and by the served job (marketing routes **and** `/app/`). | **done** — the `base_path` rule + browser-like smoke resolution + the local deploy simulation (all seven fetches 200, every link resolved) |
+| W3 | **Every button on the site resolves.** Full link audit over the built pages at the local root **and** over the prefixed Pages artifact, asserted by the static gates, the workflow's prefixed-link step and the served job (marketing routes **and** `/app/`). | **done** — internal-link resolution in `website_quality.py` (with `/app/` resolved against `app-web/src`) + browser-like smoke resolution + the workflow's prefixed-link verification |
 | W4 | **Honest copy around the live interface** (what the CTA delivers, what it does not), docs, verification record, CHANGELOG. | **done** — one line under the hero CTA (worded around the honesty contract), README rewritten for the live state, record **30** in `docs/verification/`, KNOWN_LIMITATIONS, WEBSITE_PLAN D13/D14, DEBUG_LOG, CHANGELOG |
 | W5 | **The first real browser run of the mirror found it never booted: fix + gate.** The new `browser` job's first pass (website run 37864321503 on `6376b6d`) reported `#app` empty on all four viewports with no error of any kind — `app-web/src/js/main.js` exported `boot` without ever calling it, and the page loads the module as its only script. Fixed with a top-level `boot();` (61/61 DOM-stub tests still green) and a browser-free contract test that asserts the call exists (mutation-proven). | **done** (commit `5f1f2c6`) — the first booting run's record closes W2's "CI read at the finish sequence" |
 | W6 | **The first booting run's real finding: five track rows spilling on the phone viewport.** `overflow: hidden` + ellipsis on the inline `<span>` title/subtitle was dead CSS (no effect on non-replaced inline boxes) — rows with a long "Artist • Album" ran 491 px wide in a 350 px box, phone only (dark and light); desktop clean. Fixed with `display: block` on both classes (stacked, clipping, like the Android TrackRow); the web app overflow finding now names the text and widths, matching the marketing check. | **done** (fix on this branch; the green browser run on the fix head is the verification) |
+| W8 | **The W6 overflow's real root cause: the track-row button was never in the DOM.** The `display: block` fix shipped and the byte-identical 491 px overflow returned, with the row's only element child at container width — the inline-span theory was dead. Node-rendering the templates (no browser, no CI) showed `trackRow` emitting `&lt;button class=&quot;dhun-icon-button&quot;…`: the `html` tag in `app-web/src/js/dom.js` escapes every interpolated value not wrapped in `raw()`, and thirteen nested templates in `views.js` (plus one `Array.join("")` in `loadingState`) interpolated plain, so their markup rendered as a visible text node — the escaped string *is* the 491 px non-breaking run. Same bug class had silently text-ified the error/empty states, section hints, search grids, playlists list, downloads notice and artist albums grid. Fixed with `raw()` at all thirteen sites and `tests/escaping.test.mjs` (every view rendered in Node, failing on any escaped angle bracket). | **done** (commit `fc0bfe7`) — the green browser run on the fix head is the verification |
 | W7 | **The CI evidence channel: the record must survive a dying run.** Four consecutive runs failed with zero annotations and an empty step summary while their screenshot artifacts proved the suite had completed; the job log archive and artifact hosts are outside the sandbox's egress allowlist, and the check-run API does not expose step summaries. Fix: findings + per-check progress written to the step summary and emitted as annotations immediately, a process-level crash annotation, a final clean-finish marker, and an `if: always()` step posting the full step log to issue #150 (browser job granted `issues: write`). | **done** — the first readable record (run 37872180179) proved the script had finished cleanly all along and carried the W6 finding; the annotation-retention anomaly is recorded as not verified in record 30 |
 
 Boundaries unchanged: no backend, no proxy, no fourth marketing route (the
@@ -57,10 +65,12 @@ web app is not a marketing route — it is the mirror, `noindex`, linked from
 the CTA), the four app workflows untouched. One planned boundary was broken
 on purpose: "no `app-web` source changes" — the W5 fix is a one-line source
 change in `app-web/src/js/main.js` (plus its comment), made because the first
-real browser check proved the page could not load without it, and W6 is a
+real browser check proved the page could not load without it, W6 is a
 CSS-only source change in `app-web/src/css/app.css`, made because that same
 first booting check proved two of the shipped rows could not clip their text
-on a phone.
+on a phone, and W8 is a source change in `app-web/src/js/views.js` (plus its
+regression test), made because the first Node render of the rows proved the
+overflow was escaped markup, not layout.
 
 ### Exact next actions for the next session (post-merge)
 
@@ -75,6 +85,34 @@ on a phone.
 
 ---
 
+## Session — urgent UI correctness, website navigation, and instruction reconciliation (2026-10-09) — **merged to main as PR #149**
+
+**State: MERGED 2026-10-09; historical from this session's point of view.** Working branch: `fix/ui-download-feedback-website-links`, based on the current `main` source. This task supersedes the previous active-task snapshot below; that snapshot is historical context, not the next step.
+
+### Confirmed source-level defects and changes in this branch
+
+1. **Destructive download/history actions (P0):** clear-all used to hide failures and dismiss early; batch deletion and clear history had the same issue. This branch makes all three result-driven: pending disables duplicate submits, failures stay visible with retry, and confirmation/selection resets only after success. The manager serializes download mutations with clear-all and joins workers before deleting final/partial files. JVM tests cover clear-all failure/retry and successful file/row cleanup. Still needs CI confirmation and Android/desktop interaction verification.
+2. **GitHub Pages internal links (P1):** templates emitted root URLs such as `/`, `/features/` and `/ui/` although the canonical project site is hosted beneath `/DHUN/`. A `sitePath` filter preserves root-hosted local tests and prefixes internal paths for a separate Pages artifact build. The Pages workflow now builds and smoke-checks that artifact separately from the root-built artifact used by browser tests.
+3. **Design-system drift:** the current visual direction is **translucent frosted glass**, artwork-led, with cached/lightweight blur, tint/scrim and accessible fallback. Material libraries may be implementation primitives; “Material 3 only” is stale and must not direct new work.
+4. **AI operating-file drift:** update this file, MASTER_PROMPT, KNOWN_LIMITATIONS, DEBUG_LOG, WEBSITE_PLAN, HANDOFF and README together. Preserve old session notes as history; never present their old branch/commit/status or “do not touch FullPlayer” restrictions as current instructions.
+5. **Product specs:** reconcile PRD, TRD, app flow, UI/UX, data schema and implementation plan with current source and this accepted contract. Separate native app, static marketing site and experimental `app-web/`; no production browser player or new backend is implied.
+
+### Exact next steps
+
+- [ ] Finish reconciling .ai current instructions and historical notes.
+- [ ] Verify all templates route internal hrefs through `sitePath`; verify Pages artifact build uses `DHUN_SITE_PATH_PREFIX=/DHUN`.
+- [ ] Review automated tests for clear failure/retry and the project-prefix artifact; fix any CI failures.
+- [ ] Check the diff for accidental architecture or product-scope changes.
+- [ ] Wait for GitHub Actions; report each workflow's actual final result, not an assumption.
+- [ ] Only mark complete after CI is green; record real-device and canonical-origin checks as separate gates if unavailable.
+
+### Verification truth (updated 2026-10-09)
+
+The source-level defect was confirmed from `LibraryScreen.kt`, `LibraryViewModel.kt`, `FileDownloadManager.kt`, and the website templates. On code-equivalent commit `650a65e`, the APK build passed and the website build/prefix smoke check plus browser measurements passed. On current docs head `90bee52`, GitHub Actions run `37869983686` (Build APK) is green; run `37869983672` has build/quality/prefix-smoke and browser jobs green while Lighthouse is still running; run `37869983670` has shared-domain and Robolectric tests green but the overall CI job is still running; run `37869983669` has its APK job green and MSI build running. Subsequent commits added result-driven batch-delete/history handling and selection reconciliation after partial failure, so those earlier results do not cover the latest application code. Fresh final-head workflows are required; no final-head green verdict is claimed. The PR's deploy and served-origin smoke jobs are skipped by design; **the canonical origin after merge and Android/Windows hardware interactions remain unverified**.
+
+---
+
+## Historical snapshot — previous active task, superseded 2026-10-09
 ## Session `arena/967513fd-dhun` — the app's interface in a browser, and the harness bug that was hiding measurements (2026-10-09)
 
 Updated **2026-10-09** · fixed session branch `arena/967513fd-dhun` · branch point
@@ -1845,7 +1883,7 @@ CI-green until the checks on this commit finish, and the merge / rolling
   that veil (list cards above the dock unchanged); Related list carries one
   blurred-artwork layer plus that veil (queue rows unchanged); mini-player
   is a lighter acrylic on the phone dock and on the rail / two-pane card.
-  Material 3 blur + a veil — not Liquid Glass, not a platform Acrylic API.
+  Historical visual description for that 2026-09-22 session: Material 3 blur + a veil. Superseded as the visual-target statement by the 2026-10-09 frosted-glass contract at the top of this file; cached blur and lightweight-rendering constraints remain.
 - `d2a9045` — the overlays that were still at the old darkness. Full-player
   black dim **0.52/0.16 → 0.40/0.08**. Ambient scrim stops lowered again;
   the bottom stop sits on the **≥0.85** floor (`PlayerSheetLayoutTest`),

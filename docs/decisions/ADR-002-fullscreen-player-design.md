@@ -1,15 +1,18 @@
-# ADR-002: Full-Screen Now Playing — design lock (Apple clarity × ViMusic immersion × Material 3 glass)
+# ADR-002: Full-Screen Now Playing — frosted-glass design contract (Apple clarity × ViMusic immersion)
 
 ## Status
-Accepted (2026-09-05) — **design contract**. Implementation is **incremental polish
-on existing Phase 08/11 code**, not a greenfield player. Does not reorder the
-locked 14-phase plan.
+Accepted design contract, updated 2026-10-09. Implementation remains **incremental polish
+on existing Phase 08/11 code**, not a greenfield player. This ADR does not reorder
+the locked engineering roadmap.
 
-**Visual system (user lock 2026-09-05): Material 3 only. No Liquid Glass.**
-Translucent M3 surfaces + one-shot `Modifier.blur` on artwork backgrounds +
-gradient scrims. Glass tokens (`DhunColors.glass`) remain the atmosphere
-layer — never a separate Liquid Glass renderer, never continuous full-res
-reblur, never platform-private glass APIs.
+**Current visual system (user correction 2026-10-09): translucent frosted glass.**
+This supersedes the 2026-09-05 “Material 3 only” visual-target wording retained
+in the historical addenda below. Use artwork-led translucent surfaces, soft
+tints, restrained highlights/hairlines, gradients and scrims, with cached
+lightweight 2D blur. Material/Compose components may be implementation primitives,
+but their default visual treatment is not the product target. Preserve legibility
+with an opaque fallback when needed. No continuous full-resolution reblur,
+heavyweight 3D/liquid-distortion renderer, or platform-private glass APIs.
 
 ## Context
 
@@ -39,21 +42,28 @@ deferred per MASTER_PROMPT).
 
 ## Decision — design philosophy (locked)
 
-> **Apple Music's clarity + ViMusic's immersive philosophy + VIVI's Material 3 /
-> dynamic-artwork direction + DHUN's lightweight cross-platform implementation.**
+> **Apple Music's clarity + ViMusic's immersive philosophy + DHUN's own
+> translucent frosted-glass identity and lightweight cross-platform implementation.**
 
 Rules:
 
-1. **Material 3 is structure. Glass is atmosphere.**  
-   Glass only on: player controls, lyrics surface, queue sheet, transient
-   chrome, floating actions. Home/Search/Library stay conventional M3 dark.
-2. **Material 3 only — Liquid Glass is forbidden (user lock).**  
-   Path: artwork → (optional downscale) → blur **once** per track change →
-   tint from `ArtworkColorExtractor` → gradient scrim → translucent M3
-   surface (`surfaceElevated` / `DhunColors.glass`) → cache via
-   `BlurredArtworkCache`. Re-blur only on track/URL change, never every
-   frame. Do not adopt iOS Liquid Glass, Windows Acrylic-as-primary, or
-   any continuous backdrop-filter fashion that fights battery/low-end.
+1. **Frosted glass is the signature material; hierarchy stays clear.**
+   Use it for player chrome, lyrics surfaces, queue/related sheets, dialogs and
+   floating controls where it adds value. Home/Search/Library remain scannable;
+   do not turn every card into a translucent panel.
+2. **Blur is cached atmosphere, not continuous rendering.**
+   Path: artwork → optional downscale → blur once per track/artwork generation →
+   tint from `ArtworkColorExtractor` → gradient/scrim → translucent frosted
+   surface. Cache through `BlurredArtworkCache`; invalidate when the artwork
+   identity changes. Never re-blur every animation frame.
+3. **Implementation primitives are not the visual target.**
+   Compose/Material components may be used when styled to DHUN's tokens. Do not
+   let default Material 3 color, elevation, shape or typography define the look.
+   Use an opaque/stronger-tint fallback when the background harms legibility.
+4. **Keep rendering lightweight and cross-platform.**
+   No heavyweight 3D/liquid-distortion renderer, continuous full-resolution
+   backdrop filtering, iOS Liquid Glass clone, or platform-private glass APIs.
+   Do not use Windows Acrylic as the product's design-system foundation.
 3. **UI never knows the stream source.**  
    `PlayerScreen → PlayerViewModel → DhunPlayer → StreamResolver → MusicProvider`.
    InnerTube / yt-dlp stay behind the provider/extraction boundary (already true).
@@ -190,7 +200,7 @@ Human / multi-session policy:
 - ADR-001 (extraction; rot-drill category-8 CI-network rule)
 - Design brief 2026-09-05 (Apple / ViMusic / VIVI / lightweight glass)
 
-## Addendum — 2026-09-05 execution (Material 3 only)
+## Historical addendum — 2026-09-05 execution (former Material 3 target)
 
 Shipped on `arena/01a07170-dhun` without Liquid Glass:
 
@@ -203,7 +213,7 @@ Shipped on `arena/01a07170-dhun` without Liquid Glass:
 Still OPEN: residential stream smoke, hardware Phase 08/11 checklists,
 audio-segment cache, soaks, v0.1.0.
 
-## Addendum — M3 product UI (2026-09-05)
+## Historical addendum — M3 product UI (2026-09-05)
 
 Cross-cutting with Home/shell (not Liquid Glass):
 
@@ -215,9 +225,9 @@ Cross-cutting with Home/shell (not Liquid Glass):
 ## Addendum — 2026-09-15 review fixes (artwork fit, bottom cluster, queue sheet)
 
 Device review of the 2026-09-09 "the artwork **is** the screen" reading found
-three defects. They are fixed inside the same rules (M3 only, blur once per
-track, no Liquid Glass), and the layout contract is restated so a future
-polish pass does not re-introduce them:
+three defects. They were fixed under the former M3-only target. The geometry and cached-blur
+constraints remain valid under the current frosted-glass contract, and the
+layout contract is restated so a future polish pass does not re-introduce them:
 
 - **Rule 1 (structure) is re-asserted over full-bleed art.** The sharp artwork
   is a **fit-to-card** square in the upper field (sized by
@@ -237,7 +247,7 @@ polish pass does not re-introduce them:
   is floored at `DhunSpacing.queuePanelMinHeight`, and it paints an opaque
   base under the glass so rows read on a phone and on a Windows window.
 
-## Addendum — 2026-09-22 lyrics material (not Acrylic-as-primary)
+## Historical addendum — 2026-09-22 lyrics material (former M3 veil implementation)
 
 The near-black `glassStrong` disc read as a translucent black button.
 Like/more/back chips, the nav band under the mini-player, and the Related
@@ -246,7 +256,8 @@ list now share the lyrics-card veil (`LyricsMaterialPolicy`: background alpha
 are unchanged — the veil is only for chrome that sits on the already-blurred
 player or shell backdrop, plus the Related sheet which paints its own blur
 because its base is opaque. The mini-player uses a lighter milky cut of that
-same recipe (`acrylicGlass`) — still Compose `Modifier.blur` + an M3 veil,
-not Windows Acrylic, not Liquid Glass, and not a replacement for the token
-system. `DhunColors.glassStrong` stays the token for the navigation rail and
-dialog composites.
+same recipe (`acrylicGlass`). This describes the implementation at the time of
+this historical addendum, not the current product target. The current target is
+translucent frosted glass; do not substitute Windows Acrylic or a heavyweight
+Liquid Glass renderer, and keep the token system authoritative. `DhunColors.glassStrong`
+stays the token for the navigation rail and dialog composites.

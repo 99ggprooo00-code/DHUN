@@ -58,7 +58,10 @@ physical run on Android + desktop, like Phases 03/04/05 checklists).
 - [ ] Desktop: volume slider drives vlcj; blur over artwork (Skiko)
 - [ ] BACK collapses FullPlayer; app never finishes while expanded
 
-## ADR-002 polish (2026-09-05) — Material 3 only
+## Historical ADR-002 polish (2026-09-05; superseded 2026-10-09) — former Material 3 visual lock
+
+> Historical implementation record only. The current visual target is translucent frosted glass as specified in `.ai/MASTER_PROMPT.md` and the updated ADR-002. Material/Compose components are implementation primitives, not the visual target.
+
 
 | Item | Status |
 |---|---|

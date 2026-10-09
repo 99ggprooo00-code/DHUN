@@ -92,9 +92,9 @@ const cases = {
   "addToPlaylistSheet": () => views.addToPlaylistSheet(track, catalog.playlists),
 };
 
-test("no view renders escaped markup (nested templates must be wrapped in raw())", (t) => {
+test("no view renders escaped markup (nested templates must be wrapped in raw())", async (t) => {
   for (const [name, render] of Object.entries(cases)) {
-    t.test(name, () => {
+    await t.test(name, () => {
       const out = render();
       assert.doesNotMatch(
         out,
@@ -110,11 +110,11 @@ test("no view renders escaped markup (nested templates must be wrapped in raw())
   }
 });
 
-test("the fixed structures are real DOM fragments, not text", (t) => {
-  t.test("trackRow keeps its overflow button as an element", () => {
+test("the fixed structures are real DOM fragments, not text", async (t) => {
+  await t.test("trackRow keeps its overflow button as an element", () => {
     assert.match(views.trackRow(track, { index: 0 }), /<button\s+class="dhun-icon-button"/);
   });
-  t.test("searchScreen renders result grids as elements", () => {
+  await t.test("searchScreen renders result grids as elements", () => {
     const out = views.searchScreen({
       query: "q",
       results: { tracks: catalog.tracks.slice(0, 2), albums: catalog.albums.slice(0, 1), artists: catalog.artists.slice(0, 1), playlists: catalog.playlists.slice(0, 1) },
@@ -123,9 +123,9 @@ test("the fixed structures are real DOM fragments, not text", (t) => {
       status: "ok",
     });
     assert.match(out, /<ul class="dhun-grid">/);
-    assert.match(out, /<div class="dhun-tracklist">/);
+    assert.match(out, /<ol class="dhun-tracklist">/);
   });
-  t.test("loadingState renders shimmer rows as elements", () => {
+  await t.test("loadingState renders shimmer rows as elements", () => {
     assert.match(views.loadingState(3), /<div class="dhun-track" aria-hidden="true">/);
   });
 });

@@ -36,6 +36,21 @@
 
 ---
 
+## Binding correction — UI/UX and website path contract (2026-10-09)
+
+This note supersedes older visual wording in this file and historical notes in `.ai/KNOWN_LIMITATIONS.md`, `.ai/HANDOFF_NEXT_SESSION.md`, and `docs/verification/08-player.md`.
+
+- **Visual target:** DHUN uses an artwork-led, dark-first **translucent frosted-glass** visual identity. Use translucent tinted surfaces, restrained highlights/borders, gradients/scrims, legible type, and cached/lightweight 2D artwork blur. Do not describe Material 3 as the product's visual target. Compose/Material components can remain implementation primitives if styled to DHUN's tokens.
+- **Not a heavyweight renderer:** no continuous full-resolution blur, liquid-distortion renderer, or platform-private glass APIs. Low-end/unsupported devices must receive a legible tint/gradient/opaque fallback. Accessibility and contrast take priority over transparency.
+- **Architecture stays Kotlin Multiplatform/Compose:** this visual correction does not authorize React/Tauri migration or a rewrite of player/provider code. The native app, static `website/` marketing site, and `app-web/` engineering mirror are distinct. Production browser playback remains deferred/blocked under ADR-008 unless a new decision explicitly authorizes it.
+- **Destructive actions must report outcomes:** Clear all downloads, clear history/cache, batch delete, and playlist delete must not close confirmation or clear UI state before persistence/filesystem work succeeds. Every action needs pending, success and failure behavior plus retry/cancel semantics.
+- **Website project base:** the canonical site is `https://99ggprooo00-code.github.io/DHUN/`. Templates must generate project-base-aware internal links. The Pages artifact and the root-hosted local-test artifact are separate; success building one does not prove the deployed links are correct.
+- **Status words are not interchangeable:** source present, unit-tested, CI green, verified on Android/Windows hardware, and verified at the canonical deployed origin are separate evidence states.
+
+When this note conflicts with an older dated session narrative, this note and accepted current ADRs win. Keep older text as history but label it historical; do not silently treat an old “do not touch FullPlayer” task boundary or “Material 3 only” statement as current.
+
+---
+
 ## 1. What DHUN Is (today)
 
 DHUN is a working, cross-platform music application streaming from
@@ -57,7 +72,7 @@ release hardening.**
   tray + jump lists + SMTC + single-instance, light/dark themes with
   accent selector (dev-reachable; wiring open), desktop 10-band EQ
   (Android EQ open).
-- **UI philosophy (unchanged):** premium glassy design,
+- **UI philosophy:** premium translucent frosted-glass design,
   artwork-driven, dark-first, ViMusic-quality. FullPlayer background is
   real blurred artwork; Home/Search/Library sit on the now-playing
   blurred backdrop (PR #68).

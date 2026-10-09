@@ -14,7 +14,7 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
     <div class="cta-row">
       <!-- The drawn surfaces below are the design system; the primary
            destination is the real thing, deployed at /app/. -->
-      <a class="btn btn--primary" href="{{ site.path }}/app/">Open the live interface</a>
+      <a class="btn btn--primary" href="{{ '/app/' | sitePath }}">Open the live interface</a>
       <a class="btn btn--secondary" href="{{ site.ctaSecondary.href }}" rel="noopener">{{ site.ctaSecondary.label }}<span class="ext" aria-hidden="true">{% icon "external" %}</span></a>
     </div>
   </section>
@@ -90,7 +90,7 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
           {%- endfor %}
         </ul>
         {%- if surface.note %}
-        <p class="traceable">{{ surface.note }} <a href="{{ site.path }}{{ surface.href }}">Open the {{ surface.hrefLabel }}</a></p>
+        <p class="traceable">{{ surface.note }} <a href="{{ surface.href | sitePath }}">Open the {{ surface.hrefLabel }}</a></p>
         {%- endif %}
       </div>
       {%- if surface.mockFile %}

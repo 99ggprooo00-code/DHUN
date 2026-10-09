@@ -168,18 +168,93 @@ jobs:
           node tools/build.mjs
           npm test
 
-      - name: Assemble the Pages deploy (site at the root, the mirror at /app/)
+      - name: Assemble the local test artifact (site at the root, the mirror at /app/)
         run: |
           rm -rf deploy
           mkdir -p deploy/app
           cp -r website/dist/. deploy/
           cp -r app-web/dist/. deploy/app/
 
-      - name: Upload the Pages deploy
+      - name: Upload the local test artifact
         uses: actions/upload-artifact@v6
         with:
           name: dhun-site
           path: deploy
+          retention-days: 7
+          if-no-files-found: error
+
+      # The root-built artifact above is the one tested in the local browser.
+      # GitHub Pages hosts this repository at /DHUN/, so build a second artifact
+      # with project-base-aware internal links only after those root tests pass.
+      - name: Build the GitHub Pages project-path artifact
+        working-directory: website
+        env:
+          DHUN_SITE_PATH_PREFIX: /DHUN
+        run: npm run build
+
+      # The deploy carries the mirror at /app/ too (ADR-008 amendment,
+      # 2026-10-09 (2)): the CTA's /app/ link must resolve for a visitor, so
+      # the verification below sees the assembled tree, not the site alone.
+      - name: Assemble the Pages deploy (prefixed site at the root, the mirror at /app/)
+        run: |
+          rm -rf pages-deploy
+          mkdir -p pages-deploy/app
+          cp -r website/dist/. pages-deploy/
+          cp -r app-web/dist/. pages-deploy/app/
+
+      - name: Verify GitHub Pages internal links
+        run: |
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+          import { join } from 'node:path';
+          const root = 'pages-deploy';
+          const files = [];
+          function walk(dir) {
+            for (const name of readdirSync(dir)) {
+              const path = join(dir, name);
+              // The mirror is not the site: its files reference each other
+              // relatively (./css/app.css, ./js/main.js) by design and work
+              // under any mount path — checking them here would fail on
+              // relative refs the site never uses.
+              if (name === 'app' && dir === root) continue;
+              if (statSync(path).isDirectory()) walk(path);
+              else if (path.endsWith('.html')) files.push(path);
+            }
+          }
+          walk(root);
+          const failures = [];
+          for (const file of files) {
+            const html = readFileSync(file, 'utf8');
+            for (const match of html.matchAll(/<(?:a|link)[^>]*?href="([^"]+)"/gi)) {
+              const href = match[1];
+              if (href.startsWith('http:') || href.startsWith('https:') ||
+                  href.startsWith('mailto:') || href.startsWith('tel:') ||
+                  href.startsWith('data:') || href.startsWith('#') || href.startsWith('//')) continue;
+              if (!href.startsWith('/DHUN/')) {
+                failures.push(file + ': internal URL does not use /DHUN/: ' + href);
+                continue;
+              }
+              const localPath = href.split(/[?#]/, 1)[0].slice('/DHUN/'.length);
+              let target = join(root, localPath || 'index.html');
+              if (existsSync(target) && statSync(target).isDirectory()) target = join(target, 'index.html');
+              if (!existsSync(target)) failures.push(file + ': prefixed internal URL has no target: ' + href);
+            }
+            if (!html.includes('href="/DHUN/"') || !html.includes('href="/DHUN/features/"') || !html.includes('href="/DHUN/ui/"')) {
+              failures.push(file + ': missing project-prefixed home/features/interface navigation');
+            }
+          }
+          if (failures.length) {
+            console.error(failures.join('\n'));
+            process.exit(1);
+          }
+          console.log('Verified project-prefixed internal navigation in ' + files.length + ' HTML files.');
+          NODE
+
+      - name: Upload the GitHub Pages artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: dhun-pages-site
+          path: pages-deploy
           retention-days: 7
           if-no-files-found: error
 
@@ -218,23 +293,22 @@ jobs:
         working-directory: website
         run: npx playwright install --with-deps chromium
 
-      # The production host serves the site at https://99ggprooo00-code.github.io/DHUN/
-      # — a project page under the sub-path `/DHUN/`, not at the origin's root.
-      # The local server must publish it the same way: served at a root,
-      # root-absolute links happen to work and the link-structure bug shipped
-      # dead for a week (2026-10-09) while every gate stayed green.
-      - name: Serve the built site under its published path
+      # The local test artifact is the rooted build (the /DHUN/ prefix exists
+      # only in the Pages artifact, verified by the prefixed-link step), so the
+      # local server publishes it at a root — where the browser measures layout
+      # and behaviour, and where the /app/ mirror sits beside the site.
+      # (The link-structure bug of 2026-10-09 was a *resolution* bug; resolution
+      # on the host is the prefixed artifact's check's job, not this one's.)
+      - name: Serve the built site
         run: |
-          mkdir -p /tmp/dhun-origin/DHUN
-          cp -r dist/. /tmp/dhun-origin/DHUN/
-          nohup python3 -m http.server 8080 --directory /tmp/dhun-origin --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
+          nohup python3 -m http.server 8080 --directory dist --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            if curl -sf -o /dev/null http://127.0.0.1:8080/DHUN/; then
+            if curl -sf -o /dev/null http://127.0.0.1:8080/; then
               echo "server up after ${attempt}s"; exit 0
             fi
             sleep 1
           done
-          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080/DHUN/"; cat /tmp/site-server.log; exit 1
+          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080"; cat /tmp/site-server.log; exit 1
 
       # Every number is printed as a check-run annotation: Actions log archives
       # are not retrievable from the environment this repository is maintained
@@ -340,22 +414,20 @@ jobs:
             echo "::warning title=Lighthouse::no Chrome on this runner — Lighthouse did not run; no score is claimed."
           fi
 
-      # Same published-path staging as the browser job: the numbers below have
-      # to describe the URL structure a visitor gets, including the /DHUN/
-      # sub-path (see the browser job's note on why serving at a root lied).
-      - name: Serve the built site under its published path
+      # Rooted staging, same reasoning as the browser job: the numbers describe
+      # the pages themselves; the /DHUN/ prefix is a byte-level href
+      # transformation applied to the Pages artifact only.
+      - name: Serve the built site
         if: steps.browser.outputs.available == 'true'
         run: |
-          mkdir -p /tmp/dhun-origin/DHUN
-          cp -r dist/. /tmp/dhun-origin/DHUN/
-          nohup python3 -m http.server 8080 --directory /tmp/dhun-origin --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
+          nohup python3 -m http.server 8080 --directory dist --bind 127.0.0.1 >/tmp/site-server.log 2>&1 &
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            if curl -sf -o /dev/null http://127.0.0.1:8080/DHUN/; then
+            if curl -sf -o /dev/null http://127.0.0.1:8080/; then
               echo "server up after ${attempt}s"; exit 0
             fi
             sleep 1
           done
-          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080/DHUN/"; cat /tmp/site-server.log; exit 1
+          echo "::error title=Local server::the built site did not come up on 127.0.0.1:8080"; cat /tmp/site-server.log; exit 1
 
       # Three samples, gate on the median. One Lighthouse run on a shared runner
       # swings by double digits for a page that did not change; the median is
@@ -374,7 +446,7 @@ jobs:
         run: |
           mkdir -p reports
           failed=0
-          for route in "/DHUN/" "/DHUN/features/" "/DHUN/ui/"; do
+          for route in "/" "/features/" "/ui/"; do
             name=$(echo "$route" | tr -c 'a-zA-Z0-9' '_')
             reports=""
             for sample in 1 2 3; do
@@ -448,7 +520,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v7
         with:
-          name: dhun-site
+          name: dhun-pages-site
           path: dist
 
       # Pages has to be set to the Actions build type for a workflow to be able
