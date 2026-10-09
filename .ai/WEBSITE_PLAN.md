@@ -470,17 +470,28 @@ this is the decision record.
 site is a project page at `https://99ggprooo00-code.github.io/DHUN/`, but the
 built pages shipped root-absolute internal links, which a browser resolves at
 the origin root — a different, empty site. The deployed nav 404'd while every
-local gate stayed green (verified live 2026-10-09). One `path` value in
-`website/src/_data/site.js` now prefixes every internal link; the quality
-checker gains `base_path_violations` (any internal link without the prefix
-fails) and `_resolve_internal` strips the prefix before mapping onto the
-deploy tree; the smoke test resolves served links with `urljoin` against the
-origin instead of string-joining `base + href`; and the browser and Lighthouse
-jobs serve the build under the published `/DHUN/` sub-path so they measure the
-URL structure a visitor gets. The "exactly three routes" information
+local gate stayed green (verified live 2026-10-09). Shipped via PR #149 with
+this session's mirror work (D14): every internal `href` in the `.njk` sources
+routes through the `sitePath` filter — a no-op in the committed, **rooted**
+`website/dist` (the target of every local gate: local gates serve at a root
+and measure layout/behaviour there), a `/DHUN` prefix in the second,
+Pages-only artifact the workflow builds with `DHUN_SITE_PATH_PREFIX=/DHUN`
+and verifies link-by-link ("Verify GitHub Pages internal links", run against
+the assembled deploy so the CTA's `/app/` link resolves too). The quality
+checker's `root_relative_violations` fails any internal link that is *not*
+rooted in the committed tree (a prefixed link would 404 locally and
+double-prefix on the host; protocol-relative links escape the origin);
+`_resolve_internal` maps rooted references straight onto the deploy tree
+(`/app/…` against `app-web/src`, the mirror's byte-identical source); and the
+smoke test resolves served links with `urljoin` against the origin instead of
+string-joining `base + href`. The "exactly three routes" information
 architecture is unchanged: the routes are the same, only their *published*
-form gained the prefix. Evidence: website run 37863859204 — all three routes
-100/100/100/100 at `requests=1` on the prefixed paths.
+form gains the prefix — a byte-level href transformation, not a layout one.
+Evidence: website run 37863859204 — all three routes 100/100/100/100 at
+`requests=1` (this session's first-attempt prefixed build; the mechanism
+changed, the diagnosis did not), plus the mutation tests in
+`scripts/test_website_quality.py` (RootedInternalLinks) and the workflow's
+prefixed-link verification on every run.
 
 **D14 — the interface mirror deploys at `/app/`, and the CTA reaches it.**
 `app-web/` (the app's interface in a browser, ADR-008 B2.2) is deployed to the
