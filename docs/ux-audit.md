@@ -11,6 +11,10 @@
 - **AI instructions:** current visual target and active task are reconciled in `.ai/MASTER_PROMPT.md`, `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/DEBUG_LOG.md`, `.ai/WEBSITE_PLAN.md`, `.ai/HANDOFF_NEXT_SESSION.md` and `.ai/README.md`. Older notes are retained as history, not current restrictions.
 - No claim is made that the native build, full website workflow, Android/desktop hardware checks, or post-deployment route checks have passed. Those require their actual evidence.
 
+### Latest verification evidence (2026-10-09)
+
+On code-equivalent commit `650a65e`, Build APK succeeded and the website build/prefix smoke and browser-measurement jobs passed. On current documentation head `90bee52`, run `37869983686` (Build APK) is green; run `37869983672` has the build/quality/prefix-smoke and browser jobs green while Lighthouse remains in progress; run `37869983670` has shared-domain and Robolectric steps green while overall CI remains in progress. Run `37869983669` has the APK job green and MSI still running. PR deploy and served-origin checks are skipped; post-merge canonical-origin verification and native hardware checks remain open. These results are workflow snapshots, not claims that every job has passed.
+
 ## Severity definitions
 
 - **P0 — data loss / trust:** user action can silently fail or destroy the wrong scope.
