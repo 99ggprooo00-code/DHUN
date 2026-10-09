@@ -123,6 +123,10 @@ class FileDownloadManager(
         repository.getAll().forEach { row ->
             storage.delete(row.localAudioPath)
             row.localArtworkPath?.let { art -> storage.delete(art) }
+            // Also remove deterministic temporary paths. A row may point at the
+            // final file after a retry while a stale .part file still exists.
+            storage.delete(storage.audioPath(row.trackId, row.mimeType) + ".part")
+            storage.delete(storage.artPath(row.trackId) + ".part")
         }
         repository.clearAll()
         _progress.value = emptyMap()
