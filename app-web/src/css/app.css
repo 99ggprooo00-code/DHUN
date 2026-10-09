@@ -429,6 +429,16 @@ button {
 
 .dhun-track__title,
 .dhun-track__subtitle {
+  /* display: block is load-bearing, not cosmetic: both are <span>s, and
+     `overflow: hidden` + `text-overflow: ellipsis` have no effect on
+     non-replaced inline boxes. Inline, the title and subtitle also flowed
+     on one line (the TrackRow design stacks them), and a long "Artist •
+     Album" run widened its <li> by 141 px on the 390 px phone viewport —
+     caught by the CI browser pass on 2026-10-09 as five spilling <li>
+     with scrollWidth 491 > clientWidth 350. As block boxes inside the
+     min-width: 0 flex item `.dhun-track__meta`, each line clips with an
+     ellipsis, exactly like the Android TrackRow. */
+  display: block;
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
