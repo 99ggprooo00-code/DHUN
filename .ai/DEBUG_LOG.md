@@ -1,5 +1,17 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-09 — Clear all downloads hid errors; Pages links escaped the project base; stale design lock
+
+**1. Clear all downloads hid operation failure.** In `LibraryScreen.kt`, the confirmation called `onClearAll()`, cleared selection and closed immediately. In `LibraryViewModel.kt`, `clearDownloads()` used `runCatching { dm.clearAll() }` without publishing the result. The UI could therefore report completion when file/database cleanup failed. Fix in branch `fix/ui-download-feedback-website-links`: observable pending/success/error state; duplicate-submit guard; retryable error in the confirmation; dismiss and clear selection only on success. A JVM failure/retry test was added. **Verification: pending GitHub Actions; no hardware claim.**
+
+**2. Marketing-site links were root-absolute on a project site.** The canonical origin includes `/DHUN/`, but shared header/footer, UI CTA and 404 links emitted `/`, `/features/`, `/ui/`. Local root-hosted browser tests cannot catch this deployment-only mismatch. Fix in this branch: templates use the `sitePath` filter; the normal root artifact remains the browser-test target, and a separate `DHUN_SITE_PATH_PREFIX=/DHUN` artifact is built and smoke-checked for Pages. **Verification: pending workflow; the live canonical origin has not been re-clicked by this change.**
+
+**3. Current visual direction contradicted the old lock.** A 2026-09-05 note called Material 3 the visual target. The current user direction is translucent frosted glass, artwork-led, with lightweight cached blur, tint/scrim and accessible fallback. The correction is now binding in `.ai/MASTER_PROMPT.md`; old notes are explicitly historical. Material libraries may remain implementation primitives. This does not authorize React/Tauri migration or a production browser player.
+
+**Lesson:** destructive UI actions must be result-driven, deployment paths must be tested separately from local-root navigation, and historical session notes must never override the current master contract.
+
+---
+
 ## 2026-10-09 — the red trunk, the duplicated class, and the action that re-opened its own sheet (session `arena/967513fd-dhun`)
 
 **1. `main` was red before any of this session's code existed.**
