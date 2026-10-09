@@ -16,9 +16,9 @@ extraHead: '<meta name="robots" content="noindex">'
     <h1 id="nf-title">That page is not here.</h1>
     <p class="lede">This site has three pages, and one of them is probably the one you wanted.</p>
     <div class="cta-row" style="justify-content: center;">
-      <a class="btn btn--primary" href="/ui/">See the interface</a>
-      <a class="btn btn--secondary" href="/features/">Features</a>
-      <a class="btn btn--secondary" href="/">Home</a>
+      <a class="btn btn--primary" href="{{ '/ui/' | sitePath }}">See the interface</a>
+      <a class="btn btn--secondary" href="{{ '/features/' | sitePath }}">Features</a>
+      <a class="btn btn--secondary" href="{{ '/' | sitePath }}">Home</a>
     </div>
     <p class="traceable">Looking for the source, the roadmap or the known limitations?
       They live in the repository: <a href="{{ site.repo }}" rel="noopener">{{ site.repo }}</a>.</p>
