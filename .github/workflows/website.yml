@@ -187,6 +187,13 @@ jobs:
     name: "Browser measurements (Playwright: viewports, keyboard, contrast, motion, axe)"
     needs: build
     runs-on: ubuntu-latest
+    # issues: write is the one extra the job needs, and only for the final
+    # step: the readable record (full step log) is posted as a comment on
+    # issue #150, because the job log archive and the artifacts of this run
+    # are not retrievable from the sandbox that maintains this repository.
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v7
@@ -275,17 +282,35 @@ jobs:
       # process died before speaking.
       - name: Post the readable record (step log)
         if: always()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          {
-            echo "### Browser job record — run ${{ github.run_id }} @ \`${{ github.sha }}\`"
-            echo ""
-            echo '## Step log (full output of `node tests/browser.mjs`, including `[summary]` progress lines)'
-            echo '```'
-            if [ -f /tmp/browser-step.log ]; then tail -c 58000 /tmp/browser-step.log; else echo "(not captured — the step died before tee wrote anything)"; fi
-            echo '```'
-          } | gh issue comment 150 --repo ${{ github.repository }} --body-file -
+          # Build the comment body in Python: decode the log lossily (a log
+          # that was cut mid-write may carry invalid UTF-8), keep the *tail*
+          # (the packed report is emitted last), and stay under the 65536
+          # issue-comment character limit by counting characters, not bytes.
+          python3 - <<'PY'
+          import os, pathlib
+          limit = 65000
+          header = ("### Browser job record — run "
+                    f"{os.environ.get('GITHUB_RUN_ID','?')} @ "
+                    f"`{os.environ.get('GITHUB_SHA','?')}`\n\n"
+                    "## Step log (full output of `node tests/browser.mjs`, "
+                    "including `[summary]` progress lines)\n\n```\n")
+          footer = "\n```"
+          try:
+              raw = pathlib.Path("/tmp/browser-step.log").read_bytes()
+              log = raw.decode("utf-8", "replace")
+          except Exception as e:  # the file being absent is itself a finding
+              log = f"(step log not captured: {e!r} — the step died before tee wrote anything)"
+          budget = max(0, limit - len(header) - len(footer))
+          log = log[-budget:]
+          pathlib.Path("/tmp/browser-record.md").write_text(header + log + footer, encoding="utf-8")
+          print(f"record body ready: {len(header + log + footer)} chars, log was {len(log)} chars")
+          PY
+          gh issue comment 150 --repo "$GITHUB_REPOSITORY" --body-file /tmp/browser-record.md \
+            || echo "::warning title=Readable record::posting the step log to issue #150 failed; the annotations are the fallback"
 
   lighthouse:
     name: Lighthouse (three samples per route, gate on the median)
