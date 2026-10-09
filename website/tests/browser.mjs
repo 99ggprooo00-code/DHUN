@@ -624,10 +624,19 @@ async function checkViewports(browser) {
     for (const route of ROUTES) {
       const page = await context.newPage();
       const consoleErrors = [];
+      // Handlers must never throw: an exception here is an uncaughtException
+      // in Node, which kills the process before the finally block emits the
+      // annotations — the run dies with no readable channel at all.
       page.on("console", (message) => {
-        if (message.type() === "error") consoleErrors.push(message.text().slice(0, 120));
+        try {
+          if (message.type() === "error") consoleErrors.push(String(message.text()).slice(0, 120));
+        } catch {
+          /* a handler failure is noise, not a finding */
+        }
       });
-      page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message.slice(0, 120)}`));
+      page.on("pageerror", (error) =>
+        consoleErrors.push(`pageerror: ${String((error && error.message) || error).slice(0, 120)}`),
+      );
       const badResponses = [];
       page.on("response", (response) => {
         if (response.status() >= 400 && response.url().startsWith(BASE)) {
@@ -1346,14 +1355,23 @@ async function checkWebApp(browser) {
         colorScheme: scheme,
       });
       const page = await context.newPage();
+      // Handlers must never throw: an exception here is an uncaughtException
+      // in Node, which kills the process before the finally block emits the
+      // annotations — the run dies with no readable channel at all.
       const consoleErrors = [];
       page.on("console", (message) => {
-        if (message.type() === "error" && !NETWORK_NOISE.test(message.text())) {
-          consoleErrors.push(message.text().slice(0, 120));
+        try {
+          if (message.type() === "error" && !NETWORK_NOISE.test(message.text())) {
+            consoleErrors.push(String(message.text()).slice(0, 120));
+          }
+        } catch {
+          /* a handler failure is noise, not a finding */
         }
       });
       const pageErrors = [];
-      page.on("pageerror", (error) => pageErrors.push(error.message.slice(0, 120)));
+      page.on("pageerror", (error) =>
+        pageErrors.push(String((error && error.message) || error).slice(0, 120)),
+      );
 
       await page.goto(url("/DHUN/app/"), { waitUntil: "load" });
       const report = await page.evaluate(webAppReport);
@@ -1506,14 +1524,35 @@ try {
 } catch (error) {
   fail("browser launch", `${error && error.message ? error.message : error}`);
 } finally {
-  if (browser) await browser.close();
+  // Closing the browser can itself reject (the process dies mid-teardown and
+  // the protocol errors on close). That used to escape the finally block and
+  // skip emitAnnotations() entirely — a full run of measurements reduced to
+  // "exit code 1" with no annotation and no summary (observed in website run
+  // 37864947840). A teardown error is a finding, not a reason to lose the
+  // evidence: record it and still emit.
+  if (browser) {
+    try {
+      await browser.close();
+    } catch (error) {
+      fail("browser teardown", `${error && error.message ? error.message : error}`);
+    }
+  }
   // The summary and the annotations are emitted even when a check above threw:
   // the annotations are the only channel this repository can read from CI, so
   // losing them is losing the evidence itself.
   console.log(`\n${measurements.length} measurement(s), ${warnings.length} note(s), ${failures.length} failure(s).`);
   console.error(measurements.map((line) => `  · ${line}`).join("\n"));
   if (warnings.length) console.error(warnings.map((line) => `  ! ${line}`).join("\n"));
-  emitAnnotations();
+  try {
+    emitAnnotations();
+  } catch (error) {
+    // The renderer must not be able to eat the evidence either: fall back to
+    // raw lines, one annotation each, no packing.
+    for (const line of [...failures, ...warnings, ...measurements].slice(0, 20)) {
+      annotate("error", "report", line);
+    }
+    annotate("error", "report", `the report renderer itself failed: ${error && error.message ? error.message : error}`);
+  }
   if (failures.length) {
     console.error(failures.map((line) => `  - ${line}`).join("\n"));
     process.exitCode = 1;
