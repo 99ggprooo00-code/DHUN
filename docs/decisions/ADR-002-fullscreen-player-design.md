@@ -1,252 +1,91 @@
-# ADR-002: Full-Screen Now Playing — design lock (Apple clarity × ViMusic immersion × Material 3 glass)
+# ADR-002: Full-Screen Now Playing — translucent frosted-glass design contract
 
 ## Status
-Accepted (2026-09-05) — **design contract**. Implementation is **incremental polish
-on existing Phase 08/11 code**, not a greenfield player. Does not reorder the
-locked 14-phase plan.
 
-**Visual system (user lock 2026-09-05): Material 3 only. No Liquid Glass.**
-Translucent M3 surfaces + one-shot `Modifier.blur` on artwork backgrounds +
-gradient scrims. Glass tokens (`DhunColors.glass`) remain the atmosphere
-layer — never a separate Liquid Glass renderer, never continuous full-res
-reblur, never platform-private glass APIs.
+**Accepted design direction, updated 2026-10-09.** This update supersedes the 2026-09-05 wording “Material 3 only” as the visual target. The user has clarified that DHUN's intended identity is **translucent frosted glass**, not the former Material 3 visual direction.
 
-## Context
+This is an incremental refinement of the existing player and shared design system, not a greenfield rewrite. The Kotlin Multiplatform architecture remains unchanged.
 
-DHUN already ships:
+## Decision
+
+> **Artwork-led, dark-first, translucent frosted glass.** Borrow the clarity of Apple Music's player hierarchy and the immersive approach of ViMusic/Vivi Music as inspiration, while keeping DHUN's own identity and using a lightweight 2D implementation.
+
+Material 3 / Compose components may remain implementation primitives, but **Material 3 is not the product's visual target**. The final appearance must follow DHUN's glass design tokens and components rather than default M3 colors, elevations or surfaces.
+
+“Frosted glass” means a controlled combination of cached artwork blur, translucent tinted surfaces, subtle highlights/borders, gradients and careful typography. It does **not** authorize a heavy 3D renderer, continuous full-resolution blur, platform-private glass APIs or a silent platform-stack change.
+
+## Context and current implementation
 
 | Layer | Location | Status |
 |---|---|---|
-| Source-neutral provider boundary | `MusicProvider` — UI never sees InnerTube types | ✅ Phase 02 |
-| Player engine + state | `DhunPlayer`, `QueueManager`, Media3 / vlcj | ✅ Phase 03/04 |
-| MiniPlayer + FullPlayer | `shared/ui/player/{Mini,Full}Player.kt` | ✅ Phase 08 code; hardware OPEN |
-| Blurred artwork bg + tint + scrim | `FullPlayer` + `ArtworkColorExtractor` + `Modifier.blur` | ✅ Phase 06/08 |
-| Glass surfaces | `GlassCard`, tokens in `shared/design/` | ✅ Phase 06 |
-| Lyrics domain | `Lyrics` sealed (`Synced`/`Unsynced`/`NotAvailable`), `LyricsLine(startTimeMs)` | ✅ Phase 02/11 |
-| Lyrics providers | cache → YTM → LRCLIB, `LrcParser`, tab with tap-to-seek | ✅ Phase 11 code; hardware OPEN |
-| Queue / Related tabs | `PlayerTabs.kt` | ✅ Phase 08 |
+| Source-neutral provider boundary | `MusicProvider` and stream resolver | Existing; UI must not depend on InnerTube payload types |
+| Player engine/state | `DhunPlayer`, `QueueManager`, Media3 / VLCJ | Existing; platform verification remains separate |
+| MiniPlayer + FullPlayer | `shared/ui/player/` | Existing; keep polishing in place |
+| Blurred artwork background | FullPlayer + artwork color/cache path | Existing; blur must be cached and invalidated safely |
+| Glass surfaces and design tokens | `shared/design/` | Source of truth for material, type, shape, spacing, motion and icons |
+| Lyrics domain/providers | lyrics repository/parser and UI | Existing; hardware acceptance must be recorded separately |
+| Website | `website/` | Separate static marketing site, not the native app |
+| Browser mirror | `app-web/` | Separate engineering preview; no production playback claim while its limits remain |
 
-A design brief (2026-09-05) proposed elevating Full-Screen Now Playing +
-CC/Lyrics immersion as a signature DHUN experience, referencing Apple Music
-hierarchy, ViMusic immersion, and VIVI Material 3 / dynamic artwork — with an
-explicit **lightweight** glass path (2D blur + translucent M3 + gradients),
-**not** a full Liquid Glass renderer.
+## Visual rules
 
-That brief also used milestone labels (M1/M2/M3) and stack assumptions
-(Tauri/Web) that **do not match this repository**. This ADR maps the useful
-design intent onto the **actual** KMP stack (Android + Desktop JVM only; Web
-deferred per MASTER_PROMPT).
+1. **Glass is the signature material.** Use a coherent family of translucent frosted surfaces, restrained tint, soft edge highlight, controlled shadow and gradient scrim. Do not treat every content card as a glass panel.
+2. **Legibility wins.** Increase opacity/scrim or use an opaque fallback whenever text, controls, progress, focus rings or error states are hard to read.
+3. **Sharp artwork stays sharp and fitted.** Cover art uses fit-to-card sizing and must not crop faces to fill the screen. The blurred background may extend full-bleed independently.
+4. **Blur is prepared, not continuously recomputed.** Load/downscale artwork, process off the UI thread, cache by stable artwork/track key plus generation, and invalidate on artwork URL change. Late results for a previous track must not paint over the current track.
+5. **Dialogs and sheets need a stable base.** Glass dialogs, form fields and sheets must use the shared components and sufficient opaque base so content behind them cannot compromise text entry or confirmation copy.
+6. **Fallbacks are first-class.** On Android versions without supported real blur, low-end hardware, reduced-motion settings or browsers without backdrop-filter, use tint/gradient/opaque material that preserves the hierarchy.
+7. **Motion stays lightweight.** Use short opacity/scale/position transitions; no continuous liquid distortion, per-frame full-resolution blur or heavy parallax.
+8. **Use the shared tokens.** `DhunAppearance.kt`, `DhunTypography.kt`, `DhunShapes.kt`, `DhunSpacing.kt`, `DhunAnimations.kt`, `DhunIcons.kt` and existing glass policies are the source of truth. Do not introduce raw one-off styles without documenting the reason.
+9. **Accessibility is mandatory.** Contrast, focus, keyboard/back, touch targets, reduced motion and high-contrast behavior must remain usable over both bright and dark artwork.
+10. **Do not infer a web product from the design.** The marketing site and `app-web/` are separate surfaces; production browser playback remains governed by ADR-008.
 
-## Decision — design philosophy (locked)
+## Full-screen player behavior
 
-> **Apple Music's clarity + ViMusic's immersive philosophy + VIVI's Material 3 /
-> dynamic-artwork direction + DHUN's lightweight cross-platform implementation.**
+### Normal mode
+- MiniPlayer expands into FullPlayer without restarting audio or resetting queue/position.
+- Show fitted artwork, track/artist, progress, primary transport, secondary controls and Lyrics/Queue/Related access.
+- Keep the bottom control cluster anchored; conditional content must not cause controls to jump or become clipped.
+- The blurred artwork/scrim provides atmosphere behind the sharp artwork and player chrome.
 
-Rules:
+### Lyrics / CC mode
+- A clear Lyrics/CC control enters a lyrics-dominant presentation.
+- Sharp artwork recedes with a lightweight scale/fade; the same track's cached blurred artwork remains behind a translucent frosted lyrics surface.
+- Synced lyrics emphasize the current line, keep neighboring lines readable, scroll smoothly and allow tap-to-seek.
+- Unsynced lyrics remain scrollable plain text and must not display fake timing emphasis.
+- Playback controls and Back/dismiss remain reachable on short screens and landscape layouts.
+- Entering or leaving lyrics mode must not restart playback, change queue order or reset seek position.
+- Loading, unavailable, empty and error states each have explicit copy and a recovery/exit path.
 
-1. **Material 3 is structure. Glass is atmosphere.**  
-   Glass only on: player controls, lyrics surface, queue sheet, transient
-   chrome, floating actions. Home/Search/Library stay conventional M3 dark.
-2. **Material 3 only — Liquid Glass is forbidden (user lock).**  
-   Path: artwork → (optional downscale) → blur **once** per track change →
-   tint from `ArtworkColorExtractor` → gradient scrim → translucent M3
-   surface (`surfaceElevated` / `DhunColors.glass`) → cache via
-   `BlurredArtworkCache`. Re-blur only on track/URL change, never every
-   frame. Do not adopt iOS Liquid Glass, Windows Acrylic-as-primary, or
-   any continuous backdrop-filter fashion that fights battery/low-end.
-3. **UI never knows the stream source.**  
-   `PlayerScreen → PlayerViewModel → DhunPlayer → StreamResolver → MusicProvider`.
-   InnerTube / yt-dlp stay behind the provider/extraction boundary (already true).
-4. **Lyrics are first-class, not a side panel afterthought.**  
-   Domain already has timed lines; UI must support both synced karaoke-style
-   emphasis and unsynced scrollable text (already true in `LyricsTabContent`).
-5. **Gestures stay simple** (do not copy every experimental ViMusic gesture):
-   - swipe down / back → collapse FullPlayer (never exit app)
-   - horizontal swipe on artwork stage → previous / next (optional polish)
-   - tap Lyrics/CC → lyrics-dominant mode (see below)
-   - tap lyric line → seek (already)
-   - queue via existing tab / sheet
+## Navigation and overlay contract
 
-## Decision — lyrics-dominant mode (the new interaction)
+- Back/swipe down closes FullPlayer without exiting the app or stopping audio.
+- Back/Escape closes only the topmost layer.
+- The player overlay must not intercept navigation-rail hit targets on wide layouts.
+- Queue and related-track sheets must have measured, usable geometry and enough opacity for row text.
+- Action controls inside rows/sheets must have distinct semantic handlers; opening a sheet and confirming a selection cannot share the same action identifier.
 
-Today FullPlayer uses bottom tabs `Lyrics | Queue | Related`. Keep that.
+## Implementation and verification order
 
-**Add** a lyrics-dominant presentation when Lyrics is active (or when a
-dedicated CC control is tapped):
+1. Preserve current player/provider architecture.
+2. Fix correctness and error feedback for destructive actions (Clear downloads is an urgent example; see `docs/app-flow.md` and `docs/implementation-plan.md`).
+3. Verify FullPlayer geometry, stable bottom controls, artwork fit and overlay hit-testing on real Android and Windows layouts.
+4. Verify lyrics/CC mode transition, synced/unsynced states, no-lyrics/error states and tap-to-seek.
+5. Verify blur caching, invalidation and low-end fallback; no per-frame blur.
+6. Run contrast, focus, reduced-motion, high-contrast and responsive checks.
+7. Update verification records and known limitations; do not call a design slice complete from compilation alone.
 
-```
-NORMAL                          LYRICS-DOMINANT
-┌─────────────────────┐         ┌─────────────────────────────┐
-│  large centered art │         │ full-bleed blurred artwork  │
-│  title / artist     │   →     │ dark scrim + M3 translucent │
-│  seek + transport     │         │ surface over it             │
-│  tabs               │         │ previous / CURRENT / next   │
-└─────────────────────┘         │ transport remains reachable │
-                                └─────────────────────────────┘
-```
+## Explicit non-goals
 
-- Artwork **recedes** (scale down / fade) rather than navigating away.
-- Background = **cached** blurred artwork (same pipeline as FullPlayer bg).
-- Lyrics surface = translucent M3 (`GlassCard` / token glass), **not** opaque.
-- Synced: current line large/bright/centered; neighbors dim; auto-scroll;
-  tap-to-seek (already implemented — polish motion only).
-- Unsynced: scrollable plain text (already).
-- Empty / error: existing `EmptyView` / `ErrorView`.
-
-This is **polish on Phase 08/11**, tracked as player UX slices P3–P8 below —
-not a new phase that invalidates completed work.
-
-## Architecture (already matches; keep it)
-
-```
-PlayerScreen (FullPlayer / MiniPlayer)
-  ├── PlayerBackground (blurred art + tint + scrim)   # exists
-  ├── ArtworkStage                                     # exists
-  ├── TrackMetadata / Progress / Controls              # exists
-  ├── SecondaryControls (shuffle / repeat / volume)    # exists
-  └── PlayerTabs → LyricsOverlay | Queue | Related     # exists
-         └── LyricsList (synced | unsynced | empty)    # exists
-
-UI → PlayerViewModel → DhunPlayer → platform engine
-                  ↘ LyricsRepository → cache / YTM / LRCLIB
-                  ↘ MusicProvider.relatedTracks / getStreamInfo
-```
-
-Background processor contract (implement if missing as an explicit type):
-
-```
-onTrackArtworkChanged(url)
-  → load bitmap (Coil)
-  → downscale
-  → blur off-main
-  → derive ArtworkColors
-  → cache by trackId (+ generation)
-  → FullPlayer / Lyrics-dominant only read the cache
-```
-
-Do **not** re-process full-resolution art continuously.
-
-## Implementation order (safe; does not rewrite the 14-phase plan)
-
-The locked plan is still MASTER_PROMPT Phases 01–14. Player polish inserts
-**inside** remaining Phase 08 hardware acceptance and Phase 14 robustness,
-and as post-v0.1.0 trajectory items if needed — **after** extraction is
-honestly classified (CI-network vs residential) and domain/provider stay
-source-neutral (already).
-
-| Slice | Name | Depends on | Notes |
-|---|---|---|---|
-| P0 | Extraction truthfulness | live | Rot-drill + expanded tokenless client chain (in flight). Do not build glass on a red stream path without residential evidence. |
-| P1 | Player state already exists | — | Idle/Playing/Paused/Buffering/Error via `PlaybackState` — do not reinvent. |
-| P2 | Basic player | done | Mini + Full transport — Phase 08. |
-| P3 | Full-screen Now Playing hierarchy polish | P2 | 🟨 lyrics-dominant weight shift in FullPlayer (2026-09-05). |
-| P4 | Dynamic artwork background cache | P2 | 🟨 `BlurredArtworkCache` key once-per-track (Compose blur still on layer). |
-| P5 | Lyrics domain + providers | done | Phase 11. |
-| P6 | Lyrics-dominant mode | P3+P5 | 🟨 FullPlayer: artwork recedes + M3 translucent lyrics surface when Lyrics tab selected. |
-| P7 | Blur + translucent M3 refinement | P4+P6 | Token-only; <API 31 scrim fallback already in KNOWN_LIMITATIONS. |
-| P8 | Smooth lyric sync motion | P5 | Spring emphasis, better scroll anchoring. |
-| P9 | Gesture / animation polish | P3–P8 | Horizontal skip swipe optional; keep simple. |
-
-**Do not** start P7–P9 Liquid-adjacent work before P0 residential/extraction
-classification and P1–P2 hardware smoke. Beautiful player on a broken stream
-path is how the previous attempt died (docs-first).
-
-## Branch policy (this repo)
-
-Arena sessions are **pinned to one branch** (`arena/<id>-dhun`). Do not create
-parallel long-lived branches from the agent for the same session.
-
-Human / multi-session policy:
-
-| Keep while active | Delete after merge |
-|---|---|
-| `arena/*` session branches until PR merges | stale `test-player-final-v2` style names |
-| topic PRs: extraction, player-polish, lyrics-motion | anything not representing coherent work |
-
-`main` stays release-grade. One rolling `test` pre-release (existing policy).
-
-## Non-goals (explicit)
-
-- Web / PWA / Tauri player (Web deferred; Desktop is Compose JVM + vlcj).
-- **Liquid Glass** (any form), continuous full-res blur, per-frame blur,
-  platform-private glass APIs as a hard dependency.
-- Cookies / PO-token minting without a separate ADR + user sign-off.
-- Rewriting `MusicProvider` / `DhunPlayer` for aesthetics.
-- Replacing the 14-phase MASTER_PROMPT with M1/M2/M3 labels.
+- React/Tauri migration or changing the Kotlin Multiplatform app architecture.
+- A production web/PWA player or hosted proxy; follow ADR-008 and require explicit approval.
+- iOS Liquid Glass, a heavyweight 3D renderer, continuous full-resolution blur or platform-private glass APIs.
+- Rewriting player/provider logic purely for visual polish.
+- Treating default Material 3 visual styling as the final design.
 
 ## Consequences
 
-- Design reviews judge FullPlayer against this ADR.
-- Phase 08 / 11 hardware checklists gain lyrics-dominant + blur-cache items
-  when those slices land.
-- KNOWN_LIMITATIONS keeps the <API 31 blur floor honest.
-- Trajectory table (Phase 15+) may list "player immersion polish" as a
-  candidate **after** v0.1.0 — not before extraction truth + soaks.
-
-## References
-
-- MASTER_PROMPT §Phase 08 / 11, AI Behavior Rules (code-first)
-- `docs/verification/08-player.md`, `docs/verification/11-lyrics.md`
-- ADR-001 (extraction; rot-drill category-8 CI-network rule)
-- Design brief 2026-09-05 (Apple / ViMusic / VIVI / lightweight glass)
-
-## Addendum — 2026-09-05 execution (Material 3 only)
-
-Shipped on `arena/01a07170-dhun` without Liquid Glass:
-
-- `PlaybackState.Recovering` + `StreamRecoverySignal` + Android 403 path →
-  FullPlayer / MiniPlayer **"Reconnecting…"** chip (M3 surface).
-- `BlurredArtworkCache` — once-per-track key (unit-tested).
-- FullPlayer lyrics-dominant: Lyrics tab shrinks artwork stage, expands
-  lyrics surface with `surfaceElevated` translucent fill.
-
-Still OPEN: residential stream smoke, hardware Phase 08/11 checklists,
-audio-segment cache, soaks, v0.1.0.
-
-## Addendum — M3 product UI (2026-09-05)
-
-Cross-cutting with Home/shell (not Liquid Glass):
-
-- UI type = clean sans (`FontFamily.SansSerif`); brand tracking only on logo.
-- Shell ambient wash from now-playing seed colors (cheap); FullPlayer keeps
-  real once-per-track blur + lyrics-dominant.
-- Nav bar = M3 `surfaceContainer` tonal surface, not a glass renderer.
-
-## Addendum — 2026-09-15 review fixes (artwork fit, bottom cluster, queue sheet)
-
-Device review of the 2026-09-09 "the artwork **is** the screen" reading found
-three defects. They are fixed inside the same rules (M3 only, blur once per
-track, no Liquid Glass), and the layout contract is restated so a future
-polish pass does not re-introduce them:
-
-- **Rule 1 (structure) is re-asserted over full-bleed art.** The sharp artwork
-  is a **fit-to-card** square in the upper field (sized by
-  `fittedPlayerArtworkSize`), never a crop-to-fill backdrop: a now-playing
-  screen that cuts faces off is a defect, not a style. The blurred bleed
-  behind it stays full-bleed and is what darkens towards the bottom.
-- **The control cluster is bottom-docked by construction.** `weight(1f)` on a
-  box that is always emitted — not on an `AnimatedVisibility`, which emits no
-  layout node once its exit transition has finished and therefore silently
-  releases the space that held the chrome down.
-- **Chrome over blurred art, never over the sharp thumbnail**: one ambient
-  scrim (`playerAmbientScrimStops`) that clears out mid-screen so the blur
-  glows and darkens monotonically to the bottom for title / progress /
-  transport legibility.
-- **Queue sheet geometry is measured, not guessed**: a pixel-measured chrome
-  height is converted to dp before use as the sheet's bottom inset, the sheet
-  is floored at `DhunSpacing.queuePanelMinHeight`, and it paints an opaque
-  base under the glass so rows read on a phone and on a Windows window.
-
-## Addendum — 2026-09-22 lyrics material (not Acrylic-as-primary)
-
-The near-black `glassStrong` disc read as a translucent black button.
-Like/more/back chips, the nav band under the mini-player, and the Related
-list now share the lyrics-card veil (`LyricsMaterialPolicy`: background alpha
-0.42 → 0.62 over a blur prepared once per track). List cards above the dock
-are unchanged — the veil is only for chrome that sits on the already-blurred
-player or shell backdrop, plus the Related sheet which paints its own blur
-because its base is opaque. The mini-player uses a lighter milky cut of that
-same recipe (`acrylicGlass`) — still Compose `Modifier.blur` + an M3 veil,
-not Windows Acrylic, not Liquid Glass, and not a replacement for the token
-system. `DhunColors.glassStrong` stays the token for the navigation rail and
-dialog composites.
+- `docs/ui-ux-design.md` is the detailed visual/interaction specification; this ADR is the binding design decision.
+- When older references say “Material 3 only” or “M3 is the target,” treat them as superseded by this accepted update.
+- Implementation components may still use Material libraries, but must be styled to the DHUN frosted-glass contract.
+- Record remaining platform limitations honestly in `.ai/KNOWN_LIMITATIONS.md` and verification docs.
