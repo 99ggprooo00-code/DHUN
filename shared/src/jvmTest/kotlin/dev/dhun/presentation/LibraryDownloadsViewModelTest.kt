@@ -369,19 +369,26 @@ class LibraryDownloadsViewModelTest {
     }
 
     @Test
-    fun nullDownloadManagerDegradesGracefully(): Unit = runBlocking {
+    fun nullDownloadManagerReportsUnavailableStorageForDestructiveActions(): Unit = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         try {
             val vm = LibraryViewModel(dataLayer = dataLayer(), player = NoopPlayer(), scope = scope)
             assertFalse(vm.hasDownloads)
             eventually { vm.downloads.value.isEmpty() }
-            // Summary still emits (empty), actions are no-ops, progress flow is idle.
+            // Read-only state and non-destructive actions degrade gracefully.
             assertEquals(0, vm.storageSummary.value.totalTracks)
-            vm.removeDownloads(listOf("a"))
+            var observedMessage: String? = null
+            try {
+                vm.removeDownloads(listOf("a"))
+            } catch (error: IllegalStateException) {
+                observedMessage = error.message
+            }
+            assertEquals("Download storage is unavailable.", observedMessage)
             vm.pauseDownload("a")
             vm.resumeDownload("a")
             vm.cancelDownload("a")
             vm.clearDownloads()
+            assertTrue(vm.clearDownloadsUiState.value.errorMessage != null)
             assertNull(vm.progressFor("a").first())
         } finally {
             scope.cancel()
