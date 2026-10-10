@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- API < 31: the launcher icon opens LaunchActivity (Views only). -->
+    <bool name="dhun_compose_launcher">false</bool>
+    <bool name="dhun_view_launcher">true</bool>
+</resources>
