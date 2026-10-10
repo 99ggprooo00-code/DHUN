@@ -141,6 +141,7 @@
   --dhun-breakpoint-wide-player: 480px; /* DhunSpacing.playerWideLayoutMinWidth */
   --dhun-pane-master-min: 320px;
   --dhun-pane-master-max: 720px; /* DhunSpacing.playerContentMaxWidth */
+  --dhun-space-legal-content-max: 680px; /* DhunSpacing.legalContentMaxWidth */
   --dhun-grid-card-min: 140px;
   --dhun-player-controls-min: 240px; /* DhunSpacing.playerWideControlsMinWidth */
   --dhun-player-controls-max: 400px; /* DhunSpacing.playerWideControlsMaxWidth */

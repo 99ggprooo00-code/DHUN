@@ -1287,3 +1287,277 @@ button {
   white-space: nowrap;
   border: 0;
 }
+
+/* ------------------------------------------------------------- about & legal --
+ * The long-document reader. Mirrors ui/legal/AboutLegalScreen.kt: one reading
+ * measure, a stacking label/value form for tables, and no blur behind body copy
+ * (GlassCard's contract in the app is that content stays sharp).
+ *
+ * No transition and no animation is declared anywhere in this block, so
+ * prefers-reduced-motion is satisfied by construction rather than by a rule that
+ * has to remember to undo something.
+ * ------------------------------------------------------------------------ */
+.dhun-legal {
+  max-width: var(--dhun-space-legal-content-max);
+  margin: 0 auto;
+  padding: var(--dhun-space-md) var(--dhun-space-screen-padding) var(--dhun-space-huge);
+}
+
+.dhun-legal__intro {
+  margin: 0 0 var(--dhun-space-md);
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-legal__index {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dhun-legal__entry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  /* A whole-row target: the 48dp minimum matters more on a legal page, where a
+     missed tap on "Terms of Use" is worse than a missed tap on a track. */
+  min-height: var(--dhun-space-touch-target);
+  justify-content: center;
+  padding: var(--dhun-space-md) 0;
+  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+  color: inherit;
+  text-decoration: none;
+}
+
+.dhun-legal__entry:hover {
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-legal__entry:focus-visible {
+  outline: var(--dhun-space-icon-stroke) solid var(--dhun-overlay-focus);
+  outline-offset: calc(-1 * var(--dhun-space-icon-stroke));
+}
+
+.dhun-legal__entry-title {
+  font: var(--dhun-text-body-large);
+  letter-spacing: var(--dhun-tracking-body-large);
+  color: var(--dhun-text);
+}
+
+.dhun-legal__entry-meta {
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-legal__entry-meta--draft {
+  color: var(--dhun-warning);
+}
+
+/* Draft banner: the app's GlassCard treatment, translucency without blur. */
+.dhun-legal__banner {
+  margin: 0 0 var(--dhun-space-md);
+  padding: var(--dhun-space-lg);
+  border: var(--dhun-space-border) solid var(--dhun-glass-edge);
+  border-radius: var(--dhun-shape-glass);
+  background: linear-gradient(
+    180deg,
+    var(--dhun-glass-highlight),
+    var(--dhun-glass),
+    var(--dhun-glass-deep)
+  );
+  color: var(--dhun-warning);
+}
+
+.dhun-legal__banner p {
+  margin: var(--dhun-space-xs) 0 0;
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-legal__buildinfo {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--dhun-space-xs) var(--dhun-space-lg);
+  margin: 0 0 var(--dhun-space-md);
+  padding: var(--dhun-space-md) 0;
+  border-top: var(--dhun-space-border) solid var(--dhun-border);
+  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+}
+
+.dhun-legal__buildinfo dt {
+  font: var(--dhun-text-label-medium);
+  letter-spacing: var(--dhun-tracking-label-medium);
+  color: var(--dhun-text-tertiary);
+}
+
+.dhun-legal__buildinfo dd {
+  margin: 0;
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text);
+}
+
+.dhun-legal__body > * {
+  margin: 0 0 var(--dhun-space-sm);
+}
+
+.dhun-legal__heading {
+  margin: var(--dhun-space-md) 0 var(--dhun-space-sm);
+  color: var(--dhun-text);
+}
+
+.dhun-legal__heading--1 {
+  font: var(--dhun-text-headline-small);
+}
+
+.dhun-legal__heading--2 {
+  font: var(--dhun-text-title-large);
+}
+
+.dhun-legal__heading--3,
+.dhun-legal__heading--4,
+.dhun-legal__heading--5,
+.dhun-legal__heading--6 {
+  font: var(--dhun-text-title-medium);
+  letter-spacing: var(--dhun-tracking-title-medium);
+}
+
+.dhun-legal__para {
+  font: var(--dhun-text-body-medium);
+  letter-spacing: var(--dhun-tracking-body-medium);
+  color: var(--dhun-text);
+  /* The one rule the long-URL requirement turns on: an unbreakable signed media
+     URL or a licence permalink must wrap, not push the page sideways. */
+  overflow-wrap: anywhere;
+}
+
+.dhun-legal__quote {
+  margin: var(--dhun-space-sm) 0;
+  padding: var(--dhun-space-lg);
+  border-left: var(--dhun-space-icon-stroke) solid var(--dhun-glass-edge);
+  border-radius: var(--dhun-shape-small);
+  background: var(--dhun-surface-container-low);
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.dhun-legal__list {
+  margin: var(--dhun-space-sm) 0;
+  padding-left: var(--dhun-space-xl);
+  font: var(--dhun-text-body-medium);
+  letter-spacing: var(--dhun-tracking-body-medium);
+  color: var(--dhun-text);
+}
+
+.dhun-legal__li {
+  margin-bottom: var(--dhun-space-xs);
+  overflow-wrap: anywhere;
+}
+
+/* A nested bullet is inset by one step per level, mirroring the Compose
+   `padding(start = DhunSpacing.lg * indent)`. */
+.dhun-legal__li[data-indent="1"] {
+  margin-left: var(--dhun-space-xl);
+}
+
+.dhun-legal__li[data-indent="2"] {
+  margin-left: calc(2 * var(--dhun-space-xl));
+}
+
+.dhun-legal__pre {
+  margin: var(--dhun-space-sm) 0;
+  padding: var(--dhun-space-md);
+  border-radius: var(--dhun-shape-small);
+  background: var(--dhun-surface-container-low);
+  font-family: var(--dhun-font-sans);
+  font-size: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.dhun-legal__rule {
+  margin: var(--dhun-space-md) 0;
+  border: 0;
+  border-top: var(--dhun-space-border) solid var(--dhun-border);
+}
+
+/* A table row as a stacked record — see the note in views.js. */
+.dhun-legal__record {
+  margin: var(--dhun-space-sm) 0;
+  padding: var(--dhun-space-lg);
+  border: var(--dhun-space-border) solid var(--dhun-glass-edge);
+  border-radius: var(--dhun-shape-card);
+  background: var(--dhun-surface-container-low);
+}
+
+.dhun-legal__label {
+  font: var(--dhun-text-label-medium);
+  letter-spacing: var(--dhun-tracking-label-medium);
+  color: var(--dhun-text-tertiary);
+}
+
+.dhun-legal__value {
+  margin: 0 0 var(--dhun-space-xs);
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-text);
+  overflow-wrap: anywhere;
+}
+
+.dhun-legal__link {
+  color: var(--dhun-accent);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.dhun-legal__link:focus-visible {
+  outline: var(--dhun-space-icon-stroke) solid var(--dhun-overlay-focus);
+  outline-offset: var(--dhun-space-border);
+}
+
+.dhun-legal__strong {
+  font-weight: 600;
+  color: var(--dhun-text);
+}
+
+.dhun-legal__code {
+  font-family: var(--dhun-font-sans);
+  background: var(--dhun-surface-container-low);
+  overflow-wrap: anywhere;
+}
+
+.dhun-legal__strike {
+  text-decoration: line-through;
+  color: var(--dhun-text-tertiary);
+}
+
+.dhun-legal__warn {
+  margin: 0 0 var(--dhun-space-md);
+  padding: var(--dhun-space-md);
+  border: var(--dhun-space-border) solid var(--dhun-border-error);
+  border-radius: var(--dhun-shape-small);
+  background: var(--dhun-error-container);
+  font: var(--dhun-text-body-small);
+  letter-spacing: var(--dhun-tracking-body-small);
+  color: var(--dhun-warning);
+}
+
+/* The Settings row that opens the index: tappable, with a visible focus ring. */
+.dhun-settings-row--link {
+  cursor: pointer;
+}
+
+.dhun-settings-row--link:hover {
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-settings-row--link:focus-visible {
+  outline: var(--dhun-space-icon-stroke) solid var(--dhun-overlay-focus);
+  outline-offset: calc(-1 * var(--dhun-space-icon-stroke));
+}
