@@ -38,8 +38,8 @@ profile or web asset changed.
   artifact **11552239018** (1,171,094 B) exists, but its archive redirected to an
   external blob host that was unavailable — it was **never inspected** and is not
   browser evidence.
-- **The probe is live at the canonical URL.**
-  `https://99ggprooo00-code.github.io/DHUN/web-spike/` serves probe revision
+- **The probe was live at the canonical URL under legacy Pages.** (Superseded 2026-10-10: this URL returned 404 when checked. Pages moved to workflow deploy on 2026-10-08, and the probe is not in the website workflow's artifact.)
+  `https://99ggprooo00-code.github.io/DHUN/web-spike/` served probe revision
   `b1-v1`.
 - **ADR-008 B1 ran and is BLOCKED.** The user confirmed the probe UI rendered and
   ran it in **Brave `1.96.61`** (Chromium `154.0.8037.98`, Official Build,

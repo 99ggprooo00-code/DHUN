@@ -611,7 +611,7 @@ per-project URL list is retained as cited evidence from 2026-10-08 and is
 > **Status (2026-10-08): RESEARCH / PLAN ONLY. W0 answers are recorded; the
 > user selected a browser player and separately accepted ADR-008 for its B1
 > deployed-origin feasibility spike only. B1 has now run and is BLOCKED: the
-> dependency-free probe in `web-spike/` is deployed at the canonical Pages
+> dependency-free probe in `web-spike/` was deployed at the canonical Pages (Superseded 2026-10-10: this URL returned 404 when checked. Pages moved to workflow deploy on 2026-10-08, and the probe is not in the website workflow's artifact.)
 > origin, anonymous metadata was readable, and the player request was blocked
 > before a readable response in the only available browser
 > (Brave/Chromium-family; Firefox and Safari unavailable). No Web-support claim

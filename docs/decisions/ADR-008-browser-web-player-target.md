@@ -112,7 +112,7 @@ changes.
 PR #136 merged with explicit user authorization at 2026-10-08T13:19:49Z as
 `2a20024d4b626b3f40ae95776cefb6b1e49cfdca`, so legacy Pages now publishes the
 dependency-free probe at the canonical origin
-`https://99ggprooo00-code.github.io/DHUN/web-spike/`. It is still deliberately
+`https://99ggprooo00-code.github.io/DHUN/web-spike/`. (Superseded 2026-10-10: this URL returned 404 when checked. Pages moved to workflow deploy on 2026-10-08, and the probe is not in the website workflow's artifact.) It was deliberately
 unlinked, `noindex`, credential-free, allow-listed and labelled as an
 engineering probe, and is fixed at revision `b1-v1`.
 

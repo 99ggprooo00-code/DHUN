@@ -1,5 +1,7 @@
 # 19 — ADR-008 B1 browser feasibility spike
 
+> **Superseded status note (2026-10-10):** the canonical `/DHUN/web-spike/` URL below returned 404 when checked. The result recorded here is historical.
+
 > **Status: DEPLOYED AND RUN — RESULT «BLOCKED» FOR THE AVAILABLE
 > BRAVE/CHROMIUM-FAMILY RUN. CROSS-BROWSER COVERAGE UNAVAILABLE. NO WEB-SUPPORT
 > CLAIM PERMITTED. B1 STOPS HERE; B2 REQUIRES A SEPARATE USER DECISION.**
@@ -141,7 +143,7 @@ A preflight result must not fill the canonical-origin row below.
 | Pages | run **37783499138** — success; build `built` with no error at commit `2a20024` |
 | Pages API | `build_type=legacy`, `source=main:/`, `status=built`, https enforced |
 | Pages artifact | artifact **11552239018** exists (1,171,094 bytes). Its archive redirects to a blob host that was unavailable in the previous session, so the archive was **never inspected** — it is not browser evidence and must not be cited as such |
-| Canonical probe | `https://99ggprooo00-code.github.io/DHUN/web-spike/` serves the probe page (`b1-v1`) |
+| Canonical probe | `https://99ggprooo00-code.github.io/DHUN/web-spike/` served the probe page (`b1-v1`). (Superseded 2026-10-10: this URL returned 404 when checked. Pages moved to workflow deploy on 2026-10-08, and the probe is not in the website workflow's artifact.) |
 
 ## Canonical B1 run — recorded result (2026-10-08)
 
