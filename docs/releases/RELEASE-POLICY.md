@@ -18,9 +18,9 @@ The identifier `1.00.001` is not canonical SemVer: SemVer forbids leading zeros 
 
 ## 2. Versioning options for the next release — **[decision]**
 
-The maintainer has not chosen the next version. Do not guess it.
+**Decided by the maintainer (2026-10-10): Option A.** The next release is `1.00.002` (tag `v1.00.002`, `versionCode` 7). Later minor releases continue the same pattern: `1.00.003`, `1.00.004`, and so on. Only the Gradle and workflow identity changes are made when that release is actually cut; `versionName` is not bumped before then.
 
-- **Option A — keep the padded scheme.** Next release: `1.00.002`, with `versionCode` 7 and tag `v1.00.002`. Pro: matches the published lineage with no ambiguity. Con: not SemVer, and the zero padding is unusual.
+- **Option A — keep the padded scheme (chosen).** Next release: `1.00.002`, with `versionCode` 7 and tag `v1.00.002`. Pro: matches the published lineage with no ambiguity. Con: not SemVer, and the zero padding is unusual.
 - **Option B — switch to SemVer for new releases.** Example: `1.0.1` (tag `v1.0.1`), or a pre-release `1.0.1-rc.1`. Pro: follows the changelog's stated default. Con: `v1.00.001` and `v1.0.1` would look like two different versions of one project, and the publish workflow needs a new code path.
 
 Either option needs the same identity change everywhere: Gradle `versionName`, the publish workflow's version and `--version` values, the release notes file name, the install guide and the changelog. `scripts/test_release_identity.py` will fail until those agree.
