@@ -261,7 +261,11 @@ object MarkdownParser {
         val pattern = Regex("(\\*\\*|~~|`)")
 
         while (rest.isNotEmpty()) {
-            val open = pattern.find(rest) ?: run {
+            // Written as an explicit null check, not `?: run { ... break }`.
+            // `break` inside an inline lambda needs Kotlin 2.2; this project is
+            // on 2.1.20 and the compiler rejects it.
+            val open = pattern.find(rest)
+            if (open == null) {
                 spans += MarkdownSpan.Plain(rest)
                 break
             }

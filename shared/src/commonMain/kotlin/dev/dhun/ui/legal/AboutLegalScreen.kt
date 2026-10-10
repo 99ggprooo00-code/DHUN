@@ -441,7 +441,7 @@ private fun LegalText(
                     LinkAnnotation.Clickable(
                         tag = span.url,
                         styles = linkStyles,
-                        linkInteraction = { onOpenUrl(span.url) },
+                        linkInteractionListener = { onOpenUrl(span.url) },
                     ),
                 ) { append(span.text) }
 
