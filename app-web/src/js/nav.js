@@ -27,6 +27,9 @@ export const ROOT_TAB = AppTab.HOME;
 /** AppNavState.MAX_TAB_HISTORY. */
 export const MAX_TAB_HISTORY = 8;
 
+/** DetailRoute kinds that are id-less singletons (AppNavState.push's rule). */
+export const SINGLETON_KINDS = Object.freeze(["settings", "about-legal"]);
+
 /** DhunShellLayout — the one breakpoint, DhunSpacing.navigationRailBreakpoint. */
 export const RAIL_BREAKPOINT_PX = 840;
 
@@ -90,9 +93,11 @@ export function createNavState(initial = {}) {
      *  interface in AppNavState.kt. */
     push(route) {
       if (!route || !route.kind) return false;
-      // SettingsPage is an id-less singleton: at most one lives on the stack.
-      if (route.kind === "settings") {
-        detailStack = detailStack.filter((r) => r.kind !== "settings");
+      // SettingsPage and AboutLegalPage are id-less singletons: at most one of
+      // each lives on the stack, so re-tapping the entry replaces it instead of
+      // stacking identical copies. Mirrors AppNavState.push.
+      if (SINGLETON_KINDS.includes(route.kind)) {
+        detailStack = detailStack.filter((r) => r.kind !== route.kind);
       }
       detailStack = [...detailStack, route];
       return true;

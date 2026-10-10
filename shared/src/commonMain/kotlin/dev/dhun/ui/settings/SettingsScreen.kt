@@ -1,5 +1,6 @@
 package dev.dhun.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import dev.dhun.design.DhunAccent
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
@@ -53,6 +55,9 @@ import kotlin.math.round
  *   cannot apply EQ — the whole section hides rather than showing dead
  *   sliders. Desktop passes `player.equalizer`; Android passes the Koin
  *   session once the AudioEffect engine exists (S4 slice 3).
+ * @param onOpenAboutLegal pushes the About & Legal index onto the detail stack.
+ *   Passed by the shell, so this screen does not know about navigation and both
+ *   the single-pane and two-pane layouts get the same behaviour for free.
  */
 @Composable
 fun SettingsScreen(
@@ -61,6 +66,7 @@ fun SettingsScreen(
     isDesktop: Boolean,
     equalizerSession: EqualizerSession? = null,
     modifier: Modifier = Modifier,
+    onOpenAboutLegal: () -> Unit = {},
 ) {
     val themeId by viewModel.themeId.collectAsState()
     val accentId by viewModel.accentId.collectAsState()
@@ -122,6 +128,17 @@ fun SettingsScreen(
                 SectionHeader(title = "Equalizer")
                 EqualizerSection(session = equalizerSession)
             }
+
+            // One entry, not seven. The legal pages are long documents on their
+            // own routes; listing all of them here would turn Settings into an
+            // index and push the controls that actually change behaviour off
+            // the screen.
+            SectionHeader(title = "About & Legal")
+            SettingsNavigationRow(
+                title = "About & Legal",
+                subtitle = "About this build, privacy, terms, licenses, support",
+                onClick = onOpenAboutLegal,
+            )
 
             Spacer(modifier = Modifier.height(DhunSpacing.xl))
         }
@@ -258,6 +275,32 @@ private fun SettingsSwitchRow(
         }
         Spacer(modifier = Modifier.width(DhunSpacing.md))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun SettingsNavigationRow(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick, role = Role.Button)
+            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = DhunColors.textPrimary,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = DhunColors.textSecondary,
+        )
     }
 }
 

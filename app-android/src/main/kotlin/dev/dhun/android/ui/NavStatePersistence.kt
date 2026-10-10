@@ -66,6 +66,10 @@ object NavStatePersistence {
         is DetailRoute.AlbumPage -> "album:${route.id}"
         is DetailRoute.PlaylistPage -> "playlist:${route.isLocal}:${route.id}"
         is DetailRoute.SettingsPage -> "settings"
+        is DetailRoute.AboutLegalPage -> "about-legal"
+        // The id is a fixed vocabulary from LegalContent ("privacy", "terms", …),
+        // so it never contains the ':' this format splits on.
+        is DetailRoute.LegalDocumentPage -> "legal:${route.id}"
     }
 
     fun decodeRoute(value: String): DetailRoute? {
@@ -80,6 +84,11 @@ object NavStatePersistence {
                 DetailRoute.PlaylistPage(id, parts.getOrNull(1) == "true")
             }
             "settings" -> DetailRoute.SettingsPage
+            "about-legal" -> DetailRoute.AboutLegalPage
+            // An unknown or blank legal id restores nothing rather than a page
+            // that would render "not in this build" after a rotate.
+            "legal" -> parts.getOrNull(1)?.takeIf { it.isNotBlank() }
+                ?.let { DetailRoute.LegalDocumentPage(it) }
             else -> null
         }
     }

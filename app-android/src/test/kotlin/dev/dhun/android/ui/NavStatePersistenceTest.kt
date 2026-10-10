@@ -6,6 +6,7 @@ import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DetailRoute
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -190,5 +191,48 @@ class NavStatePersistenceTest {
         // decodes even if a future version appends fields (split limit).
         assertEquals("settings", NavStatePersistence.encodeRoute(DetailRoute.SettingsPage))
         assertEquals(DetailRoute.SettingsPage, NavStatePersistence.decodeRoute("settings"))
+    }
+
+    @Test
+    fun `about-legal route round-trips as an id-less entry`() {
+        assertEquals(
+            "about-legal",
+            NavStatePersistence.encodeRoute(DetailRoute.AboutLegalPage),
+        )
+        assertEquals(
+            DetailRoute.AboutLegalPage,
+            NavStatePersistence.decodeRoute("about-legal"),
+        )
+    }
+
+    @Test
+    fun `legal document route round-trips with its page id`() {
+        // Rotation or process death while reading a policy must return to that
+        // same policy, not to the index.
+        for (id in listOf("privacy", "terms", "open-source-licenses", "third-party-notices", "about", "support", "security-reporting")) {
+            val route = DetailRoute.LegalDocumentPage(id)
+            assertEquals("legal:$id", NavStatePersistence.encodeRoute(route))
+            assertEquals(route, NavStatePersistence.decodeRoute("legal:$id"))
+        }
+    }
+
+    @Test
+    fun `a legal route with a blank id restores nothing`() {
+        // Corrupt bundle: an empty id would put a page on the back stack that
+        // renders "not in this build". Dropping it is the honest restore.
+        assertNull(NavStatePersistence.decodeRoute("legal:"))
+        assertNull(NavStatePersistence.decodeRoute("legal"))
+    }
+
+    @Test
+    fun `a full legal walk survives a save and restore`() {
+        val nav = AppNavState()
+        nav.push(DetailRoute.SettingsPage)
+        nav.push(DetailRoute.AboutLegalPage)
+        nav.push(DetailRoute.LegalDocumentPage("privacy"))
+        val bundle = Bundle()
+        NavStatePersistence.save(nav, bundle)
+        val restored = NavStatePersistence.restore(bundle)
+        assertEquals(nav.detailStack.toList(), restored.detailStack.toList())
     }
 }

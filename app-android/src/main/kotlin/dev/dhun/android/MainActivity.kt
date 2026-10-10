@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.core.content.ContextCompat
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.view.WindowCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -56,6 +57,7 @@ import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
+import dev.dhun.legal.DhunAppInfo
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.player.PlayerViewModel
@@ -255,6 +257,7 @@ class MainActivity : ComponentActivity() {
                             connectivity = koin.get(),
                             downloadManager = koin.get(),
                             equalizerSession = koin.get(),
+                            appInfo = androidx.compose.runtime.remember { dhunAppInfo() },
                         )
                     }
                     ready.reason?.let { reason ->
@@ -487,6 +490,30 @@ class MainActivity : ComponentActivity() {
         packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
     } catch (_: Exception) {
         "?"
+    }
+
+    /**
+     * The About page's build metadata, read from the installed package.
+     *
+     * Nothing here is hardcoded: the About screen reports what this APK actually
+     * is, so rebuilding with a bumped `versionName` shows the new value with no
+     * second place to update. Every field falls back to the explicit
+     * [DhunAppInfo.UNKNOWN] sentinel — a visible "unknown" is honest, a
+     * plausible-looking guess is not.
+     */
+    private fun dhunAppInfo(): DhunAppInfo = try {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        val debuggable =
+            (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        DhunAppInfo(
+            versionName = info.versionName ?: DhunAppInfo.UNKNOWN,
+            // PackageInfoCompat, not the API-28 `longVersionCode`: minSdk is 24.
+            versionCode = PackageInfoCompat.getLongVersionCode(info).toString(),
+            releaseChannel = if (debuggable) "debug build" else "release build",
+            platform = "Android",
+        )
+    } catch (_: Exception) {
+        DhunAppInfo.Unknown
     }
 
     /* ---------------- permissions ---------------- */

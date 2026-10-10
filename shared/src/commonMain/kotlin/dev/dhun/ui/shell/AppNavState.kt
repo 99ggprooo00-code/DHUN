@@ -24,6 +24,25 @@ sealed interface DetailRoute {
      * [AppNavState.push] replaces an existing one rather than stacking dupes.
      */
     data object SettingsPage : DetailRoute
+
+    /**
+     * Settings → About & Legal: the index of the bundled legal pages.
+     *
+     * Id-less singleton for the same reason [SettingsPage] is — there is only
+     * ever one About & Legal screen, so re-tapping the entry replaces it rather
+     * than stacking identical copies.
+     */
+    data object AboutLegalPage : DetailRoute
+
+    /**
+     * One bundled legal document (Privacy Policy, Terms of Use, Open-Source
+     * Licenses, Third-Party Notices, About, Support & Feedback, Security
+     * Reporting). [id] is a [dev.dhun.legal.LegalContent] id.
+     *
+     * A real page, not a dialog: these are long documents, and the reader gets
+     * the same back affordance as an artist or album page.
+     */
+    data class LegalDocumentPage(val id: String) : DetailRoute
 }
 
 /**
@@ -171,9 +190,10 @@ class AppNavState {
      */
     fun push(route: DetailRoute) {
         playerExpanded = false
-        // Settings is a singleton: re-tapping the entry replaces the existing
-        // page instead of stacking identical pages.
+        // Settings and About & Legal are id-less singletons: re-tapping the entry
+        // replaces the existing page instead of stacking identical pages.
         if (route is DetailRoute.SettingsPage) detailStack.removeAll { it is DetailRoute.SettingsPage }
+        if (route is DetailRoute.AboutLegalPage) detailStack.removeAll { it is DetailRoute.AboutLegalPage }
         detailStack += route
     }
 

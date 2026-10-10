@@ -35,6 +35,7 @@ import SAMPLE_LYRICS from "./data/sample-lyrics.js";
 import { icon } from "./views.js";
 import * as views from "./views.js";
 import { miniPlayer, fullPlayer } from "./player-ui.js";
+import { LEGAL_DOCUMENTS, legalDocumentById } from "./data/legal-content.js";
 import { escapeHtml } from "./format.js";
 
 const TAB_TITLE = {
@@ -280,6 +281,29 @@ export function boot({ root, audio = null, AudioContextCtor = null, storage = tr
         )}
       `;
     }
+    // Both legal routes are synchronous: the documents are bundled, so there is
+    // nothing to await and no loading state to show.
+    if (detail.kind === "about-legal") {
+      return html`
+        <header class="dhun-topbar">
+          <button class="dhun-icon-button" type="button" data-action="back" aria-label="Back">${icon("ArrowBack")}</button>
+          <h1 class="dhun-topbar__title">About &amp; Legal</h1>
+        </header>
+        <div class="dhun-legal">${raw(views.legalIndexScreen(LEGAL_DOCUMENTS))}</div>
+      `;
+    }
+    if (detail.kind === "legal") {
+      const doc = legalDocumentById(detail.id);
+      return html`
+        <header class="dhun-topbar">
+          <button class="dhun-icon-button" type="button" data-action="back" aria-label="Back">${icon("ArrowBack")}</button>
+          <h1 class="dhun-topbar__title">${doc ? doc.title : "About & Legal"}</h1>
+        </header>
+        <div class="dhun-legal">
+          ${raw(doc ? views.legalDocumentScreen(doc) : views.legalMissingScreen(detail.id))}
+        </div>
+      `;
+    }
     if (s.detailStatus === "loading") return views.loadingState(4);
     if (s.detailStatus === "error") {
       return views.errorState({ title: "Could not load this page", body: s.detailError ?? "" });
@@ -362,7 +386,8 @@ export function boot({ root, audio = null, AudioContextCtor = null, storage = tr
   }
 
   async function loadDetail(route) {
-    if (route.kind === "settings") {
+    // Settings and the legal pages are bundled: no network, no loading state.
+    if (route.kind === "settings" || route.kind === "about-legal" || route.kind === "legal") {
       store.set({ detailStatus: "idle" });
       render();
       return;
@@ -433,6 +458,22 @@ export function boot({ root, audio = null, AudioContextCtor = null, storage = tr
       case "open-settings":
         openDetail({ kind: "settings" });
         break;
+
+      case "open-about-legal":
+        openDetail({ kind: "about-legal" });
+        break;
+
+      case "open-legal": {
+        const id = target.dataset.id;
+        // Hash routes are the shareable form; setting the hash drives the same
+        // path a pasted link takes, so browser Back still works.
+        if (window.location.hash !== `#/legal/${id}`) {
+          window.location.hash = `#/legal/${id}`;
+        } else {
+          openDetail({ kind: "legal", id });
+        }
+        break;
+      }
 
       case "back":
         goBack();
@@ -852,11 +893,26 @@ export function boot({ root, audio = null, AudioContextCtor = null, storage = tr
 
   window.addEventListener("hashchange", () => applyHashRoute());
 
-  /** Deep links: #/artist/<id>, #/album/<id>, #/playlist/<id>, #/settings. */
+  /** Deep links: #/artist/<id>, #/album/<id>, #/playlist/<id>, #/settings,
+   *  #/about-legal, #/legal/<id>.
+   *
+   *  Hash routes, not path routes. A hash route needs no server support at all:
+   *  the browser resolves it against the one static document that is always
+   *  served, so #/legal/privacy works on a direct load, a refresh and a pasted
+   *  link under any mount path, including /DHUN/.
+   *
+   *  A path route would depend on the host instead. `tools/serve.mjs` returns
+   *  index.html for any unknown path, so it would look fine in development;
+   *  GitHub Pages has no such fallback and would serve its 404 page. That
+   *  distinction is the reason, and it is not something a local check can prove
+   *  — see docs/legal/AUDIT-2026-10-10-in-app-legal-pages.md §2. */
   function applyHashRoute() {
     const match = /^#\/(artist|album|playlist)\/(.+)$/.exec(window.location.hash);
     if (match) return openDetail({ kind: match[1], id: match[2] });
+    const legal = /^#\/legal\/([a-z0-9-]+)$/.exec(window.location.hash);
+    if (legal) return openDetail({ kind: "legal", id: legal[1] });
     if (window.location.hash === "#/settings") return openDetail({ kind: "settings" });
+    if (window.location.hash === "#/about-legal") return openDetail({ kind: "about-legal" });
     return undefined;
   }
 

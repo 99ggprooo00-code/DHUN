@@ -16,6 +16,7 @@ import { iconSvg } from "./icons.js";
 import { escapeHtml, formatDuration, trackSubtitle, pluralise, cacheOptionLabel, CACHE_OPTIONS_MB } from "./format.js";
 import { artworkStyle } from "./catalog.js";
 import { BANDS_HZ, frequencyLabel, formatDb, PRESETS, CUSTOM_ID, MIN_GAIN_DB, MAX_GAIN_DB } from "./equalizer.js";
+import { parseMarkdown, blockText } from "./markdown.js";
 
 export function icon(name, { size = 24, className = "" } = {}) {
   return raw(iconSvg(name, { size, className }));
@@ -580,6 +581,18 @@ export function settingsScreen({ theme, accent, cacheSizeMb, resumeOnLaunch, equ
     </section>
 
     <section class="dhun-section">
+      ${raw(sectionHeader("About & Legal"))}
+      <!-- One entry, not seven: the legal pages are long documents on their own
+           routes, and listing all of them here would turn Settings into an index. -->
+      <div class="dhun-settings-row dhun-settings-row--link" data-action="open-about-legal" role="link" tabindex="0">
+        <span class="dhun-settings-row__text">
+          <span class="dhun-settings-row__title">About & Legal</span>
+          <span class="dhun-settings-row__subtitle">About this build, privacy, terms, licenses, support</span>
+        </span>
+      </div>
+    </section>
+
+    <section class="dhun-section">
       ${raw(sectionHeader("Equalizer"))}
       <div class="dhun-settings-row">
         <span class="dhun-settings-row__text">
@@ -661,6 +674,232 @@ function sliderRow({ label, value, action, index = null, enabled = true }) {
 }
 
 /* ----------------------------------------------------------------- dialogs -- */
+
+/* ------------------------------------------------------------ about & legal -- */
+
+/**
+ * This build's identity, for the About page.
+ *
+ * Deliberately NOT `package.json`'s `"version"`: that field is `0.0.0` and is a
+ * module version, not a release version, so showing it would state a version the
+ * app does not have. The app reads its version from build metadata (Android from
+ * the installed package, Windows from `-Ddhun.installer.version`); the browser
+ * preview has no such metadata, and saying so is the honest mirror of that.
+ * Relabelling `0.0.0` as the app version needs a maintainer decision first.
+ */
+export const WEB_APP_INFO = Object.freeze({
+  versionName: "not applicable",
+  versionCode: null,
+  releaseChannel: "engineering preview",
+  platform: "web (browser preview)",
+});
+
+/** Render-time tokens, mirroring `LegalContent.TOKEN_*` in the app. */
+const LEGAL_TOKENS = {
+  "{{appVersion}}": WEB_APP_INFO.versionName,
+  "{{appVersionCode}}": WEB_APP_INFO.versionCode ?? "unknown",
+  "{{releaseChannel}}": WEB_APP_INFO.releaseChannel,
+  "{{platform}}": WEB_APP_INFO.platform,
+};
+
+/** Fills the About page's placeholders from this build's metadata. */
+export function substituteLegalTokens(markdown) {
+  return String(markdown).replace(
+    /\{\{[a-zA-Z][a-zA-Z0-9]*\}\}/g,
+    (token) => (token in LEGAL_TOKENS ? LEGAL_TOKENS[token] : token),
+  );
+}
+
+/** Token literals still present — a page that keeps one is rendered with a warning. */
+export function unresolvedLegalTokens(markdown) {
+  return [...new Set(String(markdown).match(/\{\{[a-zA-Z][a-zA-Z0-9]*\}\}/g) ?? [])];
+}
+
+/** True for http(s) only. Anything else renders as text, not as a link. */
+function isSafeUrl(url) {
+  return /^https?:\/\//i.test(url);
+}
+
+/**
+ * One span as an HTML string.
+ *
+ * Returns a plain string, never a `raw()` marker: these are concatenated with
+ * `join("")` by [spansMarkup], and joining marker objects yields the literal
+ * "[object Object]" — which is exactly how every link and heading on this page
+ * first shipped. Every interpolated value is escaped here, so the joined result
+ * is marked raw exactly once, by the caller.
+ */
+function spanMarkup(span) {
+  if (span.kind === "link") {
+    // http(s) only. The corpus is http(s), but a future edit must not be able to
+    // turn a policy page into a javascript: launcher.
+    if (!isSafeUrl(span.url)) return escapeHtml(span.text);
+    // External links open in a new tab with the full rel triple: this page is a
+    // browser preview, and navigating away from it loses the reader's place.
+    return `<a class="dhun-legal__link" href="${escapeHtml(span.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(span.text)}</a>`;
+  }
+  const classes = [
+    span.bold ? "dhun-legal__strong" : "",
+    span.code ? "dhun-legal__code" : "",
+    span.strike ? "dhun-legal__strike" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return classes
+    ? `<span class="${classes}">${escapeHtml(span.text)}</span>`
+    : escapeHtml(span.text);
+}
+
+function spansMarkup(spans) {
+  return raw(spans.map(spanMarkup).join(""));
+}
+
+/** Cell contents are parsed too, so a link inside a table cell still works. */
+function cellSpans(cell) {
+  return parseMarkdown(cell).flatMap((block) => block.spans ?? []);
+}
+
+/** One Markdown block as an HTML string, the way the app's LegalBlock composes it. */
+function blockMarkup(block) {
+  switch (block.kind) {
+    case "heading": {
+      const level = Math.min(Math.max(block.level, 1), 6);
+      // h2 is the top level here: the screen's own <h1> is the page title, and a
+      // second h1 would break the document outline.
+      const tag = level === 1 ? "h2" : level === 2 ? "h3" : "h4";
+      return `<${tag} class="dhun-legal__heading dhun-legal__heading--${level}">${spansMarkup(block.spans).value}</${tag}>`;
+    }
+    case "paragraph":
+      return `<p class="dhun-legal__para">${spansMarkup(block.spans).value}</p>`;
+    case "quote":
+      return `<blockquote class="dhun-legal__quote">${spansMarkup(block.spans).value}</blockquote>`;
+    case "bullet":
+      return `<li class="dhun-legal__li" data-indent="${block.indent}">${spansMarkup(block.spans).value}</li>`;
+    case "numbered":
+      return `<li class="dhun-legal__li" data-indent="${block.indent}" value="${block.number}">${spansMarkup(block.spans).value}</li>`;
+    case "code":
+      return `<pre class="dhun-legal__pre"><code>${escapeHtml(block.text)}</code></pre>`;
+    case "rule":
+      return '<hr class="dhun-legal__rule" />';
+    case "table":
+      // Stacked label/value records, not a grid: a four-column table on a 360px
+      // phone is either illegible or sideways-scrollable, and a policy that
+      // scrolls sideways is a policy nobody finishes reading.
+      return block.rows
+        .map(
+          (row) =>
+            `<dl class="dhun-legal__record">${row
+              .map((cell, column) => {
+                const label = block.headers[column];
+                const heading =
+                  label && label.trim() !== ""
+                    ? `<dt class="dhun-legal__label">${escapeHtml(label)}</dt>`
+                    : "";
+                return `${heading}<dd class="dhun-legal__value">${spansMarkup(cellSpans(cell)).value}</dd>`;
+              })
+              .join("")}</dl>`,
+        )
+        .join("");
+    default:
+      return "";
+  }
+}
+
+/** Groups consecutive list items so the markup stays a real list. */
+function blocksMarkup(blocks) {
+  const out = [];
+  let listKind = null;
+  let open = [];
+
+  const flush = () => {
+    if (!open.length) return;
+    const tag = listKind === "numbered" ? "ol" : "ul";
+    out.push(`<${tag} class="dhun-legal__list">${open.join("")}</${tag}>`);
+    open = [];
+    listKind = null;
+  };
+
+  for (const block of blocks) {
+    if (block.kind === "bullet" || block.kind === "numbered") {
+      if (listKind && listKind !== block.kind) flush();
+      listKind = block.kind;
+      open.push(blockMarkup(block));
+    } else {
+      flush();
+      out.push(blockMarkup(block));
+    }
+  }
+  flush();
+  return raw(out.join(""));
+}
+
+/** Settings -> About & Legal: the page index. */
+export function legalIndexScreen(documents) {
+  return html`
+    <p class="dhun-legal__intro">
+      These pages ship inside the app, so they open with no connection. Every
+      statement carries a status tag saying whether it was read from the source,
+      observed by running the app, taken from a third party, or is still awaiting
+      a decision.
+    </p>
+    <ul class="dhun-legal__index">
+      ${raw(
+        documents
+          .map(
+            (doc) => html`<li>
+              <a class="dhun-legal__entry" href="#/legal/${doc.id}" data-action="open-legal" data-id="${doc.id}">
+                <span class="dhun-legal__entry-title">${doc.title}</span>
+                <span class="dhun-legal__entry-meta${doc.status === "draft" ? " dhun-legal__entry-meta--draft" : ""}">
+                  ${doc.status === "draft" ? `Draft · effective ${doc.effectiveDate}` : `Effective ${doc.effectiveDate}`}
+                </span>
+              </a>
+            </li>`,
+          )
+          .join(""),
+      )}
+    </ul>`;
+}
+
+/** One legal document, rendered from the bundled Markdown. */
+export function legalDocumentScreen(document, { appInfo = WEB_APP_INFO } = {}) {
+  const markdown = substituteLegalTokens(document.markdown);
+  const unresolved = unresolvedLegalTokens(markdown);
+  const blocks = parseMarkdown(markdown);
+
+  return html`
+    ${unresolved.length > 0
+      ? html`<p class="dhun-legal__warn" role="alert">
+          This page still contains an unfilled placeholder (${unresolved.join(", ")}), so part of it
+          may read incorrectly.
+        </p>`
+      : ""}
+    ${document.status === "draft"
+      ? html`<aside class="dhun-legal__banner" role="note">
+          <strong>Draft — not yet in force</strong>
+          <p>
+            This page has not been reviewed by a lawyer and no contact channel has been
+            published. It is effective ${document.effectiveDate}.
+          </p>
+        </aside>`
+      : ""}
+    <dl class="dhun-legal__buildinfo">
+      <dt>Version</dt><dd>${appInfo.versionName}</dd>
+      <dt>Version code</dt><dd>${appInfo.versionCode ?? "not applicable"}</dd>
+      <dt>Release channel</dt><dd>${appInfo.releaseChannel}</dd>
+      <dt>Platform</dt><dd>${appInfo.platform}</dd>
+    </dl>
+    <div class="dhun-legal__body" data-testid="legal-body" data-doc-id="${document.id}"
+         data-sha256="${document.sha256}">
+      ${blocksMarkup(blocks)}
+    </div>`;
+}
+
+/** A legal id that this build does not carry — a wiring bug, said out loud. */
+export function legalMissingScreen(documentId) {
+  return html`<p class="dhun-legal__para">
+    This page (<code>${documentId}</code>) is not in this build.
+  </p>`;
+}
 
 export function trackOverflowSheet(track, { inFavourites }) {
   return html`<div class="dhun-sheet" role="dialog" aria-modal="true" aria-label="More actions for ${track.title}">

@@ -307,6 +307,60 @@ class AppNavStateTest {
     }
 
     @Test
+    fun aboutLegalPageIsASingletonOnTheStack() {
+        // Same rule as Settings: re-tapping the entry must not stack identical
+        // copies of the index behind itself.
+        val nav = AppNavState()
+        nav.push(DetailRoute.SettingsPage)
+        nav.push(DetailRoute.AboutLegalPage)
+        nav.push(DetailRoute.AboutLegalPage)
+        assertEquals(
+            listOf(DetailRoute.SettingsPage, DetailRoute.AboutLegalPage),
+            nav.detailStack.toList(),
+        )
+    }
+
+    @Test
+    fun legalDocumentPagesStackAndPopBackToTheIndex() {
+        // The real walk: Settings -> About & Legal -> Privacy Policy, then one
+        // BACK per press all the way out. A policy page is a page, not a modal,
+        // so it participates in the back stack exactly like an artist page.
+        val nav = AppNavState()
+        nav.push(DetailRoute.SettingsPage)
+        nav.push(DetailRoute.AboutLegalPage)
+        nav.push(DetailRoute.LegalDocumentPage("privacy"))
+        assertEquals(3, nav.detailStack.size)
+
+        assertTrue(nav.onBack())
+        assertEquals(DetailRoute.AboutLegalPage, nav.detailStack.last())
+        assertTrue(nav.onBack())
+        assertEquals(DetailRoute.SettingsPage, nav.detailStack.last())
+        assertTrue(nav.onBack())
+        assertEquals(0, nav.detailStack.size)
+        // Nothing left to close, so the platform default is the next press.
+        assertFalse(nav.onBack())
+    }
+
+    @Test
+    fun twoLegalDocumentsStackIndependently() {
+        // Privacy -> back -> Terms must not leave Privacy underneath.
+        val nav = AppNavState()
+        nav.push(DetailRoute.AboutLegalPage)
+        nav.push(DetailRoute.LegalDocumentPage("privacy"))
+        nav.push(DetailRoute.LegalDocumentPage("terms"))
+        assertEquals(
+            listOf(
+                DetailRoute.AboutLegalPage,
+                DetailRoute.LegalDocumentPage("privacy"),
+                DetailRoute.LegalDocumentPage("terms"),
+            ),
+            nav.detailStack.toList(),
+        )
+        nav.popDetail()
+        assertEquals(DetailRoute.LegalDocumentPage("privacy"), nav.detailStack.last())
+    }
+
+    @Test
     fun pushCollapsesThePlayerSoThePageIsVisible() {
         // Pushes issued from above the player (overflow "Go to artist/album",
         // add-to-playlist "open playlist") used to land invisibly under the

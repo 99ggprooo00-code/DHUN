@@ -70,6 +70,7 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.catalog.ComponentCatalogScreen
+import dev.dhun.legal.DhunAppInfo
 import dev.dhun.design.components.GlassDock
 import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.NowPlayingBackdrop
@@ -94,6 +95,8 @@ import dev.dhun.ui.browse.PlaylistScreen
 import dev.dhun.ui.components.AddToPlaylistDialog
 import dev.dhun.ui.components.TrackOverflowDialog
 import dev.dhun.ui.home.HomeScreen
+import dev.dhun.ui.legal.AboutLegalScreen
+import dev.dhun.ui.legal.LegalDocumentScreen
 import dev.dhun.ui.library.LibraryScreen
 import dev.dhun.ui.player.FullPlayer
 import dev.dhun.ui.player.MiniPlayer
@@ -167,6 +170,13 @@ fun DhunAppShell(
     connectivity: ConnectivityMonitor = AlwaysOnlineConnectivityMonitor,
     downloadManager: DownloadManager? = null,
     equalizerSession: EqualizerSession? = null,
+    /**
+     * This build's version/channel, read from build metadata by the platform
+     * shell. Only the About page consumes it; it defaults to the honest
+     * "unknown" sentinel so a caller that has not wired it shows that rather
+     * than a plausible-looking wrong version.
+     */
+    appInfo: DhunAppInfo = DhunAppInfo.Unknown,
 ) {
     val scope = rememberCoroutineScope()
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
@@ -424,6 +434,7 @@ fun DhunAppShell(
                             isDesktop = isDesktop,
                             equalizerSession = equalizerSession,
                             onOpenSettings = { nav.push(DetailRoute.SettingsPage) },
+                            appInfo = appInfo,
                         )
                         }
                         if (useNavigationRail && !nav.playerExpanded) {
@@ -480,6 +491,7 @@ fun DhunAppShell(
                                 isDesktop = isDesktop,
                                 equalizerSession = equalizerSession,
                                 onOpenSettings = { nav.push(DetailRoute.SettingsPage) },
+                                appInfo = appInfo,
                             )
                         },
                         detail = {
@@ -497,6 +509,7 @@ fun DhunAppShell(
                                 settingsVm = settingsVm,
                                 isDesktop = isDesktop,
                                 equalizerSession = equalizerSession,
+                                appInfo = appInfo,
                             )
                         },
                         miniPlayer = if (!nav.playerExpanded) {
@@ -798,6 +811,7 @@ private fun ShellMasterPane(
     isDesktop: Boolean,
     equalizerSession: EqualizerSession?,
     onOpenSettings: () -> Unit,
+    appInfo: DhunAppInfo,
 ) {
     val route: DetailRoute? = detailRoute
     when (route) {
@@ -859,6 +873,20 @@ private fun ShellMasterPane(
                 onBack = { nav.closeTop() },
                 isDesktop = isDesktop,
                 equalizerSession = equalizerSession,
+                onOpenAboutLegal = { nav.push(DetailRoute.AboutLegalPage) },
+            )
+        }
+        is DetailRoute.AboutLegalPage -> {
+            AboutLegalScreen(
+                onBack = { nav.closeTop() },
+                onOpenDocument = { id -> nav.push(DetailRoute.LegalDocumentPage(id)) },
+            )
+        }
+        is DetailRoute.LegalDocumentPage -> {
+            LegalDocumentScreen(
+                documentId = route.id,
+                appInfo = appInfo,
+                onBack = { nav.closeTop() },
             )
         }
     }
@@ -889,6 +917,7 @@ private fun ShellDetailPane(
     settingsVm: SettingsViewModel,
     isDesktop: Boolean,
     equalizerSession: EqualizerSession?,
+    appInfo: DhunAppInfo,
 ) {
     when (route) {
         is DetailRoute.ArtistPage -> {
@@ -934,6 +963,20 @@ private fun ShellDetailPane(
                 onBack = { nav.popDetail() },
                 isDesktop = isDesktop,
                 equalizerSession = equalizerSession,
+                onOpenAboutLegal = { nav.push(DetailRoute.AboutLegalPage) },
+            )
+        }
+        is DetailRoute.AboutLegalPage -> {
+            AboutLegalScreen(
+                onBack = { nav.popDetail() },
+                onOpenDocument = { id -> nav.push(DetailRoute.LegalDocumentPage(id)) },
+            )
+        }
+        is DetailRoute.LegalDocumentPage -> {
+            LegalDocumentScreen(
+                documentId = route.id,
+                appInfo = appInfo,
+                onBack = { nav.popDetail() },
             )
         }
     }
