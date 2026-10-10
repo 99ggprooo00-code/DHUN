@@ -1,6 +1,6 @@
-# Release policy (PROPOSAL — pending maintainer approval)
+# Release policy (versioning decided 2026-10-10; other rules pending approval)
 
-> **Status: proposal.** Nothing here changes an existing tag, release, or asset. Items marked **[decision]** need the maintainer's approval before they take effect. This file describes the current state, what each identifier means, and what a future release must prove.
+> **Status:** the versioning choice in section 2 (Option A) was decided by the maintainer on 2026-10-10. The numbered rules in section 3 remain **proposals** until the maintainer approves them. Nothing here changes an existing tag, release, or asset. Items marked **[decision]** need the maintainer's approval before they take effect. This file describes the current state, what each identifier means, and what a future release must prove.
 
 ## 1. Identifiers in use today
 
@@ -36,6 +36,7 @@ Pre-release markers and "Latest" marking: **[decision]** — current releases ar
 5. **The tag, the commit, and the built binaries must match.** The publish job refuses a superseded `main` commit. For the fixed `v1.00.001` path, `stage_versioned_release.py` requires every input's `sourceSha` to equal `GITHUB_SHA`, which is also the release `--target`. The rolling `test` draft uses `--target $GITHUB_SHA` but does not re-check its inputs.
 6. **Assets are never edited in place.** A change to a published asset requires a new version.
 7. **No `.json` files are added to release assets.** Future sidecars are `*.sha256` (standard `sha256sum` format) and `*.provenance.txt` (flat `key=value`). The v1.00.001 release keeps its historical `.build-info.json` assets, which are not modified.
+8. **Destructive cleanup is opt-in.** A manual publish deletes the legacy `dev`, `dev-v0.1.0` and `dev-v0.1.1` releases and tags only when `purge_legacy_dev_releases` is ticked for that dispatch (default off). The rolling `test` draft is replaced on every manual publish by design. Restricting who may approve a publish needs a GitHub environment with required reviewers; see `.ai/KNOWN_LIMITATIONS.md`.
 
 ## 4. Verifying a published file
 

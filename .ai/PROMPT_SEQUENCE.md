@@ -21,8 +21,8 @@ Each problem cites the original text, says why it fails **on 2026-09-02**
 (with evidence already in this repo), and names the replacement. This audit
 is intentionally terse: the full evidence base is
 [PROBLEMS_AND_FIXES.md](PROBLEMS_AND_FIXES.md),
-[ADR-001](docs/decisions/ADR-001-extraction-engine.md), and
-[docs/research/01-extraction-spike.md](docs/research/01-extraction-spike.md).
+[ADR-001](../docs/decisions/ADR-001-extraction-engine.md), and
+[docs/research/01-extraction-spike.md](../docs/research/01-extraction-spike.md).
 
 ## A1 — "First create a github repo named DHUN" — already done
 
