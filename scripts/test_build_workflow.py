@@ -133,5 +133,32 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("-ExpectedVersion $env:INSTALLER_VERSION", self.text)
 
 
+    def test_future_release_assets_contain_no_json(self):
+        # Release-facing assets: no .json may be uploaded by the publish job.
+        # (The published v1.00.001 .build-info.json files are historical and untouched.)
+        self.assertNotIn(".json", self.publish)
+        self.assertIn("dist/$version/dhun-v1.00.001.msi.provenance.txt", self.publish)
+        self.assertIn("dist/dhun-test.msi.provenance.txt", self.publish)
+        for line in self.text.splitlines():
+            if "upload" in line or "gh release create" in line:
+                self.assertNotIn(".json", line)
+        for block in self.text.split("uses: actions/upload-artifact@v6")[1:]:
+            self.assertNotIn(".json", block.split("\n      - ", 1)[0])
+
+    def test_install_over_is_required_for_main_and_a_skip_is_not_green_there(self):
+        msi = self.text.split("\n  msi:\n", 1)[1].split("\n  aab:\n", 1)[0]
+        self.assertIn("REQUIRE_INSTALL_OVER: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}", msi)
+        self.assertIn("-RequireInstallOver:$require", msi)
+        smoke = (WORKFLOW.parents[2] / "scripts/check_msi_upgrade.ps1").read_text()
+        self.assertIn("[switch]$RequireInstallOver", smoke)
+        self.assertIn("MSI install-over is REQUIRED for this build but was SKIPPED", smoke)
+        # The machine-readable outcome is text, and distinguishes skipped from passed.
+        self.assertIn("status = 'skipped'", smoke)
+        self.assertIn("status = 'passed'", smoke)
+        self.assertIn("'result.txt'", smoke)
+        self.assertNotIn("result.json", smoke)
+        self.assertNotIn("ConvertTo-Json", smoke)
+
+
 if __name__ == "__main__":
     unittest.main()

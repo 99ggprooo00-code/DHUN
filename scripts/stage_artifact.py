@@ -1,11 +1,90 @@
-"""Stage a test binary with SHA256 and non-secret, revision-bound build provenance."""
+"""Stage a test binary with SHA256 and non-secret, revision-bound build provenance.
+
+Two sidecars are written next to the binary:
+
+- ``<name>.sha256``          the standard ``sha256sum`` line (``<hex>  <name>``)
+- ``<name>.provenance.txt``  flat ``key=value`` lines (no JSON). Only the fields
+  listed in ``PROVENANCE_FIELDS`` are written, so CI credentials and other
+  environment values can never leak into a release asset.
+
+Release assets must not add ``.json`` files. The published v1.00.001 release
+still carries older ``.build-info.json`` sidecars; those are historical and are
+not read by this module.
+"""
 
 import argparse
 import hashlib
-import json
 import os
 import re
 from pathlib import Path
+
+PROVENANCE_SUFFIX = ".provenance.txt"
+SCHEMA_VERSION = "1"
+# Ordered, whitelisted provenance fields. Nothing else is ever written.
+PROVENANCE_FIELDS = (
+    "schemaVersion",
+    "artifact",
+    "sha256",
+    "bytes",
+    "sourceSha",
+    "sourceRef",
+    "repository",
+    "workflow",
+    "runId",
+    "runAttempt",
+    "runUrl",
+    "buildOnly",
+    "installerVersion",
+    "upgradeCode",
+)
+
+
+def provenance_path(binary: Path) -> Path:
+    return binary.with_name(binary.name + PROVENANCE_SUFFIX)
+
+
+def render_provenance(metadata: dict) -> str:
+    lines = []
+    for field in PROVENANCE_FIELDS:
+        value = metadata.get(field)
+        if value is None:
+            continue  # absent means "not applicable" (e.g. no MSI version on an APK)
+        text = str(value).lower() if isinstance(value, bool) else str(value)
+        if "\n" in text or "\r" in text:
+            raise ValueError(f"provenance field {field} must be single-line")
+        lines.append(f"{field}={text}")
+    return "\n".join(lines) + "\n"
+
+
+def parse_provenance(text: str) -> dict:
+    """Parse ``key=value`` provenance into the same typed shape as stage_artifact()."""
+    values: dict[str, str] = {}
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        key, separator, value = line.partition("=")
+        if not separator or not key or key not in PROVENANCE_FIELDS:
+            raise ValueError(f"unknown provenance line {number}")
+        if key in values:
+            raise ValueError(f"duplicate provenance field {key}")
+        values[key] = value
+    if values.get("schemaVersion") != SCHEMA_VERSION:
+        raise ValueError("unsupported provenance schema version")
+    parsed: dict = {}
+    for key, value in values.items():
+        if key == "bytes":
+            if not value.isdecimal():
+                raise ValueError("provenance bytes must be a decimal count")
+            parsed[key] = int(value)
+        elif key == "buildOnly":
+            if value not in ("true", "false"):
+                raise ValueError("provenance buildOnly must be true or false")
+            parsed[key] = value == "true"
+        else:
+            parsed[key] = value
+    for key in PROVENANCE_FIELDS:
+        parsed.setdefault(key, None)
+    return parsed
 
 
 def stage_artifact(binary: Path, environment, *, build_only: bool, installer_version=None, upgrade_code=None):
@@ -30,7 +109,7 @@ def stage_artifact(binary: Path, environment, *, build_only: bool, installer_ver
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     metadata = {
-        "schemaVersion": 1,
+        "schemaVersion": SCHEMA_VERSION,
         "artifact": binary.name,
         "sha256": digest.hexdigest(),
         "bytes": binary.stat().st_size,
@@ -49,9 +128,7 @@ def stage_artifact(binary: Path, environment, *, build_only: bool, installer_ver
     binary.with_name(binary.name + ".sha256").write_text(
         f"{metadata['sha256']}  {binary.name}\n", encoding="ascii",
     )
-    binary.with_name(binary.name + ".build-info.json").write_text(
-        json.dumps(metadata, indent=2) + "\n", encoding="utf-8",
-    )
+    provenance_path(binary).write_text(render_provenance(metadata), encoding="ascii")
     return metadata
 
 
@@ -80,7 +157,7 @@ def main():
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as stream:
-            stream.write(f"### {metadata['artifact']}\n\n```json\n{json.dumps(metadata, indent=2)}\n```\n")
+            stream.write(f"### {metadata['artifact']}\n\n```text\n{render_provenance(metadata)}```\n")
             stream.write("Build/checksum evidence only; playback and user-machine acceptance remain unverified.\n")
 
 

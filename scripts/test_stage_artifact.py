@@ -1,10 +1,9 @@
 import hashlib
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from stage_artifact import stage_artifact
+from stage_artifact import PROVENANCE_FIELDS, parse_provenance, render_provenance, stage_artifact
 
 
 class StageArtifactTest(unittest.TestCase):
@@ -34,10 +33,44 @@ class StageArtifactTest(unittest.TestCase):
             self.assertEqual(metadata["installerVersion"], "1.33.2")
             self.assertTrue(metadata["buildOnly"])
             self.assertEqual(binary.with_name(binary.name + ".sha256").read_text(), f"{expected}  dhun-test.msi\n")
-            text = binary.with_name(binary.name + ".build-info.json").read_text()
-            self.assertEqual(json.loads(text), metadata)
+            sidecar = binary.with_name(binary.name + ".provenance.txt")
+            text = sidecar.read_text(encoding="ascii")
+            self.assertEqual(parse_provenance(text), metadata)
             self.assertNotIn("DO-NOT-COPY-THIS", text)
             self.assertNotIn("GH_TOKEN", text)
+            # Release assets must not add JSON: no .json sidecar may be produced.
+            self.assertEqual(sorted(p.name for p in Path(directory).iterdir()), sorted([
+                "dhun-test.msi", "dhun-test.msi.sha256", "dhun-test.msi.provenance.txt",
+            ]))
+
+    def test_provenance_text_is_flat_key_value_with_whitelisted_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "dhun-test.apk"
+            binary.write_bytes(b"apk fixture")
+            stage_artifact(binary, self.environment(), build_only=True)
+            lines = binary.with_name(binary.name + ".provenance.txt").read_text(encoding="ascii").splitlines()
+            keys = [line.partition("=")[0] for line in lines]
+            self.assertTrue(set(keys) <= set(PROVENANCE_FIELDS))
+            self.assertNotIn("installerVersion", keys)  # not applicable to an APK
+            self.assertIn("buildOnly=true", lines)
+
+    def test_provenance_parser_rejects_tampered_or_unknown_input(self):
+        good = "schemaVersion=1\nartifact=a.apk\nbytes=3\nbuildOnly=false\n"
+        self.assertEqual(parse_provenance(good)["bytes"], 3)
+        for bad in (
+            "artifact=a.apk\n",                               # no schema version
+            "schemaVersion=1\nbogus=1\n",                     # unknown field
+            "schemaVersion=1\nbytes=3\nbytes=4\n",           # duplicate field
+            "schemaVersion=1\nbytes=-3\n",                    # non-decimal size
+            "schemaVersion=1\nbuildOnly=yes\n",               # non-boolean flag
+        ):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    parse_provenance(bad)
+
+    def test_provenance_rejects_multiline_values(self):
+        with self.assertRaises(ValueError):
+            render_provenance({"schemaVersion": "1", "artifact": "a\nb"})
 
     def test_apk_does_not_claim_an_msi_version(self):
         with tempfile.TemporaryDirectory() as directory:

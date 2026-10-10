@@ -1,5 +1,20 @@
 # KNOWN_LIMITATIONS
 
+## 2026-10-10 — release-readiness audit (session `arena/7884ea99-dhun`, base `6ebc45c`)
+
+Evidence: live `gh` API reads, public-download attempts, CI annotations, source reads. Full report in the session summary.
+
+- **Public assets not re-hashed here.** `objects.githubusercontent.com` (release CDN) is unreachable from the sandbox (TLS EOF). The API now returns `digest: null` for every asset; the prior session's digests match the CI annotations of run `38032631758` (`dhun-test*.apk`, `dhun-test.msi`), not an independent download.
+- **MSI install-over was SKIPPED on the main run (`38032631758`).** The job was green because the skip exited 0. Fixed on the branch: on `main` a skip now fails. Not yet executed on a hosted runner. The next `main` run is the first real test against the public `v1.00.001` MSI (`3.61.1`).
+- **Android release is a debug build signed with a public key.** `buildTypes.release` has no signing config and `isMinifyEnabled = false`. The public cert `CN=DHUN Test Build` (SHA-256 `d8e57ec6…468c3`) is committed with its private key.
+- **Private vulnerability reporting is disabled**, so `SECURITY.md` cannot offer a private channel yet.
+- **YouTube terms:** the fetched terms (page dated 2023-12-15) restrict downloading content and automated access without permission. Offline downloads and the unofficial client need legal review before any wider release.
+- **`LYRICS_ENABLED` has no reader**: lyrics requests (LRCLIB, YouTube) run on every track load regardless of the setting.
+- **Desktop About has no DHUN version**; Windows shows the installer sequence (`3.61.1`) as the product version.
+- **Local MSI builds without `-PdhunInstallerVersion`** use the fallback `1.0.6`, which is lower than the published `3.61.1` and would be refused as a downgrade.
+- **Not runnable in the audit sandbox:** JDK, Gradle distribution (`services.gradle.org`), Google Maven, `pwsh`, Android build-tools. Android and Windows builds were NOT rebuilt here; the Python suite (334), YAML parse, and the app-web tests were run.
+- **`publish.sh`** (repo root) rewrites `origin` to SSH and pushes `main` directly. Not part of the release path; a bypass risk.
+
 ## 2026-10-09 — current UI/navigation defects and verification state
 
 - **Clear all downloads (P0, fix in progress):** source previously swallowed `DownloadManager.clearAll()` errors and the UI dismissed the confirmation before the operation completed. This branch now exposes pending/success/failure state and a retry path; the manager serializes enqueue/resume/removal with clear-all and joins workers before deleting files. JVM regression tests cover failure/retry and successful file/row cleanup. CI must confirm the change, and Android/desktop interaction still needs hardware verification.

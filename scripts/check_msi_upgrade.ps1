@@ -1,5 +1,10 @@
 # A disposable hosted-Windows check, NOT an installer to run on a user's PC.
-param([string]$Candidate = 'out/dhun-test.msi')
+param(
+    [string]$Candidate = 'out/dhun-test.msi',
+    # On main (the only path that can publish) a SKIPPED install-over is a
+    # failure, not a pass. PR/branch builds may still skip, visibly.
+    [switch]$RequireInstallOver
+)
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'This install/uninstall smoke check is restricted to a disposable Windows Actions runner.'
@@ -8,6 +13,16 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or $env:RUN
 $repository = Split-Path $PSScriptRoot -Parent
 $logs = Join-Path $repository 'out/installer-check'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
+# Result evidence is flat key=value text (no JSON), written in every outcome.
+function Write-DhunInstallResult {
+    param([System.Collections.IDictionary]$Fields)
+    $lines = foreach ($key in $Fields.Keys) { "$key=$($Fields[$key])" }
+    Set-Content -LiteralPath (Join-Path $logs 'result.txt') -Value $lines -Encoding ascii
+    if ($env:GITHUB_STEP_SUMMARY) {
+        $summary = @('### MSI install-over check', '', '```text') + $lines + @('```', '')
+        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Value $summary
+    }
+}
 $baselineDir = Join-Path $env:RUNNER_TEMP 'dhun-msi-baseline'
 New-Item -ItemType Directory -Force -Path $baselineDir | Out-Null
 $baseline = $null
@@ -72,14 +87,14 @@ if (-not $baselineReleaseTag) {
     $baselineReason = "No readable MSI baseline. Tried: $($downloadFailures -join '; ')"
 }
 if ($baselineReason) {
-    Write-Host "::warning title=MSI install-over SKIPPED::${baselineReason}. The candidate MSI is build-verified only - the in-place upgrade, sentinel preservation, future-upgrade guard and uninstall checks did NOT run."
-    Write-Host '::notice title=MSI install-over NOT RUN (build-verified only)::No readable baseline, so no install or uninstall was attempted. Never report this run as an install-over pass.'
-    @{
+    Write-DhunInstallResult ([ordered]@{
+        status = 'skipped'
+        requiredForThisBuild = [string][bool]$RequireInstallOver
         sourceSha = $env:GITHUB_SHA
-        baselineTag = 'unavailable (baseline not readable)'
-        baselineVersion = 'unavailable (baseline not readable)'
-        baselineSha256 = 'unavailable (baseline not readable)'
-        candidateVersion = 'unavailable (check skipped before reading)'
+        baselineTag = 'unavailable'
+        baselineVersion = 'unavailable'
+        baselineSha256 = 'unavailable'
+        candidateVersion = 'not read'
         perUserInstall = 'not tested'
         installOver = "skipped: $baselineReason"
         userdataSentinel = 'not tested'
@@ -88,7 +103,12 @@ if ($baselineReason) {
         uninstallCleanup = 'not tested'
         appLaunch = 'not tested'
         audioAndVisuals = 'not tested'
-    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $logs 'result.json') -Encoding utf8
+    })
+    if ($RequireInstallOver) {
+        throw "MSI install-over is REQUIRED for this build but was SKIPPED: $baselineReason"
+    }
+    Write-Host "::warning title=MSI install-over SKIPPED::$baselineReason. The candidate MSI is build-verified only - the in-place upgrade, sentinel preservation, future-upgrade guard and uninstall checks did NOT run."
+    Write-Host '::notice title=MSI install-over NOT RUN (build-verified only)::No readable baseline, so no install or uninstall was attempted. Never report this run as an install-over pass.'
     exit 0
 }
 $expectedHash = ((Get-Content -LiteralPath $baselineSidecar -Raw).Trim() -split '\s+')[0]
@@ -138,7 +158,9 @@ try {
     [void](Invoke-MsiCheck '/x' $new['ProductCode'] (Join-Path $logs 'candidate-uninstall.log'))
     if (Test-Path -LiteralPath $userdata) { throw 'MSI uninstall left the test userdata directory behind' }
     Write-Host '::notice title=MSI uninstall smoke PASS::Hosted Windows uninstall removed test userdata. No app launch, audio or visual acceptance claimed.'
-    @{
+    Write-DhunInstallResult ([ordered]@{
+        status = 'passed'
+        requiredForThisBuild = [string][bool]$RequireInstallOver
         sourceSha = $env:GITHUB_SHA
         baselineTag = $baselineReleaseTag
         baselineVersion = $old['ProductVersion']
@@ -152,7 +174,7 @@ try {
         uninstallCleanup = 'passed'
         appLaunch = 'not tested'
         audioAndVisuals = 'not tested'
-    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $logs 'result.json') -Encoding utf8
+    })
 } finally {
     # Product GUIDs were read from these two verified DHUN packages. Do not
     # query Win32_Product (which can trigger repairs of unrelated software).

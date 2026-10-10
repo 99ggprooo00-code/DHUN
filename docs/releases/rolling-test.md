@@ -7,7 +7,7 @@ This is a collaborator-only, rolling development build of DHUN's `main` branch. 
 - `dhun-test.apk` — Android universal APK (Android 7.0 / API 24 or newer; preferred install).
 - `dhun-test-arm64-v8a.apk` and `dhun-test-armeabi-v7a.apk` — optional ABI APKs from the same build.
 - `dhun-test.msi` — Windows per-user installer. VLC is required separately for audio.
-- Each binary is accompanied by a `.sha256` checksum and `.build-info.json` provenance record.
+- Each binary is accompanied by a `.sha256` checksum and a `.provenance.txt` provenance record (plain `key=value` text; release assets do not use JSON).
 
 ### Install
 
