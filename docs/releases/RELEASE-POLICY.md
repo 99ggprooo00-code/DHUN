@@ -73,11 +73,11 @@ Expected for the current test key: certificate SHA-256 `d8e57ec69f40956d34adff13
 | MSI build and identity check | In `test-release.yml` | Keep |
 | MSI install-over on hosted Windows | Required on `main` (skip fails); skipped on PR/branch | Keep |
 | Public release creation | Hard-coded to `v1.00.001`, created once; later main runs skip it | A new version needs a reviewed workflow change and a **draft** step first **[decision]** |
-| Human approval before publishing | None. Publishing happens automatically on push to `main`. | **[decision]** require a manual approval environment for public releases |
+| Human approval before publishing | A push to `main` (including a merge) builds and tests only. Publishing requires a manual `workflow_dispatch` on `main` with `build_only=false`. | **[decision]** add a protected approval environment for that dispatch |
 | Hardware acceptance (Android, Windows) | Not done | Required before any "works on device" claim |
 
 ## 6. Known risks in the publish path (not yet changed)
 
 - `publish.sh` at the repository root rewrites `origin` to an SSH remote and pushes `main` directly. It is not part of the release path, but it bypasses CI. **[decision]** remove it or move it under `.ai/`.
 - The publish job deletes old `dev-*` releases and tags with `|| true`, so a failed delete is silently ignored.
-- `publish` runs on every push to `main` and replaces the private `test` draft each time.
+- `publish` no longer runs on push to `main`. A merge refreshes only the build artifacts. A manual dispatch replaces the private `test` draft.

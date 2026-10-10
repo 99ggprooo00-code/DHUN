@@ -330,7 +330,7 @@ were skipped.
 
 The `apk` artifact from
 [test-release run 37322658878](https://github.com/99ggprooo00-code/DHUN/actions/runs/37322658878)
-contains `dhun-test.apk`, `.sha256` and `.build-info.json`. APK: 18,367,219 bytes,
+contains `dhun-test.apk`, `.sha256` and `.build-info.json`. *(Historical: since 2026-10-10 the pipeline writes `.provenance.txt` instead of `.build-info.json`; the old JSON sidecars named here are kept as they were published.)* APK: 18,367,219 bytes,
 SHA-256 `c351341edbeaa7935c7a52ec096141d6d28dc18133000ff2bc00cf63473c5458`.
 The downloaded ZIP is 17,552,363 bytes; this is expected compression, not a
 size mismatch. User reports verifying the APK checksum and installing/testing

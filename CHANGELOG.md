@@ -23,6 +23,11 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Merge-to-main no longer mutates releases (2026-10-10)
+
+- **Changed:** `test-release.yml` `publish` runs only on a manual dispatch from `main` with `build_only=false`. Before, every push to `main` (including each merge) deleted the `dev`, `dev-v0.1.0`, `dev-v0.1.1`, and `test` releases and recreated the private draft. Merges now build and test only.
+- Test: `scripts/test_build_workflow.py` asserts push and PR events never publish.
+
 ### Release hygiene — no JSON in future release assets, install-over required on main, version gate (2026-10-10, session `arena/7884ea99-dhun`)
 
 - **Changed: new release sidecars are `*.provenance.txt`, not `*.build-info.json`.**

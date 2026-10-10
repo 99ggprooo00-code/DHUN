@@ -38,7 +38,8 @@ class BuildWorkflowTest(unittest.TestCase):
             ("refs/pull/30/merge", "pull_request", False, False),
             ("refs/heads/main", "workflow_dispatch", True, False),
             ("refs/heads/main", "workflow_dispatch", False, True),
-            ("refs/heads/main", "push", False, True),
+            ("refs/heads/main", "push", False, False),
+            ("refs/heads/main", "push", True, False),
             ("refs/heads/main", "schedule", False, False),
         )
         code = compile(tree, str(WORKFLOW), "eval")
@@ -46,6 +47,12 @@ class BuildWorkflowTest(unittest.TestCase):
             with self.subTest(ref=ref, event=event, build_only=build_only):
                 result = eval(code, {"__builtins__": {}}, {"ref": ref, "event": event, "build_only": build_only})
                 self.assertIs(result, expected)
+
+    def test_merge_to_main_cannot_mutate_releases(self):
+        # A merge pushes to main; that must build/test only, never publish.
+        self.assertIn("  push:\n    branches: [main]", self.text)
+        self.assertNotIn("github.event_name == 'push'", self.publish)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.build_only == false", self.publish)
 
     def test_installer_is_a_pull_request_check_before_merge(self):
         self.assertIn("  pull_request:\n    branches: [main]", self.text)

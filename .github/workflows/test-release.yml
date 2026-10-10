@@ -192,9 +192,10 @@ jobs:
             out/dhun-v1.00.001.aab.provenance.txt
 
   publish:
-    # Only main can mutate a release. The branch build path cannot publish,
-    # even if a user manually sets build_only=false on a session branch.
-    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_only == false)) }}
+    # Only a deliberate, manual dispatch from main can mutate a release. A push
+    # (including a merge to main) builds and tests only and never publishes, and
+    # the branch build path cannot publish even if build_only=false is set there.
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.build_only == false }}
     needs: [apk, msi]
     runs-on: ubuntu-latest
     timeout-minutes: 15

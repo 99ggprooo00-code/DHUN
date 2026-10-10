@@ -1,5 +1,13 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/7884ea99-dhun` — release-readiness audit and safe prep (2026-10-10)
+
+- **Status:** BLOCKED — RELEASE NOT READY for any new public release. The fixed `v1.00.001` public prerelease was not changed.
+- **Done on branch:** text provenance (`.provenance.txt`, no JSON in future assets); MSI install-over required on `main`; version-identity test; merge-to-main no longer publishes (publish only on manual `build_only=false` dispatch); SECURITY.md; privacy and terms drafts; release-policy proposal; INSTALL rewrite.
+- **Open (needs owner/legal):** YouTube ToS for downloads and the unofficial client; production signing key; next version scheme; private vulnerability reporting; lyrics setting; MSI install-over result on a `main` run; independent hash check of public assets.
+- **Verification:** `python3 -m unittest discover -s scripts` → 335 OK; `app-web npm test` → 91 pass; all workflow YAML parses. Gradle, PowerShell, and MSI install-over not run here.
+
+
 ## Session `arena/90cb6d2c-dhun` — the deployed site's dead links, and "See the interface" pointing at the real thing (2026-10-09)
 
 Updated **2026-10-09** · fixed session branch `arena/90cb6d2c-dhun` · branch
