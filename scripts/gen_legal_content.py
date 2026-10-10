@@ -279,18 +279,15 @@ def render_kotlin(pages: list[LegalPage]) -> str:
         '    const val TOKEN_RELEASE_CHANNEL = "{{releaseChannel}}"',
         '    const val TOKEN_PLATFORM = "{{platform}}"',
         "",
-        "    val all: List<LegalDocument> = listOf(",
-    ]
-    for page in pages:
-        lines.append(f"        {_const_name(page.id)},")
-    lines += [
-        "    )",
-        "",
-        "    fun byId(id: String): LegalDocument? = all.firstOrNull { it.id == id }",
-        "",
         "    /** Joins the generated chunks back into one document body. */",
         "    private fun doc(vararg parts: String): String = parts.joinToString(\"\")",
         "",
+        # The per-page vals are emitted BEFORE `val all` on purpose. Kotlin
+        # initialises object members in source order, so a `val all = listOf(
+        # DOC_ABOUT, ...)` written above the declarations is a forward reference
+        # and the compiler rejects it with "Variable 'DOC_ABOUT' must be
+        # initialized". That error reads like a missing initialiser and is very
+        # easy to misdiagnose, so the ordering is pinned by a test.
     ]
     for page in pages:
         lines += [
@@ -306,7 +303,16 @@ def render_kotlin(pages: list[LegalPage]) -> str:
         for start in range(0, len(text), KOTLIN_CHUNK):
             lines.append(f'            "{kotlin_escape(text[start:start + KOTLIN_CHUNK])}",')
         lines += ["        ),", "    )", ""]
-    lines.append("}")
+
+    lines.append("    val all: List<LegalDocument> = listOf(")
+    for page in pages:
+        lines.append(f"        {_const_name(page.id)},")
+    lines += [
+        "    )",
+        "",
+        "    fun byId(id: String): LegalDocument? = all.firstOrNull { it.id == id }",
+        "}",
+    ]
     return "\n".join(lines).rstrip("\n") + "\n"
 
 

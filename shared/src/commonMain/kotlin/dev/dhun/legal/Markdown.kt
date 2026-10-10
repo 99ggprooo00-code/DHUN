@@ -5,9 +5,16 @@ package dev.dhun.legal
  *
  * Deliberately a hand-rolled subset rather than a dependency: the project ships
  * no runtime dependency it does not need, and the corpus is seven documents this
- * repository controls. What it understands is exactly what `legal/*.md` and the
- * spliced-in `LICENSE`, `LICENSES/*.txt`, `THIRD_PARTY.md` and `SECURITY.md`
- * actually contain — headings, paragraphs, bullet and numbered lists, quotes,
+ * repository controls. What it understands is exactly what the Markdown files
+ * under `legal` and the spliced-in `LICENSE`, `LICENSES`, `THIRD_PARTY.md` and
+ * `SECURITY.md` actually contain — headings, paragraphs, bullet and numbered
+ * lists, quotes,
+ *
+ * (Those globs are spelled out because Kotlin block comments NEST: a literal
+ * slash-star inside this KDoc opens a comment that no star-slash in this file
+ * closes, and the compiler then reports the whole file as one unclosed comment.)
+ *
+ * They contain headings, paragraphs, bullet and numbered lists, quotes,
  * GFM tables, thematic breaks and inline bold / code / strikethrough / links.
  *
  * It is pure (no Compose, no I/O) so [dev.dhun.legal.MarkdownParserTest] can pin

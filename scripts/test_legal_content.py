@@ -329,5 +329,177 @@ class PolicyTextIsHonest(unittest.TestCase):
         self.assertIn("Controls that do not exist", support)
 
 
+# --------------------------------------------------------------------------
+# Kotlin syntax invariants that cannot be checked here without a JVM
+# --------------------------------------------------------------------------
+#
+# CI compiles the shared module, but a compile failure costs a full pipeline run
+# and its log lives on a host that is not always reachable. Both bugs below were
+# real, both were caught only by CI, and both are cheap to pin in Python.
+
+
+def _kotlin_comment_state(src: str) -> tuple[int, int | None, bool]:
+    """Walk Kotlin source tracking nested comments, strings and raw strings.
+
+    Returns ``(comment depth at EOF, line a still-open comment started on,
+    raw string still open)``. Kotlin block comments nest, which is the whole
+    reason this exists: a literal slash-star inside a KDoc opens a comment that
+    nothing in the file closes.
+    """
+    i, n = 0, len(src)
+    depth = 0
+    opened: int | None = None
+    raw = False
+
+    def line(pos: int) -> int:
+        return src[:pos].count("\n") + 1
+
+    while i < n:
+        c, d = src[i], src[i + 1 : i + 2]
+        if raw:
+            if src[i : i + 3] == '"""':
+                raw = False
+                i += 3
+            else:
+                i += 1
+            continue
+        if depth > 0:
+            if c == "/" and d == "*":
+                depth += 1
+                i += 2
+            elif c == "*" and d == "/":
+                depth -= 1
+                if depth == 0:
+                    opened = None
+                i += 2
+            else:
+                i += 1
+            continue
+        if src[i : i + 3] == '"""':
+            raw = True
+            i += 3
+            continue
+        if c == '"':
+            i += 1
+            while i < n and src[i] != '"':
+                if src[i] == "\\":
+                    i += 1
+                i += 1
+            i += 1
+            continue
+        if c == "\'":
+            i += 1
+            while i < n and src[i] != "\'":
+                if src[i] == "\\":
+                    i += 1
+                i += 1
+            i += 1
+            continue
+        if c == "/" and d == "/":
+            while i < n and src[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and d == "*":
+            depth += 1
+            opened = line(i)
+            i += 2
+            continue
+        i += 1
+    return depth, opened, raw
+
+
+class TestGeneratedKotlinParses(unittest.TestCase):
+    """Guards the two syntax errors CI found in the first version of this file."""
+
+    KOTLIN_TARGET = gen.KOTLIN_OUT
+    MARKDOWN_KT = gen.KOTLIN_OUT.parent / "Markdown.kt"
+
+    def test_no_unclosed_block_comment_or_raw_string(self) -> None:
+        """A slash-star inside a KDoc swallows the rest of the file.
+
+        The first revision of Markdown.kt wrote ``legal/*.md`` and
+        ``LICENSES/*.txt`` in its header KDoc. Kotlin comments nest, so those two
+        opened comments nothing closed, the compiler reported "Unclosed comment"
+        at EOF, and MarkdownBlock/MarkdownParser became unresolved in
+        AboutLegalScreen.kt.
+        """
+        for path in (self.MARKDOWN_KT, self.KOTLIN_TARGET):
+            with self.subTest(path=path.name):
+                depth, opened, raw = _kotlin_comment_state(path.read_text(encoding="utf-8"))
+                self.assertEqual(depth, 0, f"{path.name}: block comment opened at line {opened} never closes")
+                self.assertFalse(raw, f"{path.name}: unterminated raw string")
+
+    def test_no_comment_contains_a_literal_slash_star(self) -> None:
+        """The direct cause of the bug above, checked over the whole corpus."""
+        offenders = []
+        for path in (self.MARKDOWN_KT, self.KOTLIN_TARGET):
+            src = path.read_text(encoding="utf-8")
+            depth, _, _ = 0, None, False
+            # Re-walk, recording any "/*" seen while already inside a comment.
+            i, n = 0, len(src)
+            while i < n:
+                c, d = src[i], src[i + 1 : i + 2]
+                if src[i : i + 3] == '"""':
+                    i += 3
+                    while i < n and src[i : i + 3] != '"""':
+                        i += 1
+                    i += 3
+                    continue
+                if depth == 0 and c == "/" and d == "/":
+                    while i < n and src[i] != "\n":
+                        i += 1
+                    continue
+                if c == "/" and d == "*":
+                    if depth > 0:
+                        offenders.append(f"{path.name}:{src[:i].count(chr(10)) + 1}")
+                    depth += 1
+                    i += 2
+                    continue
+                if c == "*" and d == "/":
+                    depth = max(0, depth - 1)
+                    i += 2
+                    continue
+                i += 1
+        self.assertEqual(offenders, [], f"nested slash-star inside a comment at {offenders}")
+
+    def test_val_all_is_declared_after_the_pages_it_lists(self) -> None:
+        """Kotlin initialises object members in source order.
+
+        The first revision emitted `val all = listOf(DOC_ABOUT, ...)` above the
+        `private val DOC_ABOUT = LegalDocument(...)` declarations. That is a
+        forward reference, and the compiler rejects it with "Variable 'DOC_ABOUT'
+        must be initialized" — which reads like a missing initialiser and is easy
+        to misdiagnose as a generator escaping bug.
+        """
+        lines = self.KOTLIN_TARGET.read_text(encoding="utf-8").split("\n")
+        decls = {
+            i: line.strip()
+            for i, line in enumerate(lines)
+            if line.strip().startswith("private val DOC_")
+        }
+        all_line = next(
+            (i for i, line in enumerate(lines) if line.strip().startswith("val all: List<LegalDocument>")),
+            None,
+        )
+        self.assertIsNotNone(all_line, "`val all` is missing from the generated object")
+        self.assertTrue(decls, "no per-page vals were emitted")
+        first_decl = min(decls)
+        self.assertGreater(
+            all_line,
+            first_decl,
+            f"`val all` is on line {all_line + 1} but the first DOC_ val is on line "
+            f"{first_decl + 1}; Kotlin would reject the forward reference",
+        )
+        # And every name `val all` lists must have a declaration.
+        block = lines[all_line : all_line + len(decls) + 4]
+        listed = [
+            b.strip().rstrip(",")
+            for b in block
+            if b.strip().startswith("DOC_")
+        ]
+        declared = {d.split(" ")[2] for d in decls.values()}
+        self.assertEqual(sorted(listed), sorted(declared))
+
+
 if __name__ == "__main__":
     unittest.main()

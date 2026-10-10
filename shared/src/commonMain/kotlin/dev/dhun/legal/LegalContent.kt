@@ -38,18 +38,6 @@ object LegalContent {
     const val TOKEN_RELEASE_CHANNEL = "{{releaseChannel}}"
     const val TOKEN_PLATFORM = "{{platform}}"
 
-    val all: List<LegalDocument> = listOf(
-        DOC_ABOUT,
-        DOC_PRIVACY,
-        DOC_TERMS,
-        DOC_OPEN_SOURCE_LICENSES,
-        DOC_THIRD_PARTY_NOTICES,
-        DOC_SUPPORT,
-        DOC_SECURITY_REPORTING,
-    )
-
-    fun byId(id: String): LegalDocument? = all.firstOrNull { it.id == id }
-
     /** Joins the generated chunks back into one document body. */
     private fun doc(vararg parts: String): String = parts.joinToString("")
 
@@ -151,4 +139,15 @@ object LegalContent {
         ),
     )
 
+    val all: List<LegalDocument> = listOf(
+        DOC_ABOUT,
+        DOC_PRIVACY,
+        DOC_TERMS,
+        DOC_OPEN_SOURCE_LICENSES,
+        DOC_THIRD_PARTY_NOTICES,
+        DOC_SUPPORT,
+        DOC_SECURITY_REPORTING,
+    )
+
+    fun byId(id: String): LegalDocument? = all.firstOrNull { it.id == id }
 }
