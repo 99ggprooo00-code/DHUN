@@ -1,8 +1,15 @@
 # Windows candidate — quick test
 
+> **Historical guide (2026-09 candidate era).** Current status as of 2026-10-10:
+> the rolling `test` release is a **private draft for repository collaborators**,
+> not a public download. The public Windows build is the
+> [`v1.00.001` pre-release](../releases/v1.00.001.md), which is unsigned and
+> experimental. Verify it against the `.sha256` file on the same release page.
+> The steps below describe the earlier candidate and are kept for the record.
+
 This is an **unsigned development MSI**, not a stable release. The repair
-code was merged in PR #30 and is now available through the rolling `test`
-release; branch artifacts can also be used when specifically identified. It includes Java; you do **not** need a JDK or an Android SDK.
+code was merged in PR #30 (2026-09-06). At the time of this guide it was
+available through the rolling `test` release; branch artifacts can also be used when specifically identified. It includes Java; you do **not** need a JDK or an Android SDK.
 Use only the MSI artifact from a **successful** package/sentinel run. A
 failed early candidate was withheld after its installer deleted test userdata;
 plain, unfinalized `packageMsi` output is not an approved update package.

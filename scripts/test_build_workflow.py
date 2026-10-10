@@ -84,6 +84,25 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("\"$(gh release view test --json isDraft --jq '.isDraft')\" != \"true\"", self.publish)
         self.assertNotIn("gh release edit test --draft=false", self.publish)
 
+    def test_legacy_release_purge_is_an_explicit_opt_in(self):
+        # The legacy dev releases are irreversible to delete. They may be removed
+        # only when the maintainer ticks a typed, default-off input on a manual
+        # publish. The rolling `test` draft keeps its by-design replacement.
+        inputs = self.text.split("  workflow_dispatch:\n", 1)[1].split("  pull_request:\n", 1)[0]
+        self.assertIn("      purge_legacy_dev_releases:", inputs)
+        block = inputs.split("      purge_legacy_dev_releases:", 1)[1]
+        self.assertIn("        type: boolean", block)
+        self.assertIn("        default: false", block)
+        purge = self.publish.split("      - name: Delete legacy dev releases", 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("if: ${{ inputs.purge_legacy_dev_releases }}", purge)
+        for tag in ("dev-v0.1.0", "dev-v0.1.1", "dev"):
+            self.assertIn(f"gh release delete {tag} --yes --cleanup-tag", purge)
+        self.assertIn("git push origin :refs/tags/dev", purge)
+        replace = self.publish.split("      - name: Replace the private rolling test draft", 1)[1].split("\n      - name:", 1)[0]
+        for tag in ("dev-v0.1.0", "dev-v0.1.1", "dev"):
+            self.assertNotIn(f"gh release delete {tag} ", replace)
+        self.assertIn("gh release delete test --yes --cleanup-tag", replace)
+
     def test_fixed_version_is_created_once_as_public_prerelease(self):
         self.assertIn("Create the fixed v1.00.001 public prerelease once", self.publish)
         self.assertIn("python scripts/stage_versioned_release.py", self.publish)

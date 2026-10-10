@@ -24,16 +24,55 @@ release/
 # Secrets/keys — never commit
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.pem
+*.key
 keystore.properties
 cookies.txt
+# Local environment files (commit a sanitized .env.example if one is ever needed)
+.env
+.env.*
+!.env.example
+# The committed Android test keystore is PUBLIC and documented in SECURITY.md.
+# It stays tracked; this exception only records that it is intentional.
+!app-android/keystores/dhun-test.p12
+
+# Kotlin compiler cache and JVM crash dumps
+.kotlin/
+*.hprof
+hs_err_pid*
 
 # OS
 .DS_Store
+._*
 Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Logs and editor leftovers
+*.log
+*.swp
+*~
+*.bak
+*.orig
 
 # Test artifacts
 /tests/fixtures/tmp/
+test-results/
+playwright-report/
+
+# Release binaries are built into out/ or dist/ and published as release assets,
+# never committed. The root-only /dist/ avoids hiding the tracked website/dist.
+*.apk
+*.aab
+*.msi
+/dist/
+
+# Node (no root package.json; website/ and app-web/ keep their own .gitignore)
+node_modules/
 
 # Python release-helper tests
 __pycache__/
+*.pyc
 agent-1-status.md

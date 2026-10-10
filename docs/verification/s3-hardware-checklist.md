@@ -1,6 +1,12 @@
 # S3 Hardware Verification Checklist
 
-> **Purpose:** Device-side acceptance for the current rolling `test` build at
+> **SUPERSEDED COPY (2026-10-10).** This is a dated snapshot for the rolling
+> `test` build of 2026-10-08 (ProductVersion 2.210.1). Its digests are historical
+> and must not be used to verify current files. The maintained checklist is
+> [`docs/runbooks/s3-hardware-checklist.md`](../runbooks/s3-hardware-checklist.md).
+> This copy is kept only until the maintainer approves its removal.
+
+> **Purpose (historical):** Device-side acceptance for the rolling `test` build at
 > `main@8a8d6c5adc536f34c8b677c9b20e5245747ed2e9`, published
 > **2026-10-08T11:50:38Z**. Universal APK: **18,405,859 B**; MSI:
 > **112,971,776 B**, ProductVersion **2.210.1**.

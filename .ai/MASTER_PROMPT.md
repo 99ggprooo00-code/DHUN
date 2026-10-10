@@ -166,7 +166,7 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
   signing is decided).
 - **Web:** production target still cut. ADR-008 was the narrow exception: one
   isolated B1 deployed-origin feasibility spike. That spike is now **complete
-  and BLOCKED** — the dependency-free probe in `web-spike/` is deployed at
+  and BLOCKED** — the dependency-free probe in `web-spike/` was deployed at (Superseded 2026-10-10: this URL returned 404 when checked. Pages moved to workflow deploy on 2026-10-08, and the probe is not in the website workflow's artifact.)
   `https://99ggprooo00-code.github.io/DHUN/web-spike/`, anonymous metadata was
   readable, and the player request was blocked before a readable response in the
   available Chromium-family browser; Firefox and Safari were unavailable (see
@@ -281,7 +281,7 @@ DHUN/
 │                               # jump lists, single-instance, packaging
 ├── tools/playback-probe/       # Phase 01 CLI harness — STILL the rot drill's probe
 │                               # (+ OfflineMain deterministic check, SmokeMain)
-├── web-spike/                  # ADR-008 B1 static probe (deployed; run BLOCKED); not a product target
+├── web-spike/                  # ADR-008 B1 static probe (run BLOCKED; not served since 2026-10-10); not a product target
 ├── tests/fixtures/             # captured InnerTube JSON for parser tests
 ├── scripts/                    # python packaging/CI/Web-spike contracts (55 tests)
 └── .github/workflows/          # ci.yml · test-release.yml · build-apk.yml ·

@@ -23,6 +23,16 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Repository cleanup and release hygiene (2026-10-10)
+
+- **Changed:** the manual `publish` job deletes the legacy `dev`, `dev-v0.1.0` and `dev-v0.1.1` releases only when the new `purge_legacy_dev_releases` input is ticked (default off). The rolling `test` draft replacement is unchanged.
+- **Changed:** `.gitignore` ignores private keys, env files, `*.apk`/`*.aab`/`*.msi`, root `/dist/`, logs and caches. No tracked file changed status.
+- **Added:** `scripts/test_repo_health.py` (Markdown links, secret patterns with a counted public allowlist, tracked keystores, OS and build debris, app-web dependency contract, probe-failure visibility, no workflow calling `scripts/publish.sh`). Runs in CI through the existing discovery step.
+- **Added:** `.github/pull_request_template.md` with the evidence labels and release-safety checks.
+- **Fixed (docs):** `app-web/README.md` test count (60 to 91); two broken links in `.ai/PROMPT_SEQUENCE.md`; `docs/verification/windows-candidate.md` now says the `test` release is private; the `THIRD_PARTY.md` vlcj licence row (GPL v3 per the 4.8.2 POM, not LGPL-2.1); `RELEASE-POLICY.md` status.
+- **Marked superseded (kept as history):** `docs/verification/s3-hardware-checklist.md` (a 2026-10-08 snapshot); the `.ai/HANDOFF_NEXT_SESSION.md` body.
+- **Not changed (needs maintainer approval):** `scripts/publish.sh`, `.pr_body.md`, `INTEGRATION.md`, `docs/verification/s3-hardware-checklist.md` removal; the `arena/37e5c8d8-dhun` branch.
+
 ### Merge-to-main no longer mutates releases (2026-10-10)
 
 - **Changed:** `test-release.yml` `publish` runs only on a manual dispatch from `main` with `build_only=false`. Before, every push to `main` (including each merge) deleted the `dev`, `dev-v0.1.0`, `dev-v0.1.1`, and `test` releases and recreated the private draft. Merges now build and test only.

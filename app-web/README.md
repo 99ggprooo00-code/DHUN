@@ -8,7 +8,7 @@ page says so on screen.
 
 ```bash
 node tools/serve.mjs 4173     # http://0.0.0.0:4173/
-npm test                      # 60 tests, no install, no network
+npm test                      # 91 tests, no install, no network
 node tools/build.mjs          # copies src/ → dist/ and checks the icons
 npm run gen:icons             # regenerate js/icons.js from DhunIcons.kt
 ```
@@ -68,7 +68,7 @@ src/css/tokens.css        the design system, mirrored
 src/css/app.css           chrome and screens — tokens only
 src/js/                   pure modules; main.js is the only file that touches the DOM
 src/js/data/              sample catalogue and sample LRC (both labelled)
-tests/                    node --test: nav, equalizer, lyrics, format, tokens, player, boot
+tests/                    node --test: nav, equalizer, lyrics, format, escaping, tokens, player, boot
 tools/                    serve, build, gen-icons
 ```
 

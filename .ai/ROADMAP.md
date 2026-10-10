@@ -623,7 +623,7 @@ here from the user-supplied verified state rather than assumed available.
 | Pages | ✅ success | run **37783499138**; build `built` with no error at exact commit `2a20024` |
 | Pages API | ✅ legacy / `main:/` / `built` | `https_enforced=true`; canonical front door renders the README |
 | Pages artifact | ⚠️ **exists but never inspected** | artifact **11552239018** (1,171,094 B); its archive redirects to an external blob host that was unavailable, so it is **not** browser evidence |
-| Probe on the canonical origin | ✅ deployed | `https://99ggprooo00-code.github.io/DHUN/web-spike/` serves probe revision `b1-v1` |
+| Probe on the canonical origin | ⚠️ not served now | Was `https://99ggprooo00-code.github.io/DHUN/web-spike/` (revision `b1-v1`) under legacy Pages. Returned 404 on 2026-10-10 after the workflow deploy. |
 
 ### Rolling `test` release at `2a20024`
 

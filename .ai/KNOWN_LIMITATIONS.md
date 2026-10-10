@@ -1,18 +1,44 @@
 # KNOWN_LIMITATIONS
 
+## 2026-10-10 — repository cleanup session `arena/29f9acf0-dhun` (base `main` `588f14f`)
+
+This entry is the current status for the items below. Older entries further down are history; where they conflict with this entry, this entry wins.
+
+**Verified facts (with evidence)**
+
+- **MSI install-over passed on a hosted Windows runner.** `main` run `38036231113`: `v1.00.001` (ProductVersion `3.61.1`) upgraded to `3.64.1`; per-user install, userdata and cache sentinels preserved; baseline SHA-256 `c298dfae…7bd1` matches the recorded CI digest. **Not tested:** playback, visuals, ordinary uninstall.
+- **Python suite: 335 OK** (`python3 -m unittest discover -s scripts -p 'test_*.py'`), baseline on `588f14f`.
+- **app-web: 91 pass, 0 fail** (`npm test`). The README previously said 60.
+- **Website build reproduces the committed `website/dist` byte-for-byte** from a fresh `npm ci` and `npm run build`. Node tests 41/41; `verify-minify`, `website_claims`, `website_quality` and `html-validate` pass.
+- **Release identity is unchanged:** `versionName` `1.00.001`, `versionCode` 6, matching `v1.00.001`. The next release (`1.00.002`, `versionCode` 7) changes only when it is actually cut.
+- **Public release `v1.00.001` is a pre-release and not Latest**; the `test` release is a private draft. Neither was modified in this session.
+
+**Changed in this session**
+
+- The manual publish path no longer deletes the legacy `dev`, `dev-v0.1.0` and `dev-v0.1.1` releases unless the typed input `purge_legacy_dev_releases` is ticked on that dispatch (default off). Covered by `test_legacy_release_purge_is_an_explicit_opt_in`.
+- `.gitignore` ignores keys, env files, `*.apk`/`*.aab`/`*.msi`, root `/dist/`, logs and caches. No tracked file changed status.
+
+**Open (not changed here)**
+
+- **Reviewer gate on publish is not configured.** The publish job needs a GitHub environment with required reviewers to be a real approval gate. This is a manual repository setting (see `docs/releases/RELEASE-POLICY.md`, rule 8). The `test` draft is still replaced on every manual publish, by design.
+- **Dependency advisories in the website build tree (9: 5 high, 4 moderate)**, all transitive under `@11ty/eleventy` 3.1.6. None has a patched release within the current majors; `npm audit fix --force` proposes a *downgrade* to `@11ty/eleventy` 0.6.0 and must not be run. See `.ai/DEPENDENCY_AUDIT.md`, 2026-10-10 entry.
+- `scripts/publish.sh` and `.pr_body.md` (stale), `docs/verification/s3-hardware-checklist.md` (superseded copy), `INTEGRATION.md` (historical coordinator file) and the `arena/37e5c8d8-dhun` branch are **awaiting your approval** for removal or move. See the cleanup report.
+- **`web-spike/` is not served.** `https://99ggprooo00-code.github.io/DHUN/web-spike/` returned 404 on 2026-10-10. Pages has been `build_type: workflow` since the 2026-10-08 deploy, and the website artifact does not include `web-spike/`. The B1 probe result below is historical. Whether to keep `web-spike/` as an archive is your decision.
+- Everything listed in the 2026-10-10 release-readiness entry below stays open, including the YouTube terms review, the production signing key, device testing, the public-asset digest check, `LYRICS_ENABLED`, and private vulnerability reporting.
+
 ## 2026-10-10 — release-readiness audit (session `arena/7884ea99-dhun`, base `6ebc45c`)
 
 Evidence: live `gh` API reads, public-download attempts, CI annotations, source reads. Full report in the session summary.
 
 - **Public assets not re-hashed here.** `objects.githubusercontent.com` (release CDN) is unreachable from the sandbox (TLS EOF). The API now returns `digest: null` for every asset; the prior session's digests match the CI annotations of run `38032631758` (`dhun-test*.apk`, `dhun-test.msi`), not an independent download.
-- **MSI install-over was SKIPPED on the main run (`38032631758`).** The job was green because the skip exited 0. Fixed on the branch: on `main` a skip now fails. Not yet executed on a hosted runner. The next `main` run is the first real test against the public `v1.00.001` MSI (`3.61.1`).
+- *(Superseded 2026-10-10 by the entry below.)* **MSI install-over was SKIPPED on the main run (`38032631758`).** The job was green because the skip exited 0. Fixed on the branch: on `main` a skip now fails. Not yet executed on a hosted runner. *(Superseded: run `38036231113` executed it on a hosted runner and passed; see the 2026-10-10 entry.)*
 - **Android release is a debug build signed with a public key.** `buildTypes.release` has no signing config and `isMinifyEnabled = false`. The public cert `CN=DHUN Test Build` (SHA-256 `d8e57ec6…468c3`) is committed with its private key.
 - **Private vulnerability reporting is disabled**, so `SECURITY.md` cannot offer a private channel yet.
 - **YouTube terms:** the fetched terms (page dated 2023-12-15) restrict downloading content and automated access without permission. Offline downloads and the unofficial client need legal review before any wider release.
 - **`LYRICS_ENABLED` has no reader**: lyrics requests (LRCLIB, YouTube) run on every track load regardless of the setting.
 - **Desktop About has no DHUN version**; Windows shows the installer sequence (`3.61.1`) as the product version.
 - **Local MSI builds without `-PdhunInstallerVersion`** use the fallback `1.0.6`, which is lower than the published `3.61.1` and would be refused as a downgrade.
-- **Not runnable in the audit sandbox:** JDK, Gradle distribution (`services.gradle.org`), Google Maven, `pwsh`, Android build-tools. Android and Windows builds were NOT rebuilt here; the Python suite (334), YAML parse, and the app-web tests were run.
+- **Not runnable in the audit sandbox:** JDK, Gradle distribution (`services.gradle.org`), Google Maven, `pwsh`, Android build-tools. Android and Windows builds were NOT rebuilt here; the Python suite (334), YAML parse, and the app-web tests were run. *(Superseded: the Python suite is 335 OK on `main` `588f14f`, per the 2026-10-10 cleanup entry.)*
 - **`publish.sh`** (repo root) rewrites `origin` to SSH and pushes `main` directly. Not part of the release path; a bypass risk.
 
 ## 2026-10-09 — current UI/navigation defects and verification state
