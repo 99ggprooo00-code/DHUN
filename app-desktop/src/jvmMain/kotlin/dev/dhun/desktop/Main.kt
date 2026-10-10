@@ -60,6 +60,7 @@ import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
+import dev.dhun.legal.DhunAppInfo
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DhunAppShell
@@ -595,6 +596,7 @@ fun main(args: Array<String>) {
                         connectivity = koin.get(),
                         downloadManager = koin.get(),
                         equalizerSession = player.equalizer,
+                        appInfo = remember { desktopAppInfo() },
                     )
                 }
             }
@@ -608,6 +610,29 @@ fun main(args: Array<String>) {
         // second native Swing window during teardown.
         System.exit(1)
     }
+}
+
+/**
+ * The About page's build metadata on the JVM desktop.
+ *
+ * The version is the MSI ProductVersion that packaging passes as
+ * `-Ddhun.installer.version` (see `app-desktop/build.gradle.kts`). Note what
+ * that is and is not: an **installer sequence number**, not DHUN's semantic
+ * version, and it does not match Android's `versionName` today. Showing it under
+ * that label is accurate; relabelling it to look like the Android version would
+ * not be.
+ *
+ * Run from source the property is absent, so the channel says so rather than
+ * inventing a release.
+ */
+private fun desktopAppInfo(): DhunAppInfo {
+    val installer = System.getProperty("dhun.installer.version")
+    return DhunAppInfo(
+        versionName = installer ?: DhunAppInfo.UNKNOWN,
+        versionCode = null,
+        releaseChannel = if (installer != null) "packaged installer" else "run from source",
+        platform = "Windows",
+    )
 }
 
 private const val SEEK_STEP_MS = 5_000L

@@ -41,6 +41,14 @@ object DhunSpacing {
     /** Compact Now Playing transport row: hugs the 48dp targets + 72dp play disc. */
     val playerTransportHeight = 72.dp
     val playerContentMaxWidth = 720.dp
+    /**
+     * Long-form reading measure for the legal pages. Narrower than the player's
+     * 720dp on purpose: ~65–75 characters is where a column of body copy stops
+     * forcing the eye back to the wrong line. Only a ceiling — a phone keeps its
+     * full width, and the value is what stops a maximised desktop window from
+     * turning a privacy policy into a 1600dp line.
+     */
+    val legalContentMaxWidth = 680.dp
     val playerTransportMaxWidth = 400.dp
     /**
      * Largest sharp cover in Now Playing. The hero first consumes the actual
