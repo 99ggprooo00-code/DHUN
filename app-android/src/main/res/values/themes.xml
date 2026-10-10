@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launch theme: a real window background so API < 31 paints something
+         before any ComposeView exists. Theme.Material.NoActionBar left the
+         first frame to Compose 1.8, whose GraphicsLayer path references
+         android.graphics.RenderEffect (API 31). -->
+    <style name="Theme.Dhun.Launch" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ic_launcher_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+</resources>

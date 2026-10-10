@@ -13,6 +13,9 @@
 
     <!-- Accessibility (Phase 15): announced by TalkBack, never shown as UI text. -->
     <string name="a11y_connecting">Initializing audio engine</string>
+    <string name="launch_connecting_status">Initializing audio engine…</string>
+    <string name="launch_failed_title">Playback failed to start</string>
+    <string name="launch_retry">Retry</string>
 
     <!-- Widgets (candidate 26): picker description. Quick Play is the only
          widget DHUN ships — the Now Playing entry was deleted with it. -->

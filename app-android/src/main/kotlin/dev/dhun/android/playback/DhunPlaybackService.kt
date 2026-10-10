@@ -116,13 +116,15 @@ class DhunPlaybackService : MediaSessionService() {
     }
 
     override fun onCreate() {
-        super.onCreate()
         // ActivityThread.handleCreateService rethrows anything from onCreate
-        // as RuntimeException and kills the process. The activity's
-        // MediaController try/catch never runs — that is the "installs, dies
-        // in the first second" launch crash on API < 31. Degrade to a
-        // session-less service; MainActivity then falls back to a local
-        // player instead of taking the whole app with it.
+        // as RuntimeException and kills the process. Catch super too: a
+        // MediaSessionService stub failure must not take the activity with it.
+        try {
+            super.onCreate()
+        } catch (t: Throwable) {
+            android.util.Log.e(TAG, "MediaSessionService.onCreate failed", t)
+            return
+        }
         try {
             startPlaybackEngine()
         } catch (t: Throwable) {
