@@ -10,7 +10,8 @@ $logs = Join-Path $repository 'out/installer-check'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
 $baselineDir = Join-Path $env:RUNNER_TEMP 'dhun-msi-baseline'
 New-Item -ItemType Directory -Force -Path $baselineDir | Out-Null
-$baseline = Join-Path $baselineDir 'dhun-test.msi'
+$baseline = $null
+$baselineSidecar = $null
 $candidatePath = (Resolve-Path -LiteralPath $Candidate).Path
 
 function Invoke-MsiCheck {
@@ -35,35 +36,47 @@ function Invoke-MsiCheck {
     throw "msiexec $Operation failed with exit $code; log: $Log"
 }
 
-# Read-only download of the existing rolling baseline; never change a release.
-# Grade this fetch instead of trusting it. A release this job's read-scoped token
-# cannot see (absent, still a draft, or being replaced mid-run) is a
-# release-state problem, not a defect in the candidate: the MSI still builds,
-# stages and uploads, and the publish job -- the workflow's only contents:write --
-# can still repair the release. That is a SKIP, never a pass: on this path the
-# candidate is build-verified only and the install-over path is NOT verified.
-# A fetch that succeeds and then contradicts itself (checksum mismatch,
-# mismatched upgrade identity, not-newer version) still fails the run below.
-gh release download test --repo $env:GITHUB_REPOSITORY --pattern dhun-test.msi --pattern dhun-test.msi.sha256 --dir $baselineDir
-$downloadExit = $LASTEXITCODE
+# Prefer the fixed public versioned baseline. On the first release run it does
+# not exist yet, so the still-public previous `test` release is the fallback.
+# Later, `test` is a private draft and this read-scoped job uses v1.00.001.
+# Never mutate a release here. An absent/draft/unreadable baseline is a SKIP,
+# never a pass; successful but contradictory bytes/checksums still fail below.
+$baselineTags = @('v1.00.001', 'test')
+$baselineReleaseTag = $null
+$downloadFailures = @()
+foreach ($tag in $baselineTags) {
+    $assetName = if ($tag -eq 'v1.00.001') { 'dhun-v1.00.001.msi' } else { 'dhun-test.msi' }
+    $assetPath = Join-Path $baselineDir $assetName
+    $sidecarPath = "$assetPath.sha256"
+    Remove-Item -LiteralPath $assetPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $sidecarPath -Force -ErrorAction SilentlyContinue
+    gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $assetName --pattern "$assetName.sha256" --dir $baselineDir
+    $downloadExit = $LASTEXITCODE
+    if ($downloadExit -ne 0) {
+        $downloadFailures += "${tag}: gh release download exited $downloadExit (absent, private/draft, or not readable)"
+        continue
+    }
+    if (-not (Test-Path -LiteralPath $assetPath) -or -not (Test-Path -LiteralPath $sidecarPath)) {
+        throw "gh release download $tag reported success but the baseline MSI/checksum is missing"
+    }
+    if ([string]::IsNullOrWhiteSpace((Get-Content -LiteralPath $sidecarPath -Raw))) {
+        throw "The $tag baseline checksum sidecar is empty"
+    }
+    $baseline = $assetPath
+    $baselineSidecar = $sidecarPath
+    $baselineReleaseTag = $tag
+    break
+}
 $baselineReason = $null
-if ($downloadExit -ne 0) {
-    $baselineReason = "gh release download test exited $downloadExit (the release is absent, still a draft, or being replaced)"
-} elseif (-not (Test-Path -LiteralPath $baseline) -or -not (Test-Path -LiteralPath (Join-Path $baselineDir 'dhun-test.msi.sha256'))) {
-    $baselineReason = 'gh release download test reported success but the baseline MSI/checksum is missing'
-} elseif ([string]::IsNullOrWhiteSpace((Get-Content -LiteralPath (Join-Path $baselineDir 'dhun-test.msi.sha256') -Raw))) {
-    $baselineReason = 'the published baseline checksum sidecar is empty'
+if (-not $baselineReleaseTag) {
+    $baselineReason = "No readable MSI baseline. Tried: $($downloadFailures -join '; ')"
 }
 if ($baselineReason) {
-    $releaseState = 'not readable by this read-scoped token'
-    try {
-        $seen = (gh release view test --repo $env:GITHUB_REPOSITORY --json tagName,isDraft,publishedAt 2>$null | Out-String).Trim()
-        if ($seen) { $releaseState = $seen }
-    } catch { }
-    Write-Host "::warning title=MSI install-over SKIPPED::${baselineReason}. Rolling-release state as seen here: ${releaseState}. The candidate MSI is build-verified only - the in-place upgrade, sentinel preservation, future-upgrade guard and uninstall checks did NOT run."
+    Write-Host "::warning title=MSI install-over SKIPPED::${baselineReason}. The candidate MSI is build-verified only - the in-place upgrade, sentinel preservation, future-upgrade guard and uninstall checks did NOT run."
     Write-Host '::notice title=MSI install-over NOT RUN (build-verified only)::No readable baseline, so no install or uninstall was attempted. Never report this run as an install-over pass.'
     @{
         sourceSha = $env:GITHUB_SHA
+        baselineTag = 'unavailable (baseline not readable)'
         baselineVersion = 'unavailable (baseline not readable)'
         baselineSha256 = 'unavailable (baseline not readable)'
         candidateVersion = 'unavailable (check skipped before reading)'
@@ -78,7 +91,7 @@ if ($baselineReason) {
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $logs 'result.json') -Encoding utf8
     exit 0
 }
-$expectedHash = ((Get-Content -LiteralPath (Join-Path $baselineDir 'dhun-test.msi.sha256') -Raw).Trim() -split '\s+')[0]
+$expectedHash = ((Get-Content -LiteralPath $baselineSidecar -Raw).Trim() -split '\s+')[0]
 $baselineHash = (Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($baselineHash -ne $expectedHash.ToLowerInvariant()) { throw 'Published baseline MSI checksum did not match' }
 $old = Get-DhunMsiProperties -Path $baseline
@@ -108,7 +121,7 @@ try {
     if (-not (Test-Path -LiteralPath $cacheSentinel) -or [IO.File]::ReadAllText($cacheSentinel) -ne 'preserve-cache') {
         throw 'In-place MSI upgrade removed/changed existing cache data'
     }
-    Write-Host "::notice title=MSI upgrade smoke PASS::Hosted Windows: $($old['ProductVersion']) -> $($new['ProductVersion']); per-user install and userdata/cache sentinels preserved. Baseline SHA256=$baselineHash. App playback/visuals not tested."
+    Write-Host "::notice title=MSI upgrade smoke PASS::Hosted Windows: $($baselineReleaseTag) $($old['ProductVersion']) -> $($new['ProductVersion']); per-user install and userdata/cache sentinels preserved. Baseline SHA256=$baselineHash. App playback/visuals not tested."
 
     # Exercise the installed candidate's future-upgrade removal path too.
     # This is the same public flag RemoveExistingProducts gives the old MSI;
@@ -127,6 +140,7 @@ try {
     Write-Host '::notice title=MSI uninstall smoke PASS::Hosted Windows uninstall removed test userdata. No app launch, audio or visual acceptance claimed.'
     @{
         sourceSha = $env:GITHUB_SHA
+        baselineTag = $baselineReleaseTag
         baselineVersion = $old['ProductVersion']
         baselineSha256 = $baselineHash
         candidateVersion = $new['ProductVersion']

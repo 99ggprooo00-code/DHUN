@@ -276,7 +276,9 @@ class PublishingRunbook(unittest.TestCase):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         section = readme.split("## Website", 1)[1].split("\n## ", 1)[0]
         if "99ggprooo00-code.github.io/DHUN" in section:
+            self.assertIn("build_type: workflow", section)
             self.assertIn("legacy", section.lower())
+            self.assertIn("docs/runbooks/publishing-the-site.md", section)
 
 
 class BrowserHarnessSurvivesAndDiagnoses(unittest.TestCase):

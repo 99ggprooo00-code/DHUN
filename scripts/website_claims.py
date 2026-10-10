@@ -17,8 +17,8 @@ Three checks:
    disclosures, each in an element that declares itself with a `data-caveat`
    attribute so an empty element cannot satisfy the rule.
 3. `check_no_baked_digests` — no SHA-256 and no byte size may be hard-coded in
-   the built pages or the site sources. The rolling `test` release is replaced
-   on every push to `main`, so its bytes change; the site links by URL only.
+   the built pages or the site sources. Release assets are linked by their
+   release page; the site never embeds checksums or byte sizes.
 
 Run directly for a report:  python3 scripts/website_claims.py [dist-dir]
 """
@@ -174,7 +174,7 @@ def forbidden_claim_violations(pages: dict[str, str]) -> list[str]:
 # caveat key -> phrases, at least one of which must appear inside the element
 # that carries data-caveat="<key>" on the front page.
 REQUIRED_CAVEATS: dict[str, tuple[str, ...]] = {
-    "rolling-unverified": ("rolling unverified development build",),
+    "public-unverified": ("unverified public pre-release",),
     "borrowed-time": ("borrowed time",),
     "hardware-gates-open": ("hardware gates still open",),
 }

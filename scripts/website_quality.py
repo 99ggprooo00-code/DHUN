@@ -525,10 +525,9 @@ def copy_hygiene_violations(dist: pathlib.Path) -> list[str]:
 # The user's direction for this session: downloads are not the website's
 # business. Made checkable rather than remembered, in two parts.
 #
-# 1. No page may link a release *asset*. A direct link to dhun-test.apk implies
-#    "this build is for you, now"; the rolling test build is unverified and
-#    replaced on every merge, so the site points at the release page instead,
-#    where the warning and the files live together.
+# 1. No page may link a release *asset*. A direct link to an APK or MSI
+#    implies "this build is for you, now" and bypasses its installation
+#    warnings, so the site points at the release page instead.
 BINARY_LINK = re.compile(
     r'href\s*=\s*"[^"]*?(?:/releases/download/[^"]*|\.(?:apk|msi|aab|dmg|exe|deb|rpm|zip|tar\.gz|sha256))"',
     re.I,
@@ -594,9 +593,8 @@ def claim_traceability_violations(dist: pathlib.Path) -> list[str]:
 def stale_fact_violations(dist: pathlib.Path) -> list[str]:
     """No app version, release identity or date may be printed without a source.
 
-    The site describes a project whose artifacts are replaced on every push to
-    `main`. A version string or a date written into the copy is wrong within
-    days and nothing would catch it, so the copy carries none: facts that could
+    A version string or a date written into the copy can become misleading
+    without anything catching it, so the copy carries none: facts that could
     rot are either absent or derived from a checked source at build time. If a
     value is genuinely derivable, add it to the allowlist below with the source
     named in the comment — an unexplained entry is how this rule would stop

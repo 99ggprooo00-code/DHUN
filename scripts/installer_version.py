@@ -1,4 +1,4 @@
-"""Internal MSI version for the rolling release; public tag/asset names stay `test`.
+"""Internal MSI version sequence shared by rolling and fixed versioned releases.
 
 Windows compares only three numeric ProductVersion fields. Every workflow run
 must outrank every attempt of the previous run; every rerun must also upgrade.
