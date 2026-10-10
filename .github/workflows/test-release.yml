@@ -16,6 +16,11 @@ on:
         type: boolean
         required: true
         default: false
+      purge_legacy_dev_releases:
+        description: Irreversibly delete the legacy dev, dev-v0.1.0 and dev-v0.1.1 releases and tags. Publish path only. Leave unticked unless approved for this run.
+        type: boolean
+        required: true
+        default: false
   pull_request:
     branches: [main]
   push:
@@ -224,7 +229,11 @@ jobs:
             exit 1
           fi
 
-      - name: Replace the private rolling test draft
+      # Irreversible. Deletes the legacy dev releases and their tags, so it runs
+      # only when the maintainer ticks purge_legacy_dev_releases on this dispatch
+      # (default off). Keep it in its own step so the default path never reaches it.
+      - name: Delete legacy dev releases (explicit opt-in only)
+        if: ${{ inputs.purge_legacy_dev_releases }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -233,6 +242,13 @@ jobs:
           gh release delete dev-v0.1.1 --yes --cleanup-tag || true
           gh release delete dev --yes --cleanup-tag || true
           git push origin :refs/tags/dev || true
+
+      # The private rolling draft is replaced on every manual publish by design.
+      - name: Replace the private rolling test draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
           gh release delete test --yes --cleanup-tag || true
           git push origin :refs/tags/test || true
 
