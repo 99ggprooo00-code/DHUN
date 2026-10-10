@@ -13,7 +13,7 @@ GPL-3.0-compatible. Reused code gets: project, file, license, commit, date.
 | vlcj (+ libVLC, LGPL-2.1) | LGPL-2.1 | desktop playback (dynamic link) | Phase 04 |
 | SQLDelight | Apache-2.0 | persistence | Phase 05 |
 | Ktor | Apache-2.0 | networking | Phase 02 |
-| OkHttp (via `ktor-client-okhttp`, Android download transport) | Apache-2.0 | file downloads on Android | 2026-09-21 |
+| OkHttp (via `ktor-client-okhttp`, Android HTTP) | Apache-2.0 | file downloads and metadata (InnerTube / LRCLIB) on Android; CIO remains desktop-only | 2026-09-21 |
 | InnerTune / OuterTune / RiMusic / ViMusic | GPL-3.0 | **pattern reference only** — seamless radio (`startRadioSeamlessly`: trim-around-playing + append), gapless queue mutation, OkHttp+Range download recipe; read in place via the GitHub API, **no fork, no vendored copy**. DHUN's fixes are fresh implementations with attribution comments. | research 2026-09-21 |
 | Koin | Apache-2.0 | DI | Phase 03 |
 | Jetpack Compose / activity-compose | Apache-2.0 | Android UI | Phase 03 |

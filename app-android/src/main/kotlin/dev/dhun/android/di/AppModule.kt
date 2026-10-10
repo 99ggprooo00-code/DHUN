@@ -18,6 +18,7 @@ import dev.dhun.download.DownloadStorage
 import dev.dhun.download.FileDownloadManager
 import dev.dhun.download.KtorStreamDownloader
 import dev.dhun.download.createAndroidDownloadHttpClient
+import dev.dhun.download.createAndroidMetadataHttpClient
 import dev.dhun.extraction.OfflineFirstStreamResolver
 import dev.dhun.extraction.OwnClientStreamResolver
 import dev.dhun.extraction.StreamResolver
@@ -33,6 +34,7 @@ import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.lyrics.YouTubeLyricsSource
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
+import io.ktor.client.HttpClient
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +49,12 @@ import org.koin.dsl.module
  * VISIONOS, then TVHTML5 — no yt-dlp on Android.
  */
 val appModule = module {
-    single { InnerTubeClient() }
+    // One OkHttp client for metadata (InnerTube + LRCLIB). CIO is the
+    // commonMain default and is fine on desktop; on Android it is
+    // constructed while DhunPlaybackService.onCreate builds the stream
+    // cache — an engine init failure there is process death on API < 31.
+    single<HttpClient> { createAndroidMetadataHttpClient() }
+    single { InnerTubeClient(get()) }
     single<StreamResolver> { OwnClientStreamResolver(get()) }
     // ADR-006: offline-first playback — a COMPLETED persistent download
     // resolves to its local file; otherwise resolve over the network chain.
@@ -147,7 +154,7 @@ val appModule = module {
     }
 
     // Phase 11 lyrics — cache → YTM → LRCLIB
-    single { LrcLibSource() }
+    single { LrcLibSource(get()) }
     single { YouTubeLyricsSource(get()) }
     single {
         val data: DataLayer = get()

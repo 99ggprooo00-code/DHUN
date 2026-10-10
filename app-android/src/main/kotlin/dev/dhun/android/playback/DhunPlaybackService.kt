@@ -116,9 +116,29 @@ class DhunPlaybackService : MediaSessionService() {
     }
 
     override fun onCreate() {
-        super.onCreate()
+        // ActivityThread.handleCreateService rethrows anything from onCreate
+        // as RuntimeException and kills the process. Catch super too: a
+        // MediaSessionService stub failure must not take the activity with it.
+        try {
+            super.onCreate()
+        } catch (t: Throwable) {
+            android.util.Log.e(TAG, "MediaSessionService.onCreate failed", t)
+            return
+        }
+        try {
+            startPlaybackEngine()
+        } catch (t: Throwable) {
+            android.util.Log.e(TAG, "playback engine failed to start — session unavailable", t)
+            mediaSession = null
+        }
+    }
+
+    private fun startPlaybackEngine() {
         // A corrupt cache dir makes SimpleCache throw — degrade to direct
         // streaming instead of killing the service (and with it all audio).
+        // streamCache is resolved first and constructs InnerTube; if THAT
+        // throws, retrying with the same lazy would throw again, so the
+        // outer onCreate catch is the backstop.
         val player = try {
             PlaybackGraph.buildExoPlayer(this, streamCache, audioCache, downloads)
         } catch (t: Throwable) {
@@ -141,16 +161,22 @@ class DhunPlaybackService : MediaSessionService() {
      */
     private fun startMediaForeground() {
         val session = mediaSession ?: return
-        ensureChannel()
-        val notification = buildMediaNotification(session)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            ensureChannel()
+            val notification = buildMediaNotification(session)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (t: Throwable) {
+            // Missing POST_NOTIFICATIONS, OEM startForeground policy, or a
+            // MediaStyle that the platform rejects must not kill onCreate.
+            android.util.Log.e(TAG, "startForeground failed — service stays background", t)
         }
     }
 
@@ -182,10 +208,11 @@ class DhunPlaybackService : MediaSessionService() {
             // (verified by the compiler); MediaStyle + the mediaPlayback
             // FGS type carry the media semantics.
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setStyle(
-                MediaStyleNotificationHelper.MediaStyle(session)
-                    .setShowActionsInCompactView(0, 1, 2),
-            )
+            // No compact-view action indices: this builder adds no actions
+            // (the MediaStyle session is what System UI uses for transport).
+            // setShowActionsInCompactView(0, 1, 2) with zero actions has
+            // thrown on older MediaStyle implementations.
+            .setStyle(MediaStyleNotificationHelper.MediaStyle(session))
             .build()
     }
 

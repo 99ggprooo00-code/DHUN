@@ -12,40 +12,32 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
+import android.widget.Button
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.media3.session.MediaController
@@ -64,7 +56,6 @@ import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
-import dev.dhun.download.DownloadManager
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.player.PlayerViewModel
@@ -81,6 +72,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -123,16 +115,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lastSavedState = savedInstanceState
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
+        runCatching {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = false
+                isAppearanceLightNavigationBars = false
+            }
+            @Suppress("DEPRECATION")
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
         }
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         handleShortcutIntent(intent)
         requestNotificationPermissionIfNeeded()
-        connectWithFallback()
         // S4: restore the persisted theme/accent before first composition so
         // the launch frame already carries the user's appearance. Best-effort:
         // a corrupt row falls back to dark+brand inside applyPersistedAppearance,
@@ -144,6 +139,40 @@ class MainActivity : ComponentActivity() {
             }
             DhunAppearance.applyPersistedAppearance(themeId, accentId)
         }
+        // Views first — Compose 1.8's Android GraphicsLayer references
+        // android.graphics.RenderEffect (API 31). On API 29/30 that class
+        // load during the first Compose frame is a process death that looks
+        // like "installs, never opens". The connecting layout is a normal
+        // View hierarchy so Android 10 can paint DHUN before we touch Compose.
+        showConnectingUi()
+        activityScope.launch {
+            connectState.collect { ui ->
+                when (ui) {
+                    ConnectUi.Connecting -> showConnectingUi()
+                    is ConnectUi.Ready -> showReadyUi(ui)
+                    is ConnectUi.Failed -> showFailedUi(ui.message)
+                }
+            }
+        }
+        connectWithFallback()
+    }
+
+    private fun showConnectingUi() {
+        setContentView(R.layout.activity_connecting)
+        findViewById<TextView>(R.id.connecting_version).text = "v${appVersionName()}"
+    }
+
+    private fun showFailedUi(message: String) {
+        setContentView(R.layout.activity_launch_failed)
+        findViewById<TextView>(R.id.launch_failed_message).text = message
+        findViewById<Button>(R.id.launch_retry).setOnClickListener {
+            connectState.value = ConnectUi.Connecting
+            connectWithFallback()
+        }
+    }
+
+    private fun showReadyUi(ready: ConnectUi.Ready) {
+        try {
         setContent {
             DhunTheme {
                 // Music-app back behavior: FullPlayer collapses first, then
@@ -156,18 +185,14 @@ class MainActivity : ComponentActivity() {
                 currentNav = nav
                 BackHandler { if (!nav.onBack()) moveTaskToBack(true) }
 
-                val ui by connectState.collectAsState()
                 val shortcut by pendingShortcut.collectAsState()
                 val showBatteryRationale by batteryRationaleVisible.collectAsState()
                 val koin = GlobalContext.get()
 
-                LaunchedEffect(ui, shortcut) {
+                LaunchedEffect(shortcut) {
                     val action = shortcut ?: return@LaunchedEffect
-                    if (ui !is ConnectUi.Ready) return@LaunchedEffect
                     when (action) {
                         ShortcutAction.NOW_PLAYING -> {
-                            // Dynamic shortcut: land directly in the
-                            // FullPlayer for the current queue.
                             nav.playerExpanded = true
                         }
                         ShortcutAction.SEARCH -> {
@@ -177,10 +202,6 @@ class MainActivity : ComponentActivity() {
                             nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = false)
                         }
                         ShortcutAction.RESUME -> {
-                            // Restore is launched during attach; give it a
-                            // short main-scope window before resuming the
-                            // paused queue. If there is no saved queue this is
-                            // a harmless no-op in the player implementation.
                             delay(500L)
                             player?.let { p ->
                                 if (p.state.value !is PlaybackState.Playing) p.playPause()
@@ -190,73 +211,58 @@ class MainActivity : ComponentActivity() {
                     pendingShortcut.value = null
                 }
 
-                when (val s = ui) {
-                    is ConnectUi.Connecting -> ConnectingScreen(
-                        log = connectLog.collectAsState().value,
-                        version = appVersionName(),
-                    )
-                    is ConnectUi.Ready -> Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .windowInsetsPadding(WindowInsets.safeDrawing),
-                    ) {
-                        player?.let { p ->
-                            val homeViewModel: HomeViewModel = koin.get()
-                            val searchViewModel: SearchViewModel = koin.get()
-                            val dataLayer: DataLayer = koin.get()
-                            val provider: MusicProvider = koin.get()
-                            val lyricsRepository: LyricsRepository = koin.get()
-                            val playerViewModel = androidx.compose.runtime.remember(p) {
-                                PlayerViewModel(
-                                    player = p,
-                                    provider = provider,
-                                    scope = activityScope,
-                                    radioSession = koin.get(),
-                                    persistence = persistence,
-                                    lyricsRepository = lyricsRepository,
-                                )
-                            }
-
-                            DhunAppShell(
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.safeDrawing),
+                ) {
+                    player?.let { p ->
+                        val homeViewModel: HomeViewModel = koin.get()
+                        val searchViewModel: SearchViewModel = koin.get()
+                        val dataLayer: DataLayer = koin.get()
+                        val provider: MusicProvider = koin.get()
+                        val lyricsRepository: LyricsRepository = koin.get()
+                        val playerViewModel = androidx.compose.runtime.remember(p) {
+                            PlayerViewModel(
                                 player = p,
-                                homeViewModel = homeViewModel,
-                                searchViewModel = searchViewModel,
-                                playerViewModel = playerViewModel,
                                 provider = provider,
-                                dataLayer = dataLayer,
-                                nav = nav,
-                                isDesktop = false,
-                                connectivity = koin.get(),
-                                downloadManager = koin.get(),
-                                equalizerSession = koin.get(),
+                                scope = activityScope,
+                                radioSession = koin.get(),
+                                persistence = persistence,
+                                lyricsRepository = lyricsRepository,
                             )
                         }
-                        s.reason?.let { reason ->
-                            Surface(
-                                color = DhunColors.errorContainer,
-                                modifier = Modifier
-                                    .align(Alignment.TopCenter)
-                                    .fillMaxWidth()
-                                    // TalkBack announces the degraded playback
-                                    // mode when this banner appears.
-                                    .semantics { liveRegion = LiveRegionMode.Polite },
-                            ) {
-                                Text(
-                                    reason,
-                                    fontSize = DhunTypographyTokens.labelSmall.fontSize,
-                                    color = DhunColors.warning,
-                                    modifier = Modifier.padding(DhunSpacing.xsPlus),
-                                )
-                            }
+
+                        DhunAppShell(
+                            player = p,
+                            homeViewModel = homeViewModel,
+                            searchViewModel = searchViewModel,
+                            playerViewModel = playerViewModel,
+                            provider = provider,
+                            dataLayer = dataLayer,
+                            nav = nav,
+                            isDesktop = false,
+                            connectivity = koin.get(),
+                            downloadManager = koin.get(),
+                            equalizerSession = koin.get(),
+                        )
+                    }
+                    ready.reason?.let { reason ->
+                        Surface(
+                            color = DhunColors.errorContainer,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .semantics { liveRegion = LiveRegionMode.Polite },
+                        ) {
+                            Text(
+                                reason,
+                                fontSize = DhunTypographyTokens.labelSmall.fontSize,
+                                color = DhunColors.warning,
+                                modifier = Modifier.padding(DhunSpacing.xsPlus),
+                            )
                         }
                     }
-                    is ConnectUi.Failed -> FailureScreen(
-                        message = s.message,
-                        onRetry = {
-                            connectState.value = ConnectUi.Connecting
-                            connectWithFallback()
-                        },
-                    )
                 }
 
                 if (showBatteryRationale) {
@@ -293,6 +299,10 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+        } catch (t: Throwable) {
+            Log.e(TAG, "Compose ready UI failed", t)
+            showFailedUi(t.toDhunStyleMessage().ifBlank { t.javaClass.simpleName })
         }
     }
 
@@ -484,87 +494,5 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "DHUN"
         private const val MAX_CONNECT_ATTEMPTS = 3
         private var batteryExemptionRequested = false
-    }
-}
-
-/* ---------------- screens ---------------- */
-
-@Composable
-private fun ConnectingScreen(log: List<String>, version: String) {
-    // Consumer splash: brand + indeterminate indicator + one static status
-    // line. The raw attempt/log lines stay in Logcat (via logLine) — they
-    // read as a terminal on screen and never ship to users.
-    val connectingDescription = stringResource(R.string.a11y_connecting)
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing),
-    ) {
-        Column(
-            modifier = Modifier.align(Alignment.Center),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                "DHUN",
-                fontSize = DhunTypographyTokens.hero.fontSize,
-                fontWeight = FontWeight.Bold,
-                color = DhunColors.textPrimary,
-            )
-            Spacer(modifier = Modifier.height(DhunSpacing.xl))
-            CircularProgressIndicator(
-                color = DhunColors.accent,
-                strokeWidth = DhunSpacing.progressStroke,
-                modifier = Modifier.semantics {
-                    // Progress spinners have no text node — give screen
-                    // readers something to announce.
-                    contentDescription = connectingDescription
-                },
-            )
-            Spacer(modifier = Modifier.height(DhunSpacing.lg))
-            Text(
-                "Initializing audio engine…",
-                fontSize = DhunTypographyTokens.bodySmall.fontSize,
-                color = DhunColors.textTertiary,
-            )
-        }
-        Text(
-            text = "v$version",
-            fontSize = DhunTypographyTokens.labelSmall.fontSize,
-            color = DhunColors.textHint,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = DhunSpacing.lg),
-        )
-    }
-}
-
-@Composable
-private fun FailureScreen(message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(DhunSpacing.xxl),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("DHUN", fontSize = DhunTypographyTokens.hero.fontSize, fontWeight = FontWeight.Bold)
-        Text(
-            "Playback failed to start",
-            color = DhunColors.error,
-            modifier = Modifier
-                .padding(top = DhunSpacing.md)
-                .semantics { heading() },
-        )
-        Text(
-            message,
-            fontSize = DhunTypographyTokens.bodySmall.fontSize,
-            color = DhunColors.textTertiary,
-            modifier = Modifier.padding(top = DhunSpacing.sm),
-        )
-        Button(onClick = onRetry, modifier = Modifier.padding(top = DhunSpacing.xl)) {
-            Text("Retry")
-        }
     }
 }
