@@ -304,6 +304,20 @@ test("an unknown page says so instead of rendering nothing", () => {
   assert.match(legalMissingScreen("nope"), /not in this build/);
 });
 
+test("the support page renders real links to the issue tracker", () => {
+  const html = legalDocumentScreen(legalDocumentById("support"));
+  assert.match(html, /href="https:\/\/github\.com\/99ggprooo00-code\/DHUN\/issues\/new"/);
+  assert.match(html, /href="https:\/\/github\.com\/99ggprooo00-code\/DHUN\/issues"/);
+  assert.match(html, />Report a bug<\/a>/);
+  assert.match(html, />Request a feature<\/a>/);
+});
+
+test("the security page links its interim channel", () => {
+  const html = legalDocumentScreen(legalDocumentById("security-reporting"));
+  assert.match(html, /href="https:\/\/github\.com\/99ggprooo00-code\/DHUN\/issues\/new"/);
+  assert.match(html, /Security contact/);
+});
+
 test("no legal page renders a JS artefact instead of text", () => {
   // Regression: spanMarkup/blockMarkup used to return a mix of raw() marker
   // objects and strings, and joining them produced the literal "[object Object]"

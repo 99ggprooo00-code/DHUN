@@ -896,10 +896,16 @@ export function boot({ root, audio = null, AudioContextCtor = null, storage = tr
   /** Deep links: #/artist/<id>, #/album/<id>, #/playlist/<id>, #/settings,
    *  #/about-legal, #/legal/<id>.
    *
-   *  Hash routes, not path routes, on purpose: GitHub Pages serves static files
-   *  only, so /DHUN/legal/privacy would 404 on a direct load or a refresh, while
-   *  #/legal/privacy resolves with no server support at all. That is what makes
-   *  these pages shareable and refresh-safe under /DHUN/. */
+   *  Hash routes, not path routes. A hash route needs no server support at all:
+   *  the browser resolves it against the one static document that is always
+   *  served, so #/legal/privacy works on a direct load, a refresh and a pasted
+   *  link under any mount path, including /DHUN/.
+   *
+   *  A path route would depend on the host instead. `tools/serve.mjs` returns
+   *  index.html for any unknown path, so it would look fine in development;
+   *  GitHub Pages has no such fallback and would serve its 404 page. That
+   *  distinction is the reason, and it is not something a local check can prove
+   *  — see docs/legal/AUDIT-2026-10-10-in-app-legal-pages.md §2. */
   function applyHashRoute() {
     const match = /^#\/(artist|album|playlist)\/(.+)$/.exec(window.location.hash);
     if (match) return openDetail({ kind: match[1], id: match[2] });

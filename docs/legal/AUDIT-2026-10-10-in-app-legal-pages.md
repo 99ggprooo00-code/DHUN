@@ -1,48 +1,262 @@
-# Audit — in-app Privacy / Legal / About / Support pages
+# Audit — in-app About & Legal pages
 
-Session branch `arena/6d488b89-dhun`, base `origin/main` = `5c7bc43` (PR #155 merge).
-Every line below was read from the tree at that commit in this session unless it is
-labelled otherwise. Nothing here is a legal conclusion.
+**Audit date:** 2026-10-10
+**Branch:** `arena/6d488b89-dhun`
+**Base commit:** `5c7bc438`
+**Scope:** what had to be true before any in-app legal page could be built, and
+what was found.
 
-## 1. Navigation
+Every row below is labelled. **verified from source** means read from a file in
+this repository at the cited location. **verified by runtime test** means a test
+in this branch executes the claim. **official third-party documentation** means
+taken from a vendor document. **awaiting maintainer confirmation** and
+**awaiting legal review** mean no one with authority has signed it off.
 
-| Platform | Mechanism | File |
-|---|---|---|
-| Android | `ComponentActivity` + `setContent`; `remember { NavStatePersistence.restore(lastSavedState) }` then `BackHandler { if (!nav.onBack()) moveTaskToBack(true) }`. **No Jetpack NavHost.** | `app-android/src/main/kotlin/dev/dhun/android/MainActivity.kt` L194-196 |
-| Desktop | Compose Desktop `Window` + `remember { AppNavState() }`; `Key.Escape` → `nav.onBack()`. No NavHost. | `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt` L521, L539 |
-| Web | vanilla SPA, hash routing: `window.addEventListener("hashchange", …)`, `applyHashRoute()` matches `#/artist|album|playlist/<id>` and `#/settings` | `app-web/src/js/main.js` L853-862 |
+Every file path and line number below was re-checked against the working tree
+on 2026-10-10. An earlier draft of this document cited paths that do not exist
+(`shared/.../network/InnerTubeClient.kt`, `shared/.../platform/`,
+`shared/.../network/ApiPaths.kt`), wrong line numbers for `iconSize`,
+`GlassCard` and `encodeRoute`, and a `predictiveBack` manifest flag that is not
+present anywhere in the repository. Those were wrong and are corrected here.
 
-**Both app platforms share one navigator**: `shared/src/commonMain/kotlin/dev/dhun/ui/shell/AppNavState.kt`
-— `detailStack: List<DetailRoute>`, `push()` / `popDetail()` / `closeTop()` / `popTab()` /
-`onBack() = closeTop() || popTab()`. `DetailRoute` is a sealed interface with
-`ArtistPage`, `AlbumPage`, `PlaylistPage`, and the id-less singleton `SettingsPage`
-(L12-27). Routes are dispatched by two exhaustive `when` blocks —
-`ShellMasterPane` (single-pane) and `ShellDetailPane` (two-pane) in
-`shared/src/commonMain/kotlin/dev/dhun/ui/shell/DhunAppShell.kt`.
+This document records the audit. It does not replace
+`docs/legal/AUDIT-2026-10-06-claims-and-risks.md`, which audits the release
+process, or `docs/legal/AUDIT-2026-10-06-privacy-claims.md`, which audits the
+privacy policy's factual claims.
 
-`app-web/src/js/nav.js` is a deliberate line-for-line mirror of `AppNavState.kt`
-(its header comment says so) and is pinned by `app-web/tests/nav.test.mjs`.
+---
 
-**Consequence:** a legal page is a new `DetailRoute` case, added once in shared and
-rendered by both platforms. No new top-level nav destination is needed.
+## 1. What existed before this work
 
-## 2. Reusable UI
+| Item | State before | Evidence | Status |
+| --- | --- | --- | --- |
+| In-app legal UI | **None.** No privacy, terms, licences, notices, about, support or security screen on any platform | no matching route or screen in `shared/src/commonMain/kotlin/dev/dhun/ui/shell/` | verified from source |
+| External links in the UI | **None.** No `LinkAnnotation`, no `LocalUriHandler`, no `UriHandler.openUri` call anywhere | repo-wide search | verified from source |
+| Canonical legal text | `legal/` did not exist | — | verified from source |
+| Draft policy prose | `docs/legal/PRIVACY-DRAFT.md` (8,329 B), `docs/legal/TERMS-DRAFT.md` (3,958 B) | both read in full | verified from source |
+| Third-party notices | `THIRD_PARTY.md` (3,180 B) at repo root | read in full | verified from source |
+| Security policy | `SECURITY.md` (1,411 B); private reporting **not enabled** | read in full | verified from source |
+| Licence texts on disk | `LICENSE` = GPL-3.0 (35,149 B). `LICENSES/` holds **Apache-2.0.txt only** | `ls LICENSES` | verified from source |
+| Version metadata | Android `versionName "1.00.001"` / `versionCode 6`; desktop `dhunInstallerVersion "1.0.6"`; web `package.json` `"0.0.0"` | `app-android/build.gradle.kts:19-20`, `app-desktop/build.gradle.kts:12`, `app-web/package.json` | verified from source |
+| Website legal pages | None. `website/src/pages/` has index, support, roadmap, changelog, ui | `ls website/src/pages` | verified from source |
 
-`shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt` (381 lines) —
-sections `Appearance`, `Playback & storage`, `Equalizer`. Header row is
-`DhunIconButton` + `DhunIcon.ArrowBack` + `headlineMedium` title. Body is
-`Column(...).verticalScroll(rememberScrollState())` with
-`SectionHeader(title = …)` between groups. There is **no About or Legal section**.
+---
 
-Design tokens/components available in `commonMain`: `DhunColors` (52 tokens incl.
-`accent`, `textPrimary/Secondary/Tertiary`, `glassEdge`, `border`), `DhunSpacing`
-(no raw `dp` outside `design/`), `DhunTypography` (19 styles), `DhunShapes`,
-`components/{SectionHeader, DhunButton, DhunIconButton, GlassCard, Chip, Cards}`.
-`GlassCard`'s doc comment bans blurring the content layer — "Content stays **sharp**".
-`supportsRealtimeBlur` is an `expect val` with android/jvm actuals — the pattern to
-follow for platform-specific behaviour.
+## 2. Navigation, on all three targets
 
-## 3. Version metadata (nothing may be hardcoded)
+Three different navigation systems, all of which had to be wired by hand.
+
+| Target | Mechanism | Evidence |
+| --- | --- | --- |
+| Android + Desktop | one shared `AppNavState` in `shared/`; `DetailRoute` is a `sealed interface`; two panes on wide screens, single-pane otherwise | `shared/.../ui/shell/AppNavState.kt:106`, `DhunAppShell.kt` |
+| Android back button | the Activity installs its own `BackHandler`; if `nav.onBack()` declines, the task goes to the background rather than finishing | `app-android/src/main/kotlin/dev/dhun/android/MainActivity.kt:198` — `BackHandler { if (!nav.onBack()) moveTaskToBack(true) }` |
+| Android state restoration | `NavStatePersistence.encodeRoute` is an **exhaustive `when` over `DetailRoute`** — adding a route without updating it does not compile | `app-android/.../ui/NavStatePersistence.kt:64-72`; new branches are `AboutLegalPage -> "about-legal"` and `LegalDocumentPage -> "legal:${id}"` |
+| Desktop | same `shared` shell; no separate nav state | `app-desktop/src/main/kotlin/dev/dhun/desktop/Main.kt` |
+| Web SPA | a plain array in `NavState.detailStack`, `push` / `popDetail` / `selectTab` | `app-web/src/js/nav.js` |
+| Shared back semantics | `AppNavState.popDetail()`; the platform shell installs the handler and the doc comment says so | `shared/.../ui/shell/AppNavState.kt:149`, comment at `:54` |
+| Web routing | hash routes read from `window.location.hash`; `applyHashRoute` maps hash → stack | `app-web/src/js/main.js` |
+
+**Why hash routes on the web.** A hash route needs no server support: the
+browser resolves it against the one static document that is always served, so
+`#/legal/privacy` works on a direct load, a refresh and a pasted link under any
+mount path, including `/DHUN/`.
+
+A path route would depend on the host instead. `app-web/tools/serve.mjs:70-80`
+returns `index.html` with HTTP 200 for any unknown path, so a path route *looks*
+fine in local development. GitHub Pages has no such fallback: the deployed
+artifact is a static tree whose `website/dist/404.html` is the Pages 404 page, so
+`/DHUN/legal/privacy` would be served that page.
+
+**Not verified by live test.** This sandbox has no route to `github.io`, so the
+Pages behaviour above is inferred from the artifact layout and the presence of
+`404.html`, not from an HTTP request against the deployed site. The local 200
+*was* measured:
+
+```
+/legal/privacy        200      <- dev-server SPA fallback, tools/serve.mjs
+/#/legal/privacy      200      <- static document; the browser resolves the hash
+```
+
+Those two lines do not compare like with like. The first is a property of
+`serve.mjs`.
+
+---
+
+## 3. Design system available to the screens
+
+| Token / component | Value | Evidence |
+| --- | --- | --- |
+| `DhunSpacing.legalContentMaxWidth` | `680.dp` — added by this work | `shared/.../design/DhunSpacing.kt:51` |
+| `DhunSpacing.iconSize` | `24.dp` | `shared/.../design/DhunSpacing.kt:122` |
+| `GlassCard` | content lambda is `@Composable BoxScope.() -> Unit`, **not** `ColumnScope` — so a legal body needs its own inner `Column`. The *bottom-sheet* composable in the same file does take `ColumnScope`, at line 140; the two are easy to confuse | `shared/.../design/components/GlassCard.kt:63` (glass), `:140` (sheet) |
+| Frosted surfaces | `Brush.linearGradient` with `onSurface.copy(alpha = …)`; no `Modifier.blur` | `shared/.../design/Gradients.kt` |
+| `Modifier.verticalScroll` | requires `androidx.compose.foundation.rememberScrollState` + `verticalScroll`, both absent from `AboutLegalScreen.kt` before this work | verified from source |
+| Web spacing | `app-web/src/css/tokens.css`; `scripts/test_app_web.py` forbids raw hex colours and px values outside it | verified from source |
+| Reduced motion | Compose: `LocalInspectionMode` gate in `DhunAppShell.kt:71-87`. Web: no transition or animation is declared in the legal block at all | verified from source |
+
+Two web constraints shaped the implementation and are enforced by
+`scripts/test_app_web.py`:
+
+- `app-web/src/index.html` carries a strict CSP — `default-src 'none'`, no
+  `connect-src` beyond self, YouTube and lrclib. A legal page **cannot fetch its
+  Markdown at runtime**; the text has to be in the bundle. That is why the
+  generator emits a JS module alongside the Kotlin one.
+- The build is a byte-for-byte copy (`app-web/tools/build.mjs`), so what is in
+  `src/` is what ships.
+
+---
+
+## 4. Network behaviour, re-verified
+
+Re-checked because a privacy policy is only honest if it matches the traffic.
+
+**Outbound, real:**
+
+| Destination | Purpose | Evidence |
+| --- | --- | --- |
+| `music.youtube.com`, `www.youtube.com` | InnerTube API for search, browse, playback | `shared/src/commonMain/kotlin/dev/dhun/innertube/InnerTubeClient.kt` |
+| `lrclib.net` | synced lyrics | `shared/src/commonMain/kotlin/dev/dhun/lyrics/LyricsRepository.kt` |
+| artwork CDNs | album/artist artwork at the URLs InnerTube returns | `shared/.../repository/impl/LibraryRepositoryImpl.kt` |
+| `picsum.photos` | sample artwork in the **design catalog screen only** — not on any user-facing surface | `shared/.../design/catalog/ComponentCatalogScreen.kt:241` |
+
+**Not outbound**, despite looking like it:
+
+| String | What it actually is | Evidence |
+| --- | --- | --- |
+| `videolan.org` | error-message text telling the user to install VLC | `app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/player/DesktopDhunPlayer.kt:176,262,486` |
+| `reddit.com` | a `thirdPartyEmbedUrl` header value sent to YouTube; the comment at line 437 explains it is what yt-dlp sends | `shared/.../innertube/InnerTubeClient.kt:612`, comment at `:437` |
+
+**Android manifest** (`app-android/src/main/AndroidManifest.xml`):
+
+- permissions: `INTERNET`, `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE`,
+  `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `WAKE_LOCK`,
+  `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, `FOREGROUND_SERVICE_DATA_SYNC`
+- `allowBackup="false"`, `hasFragileUserData="false"`,
+  `usesCleartextTraffic="false"`
+- no deep-link intent filters
+- `DhunPlaybackService` `exported="true"`; `DhunDownloadService`
+  `exported="false"`
+
+**File writes:** offline downloads and their `.part` temp files under the app's
+external files dir; the SQLDelight database; DataStore preferences; the audio
+player's own cache.
+
+---
+
+## 5. Privacy controls that actually exist
+
+Each was traced to the code that performs the deletion.
+
+| Control | UI | What it does | Evidence |
+| --- | --- | --- | --- |
+| Clear downloads | Library screen | under a mutation lock: cancels every worker and joins them, then deletes audio, artwork and both deterministic `.part` paths per row, then `repository.clearAll()` | `LibraryViewModel.clearDownloads():392` → `FileDownloadManager.clearAll():112-134` |
+| Clear playback history | Library screen | `historyQueries.deleteAll()`; surfaces "Could not clear playback history" on failure | `LibraryViewModel.clearHistory():471`; message at `LibraryScreen.kt:1524` |
+| Clear recent searches | Search screen | `recentSearchQueries.deleteAll()` | `SearchScreen.kt:141` → `SearchViewModel.clearAllRecentSearches():132` → `SqlDelightRepositories.kt:314` |
+
+All three are destructive and none is undoable. A test in
+`scripts/test_legal_content.py` forbids the Support page from naming a control
+that has no implementation, so this table cannot silently drift.
+
+**Gaps found, and deliberately not papered over:**
+
+- `LyricsRepository.clearCache()` exists at `shared/.../lyrics/LyricsRepository.kt:87` with **no UI at all**. Not listed as a user control.
+- There is no control for the audio player's own cache.
+- **Nothing about any of this is in Settings.** All three controls live on
+  Library and Search. The Support page says where each one is.
+- There is **no account system**, therefore no account-deletion control. None
+  was added: inventing one to make the policy look complete would be worse than
+  its absence.
+
+**One live discrepancy:** `SettingsKeys.LYRICS_ENABLED` is written but has **no
+reader** — only `SettingsKeys.kt:29-30,67`, a comment at
+`SettingsViewModel.kt:32`, and `RepositoriesTest.kt:175-177`. Meanwhile
+`PlayerViewModel.loadLyrics` (line 562) fires from line 187 on every
+`currentTrack` change, ungated. So lyrics are fetched whether or not the toggle
+is on. Disclosed in `legal/privacy.md` §4.1 rather than quietly fixed.
+
+---
+
+## 6. Content-accuracy labels
+
+The seven pages use a three-valued status vocabulary, deliberately not
+`draft`/`final`:
+
+| Value | Meaning | Pages |
+| --- | --- | --- |
+| `draft` | not signed off; the in-app page **says so on screen** | `privacy`, `terms` |
+| `current` | the operative policy of this project today | `open-source-licenses`, `third-party-notices`, `support`, `security-reporting` |
+| `reference` | not a policy statement at all; an "about" page | `about` |
+
+Status is **per page**, not global. `support` is real and current while
+`privacy` is unsigned — a single project-wide flag would have had to call both
+the same thing.
+
+Two specific things the text refuses to claim, on instruction:
+
+- no affiliation, endorsement or authorisation by YouTube or Google
+- no statement that DHUN complies with all laws or with platform policies
+
+And one thing it refuses to imply: clearing local history deletes records held by
+YouTube or Google. It does not, and the text says so.
+
+---
+
+## 7. What is **not** true and is labelled as such in-app
+
+| Claim in the app | Label shown | Reason |
+| --- | --- | --- |
+| Private security reporting channel | "awaiting maintainer confirmation" | GitHub private vulnerability reporting is not enabled on this repository |
+| Privacy contact address | "contact not yet published" placeholder | no contact exists; inventing an email or a jurisdiction would be a fabricated fact |
+| Privacy Policy | "Draft — not legal advice" | not reviewed by a lawyer or the maintainer |
+| Terms of Use | "Draft — not legal advice" | ditto; also relies on a YouTube ToS page dated 15 December 2023 that was **not re-fetched** for this work |
+| Web app version | "not applicable" | `app-web/package.json` says `0.0.0`, which is a module version, not a release version |
+
+---
+
+## 8. Open decisions, unchanged by this work
+
+- Android `1.00.001` vs desktop `1.00.006` vs web `0.0.0` — three different
+  version numbers for one product. Each in-app About page shows its own
+  platform's number. **Awaiting maintainer decision.**
+- Website legal pages are **out of scope for this branch.** Adding a public
+  route touches `scripts/website_quality.py` (hardcoded `ROUTES` at line 114,
+  `PAGES` at line 154) and `website/budget-baseline.json`, which is keyed per
+  route. That is a governed change to the honesty contract and would publish an
+  unreviewed DRAFT. Documented follow-up, not done silently.
+- `website/dist` auto-deploys on merge to `main`. Nothing in this branch changes
+  it, but it means a merge publishes.
+
+---
+
+## 9. What could not be verified in this sandbox
+
+Stated plainly rather than omitted.
+
+| Not verifiable here | Why |
+| --- | --- |
+| Kotlin compilation of `shared/`, `app-android/`, `app-desktop/` | no JVM installed (`command -v java` returns nothing; `/usr/lib/jvm` absent) |
+| Gradle build, Android `assembleDebug`, desktop `jvmTest` | same |
+| Windows MSI packaging | no Windows, no PowerShell |
+| `LocalUriHandler` actually opening a browser | needs a real device or window |
+| GitHub Pages 404 behaviour for a path route | no route to `github.io` from this sandbox |
+| The two Markdown parsers against each other | one needs a JVM, the other needs Node, and CI runs them in separate steps |
+
+The last one is worth being explicit about: the Kotlin and JS parsers were
+written as mirrors and both are tested, but **they were never executed against
+each other**. Both suites pin the same invariants over the same bundled bytes
+instead, and the bundled bytes are digest-checked on both sides. That is strong
+evidence of agreement. It is not the same thing as having run them side by side.
+
+CI (`.github/workflows/ci.yml`, ubuntu-latest, Temurin 17) covers the Kotlin
+side: python unittest → pwsh syntax check → `:shared:jvmTest` →
+`:app-android:testDebugUnitTest` → `assembleDebug` → `bundleDebug` →
+`:app-android:lintDebug` → `:shared:lintDebug` →
+`:tools:playback-probe:compileKotlin` → `:tools:playback-probe:test` →
+`:app-desktop:compileKotlinJvm` → `:app-desktop:jvmTest`.
+
+---
+
+## 10. Version metadata (nothing may be hardcoded)
 
 | Platform | Source | Value at `5c7bc43` |
 |---|---|---|
@@ -60,7 +274,9 @@ The Android and desktop version numbers **do not match each other**
 (`1.00.001` vs `1.0.6`). That is a maintainer decision, not something this work
 may paper over: the About page shows each platform's own value with its own label.
 
-## 4. Build / serve under `/DHUN/`
+---
+
+## 11. Build and serve under `/DHUN/`
 
 - `website/` is Eleventy 3.1.6 → `website/dist/`, **committed** (drift check in
   `.github/workflows/website.yml` L141). `DHUN_SITE_PATH_PREFIX=/DHUN` is set only
@@ -69,10 +285,9 @@ may paper over: the About page shows each platform's own value with its own labe
   `dist/` byte-for-byte (no bundler), then the workflow copies it into
   `pages-deploy/app/` (website.yml L198-204). Its files reference each other
   relatively, so they work under any mount path.
-- **Route resolution on refresh:** GitHub Pages serves static files only. A path
-  route `/DHUN/legal/privacy` would 404. `app-web`'s existing `#/…` hash routing
-  resolves on direct load, refresh and share with no server support — that is the
-  mechanism used here.
+- **Route resolution on refresh:** covered in §2 above, including what was and
+  was not measured. Short version: hash routing needs no server support, which is
+  why these pages use it.
 - **CSP on the web preview** (`app-web/src/index.html` L12-15):
   `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
   img-src 'self' data:; media-src 'self' https:; connect-src 'self'
@@ -82,45 +297,9 @@ may paper over: the About page shows each platform's own value with its own labe
 - `scripts/test_app_web.py` additionally forbids raw hex outside `tokens.css`
   (L77), raw `px` outside `tokens.css` (L84), and raw `px` in inline styles (L109).
 
-## 5. Privacy facts — re-verified this session
+---
 
-| Claim | Result | Evidence |
-|---|---|---|
-| `LYRICS_ENABLED` gates lyric requests | **False — no reader exists.** | `grep` over all `.kt`: only `SettingsKeys.kt` L29-30 (definition), `SettingsViewModel.kt` L32 (comment), `RepositoriesTest.kt` L175-177 (round-trip). `PlayerViewModel.kt` L187 calls `loadLyrics(track)` unconditionally on every track change; `loadLyrics` (L562-585) has no gate. |
-| Permissions | Confirmed: `INTERNET`, `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `WAKE_LOCK`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, `FOREGROUND_SERVICE_DATA_SYNC` | `AndroidManifest.xml` L4-18 |
-| `allowBackup=false` | Confirmed; also `hasFragileUserData="false"` (L23) and `usesCleartextTraffic="false"` (L24) | `AndroidManifest.xml` L22-24 |
-| No deep-link intent filters | Confirmed. The four `<intent-filter>`s are MAIN/LAUNCHER (×2), `androidx.media3.session.MediaSessionService`, `android.appwidget.action.APPWIDGET_UPDATE`. No `<data android:scheme>`. | `AndroidManifest.xml` L58-121 |
-| No cookie jar | Confirmed. Every `cookie` hit in non-test source is a comment saying there are none (`OwnClientStreamResolver.kt` L29, `InnerTubeClient.kt` L602, `YtDlpStreamResolver.kt` L19). No `HttpCookies` plugin. | as cited |
-| Network destinations | Real outbound hosts in non-test source: `music.youtube.com` + `www.youtube.com` (`innertube/InnerTubeClient.kt`), `lrclib.net` (`lyrics/LrcLibSource.kt`), `picsum.photos` (`design/catalog/ComponentCatalogScreen.kt` L241/249/325 — dev catalogue, not in `AppTab.userTabs`). All other `https://` hits are in `jvmTest` fixtures. | as cited |
-
-**Corrections to assumptions in the brief:**
-
-- `www.videolan.org` in `DesktopDhunPlayer.kt` (L176, L262, L486) is **text inside
-  an error message**, not a request. DHUN never contacts videolan.org.
-- `www.reddit.com` in `InnerTubeClient.kt` L612 is a **header value**
-  (`thirdParty.embedUrl`) sent *to YouTube*, mirroring yt-dlp. DHUN never contacts
-  reddit.com.
-- **New finding, not in the brief:** `DhunPlaybackService` is declared
-  `android:exported="true"` (`AndroidManifest.xml` L79). Media3 session services do
-  not require export; this widens the local attack surface. Reported, not changed.
-- `app-android/keystores/dhun-test.p12` is a committed public test key
-  (`SECURITY.md`). APK signature proves nothing about provenance.
-
-### Privacy controls that actually exist
-
-| Control | Where | Behaviour (read, not assumed) |
-|---|---|---|
-| Clear downloads | `LibraryScreen.kt` L187 → `LibraryViewModel.clearDownloads()` L395-415 → `DownloadManager.clearAll()` | Stops/joins workers, deletes audio + artwork + `.part` files, then `repository.clearAll()` (`FileDownloadManager.kt` L112-133). Failure sets `errorMessage` "Some files may remain" and **keeps the confirmation open** — it does not claim success. |
-| Clear history | `LibraryScreen.kt` L201 → `LibraryViewModel.clearHistory()` L471-474 → `HistoryRepository.clear()` = `historyQueries.deleteAll()` | Suspends until persistence succeeds; UI surfaces "Could not clear playback history" on throw (`LibraryScreen.kt` L1524). |
-| Clear recent searches | `SearchScreen.kt` L141 → `SearchViewModel.clearAllRecentSearches()` L132 → `recentSearchQueries.deleteAll()` | Confirmed. |
-| Clear lyrics cache | `LyricsRepository.clearCache()` L87 | **Exists in code, no UI entry point found.** Not exposed, so it is not described as a user control. |
-| Clear audio cache | — | **Not found.** Only a size budget (`SettingsViewModel.setCacheSizeMb`). |
-| Account deletion | — | **Not applicable.** No account system anywhere in the tree. |
-
-All three UI-facing controls sit in **Library/Search, not Settings**. Settings has
-no data-clearing control at all.
-
-## 6. Third-party requirements reviewed
+## 12. Third-party requirements reviewed
 
 | Document | Status |
 |---|---|
@@ -130,7 +309,9 @@ no data-clearing control at all.
 | GPL-3.0 (`LICENSE`) | Present, 35,149 bytes. Requires that recipients get the licence text — that is what the Open-Source Licenses page ships. |
 | Apache-2.0 (`LICENSES/MaterialDesignIcons-Apache-2.0.txt`) | Present, 11,357 bytes. §4 requires the NOTICE/attribution be retained. |
 
-## 7. Test baselines measured on `5c7bc43` before any edit
+---
+
+## 13. Test baselines measured on `5c7bc43` before any edit
 
 | Command | Result |
 |---|---|

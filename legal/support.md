@@ -14,9 +14,14 @@ Bugs and feature requests are handled in the project's public issue tracker on
 GitHub. There is no support desk, no service-level agreement and no response
 time. **[source]**
 
-- **Report a bug** — describe what you did, what happened, and what you expected.
-- **Request a feature** — say what problem it solves.
-- **Browse open issues** — your problem may already be reported.
+- [Report a bug](https://github.com/99ggprooo00-code/DHUN/issues/new) — describe
+  what you did, what happened, and what you expected.
+- [Request a feature](https://github.com/99ggprooo00-code/DHUN/issues/new) — say
+  what problem it solves.
+- [Browse open issues](https://github.com/99ggprooo00-code/DHUN/issues) — your
+  problem may already be reported.
+- [Read the source](https://github.com/99ggprooo00-code/DHUN) — DHUN is
+  GPL-3.0; every claim on these pages can be checked against the code.
 
 When you report a playback or download problem, the fastest path is to include
 the app's own log lines and your build's version, shown on the About page.

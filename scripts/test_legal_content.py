@@ -293,6 +293,25 @@ class PolicyTextIsHonest(unittest.TestCase):
                 f"{page_id} must say a contact is not yet published",
             )
 
+    def test_the_support_page_links_the_real_tracker(self) -> None:
+        """The brief asks for bug and feature links; prose alone is not a link."""
+        support = norm(self.pages["support"].markdown)
+        for target in (
+            "https://github.com/99ggprooo00-code/DHUN/issues/new",
+            "https://github.com/99ggprooo00-code/DHUN/issues",
+        ):
+            self.assertIn(target, support, f"the support page must link {target}")
+        self.assertIn("Report a bug", support)
+        self.assertIn("Request a feature", support)
+        # And the links must be real Markdown links, not bare URLs in prose.
+        self.assertRegex(support, r"\[Report a bug\]\(https://")
+        self.assertRegex(support, r"\[Request a feature\]\(https://")
+
+    def test_the_security_page_names_its_interim_channel_as_a_link(self) -> None:
+        page = norm(self.pages["security-reporting"].markdown)
+        self.assertIn("https://github.com/99ggprooo00-code/DHUN/issues/new", page)
+        self.assertIn("Security contact request", page)
+
     def test_the_security_page_reproduces_the_real_policy(self) -> None:
         page = self.pages["security-reporting"].markdown
         upstream = _read(ROOT / "SECURITY.md").strip()
