@@ -21,7 +21,10 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -88,9 +91,14 @@ fun AboutLegalScreen(
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         LegalTopBar(title = "About & Legal", onBack = onBack)
+        // weight(1f), not fillMaxSize(). A Column hands a non-weighted child its
+        // FULL height, so fillMaxSize() makes this list a top-bar taller than the
+        // space left for it and the tail of the list is pushed off-screen. This is
+        // the pattern LibraryScreen.kt:806 already uses.
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .widthIn(max = DhunSpacing.legalContentMaxWidth),
             contentPadding = PaddingValues(bottom = DhunSpacing.xxl),
         ) {
@@ -203,37 +211,79 @@ fun LegalDocumentScreen(
     val blocks = remember(markdown) { MarkdownParser.parse(markdown) }
     val unresolved = remember(markdown) { LegalTokens.unsubstitutedTokens(markdown) }
     val uriHandler = LocalUriHandler.current
+    // Set when the platform had no way to open a link. `UriHandler.openUri`
+    // throws rather than returning a failure -- ActivityNotFoundException on
+    // Android when no browser is installed, and the desktop equivalent when
+    // `Desktop.browse` cannot hand off. An unguarded call turns a machine with
+    // no browser into a crash on a legal page, which is the worst place to
+    // crash. The URL is shown so the reader can still reach it.
+    var unopenableUrl by remember(documentId) { mutableStateOf<String?>(null) }
 
     Column(modifier = modifier.fillMaxSize()) {
         LegalTopBar(title = document.title, onBack = onBack)
-        SelectionContainer {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .widthIn(max = DhunSpacing.legalContentMaxWidth),
-                contentPadding = PaddingValues(
-                    start = DhunSpacing.screenPadding,
-                    end = DhunSpacing.screenPadding,
-                    bottom = DhunSpacing.huge,
-                ),
-                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-            ) {
-                if (unresolved.isNotEmpty()) {
-                    item(key = "unresolved-tokens") {
-                        Text(
-                            text = "This page still contains an unfilled placeholder " +
-                                "(${unresolved.joinToString()}), so part of it may read " +
-                                "incorrectly.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = DhunColors.warning,
+        // The weight goes on the Box because the Box is the Column's child; the
+        // LazyColumn inside may then fillMaxSize() against a bounded height.
+        // Without this the document is a top-bar too tall and its last blocks are
+        // unreachable -- on Open-Source Licenses that is real licence text the
+        // reader can never scroll to. Box rather than a modifier on
+        // SelectionContainer so the weight is not dependent on that overload.
+        Box(modifier = Modifier.weight(1f)) {
+            SelectionContainer {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .widthIn(max = DhunSpacing.legalContentMaxWidth),
+                    contentPadding = PaddingValues(
+                        start = DhunSpacing.screenPadding,
+                        end = DhunSpacing.screenPadding,
+                        bottom = DhunSpacing.huge,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+                ) {
+                    unopenableUrl?.let { failed ->
+                        item(key = "link-failed") {
+                            GlassCard(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = DhunSpacing.sm),
+                                contentPadding = PaddingValues(DhunSpacing.lg),
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
+                                    Text(
+                                        text = "This device has no way to open links.",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = DhunColors.warning,
+                                    )
+                                    Text(
+                                        text = failed,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = DhunColors.textSecondary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (unresolved.isNotEmpty()) {
+                        item(key = "unresolved-tokens") {
+                            Text(
+                                text = "This page still contains an unfilled placeholder " +
+                                    "(${unresolved.joinToString()}), so part of it may read " +
+                                    "incorrectly.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DhunColors.warning,
+                            )
+                        }
+                    }
+                    if (document.isDraft) {
+                        item(key = "draft-banner") { DraftBanner(document = document) }
+                    }
+                    itemsIndexed(blocks, key = { index, _ -> "block-$index" }) { _, block ->
+                        LegalBlock(
+                            block = block,
+                            onOpenUrl = { url ->
+                                runCatching { uriHandler.openUri(url) }
+                                    .onFailure { unopenableUrl = url }
+                            },
                         )
                     }
-                }
-                if (document.isDraft) {
-                    item(key = "draft-banner") { DraftBanner(document = document) }
-                }
-                itemsIndexed(blocks, key = { index, _ -> "block-$index" }) { _, block ->
-                    LegalBlock(block = block, onOpenUrl = { uriHandler.openUri(it) })
                 }
             }
         }
