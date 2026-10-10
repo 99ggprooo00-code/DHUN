@@ -8,6 +8,16 @@
 > Follow the current `.ai/ROADMAP.md` active task and the binding UI correction
 > in `.ai/MASTER_PROMPT.md`; do not copy the old branch/commit/status as live facts.
 
+> **Current status pointer (2026-10-10, session `arena/29f9acf0-dhun`).** Use these instead of the snapshot below:
+> - Release status: `BLOCKED — RELEASE NOT READY` for any new public release. The open blockers are listed in the 2026-10-10 entries at the top of `.ai/KNOWN_LIMITATIONS.md`.
+> - Public release: `v1.00.001` pre-release (not Latest, unchanged). Private `test` draft: unchanged.
+> - Next version when cut: `1.00.002` (`versionCode` 7), per `docs/releases/RELEASE-POLICY.md` section 2.
+> - Verified on `main` run `38036231113`: MSI install-over on a hosted Windows runner passed. Playback, visuals and uninstall were not tested.
+> - Legacy `dev*` release deletion now requires the `purge_legacy_dev_releases` input (default off).
+> - Cleanup decisions still awaiting approval: `scripts/publish.sh`, `.pr_body.md`, `docs/verification/s3-hardware-checklist.md`, `INTEGRATION.md`, branch `arena/37e5c8d8-dhun`.
+>
+> The sections below are the 2026-10-08 handoff, kept as history. Their branch names, commit SHAs and "current" statements are not live facts.
+
 Updated **2026-10-08**, session `arena/45db02aa-dhun`. Fixed session branch:
 `arena/45db02aa-dhun`. Current base and GitHub `main`:
 **`2a20024d4b626b3f40ae95776cefb6b1e49cfdca`** (PR #136 merge, 2026-10-08T13:19:49Z,

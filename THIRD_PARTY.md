@@ -10,7 +10,8 @@ GPL-3.0-compatible. Reused code gets: project, file, license, commit, date.
 | Kotlin / KMP | Apache-2.0 | language | Phase 02 |
 | Compose Multiplatform | Apache-2.0 | UI | Phase 03 |
 | Media3 / ExoPlayer | Apache-2.0 | Android playback | Phase 03 |
-| vlcj (+ libVLC, LGPL-2.1) | LGPL-2.1 | desktop playback (dynamic link) | Phase 04 |
+| vlcj 4.8.2 (Java bindings, `uk.co.caprica:vlcj`; POM license GPL v3, checked 2026-10-10 against Maven Central metadata) | GPL-3.0 | desktop playback (dynamic link to a system libVLC) | Phase 04 |
+| libVLC (VLC installed separately by the user; not bundled in the MSI, per README and `app-desktop/build.gradle.kts`) | LGPL (version as shipped by the user's VLC install; not re-verified in 2026-10-10 audit) | desktop audio backend, provided by the system | Phase 04 |
 | SQLDelight | Apache-2.0 | persistence | Phase 05 |
 | Ktor | Apache-2.0 | networking | Phase 02 |
 | OkHttp (via `ktor-client-okhttp`, Android HTTP) | Apache-2.0 | file downloads and metadata (InnerTube / LRCLIB) on Android; CIO remains desktop-only | 2026-09-21 |

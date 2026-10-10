@@ -50,3 +50,20 @@ Gap (honest): the repo has no dependency-vulnerability scanning
 artifact. Options for v2: enable Dependabot security updates, or add an
 `osv-scanner` scheduled workflow. Until then, each audit entry above
 should be re-checked for CVEs at upgrade time.
+
+## 2026-10-10 — repository cleanup audit (session `arena/29f9acf0-dhun`, base `main` `588f14f`)
+
+Append-only entry. Evidence is from this session's sandbox; registry reads used `registry.npmjs.org` and `pypi.org`. Maven Central and `services.gradle.org` are not reachable from the sandbox, so Gradle versions were **not** resolved or audited here.
+
+| Ecosystem | Scope | Result | Decision |
+|---|---|---|---|
+| npm — `website/` (build and CI only; ships no JS) | 4 devDependencies, 146-entry lock | `npm audit`: **9 advisories (5 high, 4 moderate)**, all transitive under `@11ty/eleventy` 3.1.6 (`braces`, `chokidar`, `nunjucks`, `js-yaml` 3.x, `gray-matter`, `argparse` 1.x, `sprintf-js`, `@11ty/eleventy-dev-server`). The registry lists **no patched version within the current majors** for `braces`, `nunjucks`, `chokidar`, `argparse` 1.x or `sprintf-js`; `js-yaml` 4 and `argparse` 3 are breaking. `npm audit fix --force` proposes a **downgrade** to `@11ty/eleventy` 0.6.0. | **HOLD, accepted build-only risk.** Do not run `npm audit fix --force`. Re-audit when Eleventy 4 leaves alpha (4.0.0-alpha.10 is the newest published alpha). Output is static HTML; the advisories affect the build tooling and the dev server. |
+| npm — `website/` tests | `node --test` (`npm run test:rules`) | 41/41 pass | — |
+| npm — `app-web/` | no runtime dependency, no lockfile | nothing to audit | keep zero-dependency (ADR-008 and `app-web/README.md`) |
+| Python — `scripts/` | stdlib only; no requirements file | nothing pinned to audit | — |
+| Python — CI diagnostics | `.github/workflows/extraction-health.yml` installs `yt-dlp` and `ytmusicapi` **unpinned** (`pip install --upgrade`) | diagnostic probe only, but the versions are not reproducible | **Recommend pinning** (needs a maintainer decision because a pin changes which YouTube-breakage signal the probe sees). |
+| Gradle — `shared`, `app-android`, `app-desktop`, `tools/playback-probe` | 43 inline `implementation`/`api`/`testImplementation` declarations, no version catalog | static check: every artifact has an import of its package in its module, except one **redundant-looking** declaration: `NewPipeExtractor` in `tools/playback-probe/build.gradle.kts` (the probe's sources do not import it; `shared` declares and uses it). | **Candidate only.** Verify with `./gradlew :tools:playback-probe:dependencies` and a probe build in CI before removing. Not changed (no Gradle in sandbox). |
+| Licences — `THIRD_PARTY.md` | `vlcj` row | Corrected. The row said `vlcj (+ libVLC, LGPL-2.1)` = LGPL-2.1. The `uk.co.caprica:vlcj:4.8.2` POM and the upstream `master` LICENSE are **GPL v3**. libVLC is a separate, user-installed component. | Documentation corrected. **Requires legal review** of the MSI's distribution obligations for a GPL-3.0 jar, although DHUN is itself GPL-3.0. |
+| Secrets — `app-web/src/js/catalog.js` | one `AIza…` InnerTube web key (39 chars) | public web client key, not a project credential (per the spec) | No rotation. Documented. |
+
+**Upgrades performed in this session:** none. The spec asks for the smallest change and the advisory fixes are unavailable within the current majors, so forced upgrades would add risk without a patched target.
