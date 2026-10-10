@@ -19,6 +19,7 @@ import dev.dhun.download.DownloadStorage
 import dev.dhun.download.FileDownloadManager
 import dev.dhun.extraction.StreamResolver
 import dev.dhun.innertube.InnerTubeClient
+import io.ktor.client.HttpClient
 import dev.dhun.lyrics.LrcLibSource
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.lyrics.YouTubeLyricsSource
@@ -52,7 +53,7 @@ import org.robolectric.annotation.Config
  * crash. (The coordinator logged this exact test as a CI follow-up.)
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [29, 34])
 class AppModuleGraphTest {
 
     private val app: Application get() = ApplicationProvider.getApplicationContext()
@@ -73,7 +74,8 @@ class AppModuleGraphTest {
         }
         val koin = GlobalContext.get()
 
-        // Provider / metadata chain
+        // Provider / metadata chain (OkHttp, not CIO — API < 31 launch path)
+        koin.get<HttpClient>()
         koin.get<InnerTubeClient>()
         koin.get<StreamResolver>()
         koin.get<MusicProvider>()

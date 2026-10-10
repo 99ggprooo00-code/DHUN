@@ -123,16 +123,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lastSavedState = savedInstanceState
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
+        runCatching {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = false
+                isAppearanceLightNavigationBars = false
+            }
+            @Suppress("DEPRECATION")
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
         }
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         handleShortcutIntent(intent)
         requestNotificationPermissionIfNeeded()
-        connectWithFallback()
         // S4: restore the persisted theme/accent before first composition so
         // the launch frame already carries the user's appearance. Best-effort:
         // a corrupt row falls back to dark+brand inside applyPersistedAppearance,
@@ -294,6 +297,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        // Bind the playback service AFTER the first composition is scheduled.
+        // connectWithFallback used to run before setContent; same-process
+        // bind then ran DhunPlaybackService.onCreate on this main thread
+        // before a frame could paint, so an onCreate throw was "does not
+        // open". The service still must not throw (see DhunPlaybackService).
+        connectWithFallback()
     }
 
     override fun onNewIntent(intent: Intent) {
