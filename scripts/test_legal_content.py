@@ -327,6 +327,47 @@ class PolicyTextIsHonest(unittest.TestCase):
         for absent in ("Clear audio cache", "Clear lyrics cache", "Delete your account"):
             self.assertNotIn(f"| {absent} |", raw, f"{absent} does not exist as a UI control")
         self.assertIn("Controls that do not exist", support)
+    def test_the_status_vocabulary_is_pinned(self) -> None:
+        """The exact status of every page, asserted against the front matter.
+        The audit document's status table was written from memory and had the
+        assignment almost exactly backwards — it called `support` current and
+        `about` reference, when the front matter says the opposite. Pinning the
+        mapping here means that table cannot drift from the sources again.
+        """
+        expected = {
+            "about": "current",
+            "privacy": "draft",
+            "terms": "draft",
+            "open-source-licenses": "reference",
+            "third-party-notices": "reference",
+            "support": "draft",
+            "security-reporting": "reference",
+        }
+        self.assertEqual(set(self.pages), set(expected), "the page set changed")
+        self.assertEqual(
+            {k: v.status for k, v in self.pages.items()},
+            expected,
+            "a page's status changed; update the audit document's §6 table too",
+        )
+        # Every status must be one of the three agreed values, never `final`.
+        for page in self.pages.values():
+            self.assertIn(page.status, {"draft", "current", "reference"})
+    def test_every_draft_page_says_so_in_its_own_text(self) -> None:
+        """A draft that does not announce itself is a policy that looks final.
+        All three draft pages must carry a visible DRAFT notice in the body,
+        not only in the front matter — the front matter never reaches the user.
+        """
+        drafts = [p for p in self.pages.values() if p.status == "draft"]
+        self.assertEqual(
+            sorted(p.id for p in drafts),
+            ["privacy", "support", "terms"],
+            "the set of draft pages changed",
+        )
+        for page in drafts:
+            with self.subTest(page=page.id):
+                self.assertIn("DRAFT", page.markdown, f"{page.id} is a draft with no notice")
+
+
 
 
 # --------------------------------------------------------------------------

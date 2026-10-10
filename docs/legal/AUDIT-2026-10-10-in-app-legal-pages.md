@@ -181,15 +181,23 @@ is on. Disclosed in `legal/privacy.md` §4.1 rather than quietly fixed.
 The seven pages use a three-valued status vocabulary, deliberately not
 `draft`/`final`:
 
+Read from the `status:` field of each canonical page, not from memory — an
+earlier draft of this table had the assignment almost exactly backwards.
+
 | Value | Meaning | Pages |
 | --- | --- | --- |
-| `draft` | not signed off; the in-app page **says so on screen** | `privacy`, `terms` |
-| `current` | the operative policy of this project today | `open-source-licenses`, `third-party-notices`, `support`, `security-reporting` |
-| `reference` | not a policy statement at all; an "about" page | `about` |
+| `draft` | not signed off; the in-app page **says so on screen** | `privacy`, `terms`, `support` |
+| `current` | the operative description of this project today | `about` |
+| `reference` | not a policy statement at all — a licence or notice text | `open-source-licenses`, `third-party-notices`, `security-reporting` |
 
-Status is **per page**, not global. `support` is real and current while
-`privacy` is unsigned — a single project-wide flag would have had to call both
-the same thing.
+`scripts/test_legal_content.py::test_the_status_vocabulary_is_pinned` asserts
+this exact mapping, so the table above cannot drift from the front matter.
+
+Status is **per page**, not global, and that is load-bearing: `support` is
+`draft` because there is no support commitment to make, while `about` is
+`current` because describing what the app is needs no sign-off. A single
+project-wide flag would have had to call all seven the same thing — either
+over-claiming on the policies or needlessly hedging the about page.
 
 Two specific things the text refuses to claim, on instruction:
 
