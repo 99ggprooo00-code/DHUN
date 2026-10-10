@@ -228,8 +228,15 @@ object MarkdownParser {
         var rest = source
 
         while (rest.isNotEmpty()) {
+            // Both patterns are searched on every pass, and the earliest match
+            // wins. Gating the bare-URL search on `link != null` — as an earlier
+            // revision did — means a paragraph with no [text](url) link never
+            // gets its bare URLs linked at all, which is most of this corpus.
+            // Ties go to `link` because minByOrNull keeps the first minimum and
+            // `link` is listed first; the web parser spells that rule as
+            // `link.index <= url.index`.
             val link = LINK.find(rest)
-            val url = if (link == null) null else BARE_URL.find(rest)
+            val url = BARE_URL.find(rest)
             val next = listOfNotNull(link, url).minByOrNull { it.range.first }
 
             if (next == null) {
