@@ -85,7 +85,7 @@ class ForbiddenClaims(unittest.TestCase):
 
 class RequiredCaveats(unittest.TestCase):
     REQUIRED = (
-        ("rolling-unverified", "<p>Rolling UNVERIFIED development build</p>"),
+        ("public-unverified", "<p>Unverified public pre-release</p>"),
         ("borrowed-time", "<p>This is borrowed time.</p>"),
         ("hardware-gates-open", "<p>Hardware gates still open</p>"),
     )
@@ -110,12 +110,12 @@ class RequiredCaveats(unittest.TestCase):
 
     def test_empty_caveat_element_fails(self):
         blocks = [
-            "<div data-caveat=\"rolling-unverified\"></div>",
+            "<div data-caveat=\"public-unverified\"></div>",
             "<div data-caveat=\"borrowed-time\"><p>borrowed time</p></div>",
             "<div data-caveat=\"hardware-gates-open\"><p>Hardware gates still open</p></div>",
         ]
         violations = claims.required_caveat_violations(self.front_page(blocks))
-        self.assertTrue(any("rolling-unverified" in v for v in violations), violations)
+        self.assertTrue(any("public-unverified" in v for v in violations), violations)
 
     def test_section_wrapper_is_supported(self):
         markup = page(
@@ -180,14 +180,12 @@ class BuiltOutput(unittest.TestCase):
         documents = {**self.pages, **claims.load_site_sources()}
         self.assertEqual(claims.digest_violations(documents), [])
 
-    def test_no_release_asset_is_linked_and_the_release_page_is(self):
+    def test_no_release_asset_is_linked_and_the_public_release_page_is(self):
         """Downloads are not this site's business: point, never hand out.
 
-        Until this session the download page linked all eight rolling assets
-        directly. That page is gone by decision, and the rule is inverted: a
-        direct link to an artifact is a defect (the files are unverified and
-        replaced on every merge), while the release *page* — where the warning
-        lives next to the files — must still be reachable from the site.
+        A direct link to an artifact implies an endorsement and bypasses the
+        warning that belongs with it. The public versioned release page must be
+        reachable; the private rolling `test` draft must not be advertised.
         """
         for route, markup in self.pages.items():
             artifacts = re.findall(r'href="([^"]*/releases/download/[^"]*)"', markup)
@@ -199,14 +197,14 @@ class BuiltOutput(unittest.TestCase):
                     f"{route} links a {extension} file",
                 )
         self.assertTrue(
-            any("/releases/tag/test" in markup for markup in self.pages.values()),
+            any("/releases/tag/v1.00.001" in markup for markup in self.pages.values()),
             "the release page is not reachable from any built page",
         )
 
     def test_front_page_states_the_honest_status_visibly(self):
         text = claims.html_to_text(self.pages["/"]).lower()
         for phrase in (
-            "rolling unverified development build",
+            "unverified public pre-release",
             "borrowed time",
             "hardware gates still open",
             "gpl-3.0",

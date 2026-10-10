@@ -2,8 +2,8 @@ name: Build APK
 
 # Fast, artifact-only debug APK for every push to main and every PR — the
 # job a reviewer/agent uses to sanity-check "does Android still assemble"
-# without waiting on the release pipeline. The rolling `test` pre-release
-# publishes its own APK from `.github/workflows/test-release.yml`; this one
+# without waiting on the release pipeline. The private rolling `test` draft
+# and fixed v1.00.001 prerelease are created by `test-release.yml`; this one
 # only uploads a run-scoped artifact.
 #
 # Module names are not guesses in this repo: the Android application module is

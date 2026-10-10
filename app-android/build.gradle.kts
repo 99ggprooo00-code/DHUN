@@ -16,8 +16,8 @@ android {
         // without a connectivity fallback. shared's minSdk must stay <= this.
         minSdk = 24
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.1.4"
+        versionCode = 6
+        versionName = "1.00.001"
     }
 
     // ABI splits plus a universal APK. The rolling release publishes all three:

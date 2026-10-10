@@ -158,7 +158,7 @@ test("print: a hidden caveat is named, a visible one is not", () => {
   assert.deepEqual(
     caveatsHiddenInPrint([
       { key: "borrowed-time", visible: true, height: 120 },
-      { key: "rolling-unverified", visible: true, height: 40 },
+      { key: "public-unverified", visible: true, height: 40 },
     ]),
     [],
   );

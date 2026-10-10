@@ -179,12 +179,12 @@ cssModules: ["tokens", "base", "components", "mockups"]
   </section>
 
   <section class="closing" aria-labelledby="feat-close">
-    <!-- README.md (test-builds policy) and test-release.yml: the download is the rolling pre-release, not a versioned release. -->
-    <h2 id="feat-close">Read the code, or run the rolling build.</h2>
-    <p>The whole thing is GPL-3.0 source. Public binaries live on the release
-    page, which carries the warning that belongs with them: they are rolling,
-    unverified development builds replaced on every merge.</p>
-    <p><a href="{{ site.testReleasePage }}" rel="noopener">The rolling test pre-release</a>
+    <!-- docs/releases/v1.00.001.md and test-release.yml: public fixed pre-release; rolling test builds are private drafts. -->
+    <h2 id="feat-close">Read the code, or try the public pre-release.</h2>
+    <p>The whole thing is GPL-3.0 source. The public release page carries the
+    experimental build and its installation warnings; the rolling test
+    channel is restricted to repository collaborators.</p>
+    <p><a href="{{ site.publicReleasePage }}" rel="noopener">View the public pre-release</a>
     · <a href="{{ site.plan }}" rel="noopener">How this site is built and checked</a></p>
     <div class="cta-row">
       <a class="btn btn--primary" href="{{ site.ctaPrimary.href | sitePath }}">{{ site.ctaPrimary.label }}</a>

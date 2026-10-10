@@ -1,4 +1,4 @@
-"""Safety contracts for the artifact-only dispatch path (no third-party YAML parser)."""
+"""Safety contracts for the release workflow without a third-party YAML parser."""
 
 import ast
 import re
@@ -70,19 +70,37 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertNotIn("contents: write", before_publish)
         self.assertIn("    permissions:\n      contents: write", self.publish)
 
-    def test_publish_reasserts_the_rolling_release_is_readable(self):
-        # GitHub lists draft releases only to callers with push access. The msi
-        # job runs on contents:read and the public Releases page has no push
-        # token either, so publishing is not done until isDraft is provably false.
-        self.assertIn("gh release edit test --draft=false --prerelease", self.publish)
-        self.assertIn("\"$(gh release view test --json isDraft --jq '.isDraft')\" != \"false\"", self.publish)
-        self.assertLess(
-            self.publish.index("gh release create test"),
-            self.publish.index("gh release edit test --draft=false"),
-        )
+    def test_rolling_test_release_stays_a_private_draft(self):
+        self.assertIn("gh release create test", self.publish)
+        self.assertIn("--draft --prerelease", self.publish)
+        self.assertIn("--notes-file docs/releases/rolling-test.md", self.publish)
+        self.assertIn("\"$(gh release view test --json isDraft --jq '.isDraft')\" != \"true\"", self.publish)
+        self.assertNotIn("gh release edit test --draft=false", self.publish)
+
+    def test_fixed_version_is_created_once_as_public_prerelease(self):
+        self.assertIn("Create the fixed v1.00.001 public prerelease once", self.publish)
+        self.assertIn("python scripts/stage_versioned_release.py", self.publish)
+        self.assertIn("--notes-file docs/releases/v1.00.001.md", self.publish)
+        for asset in (
+            "dhun-v1.00.001.apk",
+            "dhun-v1.00.001-arm64-v8a.apk",
+            "dhun-v1.00.001-armeabi-v7a.apk",
+            "dhun-v1.00.001.msi",
+        ):
+            self.assertIn(f"dist/$version/{asset}", self.publish)
+            self.assertIn(f"dist/$version/{asset}.sha256", self.publish)
+        self.assertIn("--prerelease", self.publish)
+        self.assertIn(".isDraft')\" != \"false\"", self.publish)
+        self.assertIn(".isPrerelease')\" != \"true\"", self.publish)
+        self.assertIn("already exists; leaving its assets and tag unchanged", self.publish)
+        self.assertIn("already exists but is still a draft; refusing to silently skip it", self.publish)
+        self.assertIn("already exists but is not marked as a prerelease", self.publish)
 
     def test_unreadable_baseline_skips_the_install_over_check_instead_of_wedging(self):
         smoke = (WORKFLOW.parents[2] / "scripts/check_msi_upgrade.ps1").read_text()
+        self.assertIn("'dhun-v1.00.001.msi'", smoke)
+        self.assertIn("'dhun-test.msi'", smoke)
+        self.assertIn('gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $assetName', smoke)
         # The skip is announced once, as a warning, and never as a pass.
         self.assertEqual(1, smoke.count("MSI install-over SKIPPED"))
         self.assertIn("::warning title=MSI install-over SKIPPED::", smoke)

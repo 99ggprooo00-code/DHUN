@@ -1,414 +1,53 @@
-# DHUN 
-https://99ggprooo00-code.github.io/DHUN/
+# DHUN
 
-A serious, cross-platform music application streaming from YouTube Music.
-Android (primary) · Desktop via Compose Multiplatform (Windows/Linux/macOS).
+[Features](https://99ggprooo00-code.github.io/DHUN/features/) · [Source](https://github.com/99ggprooo00-code/DHUN)
 
-> **Status:** Phases 01–11 merged; Phases 12–13 have CI-green code with
-> hardware gates open; Phase 14 robustness/rot-drill work is in progress —
-> live status in [.ai/ROADMAP.md](.ai/ROADMAP.md). Plan:
-> [.ai/MASTER_PROMPT.md](.ai/MASTER_PROMPT.md); why it looks like this:
-> [.ai/PROBLEMS_AND_FIXES.md](.ai/PROBLEMS_AND_FIXES.md).
+DHUN is a free, open-source music player for Android and Windows desktop. It uses YouTube Music for catalogue data and playback, with no DHUN account or sign-in.
 
-## The two facts that define this project
+> **Pre-release:** `v1.00.001` is an experimental build, not a stable or store-ready release. Playback depends on upstream YouTube behavior and can stop working without warning. Android and Windows hardware acceptance is still in progress. The rolling `test` build is restricted to repository collaborators.
 
-1. **Extraction is maintenance, not implementation.** YouTube enforces PO
-   tokens / SABR; hand-rolled InnerTube extraction is what killed ViMusic,
-   RiMusic, InnerTune and others. Under accepted ADR-001, DHUN currently
-   uses its **own sequential InnerTube player-client chain**, with an
-   optional **user-provided yt-dlp desktop fallback** while the pinned
-   NewPipe engine remains a non-fatal recovery watch, not the production
-   primary. Metadata also uses the own client. A **daily CI rot-drill**
-   validates resolution and actual audio bytes against live YouTube.
-2. **Code-first.** The previous attempt produced great documents and an app
-   that never attempted its core mission. Every phase here ships running
-   code on real hardware before it is "done."
+<!-- Screenshots will be added after maintainer device captures are available. -->
+
+## What DHUN includes
+
+- Home discovery, search, and artist, album, and playlist browsing.
+- A personal library with liked songs, playlists, listening history, and downloads for offline playback.
+- Android background playback with notification/media controls, plus a mini-player and full player.
+- Queue management, shuffle, repeat, lyrics when available, and related-track/radio playback.
+- A Windows desktop app with a system tray, media controls, and taskbar jump lists.
+- Appearance and playback settings. Desktop audio uses the system's VLC/libVLC installation.
+
+The browser interface at [`/app/`](https://99ggprooo00-code.github.io/DHUN/app/) is an engineering preview: it has sample/live metadata but **does not play audio**.
+
+## Install the pre-release
+
+Download builds from the [DHUN v1.00.001 pre-release](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.001). Read the [installation guide](docs/INSTALL.md) first. These builds use a public test signing key and are not intended for a daily-use device.
+
+- **Android:** Android 7.0 (API 24) or newer. Install the universal APK unless you specifically need an ABI split.
+- **Windows:** install the MSI per user. Windows SmartScreen may warn because the installer is unsigned; playback requires VLC installed separately.
+
+## Build from source
+
+Requires JDK 17. Android builds also need Android SDK 35 and `ANDROID_HOME` set.
+
+```bash
+./gradlew :app-android:assembleDebug
+./gradlew :app-desktop:run
+./gradlew :shared:jvmTest
+```
+
+The committed Android test key is public and for test builds only. Do not use it for a store release. The Windows MSI's internal version is an installer-upgrade sequence, not the DHUN app version.
+
+## Status and scope
+
+DHUN has no DHUN-hosted account, cloud sync, iOS app, or production browser audio player. The web interface is only a preview. YouTube extraction is a maintenance risk, and passing CI does not replace testing playback and installation on real devices.
 
 ## Website
 
-`website/dist/` is a static marketing site for the applications above: three
-routes (`/`, `/features/`, `/ui/`), no client-side JavaScript, no analytics and
-no third-party runtime asset. Its canonical URL,
-<https://99ggprooo00-code.github.io/DHUN/>, is a GitHub Actions deployment
-(`build_type: workflow`; switched from `legacy` by a human on 2026-10-09 — until
-then the URL served Jekyll's rendering of this README, which is why the
-previous version of this section warned against trusting the URL). What to check
-when the serving changes at all: `docs/runbooks/publishing-the-site.md`.
-
-**"See the interface" opens the real interface.** The site's primary call to
-action links to <https://99ggprooo00-code.github.io/DHUN/app/> — the `app-web/`
-mirror running from the same origin (next section) — rather than the
-hand-drawn pages. The line under the button states what it delivers and what
-it does not (audio playback from this origin is unproven; the page says so),
-and the honesty contract forbids the copy from claiming more than that.
-
-**Served under a base path — and that is checked.** The site is a *project*
-page, so its documents live at `/DHUN/...`, not at the origin's root. Every
-internal link therefore carries that prefix (one `path` value in
-`website/src/_data/site.js`); a quality check fails on any internal link that
-forgot it; and the browser and Lighthouse jobs serve the build under the same
-`/DHUN/` sub-path, so they measure the URL structure a visitor gets. The rule
-exists because the prefix was once missing: the whole deployed nav 404'd while
-every local gate stayed green (found 2026-10-09, session
-`arena/90cb6d2c-dhun`).
-
-**It is not a distribution channel.** The site describes the software and shows
-its interface; it does not hand out builds, digests, sizes or installation
-instructions. The rolling `test` pre-release is one link away, on its release
-page, where the warning about it lives next to the files — and `scripts/website_quality.py`
-fails the build if a page ever links an artifact directly.
-
-- Source: `website/` — Eleventy (pinned), one command: `cd website && npm ci && npm run build`.
-  The build composes each route's stylesheet from the modules its front matter
-  declares and then drops the rules that route cannot use
-  (`website/tools/prune-css.mjs`); measured page weight falls from 53.6 KB to
-  51.3 KB on `/`, 54.9 KB to 48.0 KB on `/features/`, 56.3 KB to 49.5 KB on
-  `/ui/` and 17.4 KB to 12.8 KB on `/404.html`, with one request per route and no
-  client-side JavaScript — see
-  `docs/verification/23-per-route-css-pruning.md`.
-- Deployment: `.github/workflows/website.yml` publishes the deploy to GitHub
-  Pages from `main` only — the checked site at the root **plus** the `app-web/`
-  mirror at `/app/` (its build is a byte copy, so the deploy assembles it
-  without a bundler). This workflow stays the single owner of the Pages
-  artifact, so the mirror cannot be published by a racing second workflow; a
-  session branch can build and check but never overwrite the public site.
-  After a publish, the `served` job fetches the live origin and re-runs the
-  honesty contract, every internal link (resolved the way a browser does) and
-  the mirror's shell over the wire.
-- Its claims are enforced by tests, not by review: forbidden claims (iOS, a web
-  player, sync, import, FLAC or any bitrate, store channels, unshipped
-  platforms), required front-page caveats (rolling unverified build, borrowed
-  time, open hardware gates), a ban on baked digests or byte sizes (the rolling
-  `test` assets change on every push), and — since 2026-10-08 — a check that the
-  site's "no telemetry, no crash reporting, no advertising SDK" claim is true of
-  the dependency graph the Gradle builds actually resolve. See
-  `scripts/website_claims.py`, `scripts/website_quality.py` and
-  `docs/verification/22-one-request-hard-viewports-print-and-structured-data.md`.
-- The repository contains **no screenshots**; every visual on the site is a
-  labelled CSS recreation of the real UI (six of them, on `/` and `/features/`
-  and `/ui/`), and `.ai/WEBSITE_PLAN.md` §9 lists the captures that should
-  replace them. The `/ui/` page also states the app's design tokens, read from
-  `shared/src/commonMain/kotlin/dev/dhun/design/`.
-- Browser-measured, not argued: Playwright checks nine viewports — 280 px, the
-  four phone widths, an 844×390 landscape phone, tablet and desktop, plus a
-  640×512 layout viewport (a 1280×1024 window at 200 % zoom) — for overflow,
-  touch targets, every tab stop's focus ring, rendered headings, link text,
-  contrast in dark and light, `forced-colors: active`, `prefers-contrast: more`,
-  print and reduced motion, in the `browser` job. The same job carries the
-  mirror's first browser measurements: `/app/` must boot, carry its
-  engineering-preview notice, throw nothing unhandled and not overflow, at
-  desktop and phone widths in both colour schemes. The decisions behind the
-  marketing checks are pure functions in `website/tests/rules.mjs`,
-  mutation-proven by `node --test` in the build job, where no browser is
-  needed. Lighthouse gates the median of three samples per route in the
-  `lighthouse` job.
-- **One request per route.** The stylesheet and the tab icon are inlined (the
-  icon as a `data:` URI built from `website/src/assets/dhun-favicon.svg`), so a
-  visit fetches exactly one document; a rule asserts the inlined icon is still
-  the source file, and another fails on any built file no page references.
-
-## Web preview (`app-web/`)
-
-The app's interface, mirrored in a browser: Home, Search, Library, Settings,
-the mini and full player, queue, LRC lyrics and the 10-band equaliser. It is an
-**engineering preview, not a product surface** — published `noindex` at
-<https://99ggprooo00-code.github.io/DHUN/app/> by the site workflow (ADR-008
-amendment, 2026-10-09 (2)) and linked from the site's primary call to action:
-
-- **No runtime dependency**: vanilla ES modules, two hand-written stylesheets
-  (every colour traced to `DhunAppearance.kt`), icons generated from
-  `DhunIcons.kt`, no framework, no bundler, no CDN.
-- **No audio.** No stream is reachable from this origin, so the transport
-  advances a *labelled clock*: the seek bar, queue, lyrics sync and equaliser
-  all respond, nothing is audible, and a persistent on-page notice says so.
-  Adding a proxy would breach ADR-008 and has not been done.
-- **Sample data, labelled.** The metadata is a fictional bundled catalogue
-  unless the anonymous live source answers; the page says which one served it.
-- The trace is enforced, not conventional: `app-web/tests/*.test.mjs` (61
-  tests, no install) and `scripts/test_app_web.py` (app CI step 1, Node-free)
-  assert the token mirror, the no-third-party-asset rule, `noindex`, the strict
-  CSP and the honesty notices.
-
-Run it locally: `cd app-web && node tools/serve.mjs 4173`, then open
-<http://localhost:4173/>.
+The [DHUN site](https://99ggprooo00-code.github.io/DHUN/) is published by GitHub Actions (`build_type: workflow`) and checked after deployment. If Pages falls back to `legacy`, see [the publishing runbook](docs/runbooks/publishing-the-site.md).
 
 ## License
 
-GPL-3.0 — required for legitimate reuse of the ecosystem's maintained
-extractors (NewPipe Extractor is GPL-3.0). See THIRD_PARTY.md.
+GPL-3.0. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md). DHUN is not affiliated with YouTube or Google.
 
-## Build
-
-Requires JDK 17 and an Android SDK (`ANDROID_HOME`).
-
-```bash
-./gradlew :app-android:assembleDebug   # Android debug APK
-./gradlew :app-android:bundleDebug     # Android debug App Bundle (AAB, same signing)
-./gradlew :shared:jvmTest              # domain + parser + queue + data-layer unit tests
-./gradlew :tools:playback-probe:run    # extraction probe (needs PYTHONPATH w/ yt-dlp for the resolve step)
-./gradlew :tools:playback-probe:run -PmainClass=dev.dhun.tools.smoke.SmokeMainKt  # live provider smoke
-./gradlew :app-desktop:run             # system libVLC; optional yt-dlp fallback (see below)
-./gradlew :app-desktop:compileKotlinJvm  # desktop compile check (what CI should run)
-
-# Live Phase 14 rot-drill (requires network + yt-dlp on PATH or Python module)
-./gradlew :tools:playback-probe:run --no-daemon
-```
-
-Outputs: ABI-split debug APKs under
-`app-android/build/outputs/apk/debug/` (`*universal*`, `*arm64-v8a*`,
-`*armeabi-v7a*` — there is no single `app-android-debug.apk` once splits are
-on), AAB `app-android/build/outputs/bundle/debug/app-android-debug.aab`. All are
-signed with the committed **public test keystore**
-(`app-android/keystores/dhun-test.p12`, see the *Release build* section for
-the exact sign/verify/install commands and what that key is — and is not —
-for).
-
-## Test builds policy
-
-ONE rolling test **pre-release** exists — tag `test`, assets
-`dhun-test.apk` (Android universal, minSdk 24 / Android 7.0),
-`dhun-test-arm64-v8a.apk` and `dhun-test-armeabi-v7a.apk` (ABI splits of the
-same build; DHUN bundles no native code — compare the `.sha256` sidecars),
-and `dhun-test.msi` (Windows, needs libVLC installed), auto-replaced on every
-push to main. Install the universal APK unless you have a reason not to. No
-versioned releases for unfinished builds; nothing in Releases is stable or
-store-ready. Install test builds only on devices where that is acceptable
-(not your daily phone). Stable URLs:
-`https://github.com/99ggprooo00-code/DHUN/releases/download/test/dhun-test.apk`,
-`…/dhun-test-arm64-v8a.apk`, `…/dhun-test-armeabi-v7a.apk`, `…/dhun-test.msi`.
-What is in a build: [`CHANGELOG.md`](CHANGELOG.md)
-(`Unreleased` until `v0.1.0` earns its tag).
-
-### Branch candidates without publishing a release
-
-The existing `test-release` workflow also supports a manual **build-only**
-run on a session branch. `build_only` defaults to true; non-main refs cannot
-run the publish job even if that input is turned off. Builds use read-only
-repository permissions. APK/MSI ZIP artifacts are retained for 14 days in
-Actions (GitHub sign-in may be required), separate from the single rolling
-`test` release. No new branch, PR or release is needed.
-
-PRs to main also run these package checks before merging, without publishing.
-Only use an MSI that passed the native sentinel checks. Packaging finalization
-in `scripts/stage_msi.ps1` applies the upgrade-data policy before checksums;
-raw `:app-desktop:packageMsi` output alone is not a distribution-ready update.
-
-Each ZIP includes the binary, SHA256 and a `*.build-info.json` with its exact
-source SHA/run and internal MSI version. The Windows job reads the actual
-MSI's version/upgrade identity and checks install-over/data preservation on
-a disposable hosted Windows runner; that is not a user-machine/audio test.
-Use [the short Windows candidate guide](docs/verification/windows-candidate.md)
-when a successful build link is supplied. Do not download the old public
-release expecting unmerged branch fixes.
-
-### Install / uninstall (test builds)
-
-These are **unsigned/debug test artifacts**, not store releases. Sideload
-only on a device you are willing to experiment with.
-
-**Android (`dhun-test.apk`, package `dev.dhun.android`)**
-- Permissions: Internet, notifications, media-playback foreground
-  service, wake lock, and a one-shot battery-optimisation exemption
-  dialog (needed so OEM savers don't kill background music). No
-  contacts, SMS, location, camera, microphone, storage, overlay, or
-  accessibility.
-- `allowBackup=false` and `hasFragileUserData=false` — Android does not
-  cloud-backup DHUN data and does not offer to keep it on uninstall.
-- All files live in app-private storage (`/data/data/dev.dhun.android`:
-  `databases/dhun.db`, `cache/audio-segments`, Coil cache). **Uninstall
-  from the launcher or Settings → Apps → DHUN deletes that tree.**
-  Nothing is written to shared storage.
-- Signed with the public throwaway test key in
-  `app-android/keystores/dhun-test.p12` (password `android`) so CI
-  updates install over each other. Anyone with the repo can mint a
-  same-key APK — only install from the GitHub `test` pre-release URL.
-
-**Windows (`dhun-test.msi`)**
-- Per-user install (no Administrator prompt) to `%LOCALAPPDATA%\DHUN`.
-  Uninstall: Settings → Apps → DHUN → Uninstall (or Start menu → DHUN
-  folder). Packaged runtime data is intended to live under
-  `<installDir>/userdata` (SQLite + audio cache), not `%APPDATA%\DHUN`,
-  and be removed with the program. Clean-target cleanup and in-place
-  upgrade data preservation still require hardware verification.
-- The MSI is **not Authenticode-signed** — SmartScreen will warn
-  ("Windows protected your PC"). That is expected for a test build,
-  not a virus. Needs a system VLC/libVLC install for playback; DHUN
-  does not install or uninstall VLC.
-- The desktop fallback is **not bundled**. If needed, install the official
-  [yt-dlp Windows executable](https://github.com/yt-dlp/yt-dlp/releases/latest)
-  on PATH, or set `DHUN_YTDLP` to its full executable path, then restart DHUN.
-  A standalone `yt-dlp.exe` does not need Python. VLC and yt-dlp perform
-  different jobs; installing VLC alone does not install an extractor.
-  The candidate resolver ignores user yt-dlp config/cookies. If audio
-  fails, open **Playback details** and copy the bounded diagnostic plus
-  track ID; do not share cookies, signed stream URLs or credentials.
-- Public tag/asset names stay `test` / `dhun-test.msi`. The **internal MSI
-  ProductVersion must increase**: `scripts/installer_version.py` maps
-  workflow run and attempt to a valid numeric version; CI supplies it via
-  `-PdhunInstallerVersion=…`, keeping the upgrade UUID stable. For manual
-  packaging, use a version higher than the installed build (the local
-  default 1.0.6 is not higher than future CI versions). Do not reset MSI
-  ProductVersion to the app's `0.1.0` semver. Quit DHUN/tray before updating.
-- **Repair build available (2026-09-06):** PR #30 merged the Windows/Home/
-  player repairs. Main CI and rolling test publishing passed, including
-  native MSI install-over/data-preservation and uninstall sentinels. The
-  first verified release of this repair code was **11:58:17Z / `76c68eb`**,
-  internal MSI **1.36.1**; the rolling release can advance with later builds.
-  Use the current checksum/build identity. This is **not** proof of actual
-  sound, live Home or visual/native behavior on your machine; those checks
-  remain open. Quit DHUN/tray and back up userdata before updating. Report
-  Playback **Details** if an uncached song still fails.
-- Unsigned / SmartScreen + debug APK are why these are not
-  daily-driver builds. Source of both artifacts is this repo via
-  `.github/workflows/test-release.yml`.
-
-## Release build — v0.1.0 candidate (build / sign / run)
-
-> **Status 2026-09-07:** the v0.1.0 release pipeline is *prepared, not
-> published*. Candidate artifacts are **debug/test-grade** (debug-keystore
-> APK + AAB, unsigned MSI), and **no `v0.1.0` tag or GitHub Release is
-> public**. A private **DRAFT** release may exist; publishing requires the
-> Phase 14 gates in `docs/verification/14-release.md` **and** the user's
-> explicit go-ahead. Hosted-Windows install-over checks are NOT proof of a
-> real upgrade, launch, audio, or hardware behavior.
-
-### Artifacts, and how each is produced
-
-| Asset | Gradle/CI job | Raw output path | Signing |
-|---|---|---|---|
-| `dhun-v0.1.0.apk` (universal) plus `dhun-v0.1.0-arm64-v8a.apk` and `dhun-v0.1.0-armeabi-v7a.apk` | `:app-android:assembleDebug` (CI `apk`, staged by `scripts/stage_android_apks.py`) | `app-android/build/outputs/apk/debug/*universal*`, `*arm64-v8a*`, `*armeabi-v7a*` | `testBuild` debug keystore (below) |
-| `dhun-v0.1.0.aab` | `:app-android:bundleDebug` (CI `aab`) | `app-android/build/outputs/bundle/debug/app-android-debug.aab` | same `testBuild` debug keystore |
-| `dhun-v0.1.0.msi` | `:app-desktop:packageMsi` (CI `msi`) | under `app-desktop/build/compose/` | not Authenticode-signed |
-
-**Android signing facts.** With no explicit config AGP would sign each debug
-build with a throwaway per-machine `~/.android/debug.keystore`, so every CI
-build would get a *different* signature and refuse to update an existing
-install. The `debug` build type therefore points at the committed public
-throwaway key `app-android/keystores/dhun-test.p12` (store/key password
-`android`, alias `androiddebugkey`); `bundleDebug` inherits it, which is why
-the candidate AAB is signed too. This key is **not** a store key: the
-`release` build type has no signing config yet, and a real Play/Store upload
-needs its own keystore — do not mint one with this file. Anyone with the
-repo can sign a same-key APK, so only install artifacts from the repo's own
-CI URLs.
-
-### Versions and the MSI ProductVersion rule
-
-- There is **no `gradle/libs.versions.toml`** in this repo (no version
-  catalog). Versions are pinned in the module build files.
-- App semantic version: `versionCode`/`versionName` in
-  `app-android/build.gradle.kts` (currently `5` / `0.1.4` — independent of
-  the `v0.1.0` tag; aligning them for a store upload is an `app-android`
-  change outside this candidate). The release tag is `v0.1.0`.
-- **MSI ProductVersion is an installer sequence, NOT the app version.**
-  Windows compares it only to decide upgrades. It must strictly increase on
-  every build/rerun and never be reset to `0.1.0`. CI allocates it from the
-  workflow run counter via `scripts/installer_version.py`
-  (`major 1..255.minor 0..255.build 0..65535`); the `upgradeUuid`
-  (`31ddb86b-9666-4071-b11c-45f16fa4682d`) stays stable forever.
-
-### Reproduce in CI (recommended, repeatable)
-
-1. GitHub → Actions → **test-release** → **Run workflow**.
-2. Ref: `main` for the real candidate (or a session branch for artifacts).
-3. Tick `build_release_candidate`; tick `publish_v010_draft` only when you
-   want the private DRAFT `v0.1.0` release refreshed with the assets.
-   Leave `build_only` at its default (artifact-only).
-4. Green jobs: `apk` + `msi` (includes the disposable-Windows install-over
-   sentinel check) + `aab`; plus `release_draft` when requested. The rolling
-   `test` release is **not** touched by these inputs.
-5. Result: 14-day artifact ZIPs, or the DRAFT release `v0.1.0` carrying
-   `dhun-v0.1.0.{apk,aab,msi}` + `.sha256` + `.build-info.json` (source
-   commit, run URL, MSI ProductVersion).
-
-The draft job re-stages provenance under the release asset names and
-verifies every binary came from the same run/commit. It replaces an older
-**draft** but refuses to touch an already-**published** `v0.1.0`.
-
-### Publish v0.1.0 — only after the user's go-ahead
-
-1. Close the Phase 14 release gates (`docs/verification/14-release.md`):
-   green live rot-drill verdict, Android + Desktop soaks, clean-target
-   installs of all three artifacts.
-2. Run the workflow on `main` with `publish_v010_draft = true` and verify
-   the draft's assets/notes.
-3. Publish: `gh release publish v0.1.0` (or the GitHub UI). Publishing
-   creates the public `v0.1.0` tag. Then finalize `CHANGELOG.md` (drop the
-   DRAFT markers, add the version compare link), review
-   `.ai/KNOWN_LIMITATIONS.md`/`THIRD_PARTY.md`, and record verification
-   evidence.
-
-### Manual Android build, verify signature, install
-
-```bash
-./gradlew :app-android:assembleDebug :app-android:bundleDebug --no-daemon
-# ABI splits: install the universal. There is no app-android-debug.apk.
-apksigner verify --print-certs app-android/build/outputs/apk/debug/*universal*.apk
-adb install -r app-android/build/outputs/apk/debug/*universal*.apk
-
-# AAB test install via bundletool (key = the committed test keystore):
-java -jar bundletool.jar build-apks \
-  --bundle=app-android/build/outputs/bundle/debug/app-android-debug.aab \
-  --output=dhun-v0.1.0.apks \
-  --ks=app-android/keystores/dhun-test.p12 --ks-pass=pass:android \
-  --ks-key-alias=androiddebugkey --key-pass=pass:android
-java -jar bundletool.jar install-apks --apks=dhun-v0.1.0.apks
-```
-
-If a tool rejects the `.p12`, convert it once with `keytool -importkeystore`
-into a JKS using the same alias/passwords. The AAB is debug-keystore-signed
-and is **not** Play-upload ready.
-
-### Manual Windows MSI (needs a Windows host with WiX; see caveats)
-
-```powershell
-# 1. Allocate a ProductVersion strictly higher than anything already installed:
-python scripts/installer_version.py $env:GITHUB_RUN_NUMBER $env:GITHUB_RUN_ATTEMPT
-# 2. Build:
-./gradlew :app-desktop:packageMsi "-PdhunInstallerVersion=1.99.1" --no-daemon
-# 3. FINALIZE before distributing (upgrade-data policy + identity check + checksums):
-./scripts/stage_msi.ps1 -ExpectedVersion 1.99.1 -BuildOnly true
-```
-
-**Manual packaging caveats**
-
-- jpackage produces MSIs via the **WiX Toolset**; GitHub's Windows runner
-  has it installed — a local Windows machine needs WiX 3.x installed and on
-  PATH or `:app-desktop:packageMsi` fails.
-- Raw `:app-desktop:packageMsi` output is **not** distribution-ready:
-  `stage_msi.ps1` (via `patch_msi_upgrade.ps1`) applies the installer
-  upgrade-data policy and verifies ProductVersion/UpgradeCode/ProductName
-  before checksums are written. Never hand out an unfinalized MSI.
-- Pick a ProductVersion higher than the installed build (query a candidate
-  with `scripts/msi_helpers.ps1` → `Get-DhunMsiProperties`); the local
-  default `1.0.6` is not higher than recent CI versions. Do **not** reset
-  ProductVersion to `0.1.0`.
-- The MSI is per-user and unsigned (SmartScreen warns); quit DHUN/tray
-  before installing; back up `<installDir>/userdata` before an in-place
-  upgrade; playback needs a system VLC install.
-
-### Verify checksums
-
-```bash
-sha256sum dhun-v0.1.0.apk dhun-v0.1.0.aab dhun-v0.1.0.msi   # Linux/macOS
-# Windows: Get-FileHash dhun-v0.1.0.msi -Algorithm SHA256
-```
-
-Compare against the `.sha256` assets; `*.build-info.json` records the exact
-source commit, workflow run URL and MSI ProductVersion, so a checksum match
-also pins provenance.
-
-## Repo map
-
-- `CHANGELOG.md` — Keep-a-Changelog; no versioned release yet; the planned
-  `[0.1.0]` first-release notes are drafted there (marked DRAFT)
-
-- `.ai/` — agent operating files (moved out of the project root 2026-09-05):
-  - `.ai/MASTER_PROMPT.md` — the 14-phase engineering plan (the contract)
-  - `.ai/PROMPT_SEQUENCE.md` — audit of the original 30-phase prompt set + rewritten prompts
-  - `.ai/PROBLEMS_AND_FIXES.md` — audit of the original plan + evidence
-  - `.ai/RISK_REGISTER.md` — what will go wrong and the pre-agreed responses
-  - `.ai/ROADMAP.md` — live phase status (CURRENT ACTIVE TASK at the top)
-  - `.ai/KNOWN_LIMITATIONS.md` — honest gaps, updated every phase
-  - `.ai/DEBUG_LOG.md` — incidents: stack → root cause → fix
-  - `.ai/README.md` — boot protocol + permanent maintenance contract
+For release details, see [`CHANGELOG.md`](CHANGELOG.md). For development and known limitations, see [`docs/`](docs/).

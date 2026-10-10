@@ -2,7 +2,7 @@
 layout: base.njk
 title: "DHUN — a YouTube Music client with no sign-in, for Android and Windows"
 ogTitle: "DHUN — music without an account"
-description: "DHUN is a free, open-source YouTube Music client for Android and Windows. No sign-in, no cookies, no ads and no telemetry, with downloads that stay on your device. Public builds are rolling and unverified."
+description: "DHUN is a free, open-source YouTube Music client for Android and Windows. No sign-in, no cookies, no ads and no telemetry, with downloads that stay on your device. A public pre-release is available for testing; rolling test builds are private."
 cssModules: ["tokens", "base", "components", "mockups"]
 ---
 <div class="wrap">
@@ -108,10 +108,10 @@ cssModules: ["tokens", "base", "components", "mockups"]
     <p>{{ paragraph }}</p>
     {%- endfor %}
     <!--{{ site.risk.source }}-->
-    <p><a href="{{ site.risk.link.href }}" rel="noopener">{{ site.risk.link.label }}</a> · <a href="{{ site.testReleasePage }}" rel="noopener">Every published build is a pre-release</a></p>
+    <p><a href="{{ site.risk.link.href }}" rel="noopener">{{ site.risk.link.label }}</a> · <a href="{{ site.publicReleasePage }}" rel="noopener">View the public pre-release</a></p>
   </section>
 
-  <!-- REQUIRED CAVEATS 2 and 3: unverified rolling build, open hardware gates. -->
+  <!-- REQUIRED CAVEATS 2 and 3: unverified public pre-release, open hardware gates. -->
   <section aria-labelledby="status-title">
     <div class="section-head">
       <h2 id="status-title">{{ site.status.title }}</h2>
@@ -119,7 +119,7 @@ cssModules: ["tokens", "base", "components", "mockups"]
     <ul class="status-list">
       {%- for item in site.status.items %}
       <!--{{ item.source }}-->
-      <li class="card" data-caveat="{% if loop.index == 1 %}rolling-unverified{% else %}hardware-gates-open{% endif %}">
+      <li class="card" data-caveat="{% if loop.index == 1 %}public-unverified{% else %}hardware-gates-open{% endif %}">
         <span class="card-label">{% if loop.index == 1 %}UNVERIFIED{% else %}OPEN GATE{% endif %}</span>
         <h3>{{ item.label }}</h3>
         <p>{{ item.text }}</p>

@@ -20,9 +20,8 @@ const SITE = "https://99ggprooo00-code.github.io/DHUN";
 // build at a root) stays green. `scripts/website_quality.py` asserts the
 // prefix on every internal link; the value is spelled in one place, here.
 const PATH = "/DHUN";
-// Rolling pre-release tag `test`. Assets are replaced on every push to main,
-// so they are linked by URL only: never by digest or size (Part A §4.3).
-const TEST_RELEASE = `${REPO}/releases/download/test`;
+// Fixed public pre-release; the rolling `test` tag is a private draft.
+const PUBLIC_RELEASE = `${REPO}/releases/tag/v1.00.001`;
 
 export default {
   url: SITE,
@@ -33,7 +32,7 @@ export default {
   licence: `${REPO}/blob/main/LICENSE`,
   thirdParty: `${REPO}/blob/main/THIRD_PARTY.md`,
   plan: `${REPO}/blob/main/.ai/WEBSITE_PLAN.md`,
-  testReleasePage: `${REPO}/releases/tag/test`,
+  publicReleasePage: PUBLIC_RELEASE,
   releases: `${REPO}/releases`,
 
   title: "DHUN — a YouTube Music client with no sign-in",
@@ -198,13 +197,13 @@ export default {
   },
 
   status: {
-    title: "What the build you can download actually is",
+    title: "What the public pre-release is — and is not",
     items: [
       {
-        label: "Rolling UNVERIFIED development build",
+        label: "Unverified public pre-release",
         text:
-          "The download on this site is the rolling “test” pre-release, rebuilt from main on every push. It is not a release, it carries no support promise, and it is signed with a public throwaway test key rather than a store key.",
-        source: "README.md test-builds policy; test-release.yml",
+          "A fixed pre-release is available from GitHub Releases for testing. It carries no support promise and uses a public throwaway Android test key rather than a store key. The rolling test channel is a separate private draft for repository collaborators.",
+        source: "docs/releases/v1.00.001.md; .github/workflows/test-release.yml",
       },
       {
         label: "Hardware gates still open",
@@ -215,16 +214,16 @@ export default {
       {
         label: "Nothing is store-ready",
         text:
-          "No Play Store, no F-Droid, no Microsoft Store, no versioned release — only a rolling pre-release that is replaced on every merge, signed with a public test key. This site does not hand out builds; the release page carries the files and the warnings that belong with them.",
-        source: "MASTER_PROMPT §7 S6; .ai/ROADMAP.md",
+          "There is no Play Store or Microsoft Store distribution, and neither the Android APK nor the Windows MSI is store-signed. This is a pre-release, not a stable release. This site does not hand out builds; the release page carries the files and the warnings that belong with them.",
+        source: "docs/releases/v1.00.001.md; .ai/ROADMAP.md",
       },
     ],
   },
 
   closing: {
-    title: "Read it, run it, or build it yourself.",
+    title: "Read it, run the pre-release, or build it yourself.",
     body:
-      "The whole project is GPL-3.0 source, and the public binaries live on the release page as a rolling, unverified pre-release. If a claim on this site is wrong, the honesty tests in the repository fail the build — and you can check them.",
+      "The whole project is GPL-3.0 source. The public versioned pre-release and its warnings live on GitHub Releases; the rolling test channel is private to repository collaborators. If a claim on this site is wrong, the honesty tests in the repository fail the build — and you can check them.",
     source: "scripts/test_website_claims.py",
   },
 
@@ -508,7 +507,7 @@ export default {
     { text: "No published audio-quality figure. DHUN makes no bitrate, lossless or FLAC claim of any kind.", source: "no verified number exists in the repository" },
     { text: "No casting, no Android Auto, no CarPlay.", source: "not implemented anywhere in the tree" },
     { text: "No recommendation engine of its own: related tracks and the radio come from the same anonymous endpoints as everything else.", source: "ADR-001, Phase 15 endless-radio" },
-    { text: "No store channel and no signed release: the only public artifact is the rolling test pre-release.", source: "app-android/.../keystores/dhun-test.p12, releases/tag/test" },
+    { text: "No store channel and no store-signed release; only a public pre-release is available for testing.", source: "app-android/.../keystores/dhun-test.p12, docs/releases/v1.00.001.md" },
   ],
 
   install: {
