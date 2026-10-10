@@ -6,12 +6,13 @@ All notable changes to DHUN are recorded here. The format follows
 should use [Semantic Versioning](https://semver.org/) unless requested
 otherwise.
 
-**Release status:** `v1.00.001` is prepared as a fixed **public pre-release**;
-the main-branch release workflow creates it after a successful build. It is
-not a stable or store-ready release, and real-device acceptance remains open.
-The rolling `test` tag is a separate private draft for collaborators and is
+**Release status:** `v1.00.001` is published as a fixed **public pre-release**
+(GitHub tag `v1.00.001` → commit `6ebc45c`, published 2026-10-10). It is not a
+stable or store-ready release, and real-device acceptance remains open. The
+rolling `test` tag is a separate private draft for collaborators and is
 replaced on main updates. Both use the public Android test key; Windows MSI
-ProductVersion is a separate increasing installer sequence.
+ProductVersion is a separate increasing installer sequence (`3.61.1` for the
+published MSI).
 
 The release/version string `1.00.001` is preserved exactly as requested in the
 GitHub tag and Android `versionName`; it is not silently normalized.
@@ -21,6 +22,27 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 `.ai/RISK_REGISTER.md`).
 
 ## [Unreleased]
+
+### Merge-to-main no longer mutates releases (2026-10-10)
+
+- **Changed:** `test-release.yml` `publish` runs only on a manual dispatch from `main` with `build_only=false`. Before, every push to `main` (including each merge) deleted the `dev`, `dev-v0.1.0`, `dev-v0.1.1`, and `test` releases and recreated the private draft. Merges now build and test only.
+- Test: `scripts/test_build_workflow.py` asserts push and PR events never publish.
+
+### Release hygiene — no JSON in future release assets, install-over required on main, version gate (2026-10-10, session `arena/7884ea99-dhun`)
+
+- **Changed: new release sidecars are `*.provenance.txt`, not `*.build-info.json`.**
+  The same whitelisted fields are written as flat `key=value` lines, next to the
+  unchanged `.sha256` checksum. The fixed `v1.00.001` release keeps its published
+  `.build-info.json` assets; nothing was modified, deleted, or re-uploaded.
+- **Changed: an MSI install-over SKIP fails the run on `main`.** On main
+  (the only path that publishes), a missing baseline is now a failure, because the
+  install-over, sentinel, future-upgrade and uninstall checks did not run. PR and
+  branch builds may still skip, recorded as `status=skipped` in `result.txt`.
+- **Added: a version-identity test** (`scripts/test_release_identity.py`) that
+  fails when the Android `versionName` and the fixed release identifier in
+  `test-release.yml` disagree.
+- **Not changed:** the publish path still creates `v1.00.001` only once and does
+  not yet support a second public version. See `docs/releases/RELEASE-POLICY.md`.
 
 ### Android — now-playing thumbnail on API < 31, blur/brightness controls, local greeting (2026-10-10, session `arena/20ca817b-dhun`)
 

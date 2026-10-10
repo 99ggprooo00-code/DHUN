@@ -21,7 +21,7 @@ The browser interface at [`/app/`](https://99ggprooo00-code.github.io/DHUN/app/)
 
 ## Install the pre-release
 
-Download builds from the [DHUN v1.00.001 pre-release](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.001). Read the [installation guide](docs/INSTALL.md) first. These builds use a public test signing key and are not intended for a daily-use device.
+Download builds from the [DHUN v1.00.001 pre-release](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.001). Read the [installation guide](docs/INSTALL.md) first, and verify each file against its `.sha256` sidecar before installing. These builds use a public test signing key and are not intended for a daily-use device. Security reports: see [SECURITY.md](SECURITY.md). Release rules: see [release policy (proposal)](docs/releases/RELEASE-POLICY.md).
 
 - **Android:** Android 7.0 (API 24) or newer. Install the universal APK unless you specifically need an ABI split.
 - **Windows:** install the MSI per user. Windows SmartScreen may warn because the installer is unsigned; playback requires VLC installed separately.

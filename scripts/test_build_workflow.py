@@ -38,7 +38,8 @@ class BuildWorkflowTest(unittest.TestCase):
             ("refs/pull/30/merge", "pull_request", False, False),
             ("refs/heads/main", "workflow_dispatch", True, False),
             ("refs/heads/main", "workflow_dispatch", False, True),
-            ("refs/heads/main", "push", False, True),
+            ("refs/heads/main", "push", False, False),
+            ("refs/heads/main", "push", True, False),
             ("refs/heads/main", "schedule", False, False),
         )
         code = compile(tree, str(WORKFLOW), "eval")
@@ -46,6 +47,12 @@ class BuildWorkflowTest(unittest.TestCase):
             with self.subTest(ref=ref, event=event, build_only=build_only):
                 result = eval(code, {"__builtins__": {}}, {"ref": ref, "event": event, "build_only": build_only})
                 self.assertIs(result, expected)
+
+    def test_merge_to_main_cannot_mutate_releases(self):
+        # A merge pushes to main; that must build/test only, never publish.
+        self.assertIn("  push:\n    branches: [main]", self.text)
+        self.assertNotIn("github.event_name == 'push'", self.publish)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.build_only == false", self.publish)
 
     def test_installer_is_a_pull_request_check_before_merge(self):
         self.assertIn("  pull_request:\n    branches: [main]", self.text)
@@ -131,6 +138,33 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("python scripts/installer_version.py $env:GITHUB_RUN_NUMBER $env:GITHUB_RUN_ATTEMPT", self.text)
         self.assertIn('"-PdhunInstallerVersion=$version"', self.text)
         self.assertIn("-ExpectedVersion $env:INSTALLER_VERSION", self.text)
+
+
+    def test_future_release_assets_contain_no_json(self):
+        # Release-facing assets: no .json may be uploaded by the publish job.
+        # (The published v1.00.001 .build-info.json files are historical and untouched.)
+        self.assertNotIn(".json", self.publish)
+        self.assertIn("dist/$version/dhun-v1.00.001.msi.provenance.txt", self.publish)
+        self.assertIn("dist/dhun-test.msi.provenance.txt", self.publish)
+        for line in self.text.splitlines():
+            if "upload" in line or "gh release create" in line:
+                self.assertNotIn(".json", line)
+        for block in self.text.split("uses: actions/upload-artifact@v6")[1:]:
+            self.assertNotIn(".json", block.split("\n      - ", 1)[0])
+
+    def test_install_over_is_required_for_main_and_a_skip_is_not_green_there(self):
+        msi = self.text.split("\n  msi:\n", 1)[1].split("\n  aab:\n", 1)[0]
+        self.assertIn("REQUIRE_INSTALL_OVER: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}", msi)
+        self.assertIn("-RequireInstallOver:$require", msi)
+        smoke = (WORKFLOW.parents[2] / "scripts/check_msi_upgrade.ps1").read_text()
+        self.assertIn("[switch]$RequireInstallOver", smoke)
+        self.assertIn("MSI install-over is REQUIRED for this build but was SKIPPED", smoke)
+        # The machine-readable outcome is text, and distinguishes skipped from passed.
+        self.assertIn("status = 'skipped'", smoke)
+        self.assertIn("status = 'passed'", smoke)
+        self.assertIn("'result.txt'", smoke)
+        self.assertNotIn("result.json", smoke)
+        self.assertNotIn("ConvertTo-Json", smoke)
 
 
 if __name__ == "__main__":

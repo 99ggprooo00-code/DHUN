@@ -19,14 +19,16 @@ it before opening the MSI**. The artifact ZIP contains:
 
 - `dhun-test.msi`
 - `dhun-test.msi.sha256`
-- `dhun-test.msi.build-info.json` — source commit, run link, internal MSI
-  version and the exact binary hash/size
+- `dhun-test.msi.provenance.txt` — source commit, run link, internal MSI
+  version and the exact binary hash/size (plain text, not JSON)
 - this guide
 
 Optional checksum check in PowerShell, from the extracted folder:
 
 ```powershell
-Get-FileHash .\dhun-test.msi -Algorithm SHA256
+$expected = (Get-Content .\dhun-test.msi.sha256 -Raw).Split()[0].ToLowerInvariant()
+$actual = (Get-FileHash .\dhun-test.msi -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -eq $expected) { "OK: checksum matches" } else { "MISMATCH: do not install" }
 ```
 
 Compare the result with the `.sha256` file. The internal MSI version is a

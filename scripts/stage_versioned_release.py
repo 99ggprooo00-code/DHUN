@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import os
 import re
 import shutil
@@ -14,7 +13,7 @@ from pathlib import Path
 from typing import Mapping
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from stage_artifact import stage_artifact  # noqa: E402
+from stage_artifact import PROVENANCE_SUFFIX, parse_provenance, stage_artifact  # noqa: E402
 
 ASSETS = (
     ("dhun-test.apk", "dhun-v{version}.apk"),
@@ -27,13 +26,9 @@ VERSION_PATTERN = re.compile(r"\d+\.\d+\.\d+\Z")
 
 def _build_info(path: Path) -> dict:
     try:
-        with path.open(encoding="utf-8") as stream:
-            info = json.load(stream)
-    except (OSError, json.JSONDecodeError) as error:
+        return parse_provenance(path.read_text(encoding="ascii"))
+    except (OSError, UnicodeError, ValueError) as error:
         raise ValueError(f"cannot read staged provenance {path}: {error}") from error
-    if not isinstance(info, dict):
-        raise ValueError(f"invalid staged provenance {path}")
-    return info
 
 
 def _sha256(path: Path) -> str:
@@ -53,7 +48,7 @@ def stage_versioned_release(
     """Copy verified `test` binaries under versioned names with fresh provenance.
 
     The source job outputs must all name this repository and the exact commit
-    being released. Checksums and build-info are regenerated for the renamed
+    being released. Checksums and provenance are regenerated for the renamed
     files, so the sidecars remain byte-accurate.
     """
     if not VERSION_PATTERN.fullmatch(version):
@@ -73,7 +68,7 @@ def stage_versioned_release(
         source = source_dir / source_name
         if not source.is_file() or source.stat().st_size == 0:
             raise ValueError(f"source asset is missing or empty: {source}")
-        source_info = _build_info(source.with_name(source.name + ".build-info.json"))
+        source_info = _build_info(source.with_name(source.name + PROVENANCE_SUFFIX))
         if source_info.get("artifact") != source_name:
             raise ValueError(f"provenance artifact mismatch for {source_name}")
         if source_info.get("sourceSha") != source_sha:

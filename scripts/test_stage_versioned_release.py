@@ -1,11 +1,11 @@
 """Contract for creating fixed-version assets from a successful test build."""
 
 import hashlib
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
+from stage_artifact import parse_provenance, render_provenance
 from stage_versioned_release import ASSETS, stage_versioned_release
 
 
@@ -35,23 +35,30 @@ class StageVersionedReleaseTest(unittest.TestCase):
             (self.source / (source_name + ".sha256")).write_text(
                 f"{digest}  {source_name}\n", encoding="ascii"
             )
-            (self.source / (source_name + ".build-info.json")).write_text(
-                json.dumps(
-                    {
-                        "artifact": source_name,
-                        "sha256": digest,
-                        "bytes": len(contents),
-                        "sourceSha": self.SHA,
-                        "repository": self.REPOSITORY,
-                        "buildOnly": False,
-                        "installerVersion": "2.193.1" if source_name.endswith(".msi") else None,
-                        "upgradeCode": "31ddb86b-9666-4071-b11c-45f16fa4682d"
-                        if source_name.endswith(".msi")
-                        else None,
-                    }
-                ),
-                encoding="utf-8",
-            )
+            self._write_provenance(source_name, digest, len(contents))
+
+    def _write_provenance(self, source_name, digest, size, **overrides):
+        fields = {
+            "schemaVersion": "1",
+            "artifact": source_name,
+            "sha256": digest,
+            "bytes": size,
+            "sourceSha": self.SHA,
+            "repository": self.REPOSITORY,
+            "buildOnly": False,
+            "installerVersion": "2.193.1" if source_name.endswith(".msi") else None,
+            "upgradeCode": "31ddb86b-9666-4071-b11c-45f16fa4682d" if source_name.endswith(".msi") else None,
+        }
+        fields.update(overrides)
+        (self.source / (source_name + ".provenance.txt")).write_text(
+            render_provenance(fields), encoding="ascii"
+        )
+
+    def _edit_apk_provenance(self, **overrides):
+        """Rewrite the APK provenance with one or more fields replaced."""
+        name = "dhun-test.apk"
+        digest = hashlib.sha256((self.source / name).read_bytes()).hexdigest()
+        self._write_provenance(name, digest, (self.source / name).stat().st_size, **overrides)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -68,13 +75,14 @@ class StageVersionedReleaseTest(unittest.TestCase):
         for item in metadata:
             binary = self.output / item["artifact"]
             sidecar = binary.with_name(binary.name + ".sha256")
-            info = binary.with_name(binary.name + ".build-info.json")
+            info = binary.with_name(binary.name + ".provenance.txt")
             expected_hash = hashlib.sha256(binary.read_bytes()).hexdigest()
             self.assertEqual(expected_hash, item["sha256"])
             self.assertEqual(
                 f"{expected_hash}  {binary.name}\n", sidecar.read_text(encoding="ascii")
             )
-            staged = json.loads(info.read_text(encoding="utf-8"))
+            self.assertFalse(binary.with_name(binary.name + ".build-info.json").exists())
+            staged = parse_provenance(info.read_text(encoding="ascii"))
             self.assertEqual(self.SHA, staged["sourceSha"])
             self.assertIn("dhun-v1.00.001", binary.name)
             self.assertFalse(staged["buildOnly"])
@@ -83,26 +91,17 @@ class StageVersionedReleaseTest(unittest.TestCase):
         self.assertIsNotNone(msi["upgradeCode"])
 
     def test_rejects_assets_built_from_another_commit(self):
-        info = self.source / "dhun-test.apk.build-info.json"
-        data = json.loads(info.read_text(encoding="utf-8"))
-        data["sourceSha"] = "b" * 40
-        info.write_text(json.dumps(data), encoding="utf-8")
+        self._edit_apk_provenance(sourceSha="b" * 40)
         with self.assertRaisesRegex(ValueError, "not built from this release commit"):
             stage_versioned_release(self.source, self.output, "1.00.001", self.ENVIRONMENT)
 
     def test_rejects_artifacts_from_another_repository(self):
-        info = self.source / "dhun-test.apk.build-info.json"
-        data = json.loads(info.read_text(encoding="utf-8"))
-        data["repository"] = "other/repo"
-        info.write_text(json.dumps(data), encoding="utf-8")
+        self._edit_apk_provenance(repository="other/repo")
         with self.assertRaisesRegex(ValueError, "different repository"):
             stage_versioned_release(self.source, self.output, "1.00.001", self.ENVIRONMENT)
 
     def test_rejects_build_only_artifacts(self):
-        info = self.source / "dhun-test.apk.build-info.json"
-        data = json.loads(info.read_text(encoding="utf-8"))
-        data["buildOnly"] = True
-        info.write_text(json.dumps(data), encoding="utf-8")
+        self._edit_apk_provenance(buildOnly=True)
         with self.assertRaisesRegex(ValueError, "not marked as a publishable build"):
             stage_versioned_release(self.source, self.output, "1.00.001", self.ENVIRONMENT)
 
