@@ -31,16 +31,48 @@
             android:name="android.app.shortcuts"
             android:resource="@xml/shortcuts" />
 
+        <!-- API < 31 trampoline: raw Activity, no Compose in its bytecode.
+             Started by .LegacyLauncher (values/bools). Android 12+ uses
+             .Launcher → MainActivity directly (values-v31). -->
+        <activity
+            android:name=".LaunchActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.Dhun.Launch" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:windowSoftInputMode="adjustResize">
+            android:theme="@style/Theme.Dhun.Launch"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity-alias
+            android:name=".Launcher"
+            android:enabled="@bool/dhun_compose_launcher"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity"
+            android:theme="@style/Theme.Dhun.Launch">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LegacyLauncher"
+            android:enabled="@bool/dhun_view_launcher"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:targetActivity=".LaunchActivity"
+            android:theme="@style/Theme.Dhun.Launch">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <service
             android:name=".playback.DhunPlaybackService"

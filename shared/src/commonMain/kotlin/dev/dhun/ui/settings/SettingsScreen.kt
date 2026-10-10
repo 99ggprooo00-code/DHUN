@@ -29,6 +29,7 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunThemeMode
+import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.design.components.DhunAppearanceControls
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunIconButton
@@ -106,6 +107,7 @@ fun SettingsScreen(
                     DhunAppearance.setAppearance(nextAccent = accent)
                 },
             )
+            BackdropControls(viewModel = viewModel)
 
             SectionHeader(title = "Playback & storage")
             CacheBudgetRow(viewModel = viewModel)
@@ -122,6 +124,76 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(DhunSpacing.xl))
+        }
+    }
+}
+
+@Composable
+private fun BackdropControls(viewModel: SettingsViewModel) {
+    val blur by viewModel.backdropBlurPercent.collectAsState()
+    val brightness by viewModel.backdropBrightnessPercent.collectAsState()
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding),
+        verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+    ) {
+        if (supportsRealtimeBlur) {
+            Text(
+                text = "Background blur",
+                style = MaterialTheme.typography.bodyLarge,
+                color = DhunColors.textPrimary,
+            )
+            Text(
+                text = "How heavily the now-playing cover is frosted behind the app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = DhunColors.textSecondary,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Slider(
+                    value = blur.toFloat(),
+                    onValueChange = { value ->
+                        val percent = value.toInt().coerceIn(0, 100)
+                        viewModel.setBackdropBlurPercent(percent)
+                        DhunAppearance.setBackdropPrefs(blurPercent = percent)
+                    },
+                    valueRange = 0f..100f,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                Text(
+                    text = "$blur%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                )
+            }
+        } else {
+            Text(
+                text = "Background brightness",
+                style = MaterialTheme.typography.bodyLarge,
+                color = DhunColors.textPrimary,
+            )
+            Text(
+                text = "This Android version cannot frost the cover. This fades the now-playing thumbnail behind the app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = DhunColors.textSecondary,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Slider(
+                    value = brightness.toFloat(),
+                    onValueChange = { value ->
+                        val percent = value.toInt().coerceIn(0, 100)
+                        viewModel.setBackdropBrightnessPercent(percent)
+                        DhunAppearance.setBackdropPrefs(brightnessPercent = percent)
+                    },
+                    valueRange = 0f..100f,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                Text(
+                    text = "$brightness%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                )
+            }
         }
     }
 }

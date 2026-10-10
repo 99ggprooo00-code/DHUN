@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- API 31+: launcher icon opens MainActivity directly (Android 12/15 path). -->
+    <bool name="dhun_compose_launcher">true</bool>
+    <bool name="dhun_view_launcher">false</bool>
+</resources>

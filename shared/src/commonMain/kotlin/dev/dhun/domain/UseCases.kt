@@ -34,13 +34,14 @@ class GetHomeFeedUseCase(
     private val provider: MusicProvider,
     private val history: HistoryRepository,
     private val clock: EpochClock = EpochClock.System,
+    private val utcOffsetMs: () -> Long = { 0L },
 ) {
     suspend operator fun invoke(mood: HomeMood = HomeMood.FOR_YOU): DhunResult<HomeFeed> {
         if (mood != HomeMood.FOR_YOU) {
             return when (val result = provider.search(requireNotNull(mood.query), SearchFilter.SONGS)) {
                 is DhunResult.Success -> DhunResult.Success(
                     HomeFeed(
-                        greeting = greetingForCurrentTime(clock),
+                        greeting = greetingForCurrentTime(clock, utcOffsetMs()),
                         sections = moodSections(mood, result.value),
                         continuationToken = result.value.continuationToken,
                     ),
@@ -48,7 +49,7 @@ class GetHomeFeedUseCase(
                 is DhunResult.Failure -> result
             }
         }
-        val greeting = greetingForCurrentTime(clock)
+        val greeting = greetingForCurrentTime(clock, utcOffsetMs())
         return when (val r = provider.homeFeedPage()) {
             is DhunResult.Success -> {
                 val sections = r.value.sections
@@ -150,11 +151,15 @@ class GetHomeFeedUseCase(
             else -> "Good night"
         }
 
-        fun greetingForCurrentTime(clock: EpochClock = EpochClock.System): String {
-            val epochMs = clock.nowMs()
+        /** [utcOffsetMs] is the device offset from UTC (e.g. Nepal +5:45). Hour is local, not UTC. */
+        fun greetingForCurrentTime(
+            clock: EpochClock = EpochClock.System,
+            utcOffsetMs: Long = 0L,
+        ): String {
+            val epochMs = clock.nowMs() + utcOffsetMs
             val totalHours = (epochMs / 3_600_000L)
-            val utcHour = ((totalHours % 24) + 24) % 24
-            return greetingForHour(utcHour.toInt())
+            val localHour = ((totalHours % 24) + 24) % 24
+            return greetingForHour(localHour.toInt())
         }
 
         /**

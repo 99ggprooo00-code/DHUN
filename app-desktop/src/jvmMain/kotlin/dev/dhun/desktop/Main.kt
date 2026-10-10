@@ -55,6 +55,7 @@ import dev.dhun.player.AudioCacheBudget
 import dev.dhun.player.AudioFileCache
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.library.currentUtcOffsetMs
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
@@ -330,6 +331,8 @@ fun main(args: Array<String>) {
                     DhunAppearance.applyPersistedAppearance(
                         settings.getString(SettingsKeys.THEME),
                         settings.getString(SettingsKeys.ACCENT),
+                        settings.getInt(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT),
+                        settings.getInt(SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT),
                     )
                 }
             }
@@ -712,7 +715,7 @@ private val desktopModule = module {
         )
     }
 
-    single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
+    single { GetHomeFeedUseCase(get(), get<DataLayer>().history, utcOffsetMs = { currentUtcOffsetMs() }) }
     single { GetRecommendationsUseCase(get(), get<DataLayer>().history, get<DataLayer>().library) }
 
     // Phase 11 lyrics — cache → YTM → LRCLIB → NotAvailable, persisted in SQLDelight

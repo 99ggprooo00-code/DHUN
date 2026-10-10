@@ -28,6 +28,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import dev.dhun.design.BlurredArtworkCache
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
@@ -96,12 +97,12 @@ object LyricsMaterialPolicy {
     )
 
     /**
-     * Whether this surface should paint its own blurred artwork. A blank URL
-     * or a platform that cannot really blur falls back to the veil alone, so
-     * a sharp cover is never stretched under text.
+     * Whether this surface should paint its own artwork. A blank URL falls
+     * back to the veil alone. Platforms without RenderEffect still paint the
+     * cover (dimmed); they do not skip it.
      */
-    fun shouldPaintArtwork(artworkUrl: String?, supportsBlur: Boolean): Boolean =
-        !artworkUrl.isNullOrBlank() && supportsBlur
+    fun shouldPaintArtwork(artworkUrl: String?): Boolean =
+        !artworkUrl.isNullOrBlank()
 }
 
 /** The lyrics-card veil. Call sites that already sit on a blurred backdrop use this alone. */
@@ -248,10 +249,9 @@ fun AcrylicSurface(
 }
 
 /**
- * Blurred now-playing artwork for one surface. List tier — a panel blurred
- * by 32dp cannot use the 1024px hero, and the shell backdrop already requests
- * this same URL. Skipped when blur is unsupported so a sharp cover never
- * fills the panel.
+ * Now-playing artwork for one surface. List tier — a panel blurred by 32dp
+ * cannot use the 1024px hero, and the shell backdrop already requests this
+ * same URL. On API < 31 the cover is drawn sharp and dimmed (no software blur).
  */
 @Composable
 internal fun LyricsArtworkLayer(
@@ -259,7 +259,7 @@ internal fun LyricsArtworkLayer(
     modifier: Modifier = Modifier,
 ) {
     val resolved = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) }
-    if (!LyricsMaterialPolicy.shouldPaintArtwork(resolved, supportsRealtimeBlur)) return
+    if (!LyricsMaterialPolicy.shouldPaintArtwork(resolved)) return
     val cacheKey = remember(artworkUrl) { BlurredArtworkCache.keyFor(artworkUrl, null) }
     // AsyncImage, not ArtworkImage: a failed load there paints a note glyph
     // and a grey wash, which under a blur reads as a dirty slab. Hide it and
@@ -267,25 +267,52 @@ internal fun LyricsArtworkLayer(
     var failed by remember(resolved) { mutableStateOf(false) }
     if (failed) return
     val context = LocalPlatformContext.current
+    val canBlur = supportsRealtimeBlur
+    val brightnessPercent = DhunAppearance.backdropBrightnessPercent
     key(cacheKey) {
         LaunchedEffect(cacheKey) {
             if (cacheKey.isNotBlank()) BlurredArtworkCache.markPrepared(cacheKey)
         }
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(resolved)
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
-            modifier = modifier
-                .graphicsLayer {
-                    // Past the clip so the blur rim never draws a hard edge.
-                    scaleX = NowPlayingBackdropPolicy.OVERSCAN
-                    scaleY = NowPlayingBackdropPolicy.OVERSCAN
-                }
-                .blur(DhunSpacing.glassBlur * LyricsMaterialPolicy.BLUR_SCALE),
-            contentScale = ContentScale.Crop,
-            onError = { failed = true },
-        )
+        Box(modifier) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(resolved)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // Past the clip so the blur rim never draws a hard edge.
+                        scaleX = NowPlayingBackdropPolicy.OVERSCAN
+                        scaleY = NowPlayingBackdropPolicy.OVERSCAN
+                    }
+                    .then(
+                        if (canBlur && DhunAppearance.backdropBlurPercent > 0) {
+                            Modifier.blur(
+                                DhunSpacing.glassBlur * LyricsMaterialPolicy.BLUR_SCALE *
+                                    NowPlayingBackdropPolicy.blurMultiplier(
+                                        DhunAppearance.backdropBlurPercent,
+                                    ),
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
+                contentScale = ContentScale.Crop,
+                onError = { failed = true },
+            )
+            if (!canBlur) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Color.Black.copy(
+                                alpha = NowPlayingBackdropPolicy.dimAlphaForBrightness(brightnessPercent),
+                            ),
+                        ),
+                )
+            }
+        }
     }
 }

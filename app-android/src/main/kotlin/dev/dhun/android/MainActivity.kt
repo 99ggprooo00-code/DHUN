@@ -128,23 +128,33 @@ class MainActivity : ComponentActivity() {
         }
         handleShortcutIntent(intent)
         requestNotificationPermissionIfNeeded()
+        // Views first, before Koin/SQLDelight. Compose 1.8's Android
+        // GraphicsLayer references android.graphics.RenderEffect (API 31).
+        // On API 29/30 that class load during the first Compose frame is
+        // process death that looks like "installs, never opens". API < 31
+        // cold starts go through LaunchActivity so ART can verify a
+        // Compose-free class and paint this layout before MainActivity loads.
+        try {
+            showConnectingUi()
+        } catch (t: Throwable) {
+            Log.e(TAG, "connecting UI failed", t)
+        }
         // S4: restore the persisted theme/accent before first composition so
         // the launch frame already carries the user's appearance. Best-effort:
         // a corrupt row falls back to dark+brand inside applyPersistedAppearance,
-        // and a dead Koin/DB must never block startup.
+        // and a dead Koin/DB must never block startup — and must never run
+        // before the connecting View has been set.
         runCatching {
             val settings = GlobalContext.get().get<DataLayer>().settings
-            val (themeId, accentId) = runBlocking {
-                settings.getString(SettingsKeys.THEME) to settings.getString(SettingsKeys.ACCENT)
+            runBlocking {
+                DhunAppearance.applyPersistedAppearance(
+                    settings.getString(SettingsKeys.THEME),
+                    settings.getString(SettingsKeys.ACCENT),
+                    settings.getInt(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT),
+                    settings.getInt(SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT),
+                )
             }
-            DhunAppearance.applyPersistedAppearance(themeId, accentId)
         }
-        // Views first — Compose 1.8's Android GraphicsLayer references
-        // android.graphics.RenderEffect (API 31). On API 29/30 that class
-        // load during the first Compose frame is a process death that looks
-        // like "installs, never opens". The connecting layout is a normal
-        // View hierarchy so Android 10 can paint DHUN before we touch Compose.
-        showConnectingUi()
         activityScope.launch {
             connectState.collect { ui ->
                 when (ui) {
@@ -159,7 +169,7 @@ class MainActivity : ComponentActivity() {
 
     private fun showConnectingUi() {
         setContentView(R.layout.activity_connecting)
-        findViewById<TextView>(R.id.connecting_version).text = "v${appVersionName()}"
+        findViewById<TextView>(R.id.connecting_version)?.text = "v${appVersionName()}"
     }
 
     private fun showFailedUi(message: String) {

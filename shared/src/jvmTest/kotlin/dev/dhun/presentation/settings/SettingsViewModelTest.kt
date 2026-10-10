@@ -44,6 +44,8 @@ class SettingsViewModelTest {
         assertEquals(SettingsKeys.CACHE_SIZE_MB_DEFAULT, v.cacheSizeMb.value)
         assertEquals(SettingsKeys.RESUME_ON_LAUNCH_DEFAULT, v.resumeOnLaunch.value)
         assertEquals(SettingsKeys.CLOSE_TO_TRAY_DEFAULT, v.closeToTray.value)
+        assertEquals(SettingsKeys.BACKDROP_BLUR_DEFAULT, v.backdropBlurPercent.value)
+        assertEquals(SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT, v.backdropBrightnessPercent.value)
     }
 
     @Test
@@ -116,5 +118,24 @@ class SettingsViewModelTest {
         assertEquals("1 GB", SettingsViewModel.cacheOptionLabel(1024))
         assertEquals("4 GB", SettingsViewModel.cacheOptionLabel(4096))
         assertTrue(SettingsKeys.ACCENT in SettingsKeys.all)
+        assertTrue(SettingsKeys.BACKDROP_BLUR in SettingsKeys.all)
+        assertTrue(SettingsKeys.BACKDROP_BRIGHTNESS in SettingsKeys.all)
+    }
+
+    @Test
+    fun backdropPrefsRoundTripAndClamp(): Unit = runBlocking {
+        val d = data()
+        val v = loaded(vm(d, this))
+        v.setBackdropBlurPercent(40)
+        v.setBackdropBrightnessPercent(20)
+        assertEquals(40, v.backdropBlurPercent.value)
+        assertEquals(20, v.backdropBrightnessPercent.value)
+        v.setBackdropBlurPercent(250)
+        v.setBackdropBrightnessPercent(-4)
+        assertEquals(100, v.backdropBlurPercent.value)
+        assertEquals(0, v.backdropBrightnessPercent.value)
+        val v2 = loaded(vm(d, this))
+        assertEquals(100, v2.backdropBlurPercent.value)
+        assertEquals(0, v2.backdropBrightnessPercent.value)
     }
 }

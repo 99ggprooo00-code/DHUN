@@ -52,11 +52,20 @@ object SettingsKeys {
     const val RESUME_ON_LAUNCH = "resume_on_launch"
     const val RESUME_ON_LAUNCH_DEFAULT = true
 
+    /** 0–100 multiplier on the 64dp now-playing blur (API 31+ / desktop). */
+    const val BACKDROP_BLUR = "backdrop_blur"
+    const val BACKDROP_BLUR_DEFAULT = 100
+
+    /** 0–100 thumbnail brightness when blur is unavailable (API < 31). */
+    const val BACKDROP_BRIGHTNESS = "backdrop_brightness"
+    const val BACKDROP_BRIGHTNESS_DEFAULT = 55
+
     /** Desktop window geometry, "x,y,w,h" — see Phase 12. */
     const val WINDOW_GEOMETRY = "window_geometry"
 
     val all: List<String> = listOf(
         AUDIO_QUALITY, THEME, ACCENT, ACCENT_MODE, LYRICS_ENABLED, CACHE_SIZE_MB, COUNTRY_CODE,
         EXPLICIT_CONTENT, CLOSE_TO_TRAY, RESUME_ON_LAUNCH, WINDOW_GEOMETRY,
+        BACKDROP_BLUR, BACKDROP_BRIGHTNESS,
     )
 }

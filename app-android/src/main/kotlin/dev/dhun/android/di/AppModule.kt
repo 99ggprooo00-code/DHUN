@@ -8,6 +8,7 @@ import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.SettingsKeys
 import dev.dhun.domain.GetHomeFeedUseCase
+import dev.dhun.presentation.library.currentUtcOffsetMs
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
@@ -130,7 +131,7 @@ val appModule = module {
     single { RecordPlayUseCase(get<DataLayer>().history) }
     // Shared endless-radio bookkeeping (PlayerViewModel + ArtistViewModel).
     single { dev.dhun.domain.RadioSession() }
-    single { GetHomeFeedUseCase(get(), get<DataLayer>().history) }
+    single { GetHomeFeedUseCase(get(), get<DataLayer>().history, utcOffsetMs = { currentUtcOffsetMs() }) }
     single { GetRecommendationsUseCase(get(), get<DataLayer>().history, get<DataLayer>().library) }
 
     // Phase 14: bounded audio-segment cache (Media3 SimpleCache LRU).

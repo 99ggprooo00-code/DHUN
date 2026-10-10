@@ -316,6 +316,21 @@ class DhunAppearanceTest {
         }
     }
 
+    @Test
+    fun backdropPrefsClampAndReset() {
+        assertEquals(DhunAppearance.BACKDROP_BLUR_DEFAULT, DhunAppearance.backdropBlurPercent)
+        assertEquals(DhunAppearance.BACKDROP_BRIGHTNESS_DEFAULT, DhunAppearance.backdropBrightnessPercent)
+        DhunAppearance.setBackdropPrefs(blurPercent = 250, brightnessPercent = -3)
+        assertEquals(100, DhunAppearance.backdropBlurPercent)
+        assertEquals(0, DhunAppearance.backdropBrightnessPercent)
+        DhunAppearance.applyPersistedAppearance("dark", "brand", blurPercent = 40, brightnessPercent = 20)
+        assertEquals(40, DhunAppearance.backdropBlurPercent)
+        assertEquals(20, DhunAppearance.backdropBrightnessPercent)
+        DhunAppearance.reset()
+        assertEquals(DhunAppearance.BACKDROP_BLUR_DEFAULT, DhunAppearance.backdropBlurPercent)
+        assertEquals(DhunAppearance.BACKDROP_BRIGHTNESS_DEFAULT, DhunAppearance.backdropBrightnessPercent)
+    }
+
     /** Perceived (non-linearised) lightness — the same yardstick the design tokens use. */
     private fun Color.luma(): Float = 0.2126f * red + 0.7152f * green + 0.0722f * blue
 }

@@ -24,6 +24,32 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Android — now-playing thumbnail on API < 31, blur/brightness controls, local greeting (2026-10-10, session `arena/20ca817b-dhun`)
+
+- **Changed: Android 10 shows the now-playing cover behind the app.** Real
+  frosted glass (`Modifier.blur` / RenderEffect) still needs API 31+, so that
+  path is unchanged. Below API 31 the cover was hidden entirely; it now paints
+  as a dimmed thumbnail. Settings: **Background blur** on Android 12+ and
+  desktop; **Background brightness** on older Android.
+- **Fixed: Home always said "Good night".** The greeting used UTC hour. Nepal
+  mornings are still night in UTC until 10:45. It now uses the device offset
+  (`currentUtcOffsetMs`) and refreshes every minute.
+
+### Android — isolate API < 31 cold start from Compose class-load (2026-10-10, session `arena/20ca817b-dhun`)
+
+- **Changed: Android 10 / API 29 launcher is a Compose-free `LaunchActivity`.** The
+  previous Views connecting screen lived on `MainActivity` (`ComponentActivity`),
+  so ART could still verify Compose 1.8 `GraphicsLayer` / `RenderEffect` (API 31)
+  while loading the launcher class — process death before a frame, which is how
+  "installs, never opens" looks on API 29/30. API < 31 now opens `LaunchActivity`
+  (`android.app.Activity`, no AndroidX/Compose, starts `MainActivity` by class-name
+  string after the connecting layout is set). API 31+ still launches `MainActivity`
+  directly (activity-alias + `values-v31`). Connecting UI is set **before**
+  Koin/SQLDelight. `startForeground` retries a no-MediaStyle notification if
+  MediaStyle is rejected, so a caught FGS failure cannot become process death.
+  Robolectric covers `LaunchActivity` on API 29; a Python source gate forbids
+  Compose/`MainActivity::class` in that file. **Not an Android 10 hardware pass.**
+
 ### Website — the deployed site's dead links, and "See the interface" reaches the live interface (2026-10-09, session `arena/90cb6d2c-dhun`)
 
 - **Fixed: every internal navigation link on the deployed site was dead.** The

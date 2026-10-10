@@ -24,6 +24,9 @@ import kotlinx.coroutines.launch
  * - [resumeOnLaunch] — honoured by `RestoreNowPlayingUseCase` on cold start.
  * - [closeToTray] — legacy storage compatibility only; no UI or host consumer.
  *   Desktop X always quits, regardless of this stored value.
+ * - [backdropBlurPercent] / [backdropBrightnessPercent] — live now-playing
+ *   backdrop. Blur is used where `Modifier.blur` is real (API 31+ / desktop);
+ *   brightness dims the sharp thumbnail on older Android.
  *
  * Settings whose keys exist but have no behaviour behind them yet
  * (`AUDIO_QUALITY`, `COUNTRY_CODE`, `LYRICS_ENABLED`, `ACCENT_MODE`,
@@ -50,6 +53,12 @@ class SettingsViewModel(
     private val _closeToTray = MutableStateFlow(SettingsKeys.CLOSE_TO_TRAY_DEFAULT)
     val closeToTray: StateFlow<Boolean> = _closeToTray.asStateFlow()
 
+    private val _backdropBlurPercent = MutableStateFlow(SettingsKeys.BACKDROP_BLUR_DEFAULT)
+    val backdropBlurPercent: StateFlow<Int> = _backdropBlurPercent.asStateFlow()
+
+    private val _backdropBrightnessPercent = MutableStateFlow(SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT)
+    val backdropBrightnessPercent: StateFlow<Int> = _backdropBrightnessPercent.asStateFlow()
+
     private val _loaded = MutableStateFlow(false)
     /** True once the persisted values have been read (flows hold defaults until then). */
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
@@ -67,6 +76,12 @@ class SettingsViewModel(
             _closeToTray.value = get.boolean(
                 SettingsKeys.CLOSE_TO_TRAY, SettingsKeys.CLOSE_TO_TRAY_DEFAULT,
             )
+            _backdropBlurPercent.value = get.int(
+                SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT,
+            ).coerceIn(0, 100)
+            _backdropBrightnessPercent.value = get.int(
+                SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT,
+            ).coerceIn(0, 100)
             _loaded.value = true
         }
     }
@@ -102,6 +117,18 @@ class SettingsViewModel(
     fun setCloseToTray(enabled: Boolean) {
         _closeToTray.value = enabled
         scope.launch { update.boolean(SettingsKeys.CLOSE_TO_TRAY, enabled) }
+    }
+
+    fun setBackdropBlurPercent(percent: Int) {
+        val value = percent.coerceIn(0, 100)
+        _backdropBlurPercent.value = value
+        scope.launch { update.int(SettingsKeys.BACKDROP_BLUR, value) }
+    }
+
+    fun setBackdropBrightnessPercent(percent: Int) {
+        val value = percent.coerceIn(0, 100)
+        _backdropBrightnessPercent.value = value
+        scope.launch { update.int(SettingsKeys.BACKDROP_BRIGHTNESS, value) }
     }
 
     companion object {

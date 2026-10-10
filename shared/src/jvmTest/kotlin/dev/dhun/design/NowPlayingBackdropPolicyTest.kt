@@ -92,13 +92,24 @@ class NowPlayingBackdropPolicyTest {
     }
 
     @Test
-    fun backdropIsSuppressedWhenBlurIsNotSupportedOrUrlIsBlank() {
-        // Android <12 (API <31) lacks RenderEffect blur, so sharp artwork is suppressed.
+    fun backdropIsSuppressedOnlyWhenUrlIsBlank() {
         val validUrl = "https://lh3.googleusercontent.com/abc=w60-h60"
-        assertTrue(NowPlayingBackdropPolicy.shouldRenderBackdrop(validUrl, supportsBlur = true))
-        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop(validUrl, supportsBlur = false))
-        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop(null, supportsBlur = true))
-        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop("", supportsBlur = true))
-        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop("   ", supportsBlur = true))
+        assertTrue(NowPlayingBackdropPolicy.shouldRenderBackdrop(validUrl))
+        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop(null))
+        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop(""))
+        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop("   "))
+    }
+
+    @Test
+    fun brightnessMapsToAReadableDimRange() {
+        val dark = NowPlayingBackdropPolicy.dimAlphaForBrightness(0)
+        val mid = NowPlayingBackdropPolicy.dimAlphaForBrightness(55)
+        val light = NowPlayingBackdropPolicy.dimAlphaForBrightness(100)
+        assertTrue(dark in 0.75f..0.90f)
+        assertTrue(light in 0.15f..0.30f)
+        assertTrue(mid in light..dark)
+        assertEquals(0f, NowPlayingBackdropPolicy.blurMultiplier(0), absoluteTolerance = 0.0001f)
+        assertEquals(1f, NowPlayingBackdropPolicy.blurMultiplier(100), absoluteTolerance = 0.0001f)
+        assertEquals(1f, NowPlayingBackdropPolicy.blurMultiplier(250), absoluteTolerance = 0.0001f)
     }
 }

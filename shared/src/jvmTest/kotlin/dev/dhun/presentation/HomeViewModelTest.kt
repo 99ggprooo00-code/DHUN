@@ -83,6 +83,13 @@ class HomeViewModelTest {
         assertEquals("Good evening", GetHomeFeedUseCase.greetingForHour(20))
         assertEquals("Good night", GetHomeFeedUseCase.greetingForHour(23))
         assertEquals("Good night", GetHomeFeedUseCase.greetingForHour(2))
+        // UTC 04:00 is night; Nepal (UTC+5:45) is 09:45 — morning.
+        val utcFourAm = object : dev.dhun.data.EpochClock {
+            override fun nowMs(): Long = 4L * 3_600_000L
+        }
+        val nepalOffsetMs = 5L * 3_600_000L + 45L * 60_000L
+        assertEquals("Good night", GetHomeFeedUseCase.greetingForCurrentTime(utcFourAm, 0L))
+        assertEquals("Good morning", GetHomeFeedUseCase.greetingForCurrentTime(utcFourAm, nepalOffsetMs))
     }
 
     @Test
