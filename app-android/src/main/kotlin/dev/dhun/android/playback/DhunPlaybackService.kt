@@ -161,23 +161,50 @@ class DhunPlaybackService : MediaSessionService() {
      */
     private fun startMediaForeground() {
         val session = mediaSession ?: return
-        try {
-            ensureChannel()
-            val notification = buildMediaNotification(session)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
+        ensureChannel()
+        val notification = try {
+            buildMediaNotification(session)
         } catch (t: Throwable) {
-            // Missing POST_NOTIFICATIONS, OEM startForeground policy, or a
-            // MediaStyle that the platform rejects must not kill onCreate.
-            android.util.Log.e(TAG, "startForeground failed — service stays background", t)
+            android.util.Log.e(TAG, "media-style notification failed — using fallback", t)
+            buildFallbackNotification()
         }
+        try {
+            promoteForeground(notification)
+        } catch (t: Throwable) {
+            // MediaStyle can still be rejected at startForeground on older
+            // implementations. A catch-and-skip here is process death: the
+            // system started us as FGS and kills the app if startForeground
+            // never succeeds. Retry with a notification that has no MediaStyle.
+            android.util.Log.e(TAG, "startForeground media failed — retrying fallback", t)
+            runCatching { promoteForeground(buildFallbackNotification()) }
+                .onFailure { t2 ->
+                    android.util.Log.e(TAG, "startForeground fallback failed — service stays background", t2)
+                }
+        }
+    }
+
+    private fun promoteForeground(notification: Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
+    private fun buildFallbackNotification(): Notification {
+        ensureChannel()
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("DHUN")
+            .setContentIntent(PlaybackGraph.sessionActivityIntent(this))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
     }
 
     private fun ensureChannel() {

@@ -449,14 +449,23 @@ data class DhunTokens(
  */
 object DhunAppearance {
 
+    const val BACKDROP_BLUR_DEFAULT = 100
+    const val BACKDROP_BRIGHTNESS_DEFAULT = 55
+
     private val modeState = mutableStateOf(DhunThemeMode.default)
     private val accentState = mutableStateOf(DhunAccent.default)
     private val tokensState = mutableStateOf(
         DhunTokens.forAppearance(DhunThemeMode.default, DhunAccent.default),
     )
+    private val backdropBlurPercentState = mutableStateOf(BACKDROP_BLUR_DEFAULT)
+    private val backdropBrightnessPercentState = mutableStateOf(BACKDROP_BRIGHTNESS_DEFAULT)
 
     val mode: DhunThemeMode get() = modeState.value
     val accent: DhunAccent get() = accentState.value
+    /** 0–100. Applied as a multiplier on the 64dp shell/player blur (API 31+ / desktop). */
+    val backdropBlurPercent: Int get() = backdropBlurPercentState.value
+    /** 0–100. Dim overlay on the un-blurred thumbnail (API < 31). */
+    val backdropBrightnessPercent: Int get() = backdropBrightnessPercentState.value
 
     /** The active token set — what every [DhunColors] accessor resolves to. */
     val tokens: DhunTokens get() = tokensState.value
@@ -477,7 +486,15 @@ object DhunAppearance {
     }
 
     /** Back to the shipped default. Used by tests and any future "reset" action. */
-    fun reset() = setAppearance(DhunThemeMode.default, DhunAccent.default)
+    fun reset() {
+        setAppearance(DhunThemeMode.default, DhunAccent.default)
+        setBackdropPrefs(BACKDROP_BLUR_DEFAULT, BACKDROP_BRIGHTNESS_DEFAULT)
+    }
+
+    fun setBackdropPrefs(blurPercent: Int = backdropBlurPercent, brightnessPercent: Int = backdropBrightnessPercent) {
+        backdropBlurPercentState.value = blurPercent.coerceIn(0, 100)
+        backdropBrightnessPercentState.value = brightnessPercent.coerceIn(0, 100)
+    }
 
     /**
      * Applies persisted ids read from `SettingsKeys.THEME` / `SettingsKeys.ACCENT`
@@ -486,10 +503,19 @@ object DhunAppearance {
      * is storable but not honoured (see [DhunThemeMode]) — fall back to the
      * defaults. Idempotent: re-applying the active ids is a no-op.
      */
-    fun applyPersistedAppearance(themeId: String?, accentId: String?) {
+    fun applyPersistedAppearance(
+        themeId: String?,
+        accentId: String?,
+        blurPercent: Int? = null,
+        brightnessPercent: Int? = null,
+    ) {
         setAppearance(
             nextMode = DhunThemeMode.fromId(themeId) ?: DhunThemeMode.default,
             nextAccent = DhunAccent.fromId(accentId) ?: DhunAccent.default,
+        )
+        setBackdropPrefs(
+            blurPercent = blurPercent ?: backdropBlurPercent,
+            brightnessPercent = brightnessPercent ?: backdropBrightnessPercent,
         )
     }
 }

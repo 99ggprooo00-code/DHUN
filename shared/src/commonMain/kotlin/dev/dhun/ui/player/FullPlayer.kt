@@ -106,6 +106,7 @@ import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.BlurredArtworkCache
 import dev.dhun.design.DhunAnimations
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -116,6 +117,7 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.design.components.LyricsArtworkSheet
+import dev.dhun.design.components.NowPlayingBackdropPolicy
 import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.fittedPlayerArtworkSize
@@ -1398,10 +1400,13 @@ private fun ArtworkBackdrop(
     lyricsDominant: Boolean,
     cacheKey: String,
 ) {
+    val dimAlpha = if (supportsRealtimeBlur) {
+        if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM
+    } else {
+        NowPlayingBackdropPolicy.dimAlphaForBrightness(DhunAppearance.backdropBrightnessPercent)
+    }
     val dimColor by animateColorAsState(
-        targetValue = Color.Black.copy(
-            alpha = if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM,
-        ),
+        targetValue = Color.Black.copy(alpha = dimAlpha),
         animationSpec = DhunAnimations.slowTween(),
         label = "backdropDim",
     )
@@ -1604,12 +1609,12 @@ private fun LyricsCardOverlay(
 }
 
 /**
- * Decision whether to render the full-screen blurred backdrop layer.
- * A null/blank URL or a platform that cannot really blur returns false so the
- * screen falls back to the clean dark surface rather than a sharp stretched cover.
+ * Decision whether to render the full-screen artwork backdrop layer.
+ * A null/blank URL returns false so the screen falls back to the clean dark
+ * surface. Platforms without RenderEffect still paint the cover (dimmed).
  */
-internal fun shouldRenderPlayerBackdrop(artworkUrl: String?, supportsBlur: Boolean): Boolean =
-    !artworkUrl.isNullOrBlank() && supportsBlur
+internal fun shouldRenderPlayerBackdrop(artworkUrl: String?): Boolean =
+    !artworkUrl.isNullOrBlank()
 
 /**
  * Blurred-artwork bleed (ADR-002 P4). [ArtworkBackdrop] mounts this inside
@@ -1625,7 +1630,10 @@ private fun PlayerBackdrop(
     artworkUrl: String?,
     cacheKey: String,
 ) {
-    if (!shouldRenderPlayerBackdrop(artworkUrl, supportsRealtimeBlur)) return
+    if (!shouldRenderPlayerBackdrop(artworkUrl)) return
+
+    val canBlur = supportsRealtimeBlur
+    val blurPercent = DhunAppearance.backdropBlurPercent
 
     var prepared by remember {
         mutableStateOf(cacheKey.isNotBlank() && BlurredArtworkCache.isPrepared(cacheKey))
@@ -1644,7 +1652,11 @@ private fun PlayerBackdrop(
         label = "backdropFade",
     )
     val blurRadius by animateDpAsState(
-        targetValue = if (prepared) DhunSpacing.glassBlur * 4 else DhunSpacing.zero,
+        targetValue = if (canBlur && prepared) {
+            DhunSpacing.glassBlur * 4 * NowPlayingBackdropPolicy.blurMultiplier(blurPercent)
+        } else {
+            DhunSpacing.zero
+        },
         animationSpec = DhunAnimations.mediumTween(),
         label = "backdropBlurOnce",
     )
@@ -1658,7 +1670,7 @@ private fun PlayerBackdrop(
                 scaleY = 1.2f
                 alpha = backdropAlpha
             }
-            .blur(blurRadius),
+            .then(if (canBlur && blurRadius > DhunSpacing.zero) Modifier.blur(blurRadius) else Modifier),
         shape = RectangleShape,
         contentScale = ContentScale.Crop,
     )
@@ -1687,16 +1699,25 @@ private fun LyricsCard(
     ) {
         // Blurred artwork inside the card — keyed like the backdrop so the
         // blur is prepared once per track, never per frame.
-        // On platforms without realtime blur (Android < API 31), skip the
-        // unblurred artwork so text stays legible over the clean scrim.
         key(cacheKey) {
-            if (shouldRenderPlayerBackdrop(artworkUrl, supportsRealtimeBlur)) {
+            if (shouldRenderPlayerBackdrop(artworkUrl)) {
                 ArtworkImage(
                     imageUrl = artworkUrl,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .blur(DhunSpacing.glassBlur * 2),
+                        .then(
+                            if (supportsRealtimeBlur && DhunAppearance.backdropBlurPercent > 0) {
+                                Modifier.blur(
+                                    DhunSpacing.glassBlur * 2 *
+                                        NowPlayingBackdropPolicy.blurMultiplier(
+                                            DhunAppearance.backdropBlurPercent,
+                                        ),
+                                )
+                            } else {
+                                Modifier
+                            },
+                        ),
                     shape = RectangleShape,
                     contentScale = ContentScale.Crop,
                 )

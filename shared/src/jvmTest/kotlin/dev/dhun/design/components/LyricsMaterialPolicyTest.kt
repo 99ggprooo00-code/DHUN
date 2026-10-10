@@ -79,11 +79,10 @@ class LyricsMaterialPolicyTest {
     @Test
     fun ownArtworkIsSkippedWhenThereIsNothingToBlur() {
         val url = "https://lh3.googleusercontent.com/abc=w60-h60"
-        assertTrue(LyricsMaterialPolicy.shouldPaintArtwork(url, supportsBlur = true))
-        assertFalse(LyricsMaterialPolicy.shouldPaintArtwork(url, supportsBlur = false))
-        assertFalse(LyricsMaterialPolicy.shouldPaintArtwork(null, supportsBlur = true))
-        assertFalse(LyricsMaterialPolicy.shouldPaintArtwork("", supportsBlur = true))
-        assertFalse(LyricsMaterialPolicy.shouldPaintArtwork("   ", supportsBlur = true))
+        assertTrue(LyricsMaterialPolicy.shouldPaintArtwork(url))
+        assertFalse(LyricsMaterialPolicy.shouldPaintArtwork(null))
+        assertFalse(LyricsMaterialPolicy.shouldPaintArtwork(""))
+        assertFalse(LyricsMaterialPolicy.shouldPaintArtwork("   "))
         // Same radius the lyrics card uses, not a per-frame reblur.
         assertEquals(2, LyricsMaterialPolicy.BLUR_SCALE)
     }

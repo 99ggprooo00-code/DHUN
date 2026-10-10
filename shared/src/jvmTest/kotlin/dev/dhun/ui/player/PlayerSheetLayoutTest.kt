@@ -648,13 +648,11 @@ class PlayerSheetLayoutTest {
     }
 
     @Test
-    fun playerBackdropPolicySuppressesSharpArtworkWhenBlurIsUnsupported() {
-        // Platforms without RenderEffect (Android < API 31) fall back to the clean dark surface.
-        assertTrue(shouldRenderPlayerBackdrop("https://example.com/art.jpg", supportsBlur = true))
-        assertFalse(shouldRenderPlayerBackdrop("https://example.com/art.jpg", supportsBlur = false))
-        assertFalse(shouldRenderPlayerBackdrop(null, supportsBlur = true))
-        assertFalse(shouldRenderPlayerBackdrop("", supportsBlur = true))
-        assertFalse(shouldRenderPlayerBackdrop("   ", supportsBlur = true))
+    fun playerBackdropPolicyRendersWheneverThereIsArtwork() {
+        assertTrue(shouldRenderPlayerBackdrop("https://example.com/art.jpg"))
+        assertFalse(shouldRenderPlayerBackdrop(null))
+        assertFalse(shouldRenderPlayerBackdrop(""))
+        assertFalse(shouldRenderPlayerBackdrop("   "))
     }
 
     /* -------- queue rows ------------------------------------------------- */

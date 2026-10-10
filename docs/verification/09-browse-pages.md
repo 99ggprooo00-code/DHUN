@@ -58,8 +58,8 @@ two pages paint; the Phase-09 descriptions above are otherwise unchanged.
   0.50/0.32/0.44/0.62) are the shell's, pointed at the album cover / artist
   portrait. That means the page glows with its own artwork **while nothing is
   playing**, which is when the shell backdrop has nothing to show. With no
-  artwork, or on a platform that cannot really blur (`supportsRealtimeBlur`),
-  nothing is drawn and the shell backdrop / base colour stays the fallback. The
+  artwork, nothing is drawn and the shell backdrop / base colour stays the
+  fallback. Platforms without RenderEffect still paint the cover (dimmed). The
   album header wash now fades to transparent instead of to opaque background;
   the artist hero's fade ends on the existing lyrics-card veil (0.62) so the
   seam into the blurred page stays soft. Accepted Home / Search / Library cards

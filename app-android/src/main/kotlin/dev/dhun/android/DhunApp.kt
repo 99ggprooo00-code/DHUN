@@ -16,10 +16,14 @@ class DhunApp : Application() {
         // KoinApplicationAlreadyStartedException before its tests ran.
         // Clearing first is a no-op in production and makes the app
         // re-bootable in a shared JVM.
-        runCatching { GlobalContext.stopKoin() }
-        startKoin {
-            androidContext(this@DhunApp)
-            modules(appModule)
+        try {
+            runCatching { GlobalContext.stopKoin() }
+            startKoin {
+                androidContext(this@DhunApp)
+                modules(appModule)
+            }
+        } catch (t: Throwable) {
+            android.util.Log.e("DHUN", "Koin failed to start", t)
         }
     }
 }

@@ -31,7 +31,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
@@ -77,7 +79,9 @@ import dev.dhun.domain.HomeShelfKind
 import dev.dhun.download.DownloadManager
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.library.currentUtcOffsetMs
 import dev.dhun.ui.components.TrackDownloadRowActions
+import kotlinx.coroutines.delay
 
 /**
  * Home — Material 3, deep scroll (not a 3-row stub).
@@ -135,8 +139,18 @@ fun HomeScreen(
     }) {
         Column(Modifier.padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md)) {
             Text("DHUN", style = DhunTypographyTokens.brand, color = DhunColors.accent)
+            var minuteTick by remember { mutableStateOf(0) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(60_000)
+                    minuteTick++
+                }
+            }
+            val greeting = remember(minuteTick) {
+                GetHomeFeedUseCase.greetingForCurrentTime(utcOffsetMs = currentUtcOffsetMs())
+            }
             Text(
-                (uiState as? HomeUiState.Success)?.feed?.greeting ?: "Discover music",
+                greeting,
                 style = MaterialTheme.typography.headlineMedium,
                 color = DhunColors.textPrimary,
             )
