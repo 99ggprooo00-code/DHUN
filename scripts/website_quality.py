@@ -95,14 +95,15 @@ CITATION = re.compile(
 )
 
 # Facts that rot: a semantic version, a calendar date, a build number. The site
-# currently prints none of these; anything added here needs a checked source and
-# an explicit allowlist entry (with the reason) rather than a looser pattern.
+# currently prints none of these except the verified pre-release version shown in
+# real screenshot provenance captions (`v1.00.001`, matching `versionName = "1.00.001"`
+# in `app-android/build.gradle.kts` and `.ai/WEBSITE_PLAN.md` Part A §9).
 STALE_FACT_PATTERNS = (
     (re.compile(r"\bv?\d+\.\d+\.\d+\b"), "app version"),
     (re.compile(r"\b20\d\d-\d\d-\d\d\b"), "date"),
     (re.compile(r"\bbuild \d{3,}\b", re.I), "build number"),
 )
-STALE_FACT_ALLOWLIST: frozenset[str] = frozenset()
+STALE_FACT_ALLOWLIST: frozenset[str] = frozenset({"v1.00.001"})
 REPOSITORY_URL = "https://github.com/99ggprooo00-code/DHUN"
 ALLOWED_EXTERNAL_ORIGINS = (
     REPOSITORY_URL,
@@ -116,8 +117,9 @@ ROUTES = ("/", "/features/", "/ui/")
 # from there rather than duplicated here: one table, machine-read, so a mockup
 # can never lose its replacement plan (see `backlog_drift_violations`).
 BACKLOG_PLAN = REPO_ROOT / ".ai" / "WEBSITE_PLAN.md"
-BACKLOG_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*`(mock-[a-z0-9-]+)`\s*\|\s*(shipped|planned)\s*\|", re.M)
-BACKLOG_STATUSES = ("shipped", "planned")
+BACKLOG_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*`(mock-[a-z0-9-]+)`\s*\|\s*(shipped|captured|planned)\s*\|", re.M)
+BACKLOG_STATUSES = ("shipped", "captured", "planned")
+ACTIVE_BACKLOG_STATUSES = ("shipped", "captured")
 
 # Token pairs asserted for WCAG AA, mirroring the app's own
 # DhunThemeContrastTest discipline. (foreground, background, minimum ratio)
@@ -473,21 +475,21 @@ def backlog_drift_violations(dist: pathlib.Path) -> list[str]:
             violations.append(
                 f"mockup ‘{figure_id}’ is on {'/'.join(routes)} but has no row in the §9 backlog"
             )
-        elif status[figure_id] != "shipped":
+        elif status[figure_id] not in ACTIVE_BACKLOG_STATUSES:
             violations.append(
                 f"mockup ‘{figure_id}’ is on {'/'.join(routes)} but §9 marks it ‘{status[figure_id]}’"
             )
     for figure_id, state in sorted(status.items()):
-        if state == "shipped" and figure_id not in on_pages:
+        if state in ACTIVE_BACKLOG_STATUSES and figure_id not in on_pages:
             violations.append(
-                f"§9 marks ‘{figure_id}’ shipped, but no built page carries that figure"
+                f"§9 marks ‘{figure_id}’ {state}, but no built page carries that figure"
             )
         if state == "planned" and figure_id in on_pages:
             violations.append(
                 f"§9 marks ‘{figure_id}’ planned, but it is already on {'/'.join(on_pages[figure_id])}"
             )
-    if not any(state == "shipped" for state in status.values()):
-        violations.append("§9 lists no shipped mockup, so the backlog proves nothing about the site")
+    if not any(state in ACTIVE_BACKLOG_STATUSES for state in status.values()):
+        violations.append("§9 lists no shipped or captured figure, so the backlog proves nothing about the site")
     return violations
 
 
@@ -620,9 +622,14 @@ def _sitemap_locations(dist: pathlib.Path) -> set[str]:
     return set(re.findall(r"<loc>([^<]+)</loc>", sitemap.read_text(encoding="utf-8")))
 
 
+CAPTURE_DEVICES = ("android phone", "windows desktop")
+CAPTURE_VERSION = "v1.00.001"
+
+
 def mockup_violations(dist: pathlib.Path) -> list[str]:
-    """Every mockup is labelled as a recreation, and carries its backlog id."""
+    """Every figure is labelled according to its backlog status (recreation vs real capture)."""
     violations: list[str] = []
+    status_by_id = dict(backlog_rows())
     for route, path in page_paths(dist).items():
         markup = path.read_text(encoding="utf-8")
         for match in re.finditer(
@@ -638,8 +645,7 @@ def mockup_violations(dist: pathlib.Path) -> list[str]:
                 violations.append(f"{route}: a mockup figure has no id (backlog mapping)")
                 continue
             figure_id = id_match.group(1)
-            backlog = {row_id for row_id, _status in backlog_rows()}
-            if figure_id not in backlog:
+            if figure_id not in status_by_id:
                 violations.append(
                     f"{route}: mockup id ‘{figure_id}’ is not in the screenshot backlog "
                     f"(.ai/WEBSITE_PLAN.md Part A §9)"
@@ -648,11 +654,32 @@ def mockup_violations(dist: pathlib.Path) -> list[str]:
                 violations.append(f"{route}: mockup ‘{figure_id}’ has no <figcaption>")
                 continue
             caption = text_of(caption_match.group(1)).lower()
-            if "not a screenshot" not in caption:
-                violations.append(
-                    f"{route}: mockup ‘{figure_id}’ is not labelled as a recreation "
-                    f"(caption must say it is not a screenshot)"
-                )
+            row_status = status_by_id.get(figure_id, "shipped")
+            if row_status == "captured":
+                if not re.search(r"<img\b[^>]*>", body, re.I):
+                    violations.append(
+                        f"{route}: captured figure ‘{figure_id}’ has no <img> element"
+                    )
+                if "not a screenshot" in caption:
+                    violations.append(
+                        f"{route}: captured figure ‘{figure_id}’ still says ‘not a screenshot’"
+                    )
+                if not any(device in caption for device in CAPTURE_DEVICES):
+                    violations.append(
+                        f"{route}: captured figure ‘{figure_id}’ caption does not state the device "
+                        f"({', '.join(CAPTURE_DEVICES)})"
+                    )
+                if CAPTURE_VERSION.lower() not in caption:
+                    violations.append(
+                        f"{route}: captured figure ‘{figure_id}’ caption does not state the app version "
+                        f"({CAPTURE_VERSION})"
+                    )
+            else:
+                if "not a screenshot" not in caption:
+                    violations.append(
+                        f"{route}: mockup ‘{figure_id}’ is not labelled as a recreation "
+                        f"(caption must say it is not a screenshot)"
+                    )
     return violations
 
 
@@ -1182,17 +1209,19 @@ def metadata_violations(dist: pathlib.Path) -> list[str]:
 
 
 # --------------------------------------------------------------------------
-# One request per route.
+# Inlined document shell + verified WebP screenshots.
 # --------------------------------------------------------------------------
 
-# The tab icon is inlined as a `data:` URI by `website/src/_data/favicon.js`, so
-# a route is exactly one HTTP request — the document that carries everything.
-# Lighthouse measured `requests=2` on the merged head (run 37808955045
-# annotations) for exactly this reason. Both halves are asserted: the URI must
-# decode back to the source SVG (folding the whitespace the encoder folds), and
-# no page may keep the old file reference alive, which would silently restore
-# the second request.
+# The tab icon is inlined as a `data:` URI by `website/src/_data/favicon.js`, and
+# CSS is inlined per route into `<head>`, so HTML + CSS + favicon cost a single
+# document request (zero external stylesheets, scripts, or fonts). The only
+# allowed subresource requests are `<img src="/assets/screenshots/*.webp">`
+# carrying explicit numeric `width` and `height` attributes so layout never
+# shifts as captures load.
 ICON_LINK = re.compile(r"<link\b[^>]*\brel=\"icon\"[^>]*>", re.I)
+STYLESHEET_LINK = re.compile(r"<link\b[^>]*\brel=\"stylesheet\"[^>]*>", re.I)
+IMG_TAG = re.compile(r"<img\b[^>]*>", re.I)
+SCREENSHOT_SRC = re.compile(r"^/assets/screenshots/[a-z0-9-]+\.webp$")
 ICON_HREF = re.compile(r"\bhref=\"([^\"]+)\"", re.I)
 DATA_SVG_ICON = re.compile(r"^data:image/svg\+xml;base64,([A-Za-z0-9+/]+={0,2})$")
 FAVICON_SOURCE = SOURCE_DIR / "assets" / "dhun-favicon.svg"
@@ -1211,7 +1240,7 @@ def _compact_svg(svg: str) -> str:
 
 
 def favicon_violations(dist: pathlib.Path) -> list[str]:
-    """The icon is inlined, it is the icon it claims to be, and it costs no request."""
+    """HTML+CSS+favicon stay inlined; only dimensioned WebP screenshots are subresources."""
     if not FAVICON_SOURCE.is_file():
         return [
             f"{FAVICON_SOURCE.relative_to(REPO_ROOT)} is missing, so the inlined "
@@ -1221,6 +1250,25 @@ def favicon_violations(dist: pathlib.Path) -> list[str]:
     violations: list[str] = []
     for route, path in page_paths(dist).items():
         markup = path.read_text(encoding="utf-8")
+        for sheet_tag in STYLESHEET_LINK.findall(markup):
+            violations.append(
+                f"{route}: external stylesheet link found ({sheet_tag[:60]}…) — "
+                f"CSS must remain inlined in the route document"
+            )
+        for img_tag in IMG_TAG.findall(markup):
+            src_match = re.search(r'\bsrc="([^"]+)"', img_tag, re.I)
+            src = src_match.group(1) if src_match else ""
+            if not SCREENSHOT_SRC.match(src):
+                violations.append(
+                    f"{route}: <img> src must be /assets/screenshots/<name>.webp, got ‘{src}’"
+                )
+            if not (
+                re.search(r'\bwidth="\d+"', img_tag, re.I)
+                and re.search(r'\bheight="\d+"', img_tag, re.I)
+            ):
+                violations.append(
+                    f"{route}: <img> is missing explicit numeric width/height attributes: {img_tag[:70]}"
+                )
         tags = ICON_LINK.findall(markup)
         if len(tags) != 1:
             violations.append(

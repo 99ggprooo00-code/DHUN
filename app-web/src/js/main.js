@@ -907,12 +907,59 @@ export function boot({ root, audio = null, AudioContextCtor = null, storage = tr
    *  distinction is the reason, and it is not something a local check can prove
    *  — see docs/legal/AUDIT-2026-10-10-in-app-legal-pages.md §2. */
   function applyHashRoute() {
-    const match = /^#\/(artist|album|playlist)\/(.+)$/.exec(window.location.hash);
-    if (match) return openDetail({ kind: match[1], id: match[2] });
-    const legal = /^#\/legal\/([a-z0-9-]+)$/.exec(window.location.hash);
-    if (legal) return openDetail({ kind: "legal", id: legal[1] });
-    if (window.location.hash === "#/settings") return openDetail({ kind: "settings" });
-    if (window.location.hash === "#/about-legal") return openDetail({ kind: "about-legal" });
+    const hash = window.location.hash;
+    const match = /^#\/(artist|album|playlist)\/(.+)$/.exec(hash);
+    if (match) {
+      nav.setPlayerExpanded(false);
+      return openDetail({ kind: match[1], id: match[2] });
+    }
+    const legal = /^#\/legal\/([a-z0-9-]+)$/.exec(hash);
+    if (legal) {
+      nav.setPlayerExpanded(false);
+      return openDetail({ kind: "legal", id: legal[1] });
+    }
+    if (hash === "#/settings") {
+      nav.setPlayerExpanded(false);
+      return openDetail({ kind: "settings" });
+    }
+    if (hash === "#/about-legal") {
+      nav.setPlayerExpanded(false);
+      return openDetail({ kind: "about-legal" });
+    }
+    if (hash === "#/home") {
+      nav.setPlayerExpanded(false);
+      while (nav.hasDetail) nav.popDetail();
+      nav.selectTab(AppTab.HOME);
+      render();
+      return undefined;
+    }
+    if (hash === "#/search") {
+      nav.setPlayerExpanded(false);
+      while (nav.hasDetail) nav.popDetail();
+      nav.selectTab(AppTab.SEARCH);
+      render();
+      return undefined;
+    }
+    const lib = /^#\/library(?:\/(playlists|downloads|history))?$/.exec(hash);
+    if (lib) {
+      nav.setPlayerExpanded(false);
+      while (nav.hasDetail) nav.popDetail();
+      nav.selectTab(AppTab.LIBRARY);
+      store.set({ libraryTab: (lib[1] ?? "playlists").toUpperCase() });
+      render();
+      return undefined;
+    }
+    const playerMatch = /^#\/player(?:\/(lyrics|queue))?$/.exec(hash);
+    if (playerMatch) {
+      if (!player.currentTrack) {
+        const sampleTracks = catalog.sample.allTracks();
+        if (sampleTracks.length) player.setQueue(sampleTracks, 0);
+      }
+      store.set({ playerTab: playerMatch[1] === "lyrics" ? "lyrics" : "queue" });
+      nav.setPlayerExpanded(true);
+      render();
+      return undefined;
+    }
     return undefined;
   }
 
@@ -927,7 +974,6 @@ export function boot({ root, audio = null, AudioContextCtor = null, storage = tr
     });
     render();
   });
-  applyHashRoute();
 
   // Resume on launch: restore the last queue (NowPlayingPersistence's job in
   // the app) without auto-playing — no browser may start audio unprompted.
@@ -936,6 +982,7 @@ export function boot({ root, audio = null, AudioContextCtor = null, storage = tr
     if (typeof saved.positionMs === "number") player.seek(saved.positionMs);
     render();
   }
+  applyHashRoute();
 
   return { store, nav, player, render, catalog, applyHashRoute, playTracks, closeSheet };
 }

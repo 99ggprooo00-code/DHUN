@@ -1,8 +1,8 @@
 ---
 layout: base.njk
-title: "DHUN's interface — the app's real screens and design system"
+title: "DHUN's interface — real device captures, design tokens, and live /app/ preview"
 ogTitle: "The DHUN interface"
-description: "DHUN's Android and Windows surfaces and the token values behind them — every drawing hand-written from the app's own design system and labelled as a recreation, never a screenshot."
+description: "DHUN's Android and Windows screens captured on real hardware alongside the shared design system tokens and direct deep links into the working /app/ preview."
 cssModules: ["tokens", "base", "components", "mockups", "ui"]
 ---
 <div class="wrap">
@@ -64,11 +64,11 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
 <div class="wrap">
   <div class="section-head">
     <span class="kicker">SURFACES</span>
-    <h2 id="surfaces-title">Five screens, drawn as they are built.</h2>
+    <h2 id="surfaces-title">Ten real captures, paired with the live /app/ interface.</h2>
     <p class="lede">
-      The walkthrough below covers the surfaces that carry the most product
-      decisions. Two of them are drawn on this page; the rest are drawn
-      elsewhere on the site, and the link says where.
+      Each walkthrough card below pairs a real Android phone or Windows
+      desktop screenshot with the Kotlin source path that builds it and a
+      direct link into that exact screen in the live /app/ preview.
     </p>
     <!-- Each surface below is its own <section> with its own citation; listing
          them here rather than nesting them keeps one citation per section.
@@ -89,19 +89,10 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
           <li>{{ point }}</li>
           {%- endfor %}
         </ul>
-        {%- if surface.note %}
-        <p class="traceable">{{ surface.note }} <a href="{{ surface.href | sitePath }}">Open the {{ surface.hrefLabel }}</a></p>
-        {%- endif %}
       </div>
-      {%- if surface.mockFile %}
       <div class="surface-visual">
         {% include surface.mockFile %}
       </div>
-      {%- else %}
-      <div class="surface-visual surface-visual--text">
-        <p class="traceable">Drawn further down this page.</p>
-      </div>
-      {%- endif %}
     </section>
   </div>
   {%- endfor %}

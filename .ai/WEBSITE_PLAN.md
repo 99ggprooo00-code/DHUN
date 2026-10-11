@@ -253,14 +253,27 @@ review note.
 
 | # | Mockup (site id) | Status | Real capture that should replace it | What it must show |
 |---|---|---|---|---|
-| 1 | `mock-home-phone` | shipped | Android Home, portrait | rail layout, now-playing backdrop, bottom nav + docked mini-player |
-| 2 | `mock-player-phone` | shipped | Android FullPlayer, portrait | blurred artwork backdrop, Lyrics tab, transport row, play disc |
-| 3 | `mock-downloads-phone` | shipped | Android Library → Downloads | downloaded rows with offline badges, in-progress row |
-| 4 | `mock-desktop-window` | shipped | Windows desktop window, 1200×780 | rails layout, tray-adjacent mini-player, EQ or queue panel open |
-| 5 | `mock-search-phone` | shipped | Android Search with a query typed | result-type chips, rows with duration, query visible |
-| 6 | `mock-settings-phone` | shipped | Android Settings → Equalizer | ten band sliders with labels, presets, preamp row |
+| 1 | `mock-home-phone` | captured | `android-home-portrait.webp` (`1080×2288`, 76,116 B, Android phone, DHUN `v1.00.001`, 2026-10-10) | Android Home tab with mood chips, Recommended songs, Listen again, docked mini-player, and bottom navigation |
+| 2 | `mock-player-phone` | captured | `android-full-player.webp` (`1080×2278`, 31,888 B, Android phone, DHUN `v1.00.001`, 2026-10-10) | Android FullPlayer sheet with blurred artwork, seek bar, transport controls, and bottom action row |
+| 3 | `mock-downloads-phone` | captured | `android-library-downloads.webp` (`1080×2286`, 45,818 B, Android phone, DHUN `v1.00.001`, 2026-10-10) | Android Library → Downloads with storage usage bar, Clear all action, and downloaded track row |
+| 4 | `mock-desktop-window` | captured | `windows-desktop-window.webp` (`1050×1199`, 44,832 B, Windows desktop, DHUN `v1.00.001`, 2026-10-10) | Windows desktop window with native titlebar, 4-column card grids, bottom mini-player, and volume slider |
+| 5 | `mock-search-phone` | captured | `android-search.webp` (`1080×2283`, 32,462 B, Android phone, DHUN `v1.00.001`, 2026-10-10) | Android Search tab with search field, result-type filter chips (All/Songs/Artists/Albums/Playlists/Videos), and prompt |
+| 6 | `mock-settings-phone` | captured | `android-equalizer.webp` (`1080×2304`, 70,702 B, Android phone, DHUN `v1.00.001`, 2026-10-10) | Android Settings with theme/accent pickers, cache cap, About & Legal row, presets, preamp, and 5-band equalizer |
 | 7 | `mock-widget` | planned | Android home screen with the Quick Play widget | widget on a launcher, not the app |
-| 8 | `mock-lyrics` | planned | Android FullPlayer → Lyrics, mid-song | a line highlighted against real synced lyrics |
+| 8 | `mock-lyrics` | captured | `android-player-lyrics.webp` (`1080×2288`, 41,210 B, Android phone, DHUN `v1.00.001`, 2026-10-10) | Android FullPlayer with synced Devanagari lyrics overlay active over the player backdrop |
+| 9 | `mock-queue-phone` | captured | `android-player-queue.webp` (`1080×2282`, 53,880 B, Android phone, DHUN `v1.00.001`, 2026-10-10) | Android FullPlayer with Up next queue and related tracks sheet (`1 of 24`, drag-to-reorder handle) |
+| 10 | `mock-playlists-phone` | captured | `android-library-playlists.webp` (`1080×2288`, 46,716 B, Android phone, DHUN `v1.00.001`, 2026-10-10) | Android Library → Playlists with Liked Songs folder, custom playlists, and `+ New playlist` action |
+| 11 | `mock-history-phone` | captured | `android-library-history.webp` (`1080×2300`, 35,418 B, Android phone, DHUN `v1.00.001`, 2026-10-10) | Android Library → History with play count, Clear all action, and chronological Today play rows |
+
+### Dated amendment — 2026-10-11 (session `arena/55a92a06-dhun`): real device screenshots replace CSS recreations
+
+Ten real maintainer device captures from `99ggprooo00-code/dhun-screenshot-staging`
+(`dhun-screenshot/`, captured `2026-10-10` on Android phone and Windows desktop
+running DHUN `v1.00.001`) were converted to lossy WebP (`-strip -define webp:method=6 -quality 82`),
+verified free of EXIF/XMP/ICC/PNG text chunks (`identify -verbose` + RIFF chunk
+inspection), and placed in `website/src/assets/screenshots/` (full provenance in
+`docs/verification/SCREENSHOT_PROVENANCE.md`). Every capture is paired with a
+direct deep link into the live `/app/` interface preview at its matching screen.
 
 Content-safety rule (unchanged from Part B §7): only legally safe content with
 recorded provenance may enter Git; no third-party album art without

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -30,7 +31,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
@@ -55,6 +61,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.DhunAssistChip
+import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
@@ -344,8 +351,10 @@ private fun RecentSearchesSection(
     recentSearches: List<String>,
     onSearchClick: (String) -> Unit,
     onDeleteSearch: (String) -> Unit,
-    onClearAll: () -> Unit,
+    onClearAll: suspend () -> Unit,
 ) {
+    var showClearConfirm by remember { mutableStateOf(false) }
+
     if (recentSearches.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize().padding(DhunSpacing.xxl),
@@ -366,7 +375,7 @@ private fun RecentSearchesSection(
                 SectionHeader(
                     title = "Recent searches",
                     actionLabel = "Clear all",
-                    onAction = onClearAll,
+                    onAction = { showClearConfirm = true },
                 )
             }
             items(recentSearches, key = { it }) { query ->
@@ -404,6 +413,75 @@ private fun RecentSearchesSection(
                     }
                 }
                 HorizontalDivider(color = DhunColors.border)
+            }
+        }
+
+        if (showClearConfirm) {
+            ClearRecentSearchesConfirmDialog(
+                onDismiss = { showClearConfirm = false },
+                onConfirm = onClearAll,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClearRecentSearchesConfirmDialog(
+    onDismiss: () -> Unit,
+    onConfirm: suspend () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var isClearing by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = { if (!isClearing) onDismiss() }) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            opaqueBase = true,
+        ) {
+            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
+                Text("Clear recent searches?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
+                Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                Text(
+                    "This removes all recent search terms from this device. Your history, playlists and favorites stay.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                )
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                    Text(errorMessage!!, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
+                }
+                Spacer(modifier = Modifier.height(DhunSpacing.md))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    DhunTextButton(onClick = { if (!isClearing) onDismiss() }, enabled = !isClearing) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                    DhunButton(
+                        onClick = {
+                            if (!isClearing) {
+                                isClearing = true
+                                errorMessage = null
+                                scope.launch {
+                                    try {
+                                        onConfirm()
+                                        onDismiss()
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        errorMessage = "Could not clear recent searches. Please try again."
+                                    } finally {
+                                        isClearing = false
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !isClearing,
+                    ) {
+                        Text(if (isClearing) "Clearing…" else if (errorMessage != null) "Try again" else "Clear")
+                    }
+                }
             }
         }
     }

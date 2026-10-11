@@ -115,6 +115,47 @@ test("deep links open the matching detail page", async (t) => {
   assert.ok(app.nav.detailStack.some((route) => route.kind === "album"));
 });
 
+test("screen deep links open Search, Library sub-tabs, and Full Player (Queue/Lyrics)", async (t) => {
+  const { mount, app, setHash, applyHashRoute } = await boot(t);
+
+  setHash("#/search");
+  applyHashRoute();
+  assert.equal(app.nav.selectedTab, "SEARCH");
+  assert.match(mount.innerHTML, /id="search-input"/);
+
+  setHash("#/library/downloads");
+  applyHashRoute();
+  assert.equal(app.nav.selectedTab, "LIBRARY");
+  assert.equal(app.store.get().libraryTab, "DOWNLOADS");
+
+  setHash("#/library/history");
+  applyHashRoute();
+  assert.equal(app.nav.selectedTab, "LIBRARY");
+  assert.equal(app.store.get().libraryTab, "HISTORY");
+
+  setHash("#/library/playlists");
+  applyHashRoute();
+  assert.equal(app.nav.selectedTab, "LIBRARY");
+  assert.equal(app.store.get().libraryTab, "PLAYLISTS");
+
+  setHash("#/player/lyrics");
+  applyHashRoute();
+  assert.equal(app.nav.playerExpanded, true);
+  assert.equal(app.store.get().playerTab, "lyrics");
+  assert.ok(app.player.currentTrack, "player initializes sample queue when opened via #/player/lyrics");
+  assert.match(mount.innerHTML, /data-testid="full-player"/);
+
+  setHash("#/player/queue");
+  applyHashRoute();
+  assert.equal(app.nav.playerExpanded, true);
+  assert.equal(app.store.get().playerTab, "queue");
+
+  setHash("#/home");
+  applyHashRoute();
+  assert.equal(app.nav.selectedTab, "HOME");
+  assert.equal(app.nav.playerExpanded, false);
+});
+
 test("the overflow sheet offers Add to playlist, and the sheet lists playlists", async (t) => {
   // Sheets are appended to <body>, not to the mount: they are overlays.
   const { body, store, app } = await boot(t);

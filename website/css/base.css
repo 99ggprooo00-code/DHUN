@@ -266,7 +266,7 @@ p code, li code {
   .btn { border-color: CanvasText; }
   .badges li,
   .card,
-  .tile { border-color: CanvasText; }
+  .shot { border-color: CanvasText; }
 }
 
 /* Print. The site is dark by default and browsers do not print background
@@ -290,9 +290,7 @@ p code, li code {
     --warning: #6f4100;
   }
   body { background: #ffffff; color: #000000; }
-  /* The recreation is aria-hidden decoration and costs a page of ink. Its
-     labelled figcaption stays; the drawing does not. */
-  .mock .device { display: none; }
+  .shot img { max-height: 280px; width: auto; }
   /* Backgrounds do not print, so a filled control loses its shape. */
   .btn { border-color: currentColor; }
   .site-header { position: static; }

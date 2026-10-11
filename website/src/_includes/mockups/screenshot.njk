@@ -1,0 +1,17 @@
+{% set shot = site.screenshots[shotKey] %}
+<figure class="mock {{ shot.variantClass }}" id="{{ shot.id }}">
+  <div class="shot {{ shot.frameClass }}">
+    <img
+      src="{{ shot.src | sitePath }}"
+      alt="{{ shot.alt }}"
+      width="{{ shot.width }}"
+      height="{{ shot.height }}"
+      loading="{{ 'eager' if shot.eager else 'lazy' }}"
+      decoding="async">
+  </div>
+  <figcaption class="mock-caption">
+    <span class="mock-badge">{{ shot.badge }}</span>
+    <span class="mock-caption-body">{{ shot.caption }}</span>
+    <a class="mock-app-link" href="{{ shot.appHref | sitePath }}">{{ shot.appLabel }} <span aria-hidden="true">→</span></a>
+  </figcaption>
+</figure>

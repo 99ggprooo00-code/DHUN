@@ -151,7 +151,7 @@ Each was traced to the code that performs the deletion.
 | --- | --- | --- | --- |
 | Clear downloads | Library screen | under a mutation lock: cancels every worker and joins them, then deletes audio, artwork and both deterministic `.part` paths per row, then `repository.clearAll()` | `LibraryViewModel.clearDownloads():392` → `FileDownloadManager.clearAll():112-134` |
 | Clear playback history | Library screen | `historyQueries.deleteAll()`; surfaces "Could not clear playback history" on failure | `LibraryViewModel.clearHistory():471`; message at `LibraryScreen.kt:1524` |
-| Clear recent searches | Search screen | `recentSearchQueries.deleteAll()` | `SearchScreen.kt:141` → `SearchViewModel.clearAllRecentSearches():132` → `SqlDelightRepositories.kt:314` |
+| Clear recent searches | Search screen | `recentSearchQueries.deleteAll()`; confirmation dialog + failure state (`ClearRecentSearchesConfirmDialog`) | `SearchScreen.kt:141` → `SearchViewModel.clearAllRecentSearches():132` → `SqlDelightRepositories.kt:314` |
 
 All three are destructive and none is undoable. A test in
 `scripts/test_legal_content.py` forbids the Support page from naming a control
