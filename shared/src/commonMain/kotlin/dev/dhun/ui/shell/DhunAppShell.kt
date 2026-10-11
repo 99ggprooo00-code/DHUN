@@ -851,7 +851,7 @@ private fun ShellMasterPane(
             onOpenSettings = onOpenSettings,
         )
         is DetailRoute.ArtistPage -> {
-            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession) }
+            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession, dataLayer.settings) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             ArtistScreen(
                 viewModel = vm,
@@ -864,7 +864,7 @@ private fun ShellMasterPane(
             )
         }
         is DetailRoute.AlbumPage -> {
-            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id) }
+            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id, dataLayer.settings) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             AlbumScreen(
                 viewModel = vm,
@@ -876,7 +876,7 @@ private fun ShellMasterPane(
         }
         is DetailRoute.PlaylistPage -> {
             val vm = remember(route.id, route.isLocal) {
-                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal)
+                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal, dataLayer.settings)
             }
             DisposableEffect(vm) { onDispose { vm.close() } }
             PlaylistScreen(
@@ -941,7 +941,7 @@ private fun ShellDetailPane(
 ) {
     when (route) {
         is DetailRoute.ArtistPage -> {
-            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession) }
+            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession, dataLayer.settings) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             ArtistScreen(
                 viewModel = vm,
@@ -954,7 +954,7 @@ private fun ShellDetailPane(
             )
         }
         is DetailRoute.AlbumPage -> {
-            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id) }
+            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id, dataLayer.settings) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             AlbumScreen(
                 viewModel = vm,
@@ -966,7 +966,7 @@ private fun ShellDetailPane(
         }
         is DetailRoute.PlaylistPage -> {
             val vm = remember(route.id, route.isLocal) {
-                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal)
+                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal, dataLayer.settings)
             }
             DisposableEffect(vm) { onDispose { vm.close() } }
             PlaylistScreen(

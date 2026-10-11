@@ -6,6 +6,8 @@ import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
 import dev.dhun.domain.RadioSession
 import dev.dhun.player.DhunPlayer
+import dev.dhun.player.resetModesForNewQueue
+import dev.dhun.data.SettingsRepository
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +34,7 @@ class ArtistViewModel(
     private val artistId: String,
     /** Shared endless-radio bookkeeping (same instance as PlayerViewModel). */
     private val radioSession: RadioSession = RadioSession(),
+    private val settings: SettingsRepository? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -61,6 +64,7 @@ class ArtistViewModel(
         val tracks = page.topSongs
         if (tracks.isEmpty()) return
         scope.launch {
+            resetModesForNewQueue(player, settings)
             player.prepareQueue(tracks, index.coerceIn(0, tracks.size - 1), playWhenReady = true)
         }
     }
@@ -70,6 +74,7 @@ class ArtistViewModel(
         val page = (_state.value as? ArtistUiState.Success)?.page ?: return
         if (page.topSongs.isEmpty()) return
         scope.launch {
+            resetModesForNewQueue(player, settings)
             player.prepareQueue(page.topSongs, 0, playWhenReady = true)
             player.setShuffle(true)
         }
@@ -89,7 +94,8 @@ class ArtistViewModel(
                         // starts with the seed exactly once.
                         val rest = r.value.tracks.filter { it.id != seed.id }
                         if (rest.isNotEmpty()) {
-                            player.prepareQueue(listOf(seed) + rest, 0, playWhenReady = true)
+                            resetModesForNewQueue(player, settings)
+            player.prepareQueue(listOf(seed) + rest, 0, playWhenReady = true)
                             // Hand the station (seed + paging chain) to the
                             // refill monitor so the artist radio is endless
                             // like the FullPlayer radio.

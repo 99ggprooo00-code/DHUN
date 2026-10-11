@@ -117,7 +117,9 @@ class NowPlayingPersistence(
         val current = player.currentTrack.value
         val index = queue.indexOfFirst { it.id == current?.id }.coerceAtLeast(0)
         runCatching {
-            writeMutex.withLock { save(queue, index, player.positionMs.value, repeatMode, shuffle) }
+            writeMutex.withLock {
+                save(queue, index, player.positionMs.value, player.repeatMode.value, player.shuffleEnabled.value)
+            }
         }.onFailure { log("save queue failed: ${it.message}") }
     }
 

@@ -191,7 +191,10 @@ class SettingsViewModel(
     }
     fun setLyricsPreferSynced(enabled: Boolean) {
         _lyricsPreferSynced.value = enabled
-        scope.launch { update.boolean(SettingsKeys.LYRICS_PREFER_SYNCED, enabled) }
+        scope.launch {
+            update.boolean(SettingsKeys.LYRICS_PREFER_SYNCED, enabled)
+            clearLyricsCacheAction?.invoke()
+        }
     }
     fun setLyricsAutoScroll(enabled: Boolean) {
         _lyricsAutoScroll.value = enabled
@@ -208,7 +211,11 @@ class SettingsViewModel(
         val next = if (enabled) (current + id).distinct() else current.filterNot { it == id }
         if (next.isEmpty()) return
         _providerOrder.value = next.joinToString(",")
-        scope.launch { update.string(SettingsKeys.LYRICS_PROVIDER_ORDER, _providerOrder.value) }
+        val order = _providerOrder.value
+        scope.launch {
+            update.string(SettingsKeys.LYRICS_PROVIDER_ORDER, order)
+            clearLyricsCacheAction?.invoke()
+        }
     }
 
     fun clearLyricsCache() {
@@ -242,7 +249,10 @@ class SettingsViewModel(
     fun setPreferredProvider(id: String) {
         if (id !in listOf("auto", "lrclib", "ytm", "lrclib_search", "kugou")) return
         _preferredProvider.value = id
-        scope.launch { update.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, id) }
+        scope.launch {
+            update.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, id)
+            clearLyricsCacheAction?.invoke()
+        }
     }
     fun setCountryCode(id: String) {
         if (id !in listOf("US", "NP", "IN", "GB", "CA", "AU", "DE", "FR", "JP", "KR", "BR")) return

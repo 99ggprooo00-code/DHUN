@@ -12,6 +12,35 @@ import kotlin.test.assertTrue
 /** Desktop's two-pane token reads are observed while the accent/theme changes. */
 class LiveAppearanceTest {
     @Test
+    fun paletteAndMaterialSchemeAreSafeUnderConcurrentDesktopReads() {
+        DhunAppearance.reset()
+        val failure = java.util.concurrent.atomic.AtomicReference<Throwable?>(null)
+        val reader = Thread {
+            try {
+                repeat(2_000) {
+                    val palette = DhunAppearance.tokens
+                    // First access to a token set's lazy scheme may race with
+                    // Skiko's paint thread. Kotlin's synchronized lazy must
+                    // publish the fully initialized scheme.
+                    assertEquals(palette.accent, palette.materialScheme.primary)
+                }
+            } catch (t: Throwable) { failure.set(t) }
+        }
+        try {
+            reader.start()
+            repeat(200) { n ->
+                DhunAppearance.setAppearance(
+                    if (n % 2 == 0) DhunThemeMode.LIGHT else DhunThemeMode.DARK,
+                    DhunAccent.entries[n % DhunAccent.entries.size],
+                )
+            }
+            reader.join(5_000)
+            assertTrue(!reader.isAlive, "background palette reader did not finish")
+            failure.get()?.let { throw it }
+        } finally { DhunAppearance.reset() }
+    }
+
+    @Test
     fun liveSwitchIsAtomicForSnapshotObservers() {
         DhunAppearance.reset()
         var invalid = false

@@ -7,6 +7,8 @@ import dev.dhun.core.toUserMessage
 import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.player.DhunPlayer
+import dev.dhun.player.resetModesForNewQueue
+import dev.dhun.data.SettingsRepository
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +42,7 @@ class PlaylistViewModel(
     private val player: DhunPlayer,
     private val playlistId: String,
     private val isLocal: Boolean,
+    private val settings: SettingsRepository? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -81,6 +84,7 @@ class PlaylistViewModel(
         val tracks = currentTracks() ?: return
         if (tracks.isEmpty()) return
         scope.launch {
+            resetModesForNewQueue(player, settings)
             player.prepareQueue(tracks, index.coerceIn(0, tracks.size - 1), playWhenReady = true)
         }
     }
@@ -89,6 +93,7 @@ class PlaylistViewModel(
         val tracks = currentTracks() ?: return
         if (tracks.isEmpty()) return
         scope.launch {
+            resetModesForNewQueue(player, settings)
             player.prepareQueue(tracks, 0, playWhenReady = true)
             player.setShuffle(true)
         }

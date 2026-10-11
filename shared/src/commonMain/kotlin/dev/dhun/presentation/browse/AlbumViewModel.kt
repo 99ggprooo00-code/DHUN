@@ -4,6 +4,8 @@ import dev.dhun.core.AlbumDetail
 import dev.dhun.core.DhunResult
 import dev.dhun.core.toUserMessage
 import dev.dhun.player.DhunPlayer
+import dev.dhun.player.resetModesForNewQueue
+import dev.dhun.data.SettingsRepository
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +27,7 @@ class AlbumViewModel(
     private val provider: MusicProvider,
     private val player: DhunPlayer,
     private val albumId: String,
+    private val settings: SettingsRepository? = null,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -50,6 +53,7 @@ class AlbumViewModel(
         val detail = (_state.value as? AlbumUiState.Success)?.detail ?: return
         if (detail.tracks.isEmpty()) return
         scope.launch {
+            resetModesForNewQueue(player, settings)
             player.prepareQueue(detail.tracks, index.coerceIn(0, detail.tracks.size - 1), playWhenReady = true)
         }
     }
@@ -59,6 +63,7 @@ class AlbumViewModel(
         val detail = (_state.value as? AlbumUiState.Success)?.detail ?: return
         if (detail.tracks.isEmpty()) return
         scope.launch {
+            resetModesForNewQueue(player, settings)
             player.prepareQueue(detail.tracks, 0, playWhenReady = true)
             player.setShuffle(true)
         }
