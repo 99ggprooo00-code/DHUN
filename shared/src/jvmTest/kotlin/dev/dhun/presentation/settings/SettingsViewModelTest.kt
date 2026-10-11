@@ -9,6 +9,13 @@ import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.children
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
@@ -72,6 +79,26 @@ class SettingsViewModelTest {
         v.setAccentId("  ")
         assertEquals("violet", v.accentId.value)
         assertEquals("violet", loaded(vm(d, this)).accentId.value)
+    }
+
+    @Test
+    fun rapidEditsCannotOverwriteResetAndNewEditsFollowReset(): Unit = runBlocking {
+        val d = data()
+        val background = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val v = loaded(vm(d, background))
+            repeat(12) {
+                v.setBackdropBrightnessPercent(it)
+                v.setThemeId("light")
+            }
+            v.reset()
+            background.coroutineContext[Job]!!.children.toList().joinAll()
+            assertEquals(null, d.settings.getString(SettingsKeys.THEME))
+            assertEquals(null, d.settings.getString(SettingsKeys.BACKDROP_BRIGHTNESS))
+            v.setThemeId("light")
+            background.coroutineContext[Job]!!.children.toList().joinAll()
+            assertEquals("light", d.settings.getString(SettingsKeys.THEME))
+        } finally { background.cancel() }
     }
 
     @Test

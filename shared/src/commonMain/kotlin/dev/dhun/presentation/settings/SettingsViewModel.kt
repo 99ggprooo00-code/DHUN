@@ -5,12 +5,15 @@ import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Persisted preferences for the grouped Settings screen. Writes remain in
  * [UpdateSettingUseCase]; UI-facing flows update optimistically while runtime
@@ -26,6 +29,16 @@ class SettingsViewModel(
     private val clearAudioCacheAction: (suspend () -> Long)? = null,
     private val onCountryCodeChange: (String) -> Unit = {},
 ) {
+    // Settings controls write asynchronously, but rapid changes (especially
+    // Reset right after a slider move) must reach the DB in tap order. Start
+    // undispatched so each write claims the mutex before returning to the UI.
+    private val writeMutex = Mutex()
+    private fun enqueueWrite(action: suspend () -> Unit) {
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            writeMutex.withLock { action() }
+        }
+    }
+
     private val _themeId = MutableStateFlow(SettingsKeys.THEME_DEFAULT)
     val themeId: StateFlow<String> = _themeId.asStateFlow()
 
@@ -124,86 +137,86 @@ class SettingsViewModel(
     fun setThemeId(id: String) {
         if (id !in listOf("dark", "light", "system")) return
         _themeId.value = id
-        scope.launch { update.string(SettingsKeys.THEME, id) }
+        enqueueWrite { update.string(SettingsKeys.THEME, id) }
     }
 
     fun setAccentId(id: String) {
         if (id.isBlank()) return
         _accentId.value = id
-        scope.launch { update.string(SettingsKeys.ACCENT, id) }
+        enqueueWrite { update.string(SettingsKeys.ACCENT, id) }
     }
 
     /** No-op unless [mb] is one of [CACHE_OPTIONS_MB]. */
     fun setCacheSizeMb(mb: Int) {
         if (mb !in CACHE_OPTIONS_MB) return
         _cacheSizeMb.value = mb
-        scope.launch { update.int(SettingsKeys.CACHE_SIZE_MB, mb) }
+        enqueueWrite { update.int(SettingsKeys.CACHE_SIZE_MB, mb) }
     }
 
     fun setResumeOnLaunch(enabled: Boolean) {
         _resumeOnLaunch.value = enabled
-        scope.launch { update.boolean(SettingsKeys.RESUME_ON_LAUNCH, enabled) }
+        enqueueWrite { update.boolean(SettingsKeys.RESUME_ON_LAUNCH, enabled) }
     }
 
     fun resetWindowGeometry() {
-        scope.launch { update.remove(SettingsKeys.WINDOW_GEOMETRY) }
+        enqueueWrite { update.remove(SettingsKeys.WINDOW_GEOMETRY) }
     }
 
     fun setCloseToTray(enabled: Boolean) {
         _closeToTray.value = enabled
-        scope.launch { update.boolean(SettingsKeys.CLOSE_TO_TRAY, enabled) }
+        enqueueWrite { update.boolean(SettingsKeys.CLOSE_TO_TRAY, enabled) }
     }
 
     fun setBackdropBlurPercent(percent: Int) {
         val value = percent.coerceIn(0, 100)
         _backdropBlurPercent.value = value
-        scope.launch { update.int(SettingsKeys.BACKDROP_BLUR, value) }
+        enqueueWrite { update.int(SettingsKeys.BACKDROP_BLUR, value) }
     }
 
     fun setBackdropBrightnessPercent(percent: Int) {
         val value = percent.coerceIn(0, 100)
         _backdropBrightnessPercent.value = value
-        scope.launch { update.int(SettingsKeys.BACKDROP_BRIGHTNESS, value) }
+        enqueueWrite { update.int(SettingsKeys.BACKDROP_BRIGHTNESS, value) }
     }
 
     fun setAccentMode(id: String) {
         if (id !in listOf("artwork", "static")) return
         _accentMode.value = id
-        scope.launch { update.string(SettingsKeys.ACCENT_MODE, id) }
+        enqueueWrite { update.string(SettingsKeys.ACCENT_MODE, id) }
     }
     fun setAudioQuality(id: String) {
         if (id !in listOf("low", "medium", "high")) return
         _audioQuality.value = id
-        scope.launch { update.string(SettingsKeys.AUDIO_QUALITY, id) }
+        enqueueWrite { update.string(SettingsKeys.AUDIO_QUALITY, id) }
     }
     fun setSeekStepSeconds(seconds: Int) {
         if (seconds !in listOf(5, 10, 15, 30)) return
         _seekStepSeconds.value = seconds
-        scope.launch { update.int(SettingsKeys.SEEK_STEP_SECONDS, seconds) }
+        enqueueWrite { update.int(SettingsKeys.SEEK_STEP_SECONDS, seconds) }
     }
     fun setAutoplayRadio(enabled: Boolean) {
         _autoplayRadio.value = enabled
-        scope.launch { update.boolean(SettingsKeys.AUTOPLAY_RADIO_ENABLED, enabled) }
+        enqueueWrite { update.boolean(SettingsKeys.AUTOPLAY_RADIO_ENABLED, enabled) }
     }
     fun setLyricsEnabled(enabled: Boolean) {
         _lyricsEnabled.value = enabled
-        scope.launch { update.boolean(SettingsKeys.LYRICS_ENABLED, enabled) }
+        enqueueWrite { update.boolean(SettingsKeys.LYRICS_ENABLED, enabled) }
     }
     fun setLyricsPreferSynced(enabled: Boolean) {
         _lyricsPreferSynced.value = enabled
-        scope.launch {
+        enqueueWrite {
             update.boolean(SettingsKeys.LYRICS_PREFER_SYNCED, enabled)
             clearLyricsCacheAction?.invoke()
         }
     }
     fun setLyricsAutoScroll(enabled: Boolean) {
         _lyricsAutoScroll.value = enabled
-        scope.launch { update.boolean(SettingsKeys.LYRICS_AUTO_SCROLL, enabled) }
+        enqueueWrite { update.boolean(SettingsKeys.LYRICS_AUTO_SCROLL, enabled) }
     }
     fun setLyricsTextSize(id: String) {
         if (id !in listOf("small", "default", "large")) return
         _lyricsTextSize.value = id
-        scope.launch { update.string(SettingsKeys.LYRICS_TEXT_SIZE, id) }
+        enqueueWrite { update.string(SettingsKeys.LYRICS_TEXT_SIZE, id) }
     }
     fun setProviderEnabled(id: String, enabled: Boolean) {
         if (id !in listOf("lrclib", "ytm", "lrclib_search", "kugou")) return
@@ -212,7 +225,7 @@ class SettingsViewModel(
         if (next.isEmpty()) return
         _providerOrder.value = next.joinToString(",")
         val order = _providerOrder.value
-        scope.launch {
+        enqueueWrite {
             update.string(SettingsKeys.LYRICS_PROVIDER_ORDER, order)
             clearLyricsCacheAction?.invoke()
         }
@@ -249,7 +262,7 @@ class SettingsViewModel(
     fun setPreferredProvider(id: String) {
         if (id !in listOf("auto", "lrclib", "ytm", "lrclib_search", "kugou")) return
         _preferredProvider.value = id
-        scope.launch {
+        enqueueWrite {
             update.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, id)
             clearLyricsCacheAction?.invoke()
         }
@@ -258,24 +271,24 @@ class SettingsViewModel(
         if (id !in listOf("US", "NP", "IN", "GB", "CA", "AU", "DE", "FR", "JP", "KR", "BR")) return
         onCountryCodeChange(id)
         _countryCode.value = id
-        scope.launch { update.string(SettingsKeys.COUNTRY_CODE, id) }
+        enqueueWrite { update.string(SettingsKeys.COUNTRY_CODE, id) }
     }
     fun setExplicitContent(enabled: Boolean) {
         // Publish the new UI value only after the provider's SQLDelight read
         // can see it; a Home/Search refresh is keyed to this flow.
-        scope.launch {
+        enqueueWrite {
             update.boolean(SettingsKeys.EXPLICIT_CONTENT, enabled)
             _explicitContent.value = enabled
         }
     }
     fun setPauseOnMute(enabled: Boolean) {
         _pauseOnMute.value = enabled
-        scope.launch { update.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, enabled) }
+        enqueueWrite { update.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, enabled) }
     }
 
     fun setPersistShuffleRepeat(enabled: Boolean) {
         _persistShuffleRepeat.value = enabled
-        scope.launch { update.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, enabled) }
+        enqueueWrite { update.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, enabled) }
     }
     fun reset() {
         _themeId.value = SettingsKeys.THEME_DEFAULT
@@ -300,7 +313,7 @@ class SettingsViewModel(
         _explicitContent.value = SettingsKeys.EXPLICIT_CONTENT_DEFAULT
         _pauseOnMute.value = SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT
         _persistShuffleRepeat.value = SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT
-        scope.launch { SettingsKeys.all.forEach { update.remove(it) } }
+        enqueueWrite { SettingsKeys.all.forEach { update.remove(it) } }
     }
 
     companion object {

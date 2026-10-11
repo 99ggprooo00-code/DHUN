@@ -4,7 +4,7 @@
 
 The previously dormant audio quality, country, lyrics-enabled, accent-mode and explicit-content keys now have runtime readers; the Settings page exposes each only with its consumer. The backdrop brightness slider is also available alongside blur on blur-capable platforms. Desktop X now hides to tray only after AWT has successfully registered an icon; Ctrl+Q and tray Quit still exit. New tokenless lyrics sources are LRCLIB search and KuGou.
 
-**Verification boundary:** unit/build CI and a Windows hardware theme-flip/close-to-tray test are different things. A hosted JVM test cannot reproduce an AWT/Skiko crash on a user’s Windows PC; this change removes the snapshot write from composition and publishes each token set atomically, but still needs a Windows manual stress test. The public lyrics APIs may change independently of DHUN.
+**Test-release staging:** PR #158 uses run-scoped APK/MSI artifacts from `test-release.yml`; it does not publish or advance an app version. The next `1.00.n` release is a separate, later versioning and approval step. CI on the hosted Windows JVM has passed the theme regressions and MSI packaging; this is not an interactive Windows hardware theme-flip/close-to-tray test. A hosted JVM test cannot reproduce every AWT/Skiko crash on a user's Windows PC. The public lyrics APIs may change independently of DHUN.
 
 
 ## 2026-10-10 — repository cleanup session `arena/29f9acf0-dhun` (base `main` `588f14f`)
