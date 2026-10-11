@@ -92,13 +92,13 @@ export default function (eleventyConfig) {
     if (!sitePathPrefix) return value;
     return "/" + sitePathPrefix + (value === "/" ? "/" : value);
   });
-  // No `addPassthroughCopy`: the site ships no separate asset files. The one
-  // asset it has (`src/assets/dhun-favicon.svg`) is inlined into every page as
-  // a `data:` URI by `src/_data/favicon.js`, which is why each route is a
-  // single request. A file added to `src/assets/` without a consumer therefore
-  // does *not* ship — deliberately: the quality checker fails on any built file
-  // no page references (`unreferenced_file_violations`), so shipping one by
-  // passthrough would be a red test rather than a silent extra request.
+  // Passthrough copy for real device screenshots (`src/assets/screenshots/*.webp`).
+  // HTML, CSS, and the SVG favicon (`src/assets/dhun-favicon.svg`) remain inlined
+  // into every route document, while verified WebP screenshots under
+  // `src/assets/screenshots/` copy to `dist/assets/screenshots/`. The quality
+  // checker (`unreferenced_file_violations`) fails on any built file no page
+  // references, so no unreferenced image can ship silently.
+  eleventyConfig.addPassthroughCopy("src/assets/screenshots");
 
   // Per-page stylesheet: composed from the modules the page declares. Emitted
   // unminified — `tools/minify.mjs` minifies `<style>` blocks with the same

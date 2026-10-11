@@ -1209,17 +1209,19 @@ def metadata_violations(dist: pathlib.Path) -> list[str]:
 
 
 # --------------------------------------------------------------------------
-# One request per route.
+# Inlined document shell + verified WebP screenshots.
 # --------------------------------------------------------------------------
 
-# The tab icon is inlined as a `data:` URI by `website/src/_data/favicon.js`, so
-# a route is exactly one HTTP request — the document that carries everything.
-# Lighthouse measured `requests=2` on the merged head (run 37808955045
-# annotations) for exactly this reason. Both halves are asserted: the URI must
-# decode back to the source SVG (folding the whitespace the encoder folds), and
-# no page may keep the old file reference alive, which would silently restore
-# the second request.
+# The tab icon is inlined as a `data:` URI by `website/src/_data/favicon.js`, and
+# CSS is inlined per route into `<head>`, so HTML + CSS + favicon cost a single
+# document request (zero external stylesheets, scripts, or fonts). The only
+# allowed subresource requests are `<img src="/assets/screenshots/*.webp">`
+# carrying explicit numeric `width` and `height` attributes so layout never
+# shifts as captures load.
 ICON_LINK = re.compile(r"<link\b[^>]*\brel=\"icon\"[^>]*>", re.I)
+STYLESHEET_LINK = re.compile(r"<link\b[^>]*\brel=\"stylesheet\"[^>]*>", re.I)
+IMG_TAG = re.compile(r"<img\b[^>]*>", re.I)
+SCREENSHOT_SRC = re.compile(r"^/assets/screenshots/[a-z0-9-]+\.webp$")
 ICON_HREF = re.compile(r"\bhref=\"([^\"]+)\"", re.I)
 DATA_SVG_ICON = re.compile(r"^data:image/svg\+xml;base64,([A-Za-z0-9+/]+={0,2})$")
 FAVICON_SOURCE = SOURCE_DIR / "assets" / "dhun-favicon.svg"
@@ -1238,7 +1240,7 @@ def _compact_svg(svg: str) -> str:
 
 
 def favicon_violations(dist: pathlib.Path) -> list[str]:
-    """The icon is inlined, it is the icon it claims to be, and it costs no request."""
+    """HTML+CSS+favicon stay inlined; only dimensioned WebP screenshots are subresources."""
     if not FAVICON_SOURCE.is_file():
         return [
             f"{FAVICON_SOURCE.relative_to(REPO_ROOT)} is missing, so the inlined "
@@ -1248,6 +1250,25 @@ def favicon_violations(dist: pathlib.Path) -> list[str]:
     violations: list[str] = []
     for route, path in page_paths(dist).items():
         markup = path.read_text(encoding="utf-8")
+        for sheet_tag in STYLESHEET_LINK.findall(markup):
+            violations.append(
+                f"{route}: external stylesheet link found ({sheet_tag[:60]}…) — "
+                f"CSS must remain inlined in the route document"
+            )
+        for img_tag in IMG_TAG.findall(markup):
+            src_match = re.search(r'\bsrc="([^"]+)"', img_tag, re.I)
+            src = src_match.group(1) if src_match else ""
+            if not SCREENSHOT_SRC.match(src):
+                violations.append(
+                    f"{route}: <img> src must be /assets/screenshots/<name>.webp, got ‘{src}’"
+                )
+            if not (
+                re.search(r'\bwidth="\d+"', img_tag, re.I)
+                and re.search(r'\bheight="\d+"', img_tag, re.I)
+            ):
+                violations.append(
+                    f"{route}: <img> is missing explicit numeric width/height attributes: {img_tag[:70]}"
+                )
         tags = ICON_LINK.findall(markup)
         if len(tags) != 1:
             violations.append(

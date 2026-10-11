@@ -965,6 +965,36 @@ class InlinedIcon(DistCopyMixin):
         )
         self.assertEqual(quality.favicon_violations(self.site(markup)), [])
 
+    def test_webp_screenshot_img_with_dimensions_passes(self):
+        source = quality._compact_svg(quality.FAVICON_SOURCE.read_text(encoding="utf-8"))
+        markup = self.page_with(
+            f'<link rel="icon" href="{self.data_uri(source.encode("utf-8"))}" type="image/svg+xml">'
+        ).replace(
+            "<h1>t</h1>",
+            '<h1>t</h1><img src="/assets/screenshots/android-home-portrait.webp" alt="Home" width="1080" height="2288">',
+        )
+        self.assertEqual(quality.favicon_violations(self.site(markup)), [])
+
+    def test_non_webp_or_undimensioned_img_or_linked_css_fails(self):
+        source = quality._compact_svg(quality.FAVICON_SOURCE.read_text(encoding="utf-8"))
+        base = self.page_with(
+            f'<link rel="icon" href="{self.data_uri(source.encode("utf-8"))}" type="image/svg+xml">'
+        )
+        bad_src = base.replace("<h1>t</h1>", '<h1>t</h1><img src="/assets/photo.png" alt="x" width="10" height="10">')
+        self.assertTrue(
+            any("/assets/screenshots/" in v for v in quality.favicon_violations(self.site(bad_src)))
+        )
+        no_dims = base.replace(
+            "<h1>t</h1>", '<h1>t</h1><img src="/assets/screenshots/android-home-portrait.webp" alt="x">'
+        )
+        self.assertTrue(
+            any("width/height" in v for v in quality.favicon_violations(self.site(no_dims)))
+        )
+        linked_css = base.replace("</head>", '<link rel="stylesheet" href="/assets/styles.css"></head>')
+        self.assertTrue(
+            any("external stylesheet" in v for v in quality.favicon_violations(self.site(linked_css)))
+        )
+
 
 class NothingShipsUnreferenced(DistCopyMixin):
     """An asset no page names is dead weight in the deploy, or a broken page."""
