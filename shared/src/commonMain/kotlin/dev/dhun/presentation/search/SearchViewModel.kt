@@ -129,10 +129,8 @@ class SearchViewModel(
         }
     }
 
-    fun clearAllRecentSearches() {
-        scope.launch {
-            recentSearchesUseCase.clear()
-        }
+    suspend fun clearAllRecentSearches() {
+        recentSearchesUseCase.clear()
     }
 
     private fun fetchSuggestions(q: String) {
