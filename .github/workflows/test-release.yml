@@ -97,6 +97,13 @@ jobs:
         with:
           python-version: '3.x'
 
+      # Exercise the shared recomposer and desktop snapshot regression on the
+      # same Windows JVM/Skiko runtime as the packaged application, not just
+      # the Linux CI runner.
+      - name: Live theme regression — Windows JVM
+        shell: pwsh
+        run: ./gradlew :shared:jvmTest :app-desktop:jvmTest --no-daemon
+
       - name: Build MSI (jpackage)
         id: msi_build
         shell: pwsh

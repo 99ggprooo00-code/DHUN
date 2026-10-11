@@ -168,8 +168,8 @@ val appModule = module {
     single {
         val data: DataLayer = get()
         LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get(),
-            settings = data.settings, search = dev.dhun.lyrics.LrcLibSearchSource(),
-            kugou = dev.dhun.lyrics.KuGouLyricsSource())
+            settings = data.settings, search = dev.dhun.lyrics.LrcLibSearchSource(get()),
+            kugou = dev.dhun.lyrics.KuGouLyricsSource(get()))
     }
 
     single { CoroutineScope(SupervisorJob() + Dispatchers.Main) }

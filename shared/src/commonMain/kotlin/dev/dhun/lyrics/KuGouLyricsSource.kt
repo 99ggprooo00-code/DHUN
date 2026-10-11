@@ -6,6 +6,7 @@ import dev.dhun.core.Lyrics
 import dev.dhun.core.Track
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
@@ -26,6 +27,7 @@ class KuGouLyricsSource(
         if (track.title.isBlank() || track.artistName.isBlank()) return DhunResult.Success(Lyrics.NotAvailable)
         return try {
             val search = client.get("$baseUrl/search") {
+                timeout { requestTimeoutMillis = 12_000 }
                 parameter("ver", 1); parameter("man", "yes"); parameter("client", "pc")
                 parameter("keyword", "${track.artistName} - ${track.title}")
                 parameter("duration", (track.durationSeconds ?: 0) * 1000)
@@ -45,6 +47,7 @@ class KuGouLyricsSource(
             val id = candidate["id"]?.jsonPrimitive?.content ?: return DhunResult.Success(Lyrics.NotAvailable)
             val key = candidate["accesskey"]?.jsonPrimitive?.content ?: return DhunResult.Success(Lyrics.NotAvailable)
             val response = client.get("$baseUrl/download") {
+                timeout { requestTimeoutMillis = 12_000 }
                 parameter("ver", 1); parameter("client", "pc"); parameter("id", id)
                 parameter("accesskey", key); parameter("fmt", "lrc"); parameter("charset", "utf8")
             }
