@@ -750,6 +750,22 @@ class BacklogDrift(DistCopyMixin):
         violations = self.contract(dist, plan)
         self.assertTrue(any("mock-never-drawn" in v for v in violations), violations)
 
+    def test_a_captured_screenshot_row_is_recognized_as_active(self):
+        dist = self.copy_dist()
+        plan = Path(tempfile.mkdtemp()) / "WEBSITE_PLAN.md"
+        self.addCleanup(shutil.rmtree, plan.parent, ignore_errors=True)
+        rows = [
+            f"| {idx} | `{row_id}` | captured | Android | screen |"
+            for idx, (row_id, state) in enumerate(quality.backlog_rows(), 1)
+            if state in ("shipped", "captured")
+        ]
+        plan.write_text(
+            "| # | Mockup (site id) | Status | Real capture | What it must show |\n"
+            "|---|---|---|---|---|\n" + "\n".join(rows) + "\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(self.contract(dist, plan), [])
+
     def test_a_mockup_on_a_page_with_no_row_fails(self):
         dist = self.copy_dist()
         route = quality.page_paths(dist)["/features/"]

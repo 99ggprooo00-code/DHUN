@@ -116,8 +116,9 @@ ROUTES = ("/", "/features/", "/ui/")
 # from there rather than duplicated here: one table, machine-read, so a mockup
 # can never lose its replacement plan (see `backlog_drift_violations`).
 BACKLOG_PLAN = REPO_ROOT / ".ai" / "WEBSITE_PLAN.md"
-BACKLOG_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*`(mock-[a-z0-9-]+)`\s*\|\s*(shipped|planned)\s*\|", re.M)
-BACKLOG_STATUSES = ("shipped", "planned")
+BACKLOG_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*`(mock-[a-z0-9-]+)`\s*\|\s*(shipped|captured|planned)\s*\|", re.M)
+BACKLOG_STATUSES = ("shipped", "captured", "planned")
+ACTIVE_BACKLOG_STATUSES = ("shipped", "captured")
 
 # Token pairs asserted for WCAG AA, mirroring the app's own
 # DhunThemeContrastTest discipline. (foreground, background, minimum ratio)
@@ -473,21 +474,21 @@ def backlog_drift_violations(dist: pathlib.Path) -> list[str]:
             violations.append(
                 f"mockup ‘{figure_id}’ is on {'/'.join(routes)} but has no row in the §9 backlog"
             )
-        elif status[figure_id] != "shipped":
+        elif status[figure_id] not in ACTIVE_BACKLOG_STATUSES:
             violations.append(
                 f"mockup ‘{figure_id}’ is on {'/'.join(routes)} but §9 marks it ‘{status[figure_id]}’"
             )
     for figure_id, state in sorted(status.items()):
-        if state == "shipped" and figure_id not in on_pages:
+        if state in ACTIVE_BACKLOG_STATUSES and figure_id not in on_pages:
             violations.append(
-                f"§9 marks ‘{figure_id}’ shipped, but no built page carries that figure"
+                f"§9 marks ‘{figure_id}’ {state}, but no built page carries that figure"
             )
         if state == "planned" and figure_id in on_pages:
             violations.append(
                 f"§9 marks ‘{figure_id}’ planned, but it is already on {'/'.join(on_pages[figure_id])}"
             )
-    if not any(state == "shipped" for state in status.values()):
-        violations.append("§9 lists no shipped mockup, so the backlog proves nothing about the site")
+    if not any(state in ACTIVE_BACKLOG_STATUSES for state in status.values()):
+        violations.append("§9 lists no shipped or captured figure, so the backlog proves nothing about the site")
     return violations
 
 
