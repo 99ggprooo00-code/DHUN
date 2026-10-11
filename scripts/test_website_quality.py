@@ -250,17 +250,42 @@ class MockupLabelling(unittest.TestCase):
         "<figcaption>Illustrative recreation — not a screenshot.</figcaption>"
         "</figure>"
     )
+    CAPTURED_FIGURE = (
+        '<figure class="mock mock--phone" id="mock-home-phone">'
+        '<img src="/assets/screenshots/android-home-portrait.webp" alt="Home screen" width="1080" height="2288">'
+        "<figcaption>Captured on Android phone · DHUN v1.00.001</figcaption>"
+        "</figure>"
+    )
+
+    def _with_plan_status(self, status: str, fn):
+        plan = Path(tempfile.mkdtemp()) / "WEBSITE_PLAN.md"
+        self.addCleanup(shutil.rmtree, plan.parent, ignore_errors=True)
+        plan.write_text(
+            "| # | Mockup (site id) | Status | Real capture | What it must show |\n"
+            "|---|---|---|---|---|\n"
+            f"| 1 | `mock-home-phone` | {status} | Android Home | layout |\n",
+            encoding="utf-8",
+        )
+        original = quality.BACKLOG_PLAN
+        quality.BACKLOG_PLAN = plan
+        try:
+            return fn()
+        finally:
+            quality.BACKLOG_PLAN = original
 
     def test_unlabelled_mockup_fails(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            markup = minimal_site()["index.html"].replace(
-                "<h1>t</h1>",
-                '<h1>t</h1>' + self.FIGURE.replace("not a screenshot", "actual app"),
-            )
-            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
-            self.assertTrue(
-                any("not labelled as a recreation" in v for v in quality.mockup_violations(root))
-            )
+        def run():
+            with tempfile.TemporaryDirectory() as tmp:
+                markup = minimal_site()["index.html"].replace(
+                    "<h1>t</h1>",
+                    "<h1>t</h1>" + self.FIGURE.replace("not a screenshot", "actual app"),
+                )
+                root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+                self.assertTrue(
+                    any("not labelled as a recreation" in v for v in quality.mockup_violations(root))
+                )
+
+        self._with_plan_status("shipped", run)
 
     def test_unknown_mockup_id_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -273,10 +298,41 @@ class MockupLabelling(unittest.TestCase):
             )
 
     def test_labelled_mockup_passes(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            markup = minimal_site()["index.html"].replace("<h1>t</h1>", "<h1>t</h1>" + self.FIGURE)
-            root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
-            self.assertEqual(quality.mockup_violations(root), [])
+        def run():
+            with tempfile.TemporaryDirectory() as tmp:
+                markup = minimal_site()["index.html"].replace("<h1>t</h1>", "<h1>t</h1>" + self.FIGURE)
+                root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+                self.assertEqual(quality.mockup_violations(root), [])
+
+        self._with_plan_status("shipped", run)
+
+    def test_captured_screenshot_with_device_and_version_passes(self):
+        def run():
+            with tempfile.TemporaryDirectory() as tmp:
+                markup = minimal_site()["index.html"].replace(
+                    "<h1>t</h1>", "<h1>t</h1>" + self.CAPTURED_FIGURE
+                )
+                root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+                self.assertEqual(quality.mockup_violations(root), [])
+
+        self._with_plan_status("captured", run)
+
+    def test_captured_screenshot_missing_device_or_version_fails(self):
+        def run():
+            with tempfile.TemporaryDirectory() as tmp:
+                no_device = self.CAPTURED_FIGURE.replace("Android phone", "mobile device")
+                markup = minimal_site()["index.html"].replace("<h1>t</h1>", "<h1>t</h1>" + no_device)
+                root = write_tree(Path(tmp), minimal_site(**{"index.html": markup}))
+                violations = quality.mockup_violations(root)
+                self.assertTrue(any("does not state the device" in v for v in violations), violations)
+
+                no_version = self.CAPTURED_FIGURE.replace("v1.00.001", "latest")
+                markup2 = minimal_site()["index.html"].replace("<h1>t</h1>", "<h1>t</h1>" + no_version)
+                root2 = write_tree(Path(tmp), minimal_site(**{"index.html": markup2}))
+                violations2 = quality.mockup_violations(root2)
+                self.assertTrue(any("does not state the app version" in v for v in violations2), violations2)
+
+        self._with_plan_status("captured", run)
 
 
 class Contrast(unittest.TestCase):

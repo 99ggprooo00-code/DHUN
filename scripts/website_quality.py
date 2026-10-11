@@ -95,14 +95,15 @@ CITATION = re.compile(
 )
 
 # Facts that rot: a semantic version, a calendar date, a build number. The site
-# currently prints none of these; anything added here needs a checked source and
-# an explicit allowlist entry (with the reason) rather than a looser pattern.
+# currently prints none of these except the verified pre-release version shown in
+# real screenshot provenance captions (`v1.00.001`, matching `versionName = "1.00.001"`
+# in `app-android/build.gradle.kts` and `.ai/WEBSITE_PLAN.md` Part A §9).
 STALE_FACT_PATTERNS = (
     (re.compile(r"\bv?\d+\.\d+\.\d+\b"), "app version"),
     (re.compile(r"\b20\d\d-\d\d-\d\d\b"), "date"),
     (re.compile(r"\bbuild \d{3,}\b", re.I), "build number"),
 )
-STALE_FACT_ALLOWLIST: frozenset[str] = frozenset()
+STALE_FACT_ALLOWLIST: frozenset[str] = frozenset({"v1.00.001"})
 REPOSITORY_URL = "https://github.com/99ggprooo00-code/DHUN"
 ALLOWED_EXTERNAL_ORIGINS = (
     REPOSITORY_URL,
@@ -621,9 +622,14 @@ def _sitemap_locations(dist: pathlib.Path) -> set[str]:
     return set(re.findall(r"<loc>([^<]+)</loc>", sitemap.read_text(encoding="utf-8")))
 
 
+CAPTURE_DEVICES = ("android phone", "windows desktop")
+CAPTURE_VERSION = "v1.00.001"
+
+
 def mockup_violations(dist: pathlib.Path) -> list[str]:
-    """Every mockup is labelled as a recreation, and carries its backlog id."""
+    """Every figure is labelled according to its backlog status (recreation vs real capture)."""
     violations: list[str] = []
+    status_by_id = dict(backlog_rows())
     for route, path in page_paths(dist).items():
         markup = path.read_text(encoding="utf-8")
         for match in re.finditer(
@@ -639,8 +645,7 @@ def mockup_violations(dist: pathlib.Path) -> list[str]:
                 violations.append(f"{route}: a mockup figure has no id (backlog mapping)")
                 continue
             figure_id = id_match.group(1)
-            backlog = {row_id for row_id, _status in backlog_rows()}
-            if figure_id not in backlog:
+            if figure_id not in status_by_id:
                 violations.append(
                     f"{route}: mockup id ‘{figure_id}’ is not in the screenshot backlog "
                     f"(.ai/WEBSITE_PLAN.md Part A §9)"
@@ -649,11 +654,32 @@ def mockup_violations(dist: pathlib.Path) -> list[str]:
                 violations.append(f"{route}: mockup ‘{figure_id}’ has no <figcaption>")
                 continue
             caption = text_of(caption_match.group(1)).lower()
-            if "not a screenshot" not in caption:
-                violations.append(
-                    f"{route}: mockup ‘{figure_id}’ is not labelled as a recreation "
-                    f"(caption must say it is not a screenshot)"
-                )
+            row_status = status_by_id.get(figure_id, "shipped")
+            if row_status == "captured":
+                if not re.search(r"<img\b[^>]*>", body, re.I):
+                    violations.append(
+                        f"{route}: captured figure ‘{figure_id}’ has no <img> element"
+                    )
+                if "not a screenshot" in caption:
+                    violations.append(
+                        f"{route}: captured figure ‘{figure_id}’ still says ‘not a screenshot’"
+                    )
+                if not any(device in caption for device in CAPTURE_DEVICES):
+                    violations.append(
+                        f"{route}: captured figure ‘{figure_id}’ caption does not state the device "
+                        f"({', '.join(CAPTURE_DEVICES)})"
+                    )
+                if CAPTURE_VERSION.lower() not in caption:
+                    violations.append(
+                        f"{route}: captured figure ‘{figure_id}’ caption does not state the app version "
+                        f"({CAPTURE_VERSION})"
+                    )
+            else:
+                if "not a screenshot" not in caption:
+                    violations.append(
+                        f"{route}: mockup ‘{figure_id}’ is not labelled as a recreation "
+                        f"(caption must say it is not a screenshot)"
+                    )
     return violations
 
 
