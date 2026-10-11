@@ -190,6 +190,10 @@ fun SettingsScreen(
                     viewModel.freedAudioBytes.collectAsState().value?.let { freed ->
                         Text("Freed ${freed / (1024 * 1024)} MB", modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding))
                     }
+                    if (viewModel.audioCacheError.collectAsState().value) {
+                        Text("Could not clear audio in use. Try again after playback stops.",
+                            modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding))
+                    }
                 }
                 SettingsNavigationRow("Clear search history", "Remove recent searches", { confirmHistory = "search" })
                 SettingsNavigationRow("Clear play history", "Remove listening history", { confirmHistory = "play" })

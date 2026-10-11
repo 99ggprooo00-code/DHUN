@@ -5,6 +5,8 @@ import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -217,9 +219,16 @@ class SettingsViewModel(
     val canClearAudioCache: Boolean get() = clearAudioCacheAction != null
     private val _freedAudioBytes = MutableStateFlow<Long?>(null)
     val freedAudioBytes: StateFlow<Long?> = _freedAudioBytes.asStateFlow()
+    private val _audioCacheError = MutableStateFlow(false)
+    val audioCacheError: StateFlow<Boolean> = _audioCacheError.asStateFlow()
     fun clearAudioCache() {
         clearAudioCacheAction?.let { action ->
-            scope.launch { _freedAudioBytes.value = action() }
+            scope.launch {
+                _audioCacheError.value = false
+                runCatching { withContext(Dispatchers.Default) { action() } }
+                    .onSuccess { _freedAudioBytes.value = it }
+                    .onFailure { _audioCacheError.value = true }
+            }
         }
     }
 

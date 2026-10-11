@@ -814,6 +814,7 @@ private val desktopModule = module {
             historyRepository = get<DataLayer>().history,
             libraryRepository = get<DataLayer>().library,
             scope = get(),
+            settings = get<DataLayer>().settings,
         )
     }
 

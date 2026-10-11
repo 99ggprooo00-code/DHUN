@@ -598,7 +598,8 @@ class PlayerViewModel(
 
     suspend fun clearLyricsCache() {
         lyricsRepository?.clearCache()
-        loadLyrics(currentTrack.value, force = true)
+        // Keep the words currently on screen; the next track open/refetch
+        // consults the now-empty cache and starts a fresh provider request.
     }
 
     /* ---------------- internals ---------------- */
