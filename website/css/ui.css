@@ -62,10 +62,6 @@
 .surface-body { min-width: 0; }
 .surface-body h3 { margin: 0.2rem 0 var(--sp-3); }
 .surface-visual { min-width: 0; display: grid; justify-items: center; }
-.surface-visual--text {
-  border: 1px dashed var(--hairline-strong); border-radius: var(--r-md);
-  padding: var(--sp-4); align-content: center;
-}
 .planned { list-style: none; margin: var(--sp-4) 0; padding: 0; display: grid; gap: var(--sp-2); }
 .planned code, .inventory code { font-size: 0.85em; }
 .risk-body { color: var(--text-2); }

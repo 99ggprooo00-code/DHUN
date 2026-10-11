@@ -100,6 +100,24 @@ cssModules: ["tokens", "base", "components", "mockups"]
 </section>
 
 <div class="wrap">
+  <section aria-labelledby="app-showcase-title">
+    <div class="section-head">
+      <span class="kicker">{{ site.appShowcase.kicker }}</span>
+      <h2 id="app-showcase-title">{{ site.appShowcase.title }}</h2>
+      <p class="lede">{{ site.appShowcase.lede }}</p>
+      <!--{{ site.appShowcase.source }}-->
+    </div>
+    <ul class="card-grid" style="list-style: none; padding: 0;">
+      {%- for route in site.appShowcase.routes %}
+      <li class="card">
+        <h3>{{ route.label }}</h3>
+        <p>{{ route.detail }}</p>
+        <p style="margin: 0;"><a class="mock-app-link" href="{{ route.href | sitePath }}">{{ route.cta }} <span aria-hidden="true">→</span></a></p>
+      </li>
+      {%- endfor %}
+    </ul>
+  </section>
+
   <!-- REQUIRED CAVEAT 1: extraction is borrowed time (MASTER_PROMPT §2). -->
   <section class="risk" aria-labelledby="risk-title" data-caveat="borrowed-time">
     <span class="kicker risk-flag">THE HONEST PART</span>

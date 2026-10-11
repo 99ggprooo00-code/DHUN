@@ -12,13 +12,6 @@
 
 const REPO = "https://github.com/99ggprooo00-code/DHUN";
 const SITE = "https://99ggprooo00-code.github.io/DHUN";
-// The site is a GitHub **project** page: its documents live at the sub-path
-// `/DHUN/`, not at the origin's root. A browser resolves a root-absolute
-// `href="/features/"` against the *origin*, which on this host is a different
-// (empty) site — so every internal link on the page must carry this prefix,
-// or it 404s for a real visitor while every local check (which serves the
-// build at a root) stays green. `scripts/website_quality.py` asserts the
-// prefix on every internal link; the value is spelled in one place, here.
 const PATH = "/DHUN";
 // Fixed public pre-release; the rolling `test` tag is a private draft.
 const PUBLIC_RELEASE = `${REPO}/releases/tag/v1.00.001`;
@@ -40,10 +33,6 @@ export default {
     "DHUN is a free, open-source YouTube Music client for Android and Windows. No sign-in, no cookies, no ads, no telemetry — and downloads that stay on your device.",
   ogType: "website",
 
-  // The hrefs are the site's root-relative routes; the templates emit them
-  // prefixed with `path` (see above), which is where they live on the host.
-  // `aria-current` in the base template compares the *unprefixed* route, so
-  // the two stay the same shape.
   nav: [
     { href: "/features/", label: "Features" },
     { href: "/ui/", label: "Interface" },
@@ -62,21 +51,186 @@ export default {
   lead:
     "DHUN plays YouTube Music on Android and Windows through its own tokenless extraction chain. There is no sign-in to create, no cookie to hand over, and no PO token to solve — and what you save for offline listening stays on your device.",
   leadSource: "ADR-001 (extraction engine), ADR-003 (staged identity chain), ADR-006 (offline downloads)",
-  // The site does not distribute binaries. Its primary call to action is the
-  // interface itself — since 2026-10-09 (user direction) that is the live
-  // mirror at /app/ (ADR-008 amendment, 2026-10-09 (2)); the repository is
-  // where a build actually lives. Both hrefs are asserted by
-  // scripts/website_quality.py, which fails on any link to a release *asset*.
-  ctaPrimary: { href: "/app/", label: "See the interface" },
+  ctaPrimary: { href: "/app/", label: "Try the live /app/ interface" },
   ctaSecondary: { href: REPO, label: "Source on GitHub", external: true },
-  // The one line that tells a visitor what the CTA delivers and what it does
-  // not. It is deliberately worded around the honesty contract's forbidden
-  // claims (no "web player", no "in your browser"): this is the app's
-  // interface, published for inspection, with the playback boundary stated.
   ctaNote:
-    "The interface runs live from this site — the app's own screens, with sample data where the live catalogue is unreachable. Audio playback from this origin is unproven, and the page says so.",
+    "The interface runs live at /app/ from this site — the app's own screens, navigation, equaliser, lyrics and legal pages, with sample data where the live catalogue is unreachable. Audio playback from this static origin is unproven, and the preview states that boundary.",
   ctaNoteSource:
     "ADR-008 amendment 2026-10-09 (2) (deployment); docs/verification/29-web-app-mirror.md (labelled clock, sample catalogue)",
+
+  // Verified real device captures (`website/src/assets/screenshots/*.webp`),
+  // mapped 1-to-1 to `.ai/WEBSITE_PLAN.md` Part A §9 and deep-linked into `/app/`.
+  screenshots: {
+    "home-phone": {
+      id: "mock-home-phone",
+      variantClass: "mock--phone",
+      frameClass: "shot--phone",
+      src: "/assets/screenshots/android-home-portrait.webp",
+      width: 1080,
+      height: 2288,
+      eager: true,
+      alt: "DHUN Android Home screen showing greeting header, mood filter chips, Recommended songs grid, Listen again section, docked mini-player, and bottom navigation bar",
+      badge: "Captured on Android phone · DHUN v1.00.001",
+      caption:
+        "Home screen with mood filter chips, Recommended songs, Listen again, docked mini-player, and three-tab navigation.",
+      appHref: "/app/",
+      appLabel: "Open Home in /app/ preview",
+    },
+    "player-phone": {
+      id: "mock-player-phone",
+      variantClass: "mock--phone",
+      frameClass: "shot--phone",
+      src: "/assets/screenshots/android-full-player.webp",
+      width: 1080,
+      height: 2278,
+      eager: false,
+      alt: "DHUN Android Full Player screen showing blurred artwork, track title Dhun by Rockheads, seek bar at 0:00 of 4:18, transport controls, and bottom action row",
+      badge: "Captured on Android phone · DHUN v1.00.001",
+      caption:
+        "Full-screen player sheet with blurred artwork backdrop, seek scrubber, shuffle/prev/play/next/repeat transport, and queue/lyrics actions.",
+      appHref: "/app/#/player",
+      appLabel: "Open Full player in /app/ preview",
+    },
+    "lyrics-phone": {
+      id: "mock-lyrics",
+      variantClass: "mock--phone",
+      frameClass: "shot--phone",
+      src: "/assets/screenshots/android-player-lyrics.webp",
+      width: 1080,
+      height: 2288,
+      eager: false,
+      alt: "DHUN Android Full Player screen with synced lyrics in Devanagari overlay active over the blurred artwork card",
+      badge: "Captured on Android phone · DHUN v1.00.001",
+      caption:
+        "Synced lyrics overlay inside the full player with active CC toggle and timestamped Devanagari lines.",
+      appHref: "/app/#/player/lyrics",
+      appLabel: "Open Synced lyrics in /app/ preview",
+    },
+    "queue-phone": {
+      id: "mock-queue-phone",
+      variantClass: "mock--phone",
+      frameClass: "shot--phone",
+      src: "/assets/screenshots/android-player-queue.webp",
+      width: 1080,
+      height: 2282,
+      eager: false,
+      alt: "DHUN Android Full Player Up next queue sheet showing 1 of 24 tracks, drag-to-reorder handles, and Related tab",
+      badge: "Captured on Android phone · DHUN v1.00.001",
+      caption:
+        "Up next queue and Related sheet inside the full player with drag-to-reorder handles and active track indicator.",
+      appHref: "/app/#/player/queue",
+      appLabel: "Open Up next queue in /app/ preview",
+    },
+    "search-phone": {
+      id: "mock-search-phone",
+      variantClass: "mock--phone",
+      frameClass: "shot--phone",
+      src: "/assets/screenshots/android-search.webp",
+      width: 1080,
+      height: 2283,
+      eager: false,
+      alt: "DHUN Android Search screen showing search input field and filter chips for All, Songs, Artists, Albums, Playlists, and Videos",
+      badge: "Captured on Android phone · DHUN v1.00.001",
+      caption:
+        "Search screen with YouTube Music query bar and filter chips for All, Songs, Artists, Albums, Playlists, and Videos.",
+      appHref: "/app/#/search",
+      appLabel: "Open Search in /app/ preview",
+    },
+    "playlists-phone": {
+      id: "mock-playlists-phone",
+      variantClass: "mock--phone",
+      frameClass: "shot--phone",
+      src: "/assets/screenshots/android-library-playlists.webp",
+      width: 1080,
+      height: 2288,
+      eager: false,
+      alt: "DHUN Android Library Playlists tab showing Liked Songs pinned folder, custom playlists, and New playlist button",
+      badge: "Captured on Android phone · DHUN v1.00.001",
+      caption:
+        "Library Playlists tab with the pinned Liked Songs folder, custom playlists, and New playlist action.",
+      appHref: "/app/#/library/playlists",
+      appLabel: "Open Playlists in /app/ preview",
+    },
+    "downloads-phone": {
+      id: "mock-downloads-phone",
+      variantClass: "mock--phone",
+      frameClass: "shot--phone",
+      src: "/assets/screenshots/android-library-downloads.webp",
+      width: 1080,
+      height: 2286,
+      eager: false,
+      alt: "DHUN Android Library Downloads tab showing storage usage bar, Clear all action, and a downloaded track row with delete button",
+      badge: "Captured on Android phone · DHUN v1.00.001",
+      caption:
+        "Library Downloads tab showing device storage usage bar, Clear all control, and offline track management.",
+      appHref: "/app/#/library/downloads",
+      appLabel: "Open Downloads in /app/ preview",
+    },
+    "history-phone": {
+      id: "mock-history-phone",
+      variantClass: "mock--phone",
+      frameClass: "shot--phone",
+      src: "/assets/screenshots/android-library-history.webp",
+      width: 1080,
+      height: 2300,
+      eager: false,
+      alt: "DHUN Android Library History tab showing local play count, Clear all button, and Today play history row",
+      badge: "Captured on Android phone · DHUN v1.00.001",
+      caption:
+        "Library History tab with chronological Today play entries and confirmation-backed Clear all control.",
+      appHref: "/app/#/library/history",
+      appLabel: "Open History in /app/ preview",
+    },
+    "settings-phone": {
+      id: "mock-settings-phone",
+      variantClass: "mock--phone",
+      frameClass: "shot--phone",
+      src: "/assets/screenshots/android-equalizer.webp",
+      width: 1080,
+      height: 2304,
+      eager: false,
+      alt: "DHUN Android Settings screen showing Dark and Light theme chips, six accent colour swatches, cache cap options, About and Legal row, and 5-band Equalizer with presets and preamp",
+      badge: "Captured on Android phone · DHUN v1.00.001",
+      caption:
+        "Settings & Equalizer with Dark/Light mode, six accent palettes, cache cap, About & Legal entry, presets, preamp, and 5-band sliders.",
+      appHref: "/app/#/settings",
+      appLabel: "Open Settings in /app/ preview",
+    },
+    "desktop-window": {
+      id: "mock-desktop-window",
+      variantClass: "mock--desktop",
+      frameClass: "shot--desktop",
+      src: "/assets/screenshots/windows-desktop-window.webp",
+      width: 1050,
+      height: 1199,
+      eager: false,
+      alt: "DHUN Windows desktop window showing native title bar, Home feed with four-column card grids, bottom mini-player with volume slider, and navigation bar",
+      badge: "Captured on Windows desktop · DHUN v1.00.001",
+      caption:
+        "Windows desktop window (Compose Multiplatform JVM) with wide four-column grids and bottom mini-player with volume slider.",
+      appHref: "/app/#/home",
+      appLabel: "Open Desktop layout in /app/ preview",
+    },
+  },
+
+  // Live /app/ centerpiece showcase on the front page.
+  appShowcase: {
+    kicker: "WORKING INTERFACE PREVIEW",
+    title: "Click through the real interface at /app/ before installing anything.",
+    lede:
+      "Alongside the Android and Windows captures on this site, the shipped interface runs at /app/ with the same design tokens, navigation state machine, 10-band equaliser curves, synced lyrics parser, and About & Legal pages. Pick any destination below to jump straight into that screen.",
+    source: "app-web/src/js/main.js; docs/verification/29-web-app-mirror.md; ADR-008 amendment 2026-10-09 (2)",
+    routes: [
+      { label: "Home feed & quick picks", detail: "Three-section feed, mood chips, and docked mini-player", href: "/app/", cta: "Launch /app/ Home" },
+      { label: "Search & filter chips", detail: "Query bar, Songs/Artists/Albums/Playlists/Videos filters, recent searches", href: "/app/#/search", cta: "Launch /app/ Search" },
+      { label: "Expanded Full Player", detail: "Blurred artwork sheet, transport controls, seek scrubber", href: "/app/#/player", cta: "Launch /app/ Player" },
+      { label: "Synced lyrics (LRC)", detail: "Timestamped Devanagari & English lines with active-line highlight", href: "/app/#/player/lyrics", cta: "Launch /app/ Lyrics" },
+      { label: "Up Next Queue", detail: "Queue tab, track counter, and related tracks", href: "/app/#/player/queue", cta: "Launch /app/ Queue" },
+      { label: "Library — Playlists, Downloads & History", detail: "Liked Songs folder, offline state, and local play history", href: "/app/#/library/playlists", cta: "Launch /app/ Library" },
+      { label: "Settings & 10-band Equalizer", detail: "Dark/Light theme, 6 accents, 18 VLC presets, ±20 dB bands", href: "/app/#/settings", cta: "Launch /app/ Settings" },
+      { label: "About, Privacy & Legal", detail: "Bundled Privacy Policy, Terms, GPL-3.0 & Apache-2.0 licences, Support", href: "/app/#/about-legal", cta: "Launch /app/ About & Legal" },
+    ],
+  },
 
   // Platform strip: what actually ships, with the honest status of each.
   platforms: [
@@ -181,7 +335,7 @@ export default {
       points: [
         "Close-to-tray keeps playback alive; the tray menu drives it.",
         "System transport controls and jump lists are wired natively.",
-        "10-band equaliser on desktop (the Android equaliser is still open — see the honest list).",
+        "10-band equaliser on desktop (Android uses a 5-band system AudioEffect binding).",
       ],
     },
   ],
@@ -221,54 +375,50 @@ export default {
   },
 
   closing: {
-    title: "Read it, run the pre-release, or build it yourself.",
+    title: "Read it, try /app/, or build it yourself.",
     body:
-      "The whole project is GPL-3.0 source. The public versioned pre-release and its warnings live on GitHub Releases; the rolling test channel is private to repository collaborators. If a claim on this site is wrong, the honesty tests in the repository fail the build — and you can check them.",
+      "The whole project is GPL-3.0 source. You can inspect every screen in the live /app/ preview right now, or view the public pre-release and its warnings on GitHub Releases. If a claim on this site is wrong, the honesty tests in the repository fail the build — and you can check them.",
     source: "scripts/test_website_claims.py",
   },
 
-  // The /ui/ page. Everything here is read out of the app's own design system
-  // and UI code, and every drawing is labelled as a recreation: no screenshot
-  // exists in this repository and none is fabricated (.ai/WEBSITE_PLAN.md §8).
+  // The /ui/ page: real device screenshots + live /app/ links + design tokens.
   ui: {
-    h1: "The interface, drawn from the code.",
+    h1: "Real captures, shared tokens, and the live /app/ interface.",
     lead:
-      "DHUN's screens are built from one Compose design system — the same colour tokens, shapes, spacing scale and type ramp on Android and Windows. This page shows what those surfaces look like, states the token values behind them, and is explicit about one thing: every drawing here is hand-written CSS and SVG, not a screenshot.",
+      "DHUN's screens are built from one Compose design system — the same colour tokens, shapes, spacing scale and type ramp on Android and Windows. Below are ten real captures from Android phone and Windows desktop builds alongside direct deep links into the working /app/ preview and the token values compiled into the app.",
     source:
-      "shared/src/commonMain/kotlin/dev/dhun/design/ (DhunAppearance, DhunShapes, DhunSpacing, DhunTypography) and .../ui/ (home, search, browse, library, player, settings)",
+      "shared/src/commonMain/kotlin/dev/dhun/design/ (DhunAppearance, DhunShapes, DhunSpacing, DhunTypography) and .../ui/ (home, search, browse, library, player, settings, legal)",
     whyNoShots: {
-      title: "Why there are no screenshots",
+      title: "Provenance and content safety",
       body:
-        "This repository contains no raster or vector artwork and no device or display is available to it, so there is nothing honest to paste in. Rather than borrow another project's screenshot or invent one, each surface below is recreated in CSS from the app's own tokens — geometry, spacing and colour — and labelled as a recreation wherever it appears. Six real captures are planned to replace them, listed with what each must show in the project's website plan.",
-      source: ".ai/WEBSITE_PLAN.md Part A §8 and §9",
+        "All ten captures were taken on an Android phone and a Windows desktop running DHUN, stripped of EXIF, XMP, ICC and PNG text chunks prior to commit, and had third-party album artwork and lyrics blurred so no unpermitted copyrighted art is redistributed in Git.",
+      source: ".ai/WEBSITE_PLAN.md Part A §9; docs/verification/SCREENSHOT_PROVENANCE.md",
     },
     surfaces: [
       {
         id: "home",
         path: "shared/src/commonMain/kotlin/dev/dhun/ui/home/HomeScreen.kt",
-        kicker: "ANDROID",
+        kicker: "ANDROID · HOME",
         title: "Home",
         body:
-          "The first screen is a rail layout: a now-playing backdrop behind a dense list of tiles and rows, seeded by listening history, with the mini-player docked above the bottom navigation rather than floating over the content.",
+          "The first screen is a rail layout: a greeting header, mood filter chips, Recommended songs and Listen again sections seeded by listening history, with the mini-player docked above the bottom navigation bar.",
         points: [
-          "Quick picks and a “from your library” rail, seeded by history",
+          "Mood chips, Recommended songs, and Listen again rails",
           "Docked mini-player above the tab bar — navigation stays reachable",
-          "Bottom navigation: Home, Search, Library, Settings",
+          "Bottom navigation: Home, Search, Library, plus top-bar Settings",
         ],
-        note: "Drawn on the home page.",
-        href: "/",
-        hrefLabel: "home page",
+        mockFile: "mockups/home-phone.njk",
       },
       {
         id: "search",
-        path: "shared/src/commonMain/kotlin/dev/dhun/ui/search/",
-        kicker: "ANDROID",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/search/SearchScreen.kt",
+        kicker: "ANDROID · SEARCH",
         title: "Search",
         body:
-          "Typing filters into songs, videos, albums, playlists and artists, and Enter does one documented thing rather than guessing: the row you have highlighted is submitted, and pressing Enter twice does not jump you somewhere unexpected.",
+          "Typing filters into songs, artists, albums, playlists and videos, and Enter does one documented thing rather than guessing: the row you have highlighted is submitted, and recent searches can be removed individually or cleared after confirmation.",
         points: [
-          "Chips switch the result type without losing the query",
-          "Rows carry artwork, title and artist or duration",
+          "Filter chips switch the result type without losing the query",
+          "Recent searches include per-query delete and confirmation-backed Clear all",
           "The Enter policy is asserted by the app's own UI tests",
         ],
         mockFile: "mockups/search-phone.njk",
@@ -276,44 +426,112 @@ export default {
       {
         id: "player",
         path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt",
-        kicker: "ANDROID",
+        kicker: "ANDROID · FULL PLAYER",
         title: "Full player",
         body:
-          "Artwork is sampled at runtime and blurred into the backdrop, so the player picks up the colour of whatever is playing instead of a fixed gradient. Tabs switch between the queue and synced lyrics; the transport row carries shuffle, repeat and the play disc.",
+          "Artwork is sampled at runtime and blurred into the backdrop, so the player picks up the colour of whatever is playing instead of a fixed gradient. The bottom row switches between synced lyrics, queue, sleep timer, download, and playlist actions.",
         points: [
           "Blurred, colour-sampled artwork backdrop",
-          "Synced lyrics with the current line emphasised",
-          "Queue as a tab, not a separate route",
+          "Seek bar with elapsed and total duration plus shuffle/repeat controls",
+          "Bottom action bar for Lyrics (CC), Up next queue, Sleep timer, Download, and Add to playlist",
         ],
-        note: "Drawn on the features page.",
-        href: "/features/",
-        hrefLabel: "features page",
+        mockFile: "mockups/player-phone.njk",
+      },
+      {
+        id: "lyrics",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/SyncedLyrics.kt",
+        kicker: "ANDROID · SYNCED LYRICS",
+        title: "Synced lyrics overlay",
+        body:
+          "Tapping the CC toggle in the full player opens synced lyrics fetched from LRCLIB (falling back to YouTube Music lyrics and cached locally in SQLDelight), highlighting the active timestamped line as playback progresses.",
+        points: [
+          "LRCLIB timestamped LRC lines with YouTube Music fallback",
+          "Active line highlighted against a frosted dark overlay card",
+          "Supports Devanagari and Latin scripts with local caching",
+        ],
+        mockFile: "mockups/lyrics-phone.njk",
+      },
+      {
+        id: "queue",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/PlayerTabs.kt",
+        kicker: "ANDROID · UP NEXT QUEUE",
+        title: "Up next queue & related",
+        body:
+          "The queue sheet slides over the full player with tabs for Up next and Related tracks, showing the current position in the queue and drag handles for reordering upcoming songs.",
+        points: [
+          "Up next and Related tabs inside the expanded player sheet",
+          "Track position counter (1 of 24) and drag-to-reorder handles",
+          "Per-row remove button to trim upcoming tracks without interrupting playback",
+        ],
+        mockFile: "mockups/queue-phone.njk",
+      },
+      {
+        id: "playlists",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt",
+        kicker: "ANDROID · LIBRARY PLAYLISTS",
+        title: "Library — Playlists",
+        body:
+          "Your Library opens on Playlists, pinning Liked Songs as an automatic folder at the top alongside user-created local playlists and a New playlist action.",
+        points: [
+          "Pinned Liked Songs folder automatically collects favourited tracks",
+          "Custom local playlists stored in SQLDelight with track counts",
+          "Switchable sub-tabs for Playlists, Downloads, and History",
+        ],
+        mockFile: "mockups/playlists-phone.njk",
+      },
+      {
+        id: "downloads",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt",
+        kicker: "ANDROID · LIBRARY DOWNLOADS",
+        title: "Library — Downloads",
+        body:
+          "The Downloads sub-tab shows total offline items, a storage usage bar against device capacity, a confirmation-backed Clear all action, and individual downloaded tracks that play from disk before touching the network.",
+        points: [
+          "Resumable range downloads saved in app-private storage (ADR-006)",
+          "Storage usage bar and item counter",
+          "Per-track delete button and confirmation-backed Clear all",
+        ],
+        mockFile: "mockups/downloads-phone.njk",
+      },
+      {
+        id: "history",
+        path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt",
+        kicker: "ANDROID · LIBRARY HISTORY",
+        title: "Library — History",
+        body:
+          "Listening history is recorded purely on-device to seed Home recommendations and chronological Today/Earlier sections, with a confirmation-backed Clear all action that deletes every row from the local database.",
+        points: [
+          "Chronological play history grouped by recency",
+          "Confirmation-backed Clear all with honest failure reporting",
+          "Never uploaded or synced outside your device",
+        ],
+        mockFile: "mockups/history-phone.njk",
       },
       {
         id: "settings",
         path: "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt",
-        kicker: "ANDROID",
-        title: "Settings, including the equaliser",
+        kicker: "ANDROID · SETTINGS & EQUALIZER",
+        title: "Settings, Equalizer & Legal",
         body:
-          "Settings is grouped into appearance, playback and storage, and sound. The equaliser is ten bands matching libVLC's geometry, with presets, a preamp and per-band gain from −20 dB to +20 dB; Android binds it to the current audio session, so it is the same control surface on both platforms.",
+          "Settings groups Appearance (Dark/Light and six accent palettes), Downloads cache cap, About & Legal (Privacy Policy, Terms, GPL-3.0 & Apache-2.0 licences, Third-Party Notices, Support, Security Reporting), and the built-in Equalizer with presets and preamp.",
         points: [
-          "10 bands: 60 Hz, 170 Hz, 310 Hz, 600 Hz, 1 kHz, 3 kHz, 6 kHz, 12 kHz, 14 kHz, 16 kHz",
-          "Presets plus a preamp, and gain clamped to ±20 dB",
-          "Resume-on-launch and a capped download cache",
+          "Dark and Light themes plus Violet, Amber, Teal, Rose, Sky, and Lime accents",
+          "In-app About & Legal pages rendered offline from bundled Markdown",
+          "Equalizer with genre presets, preamp slider, and per-band dB controls",
         ],
         mockFile: "mockups/settings-phone.njk",
       },
       {
         id: "desktop",
         path: "app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/native/DhunTray.kt",
-        kicker: "WINDOWS",
-        title: "Desktop window",
+        kicker: "WINDOWS · DESKTOP WINDOW",
+        title: "Windows desktop window",
         body:
-          "The Windows build is the same Kotlin code in a different shell: a navigation rail on the left, the queue as a panel on the right, and the player docked along the bottom of the window. Closing the window leaves it in the system tray, where playback keeps its own controls.",
+          "The Windows build runs the same shared Compose Multiplatform UI in a native desktop window with a wide four-column card grid, bottom mini-player with inline volume slider, system tray integration, and OS media keys.",
         points: [
-          "Navigation rail and a permanent queue panel",
-          "Docked player, media keys through the OS, jump lists of recent tracks",
-          "One instance only — a second launch hands its request to the first",
+          "Wide multi-column card grid and desktop window chrome",
+          "Docked mini-player with volume slider, OS media keys, and taskbar jump lists",
+          "Close-to-tray behaviour and single-instance handoff",
         ],
         mockFile: "mockups/desktop-window.njk",
       },
@@ -321,7 +539,7 @@ export default {
     tokens: {
       title: "The design system behind every screen",
       lead:
-        "These are the values the app compiles with, not a palette invented for a website. The dark set is the default; the light scheme mirrors it, and the site uses the same two schemes so a drawing here looks the way the app looks.",
+        "These are the values the app compiles with, not a palette invented for a website. The dark set is the default; the light scheme mirrors it, and the site uses the same two schemes so every page matches the shipped app.",
       source: "shared/.../design/DhunAppearance.kt, DhunShapes.kt, DhunSpacing.kt, DhunTypography.kt",
       colors: [
         { name: "background", value: "#161616", use: "app canvas" },
@@ -362,23 +580,26 @@ export default {
       target: "Touch targets: 44 dp minimum, 48 dp in lists",
     },
     contract: {
-      title: "What the drawings are, and what they are not",
+      title: "Every screenshot on this site, its provenance, and its live /app/ route",
       body:
-        "Every figure on this site is a recreation: hand-written HTML, CSS and inline SVG, with the app's token values and the app's layout rules. None is a photograph of a running app, and none shows a feature DHUN does not have — a mockup of an unshipped screen would be a lie with better production values. Track and artist text is placeholder wording, artwork is a token-coloured gradient, and device chrome such as the clock is illustrative.",
+        "Every figure on this site is a real capture from an Android phone or Windows desktop running DHUN, converted to metadata-stripped WebP and paired with a deep link into the live /app/ preview.",
       rows: [
-        { id: "mock-home-phone", surface: "Android Home, portrait", page: "/" },
-        { id: "mock-player-phone", surface: "Android FullPlayer", page: "/" },
-        { id: "mock-downloads-phone", surface: "Android Library → Downloads", page: "/features/" },
-        { id: "mock-desktop-window", surface: "Windows desktop window", page: "/features/" },
-        { id: "mock-search-phone", surface: "Android Search", page: "/ui/" },
-        { id: "mock-settings-phone", surface: "Android Settings → Equalizer", page: "/ui/" },
+        { id: "mock-home-phone", surface: "Android Home, portrait (android-home-portrait.webp)", page: "/, /ui/" },
+        { id: "mock-player-phone", surface: "Android FullPlayer (android-full-player.webp)", page: "/, /ui/" },
+        { id: "mock-lyrics", surface: "Android FullPlayer → Synced Lyrics (android-player-lyrics.webp)", page: "/features/, /ui/" },
+        { id: "mock-queue-phone", surface: "Android FullPlayer → Up Next Queue (android-player-queue.webp)", page: "/features/, /ui/" },
+        { id: "mock-search-phone", surface: "Android Search (android-search.webp)", page: "/ui/" },
+        { id: "mock-playlists-phone", surface: "Android Library → Playlists (android-library-playlists.webp)", page: "/ui/" },
+        { id: "mock-downloads-phone", surface: "Android Library → Downloads (android-library-downloads.webp)", page: "/, /features/, /ui/" },
+        { id: "mock-history-phone", surface: "Android Library → History (android-library-history.webp)", page: "/ui/" },
+        { id: "mock-settings-phone", surface: "Android Settings & Equalizer (android-equalizer.webp)", page: "/ui/" },
+        { id: "mock-desktop-window", surface: "Windows desktop window (windows-desktop-window.webp)", page: "/, /features/, /ui/" },
       ],
       planned: [
-        { id: "mock-widget", surface: "Android home screen with the Quick Play widget" },
-        { id: "mock-lyrics", surface: "Android FullPlayer → Lyrics, mid-song" },
+        { id: "mock-widget", surface: "Android home screen with the Quick Play 4×2 launcher widget" },
       ],
       plannedNote:
-        "Two captures are still to be taken. Until they exist, nothing on the site pretends to show them — the widget and the lyrics tab are described in words only.",
+        "One launcher-level capture remains planned in the §9 backlog (the Android home-screen Quick Play widget outside the app). Every in-app surface is captured above.",
       source: ".ai/WEBSITE_PLAN.md Part A §9 (backlog, machine-checked both ways)",
     },
   },
@@ -431,7 +652,7 @@ export default {
     items: [
       "Tray icon and close-to-tray: closing the window keeps playback alive, and the tray menu controls it.",
       "System media keys through the OS transport controls, plus taskbar jump lists and single-instance behaviour.",
-      "A 10-band equaliser; the Android equaliser is an open item on the roadmap, not a shipped feature.",
+      "A 10-band equaliser matching libVLC's geometry (Android binds its equaliser to the device's system AudioEffect session).",
       "A user-provided yt-dlp fallback for streams the in-JVM resolver cannot resolve.",
     ],
     requirements: [
@@ -441,15 +662,6 @@ export default {
     source: "Phase 12 desktop native surface; Phase 15 EQ; README.md install notes",
   },
 
-  // /features — what exists, and what does not.
-  // The app's real surfaces, grouped the way the app groups them. Every line
-  // was read out of the tree this session; a claim the code cannot support does
-  // not belong here, and neither does a shipped feature in `notInDhun` below.
-  // The app's real surfaces, grouped the way the app groups them. Every line
-  // was read out of the tree this session; `source` is shown to the reader and
-  // `path` is the full file the claim came from, which the build writes into
-  // the page as a citation comment (asserted by website_quality.py, per
-  // section — that is why a section may never lose it).
   featureGroups: [
     {
       title: "Getting to the music",
@@ -457,7 +669,7 @@ export default {
         { text: "Home, seeded by listening history, with an endless radio", source: "Phase 07 / PR #68", path: "shared/src/commonMain/kotlin/dev/dhun/ui/home/HomeScreen.kt" },
         { text: "Search across songs, videos, albums, playlists and artists, with a documented Enter policy", source: "PR #129", path: "shared/src/commonMain/kotlin/dev/dhun/ui/search/" },
         { text: "Artist, album and playlist pages, each with its own actions", source: "Phase 09", path: "shared/src/commonMain/kotlin/dev/dhun/ui/browse/" },
-        { text: "Library in four tabs: playlists, favourites, history and downloads", source: "Phase 10", path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt" },
+        { text: "Library in Playlists, Downloads and History tabs with Liked Songs pinned at the top", source: "Phase 10", path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt" },
         { text: "Reorderable playlists — drag a track to move it", source: "ui/components/ReorderableList.kt", path: "shared/src/commonMain/kotlin/dev/dhun/ui/components/ReorderableList.kt" },
       ],
     },
@@ -474,17 +686,17 @@ export default {
     {
       title: "Sound",
       items: [
-        { text: "10-band equaliser: presets, a preamp and per-band gain, −20 dB to +20 dB", source: "player/equalizer/EqualizerBands.kt", path: "shared/src/commonMain/kotlin/dev/dhun/player/equalizer/EqualizerBands.kt (COUNT = 10)" },
+        { text: "Equaliser with genre presets, a preamp and per-band gain, −20 dB to +20 dB", source: "player/equalizer/EqualizerBands.kt", path: "shared/src/commonMain/kotlin/dev/dhun/player/equalizer/EqualizerBands.kt (COUNT = 10)" },
         { text: "Desktop equalisation uses libVLC's own 10-band geometry", source: "player/equalizer/VlcEqualizerCommand.kt", path: "shared/src/commonMain/kotlin/dev/dhun/player/equalizer/VlcEqualizerCommand.kt" },
         { text: "Android equalisation binds android.media.audiofx to the live audio session", source: "app-android/.../equalizer/AndroidEqualizerEngine.kt", path: "app-android/src/main/kotlin/dev/dhun/android/equalizer/AndroidEqualizerEngine.kt" },
-        { text: "Settings for appearance, resume-on-launch and a capped download cache", source: "ui/settings/SettingsScreen.kt", path: "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt" },
+        { text: "Settings for appearance, resume-on-launch, capped download cache, and offline About & Legal pages", source: "ui/settings/SettingsScreen.kt", path: "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt" },
       ],
     },
     {
       title: "Keeping it",
       items: [
         { text: "Persistent offline downloads that resume after the app closes", source: "ADR-006", path: "docs/decisions/ADR-006.md" },
-        { text: "Library → Downloads keeps its own filter tab and offline badges", source: "Phase 10", path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt" },
+        { text: "Library → Downloads keeps its own filter tab, storage bar and offline badges", source: "Phase 10", path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt" },
         { text: "Quick Play home-screen widget, sized to a 4×2 launcher slot", source: "app-android AndroidManifest.xml", path: "app-android/src/main/AndroidManifest.xml (DhunQuickPlayWidgetProvider)" },
         { text: "Theme modes with accent ramps read from the shared design system", source: "DhunAppearance", path: "shared/src/commonMain/kotlin/dev/dhun/design/DhunAppearance.kt" },
       ],

@@ -45,18 +45,21 @@ cssModules: ["tokens", "base", "components", "mockups"]
   <div class="wrap">
     <div class="section-head">
       <span class="kicker">THE DESKTOP AND ANDROID SURFACES</span>
-      <h2 id="visuals-title">Two layouts, one codebase.</h2>
+      <h2 id="visuals-title">Two layouts, one codebase — captured on real devices.</h2>
       <p class="lede">
         The Android shell uses bottom navigation with a docked mini-player; the
-        desktop window uses a navigation rail with a queue panel beside the
-        content. Both come from the same shared Compose code — these drawings
-        are recreations, labelled as such, not screenshots.
+        Windows desktop window uses wide multi-column grids and a docked bottom
+        transport bar. Both come from the same shared Compose code — captured
+        below on an Android phone and a Windows desktop running DHUN, with
+        direct deep links into the live /app/ preview.
       </p>
-      <!-- Drawn from shared/src/commonMain/kotlin/dev/dhun/design/ (tokens, shapes, spacing) and .../ui/ (layout); replacement captures are listed in .ai/WEBSITE_PLAN.md Part A §9. -->
+      <!-- Captured from shared/src/commonMain/kotlin/dev/dhun/ui/ and app-desktop/src/jvmMain/; provenance recorded in .ai/WEBSITE_PLAN.md Part A §9 and docs/verification/SCREENSHOT_PROVENANCE.md. -->
     </div>
     <div class="card-grid">
       {% include "mockups/downloads-phone.njk" %}
       {% include "mockups/desktop-window.njk" %}
+      {% include "mockups/lyrics-phone.njk" %}
+      {% include "mockups/queue-phone.njk" %}
     </div>
   </div>
 </section>

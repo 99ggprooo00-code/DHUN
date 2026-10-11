@@ -6,7 +6,37 @@ DHUN is a free, open-source music player for Android and Windows desktop. It use
 
 > **Pre-release:** `v1.00.001` is an experimental build, not a stable or store-ready release. Playback depends on upstream YouTube behavior and can stop working without warning. Android and Windows hardware acceptance is still in progress. The rolling `test` build is restricted to repository collaborators.
 
-<!-- Screenshots will be added after maintainer device captures are available. -->
+## Screenshots & Live Interface Preview
+
+> **Try the interface right now:** Open the live interactive preview at **[`99ggprooo00-code.github.io/DHUN/app/`](https://99ggprooo00-code.github.io/DHUN/app/)** (or see the full token and screenshot walkthrough on **[`/ui/`](https://99ggprooo00-code.github.io/DHUN/ui/)**). Every screen below is captured from an Android phone or Windows desktop running DHUN `v1.00.001` (third-party artwork and lyrics blurred for copyright safety; full provenance in [`docs/verification/SCREENSHOT_PROVENANCE.md`](docs/verification/SCREENSHOT_PROVENANCE.md)).
+
+### 1. Home & Search (Android)
+
+| Home (`mock-home-phone`) | Search (`mock-search-phone`) |
+| :---: | :---: |
+| ![DHUN Android Home screen with mood chips, Recommended songs, Listen again, and docked mini-player](website/src/assets/screenshots/android-home-portrait.webp) | ![DHUN Android Search screen with query input and Songs, Artists, Albums, Playlists, and Videos filter chips](website/src/assets/screenshots/android-search.webp) |
+| Greeting header, mood chips, Recommended songs, Listen again, docked mini-player, and bottom tabs.<br>[Open Home in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/) | Query bar and result-type filter chips (`All`, `Songs`, `Artists`, `Albums`, `Playlists`, `Videos`).<br>[Open Search in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/search) |
+
+### 2. Full Player, Synced Lyrics & Up Next Queue (Android)
+
+| Full Player (`mock-player-phone`) | Synced Lyrics (`mock-lyrics`) | Up Next Queue (`mock-queue-phone`) |
+| :---: | :---: | :---: |
+| ![DHUN Android Full Player screen showing blurred artwork, seek bar, transport controls, and action row](website/src/assets/screenshots/android-full-player.webp) | ![DHUN Android Full Player with synced Devanagari lyrics overlay active](website/src/assets/screenshots/android-player-lyrics.webp) | ![DHUN Android Full Player Up next queue sheet with drag handles and track counter](website/src/assets/screenshots/android-player-queue.webp) |
+| Blurred colour-sampled artwork, seek scrubber, shuffle/repeat transport, and bottom actions.<br>[Open Full Player in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/player) | Timestamped LRC lyrics overlay (`CC` active) with LRCLIB + YouTube Music fallback.<br>[Open Synced Lyrics in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/player/lyrics) | Reorderable `Up next` queue (`1 of 24`) and `Related` tab inside the expanded player.<br>[Open Queue in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/player/queue) |
+
+### 3. Library — Playlists, Offline Downloads & Listening History (Android)
+
+| Playlists (`mock-playlists-phone`) | Downloads (`mock-downloads-phone`) | History (`mock-history-phone`) |
+| :---: | :---: | :---: |
+| ![DHUN Android Library Playlists tab with Liked Songs folder and custom playlists](website/src/assets/screenshots/android-library-playlists.webp) | ![DHUN Android Library Downloads tab with storage usage bar and offline track row](website/src/assets/screenshots/android-library-downloads.webp) | ![DHUN Android Library History tab with chronological Today play row and Clear all button](website/src/assets/screenshots/android-library-history.webp) |
+| Pinned `Liked Songs` folder, custom SQLDelight playlists, and `+ New playlist`.<br>[Open Playlists in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/library/playlists) | App-private resumable range downloads, storage usage bar, and `Clear all`.<br>[Open Downloads in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/library/downloads) | On-device chronological listening history with confirmation-backed `Clear all`.<br>[Open History in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/library/history) |
+
+### 4. Settings, Equalizer & Windows Desktop (`v1.00.001`)
+
+| Settings & Equalizer (`mock-settings-phone`) | Windows Desktop (`mock-desktop-window`) |
+| :---: | :---: |
+| ![DHUN Android Settings screen with theme/accent pickers, cache cap, About and Legal row, and 5-band Equalizer](website/src/assets/screenshots/android-equalizer.webp) | ![DHUN Windows desktop window showing four-column card grids and bottom mini-player with volume slider](website/src/assets/screenshots/windows-desktop-window.webp) |
+| Dark/Light theme, 6 accents, cache cap, offline `About & Legal` pages, presets, preamp, and Equalizer.<br>[Open Settings in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/settings) | Native Windows Compose Desktop window with 4-column grids, volume slider, system tray, and media keys.<br>[Open Desktop view in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/home) |
 
 ## What DHUN includes
 
