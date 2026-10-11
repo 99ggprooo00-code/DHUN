@@ -112,6 +112,24 @@ class NowPlayingPersistenceTest {
     }
 
     @Test
+    fun directBrowseModeChangesArePersisted(): Unit = runBlocking {
+        val d = data()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val player = FakePlayer()
+            val pers = persistence(player, d, scope)
+            pers.start()
+            player.prepareQueue(listOf(track("mode")), 0)
+            player.setRepeatMode(RepeatMode.ALL)
+            player.setShuffle(true)
+            eventually {
+                d.nowPlaying.load()?.let { it.repeatMode == RepeatMode.ALL && it.shuffle } == true
+            }
+            pers.stop()
+        } finally { scope.cancel() }
+    }
+
+    @Test
     fun newQueueModePolicyFollowsThePersistedPreference(): Unit = runBlocking {
         val d = data()
         val p = FakePlayer()

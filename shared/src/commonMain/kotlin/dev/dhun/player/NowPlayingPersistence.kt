@@ -76,6 +76,18 @@ class NowPlayingPersistence(
                 player.currentTrack.distinctUntilChanged { a, b -> a?.id == b?.id }.collect { onTrackChanged(it) }
             },
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                player.repeatMode.collect {
+                    repeatMode = it
+                    snapshot()
+                }
+            },
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                player.shuffleEnabled.collect {
+                    shuffle = it
+                    snapshot()
+                }
+            },
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 while (isActive) {
                     delay(progressIntervalMs)
                     if (player.state.value is PlaybackState.Playing) progress()
