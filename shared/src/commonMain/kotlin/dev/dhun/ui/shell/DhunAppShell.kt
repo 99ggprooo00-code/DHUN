@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -212,9 +213,13 @@ fun DhunAppShell(
     }
 
     val countryCode by settingsVm.countryCode.collectAsState()
+    val explicitContent by settingsVm.explicitContent.collectAsState()
     val settingsLoaded by settingsVm.loaded.collectAsState()
-    LaunchedEffect(countryCode, settingsLoaded) {
-        if (settingsLoaded) homeViewModel.refresh()
+    LaunchedEffect(countryCode, explicitContent, settingsLoaded) {
+        if (settingsLoaded) {
+            homeViewModel.refresh()
+            if (searchViewModel.query.value.isNotBlank()) searchViewModel.onSearchSubmitted()
+        }
     }
 
     // Phase 10: RecordPlay contexts — every queue handoff labels the history row.

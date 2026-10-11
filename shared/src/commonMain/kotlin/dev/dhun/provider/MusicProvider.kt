@@ -4,6 +4,9 @@ import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.HomeFeedPage
 import dev.dhun.core.HomeSection
+import dev.dhun.core.HomeItem
+import dev.dhun.data.SettingsRepository
+import dev.dhun.data.SettingsKeys
 import dev.dhun.core.Lyrics
 import dev.dhun.core.RadioQueuePage
 import dev.dhun.core.SearchResults
@@ -66,37 +69,59 @@ interface MusicProvider {
 class YouTubeMusicProvider(
     private val client: dev.dhun.innertube.InnerTubeClient,
     private val streamResolver: dev.dhun.extraction.StreamResolver,
+    private val settings: SettingsRepository? = null,
 ) : MusicProvider {
 
+    private suspend fun allowExplicit(): Boolean =
+        settings?.getBoolean(SettingsKeys.EXPLICIT_CONTENT, SettingsKeys.EXPLICIT_CONTENT_DEFAULT) ?: true
+
+    private suspend fun filterSections(sections: List<HomeSection>): List<HomeSection> =
+        if (allowExplicit()) sections else sections.map { section ->
+            section.copy(items = section.items.filterNot {
+                it is HomeItem.TrackItem && it.track.explicit
+            })
+        }
+
     override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> =
-        client.search(query, filter)
+        client.search(query, filter).map { results ->
+            if (allowExplicit()) results else results.copy(
+                songs = results.songs.filterNot { it.explicit },
+                videos = results.videos.filterNot { it.explicit },
+            )
+        }
 
     override suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults> =
-        client.searchContinuation(continuationToken)
+        client.searchContinuation(continuationToken).map { results ->
+            if (allowExplicit()) results else results.copy(
+                songs = results.songs.filterNot { it.explicit },
+                videos = results.videos.filterNot { it.explicit },
+            )
+        }
 
     override suspend fun searchSuggestions(query: String): DhunResult<List<String>> =
         client.searchSuggestions(query)
 
     override suspend fun homeFeedPage(): DhunResult<HomeFeedPage> =
-        client.homeFeedPage()
+        client.homeFeedPage().map { it.copy(sections = filterSections(it.sections)) }
 
     override suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> =
-        client.homeFeedContinuation(continuationToken)
+        client.homeFeedContinuation(continuationToken).map { it.copy(sections = filterSections(it.sections)) }
 
     override suspend fun homeFeed(): DhunResult<List<HomeSection>> =
-        when (val page = client.homeFeedPage()) {
-            is DhunResult.Success -> DhunResult.Success(page.value.sections)
-            is DhunResult.Failure -> DhunResult.Failure(page.error)
-        }
+        homeFeedPage().map { it.sections }
 
     override suspend fun relatedTracks(videoId: String): DhunResult<List<Track>> =
-        client.relatedTracks(videoId)
+        client.relatedTracks(videoId).map { tracks -> if (allowExplicit()) tracks else tracks.filterNot { it.explicit } }
 
     override suspend fun radioQueuePage(videoId: String): DhunResult<RadioQueuePage> =
-        client.radioQueuePage(videoId)
+        client.radioQueuePage(videoId).map { page ->
+            if (allowExplicit()) page else page.copy(tracks = page.tracks.filterNot { it.explicit })
+        }
 
     override suspend fun radioQueueContinuation(continuationToken: String): DhunResult<RadioQueuePage> =
-        client.radioQueueContinuation(continuationToken)
+        client.radioQueueContinuation(continuationToken).map { page ->
+            if (allowExplicit()) page else page.copy(tracks = page.tracks.filterNot { it.explicit })
+        }
 
     override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> =
         streamResolver.resolve(videoId)
@@ -105,13 +130,19 @@ class YouTubeMusicProvider(
         client.getLyrics(videoId)
 
     override suspend fun artistPage(browseId: String): DhunResult<dev.dhun.core.ArtistPage> =
-        client.artistPage(browseId)
+        client.artistPage(browseId).map { page ->
+            if (allowExplicit()) page else page.copy(topSongs = page.topSongs.filterNot { it.explicit })
+        }
 
     override suspend fun albumPage(browseId: String): DhunResult<dev.dhun.core.AlbumDetail> =
-        client.albumPage(browseId)
+        client.albumPage(browseId).map { page ->
+            if (allowExplicit()) page else page.copy(tracks = page.tracks.filterNot { it.explicit })
+        }
 
     override suspend fun playlistPage(browseId: String): DhunResult<dev.dhun.core.PlaylistDetail> =
-        client.playlistPage(browseId)
+        client.playlistPage(browseId).map { page ->
+            if (allowExplicit()) page else page.copy(tracks = page.tracks.filterNot { it.explicit })
+        }
 
     companion object
 }

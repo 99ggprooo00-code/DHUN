@@ -80,6 +80,7 @@ val appModule = module {
                     primary = get<StreamResolver>(),
                     fileExists = { path -> runCatching { File(path).exists() }.getOrDefault(false) },
                 ),
+                get<DataLayer>().settings,
             ),
         )
     }

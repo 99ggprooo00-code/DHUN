@@ -175,6 +175,8 @@ fun SettingsScreen(
             SettingsGroup("Content, Region & Discovery") {
                 OptionRow("Content country", listOf("US", "NP", "IN", "GB", "CA", "AU", "DE", "FR", "JP", "KR", "BR")
                     .map { it to it }, viewModel.countryCode.collectAsState().value, viewModel::setCountryCode)
+                SettingsSwitchRow("Explicit content", "Allow explicit tracks in search, home and radio",
+                    viewModel.explicitContent.collectAsState().value, viewModel::setExplicitContent)
             }
             if (equalizerSession != null) SettingsGroup("Equalizer & Sound Processing") {
                 EqualizerSection(equalizerSession)
