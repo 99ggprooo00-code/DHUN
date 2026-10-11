@@ -35,6 +35,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import dev.dhun.data.SettingsKeys
+import dev.dhun.player.equalizer.EqualizerState
+import dev.dhun.player.equalizer.EqualizerBands
+import kotlinx.coroutines.flow.drop
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +67,7 @@ import dev.dhun.download.DownloadManager
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.design.ArtworkColorExtractor
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
@@ -177,6 +183,8 @@ fun DhunAppShell(
      * than a plausible-looking wrong version.
      */
     appInfo: DhunAppInfo = DhunAppInfo.Unknown,
+    clearAudioCache: (suspend () -> Long)? = null,
+    onCountryCodeChange: (String) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
@@ -204,7 +212,48 @@ fun DhunAppShell(
             GetSettingUseCase(dataLayer.settings),
             UpdateSettingUseCase(dataLayer.settings),
             scope,
+            clearLyricsCacheAction = { playerViewModel.clearLyricsCache() },
+            clearSearchHistoryAction = { dataLayer.search.clearRecentSearches() },
+            clearPlayHistoryAction = { dataLayer.history.clear() },
+            clearAudioCacheAction = clearAudioCache,
+            onCountryCodeChange = onCountryCodeChange,
         )
+    }
+
+    // The EQ is a platform engine session, but its controls live in Settings.
+    // Restore once before observing writes; the DB remains the source of truth
+    // across restarts, and reset-to-defaults also restores the live engine.
+    LaunchedEffect(dataLayer, equalizerSession) {
+        if (equalizerSession != null) {
+            val prefs = dataLayer.settings
+            val defaults = EqualizerState()
+            val initial = EqualizerState(
+                enabled = prefs.getBoolean(SettingsKeys.EQUALIZER_ENABLED, defaults.enabled),
+                presetId = prefs.getString(SettingsKeys.EQUALIZER_PRESET) ?: defaults.presetId,
+                preampDb = prefs.getString(SettingsKeys.EQUALIZER_PREAMP_DB)?.toFloatOrNull() ?: defaults.preampDb,
+                gainsDb = prefs.getString(SettingsKeys.EQUALIZER_GAINS_DB)
+                    ?.split(',')?.mapNotNull { it.toFloatOrNull() }
+                    ?.takeIf { it.size == EqualizerBands.COUNT }
+                    ?: defaults.gainsDb,
+            )
+            equalizerSession.restore(initial)
+            equalizerSession.state.drop(1).collect { state ->
+                prefs.putBoolean(SettingsKeys.EQUALIZER_ENABLED, state.enabled)
+                prefs.putString(SettingsKeys.EQUALIZER_PRESET, state.presetId)
+                prefs.putString(SettingsKeys.EQUALIZER_PREAMP_DB, state.preampDb.toString())
+                prefs.putString(SettingsKeys.EQUALIZER_GAINS_DB, state.gainsDb.joinToString(","))
+            }
+        }
+    }
+
+    val countryCode by settingsVm.countryCode.collectAsState()
+    val explicitContent by settingsVm.explicitContent.collectAsState()
+    val settingsLoaded by settingsVm.loaded.collectAsState()
+    LaunchedEffect(countryCode, explicitContent, settingsLoaded) {
+        if (settingsLoaded) {
+            homeViewModel.refresh()
+            if (searchViewModel.query.value.isNotBlank()) searchViewModel.onSearchSubmitted()
+        }
     }
 
     // Phase 10: RecordPlay contexts — every queue handoff labels the history row.
@@ -276,7 +325,8 @@ fun DhunAppShell(
         // artwork backdrop below, it does not replace it.
         val ambient by animateColorAsState(
             targetValue = currentTrack?.let {
-                ArtworkColorExtractor.extractFromSeed(it.thumbnailUrl ?: it.id).backgroundTint
+                if (DhunAppearance.accentMode == "static") DhunColors.accent.copy(alpha = 0.10f)
+                else ArtworkColorExtractor.extractFromSeed(it.thumbnailUrl ?: it.id).backgroundTint
             } ?: Color.Transparent,
             animationSpec = DhunAnimations.slowTween(),
             label = "shellAmbient",
@@ -831,7 +881,7 @@ private fun ShellMasterPane(
             onOpenSettings = onOpenSettings,
         )
         is DetailRoute.ArtistPage -> {
-            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession) }
+            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession, dataLayer.settings) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             ArtistScreen(
                 viewModel = vm,
@@ -844,7 +894,7 @@ private fun ShellMasterPane(
             )
         }
         is DetailRoute.AlbumPage -> {
-            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id) }
+            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id, dataLayer.settings) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             AlbumScreen(
                 viewModel = vm,
@@ -856,7 +906,7 @@ private fun ShellMasterPane(
         }
         is DetailRoute.PlaylistPage -> {
             val vm = remember(route.id, route.isLocal) {
-                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal)
+                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal, dataLayer.settings)
             }
             DisposableEffect(vm) { onDispose { vm.close() } }
             PlaylistScreen(
@@ -921,7 +971,7 @@ private fun ShellDetailPane(
 ) {
     when (route) {
         is DetailRoute.ArtistPage -> {
-            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession) }
+            val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession, dataLayer.settings) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             ArtistScreen(
                 viewModel = vm,
@@ -934,7 +984,7 @@ private fun ShellDetailPane(
             )
         }
         is DetailRoute.AlbumPage -> {
-            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id) }
+            val vm = remember(route.id) { AlbumViewModel(provider, player, route.id, dataLayer.settings) }
             DisposableEffect(vm) { onDispose { vm.close() } }
             AlbumScreen(
                 viewModel = vm,
@@ -946,7 +996,7 @@ private fun ShellDetailPane(
         }
         is DetailRoute.PlaylistPage -> {
             val vm = remember(route.id, route.isLocal) {
-                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal)
+                PlaylistViewModel(provider, dataLayer.playlists, player, route.id, route.isLocal, dataLayer.settings)
             }
             DisposableEffect(vm) { onDispose { vm.close() } }
             PlaylistScreen(

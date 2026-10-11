@@ -13,6 +13,9 @@ import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.domain.ToggleFavoriteUseCase
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.combine
+import dev.dhun.data.SettingsKeys
+import dev.dhun.data.SettingsRepository
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +42,7 @@ class HomeViewModel(
     historyRepository: HistoryRepository,
     libraryRepository: LibraryRepository,
     private val scope: CoroutineScope,
+    settings: SettingsRepository? = null,
 ) {
     private val toggleFavoriteUseCase = ToggleFavoriteUseCase(libraryRepository)
 
@@ -71,8 +75,16 @@ class HomeViewModel(
     private var pageJob: Job? = null
     private var recommendJob: Job? = null
 
-    val recentlyPlayed: StateFlow<List<Track>> = historyRepository.observeRecentlyPlayed(24)
+    private val allowExplicit = settings?.observeString(SettingsKeys.EXPLICIT_CONTENT)
+        ?.map { it?.toBooleanStrictOrNull() ?: true }
+        ?.stateIn(scope, SharingStarted.Eagerly, true)
+    private val rawRecentlyPlayed = historyRepository.observeRecentlyPlayed(24)
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
+    val recentlyPlayed: StateFlow<List<Track>> = allowExplicit?.let { allowed ->
+        combine(rawRecentlyPlayed, allowed) { tracks, yes ->
+            if (yes) tracks else tracks.filterNot { it.explicit }
+        }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+    } ?: rawRecentlyPlayed
     val favoriteIds: StateFlow<Set<String>> = libraryRepository.observeFavoriteIds()
         .stateIn(scope, SharingStarted.Eagerly, emptySet())
 
@@ -83,7 +95,11 @@ class HomeViewModel(
      * arrive. Empty when the user has neither history nor saved songs.
      */
     private val _recommendedSongs = MutableStateFlow<List<Track>>(emptyList())
-    val recommendedSongs: StateFlow<List<Track>> = _recommendedSongs.asStateFlow()
+    val recommendedSongs: StateFlow<List<Track>> = allowExplicit?.let { allowed ->
+        combine(_recommendedSongs, allowed) { tracks, yes ->
+            if (yes) tracks else tracks.filterNot { it.explicit }
+        }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+    } ?: _recommendedSongs.asStateFlow()
 
     private val _isLoadingRecommended = MutableStateFlow(false)
     val isLoadingRecommended: StateFlow<Boolean> = _isLoadingRecommended.asStateFlow()

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,6 +17,7 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
@@ -334,6 +337,8 @@ fun main(args: Array<String>) {
                         settings.getString(SettingsKeys.ACCENT),
                         settings.getInt(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT),
                         settings.getInt(SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT),
+                        settings.getString(SettingsKeys.ACCENT_MODE),
+                        systemDark = false,
                     )
                 }
             }
@@ -360,6 +365,15 @@ fun main(args: Array<String>) {
                 position = initialGeometry?.let { WindowPosition(it.x.toFloat().dp, it.y.toFloat().dp) }
                     ?: WindowPosition.PlatformDefault,
             )
+
+            val storedGeometry by settings.observeString(SettingsKeys.WINDOW_GEOMETRY)
+                .collectAsState(initial = initialGeometry?.let { "${it.x},${it.y},${it.w},${it.h}" })
+            LaunchedEffect(storedGeometry) {
+                if (storedGeometry == null) {
+                    mainState.size = DpSize(DhunSpacing.windowDefaultWidth, DhunSpacing.windowDefaultHeight)
+                    mainState.position = WindowPosition.Aligned(Alignment.Center)
+                }
+            }
 
             val mainWindowRef = AtomicReference<ComposeWindow>()
             val smctSessionRef = AtomicReference<Smct.Session?>()
@@ -521,11 +535,22 @@ fun main(args: Array<String>) {
 
             val nav = remember { AppNavState() }
 
+            // Preferences are observed by the window composition; SQLite work
+            // stays on the repository dispatcher and does not touch snapshots.
+            val closeToTray by settings.observeString(SettingsKeys.CLOSE_TO_TRAY)
+                .collectAsState(initial = null)
+            val seekStep by settings.observeString(SettingsKeys.SEEK_STEP_SECONDS)
+                .collectAsState(initial = null)
             // ---- main window ------------------------------------------------------- //
             Window(
-                // Explicit close always exits, including installs with the
-                // retired close_to_tray=true preference. Minimize is separate.
-                onCloseRequest = ::quit,
+                // X hides only when a tray icon was actually registered;
+                // Ctrl+Q and tray Quit always shut down completely.
+                onCloseRequest = {
+                    val w = mainWindowRef.get()
+                    if ((closeToTray?.toBooleanStrictOrNull() ?: SettingsKeys.CLOSE_TO_TRAY_DEFAULT) && tray.isAvailable && w != null) {
+                        w.isVisible = false
+                    } else quit()
+                },
                 state = mainState,
                 title = "DHUN",
                 // Window-scope commands run after child dispatch. The Space
@@ -558,7 +583,7 @@ fun main(args: Array<String>) {
                         }
                         event.key == Key.DirectionLeft -> {
                             playerViewModel.seekTo(
-                                (playerViewModel.positionMs.value - SEEK_STEP_MS).coerceAtLeast(0L),
+                                (playerViewModel.positionMs.value - ((seekStep?.toIntOrNull()?.takeIf { it in listOf(5, 10, 15, 30) } ?: 5) * 1000L)).coerceAtLeast(0L),
                             )
                             true
                         }
@@ -566,7 +591,7 @@ fun main(args: Array<String>) {
                             val duration = playerViewModel.durationMs.value
                             if (duration > 0) {
                                 playerViewModel.seekTo(
-                                    (playerViewModel.positionMs.value + SEEK_STEP_MS).coerceAtMost(duration),
+                                    (playerViewModel.positionMs.value + ((seekStep?.toIntOrNull()?.takeIf { it in listOf(5, 10, 15, 30) } ?: 5) * 1000L)).coerceAtMost(duration),
                                 )
                                 true
                             } else {
@@ -597,6 +622,13 @@ fun main(args: Array<String>) {
                         downloadManager = koin.get(),
                         equalizerSession = player.equalizer,
                         appInfo = remember { desktopAppInfo() },
+                        onCountryCodeChange = { koin.get<InnerTubeClient>().setCountryCode(it) },
+                        clearAudioCache = {
+                            val cache = koin.get<AudioFileCache>()
+                            val before = cache.dir.listFiles()?.sumOf { it.length() } ?: 0L
+                            cache.clear()
+                            before - (cache.dir.listFiles()?.sumOf { it.length() } ?: 0L)
+                        },
                     )
                 }
             }
@@ -635,21 +667,26 @@ private fun desktopAppInfo(): DhunAppInfo {
     )
 }
 
-private const val SEEK_STEP_MS = 5_000L
 
 /** Restored \"x,y,w,h\" (px) from [SettingsKeys.WINDOW_GEOMETRY]. */
 private data class WindowGeometry(val x: Long, val y: Long, val w: Long, val h: Long)
 
 private val desktopModule = module {
     single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-    single { InnerTubeClient() }
+    single {
+        InnerTubeClient().also { client ->
+            get<CoroutineScope>().launch {
+                get<DataLayer>().settings.observeString(SettingsKeys.COUNTRY_CODE).collect(client::setCountryCode)
+            }
+        }
+    }
     // Network-only resolution chain (ADR-001): own-client primary, yt-dlp
     // failover. Used by the download engine (must NOT short-circuit to a
     // not-yet-downloaded file) and wrapped by the offline-first resolver for
     // playback.
     single<StreamResolver> {
         ResolvingStreamResolver(
-            primary = OwnClientStreamResolver(get()),
+            primary = OwnClientStreamResolver(get(), get<DataLayer>().settings),
             fallback = YtDlpStreamResolver(),
         )
     }
@@ -662,7 +699,7 @@ private val desktopModule = module {
             primary = get<StreamResolver>(),
             fileExists = { path -> runCatching { File(path).exists() }.getOrDefault(false) },
         )
-        YouTubeMusicProvider(client, resolver)
+        YouTubeMusicProvider(client, resolver, get<DataLayer>().settings)
     }
     // ADR-006 persistent download manager: bounded worker pool over the
     // network chain, writing into <data dir>/downloads (audio/ + art/).
@@ -737,6 +774,7 @@ private val desktopModule = module {
             recordPlay = RecordPlayUseCase(data.history),
             scope = get(),
             log = { println("DHUN persistence: $it") },
+            settings = data.settings,
         )
     }
 
@@ -748,7 +786,9 @@ private val desktopModule = module {
     single { YouTubeLyricsSource(get()) }
     single {
         val data: DataLayer = get()
-        LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get())
+        LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get(),
+            settings = data.settings, search = dev.dhun.lyrics.LrcLibSearchSource(),
+            kugou = dev.dhun.lyrics.KuGouLyricsSource())
     }
 
     // Shared endless-radio bookkeeping (PlayerViewModel + ArtistViewModel).
@@ -763,6 +803,7 @@ private val desktopModule = module {
             radioSession = get(),
             persistence = get(),
             lyricsRepository = get(),
+            settings = get<DataLayer>().settings,
         )
     }
 
@@ -773,6 +814,7 @@ private val desktopModule = module {
             historyRepository = get<DataLayer>().history,
             libraryRepository = get<DataLayer>().library,
             scope = get(),
+            settings = get<DataLayer>().settings,
         )
     }
 

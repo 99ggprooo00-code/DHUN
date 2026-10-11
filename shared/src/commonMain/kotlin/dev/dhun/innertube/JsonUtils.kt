@@ -70,3 +70,15 @@ internal fun JsonElement.collectStringsMatching(regex: Regex, out: MutableList<S
         else -> {}
     }
 }
+
+/** Only inspect badge renderers on the track row, never menu labels or titles. */
+internal fun JsonObject.hasExplicitBadge(): Boolean {
+    val badges = mutableListOf<JsonObject>()
+    (this["badges"] as? JsonArray)?.collectObjects("musicInlineBadgeRenderer", badges)
+    (this["badges"] as? JsonArray)?.collectObjects("metadataBadgeRenderer", badges)
+    return badges.any { badge ->
+        badge.obj("icon")?.str("iconType")?.contains("EXPLICIT", ignoreCase = true) == true ||
+            (descend(badge, listOf("accessibilityData", "accessibilityData", "label")) as? JsonPrimitive)
+                ?.contentOrNull?.equals("Explicit", ignoreCase = true) == true
+    }
+}

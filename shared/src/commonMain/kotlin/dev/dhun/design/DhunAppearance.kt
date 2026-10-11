@@ -56,12 +56,9 @@ import androidx.compose.ui.graphics.Color
 /**
  * Light or dark. `DARK` is the default — the palette DHUN shipped with.
  *
- * There is no `SYSTEM` entry on purpose: following the platform setting needs
- * an `expect/actual` hook into Android configuration and the desktop OS
- * appearance, and neither exists in this module. Adding a value that cannot
- * be honoured would be a stub. Note that `SettingsKeys.THEME` documents
- * `"system"` as a storable value; [fromId] maps it to `null`, so a persisted
- * "system" falls back to the dark default instead of pretending to work.
+ * System is a preference rather than a token palette: [DhunTheme]
+ * resolves it through the platform's [androidx.compose.foundation.isSystemInDarkTheme].
+ * [fromId] intentionally accepts only concrete palette ids.
  */
 enum class DhunThemeMode(
     /** Stable persistence key — survives a display-name change. */
@@ -318,7 +315,9 @@ data class DhunTokens(
      * then `.copy()`-ed, so every role not set here keeps its M3 default —
      * identical to the previous `darkColorScheme(...)` construction.
      */
-    val materialScheme: ColorScheme by lazy {
+    // A token set is immutable; scheme creation is synchronized so a first
+    // read from Skiko and a background observer cannot initialize it twice.
+    val materialScheme: ColorScheme by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         val base = if (isLight) lightColorScheme() else darkColorScheme()
         base.copy(
             primary = accent,
@@ -452,41 +451,48 @@ object DhunAppearance {
     const val BACKDROP_BLUR_DEFAULT = 100
     const val BACKDROP_BRIGHTNESS_DEFAULT = 55
 
-    private val modeState = mutableStateOf(DhunThemeMode.default)
-    private val accentState = mutableStateOf(DhunAccent.default)
-    private val tokensState = mutableStateOf(
-        DhunTokens.forAppearance(DhunThemeMode.default, DhunAccent.default),
-    )
+    // Publish a complete palette in ONE snapshot write. Readers in the desktop
+    // two-pane window must never observe a new mode with the old accent tokens.
+    private data class Palette(val mode: DhunThemeMode, val accent: DhunAccent, val tokens: DhunTokens)
+    private val paletteState = mutableStateOf(Palette(DhunThemeMode.default, DhunAccent.default, DhunTokens.dark))
+    private val themeIdState = mutableStateOf("dark")
+    private val accentModeState = mutableStateOf("artwork")
     private val backdropBlurPercentState = mutableStateOf(BACKDROP_BLUR_DEFAULT)
     private val backdropBrightnessPercentState = mutableStateOf(BACKDROP_BRIGHTNESS_DEFAULT)
 
-    val mode: DhunThemeMode get() = modeState.value
-    val accent: DhunAccent get() = accentState.value
-    /** 0–100. Applied as a multiplier on the 64dp shell/player blur (API 31+ / desktop). */
+    val mode: DhunThemeMode get() = paletteState.value.mode
+    val accent: DhunAccent get() = paletteState.value.accent
+    val themeId: String get() = themeIdState.value
+    val accentMode: String get() = accentModeState.value
     val backdropBlurPercent: Int get() = backdropBlurPercentState.value
-    /** 0–100. Dim overlay on the un-blurred thumbnail (API < 31). */
     val backdropBrightnessPercent: Int get() = backdropBrightnessPercentState.value
+    val tokens: DhunTokens get() = paletteState.value.tokens
 
-    /** The active token set — what every [DhunColors] accessor resolves to. */
-    val tokens: DhunTokens get() = tokensState.value
+    fun setAppearance(nextMode: DhunThemeMode = mode, nextAccent: DhunAccent = accent) {
+        val current = paletteState.value
+        if (nextMode == current.mode && nextAccent == current.accent) return
+        paletteState.value = Palette(nextMode, nextAccent, DhunTokens.forAppearance(nextMode, nextAccent))
+    }
 
-    /**
-     * Applies [nextMode]/[nextAccent]. A no-op when nothing changed (the
-     * structural-equality snapshot policy makes the write free), which is why
-     * [DhunTheme] can call it on every composition without churning state.
-     */
-    fun setAppearance(
-        nextMode: DhunThemeMode = mode,
-        nextAccent: DhunAccent = accent,
-    ) {
-        if (nextMode == modeState.value && nextAccent == accentState.value) return
-        modeState.value = nextMode
-        accentState.value = nextAccent
-        tokensState.value = DhunTokens.forAppearance(nextMode, nextAccent)
+    /** Called from event handlers/startup, never during composition. */
+    fun setThemePreference(id: String, systemDark: Boolean) {
+        if (id !in listOf("dark", "light", "system")) return
+        themeIdState.value = id
+        setAppearance(nextMode = when (id) {
+            "light" -> DhunThemeMode.LIGHT
+            "system" -> if (systemDark) DhunThemeMode.DARK else DhunThemeMode.LIGHT
+            else -> DhunThemeMode.DARK
+        })
+    }
+
+    fun setAccentMode(id: String) {
+        if (id == "artwork" || id == "static") accentModeState.value = id
     }
 
     /** Back to the shipped default. Used by tests and any future "reset" action. */
     fun reset() {
+        themeIdState.value = "dark"
+        accentModeState.value = "artwork"
         setAppearance(DhunThemeMode.default, DhunAccent.default)
         setBackdropPrefs(BACKDROP_BLUR_DEFAULT, BACKDROP_BRIGHTNESS_DEFAULT)
     }
@@ -497,20 +503,22 @@ object DhunAppearance {
     }
 
     /**
-     * Applies persisted ids read from `SettingsKeys.THEME` / `SettingsKeys.ACCENT`
-     * by the host (platform entry points own the read; `design` cannot depend
-     * on `data`). Unknown, corrupt, or absent ids — including `"system"`, which
-     * is storable but not honoured (see [DhunThemeMode]) — fall back to the
-     * defaults. Idempotent: re-applying the active ids is a no-op.
+     * Applies persisted ids read by the host before the first frame.
+     * Invalid values fall back to dark/brand. `system` follows the platform
+     * supplied dark-mode flag and continues following changes in [DhunTheme].
      */
     fun applyPersistedAppearance(
         themeId: String?,
         accentId: String?,
         blurPercent: Int? = null,
         brightnessPercent: Int? = null,
+        accentMode: String? = null,
+        systemDark: Boolean = true,
     ) {
+        setThemePreference(themeId?.takeIf { it in listOf("dark", "light", "system") } ?: "dark", systemDark)
+        setAccentMode(accentMode ?: "artwork")
         setAppearance(
-            nextMode = DhunThemeMode.fromId(themeId) ?: DhunThemeMode.default,
+            nextMode = mode,
             nextAccent = DhunAccent.fromId(accentId) ?: DhunAccent.default,
         )
         setBackdropPrefs(

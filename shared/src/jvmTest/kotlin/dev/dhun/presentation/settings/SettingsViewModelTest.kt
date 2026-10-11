@@ -9,7 +9,15 @@ import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -36,6 +44,13 @@ class SettingsViewModelTest {
         return vm
     }
 
+    private suspend fun reloaded(d: DataLayer, scope: CoroutineScope): SettingsViewModel {
+        // UI-facing flows are optimistic. A fresh ViewModel must not read the
+        // DB until the asynchronous preference writes under test have finished.
+        scope.coroutineContext[Job]!!.children.toList().joinAll()
+        return loaded(vm(d, scope))
+    }
+
     @Test
     fun freshDbExposesDocumentedDefaults(): Unit = runBlocking {
         val v = loaded(vm(data(), this))
@@ -51,59 +66,116 @@ class SettingsViewModelTest {
     @Test
     fun themeRoundTripsAndRejectsUnknownIds(): Unit = runBlocking {
         val d = data()
-        val v = loaded(vm(d, this))
+        val v = reloaded(d, this)
         v.setThemeId("light")
         assertEquals("light", v.themeId.value)
-        v.setThemeId("system") // storable in the DB schema, but not a real mode
-        assertEquals("light", v.themeId.value)
+        v.setThemeId("system")
+        assertEquals("system", v.themeId.value)
         v.setThemeId("amoled???")
-        assertEquals("light", v.themeId.value)
-        // A second instance reads what the first wrote.
-        assertEquals("light", loaded(vm(d, this)).themeId.value)
+        assertEquals("system", v.themeId.value)
+        assertEquals("system", reloaded(d, this).themeId.value)
     }
 
     @Test
     fun accentRoundTripsAndRejectsBlanks(): Unit = runBlocking {
         val d = data()
-        val v = loaded(vm(d, this))
+        val v = reloaded(d, this)
         v.setAccentId("violet")
         assertEquals("violet", v.accentId.value)
         v.setAccentId("  ")
         assertEquals("violet", v.accentId.value)
-        assertEquals("violet", loaded(vm(d, this)).accentId.value)
+        assertEquals("violet", reloaded(d, this).accentId.value)
+    }
+
+    @Test
+    fun rapidEditsCannotOverwriteResetAndNewEditsFollowReset(): Unit = runBlocking {
+        val d = data()
+        val background = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val v = loaded(vm(d, background))
+            repeat(12) {
+                v.setBackdropBrightnessPercent(it)
+                v.setThemeId("light")
+            }
+            v.reset()
+            background.coroutineContext[Job]!!.children.toList().joinAll()
+            assertEquals(null, d.settings.getString(SettingsKeys.THEME))
+            assertEquals(null, d.settings.getString(SettingsKeys.BACKDROP_BRIGHTNESS))
+            v.setThemeId("light")
+            background.coroutineContext[Job]!!.children.toList().joinAll()
+            assertEquals("light", d.settings.getString(SettingsKeys.THEME))
+        } finally { background.cancel() }
+    }
+
+    @Test
+    fun resetAlsoRemovesPersistedEqualizerCurve(): Unit = runBlocking {
+        val d = data()
+        d.settings.putBoolean(SettingsKeys.EQUALIZER_ENABLED, true)
+        d.settings.putString(SettingsKeys.EQUALIZER_GAINS_DB, List(10) { "3" }.joinToString(","))
+        val v = reloaded(d, this)
+        v.reset()
+        // Reset dispatches its DB writes asynchronously; observe completion.
+        withTimeout(3_000) {
+            while (d.settings.getString(SettingsKeys.EQUALIZER_ENABLED) != null ||
+                d.settings.getString(SettingsKeys.EQUALIZER_GAINS_DB) != null) delay(10)
+        }
+        assertEquals(null, d.settings.getString(SettingsKeys.EQUALIZER_ENABLED))
+        assertEquals(null, d.settings.getString(SettingsKeys.EQUALIZER_GAINS_DB))
+    }
+
+    @Test
+    fun newPreferencesPersistAndReset(): Unit = runBlocking {
+        val d = data()
+        val v = reloaded(d, this)
+        v.setAudioQuality("low")
+        v.setSeekStepSeconds(15)
+        v.setAutoplayRadio(false)
+        v.setLyricsEnabled(false)
+        v.setAccentMode("static")
+        v.setPreferredProvider("kugou")
+        v.setProviderEnabled("ytm", false)
+        assertEquals("low", reloaded(d, this).audioQuality.value)
+        assertEquals(15, reloaded(d, this).seekStepSeconds.value)
+        assertFalse(reloaded(d, this).autoplayRadio.value)
+        assertFalse(reloaded(d, this).lyricsEnabled.value)
+        assertEquals("static", reloaded(d, this).accentMode.value)
+        assertEquals("kugou", reloaded(d, this).preferredProvider.value)
+        assertFalse("ytm" in reloaded(d, this).providerOrder.value.split(','))
+        v.reset()
+        assertEquals(SettingsKeys.AUDIO_QUALITY_DEFAULT, reloaded(d, this).audioQuality.value)
     }
 
     @Test
     fun cacheBudgetRoundTripsAndRejectsOffLadderValues(): Unit = runBlocking {
         val d = data()
-        val v = loaded(vm(d, this))
+        val v = reloaded(d, this)
         v.setCacheSizeMb(512)
         assertEquals(512, v.cacheSizeMb.value)
         v.setCacheSizeMb(123) // not on the ladder
         assertEquals(512, v.cacheSizeMb.value)
         v.setCacheSizeMb(0) // the documented unlimited sentinel
         assertEquals(0, v.cacheSizeMb.value)
-        assertEquals(0, loaded(vm(d, this)).cacheSizeMb.value)
+        assertEquals(0, reloaded(d, this).cacheSizeMb.value)
     }
 
     @Test
     fun corruptPersistedBudgetLoadsClamped(): Unit = runBlocking {
         val d = data()
         d.settings.putInt(SettingsKeys.CACHE_SIZE_MB, 999_999)
-        assertEquals(AudioCacheBudget.MAX_MB, loaded(vm(d, this)).cacheSizeMb.value)
+        assertEquals(AudioCacheBudget.MAX_MB, reloaded(d, this).cacheSizeMb.value)
         d.settings.putInt(SettingsKeys.CACHE_SIZE_MB, -5)
-        assertEquals(AudioCacheBudget.DEFAULT_MB, loaded(vm(d, this)).cacheSizeMb.value)
+        assertEquals(AudioCacheBudget.DEFAULT_MB, reloaded(d, this).cacheSizeMb.value)
     }
 
     @Test
     fun switchesRoundTrip(): Unit = runBlocking {
         val d = data()
-        val v = loaded(vm(d, this))
+        val v = reloaded(d, this)
         v.setResumeOnLaunch(false)
         v.setCloseToTray(false)
         assertFalse(v.resumeOnLaunch.value)
         assertFalse(v.closeToTray.value)
-        val v2 = loaded(vm(d, this))
+        val v2 = reloaded(d, this)
         assertFalse(v2.resumeOnLaunch.value)
         assertFalse(v2.closeToTray.value)
     }
@@ -125,7 +197,7 @@ class SettingsViewModelTest {
     @Test
     fun backdropPrefsRoundTripAndClamp(): Unit = runBlocking {
         val d = data()
-        val v = loaded(vm(d, this))
+        val v = reloaded(d, this)
         v.setBackdropBlurPercent(40)
         v.setBackdropBrightnessPercent(20)
         assertEquals(40, v.backdropBlurPercent.value)
@@ -134,7 +206,7 @@ class SettingsViewModelTest {
         v.setBackdropBrightnessPercent(-4)
         assertEquals(100, v.backdropBlurPercent.value)
         assertEquals(0, v.backdropBrightnessPercent.value)
-        val v2 = loaded(vm(d, this))
+        val v2 = reloaded(d, this)
         assertEquals(100, v2.backdropBlurPercent.value)
         assertEquals(0, v2.backdropBrightnessPercent.value)
     }

@@ -50,7 +50,10 @@ class DhunTray(
     private val onQuit: () -> Unit,
     private val log: (String) -> Unit = {},
 ) {
-    private var trayIcon: TrayIcon? = null
+    @Volatile private var trayIcon: TrayIcon? = null
+
+    /** Hide to tray only after AWT actually registered the icon. */
+    val isAvailable: Boolean get() = trayIcon != null
     private var trackItem: MenuItem? = null
     private var playItem: MenuItem? = null
 

@@ -425,6 +425,11 @@ internal fun LyricsTabContent(
                     }
                 }
             }
+            is LyricsUiState.Disabled -> EmptyView(
+                title = "Lyrics disabled in Settings",
+                message = "Enable lyrics in Settings to see words for this song.",
+                modifier = modifier.fillMaxSize(),
+            )
             is LyricsUiState.Unavailable -> {
                 EmptyView(
                     title = "No lyrics",
@@ -464,7 +469,11 @@ internal fun LyricsTabContent(
                         )
                         Text(
                             text = state.text,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = when (viewModel.lyricsTextSize.collectAsState().value) {
+                                "small" -> MaterialTheme.typography.bodyLarge
+                                "large" -> MaterialTheme.typography.titleLarge
+                                else -> MaterialTheme.typography.titleMedium
+                            },
                             color = DhunColors.textSecondary,
                             lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
                         )
@@ -481,6 +490,8 @@ internal fun LyricsTabContent(
                     if (viewModel.currentTrack.value?.id == track.id) viewModel.seekTo(position)
                 },
                 modifier = modifier,
+                autoScroll = viewModel.lyricsAutoScroll.collectAsState().value,
+                textSize = viewModel.lyricsTextSize.collectAsState().value,
             )
         }
     }

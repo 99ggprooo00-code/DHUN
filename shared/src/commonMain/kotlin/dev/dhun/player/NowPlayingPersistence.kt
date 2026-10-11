@@ -39,6 +39,7 @@ class NowPlayingPersistence(
     private val scope: CoroutineScope,
     private val progressIntervalMs: Long = 5_000,
     private val log: (String) -> Unit = {},
+    private val settings: dev.dhun.data.SettingsRepository? = null,
 ) {
     private var jobs: List<Job> = emptyList()
     private var repeatMode: RepeatMode = RepeatMode.OFF
@@ -75,6 +76,18 @@ class NowPlayingPersistence(
                 player.currentTrack.distinctUntilChanged { a, b -> a?.id == b?.id }.collect { onTrackChanged(it) }
             },
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                player.repeatMode.collect {
+                    repeatMode = it
+                    snapshot()
+                }
+            },
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                player.shuffleEnabled.collect {
+                    shuffle = it
+                    snapshot()
+                }
+            },
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 while (isActive) {
                     delay(progressIntervalMs)
                     if (player.state.value is PlaybackState.Playing) progress()
@@ -97,10 +110,11 @@ class NowPlayingPersistence(
         val snap = runCatching { restore.invoke() }.onFailure { log("restore failed: ${it.message}") }.getOrNull()
             ?: return null
         playContext = PlayContext.RESTORED
-        player.setRepeatMode(snap.repeatMode)
-        player.setShuffle(snap.shuffle)
-        repeatMode = snap.repeatMode
-        shuffle = snap.shuffle
+        val keepModes = settings?.getBoolean(dev.dhun.data.SettingsKeys.PERSIST_SHUFFLE_REPEAT, true) ?: true
+        player.setRepeatMode(if (keepModes) snap.repeatMode else RepeatMode.OFF)
+        player.setShuffle(keepModes && snap.shuffle)
+        repeatMode = if (keepModes) snap.repeatMode else RepeatMode.OFF
+        shuffle = keepModes && snap.shuffle
         // A restored session waits for the user, at the position they left.
         player.prepareQueue(snap.queue, snap.currentIndex, playWhenReady = false)
         if (snap.positionMs > 0) player.seekTo(snap.positionMs)
@@ -115,7 +129,9 @@ class NowPlayingPersistence(
         val current = player.currentTrack.value
         val index = queue.indexOfFirst { it.id == current?.id }.coerceAtLeast(0)
         runCatching {
-            writeMutex.withLock { save(queue, index, player.positionMs.value, repeatMode, shuffle) }
+            writeMutex.withLock {
+                save(queue, index, player.positionMs.value, player.repeatMode.value, player.shuffleEnabled.value)
+            }
         }.onFailure { log("save queue failed: ${it.message}") }
     }
 

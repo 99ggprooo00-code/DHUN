@@ -40,6 +40,7 @@ import kotlinx.serialization.json.contentOrNull
  */
 class OwnClientStreamResolver(
     private val client: InnerTubeClient,
+    private val settings: dev.dhun.data.SettingsRepository? = null,
 ) : StreamResolver {
     override val name: String = "own-innertube-player"
 
@@ -54,9 +55,11 @@ class OwnClientStreamResolver(
             val sts = async { client.signatureTimestampOrNull(videoId) }
             PlayerIdentity(visitorData.await(), sts.await())
         }
+        val quality = runCatching { settings?.getString(dev.dhun.data.SettingsKeys.AUDIO_QUALITY) }.getOrNull()
+            ?: dev.dhun.data.SettingsKeys.AUDIO_QUALITY_DEFAULT
         val outcomes = LinkedHashMap<String, DhunError>()
         for (wave in WAVES) {
-            val streamInfo = executeWave(videoId, wave, identity, outcomes)
+            val streamInfo = executeWave(videoId, wave, identity, outcomes, quality)
             if (streamInfo != null) {
                 return DhunResult.Success(streamInfo)
             }
@@ -72,6 +75,7 @@ class OwnClientStreamResolver(
         wave: List<Strategy>,
         identity: PlayerIdentity,
         outcomes: MutableMap<String, DhunError>,
+        quality: String,
     ): StreamInfo? = coroutineScope {
         if (wave.isEmpty()) return@coroutineScope null
         if (wave.size == 1) {
@@ -85,7 +89,7 @@ class OwnClientStreamResolver(
             }
             return@coroutineScope when (response) {
                 is DhunResult.Success -> try {
-                    parseStreamInfo(videoId, response.value).copy(userAgent = strategy.userAgent)
+                    parseStreamInfo(videoId, response.value, quality).copy(userAgent = strategy.userAgent)
                 } catch (e: DhunException) {
                     outcomes[strategy.label] = e.error
                     null
@@ -119,7 +123,7 @@ class OwnClientStreamResolver(
             when (result) {
                 is DhunResult.Success -> {
                     try {
-                        val parsed = parseStreamInfo(videoId, result.value).copy(userAgent = strategy.userAgent)
+                        val parsed = parseStreamInfo(videoId, result.value, quality).copy(userAgent = strategy.userAgent)
                         winner = parsed
                         break
                     } catch (e: DhunException) {
@@ -256,7 +260,7 @@ internal fun aggregateResolveFailures(outcomes: Map<String, DhunError>): DhunErr
     return preferred.withDetail(summary)
 }
 
-internal fun parseStreamInfo(videoId: String, root: JsonObject): StreamInfo {
+internal fun parseStreamInfo(videoId: String, root: JsonObject, quality: String = "high"): StreamInfo {
     val streaming = root.obj("streamingData")
     val adaptive = streaming?.arr("adaptiveFormats")?.mapNotNull { it as? JsonObject }.orEmpty()
     val progressive = streaming?.arr("formats")?.mapNotNull { it as? JsonObject }.orEmpty()
@@ -273,8 +277,13 @@ internal fun parseStreamInfo(videoId: String, root: JsonObject): StreamInfo {
         urlOf(it) != null && run { val m = mimeOf(it); m.contains("mp4a") || m.contains("opus") }
     }
 
-    val best = audio.maxByOrNull { it.long("bitrate") ?: 0L }
-        ?: muxed.maxByOrNull { it.long("bitrate") ?: 0L }
+    fun pick(formats: List<JsonObject>): JsonObject? {
+        val target = when (quality) { "low" -> 64_000L; "medium" -> 128_000L; else -> Long.MAX_VALUE }
+        return formats.filter { (it.long("bitrate") ?: 0L) <= target }
+            .maxByOrNull { it.long("bitrate") ?: 0L }
+            ?: formats.minByOrNull { it.long("bitrate") ?: 0L }
+    }
+    val best = pick(audio) ?: pick(muxed)
         ?: throw DhunException(
             when {
                 adaptive.isEmpty() && progressive.isEmpty() ->

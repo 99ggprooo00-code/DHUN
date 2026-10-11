@@ -21,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -108,6 +109,40 @@ class NowPlayingPersistenceTest {
 
     private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {
         withTimeout(timeoutMs) { while (!check()) delay(20) }
+    }
+
+    @Test
+    fun directBrowseModeChangesArePersisted(): Unit = runBlocking {
+        val d = data()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val player = FakePlayer()
+            val pers = persistence(player, d, scope)
+            pers.start()
+            player.prepareQueue(listOf(track("mode")), 0)
+            player.setRepeatMode(RepeatMode.ALL)
+            player.setShuffle(true)
+            eventually {
+                d.nowPlaying.load()?.let { it.repeatMode == RepeatMode.ALL && it.shuffle } == true
+            }
+            pers.stop()
+        } finally { scope.cancel() }
+    }
+
+    @Test
+    fun newQueueModePolicyFollowsThePersistedPreference(): Unit = runBlocking {
+        val d = data()
+        val p = FakePlayer()
+        p.setRepeatMode(RepeatMode.ALL)
+        p.setShuffle(true)
+        d.settings.putBoolean(dev.dhun.data.SettingsKeys.PERSIST_SHUFFLE_REPEAT, true)
+        resetModesForNewQueue(p, d.settings)
+        assertEquals(RepeatMode.ALL, p.repeatMode.value)
+        assertTrue(p.shuffleEnabled.value)
+        d.settings.putBoolean(dev.dhun.data.SettingsKeys.PERSIST_SHUFFLE_REPEAT, false)
+        resetModesForNewQueue(p, d.settings)
+        assertEquals(RepeatMode.OFF, p.repeatMode.value)
+        assertFalse(p.shuffleEnabled.value)
     }
 
     @Test

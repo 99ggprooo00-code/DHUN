@@ -188,6 +188,7 @@ private fun parseBrowseSongRow(
         durationSeconds = trailingDuration(item),
         // Row art wins; the page's own cover is the fallback (see KDoc).
         thumbnailUrl = thumbnailOf(item) ?: fallbackThumbnail,
+        explicit = item.hasExplicitBadge(),
     )
 }
 

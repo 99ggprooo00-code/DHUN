@@ -61,6 +61,9 @@ class YtDlpStreamResolverTest {
 
     @Test
     fun unixStillFindsTheExecutable() {
+        // Windows cannot mark a POSIX filename as executable; the platform's
+        // .exe lookup is covered by windowsFindsExeOnPathIncludingSpaces.
+        if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) return
         val directory = Files.createTempDirectory("dhun tools").toFile()
         try {
             val exe = File(directory, "yt-dlp").apply { writeText("test fixture"); setExecutable(true) }

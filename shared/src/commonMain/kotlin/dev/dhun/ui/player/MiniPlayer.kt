@@ -43,6 +43,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.PlaybackState
 import dev.dhun.design.ArtworkColorExtractor
+import dev.dhun.design.ArtworkColors
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
@@ -78,11 +80,14 @@ fun MiniPlayer(
     val durationMs by viewModel.durationMs.collectAsState()
     val track = currentTrack ?: return
     val progress = playbackProgress(positionMs, durationMs)
-    val colors = remember(track.thumbnailUrl, track.id) {
-        ArtworkColorExtractor.extractFromSeed(track.thumbnailUrl ?: track.id)
+    val accentMode = DhunAppearance.accentMode
+    val selectedAccent = DhunColors.accent
+    val colors = remember(track.thumbnailUrl, track.id, accentMode, selectedAccent) {
+        if (accentMode == "static") ArtworkColors.fallback
+        else ArtworkColorExtractor.extractFromSeed(track.thumbnailUrl ?: track.id)
     }
     val accent by animateColorAsState(
-        targetValue = colors.controlAccent,
+        targetValue = if (accentMode == "static") selectedAccent else colors.controlAccent,
         animationSpec = DhunAnimations.slowTween(),
         label = "miniPlayerAccent",
     )

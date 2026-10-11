@@ -102,6 +102,7 @@ internal fun parseSearchResults(query: String, root: JsonObject): SearchResults 
                     albumId = idsAlbum.second ?: idsArtist.second,
                     durationSeconds = trailingDuration(item),
                     thumbnailUrl = thumbnailOf(item),
+                    explicit = item.hasExplicitBadge(),
                 )
             }
             browseId != null && browseId.startsWith("MPREb") -> albums += Album(
@@ -201,6 +202,7 @@ internal fun parseHomeSections(root: JsonObject): List<HomeSection> {
                                     albumId = idsAlbum.second ?: idsArtist.second,
                                     durationSeconds = trailingDuration(responsive),
                                     thumbnailUrl = thumb,
+                                    explicit = responsive.hasExplicitBadge(),
                                 )
                             )
                         }
@@ -256,6 +258,7 @@ internal fun parseHomeSections(root: JsonObject): List<HomeSection> {
                                     albumName = parts.getOrNull(1),
                                     albumId = ids.second,
                                     thumbnailUrl = thumb,
+                                    explicit = twoRow.hasExplicitBadge(),
                                 )
                             )
                         }
@@ -327,6 +330,7 @@ internal fun parseRelatedTracks(root: JsonObject): List<Track> {
             thumbnailUrl = (descend(p, listOf("thumbnail", "thumbnails"))
                 as? JsonArray)?.lastOrNull()?.let { (it as? JsonObject)?.str("url") }
                 ?.let { ArtworkUrls.list(it) },
+            explicit = p.hasExplicitBadge(),
         )
     }
 }

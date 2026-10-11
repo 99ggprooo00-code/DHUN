@@ -62,6 +62,18 @@ class OwnClientStreamResolverTest {
     }
 
     @Test
+    fun qualityTiersChooseDifferentAvailableAudioFormats() {
+        val json = root(formatsJson(
+            audioFormat(48, "audio/webm"),
+            audioFormat(128, "audio/webm"),
+            audioFormat(256, "audio/webm"),
+        ))
+        assertEquals(48, parseStreamInfo("v", json, "low").bitrateKbps)
+        assertEquals(128, parseStreamInfo("v", json, "medium").bitrateKbps)
+        assertEquals(256, parseStreamInfo("v", json, "high").bitrateKbps)
+    }
+
+    @Test
     fun skipsVideoFormats() {
         val json = formatsJson(
             audioFormat(500, "video/mp4"),
