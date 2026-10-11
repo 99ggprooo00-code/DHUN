@@ -10,6 +10,8 @@ import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -79,6 +81,11 @@ class SettingsViewModelTest {
         d.settings.putString(SettingsKeys.EQUALIZER_GAINS_DB, List(10) { "3" }.joinToString(","))
         val v = loaded(vm(d, this))
         v.reset()
+        // Reset dispatches its DB writes asynchronously; observe completion.
+        withTimeout(3_000) {
+            while (d.settings.getString(SettingsKeys.EQUALIZER_ENABLED) != null ||
+                d.settings.getString(SettingsKeys.EQUALIZER_GAINS_DB) != null) delay(10)
+        }
         assertEquals(null, d.settings.getString(SettingsKeys.EQUALIZER_ENABLED))
         assertEquals(null, d.settings.getString(SettingsKeys.EQUALIZER_GAINS_DB))
     }
