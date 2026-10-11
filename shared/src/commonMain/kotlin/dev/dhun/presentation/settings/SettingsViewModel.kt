@@ -10,28 +10,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/**
- * Settings screen model (S4).
- *
- * Owns the user-facing settings and a legacy close-to-tray value:
- *
- * - [themeId] / [accentId] — persisted ids; the screen maps them onto
- *   `DhunThemeMode` / `DhunAccent` and applies them live through
- *   `DhunAppearance`. This VM deliberately stays in plain strings so
- *   `presentation` keeps its clean-room separation from `design`.
- * - [cacheSizeMb] — the audio-segment cache budget, honoured by the platform
- *   players on the next process start (the running cache cannot be resized).
- * - [resumeOnLaunch] — honoured by `RestoreNowPlayingUseCase` on cold start.
- * - [closeToTray] — legacy storage compatibility only; no UI or host consumer.
- *   Desktop X always quits, regardless of this stored value.
- * - [backdropBlurPercent] / [backdropBrightnessPercent] — live now-playing
- *   backdrop. Blur is used where `Modifier.blur` is real (API 31+ / desktop);
- *   brightness dims the sharp thumbnail on older Android.
- *
- * Settings whose keys exist but have no behaviour behind them yet
- * (`AUDIO_QUALITY`, `COUNTRY_CODE`, `LYRICS_ENABLED`, `ACCENT_MODE`,
- * `EXPLICIT_CONTENT` — see `.ai/KNOWN_LIMITATIONS.md`) are deliberately *not*
- * exposed: a toggle that changes nothing is worse than no toggle.
+/** Persisted preferences for the grouped Settings screen. Writes remain in
+ * [UpdateSettingUseCase]; UI-facing flows update optimistically while runtime
+ * consumers observe the same SQLDelight keys on their own dispatchers.
  */
 class SettingsViewModel(
     private val get: GetSettingUseCase,
@@ -87,6 +68,8 @@ class SettingsViewModel(
     val countryCode: StateFlow<String> = _countryCode.asStateFlow()
     private val _explicitContent = MutableStateFlow(SettingsKeys.EXPLICIT_CONTENT_DEFAULT)
     val explicitContent: StateFlow<Boolean> = _explicitContent.asStateFlow()
+    private val _pauseOnMute = MutableStateFlow(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT)
+    val pauseOnMute: StateFlow<Boolean> = _pauseOnMute.asStateFlow()
     private val _persistShuffleRepeat = MutableStateFlow(SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
     val persistShuffleRepeat: StateFlow<Boolean> = _persistShuffleRepeat.asStateFlow()
 
@@ -125,6 +108,7 @@ class SettingsViewModel(
             _preferredProvider.value = get.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT)
             _countryCode.value = get.string(SettingsKeys.COUNTRY_CODE, SettingsKeys.COUNTRY_CODE_DEFAULT)
             _explicitContent.value = get.boolean(SettingsKeys.EXPLICIT_CONTENT, SettingsKeys.EXPLICIT_CONTENT_DEFAULT)
+            _pauseOnMute.value = get.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT)
             _persistShuffleRepeat.value = get.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
             _loaded.value = true
         }
@@ -259,6 +243,11 @@ class SettingsViewModel(
         _explicitContent.value = enabled
         scope.launch { update.boolean(SettingsKeys.EXPLICIT_CONTENT, enabled) }
     }
+    fun setPauseOnMute(enabled: Boolean) {
+        _pauseOnMute.value = enabled
+        scope.launch { update.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, enabled) }
+    }
+
     fun setPersistShuffleRepeat(enabled: Boolean) {
         _persistShuffleRepeat.value = enabled
         scope.launch { update.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, enabled) }
@@ -283,6 +272,7 @@ class SettingsViewModel(
         _providerOrder.value = SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT
         _countryCode.value = SettingsKeys.COUNTRY_CODE_DEFAULT
         _explicitContent.value = SettingsKeys.EXPLICIT_CONTENT_DEFAULT
+        _pauseOnMute.value = SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT
         _persistShuffleRepeat.value = SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT
         scope.launch { SettingsKeys.all.forEach { update.remove(it) } }
     }

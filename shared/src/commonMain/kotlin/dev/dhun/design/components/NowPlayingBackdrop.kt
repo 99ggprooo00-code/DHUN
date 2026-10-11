@@ -32,8 +32,8 @@ import dev.dhun.design.supportsRealtimeBlur
  * **currently playing** song, edge to edge, under everything else.
  *
  * On API 31+ / desktop the cover is heavily blurred (user-controlled). On
- * Android below API 31 `Modifier.blur` is a no-op, so the same thumbnail is
- * drawn sharp and dimmed instead — brightness is user-controlled. Nothing is
+ * Android below API 31 `Modifier.blur` is a no-op, so the thumbnail is
+ * drawn sharp. Brightness independently dims the artwork on all platforms. Nothing is
  * drawn when the current song has no thumbnail, the URL is blank, or the load
  * fails; the default DHUN background shows through.
  */

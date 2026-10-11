@@ -85,6 +85,7 @@ class PlayerViewModel(
     val shuffleEnabled: StateFlow<Boolean> = player.shuffleEnabled
     val volume: StateFlow<Float> = player.volume
     private val _autoRadio = MutableStateFlow(true)
+    private val _pauseOnMute = MutableStateFlow(false)
     val lyricsAutoScroll: StateFlow<Boolean> = settings?.observeString(SettingsKeys.LYRICS_AUTO_SCROLL)
         ?.map { it?.toBooleanStrictOrNull() ?: true }
         ?.stateIn(scope, SharingStarted.Eagerly, true) ?: MutableStateFlow(true)
@@ -181,6 +182,11 @@ class PlayerViewModel(
             scope.launch {
                 repo.observeString(SettingsKeys.AUTOPLAY_RADIO_ENABLED).collect {
                     _autoRadio.value = it?.toBooleanStrictOrNull() ?: true
+                }
+            }
+            scope.launch {
+                repo.observeString(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME).collect {
+                    _pauseOnMute.value = it?.toBooleanStrictOrNull() ?: false
                 }
             }
             scope.launch {
@@ -321,7 +327,7 @@ class PlayerViewModel(
                 // A network round-trip is enough time for the user to
                 // replace the queue: a late page must never clobber a
                 // newer queue (or a stopped station).
-                if (!radioSession.isActive) return
+                if (!_autoRadio.value || !radioSession.isActive) return
                 val queueNow = player.queue.value
                 // The WHOLE queue must still be the one this page was
                 // fetched for — a head-id match is not enough (a stale
@@ -431,7 +437,10 @@ class PlayerViewModel(
         return newValue
     }
 
-    fun setVolume(volume: Float) = player.setVolume(volume)
+    fun setVolume(volume: Float) {
+        player.setVolume(volume)
+        if (volume <= 0f && _pauseOnMute.value && state.value is PlaybackState.Playing) player.playPause()
+    }
 
     private suspend fun resetModesForNewQueue() {
         if (settings?.getBoolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, true) == false) {

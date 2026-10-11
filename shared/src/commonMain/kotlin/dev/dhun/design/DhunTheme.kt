@@ -11,18 +11,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
  * this. The color scheme, typography, and shapes are the single source of
  * truth; no screen defines its own.
  *
- * **Appearance (candidate 28).** [mode] and [accent] default to the active
- * [DhunAppearance], which is dark + brand violet unless someone changes it —
- * so every existing `DhunTheme { ... }` call site compiles and renders exactly
- * as it did before, and follows the toggle automatically once something sets
- * it. Passing them explicitly applies that appearance **process-wide** (it is
- * written back to [DhunAppearance]), because DHUN has one theme, not a
- * per-window one; that is deliberate, and it keeps `MaterialTheme` and the
- * [DhunColors] token reads from ever disagreeing — the screens read tokens,
- * not the scheme.
- *
- * The write is a no-op when the requested appearance is already active, so
- * recomposition never churns state.
+ * Appearance follows the process-wide palette. The system mode resolves via
+ * [isSystemInDarkTheme]; only a post-composition SideEffect updates the
+ * global tokens when the OS changes. Rendering this composable never writes
+ * snapshot state during composition.
  */
 @Composable
 fun DhunTheme(

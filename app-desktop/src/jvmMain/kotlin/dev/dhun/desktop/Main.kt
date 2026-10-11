@@ -446,7 +446,7 @@ fun main(args: Array<String>) {
             }
             quitRef.set(::quit)
 
-            val trayAvailable = tray.start()
+            tray.start()
 
             // Tray mirrors the player (collectors run on Dispatchers.Default; the
             // tray marshals to the EDT internally).
@@ -543,11 +543,11 @@ fun main(args: Array<String>) {
                 .collectAsState(initial = null)
             // ---- main window ------------------------------------------------------- //
             Window(
-                // Explicit close always exits, including installs with the
-                // retired close_to_tray=true preference. Minimize is separate.
+                // X hides only when a tray icon was actually registered;
+                // Ctrl+Q and tray Quit always shut down completely.
                 onCloseRequest = {
                     val w = mainWindowRef.get()
-                    if ((closeToTray?.toBooleanStrictOrNull() ?: SettingsKeys.CLOSE_TO_TRAY_DEFAULT) && trayAvailable && w != null) {
+                    if ((closeToTray?.toBooleanStrictOrNull() ?: SettingsKeys.CLOSE_TO_TRAY_DEFAULT) && tray.isAvailable && w != null) {
                         w.isVisible = false
                     } else quit()
                 },

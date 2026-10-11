@@ -56,12 +56,9 @@ import androidx.compose.ui.graphics.Color
 /**
  * Light or dark. `DARK` is the default — the palette DHUN shipped with.
  *
- * There is no `SYSTEM` entry on purpose: following the platform setting needs
- * an `expect/actual` hook into Android configuration and the desktop OS
- * appearance, and neither exists in this module. Adding a value that cannot
- * be honoured would be a stub. Note that `SettingsKeys.THEME` documents
- * `"system"` as a storable value; [fromId] maps it to `null`, so a persisted
- * "system" falls back to the dark default instead of pretending to work.
+ * System is a preference rather than a token palette: [DhunTheme]
+ * resolves it through the platform's [androidx.compose.foundation.isSystemInDarkTheme].
+ * [fromId] intentionally accepts only concrete palette ids.
  */
 enum class DhunThemeMode(
     /** Stable persistence key — survives a display-name change. */
@@ -318,7 +315,9 @@ data class DhunTokens(
      * then `.copy()`-ed, so every role not set here keeps its M3 default —
      * identical to the previous `darkColorScheme(...)` construction.
      */
-    val materialScheme: ColorScheme by lazy {
+    // A token set is immutable; scheme creation is synchronized so a first
+    // read from Skiko and a background observer cannot initialize it twice.
+    val materialScheme: ColorScheme by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         val base = if (isLight) lightColorScheme() else darkColorScheme()
         base.copy(
             primary = accent,
@@ -504,11 +503,9 @@ object DhunAppearance {
     }
 
     /**
-     * Applies persisted ids read from `SettingsKeys.THEME` / `SettingsKeys.ACCENT`
-     * by the host (platform entry points own the read; `design` cannot depend
-     * on `data`). Unknown, corrupt, or absent ids — including `"system"`, which
-     * is storable but not honoured (see [DhunThemeMode]) — fall back to the
-     * defaults. Idempotent: re-applying the active ids is a no-op.
+     * Applies persisted ids read by the host before the first frame.
+     * Invalid values fall back to dark/brand. `system` follows the platform
+     * supplied dark-mode flag and continues following changes in [DhunTheme].
      */
     fun applyPersistedAppearance(
         themeId: String?,

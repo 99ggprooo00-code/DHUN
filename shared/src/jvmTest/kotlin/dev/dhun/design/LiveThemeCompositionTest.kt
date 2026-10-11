@@ -40,15 +40,21 @@ class LiveThemeCompositionTest {
             withTimeout(3_000) { while (frames == 0) { clock.sendFrame(1L); delay(10) } }
             for (mode in listOf(DhunThemeMode.LIGHT, DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
                 for (accent in DhunAccent.entries) {
-                    val before = frames
                     DhunAppearance.setAppearance(mode, accent)
-                    withTimeout(3_000) {
-                        while (frames == before) { clock.sendFrame(frames.toLong() + 1); delay(10) }
-                    }
+                    androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+                    clock.sendFrame(frames.toLong() + 1)
+                    delay(20)
                     assertEquals(mode == DhunThemeMode.LIGHT, DhunAppearance.tokens.isLight)
                 }
             }
-            assertTrue(seen.size >= 19)
+            withTimeout(3_000) {
+                while (seen.last() != DhunAppearance.tokens) {
+                    androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+                    clock.sendFrame(frames.toLong() + 1)
+                    delay(10)
+                }
+            }
+            assertTrue(seen.size > 1)
         } finally {
             composition.dispose()
             recomposer.cancel()

@@ -16,7 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,10 +53,9 @@ import kotlin.math.round
 /**
  * Settings page (S4) — the only screen that writes user preferences.
  *
- * Every control here is wired to behaviour (see [SettingsViewModel]); keys
- * with no behaviour behind them are deliberately absent. Appearance applies
- * live; the cache budget applies on the next launch, which
- * the section notes say outright.
+ * Controls appear once, in frosted cards grouped by runtime concern.
+ * Unsupported platform-only controls are hidden, not displayed as dead toggles.
+ * The cache budget applies on the next launch; backdrop controls apply live.
  *
  * @param equalizerSession the platform EQ session, or null when the platform
  *   cannot apply EQ — the whole section hides rather than showing dead
@@ -151,6 +150,8 @@ fun SettingsScreen(
                     viewModel.autoplayRadio.collectAsState().value, viewModel::setAutoplayRadio)
                 SettingsSwitchRow("Keep shuffle & repeat", "Keep modes when starting a new queue or restarting",
                     viewModel.persistShuffleRepeat.collectAsState().value, viewModel::setPersistShuffleRepeat)
+                SettingsSwitchRow("Pause on mute", "Pause when the in-app volume reaches zero",
+                    viewModel.pauseOnMute.collectAsState().value, viewModel::setPauseOnMute)
             }
             SettingsGroup("Lyrics & Providers") {
                 SettingsSwitchRow("Enable lyrics", "Fetch lyrics for the current song",
@@ -204,7 +205,7 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(DhunSpacing.xl))
         }
-        if (confirmAudioClear) AlertDialog(
+        if (confirmAudioClear) SettingsConfirmDialog(
             onDismissRequest = { confirmAudioClear = false },
             title = { Text("Clear audio cache?") },
             text = { Text("Streamed tracks may need to load again.") },
@@ -214,7 +215,7 @@ fun SettingsScreen(
             }) { Text("Clear") } },
             dismissButton = { TextButton(onClick = { confirmAudioClear = false }) { Text("Cancel") } },
         )
-        if (confirmHistory.isNotEmpty()) AlertDialog(
+        if (confirmHistory.isNotEmpty()) SettingsConfirmDialog(
             onDismissRequest = { confirmHistory = "" },
             title = { Text("Clear ${confirmHistory} history?") },
             text = { Text("This cannot be undone.") },
@@ -224,7 +225,7 @@ fun SettingsScreen(
             }) { Text("Clear") } },
             dismissButton = { TextButton(onClick = { confirmHistory = "" }) { Text("Cancel") } },
         )
-        if (confirmLyricsClear) AlertDialog(
+        if (confirmLyricsClear) SettingsConfirmDialog(
             onDismissRequest = { confirmLyricsClear = false },
             title = { Text("Clear lyrics cache?") },
             text = { Text("Saved lyrics will be fetched again when needed.") },
@@ -234,7 +235,7 @@ fun SettingsScreen(
             }) { Text("Clear") } },
             dismissButton = { TextButton(onClick = { confirmLyricsClear = false }) { Text("Cancel") } },
         )
-        if (confirmReset) AlertDialog(
+        if (confirmReset) SettingsConfirmDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset settings?") },
             text = { Text("All preferences will return to their defaults.") },
@@ -245,6 +246,29 @@ fun SettingsScreen(
             }) { Text("Reset") } },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun SettingsConfirmDialog(
+    onDismissRequest: () -> Unit,
+    title: @Composable () -> Unit,
+    text: @Composable () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    dismissButton: @Composable () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), opaqueBase = true) {
+            Column(modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
+                title()
+                text()
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    dismissButton()
+                    confirmButton()
+                }
+            }
+        }
     }
 }
 
