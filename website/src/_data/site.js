@@ -87,7 +87,7 @@ export default {
       alt: "DHUN Android Full Player screen showing blurred artwork, track title Dhun by Rockheads, seek bar at 0:00 of 4:18, transport controls, and bottom action row",
       badge: "Captured on Android phone · DHUN v1.00.001",
       caption:
-        "Full-screen player sheet with blurred artwork backdrop, seek scrubber, shuffle/prev/play/next/repeat transport, and queue/lyrics actions.",
+        "Full-screen player sheet with blurred artwork backdrop, seek scrubber, shuffle, previous, play, next, and repeat transport, and queue and lyrics actions.",
       appHref: "/app/#/player",
       appLabel: "Open Full player in /app/ preview",
     },
@@ -192,7 +192,7 @@ export default {
       alt: "DHUN Android Settings screen showing Dark and Light theme chips, six accent colour swatches, cache cap options, About and Legal row, and 5-band Equalizer with presets and preamp",
       badge: "Captured on Android phone · DHUN v1.00.001",
       caption:
-        "Settings & Equalizer with Dark/Light mode, six accent palettes, cache cap, About & Legal entry, presets, preamp, and 5-band sliders.",
+        "Settings & Equalizer with Dark and Light modes, six accent palettes, cache cap, About & Legal entry, presets, preamp, and 5-band sliders.",
       appHref: "/app/#/settings",
       appLabel: "Open Settings in /app/ preview",
     },
@@ -222,12 +222,12 @@ export default {
     source: "app-web/src/js/main.js; docs/verification/29-web-app-mirror.md; ADR-008 amendment 2026-10-09 (2)",
     routes: [
       { label: "Home feed & quick picks", detail: "Three-section feed, mood chips, and docked mini-player", href: "/app/", cta: "Launch /app/ Home" },
-      { label: "Search & filter chips", detail: "Query bar, Songs/Artists/Albums/Playlists/Videos filters, recent searches", href: "/app/#/search", cta: "Launch /app/ Search" },
+      { label: "Search & filter chips", detail: "Query bar, Songs, Artists, Albums, Playlists, and Videos filters, and recent searches", href: "/app/#/search", cta: "Launch /app/ Search" },
       { label: "Expanded Full Player", detail: "Blurred artwork sheet, transport controls, seek scrubber", href: "/app/#/player", cta: "Launch /app/ Player" },
       { label: "Synced lyrics (LRC)", detail: "Timestamped Devanagari & English lines with active-line highlight", href: "/app/#/player/lyrics", cta: "Launch /app/ Lyrics" },
       { label: "Up Next Queue", detail: "Queue tab, track counter, and related tracks", href: "/app/#/player/queue", cta: "Launch /app/ Queue" },
       { label: "Library — Playlists, Downloads & History", detail: "Liked Songs folder, offline state, and local play history", href: "/app/#/library/playlists", cta: "Launch /app/ Library" },
-      { label: "Settings & 10-band Equalizer", detail: "Dark/Light theme, 6 accents, 18 VLC presets, ±20 dB bands", href: "/app/#/settings", cta: "Launch /app/ Settings" },
+      { label: "Settings & 10-band Equalizer", detail: "Dark and Light themes, 6 accents, 18 VLC presets, ±20 dB bands", href: "/app/#/settings", cta: "Launch /app/ Settings" },
       { label: "About, Privacy & Legal", detail: "Bundled Privacy Policy, Terms, GPL-3.0 & Apache-2.0 licences, Support", href: "/app/#/about-legal", cta: "Launch /app/ About & Legal" },
     ],
   },

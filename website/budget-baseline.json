@@ -3,8 +3,8 @@
   "tolerance": 0.05,
   "routes": {
     "/": {
-      "htmlCss": 35227,
-      "html": 35227,
+      "htmlCss": 35260,
+      "html": 35260,
       "cssInlined": 12978,
       "cssLinked": 0
     },
@@ -15,8 +15,8 @@
       "cssLinked": 0
     },
     "/ui/": {
-      "htmlCss": 43066,
-      "html": 43066,
+      "htmlCss": 43087,
+      "html": 43087,
       "cssInlined": 12305,
       "cssLinked": 0
     }
