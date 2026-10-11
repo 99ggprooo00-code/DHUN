@@ -79,6 +79,11 @@ object SettingsKeys {
     const val PAUSE_ON_MUTE_OR_ZERO_VOLUME = "pause_on_mute_or_zero_volume"
     const val PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT = false
 
+    const val EQUALIZER_ENABLED = "equalizer_enabled"
+    const val EQUALIZER_PRESET = "equalizer_preset"
+    const val EQUALIZER_PREAMP_DB = "equalizer_preamp_db"
+    const val EQUALIZER_GAINS_DB = "equalizer_gains_db"
+
     /** Desktop window geometry, "x,y,w,h" — see Phase 12. */
     const val WINDOW_GEOMETRY = "window_geometry"
 
@@ -88,5 +93,6 @@ object SettingsKeys {
         BACKDROP_BLUR, BACKDROP_BRIGHTNESS, SEEK_STEP_SECONDS, AUTOPLAY_RADIO_ENABLED,
         LYRICS_PREFER_SYNCED, LYRICS_AUTO_SCROLL, LYRICS_TEXT_SIZE, LYRICS_PREFERRED_PROVIDER,
         LYRICS_PROVIDER_ORDER, PERSIST_SHUFFLE_REPEAT, PAUSE_ON_MUTE_OR_ZERO_VOLUME,
+        EQUALIZER_ENABLED, EQUALIZER_PRESET, EQUALIZER_PREAMP_DB, EQUALIZER_GAINS_DB,
     )
 }

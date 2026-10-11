@@ -36,6 +36,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import dev.dhun.data.SettingsKeys
+import dev.dhun.player.equalizer.EqualizerState
+import dev.dhun.player.equalizer.EqualizerBands
+import kotlinx.coroutines.flow.drop
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -214,6 +218,32 @@ fun DhunAppShell(
             clearAudioCacheAction = clearAudioCache,
             onCountryCodeChange = onCountryCodeChange,
         )
+    }
+
+    // The EQ is a platform engine session, but its controls live in Settings.
+    // Restore once before observing writes; the DB remains the source of truth
+    // across restarts, and reset-to-defaults also restores the live engine.
+    LaunchedEffect(dataLayer, equalizerSession) {
+        if (equalizerSession != null) {
+            val prefs = dataLayer.settings
+            val defaults = EqualizerState()
+            val initial = EqualizerState(
+                enabled = prefs.getBoolean(SettingsKeys.EQUALIZER_ENABLED, defaults.enabled),
+                presetId = prefs.getString(SettingsKeys.EQUALIZER_PRESET) ?: defaults.presetId,
+                preampDb = prefs.getString(SettingsKeys.EQUALIZER_PREAMP_DB)?.toFloatOrNull() ?: defaults.preampDb,
+                gainsDb = prefs.getString(SettingsKeys.EQUALIZER_GAINS_DB)
+                    ?.split(',')?.mapNotNull { it.toFloatOrNull() }
+                    ?.takeIf { it.size == EqualizerBands.COUNT }
+                    ?: defaults.gainsDb,
+            )
+            equalizerSession.restore(initial)
+            equalizerSession.state.drop(1).collect { state ->
+                prefs.putBoolean(SettingsKeys.EQUALIZER_ENABLED, state.enabled)
+                prefs.putString(SettingsKeys.EQUALIZER_PRESET, state.presetId)
+                prefs.putString(SettingsKeys.EQUALIZER_PREAMP_DB, state.preampDb.toString())
+                prefs.putString(SettingsKeys.EQUALIZER_GAINS_DB, state.gainsDb.joinToString(","))
+            }
+        }
     }
 
     val countryCode by settingsVm.countryCode.collectAsState()

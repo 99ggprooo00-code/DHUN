@@ -245,6 +245,7 @@ fun SettingsScreen(
             text = { Text("All preferences will return to their defaults.") },
             confirmButton = { TextButton(onClick = {
                 viewModel.reset()
+                equalizerSession?.restore(dev.dhun.player.equalizer.EqualizerState())
                 DhunAppearance.reset()
                 confirmReset = false
             }) { Text("Reset") } },

@@ -73,6 +73,17 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun resetAlsoRemovesPersistedEqualizerCurve(): Unit = runBlocking {
+        val d = data()
+        d.settings.putBoolean(SettingsKeys.EQUALIZER_ENABLED, true)
+        d.settings.putString(SettingsKeys.EQUALIZER_GAINS_DB, List(10) { "3" }.joinToString(","))
+        val v = loaded(vm(d, this))
+        v.reset()
+        assertEquals(null, d.settings.getString(SettingsKeys.EQUALIZER_ENABLED))
+        assertEquals(null, d.settings.getString(SettingsKeys.EQUALIZER_GAINS_DB))
+    }
+
+    @Test
     fun newPreferencesPersistAndReset(): Unit = runBlocking {
         val d = data()
         val v = loaded(vm(d, this))
