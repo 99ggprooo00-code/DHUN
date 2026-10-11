@@ -22,6 +22,7 @@ class SettingsViewModel(
     private val clearSearchHistoryAction: (suspend () -> Unit)? = null,
     private val clearPlayHistoryAction: (suspend () -> Unit)? = null,
     private val clearAudioCacheAction: (suspend () -> Long)? = null,
+    private val onCountryCodeChange: (String) -> Unit = {},
 ) {
     private val _themeId = MutableStateFlow(SettingsKeys.THEME_DEFAULT)
     val themeId: StateFlow<String> = _themeId.asStateFlow()
@@ -236,12 +237,17 @@ class SettingsViewModel(
     }
     fun setCountryCode(id: String) {
         if (id !in listOf("US", "NP", "IN", "GB", "CA", "AU", "DE", "FR", "JP", "KR", "BR")) return
+        onCountryCodeChange(id)
         _countryCode.value = id
         scope.launch { update.string(SettingsKeys.COUNTRY_CODE, id) }
     }
     fun setExplicitContent(enabled: Boolean) {
-        _explicitContent.value = enabled
-        scope.launch { update.boolean(SettingsKeys.EXPLICIT_CONTENT, enabled) }
+        // Publish the new UI value only after the provider's SQLDelight read
+        // can see it; a Home/Search refresh is keyed to this flow.
+        scope.launch {
+            update.boolean(SettingsKeys.EXPLICIT_CONTENT, enabled)
+            _explicitContent.value = enabled
+        }
     }
     fun setPauseOnMute(enabled: Boolean) {
         _pauseOnMute.value = enabled
@@ -270,6 +276,7 @@ class SettingsViewModel(
         _lyricsTextSize.value = SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT
         _preferredProvider.value = SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT
         _providerOrder.value = SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT
+        onCountryCodeChange(SettingsKeys.COUNTRY_CODE_DEFAULT)
         _countryCode.value = SettingsKeys.COUNTRY_CODE_DEFAULT
         _explicitContent.value = SettingsKeys.EXPLICIT_CONTENT_DEFAULT
         _pauseOnMute.value = SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT

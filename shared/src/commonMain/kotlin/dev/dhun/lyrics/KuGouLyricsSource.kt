@@ -33,7 +33,12 @@ class KuGouLyricsSource(
             if (!search.status.isSuccess()) return DhunResult.Success(Lyrics.NotAvailable)
             val root = Json.parseToJsonElement(search.bodyAsText()) as? JsonObject
             val candidates = root?.get("candidates") as? JsonArray
-            val candidate = candidates?.filterIsInstance<JsonObject>()?.minByOrNull {
+            val candidate = candidates?.filterIsInstance<JsonObject>()?.filter { item ->
+                item["song"]?.jsonPrimitive?.content?.contains(track.title, ignoreCase = true) == true &&
+                    item["singer"]?.jsonPrimitive?.content?.contains(track.artistName, ignoreCase = true) == true &&
+                    (track.durationSeconds == null || abs((item["duration"]?.jsonPrimitive?.content?.toLongOrNull()
+                        ?: 0L) - track.durationSeconds * 1000L) <= 10_000L)
+            }?.minByOrNull {
                 abs((it["duration"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L) -
                     (track.durationSeconds ?: 0) * 1000L)
             } ?: return DhunResult.Success(Lyrics.NotAvailable)

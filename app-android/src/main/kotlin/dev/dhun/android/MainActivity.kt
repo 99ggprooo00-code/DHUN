@@ -263,6 +263,7 @@ class MainActivity : ComponentActivity() {
                             equalizerSession = koin.get(),
                             appInfo = androidx.compose.runtime.remember { dhunAppInfo() },
                             clearAudioCache = { koin.get<dev.dhun.android.playback.DhunAudioSegmentCache>().clear() },
+                            onCountryCodeChange = { koin.get<dev.dhun.innertube.InnerTubeClient>().setCountryCode(it) },
                         )
                     }
                     ready.reason?.let { reason ->

@@ -302,17 +302,11 @@ internal fun LyricsArtworkLayer(
                 contentScale = ContentScale.Crop,
                 onError = { failed = true },
             )
-            if (!canBlur) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Color.Black.copy(
-                                alpha = NowPlayingBackdropPolicy.dimAlphaForBrightness(brightnessPercent),
-                            ),
-                        ),
-                )
-            }
+            Box(
+                modifier = Modifier.fillMaxSize().background(
+                    Color.Black.copy(alpha = NowPlayingBackdropPolicy.dimAlphaForBrightness(brightnessPercent)),
+                ),
+            )
         }
     }
 }

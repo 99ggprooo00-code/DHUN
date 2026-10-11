@@ -86,6 +86,8 @@ class PlayerViewModel(
     val volume: StateFlow<Float> = player.volume
     private val _autoRadio = MutableStateFlow(true)
     private val _pauseOnMute = MutableStateFlow(false)
+    private val _seekStepSeconds = MutableStateFlow<Int?>(null)
+    private val _keepModes = MutableStateFlow(true)
     val lyricsAutoScroll: StateFlow<Boolean> = settings?.observeString(SettingsKeys.LYRICS_AUTO_SCROLL)
         ?.map { it?.toBooleanStrictOrNull() ?: true }
         ?.stateIn(scope, SharingStarted.Eagerly, true) ?: MutableStateFlow(true)
@@ -182,6 +184,17 @@ class PlayerViewModel(
             scope.launch {
                 repo.observeString(SettingsKeys.AUTOPLAY_RADIO_ENABLED).collect {
                     _autoRadio.value = it?.toBooleanStrictOrNull() ?: true
+                }
+            }
+            scope.launch {
+                repo.observeString(SettingsKeys.PERSIST_SHUFFLE_REPEAT).collect {
+                    _keepModes.value = it?.toBooleanStrictOrNull() ?: true
+                }
+            }
+            scope.launch {
+                repo.observeString(SettingsKeys.SEEK_STEP_SECONDS).collect {
+                    _seekStepSeconds.value = it?.toIntOrNull()?.takeIf { seconds -> seconds in listOf(5, 10, 15, 30) }
+                        ?: SettingsKeys.SEEK_STEP_SECONDS_DEFAULT
                 }
             }
             scope.launch {
@@ -397,8 +410,9 @@ class PlayerViewModel(
             while (true) {
                 val duration = durationMs.value
                 if (duration > 0) {
-                    val step = (duration / HOLD_SEEK_FRACTION)
-                        .coerceIn(MIN_HOLD_STEP_MS, MAX_HOLD_STEP_MS)
+                    val step = _seekStepSeconds.value?.let { it * 1_000L }
+                        ?: (duration / HOLD_SEEK_FRACTION)
+                            .coerceIn(MIN_HOLD_STEP_MS, MAX_HOLD_STEP_MS)
                     val target = if (forward) {
                         (positionMs.value + step).coerceAtMost(duration)
                     } else {
@@ -453,6 +467,14 @@ class PlayerViewModel(
 
     /** Phase 10: caller primes history context before any queue handoff. */
     fun setPlayContext(context: PlayContext) {
+        // Library's queue actions use DhunPlayer directly after this callback.
+        // Reset synchronously, before those prepareQueue calls run.
+        if (!_keepModes.value) {
+            player.setRepeatMode(RepeatMode.OFF)
+            player.setShuffle(false)
+            persistence?.onRepeatModeChanged(RepeatMode.OFF)
+            persistence?.onShuffleChanged(false)
+        }
         persistence?.setPlayContext(context)
     }
 

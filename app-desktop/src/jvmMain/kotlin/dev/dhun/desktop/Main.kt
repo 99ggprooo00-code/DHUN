@@ -371,7 +371,7 @@ fun main(args: Array<String>) {
             LaunchedEffect(storedGeometry) {
                 if (storedGeometry == null) {
                     mainState.size = DpSize(DhunSpacing.windowDefaultWidth, DhunSpacing.windowDefaultHeight)
-                    mainState.position = WindowPosition.PlatformDefault
+                    mainState.position = WindowPosition.Aligned(Alignment.Center)
                 }
             }
 
@@ -622,6 +622,7 @@ fun main(args: Array<String>) {
                         downloadManager = koin.get(),
                         equalizerSession = player.equalizer,
                         appInfo = remember { desktopAppInfo() },
+                        onCountryCodeChange = { koin.get<InnerTubeClient>().setCountryCode(it) },
                         clearAudioCache = {
                             val cache = koin.get<AudioFileCache>()
                             val before = cache.dir.listFiles()?.sumOf { it.length() } ?: 0L

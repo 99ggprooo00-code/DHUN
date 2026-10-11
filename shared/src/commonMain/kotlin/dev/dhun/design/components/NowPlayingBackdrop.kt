@@ -49,7 +49,7 @@ fun NowPlayingBackdrop(
     val blurPercent = DhunAppearance.backdropBlurPercent
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
     val canBlur = supportsRealtimeBlur
-    val overlay = Color.Black.copy(alpha = NowPlayingBackdropPolicy.dimAlphaForBrightness(brightnessPercent))
+    val overlay = dimColor.copy(alpha = NowPlayingBackdropPolicy.dimAlphaForBrightness(brightnessPercent))
 
     val context = LocalPlatformContext.current
     var phase by remember(artworkUrl) { mutableStateOf(NowPlayingBackdropPhase.Idle) }

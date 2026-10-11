@@ -36,7 +36,7 @@ class TokenlessSourcesTest {
     fun kugouDecodesLrcAndFailsOpenOnMissingCandidates(): Unit = runBlocking {
         val client = HttpClient(MockEngine { request ->
             when (request.url.encodedPath) {
-                "/search" -> respond("""{"candidates":[{"id":"17","accesskey":"public","duration":240000}]}""")
+                "/search" -> respond("""{"candidates":[{"id":"17","accesskey":"public","song":"Song","singer":"Artist","duration":240000}]}""")
                 "/download" -> respond("""{"fmt":"lrc","content":"WzAwOjAxLjAwXUhlbGxv"}""")
                 else -> respond("", HttpStatusCode.NotFound)
             }

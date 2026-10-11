@@ -180,6 +180,7 @@ fun DhunAppShell(
      */
     appInfo: DhunAppInfo = DhunAppInfo.Unknown,
     clearAudioCache: (suspend () -> Long)? = null,
+    onCountryCodeChange: (String) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
@@ -211,6 +212,7 @@ fun DhunAppShell(
             clearSearchHistoryAction = { dataLayer.search.clearRecentSearches() },
             clearPlayHistoryAction = { dataLayer.history.clear() },
             clearAudioCacheAction = clearAudioCache,
+            onCountryCodeChange = onCountryCodeChange,
         )
     }
 
