@@ -469,7 +469,11 @@ internal fun LyricsTabContent(
                         )
                         Text(
                             text = state.text,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = when (viewModel.lyricsTextSize.collectAsState().value) {
+                                "small" -> MaterialTheme.typography.bodyLarge
+                                "large" -> MaterialTheme.typography.titleLarge
+                                else -> MaterialTheme.typography.titleMedium
+                            },
                             color = DhunColors.textSecondary,
                             lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
                         )

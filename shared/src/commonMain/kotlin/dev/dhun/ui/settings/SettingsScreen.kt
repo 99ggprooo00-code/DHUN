@@ -107,6 +107,7 @@ fun SettingsScreen(
         val systemDark = isSystemInDarkTheme()
         var confirmReset by remember { mutableStateOf(false) }
         var confirmLyricsClear by remember { mutableStateOf(false) }
+        var confirmAudioClear by remember { mutableStateOf(false) }
         var confirmHistory by remember { mutableStateOf("") }
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -183,12 +184,19 @@ fun SettingsScreen(
             }
             SettingsGroup("Storage, Cache & Data") {
                 CacheBudgetRow(viewModel)
+                if (viewModel.canClearAudioCache) {
+                    SettingsNavigationRow("Clear audio cache", "Remove streamed audio files", { confirmAudioClear = true })
+                    viewModel.freedAudioBytes.collectAsState().value?.let { freed ->
+                        Text("Freed ${freed / (1024 * 1024)} MB", modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding))
+                    }
+                }
                 SettingsNavigationRow("Clear search history", "Remove recent searches", { confirmHistory = "search" })
                 SettingsNavigationRow("Clear play history", "Remove listening history", { confirmHistory = "play" })
             }
             if (isDesktop) SettingsGroup("Desktop & Window Behavior") {
                 SettingsSwitchRow("Close to tray", "Keep music playing when closing the window",
                     viewModel.closeToTray.collectAsState().value, viewModel::setCloseToTray)
+                SettingsNavigationRow("Reset window geometry", "Center at 1200 × 780", viewModel::resetWindowGeometry)
             }
             SettingsGroup("About, Privacy & Legal") {
                 SettingsNavigationRow("About & Legal", "Privacy, terms, licenses and support", onOpenAboutLegal)
@@ -196,6 +204,16 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(DhunSpacing.xl))
         }
+        if (confirmAudioClear) AlertDialog(
+            onDismissRequest = { confirmAudioClear = false },
+            title = { Text("Clear audio cache?") },
+            text = { Text("Streamed tracks may need to load again.") },
+            confirmButton = { TextButton(onClick = {
+                viewModel.clearAudioCache()
+                confirmAudioClear = false
+            }) { Text("Clear") } },
+            dismissButton = { TextButton(onClick = { confirmAudioClear = false }) { Text("Cancel") } },
+        )
         if (confirmHistory.isNotEmpty()) AlertDialog(
             onDismissRequest = { confirmHistory = "" },
             title = { Text("Clear ${confirmHistory} history?") },

@@ -17,6 +17,7 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
@@ -365,6 +366,15 @@ fun main(args: Array<String>) {
                     ?: WindowPosition.PlatformDefault,
             )
 
+            val storedGeometry by settings.observeString(SettingsKeys.WINDOW_GEOMETRY)
+                .collectAsState(initial = initialGeometry?.let { "${it.x},${it.y},${it.w},${it.h}" })
+            LaunchedEffect(storedGeometry) {
+                if (storedGeometry == null) {
+                    mainState.size = DpSize(DhunSpacing.windowDefaultWidth, DhunSpacing.windowDefaultHeight)
+                    mainState.position = WindowPosition.PlatformDefault
+                }
+            }
+
             val mainWindowRef = AtomicReference<ComposeWindow>()
             val smctSessionRef = AtomicReference<Smct.Session?>()
 
@@ -612,6 +622,12 @@ fun main(args: Array<String>) {
                         downloadManager = koin.get(),
                         equalizerSession = player.equalizer,
                         appInfo = remember { desktopAppInfo() },
+                        clearAudioCache = {
+                            val cache = koin.get<AudioFileCache>()
+                            val before = cache.dir.listFiles()?.sumOf { it.length() } ?: 0L
+                            cache.clear()
+                            before - (cache.dir.listFiles()?.sumOf { it.length() } ?: 0L)
+                        },
                     )
                 }
             }
@@ -682,7 +698,7 @@ private val desktopModule = module {
             primary = get<StreamResolver>(),
             fileExists = { path -> runCatching { File(path).exists() }.getOrDefault(false) },
         )
-        YouTubeMusicProvider(client, resolver)
+        YouTubeMusicProvider(client, resolver, get<DataLayer>().settings)
     }
     // ADR-006 persistent download manager: bounded worker pool over the
     // network chain, writing into <data dir>/downloads (audio/ + art/).

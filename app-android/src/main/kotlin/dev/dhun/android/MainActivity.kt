@@ -262,6 +262,7 @@ class MainActivity : ComponentActivity() {
                             downloadManager = koin.get(),
                             equalizerSession = koin.get(),
                             appInfo = androidx.compose.runtime.remember { dhunAppInfo() },
+                            clearAudioCache = { koin.get<dev.dhun.android.playback.DhunAudioSegmentCache>().clear() },
                         )
                     }
                     ready.reason?.let { reason ->

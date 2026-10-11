@@ -179,6 +179,7 @@ fun DhunAppShell(
      * than a plausible-looking wrong version.
      */
     appInfo: DhunAppInfo = DhunAppInfo.Unknown,
+    clearAudioCache: (suspend () -> Long)? = null,
 ) {
     val scope = rememberCoroutineScope()
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
@@ -209,6 +210,7 @@ fun DhunAppShell(
             clearLyricsCacheAction = { playerViewModel.clearLyricsCache() },
             clearSearchHistoryAction = { dataLayer.search.clearRecentSearches() },
             clearPlayHistoryAction = { dataLayer.history.clear() },
+            clearAudioCacheAction = clearAudioCache,
         )
     }
 

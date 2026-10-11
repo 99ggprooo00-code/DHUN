@@ -26,7 +26,7 @@ class LiveThemeCompositionTest {
             override fun move(from: Int, to: Int, count: Int) = Unit
             override fun onClear() = Unit
         }, recomposer)
-        val runner = launch { recomposer.runRecomposeAndApplyChanges() }
+        val runner = launch(clock) { recomposer.runRecomposeAndApplyChanges() }
         var frames = 0
         val seen = mutableListOf<DhunTokens>()
         try {

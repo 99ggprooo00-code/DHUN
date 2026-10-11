@@ -60,6 +60,13 @@ class DhunAudioSegmentCache private constructor(
         }
     }
 
+    /** Evict all segments via Media3 while the process still owns the cache lock. */
+    fun clear(): Long {
+        val before = cache.cacheSpace
+        cache.keys.toList().forEach { cache.removeResource(it) }
+        return (before - cache.cacheSpace).coerceAtLeast(0L)
+    }
+
     fun release() {
         try {
             (cache as? SimpleCache)?.release()

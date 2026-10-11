@@ -40,6 +40,7 @@ class SettingsViewModel(
     private val clearLyricsCacheAction: (suspend () -> Unit)? = null,
     private val clearSearchHistoryAction: (suspend () -> Unit)? = null,
     private val clearPlayHistoryAction: (suspend () -> Unit)? = null,
+    private val clearAudioCacheAction: (suspend () -> Long)? = null,
 ) {
     private val _themeId = MutableStateFlow(SettingsKeys.THEME_DEFAULT)
     val themeId: StateFlow<String> = _themeId.asStateFlow()
@@ -157,6 +158,10 @@ class SettingsViewModel(
         scope.launch { update.boolean(SettingsKeys.RESUME_ON_LAUNCH, enabled) }
     }
 
+    fun resetWindowGeometry() {
+        scope.launch { update.remove(SettingsKeys.WINDOW_GEOMETRY) }
+    }
+
     fun setCloseToTray(enabled: Boolean) {
         _closeToTray.value = enabled
         scope.launch { update.boolean(SettingsKeys.CLOSE_TO_TRAY, enabled) }
@@ -222,6 +227,15 @@ class SettingsViewModel(
     fun clearLyricsCache() {
         val action = clearLyricsCacheAction ?: return
         scope.launch { action() }
+    }
+
+    val canClearAudioCache: Boolean get() = clearAudioCacheAction != null
+    private val _freedAudioBytes = MutableStateFlow<Long?>(null)
+    val freedAudioBytes: StateFlow<Long?> = _freedAudioBytes.asStateFlow()
+    fun clearAudioCache() {
+        clearAudioCacheAction?.let { action ->
+            scope.launch { _freedAudioBytes.value = action() }
+        }
     }
 
     fun clearSearchHistory() {
