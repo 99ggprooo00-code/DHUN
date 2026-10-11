@@ -14,12 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -60,6 +61,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.DhunAssistChip
+import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
@@ -416,7 +418,6 @@ private fun RecentSearchesSection(
 
         if (showClearConfirm) {
             ClearRecentSearchesConfirmDialog(
-                searchCount = recentSearches.size,
                 onDismiss = { showClearConfirm = false },
                 onConfirm = onClearAll,
             )
@@ -426,7 +427,6 @@ private fun RecentSearchesSection(
 
 @Composable
 private fun ClearRecentSearchesConfirmDialog(
-    searchCount: Int,
     onDismiss: () -> Unit,
     onConfirm: suspend () -> Unit,
 ) {
@@ -434,61 +434,57 @@ private fun ClearRecentSearchesConfirmDialog(
     var isClearing by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = { if (!isClearing) onDismiss() },
-        containerColor = DhunColors.surfaceElevated,
-        shape = DhunShapes.cardLarge,
-        title = {
-            Text(
-                text = "Clear recent searches?",
-                style = MaterialTheme.typography.titleMedium,
-                color = DhunColors.textPrimary,
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
+    Dialog(onDismissRequest = { if (!isClearing) onDismiss() }) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            opaqueBase = true,
+        ) {
+            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
+                Text("Clear recent searches?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
+                Spacer(modifier = Modifier.height(DhunSpacing.sm))
                 Text(
-                    text = "Remove all $searchCount recent search ${if (searchCount == 1) "query" else "queries"} from this device? This action cannot be undone.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    "This removes all recent search terms from this device. Your history, playlists and favorites stay.",
+                    style = MaterialTheme.typography.bodySmall,
                     color = DhunColors.textSecondary,
                 )
-                errorMessage?.let { err ->
-                    Text(
-                        text = err,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DhunColors.error,
-                    )
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                    Text(errorMessage!!, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
+                }
+                Spacer(modifier = Modifier.height(DhunSpacing.md))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    DhunTextButton(onClick = { if (!isClearing) onDismiss() }, enabled = !isClearing) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                    DhunButton(
+                        onClick = {
+                            if (!isClearing) {
+                                isClearing = true
+                                errorMessage = null
+                                scope.launch {
+                                    try {
+                                        onConfirm()
+                                        onDismiss()
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        errorMessage = "Could not clear recent searches. Please try again."
+                                    } finally {
+                                        isClearing = false
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !isClearing,
+                    ) {
+                        Text(if (isClearing) "Clearing…" else if (errorMessage != null) "Try again" else "Clear")
+                    }
                 }
             }
-        },
-        confirmButton = {
-            DhunTextButton(
-                label = if (isClearing) "Clearing…" else "Clear all",
-                onClick = {
-                    if (isClearing) return@DhunTextButton
-                    scope.launch {
-                        isClearing = true
-                        errorMessage = null
-                        try {
-                            onConfirm()
-                            isClearing = false
-                            onDismiss()
-                        } catch (t: Throwable) {
-                            isClearing = false
-                            errorMessage = t.message?.takeIf { it.isNotBlank() }
-                                ?: "Could not clear recent searches. Please try again."
-                        }
-                    }
-                },
-            )
-        },
-        dismissButton = {
-            DhunTextButton(
-                label = "Cancel",
-                onClick = { if (!isClearing) onDismiss() },
-            )
-        },
-    )
+        }
+    }
 }
 
 @Composable
