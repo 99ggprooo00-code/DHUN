@@ -44,7 +44,7 @@ object SettingsKeys {
     const val EXPLICIT_CONTENT = "explicit_content"
     const val EXPLICIT_CONTENT_DEFAULT = true
 
-    /** Legacy persisted key; desktop no longer reads it. X always quits. */
+    /** Hide the desktop window on X while keeping playback alive. */
     const val CLOSE_TO_TRAY = "close_to_tray"
     const val CLOSE_TO_TRAY_DEFAULT = true
 
@@ -56,9 +56,28 @@ object SettingsKeys {
     const val BACKDROP_BLUR = "backdrop_blur"
     const val BACKDROP_BLUR_DEFAULT = 100
 
-    /** 0–100 thumbnail brightness when blur is unavailable (API < 31). */
+    /** 0–100 artwork brightness on every platform. */
     const val BACKDROP_BRIGHTNESS = "backdrop_brightness"
     const val BACKDROP_BRIGHTNESS_DEFAULT = 55
+
+    const val SEEK_STEP_SECONDS = "seek_step_seconds"
+    const val SEEK_STEP_SECONDS_DEFAULT = 5
+    const val AUTOPLAY_RADIO_ENABLED = "autoplay_radio_enabled"
+    const val AUTOPLAY_RADIO_ENABLED_DEFAULT = true
+    const val LYRICS_PREFER_SYNCED = "lyrics_prefer_synced"
+    const val LYRICS_PREFER_SYNCED_DEFAULT = true
+    const val LYRICS_AUTO_SCROLL = "lyrics_auto_scroll"
+    const val LYRICS_AUTO_SCROLL_DEFAULT = true
+    const val LYRICS_TEXT_SIZE = "lyrics_text_size"
+    const val LYRICS_TEXT_SIZE_DEFAULT = "default"
+    const val LYRICS_PREFERRED_PROVIDER = "lyrics_preferred_provider"
+    const val LYRICS_PREFERRED_PROVIDER_DEFAULT = "auto"
+    const val LYRICS_PROVIDER_ORDER = "lyrics_provider_order"
+    const val LYRICS_PROVIDER_ORDER_DEFAULT = "lrclib,ytm,lrclib_search,kugou"
+    const val PERSIST_SHUFFLE_REPEAT = "persist_shuffle_repeat"
+    const val PERSIST_SHUFFLE_REPEAT_DEFAULT = true
+    const val PAUSE_ON_MUTE_OR_ZERO_VOLUME = "pause_on_mute_or_zero_volume"
+    const val PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT = false
 
     /** Desktop window geometry, "x,y,w,h" — see Phase 12. */
     const val WINDOW_GEOMETRY = "window_geometry"
@@ -66,6 +85,8 @@ object SettingsKeys {
     val all: List<String> = listOf(
         AUDIO_QUALITY, THEME, ACCENT, ACCENT_MODE, LYRICS_ENABLED, CACHE_SIZE_MB, COUNTRY_CODE,
         EXPLICIT_CONTENT, CLOSE_TO_TRAY, RESUME_ON_LAUNCH, WINDOW_GEOMETRY,
-        BACKDROP_BLUR, BACKDROP_BRIGHTNESS,
+        BACKDROP_BLUR, BACKDROP_BRIGHTNESS, SEEK_STEP_SECONDS, AUTOPLAY_RADIO_ENABLED,
+        LYRICS_PREFER_SYNCED, LYRICS_AUTO_SCROLL, LYRICS_TEXT_SIZE, LYRICS_PREFERRED_PROVIDER,
+        LYRICS_PROVIDER_ORDER, PERSIST_SHUFFLE_REPEAT, PAUSE_ON_MUTE_OR_ZERO_VOLUME,
     )
 }

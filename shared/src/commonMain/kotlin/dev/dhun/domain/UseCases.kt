@@ -315,6 +315,10 @@ class GetSettingUseCase(private val settings: SettingsRepository) {
 }
 
 class UpdateSettingUseCase(private val settings: SettingsRepository) {
+    suspend fun remove(key: String) {
+        require(key in SettingsKeys.all)
+        settings.remove(key)
+    }
     suspend fun string(key: String, value: String) {
         require(key in SettingsKeys.all) { "Unknown setting key: $key" }
         settings.putString(key, value)

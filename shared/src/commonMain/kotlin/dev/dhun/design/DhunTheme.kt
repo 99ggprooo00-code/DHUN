@@ -3,6 +3,8 @@ package dev.dhun.design
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
+import androidx.compose.foundation.isSystemInDarkTheme
 
 /**
  * The DHUN theme — dark-first, glass-capable. Every screen is wrapped in
@@ -28,8 +30,19 @@ fun DhunTheme(
     accent: DhunAccent = DhunAppearance.accent,
     content: @Composable () -> Unit,
 ) {
-    DhunAppearance.setAppearance(mode, accent)
-    val tokens = remember(mode, accent) { DhunTokens.forAppearance(mode, accent) }
+    val systemDark = isSystemInDarkTheme()
+    val resolvedMode = if (DhunAppearance.themeId == "system") {
+        if (systemDark) DhunThemeMode.DARK else DhunThemeMode.LIGHT
+    } else mode
+    // SideEffect runs after a successful composition, not while token readers
+    // are composing. In particular, the catalog's explicit parameters do not
+    // write global state as a side effect of rendering.
+    SideEffect {
+        if (DhunAppearance.themeId == "system") {
+            DhunAppearance.setAppearance(nextMode = resolvedMode)
+        }
+    }
+    val tokens = remember(resolvedMode, accent) { DhunTokens.forAppearance(resolvedMode, accent) }
     MaterialTheme(
         colorScheme = tokens.materialScheme,
         typography = DhunTypography,

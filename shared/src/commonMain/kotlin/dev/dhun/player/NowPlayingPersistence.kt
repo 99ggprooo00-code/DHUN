@@ -39,6 +39,7 @@ class NowPlayingPersistence(
     private val scope: CoroutineScope,
     private val progressIntervalMs: Long = 5_000,
     private val log: (String) -> Unit = {},
+    private val settings: dev.dhun.data.SettingsRepository? = null,
 ) {
     private var jobs: List<Job> = emptyList()
     private var repeatMode: RepeatMode = RepeatMode.OFF
@@ -97,10 +98,11 @@ class NowPlayingPersistence(
         val snap = runCatching { restore.invoke() }.onFailure { log("restore failed: ${it.message}") }.getOrNull()
             ?: return null
         playContext = PlayContext.RESTORED
-        player.setRepeatMode(snap.repeatMode)
-        player.setShuffle(snap.shuffle)
-        repeatMode = snap.repeatMode
-        shuffle = snap.shuffle
+        val keepModes = settings?.getBoolean(dev.dhun.data.SettingsKeys.PERSIST_SHUFFLE_REPEAT, true) ?: true
+        player.setRepeatMode(if (keepModes) snap.repeatMode else RepeatMode.OFF)
+        player.setShuffle(keepModes && snap.shuffle)
+        repeatMode = if (keepModes) snap.repeatMode else RepeatMode.OFF
+        shuffle = keepModes && snap.shuffle
         // A restored session waits for the user, at the position they left.
         player.prepareQueue(snap.queue, snap.currentIndex, playWhenReady = false)
         if (snap.positionMs > 0) player.seekTo(snap.positionMs)

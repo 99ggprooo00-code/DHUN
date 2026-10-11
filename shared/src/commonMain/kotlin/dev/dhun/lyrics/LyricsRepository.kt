@@ -4,6 +4,8 @@ import dev.dhun.core.DhunResult
 import dev.dhun.core.Lyrics
 import dev.dhun.core.Track
 import dev.dhun.data.LyricsCacheRepository
+import dev.dhun.data.SettingsKeys
+import dev.dhun.data.SettingsRepository
 
 /**
  * Phase 11 repository — the single lyrics entry point the UI calls.
@@ -25,6 +27,9 @@ class LyricsRepository(
     private val cache: LyricsCacheRepository,
     private val ytm: YouTubeLyricsSource,
     private val lrcLib: LrcLibSource,
+    private val settings: SettingsRepository? = null,
+    private val search: LyricsSource? = null,
+    private val kugou: LyricsSource? = null,
 ) {
     /**
      * @return `DhunResult.Success(Lyrics.Synced/Unsynced/NotAvailable)` — never
@@ -34,52 +39,43 @@ class LyricsRepository(
      *         itself fails to read the cache (disk I/O) — which is rare.
      */
     suspend fun getLyrics(track: Track): DhunResult<Lyrics> {
-        // 1. Cache
+        if (settings?.getBoolean(SettingsKeys.LYRICS_ENABLED, true) == false)
+            return DhunResult.Success(Lyrics.NotAvailable)
+        val preferred = settings?.getString(SettingsKeys.LYRICS_PREFERRED_PROVIDER) ?: "ytm"
+        val syncedFirst = settings?.getBoolean(SettingsKeys.LYRICS_PREFER_SYNCED, true) ?: false
         try {
             val cached = cache.get(track.id)
-            if (cached != null && cached != Lyrics.NotAvailable) {
-                return DhunResult.Success(cached)
-            }
-        } catch (_: Exception) {
-            // Cache read failure — fall through to network; don't block lyrics
-        }
+            if (cached != null && cached != Lyrics.NotAvailable) return DhunResult.Success(cached)
+        } catch (_: Exception) { /* cache failure must not block network */ }
 
-        // 2. YTM
-        when (val ytmResult = ytm.fetch(track)) {
-            is DhunResult.Success -> {
-                val ytmLyrics = ytmResult.value
-                if (ytmLyrics is Lyrics.Synced || ytmLyrics is Lyrics.Unsynced) {
-                    // YTM rarely returns Synced, but if it does we cache it
-                    runCatching { cache.put(track.id, ytmLyrics) }
-                    return DhunResult.Success(ytmLyrics)
+        val sources = mapOf("lrclib" to lrcLib, "ytm" to ytm, "lrclib_search" to search, "kugou" to kugou)
+        val enabled = (settings?.getString(SettingsKeys.LYRICS_PROVIDER_ORDER)
+            ?: if (settings == null) "ytm,lrclib" else SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT)
+            .split(',').filter { sources[it] != null }.distinct()
+        val order = if (preferred == "auto") enabled else
+            (listOf(preferred) + enabled).distinct().filter { it in enabled }
+        var plain: Lyrics.Unsynced? = null
+        for (id in order) {
+            val result = try { sources[id]?.fetch(track) } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) { null }
+            val lyrics = (result as? DhunResult.Success)?.value
+            if (lyrics is Lyrics.Synced) {
+                runCatching { cache.put(track.id, lyrics) }
+                return DhunResult.Success(lyrics)
+            }
+            if (lyrics is Lyrics.Unsynced) {
+                if (!syncedFirst || preferred != "auto") {
+                    runCatching { cache.put(track.id, lyrics) }
+                    return DhunResult.Success(lyrics)
                 }
-                // NotAvailable or empty — try LRCLIB
-            }
-            is DhunResult.Failure -> {
-                // YTM failure (network/parse) — try LRCLIB instead of surfacing error
+                if (plain == null) plain = lyrics
             }
         }
-
-        // 3. LRCLIB
-        when (val lrcResult = lrcLib.fetch(track)) {
-            is DhunResult.Success -> {
-                val lrcLyrics = lrcResult.value
-                when (lrcLyrics) {
-                    is Lyrics.Synced, is Lyrics.Unsynced -> {
-                        runCatching { cache.put(track.id, lrcLyrics) }
-                        return DhunResult.Success(lrcLyrics)
-                    }
-                    is Lyrics.NotAvailable -> {
-                        // fall through to NotAvailable
-                    }
-                }
-            }
-            is DhunResult.Failure -> {
-                // LRCLIB failure — will return NotAvailable
-            }
+        plain?.let {
+            runCatching { cache.put(track.id, it) }
+            return DhunResult.Success(it)
         }
-
-        // 4. NotAvailable
         return DhunResult.Success(Lyrics.NotAvailable)
     }
 

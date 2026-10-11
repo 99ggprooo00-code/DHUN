@@ -425,6 +425,11 @@ internal fun LyricsTabContent(
                     }
                 }
             }
+            is LyricsUiState.Disabled -> EmptyView(
+                title = "Lyrics disabled in Settings",
+                message = "Enable lyrics in Settings to see words for this song.",
+                modifier = modifier.fillMaxSize(),
+            )
             is LyricsUiState.Unavailable -> {
                 EmptyView(
                     title = "No lyrics",
@@ -481,6 +486,8 @@ internal fun LyricsTabContent(
                     if (viewModel.currentTrack.value?.id == track.id) viewModel.seekTo(position)
                 },
                 modifier = modifier,
+                autoScroll = viewModel.lyricsAutoScroll.collectAsState().value,
+                textSize = viewModel.lyricsTextSize.collectAsState().value,
             )
         }
     }

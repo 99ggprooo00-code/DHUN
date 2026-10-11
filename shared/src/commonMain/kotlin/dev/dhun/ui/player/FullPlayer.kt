@@ -103,6 +103,7 @@ import dev.dhun.core.PlaybackState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.design.ArtworkColorExtractor
+import dev.dhun.design.ArtworkColors
 import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.BlurredArtworkCache
 import dev.dhun.design.DhunAnimations
@@ -224,11 +225,14 @@ fun FullPlayer(
     }
     // Controls use the tamed accent, never the raw artwork colour — a raw
     // hue put a red play disc + red volume slider on screen (device report).
-    val colors = remember(current?.thumbnailUrl, current?.id) {
-        ArtworkColorExtractor.extractFromSeed(current?.thumbnailUrl ?: current?.id ?: "")
+    val accentMode = DhunAppearance.accentMode
+    val selectedAccent = DhunColors.accent
+    val colors = remember(current?.thumbnailUrl, current?.id, accentMode, selectedAccent) {
+        if (accentMode == "static") ArtworkColors.fallback
+        else ArtworkColorExtractor.extractFromSeed(current?.thumbnailUrl ?: current?.id ?: "")
     }
     val accent by animateColorAsState(
-        targetValue = colors.controlAccent,
+        targetValue = if (accentMode == "static") selectedAccent else colors.controlAccent,
         animationSpec = DhunAnimations.slowTween(),
         label = "accent",
     )
@@ -1400,11 +1404,7 @@ private fun ArtworkBackdrop(
     lyricsDominant: Boolean,
     cacheKey: String,
 ) {
-    val dimAlpha = if (supportsRealtimeBlur) {
-        if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM
-    } else {
-        NowPlayingBackdropPolicy.dimAlphaForBrightness(DhunAppearance.backdropBrightnessPercent)
-    }
+    val dimAlpha = NowPlayingBackdropPolicy.dimAlphaForBrightness(DhunAppearance.backdropBrightnessPercent)
     val dimColor by animateColorAsState(
         targetValue = Color.Black.copy(alpha = dimAlpha),
         animationSpec = DhunAnimations.slowTween(),

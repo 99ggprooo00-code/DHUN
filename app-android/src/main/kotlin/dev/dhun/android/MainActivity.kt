@@ -154,6 +154,9 @@ class MainActivity : ComponentActivity() {
                     settings.getString(SettingsKeys.ACCENT),
                     settings.getInt(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT),
                     settings.getInt(SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT),
+                    settings.getString(SettingsKeys.ACCENT_MODE),
+                    systemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                        android.content.res.Configuration.UI_MODE_NIGHT_YES,
                 )
             }
         }
@@ -242,6 +245,7 @@ class MainActivity : ComponentActivity() {
                                 radioSession = koin.get(),
                                 persistence = persistence,
                                 lyricsRepository = lyricsRepository,
+                                settings = dataLayer.settings,
                             )
                         }
 
@@ -435,6 +439,7 @@ class MainActivity : ComponentActivity() {
             recordPlay = koin.get(),
             scope = activityScope,
             log = { Log.i(TAG, "persistence: $it") },
+            settings = koin.get<DataLayer>().settings,
         )
         persistence = pers
         activityScope.launch {

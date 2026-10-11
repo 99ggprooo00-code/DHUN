@@ -58,6 +58,8 @@ internal fun SyncedLyricsContent(
     accent: Color,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    autoScroll: Boolean = true,
+    textSize: String = "default",
 ) {
     if (lines.isEmpty()) {
         EmptyView(
@@ -84,8 +86,8 @@ internal fun SyncedLyricsContent(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val viewportHeight = constraints.maxHeight
-        LaunchedEffect(activeIndex, following, viewportHeight, lines) {
-            if (following) {
+        LaunchedEffect(activeIndex, following, viewportHeight, lines, autoScroll) {
+            if (autoScroll && following) {
                 // Includes index zero and the intro before the first timestamp:
                 // seeking to the beginning must not leave the last verse on screen.
                 listState.centerLyric(activeIndex.coerceAtLeast(0))
@@ -130,7 +132,11 @@ internal fun SyncedLyricsContent(
                     // font size per line made wrapping fight the scroll animation —
                     // we bump the base to headlineSmall (larger, more readable)
                     // and use scale/weight/colour for the active pop.
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = when (textSize) {
+                        "small" -> MaterialTheme.typography.titleLarge
+                        "large" -> MaterialTheme.typography.headlineMedium
+                        else -> MaterialTheme.typography.headlineSmall
+                    },
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                     color = color,
                     textAlign = TextAlign.Center,

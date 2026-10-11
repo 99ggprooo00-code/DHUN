@@ -55,6 +55,8 @@ fun DhunAppearanceControls(
     onModeChange: (DhunThemeMode) -> Unit,
     onAccentChange: (DhunAccent) -> Unit,
     modifier: Modifier = Modifier,
+    selectedThemeId: String = mode.id,
+    onSystemChange: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier.padding(horizontal = DhunSpacing.lg),
@@ -71,9 +73,16 @@ fun DhunAppearanceControls(
         ) {
             DhunThemeMode.entries.forEach { entry ->
                 DhunFilterChip(
-                    selected = entry == mode,
+                    selected = entry.id == selectedThemeId,
                     onClick = { onModeChange(entry) },
                     label = { Text(entry.label) },
+                )
+            }
+            if (onSystemChange != null) {
+                DhunFilterChip(
+                    selected = selectedThemeId == "system",
+                    onClick = onSystemChange,
+                    label = { Text("System") },
                 )
             }
         }

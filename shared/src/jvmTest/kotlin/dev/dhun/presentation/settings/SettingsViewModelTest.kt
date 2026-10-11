@@ -54,12 +54,11 @@ class SettingsViewModelTest {
         val v = loaded(vm(d, this))
         v.setThemeId("light")
         assertEquals("light", v.themeId.value)
-        v.setThemeId("system") // storable in the DB schema, but not a real mode
-        assertEquals("light", v.themeId.value)
+        v.setThemeId("system")
+        assertEquals("system", v.themeId.value)
         v.setThemeId("amoled???")
-        assertEquals("light", v.themeId.value)
-        // A second instance reads what the first wrote.
-        assertEquals("light", loaded(vm(d, this)).themeId.value)
+        assertEquals("system", v.themeId.value)
+        assertEquals("system", loaded(vm(d, this)).themeId.value)
     }
 
     @Test
@@ -71,6 +70,28 @@ class SettingsViewModelTest {
         v.setAccentId("  ")
         assertEquals("violet", v.accentId.value)
         assertEquals("violet", loaded(vm(d, this)).accentId.value)
+    }
+
+    @Test
+    fun newPreferencesPersistAndReset(): Unit = runBlocking {
+        val d = data()
+        val v = loaded(vm(d, this))
+        v.setAudioQuality("low")
+        v.setSeekStepSeconds(15)
+        v.setAutoplayRadio(false)
+        v.setLyricsEnabled(false)
+        v.setAccentMode("static")
+        v.setPreferredProvider("kugou")
+        v.setProviderEnabled("ytm", false)
+        assertEquals("low", loaded(vm(d, this)).audioQuality.value)
+        assertEquals(15, loaded(vm(d, this)).seekStepSeconds.value)
+        assertFalse(loaded(vm(d, this)).autoplayRadio.value)
+        assertFalse(loaded(vm(d, this)).lyricsEnabled.value)
+        assertEquals("static", loaded(vm(d, this)).accentMode.value)
+        assertEquals("kugou", loaded(vm(d, this)).preferredProvider.value)
+        assertFalse("ytm" in loaded(vm(d, this)).providerOrder.value.split(','))
+        v.reset()
+        assertEquals(SettingsKeys.AUDIO_QUALITY_DEFAULT, loaded(vm(d, this)).audioQuality.value)
     }
 
     @Test

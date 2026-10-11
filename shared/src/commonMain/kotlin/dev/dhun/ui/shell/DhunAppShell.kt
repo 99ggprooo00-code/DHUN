@@ -62,6 +62,7 @@ import dev.dhun.download.DownloadManager
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.design.ArtworkColorExtractor
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
@@ -204,7 +205,16 @@ fun DhunAppShell(
             GetSettingUseCase(dataLayer.settings),
             UpdateSettingUseCase(dataLayer.settings),
             scope,
+            clearLyricsCacheAction = { playerViewModel.clearLyricsCache() },
+            clearSearchHistoryAction = { dataLayer.search.clearRecentSearches() },
+            clearPlayHistoryAction = { dataLayer.history.clear() },
         )
+    }
+
+    val countryCode by settingsVm.countryCode.collectAsState()
+    val settingsLoaded by settingsVm.loaded.collectAsState()
+    LaunchedEffect(countryCode, settingsLoaded) {
+        if (settingsLoaded) homeViewModel.refresh()
     }
 
     // Phase 10: RecordPlay contexts — every queue handoff labels the history row.
@@ -276,7 +286,8 @@ fun DhunAppShell(
         // artwork backdrop below, it does not replace it.
         val ambient by animateColorAsState(
             targetValue = currentTrack?.let {
-                ArtworkColorExtractor.extractFromSeed(it.thumbnailUrl ?: it.id).backgroundTint
+                if (DhunAppearance.accentMode == "static") DhunColors.accent.copy(alpha = 0.10f)
+                else ArtworkColorExtractor.extractFromSeed(it.thumbnailUrl ?: it.id).backgroundTint
             } ?: Color.Transparent,
             animationSpec = DhunAnimations.slowTween(),
             label = "shellAmbient",

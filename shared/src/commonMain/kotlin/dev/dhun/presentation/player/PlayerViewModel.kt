@@ -8,6 +8,8 @@ import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
 import dev.dhun.data.PlayContext
+import dev.dhun.data.SettingsKeys
+import dev.dhun.data.SettingsRepository
 import dev.dhun.domain.RadioSession
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.player.DhunPlayer
@@ -41,6 +43,7 @@ sealed interface LyricsUiState {
     data class Unsynced(val text: String) : LyricsUiState
     data class Synced(val lines: List<LyricsLine>) : LyricsUiState
     data object Unavailable : LyricsUiState
+    data object Disabled : LyricsUiState
     data class Error(val message: String) : LyricsUiState
 }
 
@@ -68,6 +71,7 @@ class PlayerViewModel(
     val radioSession: RadioSession = RadioSession(),
     private val persistence: NowPlayingPersistence? = null,
     private val lyricsRepository: LyricsRepository? = null,
+    private val settings: SettingsRepository? = null,
 ) {
     /* ---------------- pass-through player state ---------------- */
 
@@ -80,6 +84,14 @@ class PlayerViewModel(
     val repeatMode: StateFlow<RepeatMode> = player.repeatMode
     val shuffleEnabled: StateFlow<Boolean> = player.shuffleEnabled
     val volume: StateFlow<Float> = player.volume
+    private val _autoRadio = MutableStateFlow(true)
+    val lyricsAutoScroll: StateFlow<Boolean> = settings?.observeString(SettingsKeys.LYRICS_AUTO_SCROLL)
+        ?.map { it?.toBooleanStrictOrNull() ?: true }
+        ?.stateIn(scope, SharingStarted.Eagerly, true) ?: MutableStateFlow(true)
+    val lyricsTextSize: StateFlow<String> = settings?.observeString(SettingsKeys.LYRICS_TEXT_SIZE)
+        ?.map { it ?: SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT }
+        ?.stateIn(scope, SharingStarted.Eagerly, SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT)
+        ?: MutableStateFlow(SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT)
 
     val isPlaying: StateFlow<Boolean> = player.state
         .map { it is PlaybackState.Playing }
@@ -165,6 +177,21 @@ class PlayerViewModel(
     }
 
     init {
+        settings?.let { repo ->
+            scope.launch {
+                repo.observeString(SettingsKeys.AUTOPLAY_RADIO_ENABLED).collect {
+                    _autoRadio.value = it?.toBooleanStrictOrNull() ?: true
+                }
+            }
+            scope.launch {
+                repo.observeString(SettingsKeys.LYRICS_ENABLED).collect {
+                    if (it == "false") {
+                        lyricsJob?.cancel()
+                        _lyricsState.value = LyricsUiState.Disabled
+                    } else if (currentTrack.value != null) loadLyrics(currentTrack.value, force = true)
+                }
+            }
+        }
         // Skip direction: forward on natural advance / next, backward on
         // previous. Used only for artwork slide choreography.
         scope.launch {
@@ -220,7 +247,7 @@ class PlayerViewModel(
         // situation (nothing changed while a refill was in flight) stops
         // the chain instead of spinning.
         if (probe == lastRefillProbe) return
-        if (!radioSession.isActive) return
+        if (!_autoRadio.value || !radioSession.isActive) return
         // Stale-probe guard. The monitor can lag behind the player: a probe
         // of the PRE-station queue (e.g. the one-song [a] before "Play
         // radio" swapped in [a, r1..r5]) may still be in flight when the
@@ -406,6 +433,15 @@ class PlayerViewModel(
 
     fun setVolume(volume: Float) = player.setVolume(volume)
 
+    private suspend fun resetModesForNewQueue() {
+        if (settings?.getBoolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, true) == false) {
+            player.setRepeatMode(RepeatMode.OFF)
+            player.setShuffle(false)
+            persistence?.onRepeatModeChanged(RepeatMode.OFF)
+            persistence?.onShuffleChanged(false)
+        }
+    }
+
     /** Phase 10: caller primes history context before any queue handoff. */
     fun setPlayContext(context: PlayContext) {
         persistence?.setPlayContext(context)
@@ -419,7 +455,10 @@ class PlayerViewModel(
         persistence?.setPlayContext(context)
         _skipDirection.value = SkipDirection.FORWARD
         // Fire in scope so caller needn't be suspend.
-        scope.launch { player.prepareQueue(tracks, index.coerceIn(0, tracks.size - 1), playWhenReady = true) }
+        scope.launch {
+            resetModesForNewQueue()
+            player.prepareQueue(tracks, index.coerceIn(0, tracks.size - 1), playWhenReady = true)
+        }
     }
 
     /* ---------------- queue ---------------- */
@@ -474,6 +513,7 @@ class PlayerViewModel(
         // The queue IS the station: the refill monitor keeps it going.
         // Prepare first, start the session second — the monitor must never
         // see an active station over the previous (possibly short) queue.
+        resetModesForNewQueue()
         player.prepareQueue(tracks, index, playWhenReady = true)
         radioSession.start(track.id, lastRelatedPageToken)
         _skipDirection.value = SkipDirection.FORWARD
@@ -516,6 +556,7 @@ class PlayerViewModel(
         // A fresh non-radio queue takes over: any running station stops refilling.
         radioSession.stop()
         persistence?.setPlayContext(context)
+        resetModesForNewQueue()
         player.prepareQueue(tracks, startIndex, playWhenReady = true)
         _skipDirection.value = SkipDirection.FORWARD
     }
@@ -523,6 +564,11 @@ class PlayerViewModel(
     fun refreshRelated() = loadRelated(currentTrack.value, force = true)
 
     fun refreshLyrics() = loadLyrics(currentTrack.value, force = true)
+
+    suspend fun clearLyricsCache() {
+        lyricsRepository?.clearCache()
+        loadLyrics(currentTrack.value, force = true)
+    }
 
     /* ---------------- internals ---------------- */
 
@@ -566,6 +612,10 @@ class PlayerViewModel(
         }
         lyricsJob?.cancel()
         lyricsJob = scope.launch {
+            if (settings?.getBoolean(SettingsKeys.LYRICS_ENABLED, true) == false) {
+                _lyricsState.value = LyricsUiState.Disabled
+                return@launch
+            }
             if (_lyricsState.value !is LyricsUiState.Loading || force) {
                 _lyricsState.value = LyricsUiState.Loading
             }

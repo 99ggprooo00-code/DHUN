@@ -41,6 +41,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
@@ -55,8 +56,14 @@ val appModule = module {
     // constructed while DhunPlaybackService.onCreate builds the stream
     // cache — an engine init failure there is process death on API < 31.
     single<HttpClient> { createAndroidMetadataHttpClient() }
-    single { InnerTubeClient(get()) }
-    single<StreamResolver> { OwnClientStreamResolver(get()) }
+    single {
+        InnerTubeClient(get()).also { client ->
+            get<CoroutineScope>().launch {
+                get<DataLayer>().settings.observeString(SettingsKeys.COUNTRY_CODE).collect(client::setCountryCode)
+            }
+        }
+    }
+    single<StreamResolver> { OwnClientStreamResolver(get(), get<DataLayer>().settings) }
     // ADR-006: offline-first playback — a COMPLETED persistent download
     // resolves to its local file; otherwise resolve over the network chain.
     // Playback-diagnostics (2026-09-09): wrapped in ResolveObservingMusicProvider
@@ -159,7 +166,9 @@ val appModule = module {
     single { YouTubeLyricsSource(get()) }
     single {
         val data: DataLayer = get()
-        LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get())
+        LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get(),
+            settings = data.settings, search = dev.dhun.lyrics.LrcLibSearchSource(),
+            kugou = dev.dhun.lyrics.KuGouLyricsSource())
     }
 
     single { CoroutineScope(SupervisorJob() + Dispatchers.Main) }

@@ -15,6 +15,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import dev.dhun.design.components.GlassCard
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -97,50 +104,150 @@ fun SettingsScreen(
             )
         }
 
+        val systemDark = isSystemInDarkTheme()
+        var confirmReset by remember { mutableStateOf(false) }
+        var confirmLyricsClear by remember { mutableStateOf(false) }
+        var confirmHistory by remember { mutableStateOf("") }
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = DhunSpacing.screenPadding),
+            verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
-            SectionHeader(title = "Appearance")
-            DhunAppearanceControls(
-                mode = DhunThemeMode.fromId(themeId) ?: DhunThemeMode.default,
-                accent = DhunAccent.fromId(accentId) ?: DhunAccent.default,
-                onModeChange = { mode ->
-                    viewModel.setThemeId(mode.id)
-                    DhunAppearance.setAppearance(nextMode = mode)
-                },
-                onAccentChange = { accent ->
-                    viewModel.setAccentId(accent.id)
-                    DhunAppearance.setAppearance(nextAccent = accent)
-                },
-            )
-            BackdropControls(viewModel = viewModel)
-
-            SectionHeader(title = "Playback & storage")
-            CacheBudgetRow(viewModel = viewModel)
-            SettingsSwitchRow(
-                title = "Resume on launch",
-                subtitle = "Restore the last queue when the app starts",
-                checked = viewModel.resumeOnLaunch.collectAsState().value,
-                onCheckedChange = viewModel::setResumeOnLaunch,
-            )
-
-            if (equalizerSession != null) {
-                SectionHeader(title = "Equalizer")
-                EqualizerSection(session = equalizerSession)
+            SettingsGroup("Appearance & Backdrop") {
+                DhunAppearanceControls(
+                    mode = DhunThemeMode.fromId(themeId) ?: DhunAppearance.mode,
+                    accent = DhunAccent.fromId(accentId) ?: DhunAccent.default,
+                    selectedThemeId = themeId,
+                    onModeChange = { mode ->
+                        viewModel.setThemeId(mode.id)
+                        DhunAppearance.setThemePreference(mode.id, systemDark)
+                    },
+                    onSystemChange = {
+                        viewModel.setThemeId("system")
+                        DhunAppearance.setThemePreference("system", systemDark)
+                    },
+                    onAccentChange = { accent ->
+                        viewModel.setAccentId(accent.id)
+                        DhunAppearance.setAppearance(nextAccent = accent)
+                    },
+                )
+                OptionRow("Accent color mode", listOf("artwork" to "Dynamic (from artwork)", "static" to "Static (selected accent)"),
+                    viewModel.accentMode.collectAsState().value) {
+                    viewModel.setAccentMode(it)
+                    DhunAppearance.setAccentMode(it)
+                }
+                BackdropControls(viewModel)
             }
-
-            // One entry, not seven. The legal pages are long documents on their
-            // own routes; listing all of them here would turn Settings into an
-            // index and push the controls that actually change behaviour off
-            // the screen.
-            SectionHeader(title = "About & Legal")
-            SettingsNavigationRow(
-                title = "About & Legal",
-                subtitle = "About this build, privacy, terms, licenses, support",
-                onClick = onOpenAboutLegal,
-            )
-
+            SettingsGroup("Playback & Audio") {
+                OptionRow("Streaming & download quality", listOf("low" to "Low (~48–64 kbps)",
+                    "medium" to "Medium (~128 kbps)", "high" to "High (best available)"),
+                    viewModel.audioQuality.collectAsState().value, viewModel::setAudioQuality)
+                OptionRow("Keyboard seek step", listOf(5 to "5s", 10 to "10s", 15 to "15s", 30 to "30s"),
+                    viewModel.seekStepSeconds.collectAsState().value, viewModel::setSeekStepSeconds)
+                SettingsSwitchRow("Resume on launch", "Restore the last queue and position when the app starts",
+                    viewModel.resumeOnLaunch.collectAsState().value, viewModel::setResumeOnLaunch)
+                SettingsSwitchRow("Endless radio", "Automatically queue similar songs near the end",
+                    viewModel.autoplayRadio.collectAsState().value, viewModel::setAutoplayRadio)
+                SettingsSwitchRow("Keep shuffle & repeat", "Keep modes when starting a new queue or restarting",
+                    viewModel.persistShuffleRepeat.collectAsState().value, viewModel::setPersistShuffleRepeat)
+            }
+            SettingsGroup("Lyrics & Providers") {
+                SettingsSwitchRow("Enable lyrics", "Fetch lyrics for the current song",
+                    viewModel.lyricsEnabled.collectAsState().value, viewModel::setLyricsEnabled)
+                OptionRow("Preferred provider", listOf("auto" to "Auto (synced first)", "lrclib" to "LRCLIB",
+                    "ytm" to "YouTube Music", "lrclib_search" to "LRCLIB search", "kugou" to "KuGou"),
+                    viewModel.preferredProvider.collectAsState().value, viewModel::setPreferredProvider)
+                listOf("lrclib" to "LRCLIB", "ytm" to "YouTube Music",
+                    "lrclib_search" to "LRCLIB search", "kugou" to "KuGou").forEach { (id, label) ->
+                    SettingsSwitchRow(label, "Use as a lyrics fallback",
+                        id in viewModel.providerOrder.collectAsState().value.split(',')) {
+                        viewModel.setProviderEnabled(id, it)
+                    }
+                }
+                SettingsNavigationRow("Clear lyrics cache", "Fetch fresh lyrics next time", { confirmLyricsClear = true })
+                SettingsSwitchRow("Prefer synced lyrics", "Use timestamped lyrics when available",
+                    viewModel.lyricsPreferSynced.collectAsState().value, viewModel::setLyricsPreferSynced)
+                SettingsSwitchRow("Auto-scroll synced lyrics", "Follow the current line until you scroll manually",
+                    viewModel.lyricsAutoScroll.collectAsState().value, viewModel::setLyricsAutoScroll)
+                OptionRow("Lyrics text size", listOf("small" to "Small", "default" to "Default", "large" to "Large"),
+                    viewModel.lyricsTextSize.collectAsState().value, viewModel::setLyricsTextSize)
+            }
+            SettingsGroup("Content, Region & Discovery") {
+                OptionRow("Content country", listOf("US", "NP", "IN", "GB", "CA", "AU", "DE", "FR", "JP", "KR", "BR")
+                    .map { it to it }, viewModel.countryCode.collectAsState().value, viewModel::setCountryCode)
+            }
+            if (equalizerSession != null) SettingsGroup("Equalizer & Sound Processing") {
+                EqualizerSection(equalizerSession)
+            }
+            SettingsGroup("Storage, Cache & Data") {
+                CacheBudgetRow(viewModel)
+                SettingsNavigationRow("Clear search history", "Remove recent searches", { confirmHistory = "search" })
+                SettingsNavigationRow("Clear play history", "Remove listening history", { confirmHistory = "play" })
+            }
+            if (isDesktop) SettingsGroup("Desktop & Window Behavior") {
+                SettingsSwitchRow("Close to tray", "Keep music playing when closing the window",
+                    viewModel.closeToTray.collectAsState().value, viewModel::setCloseToTray)
+            }
+            SettingsGroup("About, Privacy & Legal") {
+                SettingsNavigationRow("About & Legal", "Privacy, terms, licenses and support", onOpenAboutLegal)
+                SettingsNavigationRow("Reset settings to defaults", "Restore all preferences", { confirmReset = true })
+            }
             Spacer(modifier = Modifier.height(DhunSpacing.xl))
+        }
+        if (confirmHistory.isNotEmpty()) AlertDialog(
+            onDismissRequest = { confirmHistory = "" },
+            title = { Text("Clear ${confirmHistory} history?") },
+            text = { Text("This cannot be undone.") },
+            confirmButton = { TextButton(onClick = {
+                if (confirmHistory == "search") viewModel.clearSearchHistory() else viewModel.clearPlayHistory()
+                confirmHistory = ""
+            }) { Text("Clear") } },
+            dismissButton = { TextButton(onClick = { confirmHistory = "" }) { Text("Cancel") } },
+        )
+        if (confirmLyricsClear) AlertDialog(
+            onDismissRequest = { confirmLyricsClear = false },
+            title = { Text("Clear lyrics cache?") },
+            text = { Text("Saved lyrics will be fetched again when needed.") },
+            confirmButton = { TextButton(onClick = {
+                viewModel.clearLyricsCache()
+                confirmLyricsClear = false
+            }) { Text("Clear") } },
+            dismissButton = { TextButton(onClick = { confirmLyricsClear = false }) { Text("Cancel") } },
+        )
+        if (confirmReset) AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text("Reset settings?") },
+            text = { Text("All preferences will return to their defaults.") },
+            confirmButton = { TextButton(onClick = {
+                viewModel.reset()
+                DhunAppearance.reset()
+                confirmReset = false
+            }) { Text("Reset") } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@Composable
+private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
+    GlassCard(modifier = Modifier.fillMaxWidth(), elevated = false) {
+        Column(modifier = Modifier.fillMaxWidth().padding(vertical = DhunSpacing.md)) {
+            SectionHeader(title = title)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun <T> OptionRow(title: String, options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding)) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, color = DhunColors.textPrimary)
+        val scroll = rememberScrollState()
+        Row(modifier = Modifier.horizontalScroll(scroll).dhunMouseDragScroll(scroll),
+            horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
+            options.forEach { (value, label) ->
+                DhunFilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(label) })
+            }
         }
     }
 }
@@ -182,14 +289,14 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
                     color = DhunColors.textSecondary,
                 )
             }
-        } else {
-            Text(
+        }
+        Text(
                 text = "Background brightness",
                 style = MaterialTheme.typography.bodyLarge,
                 color = DhunColors.textPrimary,
             )
             Text(
-                text = "This Android version cannot frost the cover. This fades the now-playing thumbnail behind the app.",
+                text = if (supportsRealtimeBlur) "Dim the blurred artwork independently of blur." else "Hardware blur is unavailable on this Android version; dim the sharp cover instead.",
                 style = MaterialTheme.typography.bodySmall,
                 color = DhunColors.textSecondary,
             )
@@ -211,7 +318,6 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
                     color = DhunColors.textSecondary,
                 )
             }
-        }
     }
 }
 

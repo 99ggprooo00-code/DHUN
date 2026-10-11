@@ -84,6 +84,12 @@ class InnerTubeClient(
     private val httpClient: HttpClient = defaultHttpClient(),
     private val country: String = "US",
 ) {
+    @Volatile private var liveCountry: String = country
+
+    fun setCountryCode(code: String?) {
+        if (code != null && code.length == 2 && code.all { it in 'A'..'Z' }) liveCountry = code
+    }
+
     @Volatile
     private var cachedClientVersion: String? = null
 
@@ -428,7 +434,7 @@ class InnerTubeClient(
             put("clientName", alt.name)
             put("clientVersion", alt.version)
             put("hl", "en")
-            put("gl", country)
+            put("gl", liveCountry)
             alt.contextExtras.forEach { (key, value) -> put(key, value) }
             // Anonymous visitor identity required by YouTube to avoid LOGIN_REQUIRED.
             visitorData?.let { put("visitorData", it) }
@@ -490,7 +496,7 @@ class InnerTubeClient(
             put("clientName", "WEB_REMIX")
             put("clientVersion", cachedClientVersion ?: CLIENT_VERSION_FALLBACK)
             put("hl", "en")
-            put("gl", country)
+            put("gl", liveCountry)
         }
         putJsonObject("user") {}
     }
