@@ -61,6 +61,7 @@ import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.SectionShimmer
 import dev.dhun.design.components.TrackRow
+import dev.dhun.design.components.readingSurfaceFill
 import dev.dhun.presentation.browse.ArtistUiState
 import dev.dhun.presentation.browse.ArtistViewModel
 
@@ -137,16 +138,9 @@ fun ArtistScreen(
                 .height(DhunSpacing.huge),
         ) {
             if (toolbarCollapsed) {
-                // Frosted collapse toolbar — multi-stop glass, not a solid slab.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(DhunColors.glassBarTop, DhunColors.glassStrong),
-                            ),
-                        ),
-                )
+                // Match the page's warm/tonal reading material instead of a
+                // near-black bar in dark or an opaque white bar in light.
+                Box(modifier = Modifier.fillMaxSize().background(readingSurfaceFill()))
             }
             Row(
                 modifier = Modifier

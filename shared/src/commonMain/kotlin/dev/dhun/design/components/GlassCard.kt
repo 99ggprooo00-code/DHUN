@@ -49,7 +49,8 @@ fun GlassCard(
         modifier = base
             .clip(shape)
             .background(when {
-                opaqueBase -> DhunColors.surface
+                // Dialogs stay opaque for reading, but not stark black/white.
+                opaqueBase -> DhunColors.surfaceVariant
                 subtle -> DhunColors.overlayFocus
                 else -> readingSurfaceFill()
             }, shape)

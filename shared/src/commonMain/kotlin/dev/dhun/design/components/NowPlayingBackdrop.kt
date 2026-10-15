@@ -22,8 +22,8 @@ import coil3.request.crossfade
 import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunAppearance
-import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.DhunTokens
 import dev.dhun.design.supportsRealtimeBlur
 
 /**
@@ -47,7 +47,9 @@ fun NowPlayingBackdrop(
     val blurPercent = DhunAppearance.backdropBlurPercent
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
     val canBlur = supportsRealtimeBlur
-    val veilStops = NowPlayingBackdropPolicy.veilStops(DhunAppearance.tokens.isLight, brightnessPercent)
+    val tokens = DhunAppearance.tokens
+    val veilStops = NowPlayingBackdropPolicy.veilStops(tokens.isLight, brightnessPercent)
+    val veilTint = NowPlayingBackdropPolicy.veilTint(tokens)
 
     val context = LocalPlatformContext.current
     var phase by remember(artworkUrl) { mutableStateOf(NowPlayingBackdropPhase.Idle) }
@@ -97,7 +99,7 @@ fun NowPlayingBackdrop(
                 .background(
                     Brush.verticalGradient(
                         colorStops = veilStops.map { (offset, alpha) ->
-                            offset to DhunColors.background.copy(alpha = alpha)
+                            offset to veilTint.copy(alpha = alpha)
                         }.toTypedArray(),
                     ),
                 ),
@@ -134,17 +136,25 @@ object NowPlayingBackdropPolicy {
     fun blurMultiplier(percent: Int): Float =
         percent.coerceIn(0, 100) / 100f
 
-    /** A single translucent veil instead of stacking a black dim and a second scrim.
-     * Brightness changes its opacity, never its hue; light mode uses the warm
-     * light background and dark mode uses the dark background. Lists and reading
-     * surfaces supply their own local contrast rather than blacking out art.
+    /**
+     * Screen artwork (including the full player) gets a tonal, not
+     * near-black/pure-white, veil. The queue sheet and its lyrics material
+     * deliberately do NOT use this policy.
+     */
+    fun veilTint(tokens: DhunTokens) =
+        if (tokens.isLight) tokens.surfaceContainerHighest else tokens.surfaceElevated
+
+    /**
+     * One translucent veil; brightness changes opacity, never the tint.
+     * Slightly more coverage on dark artwork in light mode offsets the darker
+     * warm tint, while lighter dark-mode tint lets artwork glow through.
      */
     fun veilStops(isLight: Boolean, brightnessPercent: Int): List<Pair<Float, Float>> {
         val adjustment = (55 - brightnessPercent.coerceIn(0, 100)) / 100f * 0.30f
         val base = if (isLight) listOf(
-            0f to 0.56f, 0.35f to 0.42f, 0.72f to 0.48f, 1f to 0.56f,
+            0f to 0.72f, 0.35f to 0.51f, 0.72f to 0.54f, 1f to 0.62f,
         ) else listOf(
-            0f to 0.68f, 0.35f to 0.52f, 0.72f to 0.54f, 1f to 0.64f,
+            0f to 0.75f, 0.35f to 0.52f, 0.72f to 0.55f, 1f to 0.65f,
         )
         return base.map { (offset, alpha) -> offset to (alpha + adjustment).coerceIn(0.18f, 0.86f) }
     }

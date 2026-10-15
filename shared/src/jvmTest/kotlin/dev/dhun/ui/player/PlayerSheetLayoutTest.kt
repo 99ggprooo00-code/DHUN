@@ -620,7 +620,8 @@ class PlayerSheetLayoutTest {
         val light = playerAmbientScrimStops(isLight = true)
         assertEquals(dark.map { it.first }, light.map { it.first })
         assertTrue(light.last().second < dark.last().second)
-        assertTrue(light.last().second >= 0.65f, "controls still need contrast in light mode")
+        assertTrue(light.last().second in 0.72f..0.78f,
+            "the warm light tint needs enough coverage for controls over dark artwork")
         assertEquals(0f, light.first { it.first == 0.42f }.second)
     }
 

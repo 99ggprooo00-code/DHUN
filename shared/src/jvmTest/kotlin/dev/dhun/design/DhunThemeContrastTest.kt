@@ -213,8 +213,19 @@ class DhunThemeContrastTest {
             val fill = contentRowFill()
             assertTrue(fill.alpha > 0f && fill.alpha < 1f, "$mode row fill must be translucent")
             if (mode == DhunThemeMode.LIGHT) {
-                assertEquals(tokens.surfaceVariant.red, readingSurfaceFill().red,
-                    "light reading material should be warm, not pure white")
+                assertEquals(tokens.surfaceContainerHigh.red, fill.red,
+                    "light rows should use warm mid-tones, not pure white")
+                assertEquals(tokens.surfaceContainerHighest.red, readingSurfaceFill().red,
+                    "light reading material should use the warm lower rung")
+                assertTrue(fill.compositedOver(Color.White).red < 0.95f,
+                    "light rows over pale artwork must not turn into white tiles")
+            } else {
+                assertEquals(tokens.surfaceElevated.red, fill.red,
+                    "dark rows should use the lifted tonal rung, not near-black")
+                if (mode == DhunThemeMode.DARK) assertTrue(fill.compositedOver(Color.Black).red > 0.14f,
+                    "dark rows over dark artwork must not turn into black tiles")
+                // BLACK is the deliberately OLED-black variant; do not silently
+                // turn it into the standard lifted dark theme.
             }
             listOf(Color.Black, Color.White).forEach { artwork ->
                 val row = fill.compositedOver(artwork)
