@@ -21,7 +21,7 @@ The user subsequently prioritized detailed word-by-word synchronization.
 | Word karaoke and seeking | Implemented slice, device acceptance pending | Highlight each timed segment as playback reaches it; emphasize current segment; tap word to seek, accessible line-seek fallback. One shaped Text paragraph for RTL/joined scripts | Local only; does not manufacture timestamps for plain lyrics | KaraokeTextTest covers boundaries, backward seek, inactive/plain fallback, logical text hit testing |
 | Overlapping vocals | Partial | Explicit enhanced-LRC end markers allow multiple active lines; agent/background metadata and TTML are not implemented | Do not infer singer identities | Overlap/end boundary tests; multi-singer device test pending |
 | Per-song timing/resync | Implemented slice, device acceptance pending | Earlier/later in 100 ms increments and reset; persisted per-track via SettingsRepository; ±10 s bound; inverse seek correction | Local only, originals unchanged | LyricsTimingTest: persistence, track isolation, bounds, malformed settings, display/seek inversion |
-| TTML | Missing | Secure bounded XML parser with DTD/external entities disabled | XML entity and input-size risks; never use regex as XML parser | Malformed/XML security tests needed |
+| TTML | Implemented bounded media-time import subset; device acceptance pending | Explicit local paste, preview and per-song choice; platform XML tokenizers, parallel relative media clocks, line/word ends and independent gaps | DTDs/entities/external loads disabled; hard bounds; unsupported frame/tick/clock/sequential/repeated timing rejected; no new provider or content-rights claim | Parser/security/bounds/cancellation, cache/choice compatibility, controller and API 24/35 tests; see slice below |
 | Romanization | Implemented slice; device/language-quality acceptance pending | Separate persisted player toggle and override; original + secondary line; worker-dispatched ICU4J engine and source/mode-keyed bounded cache | On-device only, no API/credentials; full Unicode/ICU notices bundled. Conservative auto leaves Han/Cyrillic ambiguous. Japanese kana only, no Kanji pronunciation guesses | Real ICU mode fixtures, mixed/punctuation/unknown text, caching, worker/cancellation/failure, controller persistence/source guards and Android API 24/35 smoke tests |
 | Opt-in translation | Missing | Provider abstraction, explicit request consent, target setting, cancellation/rate limits and hash-keyed cache; secure platform credential store before any keyed integration | External disclosure/retention, lyrics copyright, Android Keystore/desktop credential facilities; no credentials in settings or URLs | Fake provider/privacy tests and platform credential acceptance needed |
 | Personalized Quick Picks | Partial | Home already has remote Quick Picks and recommendations; local-history personalization needs a separate transparent ranking slice | Prefer on-device history, with clear/reset controls | Ranking/history state tests needed; do not duplicate existing shelves |
@@ -181,3 +181,55 @@ shared Compose/GlassCard design and implementation; no reference code copied.
   overlays, Back/rotation/restart, and history off/on during playback. No claim of
   full Metrolist parity or merge readiness; the earlier rich-lyrics/translation/
   provider and integration gaps still apply.
+
+
+## Secure local TTML slice
+
+A real local import path is exposed in the lyrics match picker: **Paste local TTML
+lyrics → Preview local TTML → Choose this match**. Preview does not fetch providers
+or automatically save. Use automatic removes the song choice as before. Document
+ownership/title/artist is not verified; users must have permission to use content.
+
+- Shared parser uses namespace-aware platform XML tokenizers (JVM SAX with mandatory
+  secure features and no external access; Android pull-token mode, DTD processing
+  disabled, document declarations rejected before entity use). No regex XML parser,
+  HTTP, file loading, schema fetch, XInclude expansion or automatic clipboard read.
+- Input limit 256,000 characters, depth 48, 10,000 XML elements, 32 attributes per
+  element, 2,000 paragraphs and 16,000 characters per line; media times bounded to
+  24 hours. DTD/entity expansion and processing instructions are rejected. Worker
+  parsing checks cooperative cancellation, and track generations guard preview state.
+- Supported: TTML namespace, parallel body/div/p/span timing, decimal h/m/s/ms and
+  hh:mm:ss.fraction clocks, parent-relative timing with ancestor-end clipping,
+  explicit line ends, timed leaf spans, entities/CDATA, br, default/preserve XML
+  whitespace and original logical UTF-16 text ranges. Decimal arithmetic retains
+  milliseconds. No character/word splitting or estimated timings.
+- Only real span markers generate word ranges; unmarked text remains visible.
+  Conflicting word-time order degrades to line timing. Explicit independent word
+  ends retain silence gaps, and explicit line ends support overlapping paragraphs
+  even without word markers. Existing line/word rendering and inverse-offset seeking
+  remain in use.
+- New bounded versioned synced payload retains independent word/line ends in the
+  existing SQLDelight content column (no schema migration). Legacy line/enhanced-LRC
+  cache rows and version-1 saved choices remain readable; new choices are version 2.
+  Corrupt structured cache payloads become unavailable, never visible raw JSON/XML.
+- Closing the picker no longer cancels an explicit save/reset; searches/previews
+  remain cancelable and track changes invalidate stale work. No unverified new lyric
+  provider was added; this does not claim current remote sources serve TTML.
+- Supported subset deliberately excludes frame/tick/SMPTE/wall clocks, sequential
+  or repeated timing, layouts/styles/animation, agent/background-role presentation,
+  translation and arbitrary embedded content. Unsupported timing/unsafe input fails
+  closed; a bad preview never replaces the existing choice. Not full TTML2 conformance
+  or full Metrolist parity.
+- W3C timing semantics reviewed via `https://github.com/w3c/ttml2/blob/main/spec/ttml2.xml`:
+  `timeContainer` parallel intervals are relative to their parent; default is par;
+  begin inclusive/end exclusive; end/duration choose the smaller bound. No spec code
+  or fixture copied. Malformed/unsupported zero-length intervals are rejected in this
+  subset rather than synthesizing visible timing.
+- Deterministic tests cover timing, nested ranges, scripts/entities/whitespace,
+  malformed/unsafe/oversize XML, cancellation, local preview/no-provider behavior,
+  persistence/recreation, old cache/choice formats, dismissal/save race, independent
+  word gaps and overlapping line ends. Android tokenizer is exercised on API 24/35.
+  Local Kotlin execution is unavailable without Java; hosted current-head CI must
+  validate the new tests. Physical Android/Windows import/layout/focus/accessibility
+  and large-input performance acceptance remain required. Earlier translation,
+  provider/integration and ICU physical-device checks remain outstanding; do not merge.

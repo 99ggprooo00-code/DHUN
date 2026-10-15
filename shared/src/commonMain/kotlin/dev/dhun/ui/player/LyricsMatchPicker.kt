@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
+import dev.dhun.lyrics.TtmlParser
 import dev.dhun.presentation.player.LyricsMatchController
 
 /** UI dispatches state-machine actions only; no HTTP/client/repository calls here. */
@@ -31,6 +32,8 @@ import dev.dhun.presentation.player.LyricsMatchController
 internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, onDismiss: () -> Unit) {
     val state by controller.state.collectAsState()
     var query by remember(track.id) { mutableStateOf("${track.artistName} ${track.title}".take(240)) }
+    var showLocalImport by remember(track.id) { mutableStateOf(false) }
+    var ttml by remember(track.id) { mutableStateOf("") }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = MaterialTheme.shapes.large) {
             Column(
@@ -50,7 +53,18 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
                     }
                     TextButton(onClick = { controller.choose(track.id, null) }, enabled = !state.loading) { Text("Use automatic") }
                 }
-                if (state.loading) Text("Searching / saving…", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { showLocalImport = !showLocalImport }) { Text("Paste local TTML lyrics") }
+                if (showLocalImport) {
+                    Text("Local only: paste TTML you have permission to use. Preview does not save or contact a provider. Unsupported XML/timing is rejected; use Choose this match after reviewing the preview.",
+                        style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(value = ttml, onValueChange = { ttml = it.take(TtmlParser.MAX_INPUT_CHARS + 1) },
+                        label = { Text("TTML document (maximum 256,000 characters)") },
+                        minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
+                    if (ttml.length > TtmlParser.MAX_INPUT_CHARS) Text("Document is too large. Paste a smaller document.")
+                    TextButton(onClick = { controller.previewTtml(track.id, ttml) },
+                        enabled = !state.loading && ttml.isNotBlank() && ttml.length <= TtmlParser.MAX_INPUT_CHARS) { Text("Preview local TTML") }
+                }
+                if (state.loading) Text("Searching / parsing / saving…", style = MaterialTheme.typography.bodySmall)
                 if (state.trackId == track.id) {
                     state.selected?.let { Text("Saved choice: ${it.provider} · ${it.title}", style = MaterialTheme.typography.labelLarge) }
                     state.message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
@@ -63,12 +77,13 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
                         Text("${match.title} — ${match.artist}", style = MaterialTheme.typography.titleMedium)
                         val timing = if (match.synced) "Synced" else "Unsynced"
                         val wordTimed = (match.lyrics as? dev.dhun.core.Lyrics.Synced)?.lines?.any { it.words.isNotEmpty() } == true
-                        Text("${match.provider} · $timing${if (wordTimed) " (word timed)" else ""} · Language: ${match.language ?: "unknown"}",
+                        Text("${if (match.provider == "local_ttml") "Local TTML" else match.provider} · $timing${if (wordTimed) " (word timed)" else ""} · Language: ${match.language ?: "unknown"}",
                             style = MaterialTheme.typography.labelMedium)
                         if (match.metadataVerified) Text(
                             "Title: ${if (match.title.equals(track.title, true)) "exact match" else "different"}; artist: ${if (match.artist.equals(track.artistName, true)) "exact match" else "different"}",
                             style = MaterialTheme.typography.bodySmall,
-                        ) else Text("Requested track metadata; this source did not provide match details.", style = MaterialTheme.typography.bodySmall)
+                        ) else Text(if (match.provider == "local_ttml") "Local import for this song; title/artist are not verified against the document."
+                            else "Requested track metadata; this source did not provide match details.", style = MaterialTheme.typography.bodySmall)
                         Text(match.preview, style = MaterialTheme.typography.bodyMedium)
                         TextButton(onClick = { controller.choose(track.id, match) }, enabled = !state.loading) {
                             Text(if (state.selected?.let { it.provider == match.provider && it.id == match.id } == true) "Selected" else "Choose this match")

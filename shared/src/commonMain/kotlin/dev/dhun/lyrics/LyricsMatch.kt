@@ -36,21 +36,21 @@ interface LyricsCandidateSource : LyricsSource {
 data class LyricsMatchSearch(val matches: List<LyricsMatch>, val failedProviders: List<String> = emptyList())
 
 /** Versioned, bounded per-song choice, independent of the evictable lyrics cache.
- * LRC serialization is lossless for the line/enhanced-LRC model we currently accept.
+ * Version 2 retains independent TTML word/line ends; version 1 LRC remains readable.
  */
 internal object LyricsMatchCodec {
     const val MAX_CHARS = 512_000
     fun encode(match: LyricsMatch): String {
         require(match.lyrics != Lyrics.NotAvailable)
         val encoded = buildJsonObject {
-            put("version", 1)
+            put("version", 2)
             put("id", match.id); put("provider", match.provider)
             put("title", match.title); put("artist", match.artist)
             put("synced", match.synced); put("verified", match.metadataVerified)
             match.language?.let { put("language", it) }
             match.durationSeconds?.let { put("duration", it) }
             put("content", when (val lyrics = match.lyrics) {
-                is Lyrics.Synced -> LrcParser.serialize(lyrics.lines)
+                is Lyrics.Synced -> SyncedLyricsCodec.encode(lyrics.lines)
                 is Lyrics.Unsynced -> lyrics.text
                 Lyrics.NotAvailable -> error("Unavailable match")
             })
@@ -60,13 +60,13 @@ internal object LyricsMatchCodec {
     }
 
     fun decode(encoded: String?): LyricsMatch? = runCatching {
-        if (encoded == null || encoded.length > MAX_CHARS) return null
+        if (encoded == null || encoded.length > MAX_CHARS || !boundedLyricsJson(encoded)) return null
         val obj = Json.parseToJsonElement(encoded) as? JsonObject ?: return null
         fun value(key: String) = obj[key]?.jsonPrimitive?.contentOrNull
-        if (value("version") != "1") return null
+        if (value("version") !in setOf("1", "2")) return null
         val content = value("content") ?: return null
         val lyrics = if (value("synced") == "true") {
-            val lines = LrcParser.parse(content, false)
+            val lines = if (value("version") == "1") LrcParser.parse(content, false) else SyncedLyricsCodec.decode(content)
             if (lines.isEmpty()) return null
             Lyrics.Synced(lines)
         } else {

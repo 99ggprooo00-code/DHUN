@@ -105,7 +105,7 @@ class LyricsRepository(
 
     suspend fun selectMatch(trackId: String, match: LyricsMatch) {
         val store = checkNotNull(settings) { "Persistent song choices are unavailable" }
-        require(match.provider in registry) { "Unknown lyrics provider" }
+        require(match.provider in registry || match.provider == "local_ttml") { "Unknown lyrics provider" }
         store.putString(SettingsKeys.lyricsMatchKey(trackId), LyricsMatchCodec.encode(match))
     }
 

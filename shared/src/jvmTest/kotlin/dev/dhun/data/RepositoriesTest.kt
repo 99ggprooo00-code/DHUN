@@ -268,6 +268,32 @@ class RepositoriesTest {
     }
 
     @Test
+    fun ttmlLineEndsAndWordGapsSurviveCacheAndChoiceRecreation(): Unit = runBlocking {
+        val db = newDb()
+        val lines = dev.dhun.lyrics.TtmlParser.parse("""<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="6s"><span begin="0s" end="1s">A </span><span begin="3s" end="4s">B</span></p></div></body></tt>""")
+        val lyrics = dev.dhun.core.Lyrics.Synced(lines)
+        val cache = SqlDelightLyricsCacheRepository(db, FakeClock(), Dispatchers.Unconfined)
+        cache.put("ttml", lyrics)
+        val reopened = SqlDelightLyricsCacheRepository(db, FakeClock(), Dispatchers.Unconfined)
+        assertEquals(lyrics, reopened.get("ttml"))
+        assertEquals(lyrics, reopened.observe("ttml").first())
+        // Historical line/enhanced LRC cache rows need no migration.
+        db.lyricsCacheQueries.insert("old", true, "[00:01]<00:01>old<00:02>", 1L)
+        assertEquals(dev.dhun.core.Lyrics.Synced(dev.dhun.lyrics.LrcParser.parse("[00:01]<00:01>old<00:02>")), reopened.get("old"))
+        db.lyricsCacheQueries.insert("corrupt", true, "{broken-json", 1L)
+        assertEquals(dev.dhun.core.Lyrics.NotAvailable, reopened.get("corrupt"))
+        val source = object : dev.dhun.lyrics.LyricsSource {
+            override suspend fun fetch(track: dev.dhun.core.Track) = dev.dhun.core.DhunResult.Success(dev.dhun.core.Lyrics.NotAvailable)
+        }
+        val settings = SqlDelightSettingsRepository(db, Dispatchers.Unconfined)
+        val chosen = dev.dhun.lyrics.LyricsMatch("local-ttml", "local_ttml", "Song", "Artist", lyrics, metadataVerified = false)
+        dev.dhun.lyrics.LyricsRepository(cache, source, source, settings).selectMatch("ttml", chosen)
+        reopened.clear()
+        val repo = dev.dhun.lyrics.LyricsRepository(reopened, source, source, SqlDelightSettingsRepository(db, Dispatchers.Unconfined))
+        assertEquals(chosen, repo.selectedMatch("ttml"))
+    }
+
+    @Test
     fun enhancedLyricsSurviveRepositoryRecreation(): Unit = runBlocking {
         val db = newDb()
         val original = dev.dhun.core.Lyrics.Synced(dev.dhun.lyrics.LrcParser.parse(

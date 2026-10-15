@@ -186,6 +186,8 @@ data class LyricsLine(
     val startTimeMs: Long?, // null = unsynced line
     val text: String,
     val words: List<LyricsWord> = emptyList(),
+    /** Explicit source line end, independent of the last word (TTML overlap/gaps). */
+    val endTimeMs: Long? = null,
 )
 
 /** UTF-16 ranges into the original line: never split/reorder joined scripts for rendering. */

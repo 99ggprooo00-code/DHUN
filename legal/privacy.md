@@ -51,7 +51,7 @@ Nothing in this section leaves your device by the app's own design. **[source]**
 | Recent searches | local SQLite database |
 | Track metadata you have browsed | local SQLite database |
 | Queue and now-playing position | local SQLite database |
-| Cached lyrics, explicit per-song lyric choices, timing offsets and romanization preferences | local SQLite database |
+| Cached lyrics, explicit per-song lyric choices (including local TTML imports), timing offsets and romanization preferences | local SQLite database |
 | Settings (theme, accent, cache size, backdrop) | local SQLite database |
 | Downloaded audio and saved artwork | Android: the app's private files directory. Windows: the per-user install folder. |
 | Streamed-audio cache (size-capped) | Android: the app cache directory |
@@ -104,6 +104,13 @@ configured providers with bounded fallback. **[source]**
 The match picker sends queries/track metadata only when Search is requested. A
 per-song choice is stored locally and survives clearing the automatic lyric cache;
 choose **Use automatic** in the match picker to remove that choice. **[source]**
+
+**Paste local TTML lyrics** accepts a document you explicitly paste into the match
+picker. Preview parsing runs on-device, without provider requests or automatic
+clipboard reads. Only **Choose this match** saves the parsed text/timing for that
+song; the raw XML is not saved. Unsupported or unsafe XML is rejected, and a failed
+import leaves the previous choice intact. These controls do not establish rights
+to redistribute imported lyrics. **[source]**
 
 Optional romanization uses bundled ICU4J transforms on the device. It does not send
 lyric text to a transliteration service. Its bounded in-memory cache is keyed by

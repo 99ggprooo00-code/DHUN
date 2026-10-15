@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -37,8 +38,10 @@ class LyricsMatchTest {
     private class Store : SettingsRepository {
         val values = mutableMapOf<String, String>()
         var failWrites = false
+        var writeGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
         override suspend fun getString(key: String) = values[key]
         override suspend fun putString(key: String, value: String) {
+            writeGate?.await()
             if (failWrites) error("disk unavailable")
             values[key] = value
         }
@@ -78,6 +81,132 @@ class LyricsMatchTest {
     }
     private fun emptySource() = Source { DhunResult.Success(Lyrics.NotAvailable) }
     private fun store(vararg ids: String) = Store().apply { values[SettingsKeys.LYRICS_PROVIDER_ORDER] = ids.joinToString(",") }
+
+    private val localTtml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s"><span begin="0s" end="1s">Hello </span><span begin="2s" end="3s">world</span></p></div></body></tt>"""
+
+    @Test fun localTtmlPreviewRequiresExplicitChoiceSurvivesReloadAndDoesNotFetchProviders() = runTest {
+        val settings = store("ytm")
+        val source = emptySource()
+        val repo = LyricsRepository(Cache(), source, source, settings)
+        val refreshed = mutableListOf<String>()
+        val controller = LyricsMatchController(repo, backgroundScope, StandardTestDispatcher(testScheduler)) { refreshed += it }
+        controller.setTrack(track)
+        runCurrent()
+        controller.previewTtml(track.id, localTtml)
+        runCurrent()
+        val preview = controller.state.value.matches.single()
+        assertEquals("local_ttml", preview.provider)
+        assertFalse(preview.metadataVerified)
+        assertNull(repo.selectedMatch(track.id))
+        assertTrue(refreshed.isEmpty())
+        assertEquals(0, source.calls)
+        controller.choose(track.id, preview)
+        runCurrent()
+        assertEquals(preview, repo.selectedMatch(track.id))
+        val reopened = LyricsRepository(Cache(), source, source, settings)
+        assertEquals(DhunResult.Success(preview.lyrics), reopened.getLyrics(track))
+        assertEquals(0, source.calls)
+        val line = (preview.lyrics as Lyrics.Synced).lines.single()
+        assertEquals(5_000L, line.endTimeMs)
+        assertEquals(listOf(2_000L, 4_000L), line.words.map { it.endTimeMs })
+        assertEquals(listOf(track.id), refreshed)
+        controller.choose(track.id, null)
+        runCurrent()
+        assertNull(reopened.selectedMatch(track.id))
+    }
+
+    @Test fun invalidLocalImportDoesNotReplaceASavedChoiceAndWriteErrorsAreRecoverable() = runTest {
+        val settings = store("lrclib_search")
+        val source = emptySource()
+        val repo = LyricsRepository(Cache(), source, source, settings, source)
+        repo.selectMatch(track.id, match)
+        val controller = LyricsMatchController(repo, backgroundScope, StandardTestDispatcher(testScheduler)) {}
+        controller.setTrack(track)
+        runCurrent()
+        controller.previewTtml(track.id, "<broken>")
+        runCurrent()
+        assertFalse(controller.state.value.loading)
+        assertTrue(controller.state.value.message!!.contains("No supported"))
+        assertEquals(match, repo.selectedMatch(track.id))
+        controller.previewTtml(track.id, localTtml)
+        runCurrent()
+        settings.failWrites = true
+        controller.choose(track.id, controller.state.value.matches.single())
+        runCurrent()
+        assertEquals(match, repo.selectedMatch(track.id))
+        assertTrue(controller.state.value.message!!.contains("Couldn't save"))
+        assertEquals(0, source.calls)
+    }
+
+    @Test fun localImportWorkerCannotPublishAfterTrackChangeOrDismissal() = runTest {
+        val pending = mutableListOf<Runnable>()
+        val worker = object : kotlinx.coroutines.CoroutineDispatcher() {
+            override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) { pending += block }
+        }
+        var parsed = 0
+        val source = emptySource()
+        val repo = LyricsRepository(Cache(), source, source, store("ytm"))
+        val controller = LyricsMatchController(repo, backgroundScope, worker, { xml, checkpoint ->
+            parsed++
+            TtmlParser.parse(xml, checkpoint)
+        }) {}
+        controller.setTrack(track)
+        runCurrent()
+        controller.previewTtml(track.id, localTtml)
+        runCurrent()
+        assertEquals(1, pending.size)
+        controller.setTrack(track.copy(id = "successor"))
+        pending.removeAt(0).run()
+        runCurrent()
+        assertEquals(0, parsed)
+        assertEquals("successor", controller.state.value.trackId)
+        assertTrue(controller.state.value.matches.isEmpty())
+        assertNull(repo.selectedMatch(track.id))
+        controller.previewTtml("successor", localTtml)
+        runCurrent()
+        controller.cancelSearch()
+        pending.removeAt(0).run()
+        runCurrent()
+        assertTrue(controller.state.value.matches.isEmpty())
+        assertFalse(controller.state.value.loading)
+        assertEquals(0, parsed)
+    }
+
+    @Test fun closingThePickerDoesNotCancelAnExplicitSaveOrReset() = runTest {
+        val settings = store("ytm")
+        val source = emptySource()
+        val repo = LyricsRepository(Cache(), source, source, settings)
+        val refreshed = mutableListOf<String>()
+        val controller = LyricsMatchController(repo, backgroundScope, StandardTestDispatcher(testScheduler)) { refreshed += it }
+        controller.setTrack(track)
+        runCurrent()
+        controller.previewTtml(track.id, localTtml)
+        runCurrent()
+        val preview = controller.state.value.matches.single()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        settings.writeGate = gate
+        controller.choose(track.id, preview)
+        runCurrent()
+        controller.cancelSearch() // Close/dismiss while the DB write is pending.
+        controller.search(track.id, "must not interrupt a save")
+        runCurrent()
+        assertTrue(controller.state.value.loading)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(preview, repo.selectedMatch(track.id))
+        assertFalse(controller.state.value.loading)
+        assertEquals(listOf(track.id), refreshed)
+        controller.choose(track.id, null)
+        controller.cancelSearch()
+        runCurrent()
+        assertNull(repo.selectedMatch(track.id))
+        assertEquals(2, refreshed.size)
+    }
+
+    @Test fun legacyVersionOneSavedChoiceRemainsReadable() {
+        val legacy = """{"version":1,"id":"old","provider":"lrclib","title":"Song","artist":"Artist","synced":true,"content":"[00:01.123]<00:01.123>Hello <00:02.456>world<00:03.789>"}"""
+        assertEquals(timed, LyricsMatchCodec.decode(legacy)?.lyrics)
+    }
 
     @Test fun choiceRetainsWordTimingAcrossRecreationCacheClearAndProviderPreferenceChanges() = runTest {
         val settings = store("ytm", "lrclib_search")

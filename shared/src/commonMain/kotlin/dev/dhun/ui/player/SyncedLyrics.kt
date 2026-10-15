@@ -285,16 +285,16 @@ internal fun karaokeText(line: LyricsLine, positionMs: Long, accent: Color, line
         }
     }
 
-/** Explicit word end times allow simultaneous singers without guessing an overlap.
+/** Explicit line/word end times allow simultaneous singers without guessing an overlap.
  * Plain LRC still uses the established last-line fallback.
  */
 internal fun activeLyricIndices(lines: List<LyricsLine>, positionMs: Long): Set<Int> {
     val latest = activeLyricIndex(lines, positionMs)
     return buildSet {
-        if (latest >= 0 && lines[latest].words.lastOrNull()?.endTimeMs == null) add(latest)
+        if (latest >= 0 && (lines[latest].endTimeMs ?: lines[latest].words.lastOrNull()?.endTimeMs) == null) add(latest)
         lines.forEachIndexed { index, line ->
             val start = line.startTimeMs ?: return@forEachIndexed
-            val end = line.words.lastOrNull()?.endTimeMs ?: return@forEachIndexed
+            val end = line.endTimeMs ?: line.words.lastOrNull()?.endTimeMs ?: return@forEachIndexed
             if (start <= positionMs && positionMs < end) add(index)
         }
     }

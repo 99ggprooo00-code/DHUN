@@ -40,6 +40,17 @@ class KaraokeTextTest {
         assertTrue(karaokeText(plain, 2_000, Color.Red, Color.Gray).spanStyles.isEmpty())
     }
 
+    @Test fun explicitTtmlLineEndsOverlapEvenWithoutWordsAndRetainWordSilence() {
+        val lines = dev.dhun.lyrics.TtmlParser.parse("""<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s">Main</p><p begin="2s" end="3s">Backing</p></div></body></tt>""")
+        assertEquals(setOf(0, 1), activeLyricIndices(lines, 2_500))
+        assertEquals(setOf(0), activeLyricIndices(lines, 3_000))
+        assertTrue(activeLyricIndices(lines, 5_000).isEmpty())
+        assertEquals(setOf(0, 1), activeLyricIndices(lines, 2_500)) // Backwards seek.
+        val wordLine = dev.dhun.lyrics.TtmlParser.parse("""<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="6s"><span begin="0s" end="1s">A </span><span begin="3s" end="4s">B</span></p></div></body></tt>""").single()
+        assertTrue(karaokeText(wordLine, 3_000, Color.Red, Color.Gray).spanStyles.none { it.item.textDecoration == TextDecoration.Underline })
+        assertEquals(4_000L, wordSeekTime(wordLine, wordLine.words.last().startIndex))
+    }
+
     @Test fun explicitEndTimesAllowOverlappingVoices() {
         val lines = LrcParser.parse("[00:01]<00:01>Main<00:05>\n[00:02]<00:02>Backing<00:03>")
         assertEquals(setOf(0, 1), activeLyricIndices(lines, 2_500))

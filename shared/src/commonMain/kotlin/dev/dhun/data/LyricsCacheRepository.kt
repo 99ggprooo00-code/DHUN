@@ -4,7 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import dev.dhun.core.Lyrics
 import dev.dhun.database.DhunDatabase
-import dev.dhun.lyrics.LrcParser
+import dev.dhun.lyrics.SyncedLyricsCodec
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -14,12 +14,12 @@ import kotlinx.coroutines.withContext
 /**
  * Persisted lyrics cache (Phase 11) — lives in the Phase 05 DB
  * (`dhun.db`) alongside history/favorites. Keyed by `Track.id`
- * (YouTube videoId). Stores either the raw LRC (synced) or plain
+ * (YouTube videoId). Stores either versioned timed lyrics (synced) or plain
  * text (unsynced). `NotAvailable` is not cached (negative caching
  * would hide future availability).
  *
- * Content for `Synced` is the raw LRC string (e.g. `[00:12.34]Hello`);
- * it is re-parsed on read so the parser stays the single source of truth.
+ * Synced content retains independent word/line ends in a versioned JSON payload;
+ * legacy raw line/enhanced LRC rows remain readable without a schema migration.
  */
 interface LyricsCacheRepository {
     suspend fun get(trackId: String): Lyrics?
@@ -43,9 +43,9 @@ class SqlDelightLyricsCacheRepository(
         val now = clock.nowMs()
         when (lyrics) {
             is Lyrics.Synced -> {
-                // Retain enhanced word markers and full millisecond precision.
-                // Old line-only cache entries remain readable without a migration.
-                val lrc = LrcParser.serialize(lyrics.lines)
+                // Preserve real independent word/line ends, including silence gaps.
+                // Old line/enhanced LRC entries remain readable without a migration.
+                val lrc = SyncedLyricsCodec.encode(lyrics.lines)
                 db.lyricsCacheQueries.insert(trackId, true, lrc, now)
             }
             is Lyrics.Unsynced -> {
@@ -69,8 +69,8 @@ class SqlDelightLyricsCacheRepository(
 
     private fun rowToLyrics(row: dev.dhun.database.LyricsCache): Lyrics {
         return if (row.isSynced) {
-            val lines = LrcParser.parse(row.content, allowUnsyncedFallback = false)
-            if (lines.isEmpty()) Lyrics.Unsynced(row.content) else Lyrics.Synced(lines)
+            val lines = SyncedLyricsCodec.decode(row.content)
+            if (lines.isEmpty()) Lyrics.NotAvailable else Lyrics.Synced(lines)
         } else {
             if (row.content.isBlank()) Lyrics.NotAvailable else Lyrics.Unsynced(row.content)
         }
