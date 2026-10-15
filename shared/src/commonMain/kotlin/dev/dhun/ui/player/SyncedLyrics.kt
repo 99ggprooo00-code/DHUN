@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import dev.dhun.core.LyricsLine
 import dev.dhun.design.DhunAnimations
@@ -268,7 +269,7 @@ internal fun karaokeText(line: LyricsLine, positionMs: Long, accent: Color, line
             addStyle(
                 SpanStyle(
                     color = if (sung) accent else lineColor.copy(alpha = 0.5f),
-                    fontWeight = if (sung && (word.endTimeMs == null || positionMs < word.endTimeMs)) FontWeight.ExtraBold else FontWeight.Medium,
+                    textDecoration = if (sung && (word.endTimeMs == null || positionMs < word.endTimeMs)) TextDecoration.Underline else TextDecoration.None,
                 ),
                 word.startIndex, word.endIndex,
             )

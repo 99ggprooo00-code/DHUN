@@ -68,6 +68,10 @@ object SettingsKeys {
     const val LYRICS_PREFER_SYNCED_DEFAULT = true
     const val LYRICS_AUTO_SCROLL = "lyrics_auto_scroll"
     const val LYRICS_AUTO_SCROLL_DEFAULT = true
+    /** Per-track timing corrections are dynamic keys, not a global playback preference. */
+    const val LYRICS_OFFSET_PREFIX = "lyrics_offset_ms:"
+    fun lyricsOffsetKey(trackId: String): String = LYRICS_OFFSET_PREFIX + trackId
+
     const val LYRICS_TEXT_SIZE = "lyrics_text_size"
     const val LYRICS_TEXT_SIZE_DEFAULT = "default"
     const val LYRICS_PREFERRED_PROVIDER = "lyrics_preferred_provider"

@@ -1,6 +1,7 @@
 package dev.dhun.ui.player
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextDecoration
 import dev.dhun.lyrics.LrcParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,6 +17,9 @@ class KaraokeTextTest {
         assertEquals(line.text, during.text)
         assertTrue(before.spanStyles.none { it.item.color == Color.Red })
         assertEquals(1, during.spanStyles.count { it.item.color == Color.Red })
+        assertEquals(TextDecoration.Underline, during.spanStyles[0].item.textDecoration)
+        assertEquals(TextDecoration.None, after.spanStyles[0].item.textDecoration)
+        assertEquals(TextDecoration.Underline, after.spanStyles[1].item.textDecoration)
         assertEquals(2, after.spanStyles.count { it.item.color == Color.Red })
         assertEquals(before, karaokeText(line, 999, Color.Red, Color.Gray))
     }

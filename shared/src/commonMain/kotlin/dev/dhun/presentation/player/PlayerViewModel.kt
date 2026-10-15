@@ -11,6 +11,8 @@ import dev.dhun.data.PlayContext
 import dev.dhun.data.SettingsKeys
 import dev.dhun.data.SettingsRepository
 import dev.dhun.domain.RadioSession
+import dev.dhun.lyrics.LyricsTiming
+import dev.dhun.lyrics.LyricsTimingRepository
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.NowPlayingPersistence
@@ -24,6 +26,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -95,6 +99,23 @@ class PlayerViewModel(
         ?.map { it ?: SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT }
         ?.stateIn(scope, SharingStarted.Eagerly, SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT)
         ?: MutableStateFlow(SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT)
+
+    private val lyricsTimingRepository = settings?.let { LyricsTimingRepository(it) }
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val lyricsTiming: StateFlow<LyricsTiming> = currentTrack.flatMapLatest { track ->
+        if (track == null || lyricsTimingRepository == null) flowOf(LyricsTiming(track?.id))
+        else lyricsTimingRepository.observe(track.id)
+    }.stateIn(scope, SharingStarted.Eagerly, LyricsTiming(null))
+
+    fun adjustLyricsTiming(trackId: String, deltaMs: Int) {
+        if (currentTrack.value?.id != trackId) return
+        scope.launch { lyricsTimingRepository?.adjust(trackId, deltaMs) }
+    }
+
+    fun resetLyricsTiming(trackId: String) {
+        if (currentTrack.value?.id != trackId) return
+        scope.launch { lyricsTimingRepository?.reset(trackId) }
+    }
 
     val isPlaying: StateFlow<Boolean> = player.state
         .map { it is PlaybackState.Playing }

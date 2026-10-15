@@ -20,7 +20,8 @@ The user subsequently prioritized detailed word-by-word synchronization.
 | Enhanced-LRC word timestamps | Partial → implemented slice | Preserve UTF-16 text ranges, times and explicit final end markers; repeated-line time shifts; cache round-trip at millisecond precision | Local parsing; no inferred timing advertised as real | EnhancedLrcTest; DB repository recreation test |
 | Word karaoke and seeking | Implemented slice, device acceptance pending | Highlight each timed segment as playback reaches it; emphasize current segment; tap word to seek, accessible line-seek fallback. One shaped Text paragraph for RTL/joined scripts | Local only; does not manufacture timestamps for plain lyrics | KaraokeTextTest covers boundaries, backward seek, inactive/plain fallback, logical text hit testing |
 | Overlapping vocals | Partial | Explicit enhanced-LRC end markers allow multiple active lines; agent/background metadata and TTML are not implemented | Do not infer singer identities | Overlap/end boundary tests; multi-singer device test pending |
-| TTML, offset/resync | Missing | Secure bounded XML parser with DTD/external entities disabled; persisted runtime offset and safe seek mapping | XML entity and input-size risks; never use regex as XML parser | Malformed/XML security and offset tests needed |
+| Per-song timing/resync | Implemented slice, device acceptance pending | Earlier/later in 100 ms increments and reset; persisted per-track via SettingsRepository; ±10 s bound; inverse seek correction | Local only, originals unchanged | LyricsTimingTest: persistence, track isolation, bounds, malformed settings, display/seek inversion |
+| TTML | Missing | Secure bounded XML parser with DTD/external entities disabled | XML entity and input-size risks; never use regex as XML parser | Malformed/XML security tests needed |
 | Romanization | Missing | Separate persisted toggle/override; platform transliteration service with off-thread bounded cache | Verify script-specific quality and library/data licenses; no translation label | Mixed scripts, punctuation, unknown language and immutable-original tests needed |
 | Opt-in translation | Missing | Provider abstraction, explicit request consent, target setting, cancellation/rate limits and hash-keyed cache; secure platform credential store before any keyed integration | External disclosure/retention, lyrics copyright, Android Keystore/desktop credential facilities; no credentials in settings or URLs | Fake provider/privacy tests and platform credential acceptance needed |
 | Personalized Quick Picks | Partial | Home already has remote Quick Picks and recommendations; local-history personalization needs a separate transparent ranking slice | Prefer on-device history, with clear/reset controls | Ranking/history state tests needed; do not duplicate existing shelves |
@@ -66,7 +67,7 @@ while explicit match search can request bounded candidate sets.
   become word timed merely because the renderer supports it.
 - Word emphasis follows player position ticks, not a fabricated per-character sweep.
   Explicit end markers permit overlapping active lines; vocalist/background tags,
-  TTML, per-word gradient sweep and resync controls remain outstanding.
+  TTML and per-word gradient sweep remain outstanding. Per-track offset controls now correct both display and seeking without modifying source timing.
 - Android + desktop acceptance: playback/seek forward and backward across boundaries;
   word tapping, TalkBack/keyboard line seek; RTL/Devanagari/emoji shaping; user scroll
   pause/resume; overlapping timed lines; restart/cache reload; long lyrics performance.

@@ -30,6 +30,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import dev.dhun.lyrics.LyricsTiming
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -406,6 +408,7 @@ internal fun LyricsTabContent(
     modifier: Modifier = Modifier,
 ) {
     val lyricsState by viewModel.lyricsState.collectAsState()
+    val savedTiming by viewModel.lyricsTiming.collectAsState()
     val positionMs by viewModel.positionMs.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
     val track = currentTrack
@@ -424,6 +427,16 @@ internal fun LyricsTabContent(
             onSelect = onPreferredProviderChange,
             accent = accent,
         )
+        // Ignore the outgoing track's correction while the new settings flow starts.
+        val timing = savedTiming.takeIf { it.trackId == track.id } ?: LyricsTiming(track.id)
+        if (lyricsState is LyricsUiState.Synced) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = { viewModel.adjustLyricsTiming(track.id, -100) }) { Text("Earlier") }
+                Text("${timing.offsetMs} ms", style = MaterialTheme.typography.labelMedium)
+                TextButton(onClick = { viewModel.adjustLyricsTiming(track.id, 100) }) { Text("Later") }
+                TextButton(onClick = { viewModel.resetLyricsTiming(track.id) }) { Text("Reset") }
+            }
+        }
         val lyricsBodyModifier = Modifier.fillMaxWidth().weight(1f)
 
         // Scroll position and manual-follow preference belong to this track, not
@@ -501,11 +514,11 @@ internal fun LyricsTabContent(
                 }
                 is LyricsUiState.Synced -> SyncedLyricsContent(
                     lines = state.lines,
-                    positionMs = positionMs,
+                    positionMs = timing.lyricPosition(positionMs),
                     accent = accent,
                     onSeek = { position ->
                         // An outgoing tab/track must never seek its successor.
-                        if (viewModel.currentTrack.value?.id == track.id) viewModel.seekTo(position)
+                        if (viewModel.currentTrack.value?.id == track.id) viewModel.seekTo(timing.seekPosition(position, viewModel.durationMs.value))
                     },
                     modifier = lyricsBodyModifier,
                     autoScroll = viewModel.lyricsAutoScroll.collectAsState().value,
