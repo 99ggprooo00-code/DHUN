@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -120,10 +121,9 @@ enum class AppTab(val title: String, val icon: DhunIcon) {
     LIBRARY("Library", DhunIcon.LibraryMusic),
 
     /**
-     * Internal design catalogue. Kept in the enum (deep links and restored
-     * state may name it) but **not shown in the nav bar** — it shipped to
-     * real devices as a fourth user-facing tab full of swatches, which is
-     * developer scaffolding, not a product surface. See [userTabs].
+     * Legacy internal design-catalogue tab. Kept parseable for old restored
+     * state but never offered in normal navigation; the current preview entry
+     * is a test-channel-only route from Settings. See [userTabs].
      */
     CATALOG("Catalog", DhunIcon.Palette),
     ;
@@ -178,9 +178,9 @@ fun DhunAppShell(
     equalizerSession: EqualizerSession? = null,
     /**
      * This build's version/channel, read from build metadata by the platform
-     * shell. Only the About page consumes it; it defaults to the honest
-     * "unknown" sentinel so a caller that has not wired it shows that rather
-     * than a plausible-looking wrong version.
+     * shell. About & Legal reports it, and the test channel gates the internal
+     * Theme Catalogue entry. It defaults to the honest "unknown" sentinel so
+     * an unwired caller shows that rather than a plausible-looking wrong version.
      */
     appInfo: DhunAppInfo = DhunAppInfo.Unknown,
     clearAudioCache: (suspend () -> Long)? = null,
@@ -332,10 +332,12 @@ fun DhunAppShell(
             selectedAccentColor,
             DhunAppearance.appearanceRevision,
         ) {
-            val artworkAccent = if (accentMode == "static" || currentTrack == null) {
+            val artworkAccent = if (accentMode == "static") {
                 null
             } else {
-                ArtworkColorExtractor.extractFromSeed(currentTrack.thumbnailUrl ?: currentTrack.id).controlAccent
+                currentTrack?.let { track ->
+                    ArtworkColorExtractor.extractFromSeed(track.thumbnailUrl ?: track.id).controlAccent
+                }
             }
             DhunAppearance.setArtworkAccent(artworkAccent)
         }
@@ -904,6 +906,7 @@ private fun ShellMasterPane(
             sleepTimerLabel = sleepTimerLabel,
             onCycleSleepTimer = onCycleSleepTimer,
             onOpenSettings = onOpenSettings,
+            showThemeCatalogue = appInfo.isTestRelease,
         )
         is DetailRoute.ArtistPage -> {
             val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession, dataLayer.settings) }
@@ -949,7 +952,24 @@ private fun ShellMasterPane(
                 isDesktop = isDesktop,
                 equalizerSession = equalizerSession,
                 onOpenAboutLegal = { nav.push(DetailRoute.AboutLegalPage) },
+                showThemeCatalogue = appInfo.isTestRelease,
+                onOpenThemeCatalogue = { nav.push(DetailRoute.ThemeCatalogPage) },
             )
+        }
+        is DetailRoute.ThemeCatalogPage -> {
+            if (appInfo.isTestRelease) {
+                SettingsThemeCatalogue(
+                    viewModel = settingsVm,
+                    onClose = { nav.popDetail() },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text(
+                    text = "The theme catalogue is available in test-release builds only.",
+                    modifier = Modifier.padding(DhunSpacing.screenPadding),
+                    color = DhunColors.textSecondary,
+                )
+            }
         }
         is DetailRoute.AboutLegalPage -> {
             AboutLegalScreen(
@@ -1039,7 +1059,24 @@ private fun ShellDetailPane(
                 isDesktop = isDesktop,
                 equalizerSession = equalizerSession,
                 onOpenAboutLegal = { nav.push(DetailRoute.AboutLegalPage) },
+                showThemeCatalogue = appInfo.isTestRelease,
+                onOpenThemeCatalogue = { nav.push(DetailRoute.ThemeCatalogPage) },
             )
+        }
+        is DetailRoute.ThemeCatalogPage -> {
+            if (appInfo.isTestRelease) {
+                SettingsThemeCatalogue(
+                    viewModel = settingsVm,
+                    onClose = { nav.popDetail() },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text(
+                    text = "The theme catalogue is available in test-release builds only.",
+                    modifier = Modifier.padding(DhunSpacing.screenPadding),
+                    color = DhunColors.textSecondary,
+                )
+            }
         }
         is DetailRoute.AboutLegalPage -> {
             AboutLegalScreen(
@@ -1055,6 +1092,33 @@ private fun ShellDetailPane(
             )
         }
     }
+}
+
+@Composable
+private fun SettingsThemeCatalogue(
+    viewModel: SettingsViewModel,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val systemDark = isSystemInDarkTheme()
+    val selectedThemeId by viewModel.themeId.collectAsState()
+    ComponentCatalogScreen(
+        onClose = onClose,
+        modifier = modifier,
+        selectedThemeId = selectedThemeId,
+        onModeChange = { mode ->
+            viewModel.setThemeId(mode.id)
+            DhunAppearance.setThemePreference(mode.id, systemDark)
+        },
+        onSystemChange = {
+            viewModel.setThemeId("system")
+            DhunAppearance.setThemePreference("system", systemDark)
+        },
+        onAccentChange = { accent ->
+            viewModel.setAccentId(accent.id)
+            DhunAppearance.setAppearance(nextAccent = accent)
+        },
+    )
 }
 
 @Composable
@@ -1125,6 +1189,7 @@ private fun TabContent(
     sleepTimerLabel: String? = null,
     onCycleSleepTimer: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    showThemeCatalogue: Boolean = false,
 ) {
     when (tab) {
         AppTab.HOME -> {
@@ -1163,10 +1228,18 @@ private fun TabContent(
             )
         }
         AppTab.CATALOG -> {
-            ComponentCatalogScreen(
-                onClose = { },
-                modifier = Modifier.fillMaxSize(),
-            )
+            if (showThemeCatalogue) {
+                ComponentCatalogScreen(
+                    onClose = { },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text(
+                    text = "The theme catalogue is available in test-release builds only.",
+                    modifier = Modifier.fillMaxSize().padding(DhunSpacing.screenPadding),
+                    color = DhunColors.textSecondary,
+                )
+            }
         }
     }
 }

@@ -10,6 +10,10 @@ plugins {
 // Rebuilding "1.0.5" for every main push prevented in-place Windows upgrades.
 // Rolling CI supplies a strictly increasing value, including workflow reruns.
 val installerVersion = providers.gradleProperty("dhunInstallerVersion").getOrElse("1.0.6")
+val dhunReleaseChannel = providers.gradleProperty("dhunReleaseChannel").getOrElse("development")
+require(dhunReleaseChannel in setOf("development", "test", "public")) {
+    "dhunReleaseChannel must be development, test, or public"
+}
 val installerParts = installerVersion.split('.').map { it.toIntOrNull() ?: -1 }
 require(installerParts.size == 3 &&
     installerParts[0] in 1..255 && installerParts[1] in 0..255 && installerParts[2] in 0..65535) {
@@ -56,6 +60,7 @@ compose.desktop {
     application {
         mainClass = "dev.dhun.desktop.MainKt"
         jvmArgs += "-Ddhun.installer.version=$installerVersion"
+        jvmArgs += "-Ddhun.release.channel=$dhunReleaseChannel"
 
         nativeDistributions {
             // Phase 14 Windows JVM launch fix: the MSI bundles a jlink-slimmed

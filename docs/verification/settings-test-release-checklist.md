@@ -1,6 +1,6 @@
 # Settings overhaul — test-release acceptance checklist
 
-**Scope:** Settings overhaul merged as PR #158, merge commit `22c006f53ffcb5f030cf4747556bbc4967fb495d`. This is validation of run-scoped test artifacts only. It does **not** approve a public release or advance the app version.
+**Scope:** The initial Settings overhaul merged in PR #158 at `22c006f53ffcb5f030cf4747556bbc4967fb495d`; follow-up fixes and the test-only Theme Catalogue entry are being validated in PR #159. This is test-release validation, not approval of a public release or an app-version advance.
 
 ## Automated evidence recorded (2026-10-12)
 
@@ -15,7 +15,9 @@
 | Website | `npm ci`, then `npm run build` (run sequentially after Python tests) | Build passed. `npm ci` reports 9 existing dependency advisories (5 high, 4 moderate); no forced dependency change was made. |
 | Local Gradle | Java/JDK is not installed in this sandbox | Not runnable locally; hosted main CI above supplies Gradle evidence. |
 
-The test-release artifacts are run-scoped Actions artifacts, not release assets. The `apk`, `msi`, and `msi-install-check` artifacts were uploaded successfully and are listed on run 38140705490. The APK/MSI workflow manifests include their `.sha256` and `.provenance.txt` sidecars, and the upload steps use `if-no-files-found: error`. GitHub's artifact API reports archive digests `bd1055bc38d8711a18f91c3fc00a4aa0f42dc4899fb7fc1f6a26371bd14770a2` (APK) and `433f49defab5dfe009ac5330d20e3ddaa4e899405a84553e97f4871ae91d334d` (MSI); these are **artifact ZIP digests**, not the APK/MSI file checksums. The sandbox could not fetch the artifact ZIPs from GitHub's external Actions blob-storage host, so the sidecar contents and binary hashes were not independently re-read here. Artifacts are due to expire on 2026-10-25 UTC.
+In the recorded main run `38140705490`, the APK/MSI and installer diagnostics were run-scoped Actions artifacts, not release assets; its `publish` job was skipped. The APK/MSI manifests include `.sha256` and `.provenance.txt` sidecars, and the upload steps use `if-no-files-found: error`. GitHub's artifact API reports archive digests `bd1055bc38d8711a18f91c3fc00a4aa0f42dc4899fb7fc1f6a26371bd14770a2` (APK) and `433f49defab5dfe009ac5330d20e3ddaa4e899405a84553e97f4871ae91d334d` (MSI); these are **artifact ZIP digests**, not the APK/MSI file checksums. The sandbox could not fetch those archives from GitHub's external Actions blob-storage host, so their sidecar contents and binary hashes were not independently re-read here.
+
+PRs and build-only dispatches remain run-scoped artifacts. Under PR #159's workflow change, a successful `push` to `main` that includes app source/build changes replaces only the private rolling `test` draft with the passed APK/MSI artifacts. Docs-only pushes do not publish it. The fixed public `v1.00.001` prerelease remains on the separate manual path and is not changed by this test-only work. Each test artifact receives an explicit `test` build channel; ordinary development builds and public-release builds do not expose the Theme Catalogue.
 
 ## User device report (2026-10-15)
 
@@ -36,6 +38,7 @@ Test the MSI from the run-scoped artifact on a Windows installation (preferably 
 
 - [ ] Diagnose and retest the reported Windows 11 crash. Record whether it fails before the first window, after the window opens, or after an interaction; collect `dhun-startup.log` and the matching Application Event Viewer details.
 - [ ] Repeatedly switch Light, Dark, and System themes; while playback and lyrics are active, change the OS theme too. Watch for crashes, freezes, partial/stale colours, and startup-log or Windows Event Viewer errors.
+- [ ] In this explicitly tagged test build, open Settings → Theme catalogue, exercise the live previews, close back to Settings, and confirm theme/accent choices persist after restart. Confirm the catalogue row is absent in a public/non-test build.
 - [ ] Switch static and dynamic artwork accents repeatedly while playback and lyrics remain active; confirm dynamic mode noticeably updates accent-colored controls across the app, while static mode keeps the selected accent.
 - [ ] Change the preferred lyric provider directly from the lyrics view; confirm the current track reloads using that provider and the preference survives a restart.
 - [ ] Adjust blur and brightness together across their ranges; close/reopen and restart DHUN to confirm appearance preferences persist.
@@ -47,6 +50,7 @@ Test the MSI from the run-scoped artifact on a Windows installation (preferably 
 
 Record device/emulator model, Android version/API level, ABI, and APK artifact/run used. Restart after changing settings, then confirm persistence.
 
+- [ ] In the test APK, open Settings → Theme catalogue, exercise the live previews, close back to Settings, and confirm theme/accent choices persist after restart. Confirm the catalogue row is absent in a public/non-test build.
 - [ ] Playback quality selection, keyboard seek step, endless radio, shuffle/repeat policy, and in-app zero-volume pause. Do not infer platform audio-focus-loss or task-clear behavior from the in-app zero-volume setting.
 - [ ] Lyrics enable/disable, synced preference, auto-scroll, text size, provider preference/order, and graceful fallback.
 - [ ] Search the full country/region picker by full name and code; verify the selected catalogue region and explicit-content filtering in Home/Search/radio surfaces.
@@ -64,4 +68,4 @@ For each platform, send the environment and artifact details above, PASS/FAIL/NO
 
 ## Release boundary
 
-The verified source still declares Android `versionName` `1.00.001` and `versionCode` 6. No public release or version was changed for this validation. The `publish` job was skipped on the ordinary `main` push; the future `1.00.002` / versionCode 7 decision remains a separate release-cut and approval step.
+The source still declares Android `versionName` `1.00.001` and `versionCode` 6; neither changes in PR #159. No public release was changed or published for this validation. After this workflow change merges, the `publish_test` job may replace only the private rolling `test` draft after a successful app-code push to `main`; the fixed public `v1.00.001` path remains separate and manual. Any future app-version change or public release requires a distinct release decision.

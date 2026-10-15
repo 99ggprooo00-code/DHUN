@@ -82,6 +82,8 @@ fun SettingsScreen(
     equalizerSession: EqualizerSession? = null,
     modifier: Modifier = Modifier,
     onOpenAboutLegal: () -> Unit = {},
+    showThemeCatalogue: Boolean = false,
+    onOpenThemeCatalogue: () -> Unit = {},
 ) {
     val themeId by viewModel.themeId.collectAsState()
     val accentId by viewModel.accentId.collectAsState()
@@ -152,6 +154,13 @@ fun SettingsScreen(
                     modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
                 )
                 BackdropControls(viewModel)
+                if (showThemeCatalogue) {
+                    SettingsNavigationRow(
+                        "Theme catalogue",
+                        "Preview the test build’s themes and shared components",
+                        onOpenThemeCatalogue,
+                    )
+                }
             }
             SettingsGroup("Playback & Audio") {
                 OptionRow("Streaming & download quality", listOf("low" to "Low (~48–64 kbps)",

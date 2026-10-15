@@ -4,6 +4,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val dhunReleaseChannel = providers.gradleProperty("dhunReleaseChannel").getOrElse("development")
+require(dhunReleaseChannel in setOf("development", "test", "public")) {
+    "dhunReleaseChannel must be development, test, or public"
+}
+
 android {
     namespace = "dev.dhun.android"
     compileSdk = 35
@@ -18,6 +23,7 @@ android {
         targetSdk = 35
         versionCode = 6
         versionName = "1.00.001"
+        buildConfigField("String", "DHUN_RELEASE_CHANNEL", "\"$dhunReleaseChannel\"")
     }
 
     // ABI splits plus a universal APK. The rolling release publishes all three:
@@ -72,6 +78,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

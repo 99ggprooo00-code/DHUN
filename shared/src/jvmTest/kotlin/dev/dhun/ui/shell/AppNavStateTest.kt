@@ -58,6 +58,19 @@ class AppNavStateTest {
     }
 
     @Test
+    fun themeCatalogueStacksOverSettingsAndReturnsToIt() {
+        val nav = AppNavState()
+        nav.push(DetailRoute.SettingsPage)
+        nav.push(DetailRoute.ThemeCatalogPage)
+        nav.push(DetailRoute.ThemeCatalogPage)
+
+        assertEquals(2, nav.detailStack.size, "re-opening the catalogue does not stack duplicates")
+        assertEquals(DetailRoute.ThemeCatalogPage, nav.detailStack.last())
+        assertTrue(nav.popDetail())
+        assertEquals(DetailRoute.SettingsPage, nav.detailStack.last())
+    }
+
+    @Test
     fun hasOverlayAndHasDetailTrackExactlyWhatCoversTheTabContent() {
         val nav = AppNavState()
         assertFalse(nav.hasOverlay)

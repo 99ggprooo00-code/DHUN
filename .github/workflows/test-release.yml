@@ -1,8 +1,9 @@
 name: test-release
 
-# The rolling `test` tag is a private draft for collaborators. One fixed,
-# public prerelease (v1.00.001) is created once from a successful main build.
-# Builds on PRs and non-main refs only upload run-scoped artifacts.
+# The rolling `test` tag is a private draft for collaborators. Successful main
+# builds replace it automatically when Android/Desktop/shared app code changes.
+# PRs and non-main refs only upload run-scoped artifacts. The fixed public
+# prerelease (v1.00.001) remains on its separate, deliberate manual path.
 on:
   workflow_dispatch:
     inputs:
@@ -25,12 +26,25 @@ on:
     branches: [main]
   push:
     branches: [main]
+    paths:
+      - 'shared/**'
+      - 'app-android/**'
+      - 'app-desktop/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradlew'
+      - 'gradlew.bat'
 
 permissions:
   contents: read
 
 env:
   BUILD_ONLY: ${{ (github.event_name == 'workflow_dispatch' && inputs.build_only) || github.ref != 'refs/heads/main' }}
+  # Test artifacts on PRs, main pushes, and build-only dispatches get the
+  # test-only Settings catalogue. The deliberate public-release dispatch does not.
+  DHUN_RELEASE_CHANNEL: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.build_only == false && 'public' || 'test' }}
 
 concurrency:
   group: ${{ github.ref == 'refs/heads/main' && 'test-release' || format('test-build-{0}', github.ref) }}
@@ -54,7 +68,7 @@ jobs:
           python-version: '3.x'
 
       - name: Build debug APK
-        run: ./gradlew :app-android:assembleDebug --no-daemon
+        run: ./gradlew :app-android:assembleDebug "-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL" --no-daemon
 
       - name: Stage universal and ABI APKs with checksums and provenance
         run: |
@@ -113,7 +127,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Could not allocate MSI ProductVersion" }
           "installer_version=$version" >> $env:GITHUB_OUTPUT
           Write-Host "MSI ProductVersion: $version"
-          ./gradlew :app-desktop:packageMsi "-PdhunInstallerVersion=$version" --no-daemon
+          ./gradlew :app-desktop:packageMsi "-PdhunInstallerVersion=$version" "-PdhunReleaseChannel=$env:DHUN_RELEASE_CHANNEL" --no-daemon
 
       - name: Verify MSI identity and stage checksum/provenance
         shell: pwsh
@@ -185,7 +199,7 @@ jobs:
           python-version: '3.x'
 
       - name: Build debug-signed AAB
-        run: ./gradlew :app-android:bundleDebug --no-daemon
+        run: ./gradlew :app-android:bundleDebug "-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL" --no-daemon
 
       - name: Stage optional AAB
         run: |
@@ -203,10 +217,73 @@ jobs:
             out/dhun-v1.00.001.aab.sha256
             out/dhun-v1.00.001.aab.provenance.txt
 
+  publish_test:
+    # A main push is admitted by the app-code path filter above. Publish only
+    # the private rolling test draft; this never creates or changes a public tag.
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    needs: [apk, msi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: apk
+          path: dist
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: msi
+          path: dist
+
+      - name: Verify the build is still the tip of main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$latest" != "$GITHUB_SHA" ]; then
+            echo "::error::Refusing to publish a superseded main commit ($GITHUB_SHA; current $latest)"
+            exit 1
+          fi
+
+      - name: Replace the private rolling test draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release delete test --yes --cleanup-tag || true
+          git push origin :refs/tags/test || true
+
+          gh release create test \
+            dist/dhun-test.apk dist/dhun-test.apk.sha256 dist/dhun-test.apk.provenance.txt \
+            dist/dhun-test-arm64-v8a.apk dist/dhun-test-arm64-v8a.apk.sha256 dist/dhun-test-arm64-v8a.apk.provenance.txt \
+            dist/dhun-test-armeabi-v7a.apk dist/dhun-test-armeabi-v7a.apk.sha256 dist/dhun-test-armeabi-v7a.apk.provenance.txt \
+            dist/dhun-test.msi dist/dhun-test.msi.sha256 dist/dhun-test.msi.provenance.txt \
+            --target "$GITHUB_SHA" \
+            --title "DHUN rolling test build (private draft)" \
+            --notes-file docs/releases/rolling-test.md \
+            --draft --prerelease
+
+          gh release view test --json tagName,isDraft,isPrerelease,targetCommitish --jq '{tagName,isDraft,isPrerelease,targetCommitish}'
+          if [ "$(gh release view test --json isDraft --jq '.isDraft')" != "true" ]; then
+            echo "::error::The rolling test release must remain a private draft"
+            exit 1
+          fi
+          if [ "$(gh release view test --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
+            echo "::error::The rolling test release must remain marked as a prerelease"
+            exit 1
+          fi
+          if [ "$(gh release view test --json targetCommitish --jq '.targetCommitish')" != "$GITHUB_SHA" ]; then
+            echo "::error::The rolling test release does not target this build commit"
+            exit 1
+          fi
+
   publish:
-    # Only a deliberate, manual dispatch from main can mutate a release. A push
-    # (including a merge to main) builds and tests only and never publishes, and
-    # the branch build path cannot publish even if build_only=false is set there.
+    # Only a deliberate, manual dispatch from main can create the fixed public
+    # prerelease. The automatic push path above updates only the private test draft.
     if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.build_only == false }}
     needs: [apk, msi]
     runs-on: ubuntu-latest
@@ -249,31 +326,6 @@ jobs:
           gh release delete dev-v0.1.1 --yes --cleanup-tag || true
           gh release delete dev --yes --cleanup-tag || true
           git push origin :refs/tags/dev || true
-
-      # The private rolling draft is replaced on every manual publish by design.
-      - name: Replace the private rolling test draft
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh release delete test --yes --cleanup-tag || true
-          git push origin :refs/tags/test || true
-
-          gh release create test \
-            dist/dhun-test.apk dist/dhun-test.apk.sha256 dist/dhun-test.apk.provenance.txt \
-            dist/dhun-test-arm64-v8a.apk dist/dhun-test-arm64-v8a.apk.sha256 dist/dhun-test-arm64-v8a.apk.provenance.txt \
-            dist/dhun-test-armeabi-v7a.apk dist/dhun-test-armeabi-v7a.apk.sha256 dist/dhun-test-armeabi-v7a.apk.provenance.txt \
-            dist/dhun-test.msi dist/dhun-test.msi.sha256 dist/dhun-test.msi.provenance.txt \
-            --target "$GITHUB_SHA" \
-            --title "DHUN rolling test build (private draft)" \
-            --notes-file docs/releases/rolling-test.md \
-            --draft --prerelease
-
-          gh release view test --json tagName,isDraft,isPrerelease,targetCommitish --jq '{tagName,isDraft,isPrerelease,targetCommitish}'
-          if [ "$(gh release view test --json isDraft --jq '.isDraft')" != "true" ]; then
-            echo "::error::The rolling test release must remain a private draft"
-            exit 1
-          fi
 
       - name: Create the fixed v1.00.001 public prerelease once
         env:
