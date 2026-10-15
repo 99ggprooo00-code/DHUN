@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import dev.dhun.lyrics.RomanizationMode
 import dev.dhun.presentation.player.LyricsRomanizationController
@@ -32,14 +33,20 @@ internal fun LyricsRomanizationControls(controller: LyricsRomanizationController
             Text("Romanized line", style = MaterialTheme.typography.labelLarge)
             Switch(checked = enabled, onCheckedChange = controller::setEnabled,
                 modifier = Modifier.semantics { contentDescription = "Show romanized lyrics below original" })
-        }
-        if (enabled) {
-            Text("On-device transliteration, not translation. Han and Cyrillic need a language override; Japanese Kanji stays unchanged.",
-                style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = { menu = true }) { Text("Mode: ${mode.label}") }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                RomanizationMode.entries.forEach { value ->
-                    DropdownMenuItem(text = { Text(value.label) }, onClick = { controller.setMode(value); menu = false })
+            if (enabled) {
+                TextButton(onClick = { menu = true }, modifier = Modifier.semantics {
+                    contentDescription = "Romanization mode: ${mode.label}"
+                }) { Text("Mode: ${mode.id}") }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(enabled = false, text = {
+                        Text("On-device transliteration, not translation. Han/Cyrillic need an override; Japanese Kanji stays unchanged.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }, onClick = {})
+                    RomanizationMode.entries.forEach { value ->
+                        DropdownMenuItem(text = { Text(value.label) },
+                            modifier = Modifier.semantics { selected = value == mode },
+                            onClick = { controller.setMode(value); menu = false })
+                    }
                 }
             }
         }
