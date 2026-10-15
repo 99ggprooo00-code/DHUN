@@ -18,8 +18,10 @@ import androidx.compose.ui.graphics.Color
  * object-initialiser and the JVM tests depend on.
  *
  * With the default appearance — [DhunThemeMode.DARK] + [DhunAccent.BRAND] —
- * every value below is the shipped palette with one deliberate change: the
- * 2026-09-21 UI-polish pass lifted the dark surfaces (16 → 36, each rung
+ * most values below follow the shipped palette. Tonal surface accessors now
+ * keep the 15% treatment in public builds, while the raw token palette and
+ * Material3 scheme stay opaque for safe base layers. The 2026-09-21 UI-polish
+ * pass lifted the dark surfaces (16 → 36, each rung
  * +0x0C from the original 0A → 2A) so Home/Search/Library sit closer to the
  * full player's backdrop brightness. Glass (translucent fills with a 10%-white
  * hairline border), the 4-step alpha text ladder and the static `#BB86FC`

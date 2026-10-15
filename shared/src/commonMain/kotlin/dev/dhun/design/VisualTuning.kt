@@ -25,9 +25,10 @@ enum class VisualPart(val key: String, val label: String, val detail: String) {
 
 /**
  * Live snapshot state. Nothing outside the test channel loads saved values or
- * exposes the controls. The 50% midpoint is an identity mapping, so the public
- * UI remains unchanged. Test builds default every component to 15%; remaining
- * sliders can still be customized and persisted.
+ * exposes the controls. The 50% midpoint remains the original opacity curve.
+ * Test builds default every component to 15% and persist later adjustments;
+ * public builds keep the original component settings except for the permanent
+ * 15% tonal-surface treatment requested for both release channels.
  */
 object DhunVisualTuning {
     const val NEUTRAL = 50 // Old appearance and public-build fallback.
@@ -59,10 +60,9 @@ object DhunVisualTuning {
 
     fun reset() = percentages.clear()
 
-    /** Test-only token translucency; 15% reveals more artwork, 100% is opaque. */
+    /** Public tonal surfaces are fixed at 15%; the test slider can override them. */
     fun tonalSurface(color: Color, isLight: Boolean): Color {
-        if (!testEnabled) return color
-        val percent = value(VisualPart.TONAL_SURFACES)
+        val percent = if (testEnabled) value(VisualPart.TONAL_SURFACES) else TEST_DEFAULT
         val base = if (isLight) 0.82f else 0.76f
         val minimum = if (isLight) 0.65f else 0.52f
         val opacity = if (percent < NEUTRAL) {

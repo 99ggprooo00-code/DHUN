@@ -210,7 +210,8 @@ fun LyricsArtworkSheet(
                 ambientColor = Color.Black.copy(alpha = 0.4f),
             )
             .clip(shape)
-            .background(DhunColors.surface, shape)
+            // The Queue/Related sheet keeps its opaque base in both channels.
+            .background(DhunAppearance.tokens.surface, shape)
             .then(
                 if (drawBorder) {
                     Modifier.border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), shape)

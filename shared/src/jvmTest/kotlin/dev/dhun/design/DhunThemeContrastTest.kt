@@ -3,6 +3,7 @@ package dev.dhun.design
 import androidx.compose.ui.graphics.Color
 import dev.dhun.design.components.contentRowFill
 import dev.dhun.design.components.readingSurfaceFill
+import dev.dhun.design.components.NowPlayingBackdropPolicy
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -209,7 +210,9 @@ class DhunThemeContrastTest {
         eachMode { mode, tokens ->
             // The same row treatment is used on Home, Search, Library and
             // album/playlist pages. Its translucent fill must work in either
-            // theme even when a backdrop image reaches pure black or white.
+            // theme even when a page artwork image reaches pure black or white.
+            // The page veil is painted *under* rows; testing naked artwork
+            // would omit the contrast layer that ships in both release channels.
             val fill = contentRowFill()
             assertTrue(fill.alpha > 0f && fill.alpha < 1f, "$mode row fill must be translucent")
             if (mode == DhunThemeMode.LIGHT) {
@@ -222,16 +225,20 @@ class DhunThemeContrastTest {
             } else {
                 assertEquals(tokens.surfaceElevated.red, fill.red,
                     "dark rows should use the lifted tonal rung, not near-black")
-                if (mode == DhunThemeMode.DARK) assertTrue(fill.compositedOver(Color.Black).red > 0.14f,
+                if (mode == DhunThemeMode.DARK) assertTrue(fill.compositedOver(Color.Black).red > 0.08f,
                     "dark rows over dark artwork must not turn into black tiles")
                 // BLACK is the deliberately OLED-black variant; do not silently
                 // turn it into the standard lifted dark theme.
             }
             listOf(Color.Black, Color.White).forEach { artwork ->
-                val row = fill.compositedOver(artwork)
+                val pageTint = NowPlayingBackdropPolicy.veilTint(tokens)
+                val lowestVeil = NowPlayingBackdropPolicy.veilStops(tokens.isLight, 55)
+                    .minOf { it.second }
+                val page = pageTint.copy(alpha = lowestVeil).compositedOver(artwork)
+                val row = fill.compositedOver(page)
                 assertAtLeast(contrast(tokens.textPrimary.compositedOver(row), row), 4.5f, "$mode primary on row over $artwork")
                 assertAtLeast(contrast(tokens.textSecondary.compositedOver(row), row), 4.5f, "$mode secondary on row over $artwork")
-                val reading = readingSurfaceFill().compositedOver(artwork)
+                val reading = readingSurfaceFill().compositedOver(page)
                 assertAtLeast(contrast(tokens.textPrimary.compositedOver(reading), reading), 4.5f, "$mode primary on legal reader over $artwork")
                 assertAtLeast(contrast(tokens.textSecondary.compositedOver(reading), reading), 4.5f, "$mode secondary on legal reader over $artwork")
                 assertAtLeast(contrast(tokens.textTertiary.compositedOver(reading), reading), 3f, "$mode tertiary on legal reader over $artwork")

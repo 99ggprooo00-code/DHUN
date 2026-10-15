@@ -62,9 +62,9 @@ class VisualTuningTest {
     }
 
     @Test
-    fun tonalSliderIsLiveTestOnlyAndRespectsOpaqueDialogs() {
+    fun tonalSliderOverridesPermanentFifteenAndKeepsDialogsOpaque() {
         val dark = Color(0xFF303030)
-        assertEquals(dark, DhunVisualTuning.tonalSurface(dark, false))
+        assertEquals(0.592f, DhunVisualTuning.tonalSurface(dark, false).alpha, 0.01f)
         DhunVisualTuning.restore(emptyMap(), enabled = true)
         assertEquals(15, DhunVisualTuning.value(VisualPart.TONAL_SURFACES))
         assertEquals(0.592f, DhunVisualTuning.tonalSurface(dark, false).alpha, 0.01f)
@@ -75,7 +75,7 @@ class VisualTuningTest {
         DhunVisualTuning.set(VisualPart.TONAL_SURFACES, 100)
         assertEquals(dark, DhunVisualTuning.tonalSurface(dark, false))
         DhunVisualTuning.restore(mapOf(VisualPart.TONAL_SURFACES to 0), enabled = false)
-        assertEquals(dark, DhunVisualTuning.tonalSurface(dark, false))
+        assertEquals(0.592f, DhunVisualTuning.tonalSurface(dark, false).alpha, 0.01f)
     }
 
     @Test
@@ -111,5 +111,6 @@ class VisualTuningTest {
         VisualPart.entries.forEach { assertEquals(15, DhunVisualTuning.value(it), it.label) }
         DhunVisualTuning.restore(emptyMap(), enabled = false)
         VisualPart.entries.forEach { assertEquals(50, DhunVisualTuning.value(it), it.label) }
+        assertEquals(0.592f, DhunVisualTuning.tonalSurface(Color(0xFF303030), false).alpha, 0.01f)
     }
 }
