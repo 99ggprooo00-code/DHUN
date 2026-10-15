@@ -1,6 +1,7 @@
 package dev.dhun.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -55,6 +56,9 @@ import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.player.equalizer.EqualizerPresets
 import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.player.equalizer.toUiModel
+import dev.dhun.presentation.settings.SettingsCategory
+import dev.dhun.presentation.player.LyricsRomanizationController
+import dev.dhun.ui.player.LyricsRomanizationControls
 import dev.dhun.presentation.settings.CountryRegions
 import dev.dhun.presentation.settings.SettingsViewModel
 import kotlin.math.round
@@ -84,6 +88,9 @@ fun SettingsScreen(
     onOpenAboutLegal: () -> Unit = {},
     showThemeCatalogue: Boolean = false,
     onOpenThemeCatalogue: () -> Unit = {},
+    category: SettingsCategory? = null,
+    onOpenCategory: (SettingsCategory) -> Unit = {},
+    romanization: LyricsRomanizationController? = null,
 ) {
     val themeId by viewModel.themeId.collectAsState()
     val accentId by viewModel.accentId.collectAsState()
@@ -108,7 +115,7 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.width(DhunSpacing.sm))
             Text(
-                text = "Settings",
+                text = category?.title ?: "Settings",
                 style = MaterialTheme.typography.headlineMedium,
                 color = DhunColors.textPrimary,
             )
@@ -120,11 +127,12 @@ fun SettingsScreen(
         var confirmAudioClear by remember { mutableStateOf(false) }
         var confirmHistory by remember { mutableStateOf("") }
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            modifier = Modifier.fillMaxSize().verticalScroll(remember(category) { ScrollState(0) })
                 .padding(horizontal = DhunSpacing.screenPadding),
             verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
-            SettingsGroup("Appearance & Backdrop") {
+            if (category == null) SettingsHub(isDesktop, themeId, viewModel.accentMode.collectAsState().value, onOpenCategory)
+            if (category == SettingsCategory.APPEARANCE) SettingsGroup("Appearance & Backdrop") {
                 DhunAppearanceControls(
                     mode = DhunThemeMode.fromId(themeId) ?: DhunAppearance.mode,
                     accent = DhunAccent.fromId(accentId) ?: DhunAccent.default,
@@ -162,7 +170,7 @@ fun SettingsScreen(
                     )
                 }
             }
-            SettingsGroup("Playback & Audio") {
+            if (category == SettingsCategory.PLAYBACK) SettingsGroup("Playback & Audio") {
                 OptionRow("Streaming & download quality", listOf("low" to "Low (~48–64 kbps)",
                     "medium" to "Medium (~128 kbps)", "high" to "High (best available)"),
                     viewModel.audioQuality.collectAsState().value, viewModel::setAudioQuality)
@@ -177,7 +185,12 @@ fun SettingsScreen(
                 SettingsSwitchRow("Pause on mute", "Pause when the in-app volume reaches zero",
                     viewModel.pauseOnMute.collectAsState().value, viewModel::setPauseOnMute)
             }
-            SettingsGroup("Lyrics & Providers") {
+            if (category == SettingsCategory.LYRICS) SettingsGroup("Lyrics & Providers") {
+                if (romanization != null) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding)) {
+                        LyricsRomanizationControls(romanization)
+                    }
+                }
                 SettingsSwitchRow("Enable lyrics", "Fetch lyrics for the current song",
                     viewModel.lyricsEnabled.collectAsState().value, viewModel::setLyricsEnabled)
                 OptionRow("Preferred provider", listOf("auto" to "Auto (synced first)", "lrclib" to "LRCLIB",
@@ -198,15 +211,25 @@ fun SettingsScreen(
                 OptionRow("Lyrics text size", listOf("small" to "Small", "default" to "Default", "large" to "Large"),
                     viewModel.lyricsTextSize.collectAsState().value, viewModel::setLyricsTextSize)
             }
-            SettingsGroup("Content, Region & Discovery") {
+            if (category == SettingsCategory.CONTENT) SettingsGroup("Content, Region & Discovery") {
                 CountryRegionPicker(viewModel)
                 SettingsSwitchRow("Explicit content", "Allow explicit tracks in search, home and radio",
                     viewModel.explicitContent.collectAsState().value, viewModel::setExplicitContent)
             }
-            if (equalizerSession != null) SettingsGroup("Equalizer & Sound Processing") {
+            if (category == SettingsCategory.PLAYBACK && equalizerSession != null) SettingsGroup("Equalizer & Sound Processing") {
                 EqualizerSection(equalizerSession)
             }
-            SettingsGroup("Storage, Cache & Data") {
+            if (category == SettingsCategory.PRIVACY) SettingsGroup("Privacy & History") {
+                SettingsSwitchRow("Record listening history", "Save new plays locally; turning off keeps existing history and queue restore",
+                    viewModel.recordListeningHistory.collectAsState().value, viewModel::setRecordListeningHistory)
+                Text("This is not incognito: queue restore, caches and provider requests still work. Plays skipped while off are not added later.",
+                    modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
+                    style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
+                SettingsNavigationRow("Clear search history", "Remove recent searches", { confirmHistory = "search" })
+                SettingsNavigationRow("Clear play history", "Remove listening history", { confirmHistory = "play" })
+                SettingsNavigationRow("Privacy & Legal", "Review provider requests and on-device data", onOpenAboutLegal)
+            }
+            if (category == SettingsCategory.STORAGE) SettingsGroup("Storage, Cache & Data") {
                 CacheBudgetRow(viewModel)
                 if (viewModel.canClearAudioCache) {
                     SettingsNavigationRow("Clear audio cache", "Remove streamed audio files", { confirmAudioClear = true })
@@ -218,15 +241,13 @@ fun SettingsScreen(
                             modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding))
                     }
                 }
-                SettingsNavigationRow("Clear search history", "Remove recent searches", { confirmHistory = "search" })
-                SettingsNavigationRow("Clear play history", "Remove listening history", { confirmHistory = "play" })
             }
-            if (isDesktop) SettingsGroup("Desktop & Window Behavior") {
+            if (category == SettingsCategory.DESKTOP && isDesktop) SettingsGroup("Desktop & Window Behavior") {
                 SettingsSwitchRow("Close to tray", "Keep music playing when closing the window",
                     viewModel.closeToTray.collectAsState().value, viewModel::setCloseToTray)
                 SettingsNavigationRow("Reset window geometry", "Center at 1200 × 780", viewModel::resetWindowGeometry)
             }
-            SettingsGroup("About, Privacy & Legal") {
+            if (category == SettingsCategory.ABOUT) SettingsGroup("About, Privacy & Legal") {
                 SettingsNavigationRow("About & Legal", "Privacy, terms, licenses and support", onOpenAboutLegal)
                 SettingsNavigationRow("Reset settings to defaults", "Restore all preferences", { confirmReset = true })
             }

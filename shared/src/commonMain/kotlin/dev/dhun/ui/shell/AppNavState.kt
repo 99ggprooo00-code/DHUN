@@ -1,5 +1,7 @@
 package dev.dhun.ui.shell
 
+import dev.dhun.presentation.settings.SettingsCategory
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +26,9 @@ sealed interface DetailRoute {
      * [AppNavState.push] replaces an existing one rather than stacking dupes.
      */
     data object SettingsPage : DetailRoute
+
+    /** Real stack entry: platform Back returns from a category to the Settings hub. */
+    data class SettingsCategoryPage(val category: SettingsCategory) : DetailRoute
 
     /** Test-build-only theme and component preview opened from Settings. */
     data object ThemeCatalogPage : DetailRoute
@@ -196,6 +201,7 @@ class AppNavState {
         // Settings and About & Legal are id-less singletons: re-tapping the entry
         // replaces the existing page instead of stacking identical pages.
         if (route is DetailRoute.SettingsPage) detailStack.removeAll { it is DetailRoute.SettingsPage }
+        if (route is DetailRoute.SettingsCategoryPage) detailStack.removeAll { it == route }
         if (route is DetailRoute.ThemeCatalogPage) detailStack.removeAll { it is DetailRoute.ThemeCatalogPage }
         if (route is DetailRoute.AboutLegalPage) detailStack.removeAll { it is DetailRoute.AboutLegalPage }
         detailStack += route

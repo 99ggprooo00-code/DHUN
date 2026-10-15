@@ -65,6 +65,18 @@ does not copy this data off the device. **[source]**
 the in-app "Playback details" text. Do not assume they are free of personal data
 before you share one. **[maintainer]**
 
+### Listening-history controls
+
+Settings → Privacy & history → **Record listening history** is on by default.
+Turning it off prevents new local listening-history entries and playback-completion
+updates after the preference is saved. Existing history stays until you clear it;
+plays skipped while recording is off are not added later. **[source]**
+
+This is not an incognito or network-blocking mode. Queue restoration, searches,
+track metadata, audio/artwork/lyrics caches and requests to providers remain
+independent. Category search in Settings filters category labels locally and is
+not saved or sent to providers. **[source]**
+
 ## 4. Data sent to third parties
 
 Every item below is sent by the app to a third party. {{appTitle}} does not

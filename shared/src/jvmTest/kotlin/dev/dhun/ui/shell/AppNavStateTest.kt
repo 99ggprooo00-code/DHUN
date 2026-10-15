@@ -19,6 +19,20 @@ import kotlin.test.assertTrue
 class AppNavStateTest {
 
     @Test
+    fun settingsCategoryBackReturnsToHubAndNeverStacksTheSameCategoryTwice() {
+        val nav = AppNavState()
+        val page = DetailRoute.SettingsCategoryPage(dev.dhun.presentation.settings.SettingsCategory.APPEARANCE)
+        nav.push(DetailRoute.SettingsPage)
+        nav.push(page)
+        nav.push(page)
+        assertEquals(listOf(DetailRoute.SettingsPage, page), nav.detailStack.toList())
+        assertTrue(nav.onBack())
+        assertEquals(DetailRoute.SettingsPage, nav.detailStack.last())
+        assertTrue(nav.onBack())
+        assertTrue(nav.detailStack.isEmpty())
+    }
+
+    @Test
     fun routesPopInReversePushOrderAndStopAtEmpty() {
         val nav = AppNavState()
         val artist = DetailRoute.ArtistPage("UCartist")

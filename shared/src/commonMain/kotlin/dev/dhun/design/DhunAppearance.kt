@@ -69,6 +69,7 @@ enum class DhunThemeMode(
 ) {
     DARK("dark", "Dark"),
     LIGHT("light", "Light"),
+    BLACK("black", "Black (OLED)"),
     ;
 
     companion object {
@@ -432,10 +433,26 @@ data class DhunTokens(
             onTertiary = Color(0xFFFFFFFF),
         )
 
+        /** OLED-friendly background with DHUN's dark text/accent ramps and visible card hierarchy. */
+        val black: DhunTokens = dark.copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceVariant = Color(0xFF141414),
+            surfaceElevated = Color(0xFF181818),
+            surfaceHighest = Color(0xFF202020),
+            surfaceCard = Color(0xFF101010),
+            surfaceContainerLowest = Color.Black,
+            surfaceContainerLow = Color(0xFF080808),
+            surfaceContainer = Color(0xFF101010),
+            surfaceContainerHigh = Color(0xFF181818),
+            surfaceContainerHighest = Color(0xFF202020),
+        )
+
         /** The token set for [mode] + [accent]. Dark + [DhunAccent.BRAND] is [dark] by value. */
         fun forAppearance(mode: DhunThemeMode, accent: DhunAccent): DhunTokens = when (mode) {
             DhunThemeMode.DARK -> dark.withAccent(accent.dark)
             DhunThemeMode.LIGHT -> light.withAccent(accent.light)
+            DhunThemeMode.BLACK -> black.withAccent(accent.dark)
         }
     }
 }
@@ -490,10 +507,11 @@ object DhunAppearance {
 
     /** Called from event handlers/startup, never during composition. */
     fun setThemePreference(id: String, systemDark: Boolean) {
-        if (id !in listOf("dark", "light", "system")) return
+        if (id !in listOf("dark", "light", "black", "system")) return
         themeIdState.value = id
         setAppearance(nextMode = when (id) {
             "light" -> DhunThemeMode.LIGHT
+            "black" -> DhunThemeMode.BLACK
             "system" -> if (systemDark) DhunThemeMode.DARK else DhunThemeMode.LIGHT
             else -> DhunThemeMode.DARK
         })
@@ -582,7 +600,7 @@ object DhunAppearance {
         accentMode: String? = null,
         systemDark: Boolean = true,
     ) {
-        setThemePreference(themeId?.takeIf { it in listOf("dark", "light", "system") } ?: "dark", systemDark)
+        setThemePreference(themeId?.takeIf { it in listOf("dark", "light", "black", "system") } ?: "dark", systemDark)
         setAccentMode(accentMode ?: "artwork")
         setAppearance(
             nextMode = mode,

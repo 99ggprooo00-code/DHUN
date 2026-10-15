@@ -136,7 +136,7 @@ val appModule = module {
     single { dev.dhun.android.download.DownloadServiceController() }
     single { SaveNowPlayingUseCase(get<DataLayer>().nowPlaying) }
     single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
-    single { RecordPlayUseCase(get<DataLayer>().history) }
+    single { RecordPlayUseCase(get<DataLayer>().history, get<DataLayer>().settings) }
     // Shared endless-radio bookkeeping (PlayerViewModel + ArtistViewModel).
     single { dev.dhun.domain.RadioSession() }
     single { GetHomeFeedUseCase(get(), get<DataLayer>().history, utcOffsetMs = { currentUtcOffsetMs() }) }

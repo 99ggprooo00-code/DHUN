@@ -10,7 +10,7 @@ object SettingsKeys {
     const val AUDIO_QUALITY = "audio_quality"
     const val AUDIO_QUALITY_DEFAULT = "high"
 
-    /** "dark" | "light" | "system" — v1 ships dark-first. */
+    /** "dark" | "light" | "black" | "system" — v1 ships dark-first. */
     const val THEME = "theme"
     const val THEME_DEFAULT = "dark"
 
@@ -40,6 +40,9 @@ object SettingsKeys {
     /** ISO-3166 alpha-2 for InnerTube `gl`. */
     const val COUNTRY_CODE = "country_code"
     const val COUNTRY_CODE_DEFAULT = "US"
+
+    const val RECORD_LISTENING_HISTORY = "record_listening_history"
+    const val RECORD_LISTENING_HISTORY_DEFAULT = true
 
     const val EXPLICIT_CONTENT = "explicit_content"
     const val EXPLICIT_CONTENT_DEFAULT = true
@@ -98,7 +101,7 @@ object SettingsKeys {
 
     val all: List<String> = listOf(
         AUDIO_QUALITY, THEME, ACCENT, ACCENT_MODE, LYRICS_ENABLED, CACHE_SIZE_MB, COUNTRY_CODE,
-        EXPLICIT_CONTENT, CLOSE_TO_TRAY, RESUME_ON_LAUNCH, WINDOW_GEOMETRY,
+        RECORD_LISTENING_HISTORY, EXPLICIT_CONTENT, CLOSE_TO_TRAY, RESUME_ON_LAUNCH, WINDOW_GEOMETRY,
         BACKDROP_BLUR, BACKDROP_BRIGHTNESS, SEEK_STEP_SECONDS, AUTOPLAY_RADIO_ENABLED,
         LYRICS_ROMANIZATION_ENABLED, LYRICS_ROMANIZATION_MODE,
         LYRICS_PREFER_SYNCED, LYRICS_AUTO_SCROLL, LYRICS_TEXT_SIZE, LYRICS_PREFERRED_PROVIDER,

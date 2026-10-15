@@ -24,6 +24,21 @@ import org.robolectric.annotation.Config
 class NavStatePersistenceTest {
 
     @Test
+    fun `settings categories survive rotation and reject unknown destinations`() {
+        dev.dhun.presentation.settings.SettingsCategory.entries.forEach { category ->
+            val route = DetailRoute.SettingsCategoryPage(category)
+            assertEquals(route, NavStatePersistence.decodeRoute(NavStatePersistence.encodeRoute(route)))
+            val original = AppNavState().apply { push(DetailRoute.SettingsPage); push(route) }
+            val restored = NavStatePersistence.restore(Bundle().also { NavStatePersistence.save(original, it) })
+            assertEquals(original.detailStack.toList(), restored.detailStack.toList())
+            assertTrue(restored.onBack())
+            assertEquals(DetailRoute.SettingsPage, restored.detailStack.last())
+        }
+        assertNull(NavStatePersistence.decodeRoute("settings-category:future-feature"))
+        assertNull(NavStatePersistence.decodeRoute("settings-category:"))
+    }
+
+    @Test
     fun `full round trip preserves tab, expanded player and detail stack order`() {
         val original = AppNavState().apply {
             selectedTab = AppTab.LIBRARY

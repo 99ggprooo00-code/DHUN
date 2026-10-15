@@ -146,3 +146,38 @@ are preserved verbatim in LICENSES and generated bundled legal pages.
   Android/desktop glyph layout, pane scrolling, toggle/reset/restart behavior, API-floor
   device performance and package-size acceptance. TTML, translation and broader gaps
   above remain unfinished, so this is not full Metrolist parity and not merge approval.
+
+## Categorized Settings and appearance/privacy slice
+
+Behavioral reference: Metrolist-test's grouped Settings hub. DHUN keeps its own
+shared Compose/GlassCard design and implementation; no reference code copied.
+
+- Searchable Interface / Music / Your data / System hub, with Appearance,
+  Player & audio, Lyrics & romanization, Content & discovery, Privacy & history,
+  Storage & cache, Desktop & window (desktop only), and About & legal. Category
+  routes use the existing shell stack; Back returns to the hub, and Android
+  saves stable category IDs across recreation. Search is local, case-insensitive,
+  multi-keyword and limited to supported categories, not a claim of full-text
+  control search. No dead account/AI/integration destinations.
+- Black (OLED) is a persisted third concrete theme with pure black base surfaces,
+  dark accent ramps and a differentiated card/surface ladder. Follow-system still
+  resolves to normal light/dark; choosing Black is explicit. Existing artwork-based
+  dynamic accents remain, and Material3 components now receive the same active
+  artwork palette as DHUN tokens (explicit catalogue previews keep their fallback).
+  This does not introduce Android wallpaper/Monet extraction.
+- Lyrics category reuses the player's real romanization controller/preferences.
+- Default-on Record listening history is persisted and read at actual history
+  record/completion boundaries on both platforms. Off preserves existing rows,
+  skips new rows/completions and does not retroactively record skipped tracks.
+  Queue restore remains independent. This is not full incognito: provider traffic,
+  metadata, search and caches are unchanged, as disclosed in UI/bundled privacy.
+- Added deterministic category/platform/search, navigation/back/Android recreation,
+  Black persistence/reset, active Material palette/recomposition and history-gate/
+  queue-preservation tests. Kotlin/Android execution requires hosted CI because
+  this sandbox has no Java runtime; verification results must be checked on the
+  new PR head, not inferred from the previous lyrics slice.
+- Device acceptance remains: phone/desktop category scrolling, large-font and
+  TalkBack/focus behavior, theme and artwork transitions, OLED contrast in glass
+  overlays, Back/rotation/restart, and history off/on during playback. No claim of
+  full Metrolist parity or merge readiness; the earlier rich-lyrics/translation/
+  provider and integration gaps still apply.

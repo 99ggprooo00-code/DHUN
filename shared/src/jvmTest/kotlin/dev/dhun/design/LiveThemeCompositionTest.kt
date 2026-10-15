@@ -34,13 +34,17 @@ class LiveThemeCompositionTest {
                 val tokens = DhunAppearance.tokens
                 assertEquals(tokens.accent, DhunColors.accent)
                 assertEquals(tokens.background, DhunColors.background)
+                val material = resolveThemeTokens(DhunAppearance.mode, DhunAppearance.accent).materialScheme
+                assertEquals(tokens.accent, material.primary)
+                assertEquals(tokens.background, material.background)
                 seen += tokens
                 frames++
             }
             withTimeout(3_000) { while (frames == 0) { clock.sendFrame(1L); delay(10) } }
-            for (mode in listOf(DhunThemeMode.LIGHT, DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            for (mode in listOf(DhunThemeMode.LIGHT, DhunThemeMode.DARK, DhunThemeMode.BLACK, DhunThemeMode.LIGHT)) {
                 for (accent in DhunAccent.entries) {
                     DhunAppearance.setAppearance(mode, accent)
+                    DhunAppearance.setArtworkAccent(ArtworkColorExtractor.extractFromSeed("live-$mode-$accent").primary)
                     androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
                     clock.sendFrame(frames.toLong() + 1)
                     delay(20)

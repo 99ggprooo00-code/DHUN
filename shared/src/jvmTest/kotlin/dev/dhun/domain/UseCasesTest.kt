@@ -76,7 +76,7 @@ class UseCasesTest {
         val clock = FakeClock()
         val d = data(clock)
         val record = RecordPlayUseCase(d.history)
-        val h1 = record(track("s"), PlayContext.SEARCH)
+        val h1 = assertNotNull(record(track("s"), PlayContext.SEARCH))
         clock.now += 1000
         record(track("s"), PlayContext.QUEUE)
         record.complete(h1)
@@ -85,6 +85,30 @@ class UseCasesTest {
         assertTrue(entries.last().completedPlayback) // the first play
         assertFalse(entries.first().completedPlayback)
         assertEquals(listOf("s"), GetRecentlyPlayedUseCase(d.history)().first().map { it.id })
+    }
+
+    @Test
+    fun listeningHistoryPauseSkipsNewPlaysAndCompletionWithoutDeletingExistingRows(): Unit = runBlocking {
+        val clock = FakeClock()
+        val d = data(clock)
+        val record = RecordPlayUseCase(d.history, d.settings)
+        val first = assertNotNull(record(track("before"), PlayContext.HOME))
+        d.settings.putBoolean(SettingsKeys.RECORD_LISTENING_HISTORY, false)
+        clock.now += 1_000
+        assertNull(record(track("private"), PlayContext.QUEUE))
+        record.complete(first)
+        val pausedHistory = d.history.observeHistory(100).first()
+        assertEquals(listOf("before"), pausedHistory.map { it.track.id })
+        assertFalse(pausedHistory.single().completedPlayback)
+        // Recreated use cases must honour the stored value, not just a UI flag.
+        assertNull(RecordPlayUseCase(d.history, d.settings)(track("also-private"), PlayContext.SEARCH))
+        d.settings.putBoolean(SettingsKeys.RECORD_LISTENING_HISTORY, true)
+        clock.now += 1_000
+        val resumed = assertNotNull(record(track("after"), PlayContext.HOME))
+        record.complete(resumed)
+        val history = d.history.observeHistory(100).first()
+        assertEquals(listOf("after", "before"), history.map { it.track.id })
+        assertTrue(history.first().completedPlayback)
     }
 
     @Test

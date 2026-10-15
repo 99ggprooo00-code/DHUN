@@ -66,6 +66,7 @@ object NavStatePersistence {
         is DetailRoute.AlbumPage -> "album:${route.id}"
         is DetailRoute.PlaylistPage -> "playlist:${route.isLocal}:${route.id}"
         is DetailRoute.SettingsPage -> "settings"
+        is DetailRoute.SettingsCategoryPage -> "settings-category:${route.category.id}"
         is DetailRoute.ThemeCatalogPage -> "theme-catalog"
         is DetailRoute.AboutLegalPage -> "about-legal"
         // The id is a fixed vocabulary from LegalContent ("privacy", "terms", …),
@@ -85,6 +86,8 @@ object NavStatePersistence {
                 DetailRoute.PlaylistPage(id, parts.getOrNull(1) == "true")
             }
             "settings" -> DetailRoute.SettingsPage
+            "settings-category" -> dev.dhun.presentation.settings.SettingsCategory.entries
+                .firstOrNull { it.id == parts.getOrNull(1) }?.let(DetailRoute::SettingsCategoryPage)
             "theme-catalog" -> DetailRoute.ThemeCatalogPage
             "about-legal" -> DetailRoute.AboutLegalPage
             // An unknown or blank legal id restores nothing rather than a page

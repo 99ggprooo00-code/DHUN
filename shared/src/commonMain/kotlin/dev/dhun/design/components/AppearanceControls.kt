@@ -32,7 +32,7 @@ import dev.dhun.design.DhunThemeMode
  * `dev.dhun.design.DhunAppearance`.
  *
  * Two controls:
- * - **Mode** — Dark / Light. Dark is the shipped default.
+ * - **Mode** — Dark / Light / Black (OLED), plus optional Follow system. Dark is the shipped default.
  * - **Accent** — one chip per [DhunAccent], each showing the ramp it will
  *   actually apply *in the selected mode* (an accent is a dark ramp and a
  *   light ramp, not one colour), so the swatch never lies about the result.
@@ -68,7 +68,9 @@ fun DhunAppearanceControls(
             style = MaterialTheme.typography.labelMedium,
             color = DhunColors.textTertiary,
         )
+        val themeRowState = rememberScrollState()
         Row(
+            modifier = Modifier.horizontalScroll(themeRowState).dhunMouseDragScroll(themeRowState),
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
