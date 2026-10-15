@@ -66,6 +66,7 @@ object NavStatePersistence {
         is DetailRoute.AlbumPage -> "album:${route.id}"
         is DetailRoute.PlaylistPage -> "playlist:${route.isLocal}:${route.id}"
         is DetailRoute.SettingsPage -> "settings"
+        is DetailRoute.ThemeCatalogPage -> "theme-catalog"
         is DetailRoute.AboutLegalPage -> "about-legal"
         // The id is a fixed vocabulary from LegalContent ("privacy", "terms", …),
         // so it never contains the ':' this format splits on.
@@ -84,6 +85,7 @@ object NavStatePersistence {
                 DetailRoute.PlaylistPage(id, parts.getOrNull(1) == "true")
             }
             "settings" -> DetailRoute.SettingsPage
+            "theme-catalog" -> DetailRoute.ThemeCatalogPage
             "about-legal" -> DetailRoute.AboutLegalPage
             // An unknown or blank legal id restores nothing rather than a page
             // that would render "not in this build" after a rotate.

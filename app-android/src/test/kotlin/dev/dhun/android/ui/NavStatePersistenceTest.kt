@@ -194,6 +194,12 @@ class NavStatePersistenceTest {
     }
 
     @Test
+    fun `test theme catalogue route round-trips as an id-less entry`() {
+        assertEquals("theme-catalog", NavStatePersistence.encodeRoute(DetailRoute.ThemeCatalogPage))
+        assertEquals(DetailRoute.ThemeCatalogPage, NavStatePersistence.decodeRoute("theme-catalog"))
+    }
+
+    @Test
     fun `about-legal route round-trips as an id-less entry`() {
         assertEquals(
             "about-legal",

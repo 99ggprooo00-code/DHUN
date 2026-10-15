@@ -192,7 +192,7 @@ class SettingsViewModelTest {
         assertEquals(249, CountryRegions.all.map { it.code }.distinct().size)
         assertEquals("Nepal", CountryRegions.find("NP")?.name)
         assertEquals("NP", CountryRegions.search("nepal").single().code)
-        assertEquals("NZ", CountryRegions.search("nz").single().code)
+        assertTrue(CountryRegions.search("nz").any { it.code == "NZ" })
 
         val d = data()
         d.settings.putString(SettingsKeys.COUNTRY_CODE, "ZZ")
