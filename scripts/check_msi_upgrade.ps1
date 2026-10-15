@@ -51,16 +51,23 @@ function Invoke-MsiCheck {
     throw "msiexec $Operation failed with exit $code; log: $Log"
 }
 
-# Prefer the fixed public versioned baseline. On the first release run it does
-# not exist yet, so the still-public previous `test` release is the fallback.
-# Later, `test` is a private draft and this read-scoped job uses v1.00.001.
-# Never mutate a release here. An absent/draft/unreadable baseline is a SKIP,
-# never a pass; successful but contradictory bytes/checksums still fail below.
-$baselineTags = @('v1.00.001', 'test')
+# Prefer the published fixed public release, whose actual asset is `dhun.msi`.
+# Accept its older versioned filename too if the asset is renamed back. A
+# public test release used to be the fallback; the current `test` is a private
+# draft and can be unreadable by the read-scoped job. Never weaken this gate
+# to use an unverified/local MSI just because a download is unavailable.
+# A missing baseline is SKIPPED (and a failure on main); contradictory bytes
+# or checksums fail outright below.
+$baselineOptions = @(
+    @{ Tag = 'v1.00.001'; Name = 'dhun.msi' },
+    @{ Tag = 'v1.00.001'; Name = 'dhun-v1.00.001.msi' },
+    @{ Tag = 'test'; Name = 'dhun-test.msi' }
+)
 $baselineReleaseTag = $null
 $downloadFailures = @()
-foreach ($tag in $baselineTags) {
-    $assetName = if ($tag -eq 'v1.00.001') { 'dhun-v1.00.001.msi' } else { 'dhun-test.msi' }
+foreach ($option in $baselineOptions) {
+    $tag = $option.Tag
+    $assetName = $option.Name
     $assetPath = Join-Path $baselineDir $assetName
     $sidecarPath = "$assetPath.sha256"
     Remove-Item -LiteralPath $assetPath -Force -ErrorAction SilentlyContinue

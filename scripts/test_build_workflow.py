@@ -188,8 +188,13 @@ class BuildWorkflowTest(unittest.TestCase):
 
     def test_unreadable_baseline_skips_the_install_over_check_instead_of_wedging(self):
         smoke = (WORKFLOW.parents[2] / "scripts/check_msi_upgrade.ps1").read_text()
-        self.assertIn("'dhun-v1.00.001.msi'", smoke)
-        self.assertIn("'dhun-test.msi'", smoke)
+        # The published v1.00.001 release currently names its verified MSI
+        # `dhun.msi`, not the versioned name used by the future public path.
+        self.assertIn("@{ Tag = 'v1.00.001'; Name = 'dhun.msi' }", smoke)
+        self.assertIn("@{ Tag = 'v1.00.001'; Name = 'dhun-v1.00.001.msi' }", smoke)
+        self.assertIn("@{ Tag = 'test'; Name = 'dhun-test.msi' }", smoke)
+        self.assertLess(smoke.index("Name = 'dhun.msi'"), smoke.index("Name = 'dhun-test.msi'"))
+        self.assertIn("Published baseline MSI checksum did not match", smoke)
         self.assertIn('gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $assetName', smoke)
         # The skip is announced once, as a warning, and never as a pass.
         self.assertEqual(1, smoke.count("MSI install-over SKIPPED"))
