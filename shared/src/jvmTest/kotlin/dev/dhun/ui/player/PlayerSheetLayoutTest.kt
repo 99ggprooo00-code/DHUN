@@ -615,6 +615,16 @@ class PlayerSheetLayoutTest {
     }
 
     @Test
+    fun lightPlayerScrimDoesNotWashOutTheControlCluster() {
+        val dark = playerAmbientScrimStops()
+        val light = playerAmbientScrimStops(isLight = true)
+        assertEquals(dark.map { it.first }, light.map { it.first })
+        assertTrue(light.last().second < dark.last().second)
+        assertTrue(light.last().second >= 0.65f, "controls still need contrast in light mode")
+        assertEquals(0f, light.first { it.first == 0.42f }.second)
+    }
+
+    @Test
     fun playerBackdropDimLetsArtworkThroughWithoutGoingClear() {
         // The flat black over the bleed was 0.16 / 0.52. It has to stay under
         // those — that is the "artwork shows through" contract — and above a

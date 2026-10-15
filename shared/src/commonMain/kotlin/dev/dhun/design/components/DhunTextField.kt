@@ -79,7 +79,7 @@ fun DhunTextField(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(DhunShapes.medium)
-                    .background(DhunColors.surfaceElevated)
+                    .background(DhunColors.surfaceElevated.copy(alpha = 0.78f))
                     .border(
                         BorderStroke(
                             DhunSpacing.border,

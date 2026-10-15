@@ -1,7 +1,9 @@
 package dev.dhun.ui.player
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -29,14 +31,17 @@ internal fun LyricsRomanizationControls(controller: LyricsRomanizationController
     val error by controller.error.collectAsState()
     var menu by remember { mutableStateOf(false) }
     Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Romanized line", style = MaterialTheme.typography.labelLarge)
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Romanized line", style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f))
             Switch(checked = enabled, onCheckedChange = controller::setEnabled,
                 modifier = Modifier.semantics { contentDescription = "Show romanized lyrics below original" })
-            if (enabled) {
+        }
+        if (enabled) {
+            Box {
                 TextButton(onClick = { menu = true }, modifier = Modifier.semantics {
                     contentDescription = "Romanization mode: ${mode.label}"
-                }) { Text("Mode: ${mode.id}") }
+                }) { Text("Mode: ${mode.label}") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(enabled = false, text = {
                         Text("On-device transliteration, not translation. Han/Cyrillic need an override; Japanese Kanji stays unchanged.",

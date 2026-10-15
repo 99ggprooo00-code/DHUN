@@ -250,6 +250,36 @@ fun FullPlayer(
     var lastPlainTab by rememberSaveable { mutableIntStateOf(1) }
     var panelOpen by rememberSaveable { mutableStateOf(false) }
     val lyricsDominant = selectedTab == LYRICS_TAB_INDEX
+    var showLyricsControls by remember(current?.id) { mutableStateOf(false) }
+    var showLyricsMatches by remember(current?.id) { mutableStateOf(false) }
+    LaunchedEffect(lyricsDominant) {
+        if (!lyricsDominant) {
+            showLyricsControls = false
+            if (showLyricsMatches) viewModel.lyricsMatches?.cancelSearch()
+            showLyricsMatches = false
+        }
+    }
+    if (lyricsDominant && current != null) {
+        if (showLyricsControls) LyricsControlsDialog(
+            viewModel = viewModel,
+            track = current,
+            preferredProvider = preferredLyricsProvider,
+            onPreferredProviderChange = onPreferredLyricsProviderChange,
+            onFindMatches = viewModel.lyricsMatches?.let {
+                {
+                    showLyricsControls = false
+                    showLyricsMatches = true
+                }
+            },
+            onDismiss = { showLyricsControls = false },
+        )
+        if (showLyricsMatches) viewModel.lyricsMatches?.let { controller ->
+            LyricsMatchPicker(current, controller) {
+                controller.cancelSearch()
+                showLyricsMatches = false
+            }
+        }
+    }
 
     // ADR-002 P4: one stable identity for the backdrop per track/artwork URL.
     val artworkCacheKey = remember(current?.thumbnailUrl, current?.id) {
@@ -465,6 +495,7 @@ fun FullPlayer(
                         actionRowVisible = relatedSheet.actionRowVisible,
                         compact = compact,
                         onOverflowTrack = onOverflowTrack,
+                        onLyricsSettings = { showLyricsControls = true },
                         onOpenArtist = onOpenArtist,
                         onToggleFavorite = onToggleFavorite,
                         onQueueToggle = onQueueToggle,
@@ -512,8 +543,6 @@ fun FullPlayer(
                                         cacheKey = artworkCacheKey,
                                         viewModel = viewModel,
                                         accent = accent,
-                                        preferredLyricsProvider = preferredLyricsProvider,
-                                        onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding(
@@ -547,8 +576,6 @@ fun FullPlayer(
                                         cacheKey = artworkCacheKey,
                                         viewModel = viewModel,
                                         accent = accent,
-                                        preferredLyricsProvider = preferredLyricsProvider,
-                                        onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding(
@@ -593,8 +620,6 @@ fun FullPlayer(
                         onSelectTab = onPanelTabSelect,
                         onClose = onQueueToggle,
                         accent = accent,
-                        preferredLyricsProvider = preferredLyricsProvider,
-                        onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
                         artworkUrl = current?.thumbnailUrl,
                         sheetHeight = travelDp,
                         motion = draggedMotion,
@@ -608,6 +633,12 @@ fun FullPlayer(
         }
     }
 }
+
+/** The same ⋮ has contextual destinations; CC must never open track actions. */
+internal enum class PlayerOverflowMenu { TRACK, LYRICS }
+
+internal fun playerOverflowMenu(lyricsDominant: Boolean): PlayerOverflowMenu =
+    if (lyricsDominant) PlayerOverflowMenu.LYRICS else PlayerOverflowMenu.TRACK
 
 /**
  * The persistent metadata / timeline / transport cluster. It stays in one
@@ -641,6 +672,7 @@ private fun PlayerControlCluster(
     actionRowVisible: Boolean,
     compact: Boolean,
     onOverflowTrack: (Track) -> Unit,
+    onLyricsSettings: () -> Unit,
     onOpenArtist: (Track) -> Unit,
     onToggleFavorite: (Track) -> Unit,
     onQueueToggle: () -> Unit,
@@ -650,6 +682,7 @@ private fun PlayerControlCluster(
     modifier: Modifier = Modifier,
 ) {
     val playbackError = state as? PlaybackState.Error
+    val overflowMenu = playerOverflowMenu(lyricsDominant)
     val horizontalPadding = if (compact) DhunSpacing.md else DhunSpacing.xxl
     val bottomPadding = if (compact) DhunSpacing.xs else DhunSpacing.md
     val itemSpacing = if (compact) DhunSpacing.xs else DhunSpacing.sm
@@ -734,10 +767,14 @@ private fun PlayerControlCluster(
                 }
                 PlayerChipButton(
                     icon = DhunIcon.MoreVert,
-                    contentDescription = "More player actions",
+                    contentDescription = if (overflowMenu == PlayerOverflowMenu.LYRICS) "Lyrics controls" else "More player actions",
                     enabled = t != null,
                     tint = DhunColors.textSecondary,
-                    onClick = { t?.let(onOverflowTrack) },
+                    onClick = {
+                        if (overflowMenu == PlayerOverflowMenu.LYRICS) {
+                            if (t?.id == current?.id) onLyricsSettings()
+                        } else t?.let(onOverflowTrack)
+                    },
                 )
                 PlayerChipButton(
                     icon = if (isFavorite) DhunIcon.Favorite else DhunIcon.FavoriteBorder,
@@ -1036,8 +1073,6 @@ private fun PlayerArtworkStage(
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
-    preferredLyricsProvider: String,
-    onPreferredLyricsProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.clipToBounds()) {
@@ -1058,8 +1093,6 @@ private fun PlayerArtworkStage(
             cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
-            preferredLyricsProvider = preferredLyricsProvider,
-            onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
             modifier = Modifier.fillMaxSize(),
         )
         PlayerStatusPill(
@@ -1422,9 +1455,11 @@ private fun ArtworkBackdrop(
     lyricsDominant: Boolean,
     cacheKey: String,
 ) {
-    val dimAlpha = NowPlayingBackdropPolicy.dimAlphaForBrightness(DhunAppearance.backdropBrightnessPercent)
+    val brightnessShift = (55 - DhunAppearance.backdropBrightnessPercent) / 100f * 0.12f
     val dimColor by animateColorAsState(
-        targetValue = Color.Black.copy(alpha = dimAlpha),
+        targetValue = DhunColors.background.copy(alpha =
+            ((if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM) + brightnessShift)
+                .coerceIn(0.02f, 0.54f)),
         animationSpec = DhunAnimations.slowTween(),
         label = "backdropDim",
     )
@@ -1459,7 +1494,7 @@ private fun ArtworkBackdrop(
 }
 
 /**
- * Flat black over the blurred bleed, painted on top of [playerAmbientScrimStops].
+ * Theme-aware translucent dim over the blurred bleed, above [playerAmbientScrimStops].
  *
  * Lowered 0.16 → 0.08 (lyrics-dominant 0.52 → 0.40) so the artwork shows
  * through more. The control cluster stays readable because the ambient
@@ -1472,18 +1507,19 @@ internal const val PLAYER_BACKDROP_DIM = 0.08f
 internal const val PLAYER_BACKDROP_DIM_LYRICS = 0.40f
 
 /**
- * Ambient scrim color stops (`offset to alpha`, alphas applied to the surface
- * colour): clear across the middle so the blurred bleed glows, dark towards
+ * Ambient scrim color stops (`offset to alpha`, alphas applied to the theme
+ * background): clear across the middle so the blurred bleed glows, stronger towards
  * the bottom so titles, progress and transport stay legible, and light at the
  * very top so the "NOW PLAYING" strip reads under the status bar.
  *
  * Kept as data (not a hard-coded brush) so the legibility contract — clears
  * out in the middle, darkens monotonically towards the bottom, never fully
  * opaque — is unit-tested rather than eyeballed. Stops were lowered again
- * after the 2026-09-21 polish; the bottom stop sits on the ≥0.85 floor pinned
- * by `PlayerSheetLayoutTest` and is not taken below it.
+ * after the 2026-09-21 polish; dark mode keeps the ≥0.85 bottom floor
+ * pinned by `PlayerSheetLayoutTest`. Light mode uses 80% of that opacity so
+ * the warm background does not turn the entire control cluster white.
  */
-internal fun playerAmbientScrimStops(): List<Pair<Float, Float>> = listOf(
+internal fun playerAmbientScrimStops(isLight: Boolean = false): List<Pair<Float, Float>> = listOf(
     0.00f to 0.16f,
     0.16f to 0.04f,
     0.42f to 0.00f,
@@ -1491,12 +1527,12 @@ internal fun playerAmbientScrimStops(): List<Pair<Float, Float>> = listOf(
     0.72f to 0.28f,
     0.86f to 0.50f,
     1.00f to 0.85f,
-)
+).map { (offset, alpha) -> offset to if (isLight) alpha * 0.8f else alpha }
 
 /** [playerAmbientScrimStops] as the brush the backdrop actually paints. */
 @Composable
 private fun ambientScrimBrush(): Brush = Brush.verticalGradient(
-    colorStops = playerAmbientScrimStops()
+    colorStops = playerAmbientScrimStops(DhunAppearance.tokens.isLight)
         .map { (offset, alpha) -> offset to DhunColors.background.copy(alpha = alpha) }
         .toTypedArray(),
 )
@@ -1607,8 +1643,6 @@ private fun LyricsCardOverlay(
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
-    preferredLyricsProvider: String,
-    onPreferredLyricsProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -1624,8 +1658,6 @@ private fun LyricsCardOverlay(
             cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
-            preferredLyricsProvider = preferredLyricsProvider,
-            onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
         )
     }
 }
@@ -1709,8 +1741,6 @@ private fun LyricsCard(
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
-    preferredLyricsProvider: String,
-    onPreferredLyricsProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -1759,8 +1789,6 @@ private fun LyricsCard(
             tab = LYRICS_TAB_INDEX,
             viewModel = viewModel,
             accent = accent,
-            preferredLyricsProvider = preferredLyricsProvider,
-            onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -1958,8 +1986,6 @@ private fun QueueSheet(
     onSelectTab: (Int) -> Unit,
     onClose: () -> Unit,
     accent: Color,
-    preferredLyricsProvider: String,
-    onPreferredLyricsProviderChange: (String) -> Unit,
     /** The playing track's raw thumbnail URL — the panel's own blurred artwork. */
     artworkUrl: String?,
     sheetHeight: Dp,
@@ -2016,8 +2042,6 @@ private fun QueueSheet(
                             tab = selectedTab,
                             viewModel = viewModel,
                             accent = accent,
-                            preferredLyricsProvider = preferredLyricsProvider,
-                            onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
                         )
                     }
                 }

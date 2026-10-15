@@ -29,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +41,7 @@ import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunTextField
@@ -218,12 +218,7 @@ private fun RemoteTrackRow(index: Int, track: Track, onClick: () -> Unit, onOver
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs)
-            .clip(DhunShapes.large)
-            .background(
-                Brush.verticalGradient(
-                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.5f)),
-                ),
-            )
+            .dhunContentRowSurface()
             .clickable(onClick = onClick)
             .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.smPlus),
         verticalAlignment = Alignment.CenterVertically,

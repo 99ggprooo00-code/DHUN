@@ -10,8 +10,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.dhun.core.Album
@@ -37,12 +35,8 @@ fun TrackCard(
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
             contentDescription = track.title,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .shadow(6.dp, DhunShapes.cardLarge, clip = false)
-                .clip(DhunShapes.cardLarge),
-            shape = DhunShapes.cardLarge,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            shape = DhunShapes.artwork,
         )
         Text(
             track.title,
@@ -114,12 +108,8 @@ fun AlbumCard(
         ArtworkImage(
             imageUrl = album.thumbnailUrl,
             contentDescription = album.title,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .shadow(6.dp, DhunShapes.cardLarge, clip = false)
-                .clip(DhunShapes.cardLarge),
-            shape = DhunShapes.cardLarge,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            shape = DhunShapes.artwork,
         )
         Text(
             album.title,
@@ -153,12 +143,8 @@ fun PlaylistCard(
         ArtworkImage(
             imageUrl = playlist.thumbnailUrl,
             contentDescription = playlist.title,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .shadow(6.dp, DhunShapes.cardLarge, clip = false)
-                .clip(DhunShapes.cardLarge),
-            shape = DhunShapes.cardLarge,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            shape = DhunShapes.artwork,
         )
         Text(
             playlist.title,

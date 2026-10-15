@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,6 +26,8 @@ import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunThemeMode
 import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.DhunTextField
+import dev.dhun.design.components.dhunContentSurface
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.presentation.settings.SettingsCategory
 
@@ -36,16 +37,48 @@ internal fun SettingsHub(
     themeId: String,
     accentMode: String,
     onOpenCategory: (SettingsCategory) -> Unit,
+    showThemeCatalogue: Boolean = false,
+    onOpenThemeCatalogue: () -> Unit = {},
 ) {
     var query by remember { mutableStateOf("") }
     val matches = remember(query, isDesktop) { SettingsCategory.search(query, isDesktop) }
-    Text("Make DHUN yours", style = MaterialTheme.typography.titleLarge, color = DhunColors.textPrimary)
-    Text("Appearance, playback and your data — organized in one place.",
-        style = MaterialTheme.typography.bodyMedium, color = DhunColors.textSecondary)
-    OutlinedTextField(value = query, onValueChange = { query = it.take(120) },
-        label = { Text("Search settings categories") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-    if (matches.isEmpty()) Text("No settings categories match. Try theme, lyrics, history or storage.",
-        style = MaterialTheme.typography.bodyMedium, color = DhunColors.textSecondary)
+    Column(
+        modifier = Modifier.fillMaxWidth().dhunContentSurface(reading = true).padding(DhunSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+    ) {
+        Text("Make DHUN yours", style = MaterialTheme.typography.titleLarge, color = DhunColors.textPrimary)
+        Text("Appearance, playback and your data — organized in one place.",
+            style = MaterialTheme.typography.bodyMedium, color = DhunColors.textSecondary)
+        DhunTextField(value = query, onValueChange = { query = it.take(120) },
+            placeholder = "Search settings categories")
+        if (matches.isEmpty()) Text("No settings categories match. Try theme, lyrics, history or storage.",
+            style = MaterialTheme.typography.bodyMedium, color = DhunColors.textSecondary)
+    }
+    if (showThemeCatalogue) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), elevated = false) {
+            Column(Modifier.fillMaxWidth().padding(vertical = DhunSpacing.sm)) {
+                SectionHeader(title = "Test tools")
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clickable(role = Role.Button, onClickLabel = "Open theme catalogue", onClick = onOpenThemeCatalogue)
+                        .heightIn(min = DhunSpacing.touchTarget)
+                        .padding(horizontal = DhunSpacing.lg, vertical = DhunSpacing.md),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+                ) {
+                    DhunIconView(icon = DhunIcon.Palette, contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSize), tint = DhunColors.accent)
+                    Column(Modifier.weight(1f)) {
+                        Text("Theme catalogue", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
+                        Text("Preview themes and shared components · test release only",
+                            style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
+                    }
+                    Spacer(Modifier.width(DhunSpacing.xs))
+                    Text("›", style = MaterialTheme.typography.titleLarge, color = DhunColors.textSecondary)
+                }
+            }
+        }
+    }
     matches.groupBy { it.group }.forEach { (group, categories) ->
         GlassCard(modifier = Modifier.fillMaxWidth(), elevated = false) {
             Column(Modifier.fillMaxWidth().padding(vertical = DhunSpacing.sm)) {

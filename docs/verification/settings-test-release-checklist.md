@@ -38,9 +38,9 @@ Test the MSI from the run-scoped artifact on a Windows installation (preferably 
 
 - [ ] If further Windows acceptance is requested, test the intended install scenario and record whether DHUN was fully closed, whether installation and launch succeeded, and any startup-log/Event Viewer details. Keep the user's exclusion of the earlier report distinct from a verified pass.
 - [ ] Repeatedly switch Light, Dark, and System themes; while playback and lyrics are active, change the OS theme too. Watch for crashes, freezes, partial/stale colours, and startup-log or Windows Event Viewer errors.
-- [ ] In this explicitly tagged test build, open Settings → Theme catalogue, exercise the live previews, close back to Settings, and confirm theme/accent choices persist after restart. Confirm the catalogue row is absent in a public/non-test build.
+- [ ] In this explicitly tagged test build, open Settings → Test tools → Theme catalogue, exercise the live previews, close back to Settings, and confirm theme/accent choices persist after restart. Confirm the catalogue row is absent in a public/non-test build.
 - [ ] Switch static and dynamic artwork accents repeatedly while playback and lyrics remain active; confirm dynamic mode noticeably updates accent-colored controls across the app, while static mode keeps the selected accent.
-- [ ] Change the preferred lyric provider directly from the lyrics view; confirm the current track reloads using that provider and the preference survives a restart.
+- [ ] While CC/lyrics is active, open the player’s ⋮: it should contain romanization, provider, synced timing (when applicable) and match search, not the ordinary track actions. Confirm no settings row crowds the top of the lyric text. Choose another provider and confirm the track reloads and the preference survives a restart. Leave CC mode and confirm ⋮ again opens the ordinary track actions.
 - [ ] Adjust blur and brightness together across their ranges; close/reopen and restart DHUN to confirm appearance preferences persist.
 - [ ] Test X/close-to-tray, reopen from the tray, and both Ctrl+Q and tray Quit. Confirm playback/lyrics do not leave a frozen or stranded window.
 - [ ] Reset window geometry and confirm the window returns to the documented centered size/position.
@@ -50,7 +50,7 @@ Test the MSI from the run-scoped artifact on a Windows installation (preferably 
 
 Record device/emulator model, Android version/API level, ABI, and APK artifact/run used. Restart after changing settings, then confirm persistence.
 
-- [ ] In the test APK, open Settings → Theme catalogue, exercise the live previews, close back to Settings, and confirm theme/accent choices persist after restart. Confirm the catalogue row is absent in a public/non-test build.
+- [ ] In the test APK, open Settings → Test tools → Theme catalogue, exercise the live previews, close back to Settings, and confirm theme/accent choices persist after restart. Confirm the catalogue row is absent in a public/non-test build.
 - [ ] Playback quality selection, keyboard seek step, endless radio, shuffle/repeat policy, and in-app zero-volume pause. Do not infer platform audio-focus-loss or task-clear behavior from the in-app zero-volume setting.
 - [ ] Lyrics enable/disable, synced preference, auto-scroll, text size, provider preference/order, and graceful fallback.
 - [ ] Search the full country/region picker by full name and code; verify the selected catalogue region and explicit-content filtering in Home/Search/radio surfaces.

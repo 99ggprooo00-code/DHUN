@@ -1,7 +1,6 @@
 package dev.dhun.ui.shell
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -49,7 +48,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -341,55 +339,13 @@ fun DhunAppShell(
             }
             DhunAppearance.setArtworkAccent(artworkAccent)
         }
-        // Ambient wash from now-playing art, derived from a seed hash so it
-        // costs nothing per frame — it tints the shell over the real blurred
-        // artwork backdrop below, it does not replace it.
-        val ambient by animateColorAsState(
-            targetValue = currentTrack?.let {
-                if (accentMode == "static") selectedAccentColor.copy(alpha = 0.10f)
-                else ArtworkColorExtractor.extractFromSeed(it.thumbnailUrl ?: it.id).backgroundTint
-            } ?: Color.Transparent,
-            animationSpec = DhunAnimations.slowTween(),
-            label = "shellAmbient",
-        )
-        // Backdrop, back to front:
-        //   1. the DHUN base colour,
-        //   2. the blurred, darkened artwork of the **currently playing** song
-        //      ([NowPlayingBackdrop] — drawn only when there is artwork to show
-        //      and the platform can really blur, so the base stays the fallback),
-        //   3. the ambient tint wash, kept *over* the artwork so the app reads
-        //      in its own palette rather than in the album's.
-        // Home, Search and Library all live inside this Box, so one backdrop
-        // serves all three and it is already correct when you switch tabs.
+        // Only one theme-aware artwork veil lives beneath the screens. Accent
+        // extraction above still colors controls, but no second full-screen wash
+        // is painted over the image (or over the fallback when art is absent).
         Box(modifier = Modifier.fillMaxSize().background(DhunColors.background)) {
             NowPlayingBackdrop(
                 artworkUrl = currentTrack?.thumbnailUrl,
                 modifier = Modifier.fillMaxSize(),
-            )
-            // Ambient glass wash from now-playing (seed tint — lightweight).
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            // Restrained: the old 0.42 wash tinted whole screens
-                            // brown/green and made list art look dirty.
-                            colorStops = arrayOf(
-                                0.0f to ambient.copy(alpha = 0.30f),
-                                0.22f to ambient.copy(alpha = 0.10f),
-                                0.45f to Color.Transparent,
-                                1.0f to Color.Transparent,
-                            ),
-                        ),
-                    )
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                ambient.copy(alpha = 0.08f),
-                                Color.Transparent,
-                            ),
-                        ),
-                    ),
             )
         }
         Row(modifier = Modifier.fillMaxSize()) {
@@ -910,7 +866,6 @@ private fun ShellMasterPane(
             sleepTimerLabel = sleepTimerLabel,
             onCycleSleepTimer = onCycleSleepTimer,
             onOpenSettings = onOpenSettings,
-            showThemeCatalogue = appInfo.isTestRelease,
         )
         is DetailRoute.ArtistPage -> {
             val vm = remember(route.id) { ArtistViewModel(provider, player, route.id, radioSession, dataLayer.settings) }
@@ -971,11 +926,11 @@ private fun ShellMasterPane(
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Text(
-                    text = "The theme catalogue is available in test-release builds only.",
-                    modifier = Modifier.padding(DhunSpacing.screenPadding),
-                    color = DhunColors.textSecondary,
-                )
+                // A stale route from an older test install must not expose a
+                // test-only destination (or even its placeholder) in public.
+                LaunchedEffect(nav, appInfo.isTestRelease) {
+                    nav.detailStack.removeAll { it == DetailRoute.ThemeCatalogPage }
+                }
             }
         }
         is DetailRoute.AboutLegalPage -> {
@@ -1082,11 +1037,11 @@ private fun ShellDetailPane(
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Text(
-                    text = "The theme catalogue is available in test-release builds only.",
-                    modifier = Modifier.padding(DhunSpacing.screenPadding),
-                    color = DhunColors.textSecondary,
-                )
+                // A stale route from an older test install must not expose a
+                // test-only destination (or even its placeholder) in public.
+                LaunchedEffect(nav, appInfo.isTestRelease) {
+                    nav.detailStack.removeAll { it == DetailRoute.ThemeCatalogPage }
+                }
             }
         }
         is DetailRoute.AboutLegalPage -> {
@@ -1200,10 +1155,11 @@ private fun TabContent(
     sleepTimerLabel: String? = null,
     onCycleSleepTimer: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    showThemeCatalogue: Boolean = false,
 ) {
     when (tab) {
-        AppTab.HOME -> {
+        // Old saved CATALOG tabs now land on Home. The only preview entry is
+        // the explicitly test-channelled Settings route with a working Back.
+        AppTab.HOME, AppTab.CATALOG -> {
             HomeScreen(
                 viewModel = homeViewModel,
                 onTrackClick = onPlayTrack,
@@ -1237,20 +1193,6 @@ private fun TabContent(
                 modifier = Modifier.fillMaxSize(),
                 onOpenSettings = onOpenSettings,
             )
-        }
-        AppTab.CATALOG -> {
-            if (showThemeCatalogue) {
-                ComponentCatalogScreen(
-                    onClose = { },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Text(
-                    text = "The theme catalogue is available in test-release builds only.",
-                    modifier = Modifier.fillMaxSize().padding(DhunSpacing.screenPadding),
-                    color = DhunColors.textSecondary,
-                )
-            }
         }
     }
 }

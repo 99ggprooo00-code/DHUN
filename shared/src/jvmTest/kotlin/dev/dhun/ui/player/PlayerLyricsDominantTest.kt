@@ -36,6 +36,15 @@ class PlayerLyricsDominantTest {
     }
 
     @Test
+    fun overflowFollowsTheCcModeInsteadOfAlwaysShowingTrackActions() {
+        assertEquals(PlayerOverflowMenu.TRACK, playerOverflowMenu(lyricsDominant = false))
+        val (lyricsTab, returnTab) = toggleLyricsDominant(selectedTab = 1, lastPlainTab = 1)
+        assertEquals(PlayerOverflowMenu.LYRICS, playerOverflowMenu(lyricsTab == LYRICS_TAB_INDEX))
+        val (plainTab, _) = toggleLyricsDominant(lyricsTab, returnTab)
+        assertEquals(PlayerOverflowMenu.TRACK, playerOverflowMenu(plainTab == LYRICS_TAB_INDEX))
+    }
+
+    @Test
     fun collapseNeedsACompletedDownwardSwipePastThreshold() {
         assertTrue(shouldCollapseFullPlayer(48f, 48f))
         assertTrue(shouldCollapseFullPlayer(120f, 48f))

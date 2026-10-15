@@ -35,13 +35,14 @@ When tokens conflict with an old prose document, the accepted updated design con
 - Text hierarchy distinguishes screen title, track title, artist, secondary metadata, section labels, timestamps and helper/error text.
 - Track titles may wrap only where designed; list rows use consistent alignment, stable row height, ellipsis where appropriate and a reachable overflow target.
 - Use a consistent spacing scale, shape/radius scale, icon family and motion scale. No one-off radii/spacing for a single dialog without an explicit reason.
+- Ordinary music rows on Home, Search, Library and browse pages share `dhunContentRowSurface()` (translucent neutral fill, medium radius); About & Legal and Settings use the stronger `dhunContentSurface(reading = true)` where text needs a stable reading ground. Both follow the active dark/light palette. Top-level filters, including Library tabs, use `DhunFilterChip` so selection has the same shape and accessible state everywhere.
 - Artwork thumbnails preserve subject/faces with fit-to-card sizing. Ambient blurred background may fill/crop independently.
 - Touch targets meet platform accessibility expectations; desktop controls have visible focus and keyboard operation.
 
 ## 5. Glass material rules
 
 ### Player backdrop
-Artwork changes → load/downscale artwork → blur off the UI thread once → derive a restrained accent/tint → compose gradient scrim → cache by stable artwork/track key and generation. Invalidate the cache when the artwork URL changes; guard against late async results painting the previous track's image.
+Artwork changes → load/downscale artwork → blur off the UI thread once → derive a restrained accent/tint → compose **one** theme-aware translucent veil over the screen artwork → cache by stable artwork/track key and generation. Do not stack a black dim, a light/dark scrim and an ambient wash on top of one another. The veil must fade with the image on load/failure, leaving the base color untouched. Invalidate the cache when the artwork URL changes; guard against late async results painting the previous track's image.
 
 ### Surfaces
 Use glass for player chrome, lyrics, navigation band/rail where designed, queue sheets, dialogs and floating actions. Avoid turning every content list/card into a translucent slab. Use opaque base under dialogs and sheets when content behind would compromise reading or text fields.
@@ -63,7 +64,7 @@ Use glass for player chrome, lyrics, navigation band/rail where designed, queue 
 - MiniPlayer expands to FullPlayer without resetting playback or queue.
 
 ### Lyrics / CC mode
-- A clear Lyrics/CC control enters lyrics-dominant mode.
+- A clear Lyrics/CC control enters lyrics-dominant mode. In this mode, the player’s ⋮ opens lyrics controls (romanization, provider, synced timing and match search), not track actions; outside CC mode ⋮ still opens track actions. Keep these controls out of the lyric text area.
 - Sharp artwork recedes by a lightweight scale/fade transition; the same track's blurred artwork remains behind a frosted lyrics surface.
 - Current synced line is visually dominant, neighbors remain readable, auto-scroll is stable and line tap seeks.
 - Unsynced lyrics are readable without false karaoke emphasis.

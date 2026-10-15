@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.dhunContentSurface
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -98,7 +99,9 @@ fun SettingsScreen(
     Column(modifier = modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.sm),
+                .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.sm)
+                .dhunContentSurface(reading = true)
+                .padding(horizontal = DhunSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DhunIconButton(
@@ -131,7 +134,14 @@ fun SettingsScreen(
                 .padding(horizontal = DhunSpacing.screenPadding),
             verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
-            if (category == null) SettingsHub(isDesktop, themeId, viewModel.accentMode.collectAsState().value, onOpenCategory)
+            if (category == null) SettingsHub(
+                isDesktop = isDesktop,
+                themeId = themeId,
+                accentMode = viewModel.accentMode.collectAsState().value,
+                onOpenCategory = onOpenCategory,
+                showThemeCatalogue = showThemeCatalogue,
+                onOpenThemeCatalogue = onOpenThemeCatalogue,
+            )
             if (category == SettingsCategory.APPEARANCE) SettingsGroup("Appearance & Backdrop") {
                 DhunAppearanceControls(
                     mode = DhunThemeMode.fromId(themeId) ?: DhunAppearance.mode,
@@ -162,13 +172,6 @@ fun SettingsScreen(
                     modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
                 )
                 BackdropControls(viewModel)
-                if (showThemeCatalogue) {
-                    SettingsNavigationRow(
-                        "Theme catalogue",
-                        "Preview the test build’s themes and shared components",
-                        onOpenThemeCatalogue,
-                    )
-                }
             }
             if (category == SettingsCategory.PLAYBACK) SettingsGroup("Playback & Audio") {
                 OptionRow("Streaming & download quality", listOf("low" to "Low (~48–64 kbps)",

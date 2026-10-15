@@ -35,7 +35,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.key.Key
@@ -63,6 +62,7 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunHorizontalRail
@@ -611,12 +611,7 @@ private fun QuickPickItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(DhunShapes.large)
-            .background(
-                Brush.verticalGradient(
-                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep),
-                ),
-            )
+            .dhunContentRowSurface()
             .clickable(onClick = onClick)
             .padding(DhunSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,

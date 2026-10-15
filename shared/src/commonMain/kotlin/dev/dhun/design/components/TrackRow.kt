@@ -1,6 +1,5 @@
 package dev.dhun.design.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,23 +12,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
-import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 
 /**
  * TrackRow — list workhorse (Search, Queue, History, Favorites).
  *
- * Frosted glass cell when [frosted] (default): translucent multi-stop fill so
- * lists feel M3 glass-morphism without Liquid Glass or content blur.
- * Spacing is intentionally airy (less cramped than Phase 07 defaults).
+ * Standard neutral cell when [frosted] (default) so artwork and titles, not
+ * repeated glass gradients, define the list. The false branch is for rows
+ * inside an existing surface. Spacing stays airy on both platforms.
  */
 @Composable
 fun TrackRow(
@@ -46,12 +42,7 @@ fun TrackRow(
         modifier
             .fillMaxWidth()
             .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs)
-            .clip(DhunShapes.large)
-            .background(
-                Brush.verticalGradient(
-                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.55f)),
-                ),
-            )
+            .dhunContentRowSurface()
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.smPlus)
     } else {
@@ -122,8 +113,7 @@ fun TrackRowCompact(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(DhunShapes.medium)
-            .background(DhunColors.glassHighlight.copy(alpha = 0.5f))
+            .dhunContentRowSurface()
             .clickable(onClick = onClick)
             .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.xsPlus),
         verticalAlignment = Alignment.CenterVertically,

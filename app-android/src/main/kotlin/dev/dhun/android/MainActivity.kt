@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -190,13 +191,27 @@ class MainActivity : ComponentActivity() {
         try {
         setContent {
             DhunTheme {
+                // System-bar glyphs follow the selected palette after each
+                // successful composition, including live dark/light changes.
+                val lightAppearance = DhunAppearance.tokens.isLight
+                SideEffect {
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = lightAppearance
+                        isAppearanceLightNavigationBars = lightAppearance
+                    }
+                }
                 // Music-app back behavior: FullPlayer collapses first, then
                 // detail pages pop, then the tab steps back to the tab it came
                 // from — Search and Library are *tabs*, not stack entries, so
                 // without that step BACK found nothing to close and parked the
                 // app from a screen the user was still using. Only at Home with
                 // nothing open do we park it. BACK never kills the player.
-                val nav = androidx.compose.runtime.remember { NavStatePersistence.restore(lastSavedState) }
+                val nav = androidx.compose.runtime.remember {
+                    NavStatePersistence.restore(
+                        lastSavedState,
+                        allowThemeCatalogue = BuildConfig.DHUN_RELEASE_CHANNEL == "test",
+                    )
+                }
                 currentNav = nav
                 BackHandler { if (!nav.onBack()) moveTaskToBack(true) }
 

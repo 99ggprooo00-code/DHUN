@@ -11,7 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,6 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
+import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunSpacing
+import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.DhunTextField
 import dev.dhun.lyrics.TtmlParser
 import dev.dhun.presentation.player.LyricsMatchController
 
@@ -35,18 +39,18 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
     var showLocalImport by remember(track.id) { mutableStateOf(false) }
     var ttml by remember(track.id) { mutableStateOf("") }
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.large) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), opaqueBase = true) {
             Column(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp)
-                    .verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .verticalScroll(rememberScrollState()).padding(DhunSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             ) {
                 Text("Lyrics matches for this song", style = MaterialTheme.typography.titleLarge)
                 Text("Search sends song metadata to your enabled lyrics providers. A saved choice overrides automatic matching for this song only.",
                     style = MaterialTheme.typography.bodySmall)
                 Text("Manual query search is supported by LRCLIB search; other sources retry the current track.", style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(value = query, onValueChange = { query = it.take(240) },
-                    label = { Text("Title, artist or manual search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                DhunTextField(value = query, onValueChange = { query = it.take(240) },
+                    placeholder = "Title, artist or manual search")
                 Row {
                     TextButton(onClick = { controller.search(track.id, query) }, enabled = query.isNotBlank() && !state.loading) {
                         Text("Search / Retry")
@@ -59,7 +63,15 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
                         style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(value = ttml, onValueChange = { ttml = it.take(TtmlParser.MAX_INPUT_CHARS + 1) },
                         label = { Text("TTML document (maximum 256,000 characters)") },
-                        minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
+                        minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = DhunColors.surfaceElevated,
+                            unfocusedContainerColor = DhunColors.surfaceElevated,
+                            focusedTextColor = DhunColors.textPrimary,
+                            unfocusedTextColor = DhunColors.textPrimary,
+                            focusedBorderColor = DhunColors.accent,
+                            unfocusedBorderColor = DhunColors.borderStrong,
+                        ))
                     if (ttml.length > TtmlParser.MAX_INPUT_CHARS) Text("Document is too large. Paste a smaller document.")
                     TextButton(onClick = { controller.previewTtml(track.id, ttml) },
                         enabled = !state.loading && ttml.isNotBlank() && ttml.length <= TtmlParser.MAX_INPUT_CHARS) { Text("Preview local TTML") }

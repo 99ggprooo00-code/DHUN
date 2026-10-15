@@ -215,6 +215,21 @@ class NavStatePersistenceTest {
     }
 
     @Test
+    fun `restored catalogue page is kept for test release and dropped for public release`() {
+        val bundle = Bundle().apply {
+            putStringArrayList(
+                NavStatePersistence.KEY_DETAIL_ROUTES,
+                arrayListOf("settings", "theme-catalog"),
+            )
+        }
+        val test = NavStatePersistence.restore(bundle, allowThemeCatalogue = true)
+        assertEquals(listOf(DetailRoute.SettingsPage, DetailRoute.ThemeCatalogPage), test.detailStack.toList())
+
+        val public = NavStatePersistence.restore(bundle)
+        assertEquals(listOf(DetailRoute.SettingsPage), public.detailStack.toList())
+    }
+
+    @Test
     fun `about-legal route round-trips as an id-less entry`() {
         assertEquals(
             "about-legal",

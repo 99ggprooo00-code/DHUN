@@ -42,6 +42,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.PageArtworkBackdrop
 import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.components.DhunButton
@@ -291,12 +292,7 @@ private fun AlbumTrackRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs)
-            .clip(DhunShapes.large)
-            .background(
-                Brush.verticalGradient(
-                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.5f)),
-                ),
-            )
+            .dhunContentRowSurface()
             .clickable(onClick = onClick)
             .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.smPlus),
         verticalAlignment = Alignment.CenterVertically,

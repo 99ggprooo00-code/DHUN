@@ -1,6 +1,6 @@
 ## DHUN rolling test build — private draft
 
-This is a collaborator-only, rolling development build of DHUN's `main` branch. A successful `main` build replaces it automatically when app source/build files change; documentation-only merges do not publish a new artifact. PR builds remain run-scoped Actions artifacts. This private test channel includes the Settings → Theme catalogue preview; ordinary development and public-release builds do not. It is not stable, store-ready, or intended for daily use.
+This is a collaborator-only, rolling development build of DHUN's `main` branch. A successful `main` build replaces it automatically when app source/build files change; documentation-only merges do not publish a new artifact. PR builds remain run-scoped Actions artifacts. This private test channel includes a **Settings → Test tools → Theme catalogue** preview; ordinary development and public-release builds do not show the entry. An old restored catalogue route is discarded when a public Android build starts. It is not stable, store-ready, or intended for daily use.
 
 ### Assets
 

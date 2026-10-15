@@ -129,9 +129,10 @@ exact contents of every response YouTube returns. **[source]**
 
 ### Developer-only exception
 
-The internal design catalogue screen loads sample images from `picsum.photos`. It
-is not reachable from the navigation bar, but it can be reached through restored
-state. **[source]**
+Only the explicitly channelled test release offers the Settings → Test tools →
+Theme catalogue preview. Opening it loads sample images from `picsum.photos`.
+Ordinary development and public-release builds do not offer the entry, and public
+Android builds discard a restored catalogue route. **[source]**
 
 ### Optional desktop fallback
 
