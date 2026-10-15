@@ -25,6 +25,7 @@ class SettingsViewModel(
     private val get: GetSettingUseCase,
     private val update: UpdateSettingUseCase,
     private val scope: CoroutineScope,
+    private val isTestRelease: Boolean = false,
     private val clearLyricsCacheAction: (suspend () -> Unit)? = null,
     private val clearSearchHistoryAction: (suspend () -> Unit)? = null,
     private val clearPlayHistoryAction: (suspend () -> Unit)? = null,
@@ -120,9 +121,19 @@ class SettingsViewModel(
             _backdropBrightnessPercent.value = get.int(
                 SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT,
             ).coerceIn(0, 100)
+            // One-time test-profile migration: old saved experiments must not
+            // mask the requested 15% baseline on install-over. Later slider
+            // edits remain durable, just like backdrop blur and brightness.
+            if (isTestRelease && get.int(SettingsKeys.TUNE_PROFILE_VERSION, 0) < 1) {
+                writeMutex.withLock {
+                    for (part in VisualPart.entries) update.remove(part.key)
+                    update.int(SettingsKeys.TUNE_PROFILE_VERSION, 1)
+                }
+            }
             val tuning = mutableMapOf<VisualPart, Int>()
+            val baseline = if (isTestRelease) DhunVisualTuning.TEST_DEFAULT else DhunVisualTuning.NEUTRAL
             for (part in DhunVisualTuning.adjustableParts) {
-                tuning[part] = get.int(part.key, DhunVisualTuning.DEFAULT).coerceIn(0, 100)
+                tuning[part] = get.int(part.key, baseline).coerceIn(0, 100)
             }
             _visualTuning.value = tuning
             _accentMode.value = get.string(SettingsKeys.ACCENT_MODE, SettingsKeys.ACCENT_MODE_DEFAULT)
@@ -204,7 +215,7 @@ class SettingsViewModel(
 
     fun saveVisualTuning(part: VisualPart) {
         if (part !in DhunVisualTuning.adjustableParts) return
-        val value = _visualTuning.value[part] ?: DhunVisualTuning.DEFAULT
+        val value = _visualTuning.value[part] ?: DhunVisualTuning.TEST_DEFAULT
         enqueueWrite { update.int(part.key, value) }
     }
 

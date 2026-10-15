@@ -213,6 +213,7 @@ fun DhunAppShell(
             GetSettingUseCase(dataLayer.settings),
             UpdateSettingUseCase(dataLayer.settings),
             scope,
+            isTestRelease = appInfo.isTestRelease,
             clearLyricsCacheAction = { playerViewModel.clearLyricsCache() },
             clearSearchHistoryAction = { dataLayer.search.clearRecentSearches() },
             clearPlayHistoryAction = { dataLayer.history.clear() },

@@ -15,12 +15,25 @@ class VisualTuningTest {
     @AfterTest fun reset() = DhunVisualTuning.restore(emptyMap(), enabled = false)
 
     @Test
-    fun allSlidersHaveIndependentKeysAndFiftyIsTheExactOriginal() {
+    fun allPartsHaveIndependentKeysAndPublicNeutralIsTheExactOriginal() {
         assertEquals(VisualPart.entries.size, VisualPart.entries.map { it.key }.distinct().size)
         VisualPart.entries.forEach { part ->
             assertTrue(part.key in SettingsKeys.all, "${part.label} must reset with settings")
             assertEquals(50, DhunVisualTuning.value(part))
             assertEquals(0.62f, DhunVisualTuning.alpha(part, 0.62f, 0.50f, 0.74f))
+        }
+    }
+
+    @Test
+    fun freshTestProfileStartsEveryPartAtFifteenButFiftyRemainsIdentity() {
+        DhunVisualTuning.restore(emptyMap(), enabled = true)
+        VisualPart.entries.forEach { part ->
+            assertEquals(15, DhunVisualTuning.value(part), part.label)
+            if (part in DhunVisualTuning.adjustableParts) {
+                DhunVisualTuning.set(part, 50)
+                assertEquals(0.62f, DhunVisualTuning.alpha(part, 0.62f, 0.50f, 0.74f))
+                DhunVisualTuning.set(part, 15)
+            }
         }
     }
 
@@ -41,9 +54,9 @@ class VisualTuningTest {
         DhunVisualTuning.restore(mapOf(VisualPart.MINI_PLAYER to 100, VisualPart.NAVIGATION to 83), enabled = true)
         DhunVisualTuning.set(VisualPart.PAGE_BACKDROP, 0)
         DhunVisualTuning.set(VisualPart.MINI_PLAYER, 100)
-        assertEquals(50, DhunVisualTuning.value(VisualPart.PAGE_BACKDROP))
-        assertEquals(0, DhunVisualTuning.value(VisualPart.MINI_PLAYER))
-        assertEquals(0, DhunVisualTuning.value(VisualPart.NAVIGATION))
+        assertEquals(15, DhunVisualTuning.value(VisualPart.PAGE_BACKDROP))
+        assertEquals(15, DhunVisualTuning.value(VisualPart.MINI_PLAYER))
+        assertEquals(15, DhunVisualTuning.value(VisualPart.NAVIGATION))
         DhunVisualTuning.restore(emptyMap(), enabled = false)
         assertEquals(50, DhunVisualTuning.value(VisualPart.MINI_PLAYER))
     }
@@ -53,8 +66,9 @@ class VisualTuningTest {
         val dark = Color(0xFF303030)
         assertEquals(dark, DhunVisualTuning.tonalSurface(dark, false))
         DhunVisualTuning.restore(emptyMap(), enabled = true)
-        assertEquals(0.76f, DhunVisualTuning.tonalSurface(dark, false).alpha, 0.01f)
-        assertEquals(0.82f, DhunVisualTuning.tonalSurface(dark, true).alpha, 0.01f)
+        assertEquals(15, DhunVisualTuning.value(VisualPart.TONAL_SURFACES))
+        assertEquals(0.592f, DhunVisualTuning.tonalSurface(dark, false).alpha, 0.01f)
+        assertEquals(0.701f, DhunVisualTuning.tonalSurface(dark, true).alpha, 0.01f)
         assertEquals(1f, DhunAppearance.tokens.surfaceVariant.alpha, "dialog base stays opaque")
         DhunVisualTuning.set(VisualPart.TONAL_SURFACES, 0)
         assertEquals(0.52f, DhunVisualTuning.tonalSurface(dark, false).alpha, 0.01f)
@@ -70,12 +84,12 @@ class VisualTuningTest {
         try {
             DhunVisualTuning.restore(emptyMap(), enabled = true)
             val original = readingSurfaceFill()
-            assertEquals(0.88f * 0.76f, original.alpha, 0.02f)
+            assertEquals(0.88f * 0.592f, original.alpha, 0.02f)
             DhunVisualTuning.set(VisualPart.TONAL_SURFACES, 0)
             assertTrue(readingSurfaceFill().alpha < original.alpha)
             assertTrue(contentRowFill().alpha < original.alpha)
-            assertEquals(50, DhunVisualTuning.value(VisualPart.QUEUE_SHEET))
-            assertEquals(50, DhunVisualTuning.value(VisualPart.QUEUE_ROWS))
+            assertEquals(15, DhunVisualTuning.value(VisualPart.QUEUE_SHEET))
+            assertEquals(15, DhunVisualTuning.value(VisualPart.QUEUE_ROWS))
             DhunVisualTuning.restore(emptyMap(), enabled = false)
             assertEquals(0.88f, readingSurfaceFill().alpha, 0.02f)
         } finally {
@@ -84,17 +98,18 @@ class VisualTuningTest {
     }
 
     @Test
-    fun publicBuildIgnoresSavedTestSettingsAndResetRestoresMidpoint() {
+    fun publicBuildIgnoresSavedTestSettingsAndTestResetRestoresFifteen() {
         val saved = mapOf(VisualPart.QUEUE_SHEET to 90, VisualPart.PAGE_BACKDROP to 20)
         DhunVisualTuning.restore(saved, enabled = false)
         assertEquals(50, DhunVisualTuning.value(VisualPart.QUEUE_SHEET))
         DhunVisualTuning.restore(saved, enabled = true)
         assertEquals(90, DhunVisualTuning.value(VisualPart.QUEUE_SHEET))
-        assertEquals(50, DhunVisualTuning.value(VisualPart.PAGE_BACKDROP))
-        assertEquals(0, DhunVisualTuning.value(VisualPart.MINI_PLAYER))
-        assertEquals(0, DhunVisualTuning.value(VisualPart.NAVIGATION))
+        assertEquals(15, DhunVisualTuning.value(VisualPart.PAGE_BACKDROP))
+        assertEquals(15, DhunVisualTuning.value(VisualPart.MINI_PLAYER))
+        assertEquals(15, DhunVisualTuning.value(VisualPart.NAVIGATION))
         DhunVisualTuning.reset()
-        assertEquals(50, DhunVisualTuning.value(VisualPart.QUEUE_SHEET))
-        assertEquals(0, DhunVisualTuning.value(VisualPart.MINI_PLAYER))
+        VisualPart.entries.forEach { assertEquals(15, DhunVisualTuning.value(it), it.label) }
+        DhunVisualTuning.restore(emptyMap(), enabled = false)
+        VisualPart.entries.forEach { assertEquals(50, DhunVisualTuning.value(it), it.label) }
     }
 }
