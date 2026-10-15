@@ -101,6 +101,26 @@ class LrcLibAccessTest {
         assertEquals(Long.MAX_VALUE, retryAfterDeadline("9999999999999999999999", 0))
     }
 
+    @Test fun deeplyNestedSuccessIsRejectedBeforeRecursiveJsonParsing() = runTest {
+        val http = client(MockEngine { respond("[".repeat(10_000) + "0" + "]".repeat(10_000)) })
+        try { assertTrue((LrcLibSource(http).fetch(track) as DhunResult.Failure).error is DhunError.Parse) }
+        finally { http.close() }
+    }
+
+    @Test fun wallClockJumpCannotBypassTheRelativeRequestGap() = runTest {
+        var now = 10_000L
+        val waits = mutableListOf<Long>()
+        val lane = LrcLibAccess(clock = EpochClock { now }) { waits += it }
+        val http = client(MockEngine { respond("{}") })
+        try {
+            val source = LrcLibSource(http, access = lane)
+            source.fetch(track)
+            now += 3_600_000
+            source.fetch(track)
+            assertEquals(listOf(250L), waits)
+        } finally { http.close() }
+    }
+
     @Test fun oversizedSuccessBodyFailsSoftlyInsteadOfParsingAnUnboundedTree() = runTest {
         val http = client(MockEngine { respond("x".repeat(2_000_001)) })
         try { assertTrue((LrcLibSource(http).fetch(track) as DhunResult.Failure).error is DhunError.Parse) }

@@ -27,7 +27,8 @@ Implemented `LrcLibAccess` and wired one shared instance in each platform host:
   `Retry-After`; missing headers conservatively default to 60 seconds. Unrecognized
   supplied formats fail closed for the process instead of ignoring a server delay.
   No automatic request retry is added. Queued cancellation does not reach HTTP.
-- Response bytes are bounded to 2 MB before JSON tree parsing. Error bodies are not
+- Response bytes are bounded to 2 MB and JSON nesting is checked before recursive
+  tree parsing. Inter-request delay is relative, so wall-clock jumps cannot bypass it. Error bodies are not
   assumed to be JSON. Out-of-range duration is omitted rather than sent as invalid data.
 - Tests use MockEngine, synthetic metadata, fake clocks and controlled suspension to
   verify identity, spacing, cross-adapter backoff, dates/overflow, cancellation and size

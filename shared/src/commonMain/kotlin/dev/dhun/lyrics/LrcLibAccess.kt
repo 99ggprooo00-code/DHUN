@@ -23,7 +23,7 @@ class LrcLibAccess(
     private val pause: suspend (Long) -> Unit = { delay(it) },
 ) {
     private val mutex = Mutex()
-    private var nextStart = 0L
+    private var hasRequested = false
     private var retryUntil = 0L
     private val identity = "DHUN/${version.filter { it.isLetterOrDigit() || it in ".-_" }.take(64).ifEmpty { "development" }} (https://github.com/99ggprooo00-code/DHUN)"
 
@@ -32,8 +32,8 @@ class LrcLibAccess(
             if (retryUntil > clock.nowMs()) throw LrcLibBackoff(remainingSeconds(retryUntil, clock.nowMs()))
         }
         checkBackoff()
-        val gap = (nextStart - clock.nowMs()).coerceAtLeast(0)
-        if (gap > 0) pause(gap)
+        // Delay is relative, so a wall-clock adjustment cannot remove spacing.
+        if (hasRequested) pause(250)
         checkBackoff()
         try {
             val response = client.get(url) {
@@ -63,13 +63,15 @@ class LrcLibAccess(
                     val bytes = ByteArray(size)
                     var offset = 0
                     chunks.forEach { chunk -> chunk.copyInto(bytes, offset); offset += chunk.size }
-                    bytes.decodeToString()
+                    bytes.decodeToString().also {
+                        if (!boundedLyricsJson(it)) throw LrcLibInvalidResponse()
+                    }
                 }
             } finally { channel.cancel(null) }
             LrcLibReply(status, body, if (status == 429 || status == 503) remainingSeconds(retryUntil, clock.nowMs()) else null)
         } finally {
             // Space requests after completion, not merely after dispatching headers.
-            nextStart = saturatingAdd(clock.nowMs(), 250)
+            hasRequested = true
         }
     }
 }
