@@ -3,7 +3,8 @@ name: test-release
 # The rolling `test` tag is a private draft for collaborators. Successful main
 # builds replace it automatically when Android/Desktop/shared app code changes.
 # PRs and non-main refs only upload run-scoped artifacts. The fixed public
-# public prerelease remains on its separate, deliberate manual path.
+# prerelease can be requested by manual dispatch or by adding the reviewed,
+# one-shot release-intent file in a main merge (see scripts/release_plan.py).
 on:
   workflow_dispatch:
     inputs:
@@ -38,22 +39,42 @@ on:
       - 'gradlew.bat'
       - 'scripts/**'
       - '.github/workflows/test-release.yml'
+      - '.github/release-intent/v1.00.002'
 
 permissions:
   contents: read
-
-env:
-  BUILD_ONLY: ${{ (github.event_name == 'workflow_dispatch' && inputs.build_only) || github.ref != 'refs/heads/main' }}
-  # Test artifacts on PRs, main pushes, and build-only dispatches get the
-  # test-only Settings catalogue. The deliberate public-release dispatch does not.
-  DHUN_RELEASE_CHANNEL: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.build_only == false && 'public' || 'test' }}
 
 concurrency:
   group: ${{ github.ref == 'refs/heads/main' && 'test-release' || format('test-build-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
+  release_plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      channel: ${{ steps.plan.outputs.channel }}
+      build_only: ${{ steps.plan.outputs.build_only }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - name: Verify a one-shot publication request from the prior main commit
+        id: plan
+        env:
+          MANUAL_BUILD_ONLY: ${{ inputs.build_only }}
+        run: |
+          python scripts/release_plan.py \
+            --event "$GITHUB_EVENT_NAME" --ref "$GITHUB_REF" \
+            --manual-build-only "$MANUAL_BUILD_ONLY" --sha "$GITHUB_SHA" \
+            --output "$GITHUB_OUTPUT"
+
   apk:
+    needs: release_plan
+    env:
+      BUILD_ONLY: ${{ needs.release_plan.outputs.build_only }}
+      DHUN_RELEASE_CHANNEL: ${{ needs.release_plan.outputs.channel }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -124,6 +145,10 @@ jobs:
             out/dhun-test-armeabi-v7a.apk.provenance.txt
 
   msi:
+    needs: release_plan
+    env:
+      BUILD_ONLY: ${{ needs.release_plan.outputs.build_only }}
+      DHUN_RELEASE_CHANNEL: ${{ needs.release_plan.outputs.channel }}
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
@@ -211,6 +236,10 @@ jobs:
   aab:
     # Optional diagnostic artifact only; debug-key signed and not Play-ready.
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_release_candidate == true }}
+    needs: release_plan
+    env:
+      BUILD_ONLY: ${{ needs.release_plan.outputs.build_only }}
+      DHUN_RELEASE_CHANNEL: ${{ needs.release_plan.outputs.channel }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -259,10 +288,10 @@ jobs:
             out/dhun-v1.00.002.aab.provenance.txt
 
   publish_test:
-    # A main push is admitted by the app-code path filter above. Publish only
-    # the private rolling test draft; this never creates or changes a public tag.
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-    needs: [apk, msi]
+    # Ordinary main pushes refresh only the private rolling test draft.
+    # A one-shot public intent skips this job, preserving the existing draft.
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.release_plan.outputs.channel == 'test' }}
+    needs: [release_plan, apk, msi]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -324,10 +353,10 @@ jobs:
           fi
 
   publish:
-    # Only a deliberate, manual dispatch from main can create the fixed public
-    # prerelease. The automatic push path above updates only the private test draft.
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.build_only == false }}
-    needs: [apk, msi]
+    # A reviewed, newly added intent file on main or a deliberate manual
+    # dispatch may publish. Neither PRs nor ordinary main pushes can do so.
+    if: ${{ github.ref == 'refs/heads/main' && needs.release_plan.outputs.channel == 'public' && needs.release_plan.outputs.build_only == 'false' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_only == false)) }}
+    needs: [release_plan, apk, msi]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -359,7 +388,7 @@ jobs:
       # only when the maintainer ticks purge_legacy_dev_releases on this dispatch
       # (default off). Keep it in its own step so the default path never reaches it.
       - name: Delete legacy dev releases (explicit opt-in only)
-        if: ${{ inputs.purge_legacy_dev_releases }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.purge_legacy_dev_releases }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

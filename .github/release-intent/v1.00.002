@@ -1,0 +1,3 @@
+One-shot, reviewed request to publish DHUN v1.00.002 from the commit that adds this file to main.
+
+This file is deliberately new in this PR. The test-release workflow compares the main push commit to its first parent and selects the public channel only when this exact path is added. PR builds and later main pushes cannot reuse this request. Its publication job still requires green APK and MSI builds, packaged Android identity 1.00.002 / 7, a hosted Windows install-over check, a current-main SHA match, complete nonempty checksummed/provenanced draft assets, and a public prerelease flag. The legacy-dev-release purge is never enabled on this push path. The existing v1.00.001 release is untouched.

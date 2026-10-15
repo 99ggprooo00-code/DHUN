@@ -6,7 +6,7 @@
 
 | Identifier | Current value | Meaning | Where it is declared |
 |---|---|---|---|
-| Git tag / GitHub release | `v1.00.002` (when the manual publish succeeds); `v1.00.001` remains fixed at `6ebc45c` | Fixed public pre-releases | `test-release.yml` (hard-coded) |
+| Git tag / GitHub release | `v1.00.002` (after the reviewed release-intent merge builds and publishes successfully); `v1.00.001` remains fixed at `6ebc45c` | Fixed public pre-releases | `test-release.yml` (hard-coded) |
 | App version (`versionName`) | `1.00.002` | What users see on Android | `app-android/build.gradle.kts` |
 | Android `applicationId` | `dev.dhun.android` | Package identity | `app-android/build.gradle.kts` |
 | Android `versionCode` | `7` | Integer Android uses for upgrades; must increase on each published build | `app-android/build.gradle.kts` |
@@ -18,7 +18,7 @@ The identifier `1.00.001` is not canonical SemVer: SemVer forbids leading zeros 
 
 ## 2. Versioning decision for 1.00.002
 
-**Decided by the maintainer (2026-10-10): Option A.** The current release candidate is `1.00.002` (tag `v1.00.002`, `versionCode` 7). Later minor releases continue the same pattern: `1.00.003`, `1.00.004`, and so on. The Gradle and workflow identity are bumped together in the release PR; publication still requires an explicit main-branch dispatch.
+**Decided by the maintainer (2026-10-10): Option A.** The current release candidate is `1.00.002` (tag `v1.00.002`, `versionCode` 7). Later minor releases continue the same pattern: `1.00.003`, `1.00.004`, and so on. The Gradle and workflow identity are bumped together in the release PR; publication requires an explicit main-branch dispatch or a reviewed one-shot release-intent addition on `main`.
 
 - **Option A — keep the padded scheme (chosen).** This release: `1.00.002`, with `versionCode` 7 and tag `v1.00.002`. Pro: matches the published lineage with no ambiguity. Con: not SemVer, and the zero padding is unusual.
 - **Option B — switch to SemVer for new releases.** Example: `1.0.1` (tag `v1.0.1`), or a pre-release `1.0.1-rc.1`. Pro: follows the changelog's stated default. Con: `v1.00.001` and `v1.0.1` would look like two different versions of one project, and the publish workflow needs a new code path.
@@ -73,12 +73,12 @@ Expected for the current test key: certificate SHA-256 `d8e57ec69f40956d34adff13
 | Release-only Android build (`assembleRelease`) | Not built. `release` buildType has no signing config and is not minified. | **[decision]** whether a release build type is needed |
 | MSI build and identity check | In `test-release.yml` | Keep |
 | MSI install-over on hosted Windows | Required on `main` (skip fails); skipped on PR/branch | Keep |
-| Public release creation | Hard-coded to `v1.00.002`; manual main dispatch builds, checks and publishes a verified draft once | Keep reviewed version changes and draft verification |
-| Human approval before publishing | A push to `main` (including a merge) builds and tests only. Publishing requires a manual `workflow_dispatch` on `main` with `build_only=false`. | **[decision]** add a protected approval environment for that dispatch |
+| Public release creation | Hard-coded to `v1.00.002`; a reviewed one-shot main merge or manual dispatch builds, checks and publishes a verified draft once | Keep reviewed version changes and draft verification |
+| Human approval before publishing | Ordinary pushes to `main` build and test only. The reviewed PR adding `.github/release-intent/v1.00.002` selects a public build exactly once when merged into `main`; a manual `workflow_dispatch` with `build_only=false` remains supported. Either path requires APK/MSI gates and a verified draft before publication. | **[decision]** add a protected approval environment for future release jobs |
 | Hardware acceptance (Android, Windows) | Not done | Required before any "works on device" claim |
 
 ## 6. Known risks in the publish path (not yet changed)
 
 - `publish.sh` at the repository root rewrites `origin` to an SSH remote and pushes `main` directly. It is not part of the release path, but it bypasses CI. **[decision]** remove it or move it under `.ai/`.
 - The publish job deletes old `dev-*` releases and tags with `|| true`, so a failed delete is silently ignored.
-- `publish` no longer runs on push to `main`. A merge refreshes only the build artifacts. A manual dispatch with `build_only=false` publishes only the fixed public tag after its own build gates.
+- `publish` does not run on ordinary pushes to `main`. An ordinary merge refreshes only the private test draft. The single merge that **adds** `.github/release-intent/v1.00.002` selects the public build and publishes the fixed tag only after its own build gates; subsequent pushes cannot reuse the existing marker. A manual dispatch with `build_only=false` remains available. The push path cannot purge legacy dev releases.

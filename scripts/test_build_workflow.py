@@ -1,7 +1,5 @@
 """Safety contracts for the release workflow without a third-party YAML parser."""
 
-import ast
-import re
 import unittest
 from pathlib import Path
 
@@ -20,56 +18,39 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("        type: boolean", inputs)
         self.assertIn("        default: true", inputs)
 
-    def test_actual_publish_expression_denies_every_branch_build(self):
-        expression = re.search(r"^    if: \$\{\{ (.+) \}\}$", self.publish, re.MULTILINE).group(1)
-        expression = expression.replace("github.ref", "ref").replace("github.event_name", "event").replace("inputs.build_only", "build_only")
-        expression = expression.replace("&&", "and").replace("||", "or")
-        expression = re.sub(r"\bfalse\b", "False", expression)
-        tree = ast.parse(expression, mode="eval")
-        # Evaluate only the boolean subset this guard actually uses, and only
-        # typed boolean inputs (the workflow schema above guarantees that type).
-        allowed = (ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.Compare, ast.Eq, ast.Name, ast.Load, ast.Constant)
-        self.assertTrue(all(isinstance(node, allowed) for node in ast.walk(tree)))
-        self.assertTrue(all(node.id in {"ref", "event", "build_only"} for node in ast.walk(tree) if isinstance(node, ast.Name)))
-        cases = (
-            ("refs/heads/arena/example", "workflow_dispatch", True, False),
-            ("refs/heads/arena/example", "workflow_dispatch", False, False),
-            ("refs/heads/arena/example", "push", False, False),
-            ("refs/pull/30/merge", "pull_request", True, False),
-            ("refs/pull/30/merge", "pull_request", False, False),
-            ("refs/heads/main", "workflow_dispatch", True, False),
-            ("refs/heads/main", "workflow_dispatch", False, True),
-            ("refs/heads/main", "push", False, False),
-            ("refs/heads/main", "push", True, False),
-            ("refs/heads/main", "schedule", False, False),
-        )
-        code = compile(tree, str(WORKFLOW), "eval")
-        for ref, event, build_only, expected in cases:
-            with self.subTest(ref=ref, event=event, build_only=build_only):
-                result = eval(code, {"__builtins__": {}}, {"ref": ref, "event": event, "build_only": build_only})
-                self.assertIs(result, expected)
+    def test_publish_requires_public_plan_and_green_package_jobs(self):
+        # ReleasePlanTest exercises the real git-history channel decision. The
+        # workflow must consume it both when building and when publishing.
+        self.assertIn("needs: [release_plan, apk, msi]", self.publish)
+        self.assertIn("github.ref == 'refs/heads/main'", self.publish)
+        self.assertIn("needs.release_plan.outputs.channel == 'public'", self.publish)
+        self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish)
+        self.assertIn("github.event_name == 'push'", self.publish)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.build_only == false", self.publish)
+        self.assertIn("if: ${{ github.event_name == 'workflow_dispatch' && inputs.purge_legacy_dev_releases }}", self.publish)
+        self.assertIn("fetch-depth: 2", self.text)
+        self.assertIn("python scripts/release_plan.py", self.text)
+        self.assertIn("- '.github/release-intent/v1.00.002'", self.text)
 
-    def test_app_code_merge_updates_only_the_private_rolling_test_release(self):
+    def test_ordinary_app_code_merge_updates_only_the_private_rolling_test_release(self):
         push = self.text.split("  push:\n", 1)[1].split("\n\npermissions:", 1)[0]
         self.assertIn("branches: [main]", push)
         for path in ("shared/**", "app-android/**", "app-desktop/**", "gradle/**"):
             self.assertIn(f"- '{path}'", push)
         self.assertIn("github.event_name == 'push'", self.publish_test)
         self.assertIn("github.ref == 'refs/heads/main'", self.publish_test)
-        self.assertIn("needs: [apk, msi]", self.publish_test)
+        self.assertIn("needs: [release_plan, apk, msi]", self.publish_test)
+        self.assertIn("needs.release_plan.outputs.channel == 'test'", self.publish_test)
         self.assertIn("gh release create test", self.publish_test)
         self.assertNotIn("Stage, verify and publish the fixed v1.00.002", self.publish_test)
-        # The fixed/public release path remains a separate explicit dispatch.
-        self.assertNotIn("github.event_name == 'push'", self.publish)
+        # Only a newly added marker can select public on a main push.
         self.assertIn("github.event_name == 'workflow_dispatch' && inputs.build_only == false", self.publish)
 
     def test_test_catalogue_uses_explicit_build_channel_and_public_does_not(self):
         self.assertIn("DHUN_RELEASE_CHANNEL:", self.text)
-        channel = re.search(r"^  DHUN_RELEASE_CHANNEL: (.+)$", self.text, re.MULTILINE).group(1)
-        self.assertIn("github.event_name == 'workflow_dispatch'", channel)
-        self.assertIn("inputs.build_only == false", channel)
-        self.assertIn("'public'", channel)
-        self.assertIn("|| 'test'", channel)
+        self.assertEqual(3, self.text.count("DHUN_RELEASE_CHANNEL: ${{ needs.release_plan.outputs.channel }}"))
+        self.assertEqual(3, self.text.count("BUILD_ONLY: ${{ needs.release_plan.outputs.build_only }}"))
+        self.assertIn("if: ${{ env.DHUN_RELEASE_CHANNEL == 'test' }}", self.text)
         self.assertIn('"-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL"', self.text)
         self.assertIn('"-PdhunReleaseChannel=$env:DHUN_RELEASE_CHANNEL"', self.text)
         android = (WORKFLOW.parents[2] / "app-android/build.gradle.kts").read_text()
@@ -99,27 +80,14 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("viewModel.setAccentId(accent.id)", shell)
 
     def test_automatic_test_release_guard_is_main_push_only(self):
-        expression = re.search(r"^    if: \$\{\{ (.+) \}\}$", self.publish_test, re.MULTILINE).group(1)
-        expression = expression.replace("github.ref", "ref").replace("github.event_name", "event")
-        expression = expression.replace("&&", "and").replace("||", "or")
-        tree = ast.parse(expression, mode="eval")
-        allowed = (ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.Compare, ast.Eq, ast.Name, ast.Load, ast.Constant)
-        self.assertTrue(all(isinstance(node, allowed) for node in ast.walk(tree)))
-        code = compile(tree, str(WORKFLOW), "eval")
-        for ref, event, expected in (
-            ("refs/heads/main", "push", True),
-            ("refs/heads/arena/example", "push", False),
-            ("refs/pull/30/merge", "pull_request", False),
-            ("refs/heads/main", "workflow_dispatch", False),
-        ):
-            with self.subTest(ref=ref, event=event):
-                result = eval(code, {"__builtins__": {}}, {"ref": ref, "event": event})
-                self.assertIs(result, expected)
+        self.assertIn("github.ref == 'refs/heads/main'", self.publish_test)
+        self.assertIn("github.event_name == 'push'", self.publish_test)
+        self.assertIn("needs.release_plan.outputs.channel == 'test'", self.publish_test)
 
     def test_installer_is_a_pull_request_check_before_merge(self):
         self.assertIn("  pull_request:\n    branches: [main]", self.text)
         self.assertIn("- name: Check install-over and userdata on disposable Windows", self.text)
-        self.assertIn("    needs: [apk, msi]", self.publish)
+        self.assertIn("    needs: [release_plan, apk, msi]", self.publish)
 
     def test_unsigned_msi_is_finalized_before_checksum_and_upload(self):
         scripts = WORKFLOW.parents[2] / "scripts"
@@ -158,7 +126,7 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("        type: boolean", block)
         self.assertIn("        default: false", block)
         purge = self.publish.split("      - name: Delete legacy dev releases", 1)[1].split("\n      - name:", 1)[0]
-        self.assertIn("if: ${{ inputs.purge_legacy_dev_releases }}", purge)
+        self.assertIn("if: ${{ github.event_name == 'workflow_dispatch' && inputs.purge_legacy_dev_releases }}", purge)
         for tag in ("dev-v0.1.0", "dev-v0.1.1", "dev"):
             self.assertIn(f"gh release delete {tag} --yes --cleanup-tag", purge)
         self.assertIn("git push origin :refs/tags/dev", purge)
