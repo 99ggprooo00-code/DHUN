@@ -121,7 +121,7 @@ class SettingsViewModel(
                 SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT,
             ).coerceIn(0, 100)
             val tuning = mutableMapOf<VisualPart, Int>()
-            for (part in VisualPart.entries) {
+            for (part in DhunVisualTuning.adjustableParts) {
                 tuning[part] = get.int(part.key, DhunVisualTuning.DEFAULT).coerceIn(0, 100)
             }
             _visualTuning.value = tuning
@@ -198,10 +198,12 @@ class SettingsViewModel(
 
     /** Preview continuously, but write once on slider release (not per drag frame). */
     fun previewVisualTuning(part: VisualPart, percent: Int) {
+        if (part !in DhunVisualTuning.adjustableParts) return
         _visualTuning.value = _visualTuning.value + (part to percent.coerceIn(0, 100))
     }
 
     fun saveVisualTuning(part: VisualPart) {
+        if (part !in DhunVisualTuning.adjustableParts) return
         val value = _visualTuning.value[part] ?: DhunVisualTuning.DEFAULT
         enqueueWrite { update.int(part.key, value) }
     }

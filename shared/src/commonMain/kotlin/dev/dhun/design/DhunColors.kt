@@ -32,9 +32,9 @@ object DhunColors {
 
     // Surfaces (near-black stack, warm)
     val background: Color get() = DhunAppearance.tokens.background
-    val surface: Color get() = DhunAppearance.tokens.surface
-    val surfaceVariant: Color get() = DhunAppearance.tokens.surfaceVariant
-    val surfaceElevated: Color get() = DhunAppearance.tokens.surfaceElevated
+    val surface: Color get() = DhunVisualTuning.tonalSurface(DhunAppearance.tokens.surface, DhunAppearance.tokens.isLight)
+    val surfaceVariant: Color get() = DhunVisualTuning.tonalSurface(DhunAppearance.tokens.surfaceVariant, DhunAppearance.tokens.isLight)
+    val surfaceElevated: Color get() = DhunVisualTuning.tonalSurface(DhunAppearance.tokens.surfaceElevated, DhunAppearance.tokens.isLight)
     val surfaceHighest: Color get() = DhunAppearance.tokens.surfaceHighest
     val surfaceCard: Color get() = DhunAppearance.tokens.surfaceCard
 
@@ -106,8 +106,8 @@ object DhunColors {
     val surfaceContainerLowest: Color get() = DhunAppearance.tokens.surfaceContainerLowest
     val surfaceContainerLow: Color get() = DhunAppearance.tokens.surfaceContainerLow
     val surfaceContainer: Color get() = DhunAppearance.tokens.surfaceContainer
-    val surfaceContainerHigh: Color get() = DhunAppearance.tokens.surfaceContainerHigh
-    val surfaceContainerHighest: Color get() = DhunAppearance.tokens.surfaceContainerHighest
+    val surfaceContainerHigh: Color get() = DhunVisualTuning.tonalSurface(DhunAppearance.tokens.surfaceContainerHigh, DhunAppearance.tokens.isLight)
+    val surfaceContainerHighest: Color get() = DhunVisualTuning.tonalSurface(DhunAppearance.tokens.surfaceContainerHighest, DhunAppearance.tokens.isLight)
 
     /** Material3 scheme derived from the active tokens (single source of truth). */
     val scheme: ColorScheme get() = DhunAppearance.tokens.materialScheme

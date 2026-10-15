@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.diagnosticText
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
@@ -23,7 +24,7 @@ import dev.dhun.design.DhunSpacing
 internal fun PlaybackErrorDialog(error: PlaybackState.Error, onDismiss: () -> Unit, onRetry: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DhunColors.surface,
+        containerColor = DhunAppearance.tokens.surface,
         titleContentColor = DhunColors.textPrimary,
         textContentColor = DhunColors.textSecondary,
         tonalElevation = DhunSpacing.zero,

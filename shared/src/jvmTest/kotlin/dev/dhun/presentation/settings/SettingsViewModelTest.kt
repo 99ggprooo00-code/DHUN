@@ -69,9 +69,13 @@ class SettingsViewModelTest {
     fun testVisualSlidersPersistIndependentlyAndResetToMidpoint(): Unit = runBlocking {
         val d = data()
         val v = loaded(vm(d, this))
-        assertTrue(VisualPart.entries.all { v.visualTuning.value[it] == DhunVisualTuning.DEFAULT })
+        assertTrue(DhunVisualTuning.adjustableParts.all { v.visualTuning.value[it] == DhunVisualTuning.DEFAULT })
+        assertTrue(listOf(VisualPart.PAGE_BACKDROP, VisualPart.MINI_PLAYER, VisualPart.NAVIGATION).all { it !in v.visualTuning.value })
         v.previewVisualTuning(VisualPart.LIST_ROWS, 86)
         v.previewVisualTuning(VisualPart.QUEUE_ROWS, -1)
+        v.previewVisualTuning(VisualPart.MINI_PLAYER, 100)
+        v.saveVisualTuning(VisualPart.MINI_PLAYER)
+        assertTrue(VisualPart.MINI_PLAYER !in v.visualTuning.value)
         assertEquals(86, v.visualTuning.value[VisualPart.LIST_ROWS])
         assertEquals(0, v.visualTuning.value[VisualPart.QUEUE_ROWS])
         v.saveVisualTuning(VisualPart.LIST_ROWS)
@@ -81,7 +85,7 @@ class SettingsViewModelTest {
         assertEquals(0, restored.visualTuning.value[VisualPart.QUEUE_ROWS])
         restored.resetVisualTuning()
         val reset = reloaded(d, this)
-        assertTrue(VisualPart.entries.all { reset.visualTuning.value[it] == DhunVisualTuning.DEFAULT })
+        assertTrue(DhunVisualTuning.adjustableParts.all { reset.visualTuning.value[it] == DhunVisualTuning.DEFAULT })
     }
 
     @Test

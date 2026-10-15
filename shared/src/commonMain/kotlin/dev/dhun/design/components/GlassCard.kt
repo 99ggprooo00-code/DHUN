@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.VisualPart
@@ -51,7 +52,7 @@ fun GlassCard(
             .clip(shape)
             .background(when {
                 // Dialogs stay opaque for reading, but not stark black/white.
-                opaqueBase -> DhunColors.surfaceVariant
+                opaqueBase -> DhunAppearance.tokens.surfaceVariant
                 subtle -> DhunColors.overlayFocus
                 else -> readingSurfaceFill()
             }, shape)
