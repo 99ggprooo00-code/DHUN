@@ -9,12 +9,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.TextButton
@@ -31,6 +36,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import dev.dhun.design.DhunAccent
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
@@ -42,11 +49,13 @@ import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.design.components.DhunAppearanceControls
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunIconButton
+import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.player.equalizer.EqualizerPresets
 import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.player.equalizer.toUiModel
+import dev.dhun.presentation.settings.CountryRegions
 import dev.dhun.presentation.settings.SettingsViewModel
 import kotlin.math.round
 
@@ -73,6 +82,8 @@ fun SettingsScreen(
     equalizerSession: EqualizerSession? = null,
     modifier: Modifier = Modifier,
     onOpenAboutLegal: () -> Unit = {},
+    showThemeCatalogue: Boolean = false,
+    onOpenThemeCatalogue: () -> Unit = {},
 ) {
     val themeId by viewModel.themeId.collectAsState()
     val accentId by viewModel.accentId.collectAsState()
@@ -136,7 +147,20 @@ fun SettingsScreen(
                     viewModel.setAccentMode(it)
                     DhunAppearance.setAccentMode(it)
                 }
+                Text(
+                    text = "Dynamic tints accent-colored controls throughout the app from the current track; static keeps the selected color.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                    modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
+                )
                 BackdropControls(viewModel)
+                if (showThemeCatalogue) {
+                    SettingsNavigationRow(
+                        "Theme catalogue",
+                        "Preview the test build’s themes and shared components",
+                        onOpenThemeCatalogue,
+                    )
+                }
             }
             SettingsGroup("Playback & Audio") {
                 OptionRow("Streaming & download quality", listOf("low" to "Low (~48–64 kbps)",
@@ -158,10 +182,10 @@ fun SettingsScreen(
                     viewModel.lyricsEnabled.collectAsState().value, viewModel::setLyricsEnabled)
                 OptionRow("Preferred provider", listOf("auto" to "Auto (synced first)", "lrclib" to "LRCLIB",
                     "ytm" to "YouTube Music", "lrclib_search" to "LRCLIB search", "kugou" to "KuGou"),
-                    viewModel.preferredProvider.collectAsState().value, viewModel::setPreferredProvider)
+                    viewModel.preferredProvider.collectAsState().value, { viewModel.setPreferredProvider(it) })
                 listOf("lrclib" to "LRCLIB", "ytm" to "YouTube Music",
                     "lrclib_search" to "LRCLIB search", "kugou" to "KuGou").forEach { (id, label) ->
-                    SettingsSwitchRow(label, "Use as a lyrics fallback",
+                    SettingsSwitchRow(label, "Include as a fallback after the preferred provider",
                         id in viewModel.providerOrder.collectAsState().value.split(',')) {
                         viewModel.setProviderEnabled(id, it)
                     }
@@ -175,8 +199,7 @@ fun SettingsScreen(
                     viewModel.lyricsTextSize.collectAsState().value, viewModel::setLyricsTextSize)
             }
             SettingsGroup("Content, Region & Discovery") {
-                OptionRow("Content country", listOf("US", "NP", "IN", "GB", "CA", "AU", "DE", "FR", "JP", "KR", "BR")
-                    .map { it to it }, viewModel.countryCode.collectAsState().value, viewModel::setCountryCode)
+                CountryRegionPicker(viewModel)
                 SettingsSwitchRow("Explicit content", "Allow explicit tracks in search, home and radio",
                     viewModel.explicitContent.collectAsState().value, viewModel::setExplicitContent)
             }
@@ -296,6 +319,105 @@ private fun <T> OptionRow(title: String, options: List<Pair<T, String>>, selecte
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
             options.forEach { (value, label) ->
                 DhunFilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(label) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun CountryRegionPicker(viewModel: SettingsViewModel) {
+    val countryCode by viewModel.countryCode.collectAsState()
+    val selected = CountryRegions.find(countryCode) ?: CountryRegions.default
+    var showPicker by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val matches = remember(query) { CountryRegions.search(query) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding),
+        verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+    ) {
+        Text("Content country/region", style = MaterialTheme.typography.bodyLarge, color = DhunColors.textPrimary)
+        DhunTonalButton(
+            onClick = {
+                query = ""
+                showPicker = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = "${selected.name} (${selected.code})",
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            DhunIconView(
+                icon = DhunIcon.ChevronDown,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                tint = DhunColors.textPrimary,
+            )
+        }
+        Text(
+            text = "Filters the music catalogue where that region is available.",
+            style = MaterialTheme.typography.bodySmall,
+            color = DhunColors.textSecondary,
+        )
+    }
+
+    if (showPicker) Dialog(onDismissRequest = { showPicker = false }) {
+        GlassCard(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp).heightIn(max = 560.dp),
+            opaqueBase = true,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp).padding(DhunSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+            ) {
+                Text("Choose a country or region", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Search by name or code") },
+                    singleLine = true,
+                )
+                if (matches.isEmpty()) {
+                    Text(
+                        text = "No matching country or region.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DhunColors.textSecondary,
+                        modifier = Modifier.padding(vertical = DhunSpacing.md),
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
+                        items(matches, key = { it.code }) { region ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clickable(role = Role.Button) {
+                                        viewModel.setCountryCode(region.code)
+                                        showPicker = false
+                                    }
+                                    .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.md),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = region.name,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (region.code == selected.code) DhunColors.accent else DhunColors.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(modifier = Modifier.width(DhunSpacing.md))
+                                Text(
+                                    text = region.code,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = DhunColors.textSecondary,
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

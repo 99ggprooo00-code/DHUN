@@ -111,8 +111,8 @@ class ArtworkColorExtractorTest {
     }
 
     @Test
-    fun fallback_hasExpectedAccent() {
-        assertEquals(DhunColors.accent, ArtworkColors.fallback.primary)
-        assertEquals(DhunColors.onAccent, ArtworkColors.fallback.onPrimary)
+    fun fallback_hasExpectedSelectedAccent() {
+        assertEquals(DhunAppearance.selectedAccentColor, ArtworkColors.fallback.primary)
+        assertEquals(DhunAppearance.selectedOnAccentColor, ArtworkColors.fallback.onPrimary)
     }
 }

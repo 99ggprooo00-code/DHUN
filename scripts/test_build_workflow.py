@@ -11,6 +11,7 @@ WORKFLOW = Path(__file__).resolve().parents[1] / ".github/workflows/test-release
 class BuildWorkflowTest(unittest.TestCase):
     def setUp(self):
         self.text = WORKFLOW.read_text()
+        self.publish_test = self.text.split("\n  publish_test:\n", 1)[1].split("\n  publish:\n", 1)[0]
         self.publish = self.text.split("\n  publish:\n", 1)[1]
 
     def test_typed_manual_input_defaults_to_build_only(self):
@@ -48,11 +49,63 @@ class BuildWorkflowTest(unittest.TestCase):
                 result = eval(code, {"__builtins__": {}}, {"ref": ref, "event": event, "build_only": build_only})
                 self.assertIs(result, expected)
 
-    def test_merge_to_main_cannot_mutate_releases(self):
-        # A merge pushes to main; that must build/test only, never publish.
-        self.assertIn("  push:\n    branches: [main]", self.text)
+    def test_app_code_merge_updates_only_the_private_rolling_test_release(self):
+        push = self.text.split("  push:\n", 1)[1].split("\n\npermissions:", 1)[0]
+        self.assertIn("branches: [main]", push)
+        for path in ("shared/**", "app-android/**", "app-desktop/**", "gradle/**"):
+            self.assertIn(f"- '{path}'", push)
+        self.assertIn("github.event_name == 'push'", self.publish_test)
+        self.assertIn("github.ref == 'refs/heads/main'", self.publish_test)
+        self.assertIn("needs: [apk, msi]", self.publish_test)
+        self.assertIn("gh release create test", self.publish_test)
+        self.assertNotIn("Create the fixed v1.00.001", self.publish_test)
+        # The fixed/public release path remains a separate explicit dispatch.
         self.assertNotIn("github.event_name == 'push'", self.publish)
         self.assertIn("github.event_name == 'workflow_dispatch' && inputs.build_only == false", self.publish)
+
+    def test_test_catalogue_uses_explicit_build_channel_and_public_does_not(self):
+        self.assertIn("DHUN_RELEASE_CHANNEL:", self.text)
+        channel = re.search(r"^  DHUN_RELEASE_CHANNEL: (.+)$", self.text, re.MULTILINE).group(1)
+        self.assertIn("github.event_name == 'workflow_dispatch'", channel)
+        self.assertIn("inputs.build_only == false", channel)
+        self.assertIn("'public'", channel)
+        self.assertIn("|| 'test'", channel)
+        self.assertIn('"-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL"', self.text)
+        self.assertIn('"-PdhunReleaseChannel=$env:DHUN_RELEASE_CHANNEL"', self.text)
+        android = (WORKFLOW.parents[2] / "app-android/build.gradle.kts").read_text()
+        desktop = (WORKFLOW.parents[2] / "app-desktop/build.gradle.kts").read_text()
+        self.assertIn('buildConfigField("String", "DHUN_RELEASE_CHANNEL"', android)
+        self.assertIn('jvmArgs += "-Ddhun.release.channel=$dhunReleaseChannel"', desktop)
+        activity = (WORKFLOW.parents[2] / "app-android/src/main/kotlin/dev/dhun/android/MainActivity.kt").read_text()
+        desktop_main = (WORKFLOW.parents[2] / "app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt").read_text()
+        self.assertIn('"test" -> DhunAppInfo.TEST_RELEASE_CHANNEL', activity)
+        self.assertIn('"test" -> DhunAppInfo.TEST_RELEASE_CHANNEL', desktop_main)
+        shell = (WORKFLOW.parents[2] / "shared/src/commonMain/kotlin/dev/dhun/ui/shell/DhunAppShell.kt").read_text()
+        settings = (WORKFLOW.parents[2] / "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt").read_text()
+        self.assertIn("showThemeCatalogue = appInfo.isTestRelease", shell)
+        self.assertIn("showThemeCatalogue: Boolean = false", settings)
+        self.assertIn("if (showThemeCatalogue)", settings)
+        self.assertIn('"Theme catalogue"', settings)
+        self.assertIn("viewModel.setThemeId(mode.id)", shell)
+        self.assertIn("viewModel.setAccentId(accent.id)", shell)
+
+    def test_automatic_test_release_guard_is_main_push_only(self):
+        expression = re.search(r"^    if: \$\{\{ (.+) \}\}$", self.publish_test, re.MULTILINE).group(1)
+        expression = expression.replace("github.ref", "ref").replace("github.event_name", "event")
+        expression = expression.replace("&&", "and").replace("||", "or")
+        tree = ast.parse(expression, mode="eval")
+        allowed = (ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.Compare, ast.Eq, ast.Name, ast.Load, ast.Constant)
+        self.assertTrue(all(isinstance(node, allowed) for node in ast.walk(tree)))
+        code = compile(tree, str(WORKFLOW), "eval")
+        for ref, event, expected in (
+            ("refs/heads/main", "push", True),
+            ("refs/heads/arena/example", "push", False),
+            ("refs/pull/30/merge", "pull_request", False),
+            ("refs/heads/main", "workflow_dispatch", False),
+        ):
+            with self.subTest(ref=ref, event=event):
+                result = eval(code, {"__builtins__": {}}, {"ref": ref, "event": event})
+                self.assertIs(result, expected)
 
     def test_installer_is_a_pull_request_check_before_merge(self):
         self.assertIn("  pull_request:\n    branches: [main]", self.text)
@@ -72,22 +125,24 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("'UPGRADINGPRODUCTCODE'", patch)
 
     def test_build_jobs_do_not_get_contents_write(self):
-        before_publish = self.text.split("\n  publish:\n", 1)[0]
+        before_publish = self.text.split("\n  publish_test:\n", 1)[0]
         self.assertIn("permissions:\n  contents: read", before_publish)
         self.assertNotIn("contents: write", before_publish)
+        self.assertIn("    permissions:\n      contents: write", self.publish_test)
         self.assertIn("    permissions:\n      contents: write", self.publish)
 
     def test_rolling_test_release_stays_a_private_draft(self):
-        self.assertIn("gh release create test", self.publish)
-        self.assertIn("--draft --prerelease", self.publish)
-        self.assertIn("--notes-file docs/releases/rolling-test.md", self.publish)
-        self.assertIn("\"$(gh release view test --json isDraft --jq '.isDraft')\" != \"true\"", self.publish)
-        self.assertNotIn("gh release edit test --draft=false", self.publish)
+        self.assertIn("gh release create test", self.publish_test)
+        self.assertIn("--draft --prerelease", self.publish_test)
+        self.assertIn("--notes-file docs/releases/rolling-test.md", self.publish_test)
+        self.assertIn("\"$(gh release view test --json isDraft --jq '.isDraft')\" != \"true\"", self.publish_test)
+        self.assertIn("targetCommitish", self.publish_test)
+        self.assertNotIn("gh release edit test --draft=false", self.publish_test)
 
     def test_legacy_release_purge_is_an_explicit_opt_in(self):
         # The legacy dev releases are irreversible to delete. They may be removed
         # only when the maintainer ticks a typed, default-off input on a manual
-        # publish. The rolling `test` draft keeps its by-design replacement.
+        # public release. Automatic rolling-test updates never purge legacy tags.
         inputs = self.text.split("  workflow_dispatch:\n", 1)[1].split("  pull_request:\n", 1)[0]
         self.assertIn("      purge_legacy_dev_releases:", inputs)
         block = inputs.split("      purge_legacy_dev_releases:", 1)[1]
@@ -98,10 +153,10 @@ class BuildWorkflowTest(unittest.TestCase):
         for tag in ("dev-v0.1.0", "dev-v0.1.1", "dev"):
             self.assertIn(f"gh release delete {tag} --yes --cleanup-tag", purge)
         self.assertIn("git push origin :refs/tags/dev", purge)
-        replace = self.publish.split("      - name: Replace the private rolling test draft", 1)[1].split("\n      - name:", 1)[0]
+        self.assertNotIn("gh release delete test", self.publish)
+        self.assertIn("gh release delete test --yes --cleanup-tag", self.publish_test)
         for tag in ("dev-v0.1.0", "dev-v0.1.1", "dev"):
-            self.assertNotIn(f"gh release delete {tag} ", replace)
-        self.assertIn("gh release delete test --yes --cleanup-tag", replace)
+            self.assertNotIn(f"gh release delete {tag} ", self.publish_test)
 
     def test_fixed_version_is_created_once_as_public_prerelease(self):
         self.assertIn("Create the fixed v1.00.001 public prerelease once", self.publish)
@@ -147,7 +202,7 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("python scripts/stage_android_apks.py", apk)
         self.assertIn("app-android/build/outputs/apk/debug", apk)
         self.assertNotIn("cp app-android/build/outputs/apk/debug/app-android-debug.apk", apk)
-        create = self.publish.split("gh release create test", 1)[1].split("--target", 1)[0]
+        create = self.publish_test.split("gh release create test", 1)[1].split("--target", 1)[0]
         for name in ("dhun-test.apk", "dhun-test-arm64-v8a.apk", "dhun-test-armeabi-v7a.apk"):
             self.assertIn(f"python scripts/stage_artifact.py out/{name}", apk)
             self.assertIn(name, create)
@@ -164,7 +219,7 @@ class BuildWorkflowTest(unittest.TestCase):
         # (The published v1.00.001 .build-info.json files are historical and untouched.)
         self.assertNotIn(".json", self.publish)
         self.assertIn("dist/$version/dhun-v1.00.001.msi.provenance.txt", self.publish)
-        self.assertIn("dist/dhun-test.msi.provenance.txt", self.publish)
+        self.assertIn("dist/dhun-test.msi.provenance.txt", self.publish_test)
         for line in self.text.splitlines():
             if "upload" in line or "gh release create" in line:
                 self.assertNotIn(".json", line)

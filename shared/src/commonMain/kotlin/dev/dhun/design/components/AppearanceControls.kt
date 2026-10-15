@@ -43,10 +43,11 @@ import dev.dhun.design.DhunThemeMode
  *
  * **Persistence is not this component's job.** It holds no state, so whoever
  * mounts it owns saving the choice. The store is `SettingsRepository` +
- * `SettingsKeys.THEME` / `SettingsKeys.ACCENT`; the S4 Settings screen persists
- * through them and the platform entry points restore at startup via
- * `DhunAppearance.applyPersistedAppearance`. The catalog mount stays ephemeral.
- * See [dev.dhun.design.DhunAppearance] for the full picture.
+ * `SettingsKeys.THEME` / `SettingsKeys.ACCENT`; Settings and its test-only
+ * catalogue route both persist through them, while standalone design-preview
+ * mounts may stay ephemeral. Platform entry points restore at startup via
+ * `DhunAppearance.applyPersistedAppearance`. See [dev.dhun.design.DhunAppearance]
+ * for the full picture.
  */
 @Composable
 fun DhunAppearanceControls(

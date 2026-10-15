@@ -25,6 +25,9 @@ sealed interface DetailRoute {
      */
     data object SettingsPage : DetailRoute
 
+    /** Test-build-only theme and component preview opened from Settings. */
+    data object ThemeCatalogPage : DetailRoute
+
     /**
      * Settings → About & Legal: the index of the bundled legal pages.
      *
@@ -193,6 +196,7 @@ class AppNavState {
         // Settings and About & Legal are id-less singletons: re-tapping the entry
         // replaces the existing page instead of stacking identical pages.
         if (route is DetailRoute.SettingsPage) detailStack.removeAll { it is DetailRoute.SettingsPage }
+        if (route is DetailRoute.ThemeCatalogPage) detailStack.removeAll { it is DetailRoute.ThemeCatalogPage }
         if (route is DetailRoute.AboutLegalPage) detailStack.removeAll { it is DetailRoute.AboutLegalPage }
         detailStack += route
     }

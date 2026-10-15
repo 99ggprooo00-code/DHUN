@@ -452,8 +452,12 @@ class PlayerViewModel(
     }
 
     fun setVolume(volume: Float) {
-        player.setVolume(volume)
-        if (volume <= 0f && _pauseOnMute.value && state.value is PlaybackState.Playing) player.playPause()
+        val inAppVolume = volume.coerceIn(0f, 1f)
+        val wasAudible = player.volume.value > 0f
+        player.setVolume(inAppVolume)
+        if (inAppVolume == 0f && wasAudible && _pauseOnMute.value && state.value is PlaybackState.Playing) {
+            player.playPause()
+        }
     }
 
     private suspend fun resetModesForNewQueue() {

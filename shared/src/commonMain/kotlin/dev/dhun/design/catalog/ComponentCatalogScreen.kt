@@ -33,6 +33,7 @@ import dev.dhun.core.Playlist
 import dev.dhun.core.Track
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.ArtworkColors
+import dev.dhun.design.DhunAccent
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
@@ -65,19 +66,21 @@ import dev.dhun.design.components.TrackRowShimmer
  * surface: blur visibly real, no raw tokens outside design, artwork color
  * extraction sanity.
  *
- * Shown in debug builds via a `Catalog` entry point on both platforms.
- * Not shipped in release.
+ * Exposed from Settings only in explicitly channelled test-release builds; the
+ * public pre-release and ordinary development builds do not get this entry point.
  */
 @Composable
 fun ComponentCatalogScreen(
     onClose: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    selectedThemeId: String = DhunAppearance.themeId,
+    onModeChange: ((DhunThemeMode) -> Unit)? = null,
+    onSystemChange: (() -> Unit)? = null,
+    onAccentChange: ((DhunAccent) -> Unit)? = null,
 ) {
-    // Candidate 28: the catalog is the one surface that drives the appearance
-    // toggle. It reads the shared holder (subscribing, so a flip recomposes
-    // this screen and re-wraps it in the new theme) and writes back through
-    // setAppearance — the same single source of truth the rest of the app
-    // reads, so the toggle is live for everything, not just this screen.
+    // Candidate 28: the catalog is the design-preview surface for appearance.
+    // Its standalone mount stays ephemeral; the Settings entry supplies the
+    // same SettingsViewModel-backed callbacks as the main appearance controls.
     val mode = DhunAppearance.mode
     val accent = DhunAppearance.accent
     DhunTheme(mode = mode, accent = accent) {
@@ -124,7 +127,7 @@ fun ComponentCatalogScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            "DHUN Component Catalogue",
+                            "DHUN Theme & Component Catalogue",
                             style = MaterialTheme.typography.headlineSmall,
                             color = DhunColors.textPrimary,
                         )
@@ -140,8 +143,10 @@ fun ComponentCatalogScreen(
                     DhunAppearanceControls(
                         mode = mode,
                         accent = accent,
-                        onModeChange = { next -> DhunAppearance.setAppearance(nextMode = next) },
-                        onAccentChange = { next -> DhunAppearance.setAppearance(nextAccent = next) },
+                        selectedThemeId = selectedThemeId,
+                        onModeChange = onModeChange ?: { next -> DhunAppearance.setAppearance(nextMode = next) },
+                        onSystemChange = onSystemChange,
+                        onAccentChange = onAccentChange ?: { next -> DhunAppearance.setAppearance(nextAccent = next) },
                     )
                 }
 

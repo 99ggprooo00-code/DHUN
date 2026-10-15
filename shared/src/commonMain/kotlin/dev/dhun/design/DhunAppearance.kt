@@ -5,6 +5,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
+import kotlin.math.pow
 
 /**
  * Candidate 28 — themes beyond dark-first.
@@ -440,9 +441,11 @@ data class DhunTokens(
 }
 
 /**
- * The one observable appearance holder — mode, accent, and the derived
- * [DhunTokens]. Snapshot state, so a change recomposes every token reader
- * without any screen being rewritten.
+ * The one observable appearance holder — theme mode, selected fallback accent,
+ * and the active [DhunTokens]. In artwork mode, the shell supplies a
+ * contrast-safe current-track tint that updates accent tokens app-wide; static
+ * mode restores the selected fallback ramp. Snapshot state means token readers
+ * recompose without screen-specific color plumbing.
  *
  * Default is dark + brand, i.e. the palette from before this file existed.
  */
@@ -451,27 +454,38 @@ object DhunAppearance {
     const val BACKDROP_BLUR_DEFAULT = 100
     const val BACKDROP_BRIGHTNESS_DEFAULT = 55
 
-    // Publish a complete palette in ONE snapshot write. Readers in the desktop
-    // two-pane window must never observe a new mode with the old accent tokens.
+    // Keep the selected theme/accent and its static tokens together. The
+    // derived active-token state is refreshed whenever this palette or the
+    // artwork tint changes.
     private data class Palette(val mode: DhunThemeMode, val accent: DhunAccent, val tokens: DhunTokens)
     private val paletteState = mutableStateOf(Palette(DhunThemeMode.default, DhunAccent.default, DhunTokens.dark))
     private val themeIdState = mutableStateOf("dark")
     private val accentModeState = mutableStateOf("artwork")
+    private val artworkAccentState = mutableStateOf<Color?>(null)
+    private val appearanceRevisionState = mutableStateOf(0)
+    private val activeTokensState = mutableStateOf(DhunTokens.dark)
     private val backdropBlurPercentState = mutableStateOf(BACKDROP_BLUR_DEFAULT)
     private val backdropBrightnessPercentState = mutableStateOf(BACKDROP_BRIGHTNESS_DEFAULT)
 
     val mode: DhunThemeMode get() = paletteState.value.mode
     val accent: DhunAccent get() = paletteState.value.accent
+    /** The user-selected fallback ramp, before any current-artwork tint. */
+    val selectedAccentColor: Color get() = paletteState.value.tokens.accent
+    val selectedOnAccentColor: Color get() = paletteState.value.tokens.onAccent
+    val selectedAccentContainerColor: Color get() = paletteState.value.tokens.accentContainer
     val themeId: String get() = themeIdState.value
     val accentMode: String get() = accentModeState.value
+    /** Changes on reset so the shell can reapply the current track tint. */
+    val appearanceRevision: Int get() = appearanceRevisionState.value
     val backdropBlurPercent: Int get() = backdropBlurPercentState.value
     val backdropBrightnessPercent: Int get() = backdropBrightnessPercentState.value
-    val tokens: DhunTokens get() = paletteState.value.tokens
+    val tokens: DhunTokens get() = activeTokensState.value
 
     fun setAppearance(nextMode: DhunThemeMode = mode, nextAccent: DhunAccent = accent) {
         val current = paletteState.value
         if (nextMode == current.mode && nextAccent == current.accent) return
         paletteState.value = Palette(nextMode, nextAccent, DhunTokens.forAppearance(nextMode, nextAccent))
+        refreshTokens()
     }
 
     /** Called from event handlers/startup, never during composition. */
@@ -486,14 +500,67 @@ object DhunAppearance {
     }
 
     fun setAccentMode(id: String) {
-        if (id == "artwork" || id == "static") accentModeState.value = id
+        if (id != "artwork" && id != "static") return
+        val changed = accentModeState.value != id
+        accentModeState.value = id
+        if (id == "static") artworkAccentState.value = null
+        if (changed || id == "static") refreshTokens()
+    }
+
+    /**
+     * Installs the active track's contrast-safe artwork tint in the global
+     * token palette. In artwork mode this affects the app accent tokens, not
+     * only the player; static mode continues to use the selected accent.
+     */
+    fun setArtworkAccent(color: Color?) {
+        if (artworkAccentState.value == color) return
+        artworkAccentState.value = color
+        refreshTokens()
+    }
+
+    private fun refreshTokens() {
+        val palette = paletteState.value
+        val artwork = artworkAccentState.value.takeIf { accentModeState.value == "artwork" }
+        activeTokensState.value = if (artwork == null) {
+            palette.tokens
+        } else {
+            palette.tokens.withAccent(artworkAccentRamp(artwork, palette.tokens))
+        }
+    }
+
+    private fun artworkAccentRamp(color: Color, base: DhunTokens): AccentRamp {
+        val container = color.mix(base.surface, 0.84f)
+        return AccentRamp(
+            accent = color,
+            onAccent = bestContrastText(color),
+            container = container,
+            onContainer = bestContrastText(container),
+        )
+    }
+
+    private fun bestContrastText(background: Color): Color {
+        val luminance = relativeLuminance(background)
+        val blackContrast = (luminance + 0.05f) / 0.05f
+        val whiteContrast = 1.05f / (luminance + 0.05f)
+        return if (blackContrast >= whiteContrast) Color.Black else Color.White
+    }
+
+    private fun relativeLuminance(color: Color): Float {
+        fun linearize(channel: Float): Float =
+            if (channel <= 0.04045f) channel / 12.92f else ((channel + 0.055f) / 1.055f).pow(2.4f)
+        return 0.2126f * linearize(color.red) +
+            0.7152f * linearize(color.green) +
+            0.0722f * linearize(color.blue)
     }
 
     /** Back to the shipped default. Used by tests and any future "reset" action. */
     fun reset() {
+        appearanceRevisionState.value++
         themeIdState.value = "dark"
         accentModeState.value = "artwork"
+        artworkAccentState.value = null
         setAppearance(DhunThemeMode.default, DhunAccent.default)
+        refreshTokens()
         setBackdropPrefs(BACKDROP_BLUR_DEFAULT, BACKDROP_BRIGHTNESS_DEFAULT)
     }
 

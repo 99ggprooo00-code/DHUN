@@ -502,11 +502,11 @@ class MainActivity : ComponentActivity() {
     /**
      * The About page's build metadata, read from the installed package.
      *
-     * Nothing here is hardcoded: the About screen reports what this APK actually
-     * is, so rebuilding with a bumped `versionName` shows the new value with no
-     * second place to update. Every field falls back to the explicit
-     * [DhunAppInfo.UNKNOWN] sentinel — a visible "unknown" is honest, a
-     * plausible-looking guess is not.
+     * Version values come from the installed package; the release channel is
+     * stamped into BuildConfig by the workflow's `dhunReleaseChannel` property.
+     * That explicit channel gates the test-only Theme Catalogue without changing
+     * the app version. Missing package metadata falls back to the explicit
+     * [DhunAppInfo.UNKNOWN] sentinel rather than a plausible-looking guess.
      */
     private fun dhunAppInfo(): DhunAppInfo = try {
         val info = packageManager.getPackageInfo(packageName, 0)
@@ -516,7 +516,11 @@ class MainActivity : ComponentActivity() {
             versionName = info.versionName ?: DhunAppInfo.UNKNOWN,
             // PackageInfoCompat, not the API-28 `longVersionCode`: minSdk is 24.
             versionCode = PackageInfoCompat.getLongVersionCode(info).toString(),
-            releaseChannel = if (debuggable) "debug build" else "release build",
+            releaseChannel = when (BuildConfig.DHUN_RELEASE_CHANNEL) {
+                "test" -> DhunAppInfo.TEST_RELEASE_CHANNEL
+                "public" -> "public pre-release"
+                else -> if (debuggable) "development (debug build)" else "development (release build)"
+            },
             platform = "Android",
         )
     } catch (_: Exception) {

@@ -659,10 +659,15 @@ fun main(args: Array<String>) {
  */
 private fun desktopAppInfo(): DhunAppInfo {
     val installer = System.getProperty("dhun.installer.version")
+    val channel = System.getProperty("dhun.release.channel")
     return DhunAppInfo(
         versionName = installer ?: DhunAppInfo.UNKNOWN,
         versionCode = null,
-        releaseChannel = if (installer != null) "packaged installer" else "run from source",
+        releaseChannel = when (channel) {
+            "test" -> DhunAppInfo.TEST_RELEASE_CHANNEL
+            "public" -> "public pre-release"
+            else -> if (installer != null) "packaged installer" else "run from source"
+        },
         platform = "Windows",
     )
 }

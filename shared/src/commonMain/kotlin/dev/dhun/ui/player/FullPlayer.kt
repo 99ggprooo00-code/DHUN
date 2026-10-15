@@ -163,7 +163,7 @@ import kotlinx.coroutines.launch
  * chrome). One interruptible progress then drives the whole screen: the sheet
  * slides up from below the clipped edge while the **entire** player
  * composition — header, cover, overflow/like chips, title, artist, timeline,
- * transport, and desktop volume — rises by that same distance over that same
+ * transport and in-app volume — rises by that same distance over that same
  * progress, so the two boundaries meet on every frame instead of the panel
  * arriving over a stationary player. Half of the rise is absorbed by the
  * weighted artwork field ([relatedSheetLayoutRiseDp]), so the cover re-fits
@@ -197,6 +197,8 @@ import kotlinx.coroutines.launch
 fun FullPlayer(
     viewModel: PlayerViewModel,
     onCollapse: () -> Unit,
+    preferredLyricsProvider: String,
+    onPreferredLyricsProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     isDesktop: Boolean = false,
     onOverflowTrack: (Track) -> Unit = {},
@@ -226,7 +228,7 @@ fun FullPlayer(
     // Controls use the tamed accent, never the raw artwork colour — a raw
     // hue put a red play disc + red volume slider on screen (device report).
     val accentMode = DhunAppearance.accentMode
-    val selectedAccent = DhunColors.accent
+    val selectedAccent = DhunAppearance.selectedAccentColor
     val colors = remember(current?.thumbnailUrl, current?.id, accentMode, selectedAccent) {
         if (accentMode == "static") ArtworkColors.fallback
         else ArtworkColorExtractor.extractFromSeed(current?.thumbnailUrl ?: current?.id ?: "")
@@ -474,7 +476,7 @@ fun FullPlayer(
 
                 // The backdrop stays in place for continuity. Everything else —
                 // header, cover, overflow/like chips, title and artist,
-                // timeline, transport, and desktop volume — is one composition
+                // timeline, transport, and in-app volume — is one composition
                 // rising by the sheet's travel, so the metadata and controls are
                 // never left standing still while a panel slides past them.
                 Box(
@@ -510,6 +512,8 @@ fun FullPlayer(
                                         cacheKey = artworkCacheKey,
                                         viewModel = viewModel,
                                         accent = accent,
+                                        preferredLyricsProvider = preferredLyricsProvider,
+                                        onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding(
@@ -543,6 +547,8 @@ fun FullPlayer(
                                         cacheKey = artworkCacheKey,
                                         viewModel = viewModel,
                                         accent = accent,
+                                        preferredLyricsProvider = preferredLyricsProvider,
+                                        onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding(
@@ -587,6 +593,8 @@ fun FullPlayer(
                         onSelectTab = onPanelTabSelect,
                         onClose = onQueueToggle,
                         accent = accent,
+                        preferredLyricsProvider = preferredLyricsProvider,
+                        onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
                         artworkUrl = current?.thumbnailUrl,
                         sheetHeight = travelDp,
                         motion = draggedMotion,
@@ -821,37 +829,43 @@ private fun PlayerControlCluster(
             }
         }
 
-        // Volume (desktop only — Android uses hardware keys)
-        if (isDesktop) {
-            Row(
-                modifier = Modifier
-                    .widthIn(max = DhunSpacing.playerVolumeMaxWidth)
-                    .fillMaxWidth()
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = itemSpacing, start = horizontalPadding, end = horizontalPadding),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DhunIconView(
-                    icon = DhunIcon.VolumeUp,
-                    contentDescription = null,
-                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                    tint = DhunColors.textSecondary,
-                )
-                Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                // Bounded width: a full-bleed slider at 100% volume
-                // read as a giant coloured error bar across the
-                // window.
-                Slider(
-                    value = volume,
-                    onValueChange = viewModel::setVolume,
-                    modifier = Modifier.weight(1f).semantics { contentDescription = "Volume" },
-                    colors = SliderDefaults.colors(
-                        thumbColor = accent,
-                        activeTrackColor = accent.copy(alpha = 0.85f),
-                        inactiveTrackColor = DhunColors.border,
-                    ),
-                )
-            }
+        // In-app volume is available on every platform. Android hardware keys
+        // still control system volume; this player-level slider is what makes
+        // the persisted pause-on-mute setting actionable (zero pauses only
+        // when that setting is enabled).
+        Row(
+            modifier = Modifier
+                .widthIn(max = if (isDesktop) DhunSpacing.playerVolumeMaxWidth else DhunSpacing.playerContentMaxWidth)
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .padding(top = itemSpacing, start = horizontalPadding, end = horizontalPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DhunIconView(
+                icon = DhunIcon.VolumeUp,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                tint = DhunColors.textSecondary,
+            )
+            Spacer(modifier = Modifier.width(DhunSpacing.sm))
+            Slider(
+                value = volume.coerceIn(0f, 1f),
+                onValueChange = viewModel::setVolume,
+                valueRange = 0f..1f,
+                modifier = Modifier.weight(1f).semantics { contentDescription = "In-app volume" },
+                colors = SliderDefaults.colors(
+                    thumbColor = accent,
+                    activeTrackColor = accent.copy(alpha = 0.85f),
+                    inactiveTrackColor = DhunColors.border,
+                ),
+            )
+            Spacer(modifier = Modifier.width(DhunSpacing.sm))
+            Text(
+                text = "${(volume.coerceIn(0f, 1f) * 100).toInt()}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = DhunColors.textSecondary,
+                modifier = Modifier.semantics { contentDescription = "In-app volume ${(volume.coerceIn(0f, 1f) * 100).toInt()} percent" },
+            )
         }
 
         Spacer(modifier = Modifier.height(itemSpacing))
@@ -1022,6 +1036,8 @@ private fun PlayerArtworkStage(
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
+    preferredLyricsProvider: String,
+    onPreferredLyricsProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.clipToBounds()) {
@@ -1042,6 +1058,8 @@ private fun PlayerArtworkStage(
             cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
+            preferredLyricsProvider = preferredLyricsProvider,
+            onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
             modifier = Modifier.fillMaxSize(),
         )
         PlayerStatusPill(
@@ -1589,6 +1607,8 @@ private fun LyricsCardOverlay(
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
+    preferredLyricsProvider: String,
+    onPreferredLyricsProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -1604,6 +1624,8 @@ private fun LyricsCardOverlay(
             cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
+            preferredLyricsProvider = preferredLyricsProvider,
+            onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
         )
     }
 }
@@ -1687,6 +1709,8 @@ private fun LyricsCard(
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
+    preferredLyricsProvider: String,
+    onPreferredLyricsProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -1735,6 +1759,8 @@ private fun LyricsCard(
             tab = LYRICS_TAB_INDEX,
             viewModel = viewModel,
             accent = accent,
+            preferredLyricsProvider = preferredLyricsProvider,
+            onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -1932,6 +1958,8 @@ private fun QueueSheet(
     onSelectTab: (Int) -> Unit,
     onClose: () -> Unit,
     accent: Color,
+    preferredLyricsProvider: String,
+    onPreferredLyricsProviderChange: (String) -> Unit,
     /** The playing track's raw thumbnail URL — the panel's own blurred artwork. */
     artworkUrl: String?,
     sheetHeight: Dp,
@@ -1988,6 +2016,8 @@ private fun QueueSheet(
                             tab = selectedTab,
                             viewModel = viewModel,
                             accent = accent,
+                            preferredLyricsProvider = preferredLyricsProvider,
+                            onPreferredLyricsProviderChange = onPreferredLyricsProviderChange,
                         )
                     }
                 }

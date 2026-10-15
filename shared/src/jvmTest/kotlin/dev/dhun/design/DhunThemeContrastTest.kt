@@ -7,6 +7,8 @@ import kotlin.math.pow
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -167,6 +169,33 @@ class DhunThemeContrastTest {
                         "${accent.name}/$mode control accent from #${art.toHex()} on background",
                     )
                 }
+            }
+        }
+    }
+
+    @Test
+    fun artworkAccentModeUpdatesGlobalTokensAndKeepsContrast() {
+        DhunAccent.entries.forEach { accent ->
+            DhunThemeMode.entries.forEach { mode ->
+                DhunAppearance.setAppearance(mode, accent)
+                DhunAppearance.setAccentMode("artwork")
+                val selected = DhunAppearance.selectedAccentColor
+                val artworkAccent = ArtworkColorExtractor
+                    .extractFromSeed("dynamic-${mode.name}-${accent.id}")
+                    .controlAccent
+                DhunAppearance.setArtworkAccent(artworkAccent)
+
+                val tokens = DhunAppearance.tokens
+                assertEquals(artworkAccent, tokens.accent, "artwork mode must update the shared palette")
+                assertNotEquals(selected, tokens.accent, "dynamic tint must be visibly distinct from the selected fallback")
+                assertAtLeast(contrast(tokens.onAccent, tokens.accent), 4.5f, "$mode/${accent.id} text on dynamic accent")
+                assertAtLeast(contrast(tokens.onAccentContainer, tokens.accentContainer), 4.5f, "$mode/${accent.id} text on dynamic container")
+                assertAtLeast(contrast(tokens.accent, tokens.surface), 3f, "$mode/${accent.id} dynamic accent on surface")
+                assertAtLeast(contrast(tokens.accent, tokens.background), 3f, "$mode/${accent.id} dynamic accent on background")
+
+                DhunAppearance.setAccentMode("static")
+                assertEquals(selected, DhunAppearance.tokens.accent, "static mode must restore the selected accent")
+                DhunAppearance.setArtworkAccent(null)
             }
         }
     }

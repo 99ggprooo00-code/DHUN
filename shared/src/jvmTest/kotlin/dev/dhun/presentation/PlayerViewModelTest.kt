@@ -14,6 +14,8 @@ import dev.dhun.core.AlbumDetail
 import dev.dhun.core.ArtistPage
 import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.StreamInfo
+import dev.dhun.data.SettingsKeys
+import dev.dhun.data.SettingsRepository
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.player.LyricsUiState
 import dev.dhun.presentation.player.PlayerViewModel
@@ -25,7 +27,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
@@ -91,6 +95,26 @@ class PlayerViewModelTest {
         override fun setShuffle(enabled: Boolean) { shuffleEnabled.value = enabled }
         override fun setVolume(volume: Float) { this.volume.value = volume.coerceIn(0f, 1f) }
         override fun stop() { state.value = PlaybackState.Idle }
+    }
+
+    private class FakeSettingsRepository(initial: Map<String, String>) : SettingsRepository {
+        private val values = initial.toMutableMap()
+        val pauseOnMuteObserved = CompletableDeferred<Unit>()
+
+        override suspend fun getString(key: String): String? = values[key]
+        override suspend fun putString(key: String, value: String) { values[key] = value }
+        override suspend fun getBoolean(key: String, default: Boolean): Boolean =
+            values[key]?.toBooleanStrictOrNull() ?: default
+        override suspend fun putBoolean(key: String, value: Boolean) { values[key] = value.toString() }
+        override suspend fun getInt(key: String, default: Int): Int = values[key]?.toIntOrNull() ?: default
+        override suspend fun putInt(key: String, value: Int) { values[key] = value.toString() }
+        override suspend fun remove(key: String) { values.remove(key) }
+        override fun observeString(key: String): Flow<String?> = flow {
+            emit(values[key])
+            if (key == SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME && !pauseOnMuteObserved.isCompleted) {
+                pauseOnMuteObserved.complete(Unit)
+            }
+        }
     }
 
     private class FakeProvider(
@@ -216,6 +240,38 @@ class PlayerViewModelTest {
 
             vm.setVolume(0.4f)
             assertEquals(0.4f, player.volume.value)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun inAppZeroVolumePausesOnlyWhenPauseOnMuteIsEnabledAndPlaying(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val settings = FakeSettingsRepository(
+                mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "true"),
+            )
+            val player = FakePlayer()
+            player.prepareQueue(listOf(track("mute")), 0, playWhenReady = true)
+            val vm = PlayerViewModel(player, FakeProvider(), scope, settings = settings)
+            settings.pauseOnMuteObserved.await()
+
+            vm.setVolume(0.35f)
+            assertEquals(0, player.playPauseCalls, "nonzero in-app volume must not pause")
+            vm.setVolume(0f)
+            assertEquals(0f, player.volume.value)
+            assertEquals(1, player.playPauseCalls, "zero in-app volume must pause active playback")
+
+            val disabledSettings = FakeSettingsRepository(
+                mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "false"),
+            )
+            val disabledPlayer = FakePlayer()
+            disabledPlayer.prepareQueue(listOf(track("not-muted")), 0, playWhenReady = true)
+            val disabledVm = PlayerViewModel(disabledPlayer, FakeProvider(), scope, settings = disabledSettings)
+            disabledSettings.pauseOnMuteObserved.await()
+            disabledVm.setVolume(0f)
+            assertEquals(0, disabledPlayer.playPauseCalls, "zero volume must not pause when the setting is off")
         } finally {
             scope.cancel()
         }

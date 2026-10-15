@@ -23,8 +23,8 @@ import androidx.compose.ui.graphics.Color
  * +0x0C from the original 0A → 2A) so Home/Search/Library sit closer to the
  * full player's backdrop brightness. Glass (translucent fills with a 10%-white
  * hairline border), the 4-step alpha text ladder and the static `#BB86FC`
- * accent fallback are unchanged; the dynamic artwork-derived accent still
- * arrives via [ArtworkColors].
+ * accent fallback are unchanged; artwork mode publishes its contrast-safe,
+ * current-track accent ramp through [DhunAppearance].
  *
  * The hex values themselves live in [DhunTokens] — this file only names them.
  */
@@ -71,7 +71,7 @@ object DhunColors {
     val textDisabled: Color get() = DhunAppearance.tokens.textDisabled    // 38% / 36%
     val textHint: Color get() = DhunAppearance.tokens.textHint            // 30% / 28%
 
-    // Accent (static fallback; dynamic accent via ArtworkColors)
+    // Accent (selected static fallback; artwork mode publishes a dynamic ramp via DhunAppearance)
     val accent: Color get() = DhunAppearance.tokens.accent
     val onAccent: Color get() = DhunAppearance.tokens.onAccent
     val accentContainer: Color get() = DhunAppearance.tokens.accentContainer

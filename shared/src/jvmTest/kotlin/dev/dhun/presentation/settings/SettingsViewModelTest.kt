@@ -132,14 +132,20 @@ class SettingsViewModelTest {
         v.setAutoplayRadio(false)
         v.setLyricsEnabled(false)
         v.setAccentMode("static")
-        v.setPreferredProvider("kugou")
+        var providerAppliedAfterPersist = false
+        v.setPreferredProvider("kugou") { providerAppliedAfterPersist = true }
         v.setProviderEnabled("ytm", false)
+        v.setCountryCode("np")
+        v.setCountryCode("ZZ") // unsupported region is ignored
         assertEquals("low", reloaded(d, this).audioQuality.value)
         assertEquals(15, reloaded(d, this).seekStepSeconds.value)
         assertFalse(reloaded(d, this).autoplayRadio.value)
         assertFalse(reloaded(d, this).lyricsEnabled.value)
         assertEquals("static", reloaded(d, this).accentMode.value)
         assertEquals("kugou", reloaded(d, this).preferredProvider.value)
+        assertTrue(providerAppliedAfterPersist)
+        assertEquals("NP", v.countryCode.value)
+        assertEquals("NP", reloaded(d, this).countryCode.value)
         assertFalse("ytm" in reloaded(d, this).providerOrder.value.split(','))
         v.reset()
         assertEquals(SettingsKeys.AUDIO_QUALITY_DEFAULT, reloaded(d, this).audioQuality.value)
@@ -178,6 +184,24 @@ class SettingsViewModelTest {
         val v2 = reloaded(d, this)
         assertFalse(v2.resumeOnLaunch.value)
         assertFalse(v2.closeToTray.value)
+    }
+
+    @Test
+    fun countryRegionPickerHasFullNamesAndAllIsoCodes(): Unit = runBlocking {
+        assertEquals(249, CountryRegions.all.size)
+        assertEquals(249, CountryRegions.all.map { it.code }.distinct().size)
+        assertEquals("Nepal", CountryRegions.find("NP")?.name)
+        assertEquals("NP", CountryRegions.search("nepal").single().code)
+        assertTrue(CountryRegions.search("nz").any { it.code == "NZ" })
+
+        val d = data()
+        d.settings.putString(SettingsKeys.COUNTRY_CODE, "ZZ")
+        val v = reloaded(d, this)
+        assertEquals(SettingsKeys.COUNTRY_CODE_DEFAULT, v.countryCode.value)
+        v.setCountryCode("np")
+        assertEquals("NP", reloaded(d, this).countryCode.value)
+        v.setCountryCode("ZZ")
+        assertEquals("NP", reloaded(d, this).countryCode.value)
     }
 
     @Test

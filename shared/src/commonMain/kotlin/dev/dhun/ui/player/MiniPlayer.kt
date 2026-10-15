@@ -81,7 +81,7 @@ fun MiniPlayer(
     val track = currentTrack ?: return
     val progress = playbackProgress(positionMs, durationMs)
     val accentMode = DhunAppearance.accentMode
-    val selectedAccent = DhunColors.accent
+    val selectedAccent = DhunAppearance.selectedAccentColor
     val colors = remember(track.thumbnailUrl, track.id, accentMode, selectedAccent) {
         if (accentMode == "static") ArtworkColors.fallback
         else ArtworkColorExtractor.extractFromSeed(track.thumbnailUrl ?: track.id)

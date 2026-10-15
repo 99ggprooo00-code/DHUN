@@ -13,6 +13,8 @@ import dev.dhun.core.SearchResults
 import dev.dhun.core.StreamInfo
 import dev.dhun.core.Track
 import dev.dhun.data.LyricsCacheRepository
+import dev.dhun.data.SettingsKeys
+import dev.dhun.data.SettingsRepository
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.provider.MusicProvider
 import io.ktor.client.HttpClient
@@ -61,6 +63,20 @@ class LyricsRepositoryTest {
 
         override fun observe(trackId: String): Flow<Lyrics?> =
             MutableStateFlow(storage[trackId])
+    }
+
+    private class FakeSettingsRepository(initial: Map<String, String>) : SettingsRepository {
+        private val values = initial.toMutableMap()
+
+        override suspend fun getString(key: String): String? = values[key]
+        override suspend fun putString(key: String, value: String) { values[key] = value }
+        override suspend fun getBoolean(key: String, default: Boolean): Boolean =
+            values[key]?.toBooleanStrictOrNull() ?: default
+        override suspend fun putBoolean(key: String, value: Boolean) { values[key] = value.toString() }
+        override suspend fun getInt(key: String, default: Int): Int = values[key]?.toIntOrNull() ?: default
+        override suspend fun putInt(key: String, value: Int) { values[key] = value.toString() }
+        override suspend fun remove(key: String) { values.remove(key) }
+        override fun observeString(key: String): Flow<String?> = MutableStateFlow(values[key])
     }
 
     private class FakeProvider(
@@ -187,6 +203,35 @@ class LyricsRepositoryTest {
             val result = repo.getLyrics(track("t5"))
             assertTrue(result is DhunResult.Success)
             assertEquals(ytmLyrics, result.value)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun explicitlyPreferredProviderRunsEvenWhenDisabledAsFallback(): Unit = runBlocking {
+        val cache = FakeLyricsCache()
+        val provider = FakeProvider(DhunResult.Success(Lyrics.NotAvailable))
+        val settings = FakeSettingsRepository(
+            mapOf(
+                SettingsKeys.LYRICS_ENABLED to "true",
+                SettingsKeys.LYRICS_PREFERRED_PROVIDER to "lrclib",
+                SettingsKeys.LYRICS_PREFER_SYNCED to "true",
+                SettingsKeys.LYRICS_PROVIDER_ORDER to "ytm", // LRCLIB is not enabled as a fallback
+            ),
+        )
+        val (lrcLib, client) = createLrcLib("""{"syncedLyrics":"[00:10.00]Preferred source"}""")
+        try {
+            val repo = LyricsRepository(
+                cache = cache,
+                ytm = YouTubeLyricsSource(provider),
+                lrcLib = lrcLib,
+                settings = settings,
+            )
+            val result = repo.getLyrics(track("preferred-disabled"))
+            assertTrue(result is DhunResult.Success)
+            assertTrue(result.value is Lyrics.Synced, "the explicitly preferred LRCLIB source must run")
+            assertEquals(0, provider.getLyricsCalls, "successful preferred source runs before fallback YTM")
         } finally {
             client.close()
         }
