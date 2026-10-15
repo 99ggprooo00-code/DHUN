@@ -38,6 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.dhun.design.DhunAccent
@@ -47,6 +49,8 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunThemeMode
+import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.VisualPart
 import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.design.components.DhunAppearanceControls
 import dev.dhun.design.components.DhunFilterChip
@@ -172,6 +176,9 @@ fun SettingsScreen(
                     modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
                 )
                 BackdropControls(viewModel)
+            }
+            if (category == SettingsCategory.APPEARANCE && showThemeCatalogue) SettingsGroup("Test build · UI tuning") {
+                VisualTuningControls(viewModel)
             }
             if (category == SettingsCategory.PLAYBACK) SettingsGroup("Playback & Audio") {
                 OptionRow("Streaming & download quality", listOf("low" to "Low (~48–64 kbps)",
@@ -513,6 +520,47 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
                     color = DhunColors.textSecondary,
                 )
             }
+    }
+}
+
+/** Test-channel controls, named so a tester can report exact values per component. */
+@Composable
+private fun VisualTuningControls(viewModel: SettingsViewModel) {
+    val values by viewModel.visualTuning.collectAsState()
+    val loaded by viewModel.loaded.collectAsState()
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding),
+        verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+    ) {
+        Text(
+            "Live preview · 50% is the current design. Changes are saved on release. " +
+                "Use the labels and percentages when reporting what looks too dark or too white.",
+            style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary,
+        )
+        VisualPart.entries.forEach { part ->
+            val percent = values[part] ?: DhunVisualTuning.DEFAULT
+            Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
+                Text(part.label, style = MaterialTheme.typography.bodyLarge, color = DhunColors.textPrimary)
+                Text(part.detail, style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Slider(
+                        value = percent.toFloat(),
+                        onValueChange = { value ->
+                            val next = value.toInt().coerceIn(0, 100)
+                            viewModel.previewVisualTuning(part, next)
+                            DhunVisualTuning.set(part, next)
+                        },
+                        onValueChangeFinished = { viewModel.saveVisualTuning(part) },
+                        valueRange = 0f..100f,
+                        enabled = loaded,
+                        modifier = Modifier.weight(1f).semantics { contentDescription = part.label },
+                    )
+                    Spacer(Modifier.width(DhunSpacing.sm))
+                    Text("$percent%", style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
+                }
+            }
+        }
+        TextButton(onClick = viewModel::resetVisualTuning, enabled = loaded) { Text("Reset UI tuning to 50%") }
     }
 }
 

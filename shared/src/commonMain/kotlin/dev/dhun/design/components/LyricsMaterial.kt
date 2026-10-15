@@ -32,6 +32,8 @@ import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.VisualPart
 import dev.dhun.design.supportsRealtimeBlur
 
 /**
@@ -106,16 +108,19 @@ object LyricsMaterialPolicy {
 
 /** The lyrics-card veil. Call sites that already sit on a blurred backdrop use this alone. */
 @Composable
-fun lyricsVeilBrush(): Brush = Brush.verticalGradient(
+fun lyricsVeilBrush(part: VisualPart? = null): Brush = Brush.verticalGradient(
     colorStops = LyricsMaterialPolicy.lyricsVeilStops()
-        .map { (offset, alpha) -> offset to DhunColors.background.copy(alpha = alpha) }
+        .map { (offset, alpha) ->
+            offset to DhunColors.background.copy(alpha =
+                if (part == null) alpha else DhunVisualTuning.veilAlpha(part, alpha))
+        }
         .toTypedArray(),
 )
 
 /** Lyrics veil, no extra artwork — the shell or player backdrop is the blur. */
 @Composable
-fun Modifier.lyricsVeil(shape: Shape = RectangleShape): Modifier =
-    background(lyricsVeilBrush(), shape)
+fun Modifier.lyricsVeil(shape: Shape = RectangleShape, part: VisualPart? = null): Modifier =
+    background(lyricsVeilBrush(part), shape)
 
 /**
  * Mini-player acrylic: a theme-aware veil lighter than the lyrics card;
@@ -125,7 +130,8 @@ fun Modifier.lyricsVeil(shape: Shape = RectangleShape): Modifier =
 fun Modifier.acrylicGlass(shape: Shape = RectangleShape): Modifier {
     val veil = Brush.verticalGradient(
         colorStops = LyricsMaterialPolicy.acrylicVeilStops()
-            .map { (offset, alpha) -> offset to DhunColors.background.copy(alpha = alpha) }
+            .map { (offset, alpha) -> offset to DhunColors.background.copy(alpha =
+                DhunVisualTuning.veilAlpha(VisualPart.MINI_PLAYER, alpha)) }
             .toTypedArray(),
     )
     val frost = Brush.verticalGradient(
@@ -133,7 +139,8 @@ fun Modifier.acrylicGlass(shape: Shape = RectangleShape): Modifier {
             .map { (offset, alpha) -> offset to Color.White.copy(alpha = alpha) }
             .toTypedArray(),
     )
-    return background(DhunColors.background.copy(alpha = LyricsMaterialPolicy.ACRYLIC_ART_DIM), shape)
+    return background(DhunColors.background.copy(alpha =
+        DhunVisualTuning.veilAlpha(VisualPart.MINI_PLAYER, LyricsMaterialPolicy.ACRYLIC_ART_DIM)), shape)
         .background(veil, shape)
         .then(if (DhunAppearance.tokens.isLight) Modifier else Modifier.background(frost, shape))
 }
@@ -213,7 +220,7 @@ fun LyricsArtworkSheet(
             ),
     ) {
         LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize())
-        Box(modifier = Modifier.matchParentSize().lyricsVeil())
+        Box(modifier = Modifier.matchParentSize().lyricsVeil(part = VisualPart.QUEUE_SHEET))
         Box(modifier = Modifier.fillMaxSize(), content = content)
     }
 }

@@ -1,6 +1,8 @@
 package dev.dhun.presentation.settings
 
 import dev.dhun.data.SettingsKeys
+import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.VisualPart
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
@@ -60,6 +62,9 @@ class SettingsViewModel(
     private val _backdropBrightnessPercent = MutableStateFlow(SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT)
     val backdropBrightnessPercent: StateFlow<Int> = _backdropBrightnessPercent.asStateFlow()
 
+    private val _visualTuning = MutableStateFlow<Map<VisualPart, Int>>(emptyMap())
+    val visualTuning: StateFlow<Map<VisualPart, Int>> = _visualTuning.asStateFlow()
+
     private val _accentMode = MutableStateFlow(SettingsKeys.ACCENT_MODE_DEFAULT)
     val accentMode: StateFlow<String> = _accentMode.asStateFlow()
     private val _audioQuality = MutableStateFlow(SettingsKeys.AUDIO_QUALITY_DEFAULT)
@@ -115,6 +120,11 @@ class SettingsViewModel(
             _backdropBrightnessPercent.value = get.int(
                 SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT,
             ).coerceIn(0, 100)
+            val tuning = mutableMapOf<VisualPart, Int>()
+            for (part in VisualPart.entries) {
+                tuning[part] = get.int(part.key, DhunVisualTuning.DEFAULT).coerceIn(0, 100)
+            }
+            _visualTuning.value = tuning
             _accentMode.value = get.string(SettingsKeys.ACCENT_MODE, SettingsKeys.ACCENT_MODE_DEFAULT)
             _audioQuality.value = get.string(SettingsKeys.AUDIO_QUALITY, SettingsKeys.AUDIO_QUALITY_DEFAULT)
             _seekStepSeconds.value = get.int(SettingsKeys.SEEK_STEP_SECONDS, SettingsKeys.SEEK_STEP_SECONDS_DEFAULT)
@@ -184,6 +194,22 @@ class SettingsViewModel(
         val value = percent.coerceIn(0, 100)
         _backdropBrightnessPercent.value = value
         enqueueWrite { update.int(SettingsKeys.BACKDROP_BRIGHTNESS, value) }
+    }
+
+    /** Preview continuously, but write once on slider release (not per drag frame). */
+    fun previewVisualTuning(part: VisualPart, percent: Int) {
+        _visualTuning.value = _visualTuning.value + (part to percent.coerceIn(0, 100))
+    }
+
+    fun saveVisualTuning(part: VisualPart) {
+        val value = _visualTuning.value[part] ?: DhunVisualTuning.DEFAULT
+        enqueueWrite { update.int(part.key, value) }
+    }
+
+    fun resetVisualTuning() {
+        _visualTuning.value = emptyMap()
+        DhunVisualTuning.reset()
+        enqueueWrite { for (part in VisualPart.entries) update.remove(part.key) }
     }
 
     fun setAccentMode(id: String) {
@@ -318,6 +344,8 @@ class SettingsViewModel(
         _accentMode.value = SettingsKeys.ACCENT_MODE_DEFAULT
         _backdropBlurPercent.value = SettingsKeys.BACKDROP_BLUR_DEFAULT
         _backdropBrightnessPercent.value = SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT
+        _visualTuning.value = emptyMap()
+        DhunVisualTuning.reset()
         _cacheSizeMb.value = SettingsKeys.CACHE_SIZE_MB_DEFAULT
         _resumeOnLaunch.value = SettingsKeys.RESUME_ON_LAUNCH_DEFAULT
         _closeToTray.value = SettingsKeys.CLOSE_TO_TRAY_DEFAULT

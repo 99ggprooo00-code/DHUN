@@ -5,6 +5,8 @@ import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.EpochClock
 import dev.dhun.data.SettingsKeys
+import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.VisualPart
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
@@ -61,6 +63,25 @@ class SettingsViewModelTest {
         assertEquals(SettingsKeys.CLOSE_TO_TRAY_DEFAULT, v.closeToTray.value)
         assertEquals(SettingsKeys.BACKDROP_BLUR_DEFAULT, v.backdropBlurPercent.value)
         assertEquals(SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT, v.backdropBrightnessPercent.value)
+    }
+
+    @Test
+    fun testVisualSlidersPersistIndependentlyAndResetToMidpoint(): Unit = runBlocking {
+        val d = data()
+        val v = loaded(vm(d, this))
+        assertTrue(VisualPart.entries.all { v.visualTuning.value[it] == DhunVisualTuning.DEFAULT })
+        v.previewVisualTuning(VisualPart.LIST_ROWS, 86)
+        v.previewVisualTuning(VisualPart.QUEUE_ROWS, -1)
+        assertEquals(86, v.visualTuning.value[VisualPart.LIST_ROWS])
+        assertEquals(0, v.visualTuning.value[VisualPart.QUEUE_ROWS])
+        v.saveVisualTuning(VisualPart.LIST_ROWS)
+        v.saveVisualTuning(VisualPart.QUEUE_ROWS)
+        val restored = reloaded(d, this)
+        assertEquals(86, restored.visualTuning.value[VisualPart.LIST_ROWS])
+        assertEquals(0, restored.visualTuning.value[VisualPart.QUEUE_ROWS])
+        restored.resetVisualTuning()
+        val reset = reloaded(d, this)
+        assertTrue(VisualPart.entries.all { reset.visualTuning.value[it] == DhunVisualTuning.DEFAULT })
     }
 
     @Test

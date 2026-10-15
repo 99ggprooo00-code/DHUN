@@ -74,6 +74,8 @@ import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
+import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.VisualPart
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.legal.DhunAppInfo
 import dev.dhun.design.components.GlassDock
@@ -249,6 +251,11 @@ fun DhunAppShell(
     val explicitContent by settingsVm.explicitContent.collectAsState()
     val preferredLyricsProvider by settingsVm.preferredProvider.collectAsState()
     val settingsLoaded by settingsVm.loaded.collectAsState()
+    // Stored experiments are applied only in the test channel. Public builds
+    // render the original 50% appearance even after installing over a test APK.
+    LaunchedEffect(settingsLoaded, appInfo.isTestRelease) {
+        if (settingsLoaded) DhunVisualTuning.restore(settingsVm.visualTuning.value, appInfo.isTestRelease)
+    }
     LaunchedEffect(countryCode, explicitContent, settingsLoaded) {
         if (settingsLoaded) {
             homeViewModel.refresh()
@@ -720,7 +727,7 @@ private fun BottomNavigationBar(
                     .background(DhunColors.glassEdge),
             )
         }
-        Box(modifier = Modifier.fillMaxWidth().lyricsVeil()) {
+        Box(modifier = Modifier.fillMaxWidth().lyricsVeil(part = VisualPart.NAVIGATION)) {
             NavigationBar(
                 containerColor = Color.Transparent,
                 contentColor = DhunColors.textPrimary,
@@ -753,7 +760,7 @@ private fun AppNavigationRail(
     layout: DhunShellLayout,
 ) {
     NavigationRail(
-        containerColor = readingSurfaceFill(),
+        containerColor = readingSurfaceFill(VisualPart.NAVIGATION),
         contentColor = DhunColors.textPrimary,
         modifier = Modifier.fillMaxHeight(),
     ) {

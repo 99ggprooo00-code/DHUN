@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.ImeAction
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.VisualPart
 
 /**
  * DHUN's one-line text input.
@@ -79,7 +80,7 @@ fun DhunTextField(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(DhunShapes.medium)
-                    .background(contentRowFill())
+                    .background(contentRowFill(VisualPart.INPUTS))
                     .border(
                         BorderStroke(
                             DhunSpacing.border,

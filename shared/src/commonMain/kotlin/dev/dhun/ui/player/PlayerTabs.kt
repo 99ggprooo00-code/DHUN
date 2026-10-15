@@ -62,6 +62,8 @@ import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
+import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.VisualPart
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.LyricsMaterial
@@ -154,13 +156,23 @@ internal fun QueueTabContent(
             highlightIndex = currentIndex,
             modifier = Modifier.fillMaxWidth().weight(1f),
         ) { index, track, dragHandle, isDragging, isHighlighted ->
+            // Independent queue-row slider; 50% preserves the original gradients.
+            fun tunedRowColor(color: Color): Color = color.copy(alpha =
+                DhunVisualTuning.veilAlpha(VisualPart.QUEUE_ROWS, color.alpha))
             val rowBg = if (isHighlighted) {
                 Brush.horizontalGradient(
-                    listOf(accent.copy(alpha = 0.22f), DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.4f)),
+                    listOf(
+                        tunedRowColor(accent.copy(alpha = 0.22f)),
+                        tunedRowColor(DhunColors.glassHighlight),
+                        tunedRowColor(DhunColors.glassDeep.copy(alpha = 0.4f)),
+                    ),
                 )
             } else {
                 Brush.verticalGradient(
-                    listOf(DhunColors.glassHighlight, DhunColors.glassDeep.copy(alpha = 0.45f)),
+                    listOf(
+                        tunedRowColor(DhunColors.glassHighlight),
+                        tunedRowColor(DhunColors.glassDeep.copy(alpha = 0.45f)),
+                    ),
                 )
             }
             Row(

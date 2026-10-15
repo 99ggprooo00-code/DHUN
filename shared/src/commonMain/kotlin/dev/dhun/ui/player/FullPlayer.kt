@@ -114,6 +114,8 @@ import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
+import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.VisualPart
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.dhunMouseDragScroll
@@ -1458,8 +1460,9 @@ private fun ArtworkBackdrop(
     val brightnessShift = (55 - DhunAppearance.backdropBrightnessPercent) / 100f * 0.12f
     val dimColor by animateColorAsState(
         targetValue = NowPlayingBackdropPolicy.veilTint(DhunAppearance.tokens).copy(alpha =
-            ((if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM) + brightnessShift)
-                .coerceIn(0.02f, 0.54f)),
+            DhunVisualTuning.veilAlpha(VisualPart.PLAYER,
+                ((if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM) + brightnessShift)
+                    .coerceIn(0.02f, 0.54f))),
         animationSpec = DhunAnimations.slowTween(),
         label = "backdropDim",
     )
@@ -1537,7 +1540,8 @@ private fun ambientScrimBrush(): Brush {
     val tint = NowPlayingBackdropPolicy.veilTint(tokens)
     return Brush.verticalGradient(
         colorStops = playerAmbientScrimStops(tokens.isLight)
-            .map { (offset, alpha) -> offset to tint.copy(alpha = alpha) }
+            .map { (offset, alpha) -> offset to tint.copy(alpha =
+                DhunVisualTuning.veilAlpha(VisualPart.PLAYER, alpha)) }
             .toTypedArray(),
     )
 }
@@ -1782,13 +1786,11 @@ private fun LyricsCard(
                 )
             }
         }
-        // Readability scrim behind the lyric lines — the shared lyrics-card
-        // veil (background at 0.42 → 0.62), so Related and the tab cards can
-        // use the same material without a second set of numbers.
+        // The lyrics panel can be tuned independently from Queue/Related.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(lyricsVeilBrush()),
+                .background(lyricsVeilBrush(VisualPart.LYRICS)),
         )
         PlayerTabContent(
             tab = LYRICS_TAB_INDEX,

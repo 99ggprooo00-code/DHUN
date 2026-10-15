@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.Dp
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.VisualPart
 
 /**
  * Shared content material. In-page cards use the same quiet translucent fill
@@ -99,7 +100,7 @@ fun FrostedChipSurface(
     selected: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val fill = if (selected) DhunColors.accent else contentRowFill()
+    val fill = if (selected) DhunColors.accent else contentRowFill(VisualPart.CHIPS)
     Box(
         modifier = modifier
             .clip(shape)

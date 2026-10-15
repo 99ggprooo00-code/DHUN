@@ -24,6 +24,8 @@ import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTokens
+import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.VisualPart
 import dev.dhun.design.supportsRealtimeBlur
 
 /**
@@ -49,6 +51,7 @@ fun NowPlayingBackdrop(
     val canBlur = supportsRealtimeBlur
     val tokens = DhunAppearance.tokens
     val veilStops = NowPlayingBackdropPolicy.veilStops(tokens.isLight, brightnessPercent)
+        .map { (offset, alpha) -> offset to DhunVisualTuning.veilAlpha(VisualPart.PAGE_BACKDROP, alpha) }
     val veilTint = NowPlayingBackdropPolicy.veilTint(tokens)
 
     val context = LocalPlatformContext.current
