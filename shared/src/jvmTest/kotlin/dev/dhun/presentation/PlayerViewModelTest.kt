@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -87,7 +88,14 @@ class PlayerViewModelTest {
         }
         override fun removeFromQueue(index: Int) { removedAt += index }
         override fun moveInQueue(from: Int, to: Int) { moves += from to to }
-        override fun playPause() { playPauseCalls++ }
+        override fun playPause() {
+            playPauseCalls++
+            state.value = when (val current = state.value) {
+                is PlaybackState.Playing -> PlaybackState.Paused(current.track)
+                is PlaybackState.Paused -> PlaybackState.Playing(current.track)
+                else -> current
+            }
+        }
         override fun next() { nextCalls++ }
         override fun previous() { previousCalls++ }
         override fun seekTo(positionMs: Long) { seeks += positionMs; this.positionMs.value = positionMs }
@@ -245,33 +253,132 @@ class PlayerViewModelTest {
         }
     }
 
+    private suspend fun awaitCalls(player: FakePlayer, count: Int) {
+        withTimeout(3_000) {
+            while (player.playPauseCalls != count) delay(10)
+        }
+    }
+
     @Test
-    fun inAppZeroVolumePausesOnlyWhenPauseOnMuteIsEnabledAndPlaying(): Unit = runBlocking {
+    fun mutePausesAndUnmuteResumesOnlyTheTrackItPaused(): Unit = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
-            val settings = FakeSettingsRepository(
-                mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "true"),
-            )
+            val settings = FakeSettingsRepository(mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "true"))
             val player = FakePlayer()
             player.prepareQueue(listOf(track("mute")), 0, playWhenReady = true)
             val vm = PlayerViewModel(player, FakeProvider(), scope, settings = settings)
             settings.pauseOnMuteObserved.await()
 
             vm.setVolume(0.35f)
-            assertEquals(0, player.playPauseCalls, "nonzero in-app volume must not pause")
-            vm.setVolume(0f)
-            assertEquals(0f, player.volume.value)
-            assertEquals(1, player.playPauseCalls, "zero in-app volume must pause active playback")
+            assertEquals(0, player.playPauseCalls, "nonzero volume must not pause")
+            // Simulate a HARDWARE volume key: the VM did not call setVolume.
+            player.volume.value = 0f
+            awaitCalls(player, 1)
+            assertTrue(player.state.value is PlaybackState.Paused)
+            player.volume.value = 0.5f
+            awaitCalls(player, 2)
+            assertTrue(player.state.value is PlaybackState.Playing)
+            player.volume.value = 0.7f
+            delay(30)
+            assertEquals(2, player.playPauseCalls, "a second nonzero step must not play/pause")
 
-            val disabledSettings = FakeSettingsRepository(
-                mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "false"),
-            )
+            vm.setVolume(0f)
+            awaitCalls(player, 3)
+            vm.setVolume(0.4f)
+            awaitCalls(player, 4)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun unmuteDoesNotResumeUserPauseOrDisabledSetting(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val settings = FakeSettingsRepository(mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "true"))
+            val player = FakePlayer()
+            player.prepareQueue(listOf(track("manual")), 0, playWhenReady = false)
+            PlayerViewModel(player, FakeProvider(), scope, settings = settings)
+            settings.pauseOnMuteObserved.await()
+            player.volume.value = 0f
+            delay(40)
+            player.volume.value = 0.5f
+            delay(40)
+            assertEquals(0, player.playPauseCalls, "manual pause must remain paused")
+
+            val disabledSettings = FakeSettingsRepository(mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "false"))
             val disabledPlayer = FakePlayer()
-            disabledPlayer.prepareQueue(listOf(track("not-muted")), 0, playWhenReady = true)
-            val disabledVm = PlayerViewModel(disabledPlayer, FakeProvider(), scope, settings = disabledSettings)
+            disabledPlayer.prepareQueue(listOf(track("disabled")), 0, playWhenReady = true)
+            PlayerViewModel(disabledPlayer, FakeProvider(), scope, settings = disabledSettings)
             disabledSettings.pauseOnMuteObserved.await()
-            disabledVm.setVolume(0f)
-            assertEquals(0, disabledPlayer.playPauseCalls, "zero volume must not pause when the setting is off")
+            disabledPlayer.volume.value = 0f
+            delay(40)
+            disabledPlayer.volume.value = 0.5f
+            delay(40)
+            assertEquals(0, disabledPlayer.playPauseCalls, "setting off: neither pause nor resume")
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun manualTransportAfterMuteDoesNotResumeAgainOnUnmute(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val settings = FakeSettingsRepository(mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "true"))
+            val player = FakePlayer()
+            player.prepareQueue(listOf(track("manual-after-mute")), 0, playWhenReady = true)
+            val vm = PlayerViewModel(player, FakeProvider(), scope, settings = settings)
+            settings.pauseOnMuteObserved.await()
+            player.volume.value = 0f
+            awaitCalls(player, 1)
+            vm.togglePlay() // explicit user play supersedes auto-pause
+            awaitCalls(player, 2)
+            vm.togglePlay() // user pauses deliberately before unmuting
+            awaitCalls(player, 3)
+            player.volume.value = 0.5f
+            delay(60)
+            assertEquals(3, player.playPauseCalls, "unmute must not override a user pause")
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun enablingMuteSettingWhileAlreadyAtZeroPausesCurrentPlayback(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val settings = FakeSettingsRepository(mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "true"))
+            val player = FakePlayer()
+            player.volume.value = 0f
+            player.prepareQueue(listOf(track("already-muted")), 0, playWhenReady = true)
+            PlayerViewModel(player, FakeProvider(), scope, settings = settings)
+            settings.pauseOnMuteObserved.await()
+            awaitCalls(player, 1)
+            player.volume.value = 0.5f
+            awaitCalls(player, 2)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun changingTracksAfterMuteCannotResumeTheOldPause(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val settings = FakeSettingsRepository(mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "true"))
+            val player = FakePlayer()
+            player.prepareQueue(listOf(track("old")), 0, playWhenReady = true)
+            PlayerViewModel(player, FakeProvider(), scope, settings = settings)
+            settings.pauseOnMuteObserved.await()
+            player.volume.value = 0f
+            awaitCalls(player, 1)
+            player.currentTrack.value = track("new")
+            player.state.value = PlaybackState.Paused(player.currentTrack.value!!)
+            delay(40)
+            player.volume.value = 0.5f
+            delay(40)
+            assertEquals(1, player.playPauseCalls, "unmute must not resume a different track")
         } finally {
             scope.cancel()
         }

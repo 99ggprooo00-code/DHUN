@@ -192,7 +192,7 @@ fun SettingsScreen(
                     viewModel.autoplayRadio.collectAsState().value, viewModel::setAutoplayRadio)
                 SettingsSwitchRow("Keep shuffle & repeat", "Keep modes when starting a new queue or restarting",
                     viewModel.persistShuffleRepeat.collectAsState().value, viewModel::setPersistShuffleRepeat)
-                SettingsSwitchRow("Pause on mute", "Pause when the in-app volume reaches zero",
+                SettingsSwitchRow("Pause on mute", "Pause at zero volume; resume on unmute only if mute paused playback",
                     viewModel.pauseOnMute.collectAsState().value, viewModel::setPauseOnMute)
             }
             if (category == SettingsCategory.LYRICS) SettingsGroup("Lyrics & Providers") {

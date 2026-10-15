@@ -46,6 +46,7 @@ class AndroidDhunPlayer(
     private val player: Player,
     private val scope: CoroutineScope,
     private val streamCache: DhunStreamCache? = null,
+    private val mediaVolume: AndroidMediaVolume? = null,
     /**
      * Resolve-outcome record (playback-diagnostics session, 2026-09-09).
      * Default = the process-wide log the DI-wrapped MusicProvider writes
@@ -110,6 +111,10 @@ class AndroidDhunPlayer(
     // the application thread regardless of the caller's scope.
     private val pollJob: Job = scope.launch(Dispatchers.Main) {
         while (isActive) {
+            // Hardware volume buttons and external mute are not Player.volume
+            // events. Keep the visible slider and mute policy in sync with the
+            // Android music stream even when the engine is paused.
+            if (mediaVolume != null) _volume.value = mediaVolume.current()
             if (player.isPlaying) {
                 _positionMs.value = player.currentPosition.coerceAtLeast(0)
                 val d = player.duration
@@ -131,6 +136,9 @@ class AndroidDhunPlayer(
     }
 
     init {
+        // With the music stream as the sole volume control, Media3 must not
+        // retain a separate attenuation factor across controller reconnects.
+        if (mediaVolume != null) onMain { player.volume = 1f }
         player.addListener(listener)
         refresh()
     }
@@ -351,7 +359,14 @@ class AndroidDhunPlayer(
     }
 
     override fun setVolume(volume: Float) {
-        onMain { player.volume = volume.coerceIn(0f, 1f) }
+        onMain {
+            if (mediaVolume != null) {
+                mediaVolume.set(volume)
+                _volume.value = mediaVolume.current()
+            } else {
+                player.volume = volume.coerceIn(0f, 1f)
+            }
+        }
         refresh()
     }
 
@@ -440,7 +455,7 @@ class AndroidDhunPlayer(
                 Player.REPEAT_MODE_ONE -> RepeatMode.ONE
                 else -> RepeatMode.OFF
             }
-            _volume.value = player.volume.coerceIn(0f, 1f)
+            _volume.value = mediaVolume?.current() ?: player.volume.coerceIn(0f, 1f)
 
             val now = clock()
             if (player.playbackState == Player.STATE_BUFFERING) {
