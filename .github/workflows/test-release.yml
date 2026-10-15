@@ -3,7 +3,7 @@ name: test-release
 # The rolling `test` tag is a private draft for collaborators. Successful main
 # builds replace it automatically when Android/Desktop/shared app code changes.
 # PRs and non-main refs only upload run-scoped artifacts. The fixed public
-# prerelease (v1.00.001) remains on its separate, deliberate manual path.
+# public prerelease remains on its separate, deliberate manual path.
 on:
   workflow_dispatch:
     inputs:
@@ -94,15 +94,18 @@ jobs:
           python scripts/stage_artifact.py out/dhun-test-arm64-v8a.apk --build-only "$BUILD_ONLY"
           python scripts/stage_artifact.py out/dhun-test-armeabi-v7a.apk --build-only "$BUILD_ONLY"
 
-      - name: Verify packaged test APK versions (all ABIs)
-        if: ${{ env.DHUN_RELEASE_CHANNEL == 'test' }}
+      - name: Verify packaged APK versions (all ABIs)
         env:
           TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
           TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
         run: |
           aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
           test -n "$aapt"
-          python scripts/check_android_identity.py "$aapt" out "$TEST_VERSION_NAME" "$TEST_VERSION_CODE"
+          if [ "$DHUN_RELEASE_CHANNEL" = public ]; then
+            python scripts/check_android_identity.py "$aapt" out '1.00.002' 7
+          else
+            python scripts/check_android_identity.py "$aapt" out "$TEST_VERSION_NAME" "$TEST_VERSION_CODE"
+          fi
 
       - uses: actions/upload-artifact@v6
         with:
@@ -242,8 +245,8 @@ jobs:
       - name: Stage optional AAB
         run: |
           mkdir -p out
-          cp app-android/build/outputs/bundle/debug/app-android-debug.aab out/dhun-v1.00.001.aab
-          python scripts/stage_artifact.py out/dhun-v1.00.001.aab --build-only "$BUILD_ONLY"
+          cp app-android/build/outputs/bundle/debug/app-android-debug.aab out/dhun-v1.00.002.aab
+          python scripts/stage_artifact.py out/dhun-v1.00.002.aab --build-only "$BUILD_ONLY"
 
       - uses: actions/upload-artifact@v6
         with:
@@ -251,9 +254,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: |
-            out/dhun-v1.00.001.aab
-            out/dhun-v1.00.001.aab.sha256
-            out/dhun-v1.00.001.aab.provenance.txt
+            out/dhun-v1.00.002.aab
+            out/dhun-v1.00.002.aab.sha256
+            out/dhun-v1.00.002.aab.provenance.txt
 
   publish_test:
     # A main push is admitted by the app-code path filter above. Publish only
@@ -366,12 +369,12 @@ jobs:
           gh release delete dev --yes --cleanup-tag || true
           git push origin :refs/tags/dev || true
 
-      - name: Create the fixed v1.00.001 public prerelease once
+      - name: Stage, verify and publish the fixed v1.00.002 prerelease once
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          version='v1.00.001'
+          version='v1.00.002'
           if gh release view "$version" --repo "$GITHUB_REPOSITORY" --json tagName >/dev/null 2>&1; then
             if [ "$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" != "false" ]; then
               echo "::error::$version already exists but is still a draft; refusing to silently skip it."
@@ -381,7 +384,12 @@ jobs:
               echo "::error::$version already exists but is not marked as a prerelease; refusing to silently skip it."
               exit 1
             fi
-            echo "The public $version prerelease already exists; leaving its assets and tag unchanged."
+            existing_target=$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq '.targetCommitish')
+            if [ "$existing_target" != "$GITHUB_SHA" ]; then
+              echo "::error::$version already targets $existing_target, not $GITHUB_SHA; refusing to mutate it."
+              exit 1
+            fi
+            echo "The public $version prerelease already exists at $existing_target; leaving its assets and tag unchanged."
             exit 0
           fi
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$version" >/dev/null 2>&1; then
@@ -389,32 +397,58 @@ jobs:
             exit 1
           fi
 
-          python scripts/stage_versioned_release.py dist "dist/$version" --version '1.00.001'
+          python scripts/stage_versioned_release.py dist "dist/$version" --version '1.00.002'
           gh release create "$version" \
-            "dist/$version/dhun-v1.00.001.apk" \
-            "dist/$version/dhun-v1.00.001.apk.sha256" \
-            "dist/$version/dhun-v1.00.001.apk.provenance.txt" \
-            "dist/$version/dhun-v1.00.001-arm64-v8a.apk" \
-            "dist/$version/dhun-v1.00.001-arm64-v8a.apk.sha256" \
-            "dist/$version/dhun-v1.00.001-arm64-v8a.apk.provenance.txt" \
-            "dist/$version/dhun-v1.00.001-armeabi-v7a.apk" \
-            "dist/$version/dhun-v1.00.001-armeabi-v7a.apk.sha256" \
-            "dist/$version/dhun-v1.00.001-armeabi-v7a.apk.provenance.txt" \
-            "dist/$version/dhun-v1.00.001.msi" \
-            "dist/$version/dhun-v1.00.001.msi.sha256" \
-            "dist/$version/dhun-v1.00.001.msi.provenance.txt" \
+            "dist/$version/dhun-v1.00.002.apk" \
+            "dist/$version/dhun-v1.00.002.apk.sha256" \
+            "dist/$version/dhun-v1.00.002.apk.provenance.txt" \
+            "dist/$version/dhun-v1.00.002-arm64-v8a.apk" \
+            "dist/$version/dhun-v1.00.002-arm64-v8a.apk.sha256" \
+            "dist/$version/dhun-v1.00.002-arm64-v8a.apk.provenance.txt" \
+            "dist/$version/dhun-v1.00.002-armeabi-v7a.apk" \
+            "dist/$version/dhun-v1.00.002-armeabi-v7a.apk.sha256" \
+            "dist/$version/dhun-v1.00.002-armeabi-v7a.apk.provenance.txt" \
+            "dist/$version/dhun-v1.00.002.msi" \
+            "dist/$version/dhun-v1.00.002.msi.sha256" \
+            "dist/$version/dhun-v1.00.002.msi.provenance.txt" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "DHUN v1.00.001 — public pre-release" \
-            --notes-file docs/releases/v1.00.001.md \
-            --prerelease
+            --title "DHUN v1.00.002 — public pre-release" \
+            --notes-file docs/releases/v1.00.002.md \
+            --draft --prerelease
+
+          # A draft prevents a partial upload from looking like a finished
+          # release. Verify all nonempty assets and identity before publication.
+          expected_assets=$(printf '%s\n' \
+            "dhun-$version.apk" "dhun-$version.apk.sha256" "dhun-$version.apk.provenance.txt" \
+            "dhun-$version-arm64-v8a.apk" "dhun-$version-arm64-v8a.apk.sha256" "dhun-$version-arm64-v8a.apk.provenance.txt" \
+            "dhun-$version-armeabi-v7a.apk" "dhun-$version-armeabi-v7a.apk.sha256" "dhun-$version-armeabi-v7a.apk.provenance.txt" \
+            "dhun-$version.msi" "dhun-$version.msi.sha256" "dhun-$version.msi.provenance.txt" | jq -R . | jq -s 'sort')
+          actual_assets=$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[] | select(.size > 0) | .name] | sort')
+          if [ "$actual_assets" != "$expected_assets" ]; then
+            echo "::error::$version draft assets are missing, empty or unexpected; leaving the draft unpublished."
+            exit 1
+          fi
+          if [ "$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq '.targetCommitish')" != "$GITHUB_SHA" ]; then
+            echo "::error::$version draft targets the wrong commit; leaving it unpublished."
+            exit 1
+          fi
+          if [ "$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" != "true" ]; then
+            echo "::error::$version must remain a draft until verification is complete."
+            exit 1
+          fi
+          gh release edit "$version" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease
 
           gh release view "$version" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease,targetCommitish --jq '{tagName,isDraft,isPrerelease,targetCommitish}'
+          if [ "$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq '.targetCommitish')" != "$GITHUB_SHA" ]; then
+            echo "::error::$version does not target the verified build"
+            exit 1
+          fi
           if [ "$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" != "false" ]; then
-            echo "::error::v1.00.001 must be published, not left as a draft"
+            echo "::error::v1.00.002 must be published, not left as a draft"
             exit 1
           fi
           if [ "$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
-            echo "::error::v1.00.001 must stay marked as a prerelease"
+            echo "::error::v1.00.002 must stay marked as a prerelease"
             exit 1
           fi

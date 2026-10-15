@@ -14,7 +14,7 @@ const REPO = "https://github.com/99ggprooo00-code/DHUN";
 const SITE = "https://99ggprooo00-code.github.io/DHUN";
 const PATH = "/DHUN";
 // Fixed public pre-release; the rolling `test` tag is a private draft.
-const PUBLIC_RELEASE = `${REPO}/releases/tag/v1.00.001`;
+const PUBLIC_RELEASE = `${REPO}/releases/tag/v1.00.002`;
 
 export default {
   url: SITE,
@@ -357,7 +357,7 @@ export default {
         label: "Unverified public pre-release",
         text:
           "A fixed pre-release is available from GitHub Releases for testing. It carries no support promise and uses a public throwaway Android test key rather than a store key. The rolling test channel is a separate private draft for repository collaborators.",
-        source: "docs/releases/v1.00.001.md; .github/workflows/test-release.yml",
+        source: "docs/releases/v1.00.002.md; .github/workflows/test-release.yml",
       },
       {
         label: "Hardware gates still open",
@@ -369,7 +369,7 @@ export default {
         label: "Nothing is store-ready",
         text:
           "There is no Play Store or Microsoft Store distribution, and neither the Android APK nor the Windows MSI is store-signed. This is a pre-release, not a stable release. This site does not hand out builds; the release page carries the files and the warnings that belong with them.",
-        source: "docs/releases/v1.00.001.md; .ai/ROADMAP.md",
+        source: "docs/releases/v1.00.002.md; .ai/ROADMAP.md",
       },
     ],
   },
@@ -719,7 +719,7 @@ export default {
     { text: "No published audio-quality figure. DHUN makes no bitrate, lossless or FLAC claim of any kind.", source: "no verified number exists in the repository" },
     { text: "No casting, no Android Auto, no CarPlay.", source: "not implemented anywhere in the tree" },
     { text: "No recommendation engine of its own: related tracks and the radio come from the same anonymous endpoints as everything else.", source: "ADR-001, Phase 15 endless-radio" },
-    { text: "No store channel and no store-signed release; only a public pre-release is available for testing.", source: "app-android/.../keystores/dhun-test.p12, docs/releases/v1.00.001.md" },
+    { text: "No store channel and no store-signed release; only a public pre-release is available for testing.", source: "app-android/.../keystores/dhun-test.p12, docs/releases/v1.00.002.md" },
   ],
 
   install: {

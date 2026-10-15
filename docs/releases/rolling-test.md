@@ -24,8 +24,8 @@ strictly increasing Android versionCode. Reruns increase the attempt; the next r
 outranks all supported attempts of the previous run. Windows already uses the same
 workflow run/attempt counter for its increasing MSI ProductVersion. The rolling
 `test` tag and asset filenames stay stable; the release title and installed binary
-identity change. Public `v1.00.001` is a separate frozen release and is not rewritten.
-Android will reject installing that older public build over a newer test build.
+identity change. Public `v1.00.002` is a separate fixed release and is not rewritten.
+Android will reject installing a lower-versionCode public build over a newer test build; back up app-private data before uninstalling the test build.
 
 App-code/build changes merged or pushed to main update this private draft after
 both platform jobs succeed. Release-script/workflow changes also trigger it;

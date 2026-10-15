@@ -197,7 +197,7 @@ class BuiltOutput(unittest.TestCase):
                     f"{route} links a {extension} file",
                 )
         self.assertTrue(
-            any("/releases/tag/v1.00.001" in markup for markup in self.pages.values()),
+            any("/releases/tag/v1.00.002" in markup for markup in self.pages.values()),
             "the release page is not reachable from any built page",
         )
 

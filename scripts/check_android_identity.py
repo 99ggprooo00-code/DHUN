@@ -16,7 +16,7 @@ def verify_identity(badging: str, expected_name: str, expected_code: int) -> Non
     if (values.get("name"), values.get("versionName"), values.get("versionCode")) != (
         "dev.dhun.android", expected_name, str(expected_code)
     ):
-        raise ValueError("packaged Android identity does not match this test build")
+        raise ValueError("packaged Android identity does not match the expected release channel")
 
 
 if __name__ == "__main__":

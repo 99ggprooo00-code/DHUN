@@ -21,8 +21,8 @@ android {
         // without a connectivity fallback. shared's minSdk must stay <= this.
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.00.001"
+        versionCode = 7
+        versionName = "1.00.002"
         // Test builds advance on every workflow run/rerun; public identity stays fixed.
         val testName = providers.gradleProperty("dhunTestVersionName").orNull
         val testCode = providers.gradleProperty("dhunTestVersionCode").orNull

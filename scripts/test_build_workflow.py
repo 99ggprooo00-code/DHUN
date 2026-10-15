@@ -58,7 +58,7 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("github.ref == 'refs/heads/main'", self.publish_test)
         self.assertIn("needs: [apk, msi]", self.publish_test)
         self.assertIn("gh release create test", self.publish_test)
-        self.assertNotIn("Create the fixed v1.00.001", self.publish_test)
+        self.assertNotIn("Stage, verify and publish the fixed v1.00.002", self.publish_test)
         # The fixed/public release path remains a separate explicit dispatch.
         self.assertNotIn("github.event_name == 'push'", self.publish)
         self.assertIn("github.event_name == 'workflow_dispatch' && inputs.build_only == false", self.publish)
@@ -168,31 +168,37 @@ class BuildWorkflowTest(unittest.TestCase):
             self.assertNotIn(f"gh release delete {tag} ", self.publish_test)
 
     def test_fixed_version_is_created_once_as_public_prerelease(self):
-        self.assertIn("Create the fixed v1.00.001 public prerelease once", self.publish)
+        self.assertIn("Stage, verify and publish the fixed v1.00.002 prerelease once", self.publish)
         self.assertIn("python scripts/stage_versioned_release.py", self.publish)
-        self.assertIn("--notes-file docs/releases/v1.00.001.md", self.publish)
+        self.assertIn("--notes-file docs/releases/v1.00.002.md", self.publish)
         for asset in (
-            "dhun-v1.00.001.apk",
-            "dhun-v1.00.001-arm64-v8a.apk",
-            "dhun-v1.00.001-armeabi-v7a.apk",
-            "dhun-v1.00.001.msi",
+            "dhun-v1.00.002.apk",
+            "dhun-v1.00.002-arm64-v8a.apk",
+            "dhun-v1.00.002-armeabi-v7a.apk",
+            "dhun-v1.00.002.msi",
         ):
             self.assertIn(f"dist/$version/{asset}", self.publish)
             self.assertIn(f"dist/$version/{asset}.sha256", self.publish)
-        self.assertIn("--prerelease", self.publish)
+        self.assertIn("--draft --prerelease", self.publish)
+        self.assertIn('gh release edit "$version" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease', self.publish)
+        self.assertIn('actual_assets=$(gh release view', self.publish)
+        self.assertIn('if [ "$actual_assets" != "$expected_assets" ]; then', self.publish)
+        self.assertIn('python scripts/check_android_identity.py "$aapt" out \'1.00.002\' 7', self.text)
         self.assertIn(".isDraft')\" != \"false\"", self.publish)
         self.assertIn(".isPrerelease')\" != \"true\"", self.publish)
-        self.assertIn("already exists; leaving its assets and tag unchanged", self.publish)
+        self.assertIn("already exists at $existing_target; leaving its assets and tag unchanged", self.publish)
         self.assertIn("already exists but is still a draft; refusing to silently skip it", self.publish)
         self.assertIn("already exists but is not marked as a prerelease", self.publish)
 
     def test_unreadable_baseline_skips_the_install_over_check_instead_of_wedging(self):
         smoke = (WORKFLOW.parents[2] / "scripts/check_msi_upgrade.ps1").read_text()
-        # The published v1.00.001 release currently names its verified MSI
+        # Before v1.00.002 is published, v1.00.001 names its verified MSI
         # `dhun.msi`, not the versioned name used by the future public path.
+        self.assertIn("@{ Tag = 'v1.00.002'; Name = 'dhun-v1.00.002.msi' }", smoke)
         self.assertIn("@{ Tag = 'v1.00.001'; Name = 'dhun.msi' }", smoke)
         self.assertIn("@{ Tag = 'v1.00.001'; Name = 'dhun-v1.00.001.msi' }", smoke)
         self.assertIn("@{ Tag = 'test'; Name = 'dhun-test.msi' }", smoke)
+        self.assertLess(smoke.index("Name = 'dhun-v1.00.002.msi'"), smoke.index("Name = 'dhun.msi'"))
         self.assertLess(smoke.index("Name = 'dhun.msi'"), smoke.index("Name = 'dhun-test.msi'"))
         self.assertIn("Published baseline MSI checksum did not match", smoke)
         self.assertIn('gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $assetName', smoke)
@@ -232,7 +238,7 @@ class BuildWorkflowTest(unittest.TestCase):
         # Release-facing assets: no .json may be uploaded by the publish job.
         # (The published v1.00.001 .build-info.json files are historical and untouched.)
         self.assertNotIn(".json", self.publish)
-        self.assertIn("dist/$version/dhun-v1.00.001.msi.provenance.txt", self.publish)
+        self.assertIn("dist/$version/dhun-v1.00.002.msi.provenance.txt", self.publish)
         self.assertIn("dist/dhun-test.msi.provenance.txt", self.publish_test)
         for line in self.text.splitlines():
             if "upload" in line or "gh release create" in line:
