@@ -514,9 +514,13 @@ class PlayerViewModelTest {
                 ),
             )
             fixture.player.advanceTo(3)
+            // prepareQueue publishes queue before index. A Default-dispatcher
+            // observer can see the new queue while index is still 3 (push CI
+            // 38708132204). Wait for both asserted facts, not a partial swap.
             eventually {
                 fixture.player.queue.value.map { it.id } ==
-                    listOf("r3", "r6", "r7", "r8", "r9", "r10")
+                    listOf("r3", "r6", "r7", "r8", "r9", "r10") &&
+                    fixture.player.currentQueueIndex.value == 0
             }
             // Same song, same position, no gap: the head never moves and no
             // seek may be issued — the swap goes around the sounding item.
