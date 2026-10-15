@@ -12,6 +12,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.yield
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.TimeSource
 
 /** One origin-wide lane for /get and /search. LRCLIB's documented identification,
  * sequential access, 250ms spacing and Retry-After apply even across picker/fallback.
@@ -20,6 +21,7 @@ import kotlinx.coroutines.sync.withLock
 class LrcLibAccess(
     version: String = "development",
     private val clock: EpochClock = EpochClock.System,
+    private val monotonicMs: () -> Long = LrcLibMonotonic::nowMs,
     private val pause: suspend (Long) -> Unit = { delay(it) },
 ) {
     private val mutex = Mutex()
@@ -29,7 +31,7 @@ class LrcLibAccess(
 
     internal suspend fun get(client: HttpClient, url: String, parameters: HttpRequestBuilder.() -> Unit): LrcLibReply = mutex.withLock {
         fun checkBackoff() {
-            if (retryUntil > clock.nowMs()) throw LrcLibBackoff(remainingSeconds(retryUntil, clock.nowMs()))
+            if (retryUntil > monotonicMs()) throw LrcLibBackoff(remainingSeconds(retryUntil, monotonicMs()))
         }
         checkBackoff()
         // Delay is relative, so a wall-clock adjustment cannot remove spacing.
@@ -43,7 +45,9 @@ class LrcLibAccess(
             }
             val status = response.status.value
             if (status == 429 || status == 503) {
-                retryUntil = retryAfterDeadline(response.headers["Retry-After"], clock.nowMs())
+                val now = clock.nowMs()
+                val deadline = retryAfterDeadline(response.headers["Retry-After"], now)
+                retryUntil = saturatingAdd(monotonicMs(), (deadline - now).coerceAtLeast(0))
             }
             val channel = response.bodyAsChannel()
             val body = try {
@@ -68,7 +72,7 @@ class LrcLibAccess(
                     }
                 }
             } finally { channel.cancel(null) }
-            LrcLibReply(status, body, if (status == 429 || status == 503) remainingSeconds(retryUntil, clock.nowMs()) else null)
+            LrcLibReply(status, body, if (status == 429 || status == 503) remainingSeconds(retryUntil, monotonicMs()) else null)
         } finally {
             // Space requests after completion, not merely after dispatching headers.
             hasRequested = true
@@ -109,4 +113,9 @@ internal fun retryAfterDeadline(header: String?, now: Long): Long {
     fun leaps(y: Int) = y / 4 - y / 100 + y / 400
     val days = (year - 1970L) * 365 + leaps(year - 1) - leaps(1969) + months.take(month).sum() + day - 1
     return ((days * 86_400 + hour * 3_600 + minute * 60 + second) * 1_000).coerceAtLeast(now)
+}
+
+private object LrcLibMonotonic {
+    private val origin = TimeSource.Monotonic.markNow()
+    fun nowMs(): Long = origin.elapsedNow().inWholeMilliseconds
 }

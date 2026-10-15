@@ -28,7 +28,7 @@ class LrcLibAccessTest {
         var now = 10_000L
         var calls = 0
         val waits = mutableListOf<Long>()
-        val lane = LrcLibAccess("1.2.3", EpochClock { now }) { waits += it; now += it }
+        val lane = LrcLibAccess("1.2.3", EpochClock { now }, monotonicMs = { now }) { waits += it; now += it }
         val http = client(MockEngine { request ->
             calls++
             assertEquals("DHUN/1.2.3 (https://github.com/99ggprooo00-code/DHUN)", request.headers["User-Agent"])
@@ -46,7 +46,7 @@ class LrcLibAccessTest {
     @Test fun nonJson429BacksOffBothAdaptersAndDoesNotSleepOrRetryAutomatically() = runTest {
         var now = 10_000L
         var calls = 0
-        val lane = LrcLibAccess(clock = EpochClock { now }) { now += it }
+        val lane = LrcLibAccess(clock = EpochClock { now }, monotonicMs = { now }) { now += it }
         val http = client(MockEngine {
             calls++
             if (calls == 1) respond("edge rate limit, not JSON", HttpStatusCode.TooManyRequests, headersOf("Retry-After", "120"))
@@ -69,7 +69,7 @@ class LrcLibAccessTest {
         var calls = 0
         val held = CompletableDeferred<Unit>()
         val entered = CompletableDeferred<Unit>()
-        val lane = LrcLibAccess(clock = EpochClock { now }) { now += it }
+        val lane = LrcLibAccess(clock = EpochClock { now }, monotonicMs = { now }) { now += it }
         val http = client(MockEngine {
             calls++
             if (calls == 1) { entered.complete(Unit); held.await() }
@@ -107,10 +107,32 @@ class LrcLibAccessTest {
         finally { http.close() }
     }
 
+    @Test fun wallClockJumpCannotExpireAProvidersRequestedCooldownEarly() = runTest {
+        var wall = 10_000L
+        var elapsed = 0L
+        var calls = 0
+        val lane = LrcLibAccess(clock = EpochClock { wall }, monotonicMs = { elapsed }) { elapsed += it }
+        val http = client(MockEngine {
+            calls++
+            if (calls == 1) respond("edge backoff", HttpStatusCode.TooManyRequests, headersOf("Retry-After", "120"))
+            else respond("[]")
+        })
+        try {
+            LrcLibSource(http, access = lane).fetch(track)
+            wall += 3_600_000
+            val blocked = LrcLibSearchSource(http, access = lane).candidates(track, "retry")
+            assertTrue((blocked as DhunResult.Failure).error is DhunError.RateLimited)
+            assertEquals(1, calls)
+            elapsed += 120_000
+            assertTrue(LrcLibSearchSource(http, access = lane).candidates(track, "retry") is DhunResult.Success)
+            assertEquals(2, calls)
+        } finally { http.close() }
+    }
+
     @Test fun wallClockJumpCannotBypassTheRelativeRequestGap() = runTest {
         var now = 10_000L
         val waits = mutableListOf<Long>()
-        val lane = LrcLibAccess(clock = EpochClock { now }) { waits += it }
+        val lane = LrcLibAccess(clock = EpochClock { now }, monotonicMs = { now }) { waits += it }
         val http = client(MockEngine { respond("{}") })
         try {
             val source = LrcLibSource(http, access = lane)
