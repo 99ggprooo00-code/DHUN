@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -189,7 +190,7 @@ internal object TrackMenuPolicy {
  * so there is one menu look rather than two.
  *
  * Recipe: the track's own artwork blurred once under the lyrics-card veil
- * ([LyricsMaterial]), on an opaque [DhunColors.surface] base with a soft
+ * ([LyricsMaterial]), on an opaque [DhunAppearance.tokens] surface base with a soft
  * shadow. The base matters: a menu floats over a dimmed scrim (or over an
  * anchored popup), and the veil alone — or nothing at all, when the track has
  * no artwork or the platform cannot really blur — would let the page read
@@ -227,7 +228,7 @@ internal fun TrackMenuSurface(
                 clip = false,
                 ambientColor = Color.Black.copy(alpha = 0.35f),
             )
-            .background(DhunColors.surface, shape),
+            .background(DhunAppearance.tokens.surface, shape),
         shape = shape,
     ) {
         Column(

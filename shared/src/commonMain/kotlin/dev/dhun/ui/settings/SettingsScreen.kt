@@ -533,11 +533,13 @@ private fun VisualTuningControls(viewModel: SettingsViewModel) {
         verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
         Text(
-            "Live preview · 50% is the current design. Changes are saved on release. " +
+            "Live preview · 50% preserves the earlier look except softer tonal surfaces. " +
+                "Page artwork is fixed at 50%; mini-player and navigation at 0% in test builds. " +
+                "Changes save on release. " +
                 "Use the labels and percentages when reporting what looks too dark or too white.",
             style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary,
         )
-        VisualPart.entries.forEach { part ->
+        DhunVisualTuning.adjustableParts.forEach { part ->
             val percent = values[part] ?: DhunVisualTuning.DEFAULT
             Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
                 Text(part.label, style = MaterialTheme.typography.bodyLarge, color = DhunColors.textPrimary)
@@ -560,7 +562,7 @@ private fun VisualTuningControls(viewModel: SettingsViewModel) {
                 }
             }
         }
-        TextButton(onClick = viewModel::resetVisualTuning, enabled = loaded) { Text("Reset UI tuning to 50%") }
+        TextButton(onClick = viewModel::resetVisualTuning, enabled = loaded) { Text("Reset adjustable sliders to 50%") }
     }
 }
 

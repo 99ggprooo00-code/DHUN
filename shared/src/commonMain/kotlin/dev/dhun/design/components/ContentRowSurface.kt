@@ -28,14 +28,16 @@ internal fun contentRowFill(part: VisualPart = VisualPart.LIST_ROWS): Color {
     val light = DhunAppearance.tokens.isLight
     val base = if (light) ContentSurfacePolicy.CONTENT_OPACITY_LIGHT else ContentSurfacePolicy.CONTENT_OPACITY_DARK
     val alpha = DhunVisualTuning.alpha(part, base, if (light) 0.78f else 0.75f, 0.98f)
-    return (if (light) DhunColors.surfaceContainerHigh else DhunColors.surfaceElevated).copy(alpha = alpha)
+    val tint = if (light) DhunColors.surfaceContainerHigh else DhunColors.surfaceElevated
+    return tint.copy(alpha = tint.alpha * alpha)
 }
 
 internal fun readingSurfaceFill(part: VisualPart = VisualPart.READING): Color {
     val light = DhunAppearance.tokens.isLight
     val base = if (light) ContentSurfacePolicy.READING_OPACITY_LIGHT else ContentSurfacePolicy.READING_OPACITY_DARK
     val alpha = DhunVisualTuning.alpha(part, base, 0.82f, 0.99f)
-    return (if (light) DhunColors.surfaceContainerHighest else DhunColors.surfaceElevated).copy(alpha = alpha)
+    val tint = if (light) DhunColors.surfaceContainerHighest else DhunColors.surfaceElevated
+    return tint.copy(alpha = tint.alpha * alpha)
 }
 
 /**
