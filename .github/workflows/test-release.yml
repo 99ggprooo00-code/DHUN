@@ -327,14 +327,13 @@ jobs:
           gh release delete test --yes --cleanup-tag || true
           git push origin :refs/tags/test || true
 
-          version=$(python scripts/test_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" --field name)
           gh release create test \
             dist/dhun-test.apk dist/dhun-test.apk.sha256 dist/dhun-test.apk.provenance.txt \
             dist/dhun-test-arm64-v8a.apk dist/dhun-test-arm64-v8a.apk.sha256 dist/dhun-test-arm64-v8a.apk.provenance.txt \
             dist/dhun-test-armeabi-v7a.apk dist/dhun-test-armeabi-v7a.apk.sha256 dist/dhun-test-armeabi-v7a.apk.provenance.txt \
             dist/dhun-test.msi dist/dhun-test.msi.sha256 dist/dhun-test.msi.provenance.txt \
             --target "$GITHUB_SHA" \
-            --title "DHUN test $version (private draft)" \
+            --title "DHUN beta" \
             --notes-file docs/releases/rolling-test.md \
             --draft --prerelease
 

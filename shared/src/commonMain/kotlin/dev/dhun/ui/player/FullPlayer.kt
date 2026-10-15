@@ -868,10 +868,8 @@ private fun PlayerControlCluster(
             }
         }
 
-        // In-app volume is available on every platform. Android hardware keys
-        // still control system volume; this player-level slider is what makes
-        // the persisted pause-on-mute setting actionable (zero pauses only
-        // when that setting is enabled).
+        // Android controls the system music stream (including hardware keys);
+        // desktop retains its own player volume. Both feed the mute policy.
         Row(
             modifier = Modifier
                 .widthIn(max = if (isDesktop) DhunSpacing.playerVolumeMaxWidth else DhunSpacing.playerContentMaxWidth)
@@ -891,7 +889,7 @@ private fun PlayerControlCluster(
                 value = volume.coerceIn(0f, 1f),
                 onValueChange = viewModel::setVolume,
                 valueRange = 0f..1f,
-                modifier = Modifier.weight(1f).semantics { contentDescription = "In-app volume" },
+                modifier = Modifier.weight(1f).semantics { contentDescription = if (isDesktop) "In-app volume" else "Media volume" },
                 colors = SliderDefaults.colors(
                     thumbColor = accent,
                     activeTrackColor = accent.copy(alpha = 0.85f),
@@ -903,7 +901,7 @@ private fun PlayerControlCluster(
                 text = "${(volume.coerceIn(0f, 1f) * 100).toInt()}%",
                 style = MaterialTheme.typography.labelSmall,
                 color = DhunColors.textSecondary,
-                modifier = Modifier.semantics { contentDescription = "In-app volume ${(volume.coerceIn(0f, 1f) * 100).toInt()} percent" },
+                modifier = Modifier.semantics { contentDescription = "${if (isDesktop) "In-app volume" else "Media volume"} ${(volume.coerceIn(0f, 1f) * 100).toInt()} percent" },
             )
         }
 

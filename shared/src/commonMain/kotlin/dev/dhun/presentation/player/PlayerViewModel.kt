@@ -55,6 +55,13 @@ sealed interface LyricsUiState {
 /** Which way the artwork slides on a track change (+1 next, -1 previous). */
 enum class SkipDirection { FORWARD, BACKWARD }
 
+private data class MuteSnapshot(
+    val volume: Float,
+    val enabled: Boolean,
+    val playback: PlaybackState,
+    val track: Track?,
+)
+
 /**
  * PlayerViewModel — the application-layer snapshot + actions behind
  * MiniPlayer and FullPlayer (Phase 08).
@@ -91,6 +98,11 @@ class PlayerViewModel(
     val volume: StateFlow<Float> = player.volume
     private val _autoRadio = MutableStateFlow(true)
     private val _pauseOnMute = MutableStateFlow(false)
+    private var mutePausedTrackId: String? = null
+    private var mutePauseConfirmed = false
+    private var lastVolumeWasZero = false
+    private var lastMuteSettingEnabled = false
+    private var lastMuteTrackId: String? = null
     private val _seekStepSeconds = MutableStateFlow<Int?>(null)
     private val _keepModes = MutableStateFlow(true)
     val lyricsAutoScroll: StateFlow<Boolean> = settings?.observeString(SettingsKeys.LYRICS_AUTO_SCROLL)
@@ -209,6 +221,13 @@ class PlayerViewModel(
     }
 
     init {
+        // Observe the player's actual volume, not just our own slider calls:
+        // Android hardware keys and media-stream mute update this same flow.
+        scope.launch {
+            combine(volume, _pauseOnMute, state, currentTrack) { level, enabled, playback, track ->
+                MuteSnapshot(level, enabled, playback, track)
+            }.collect(::handleMuteSnapshot)
+        }
         settings?.let { repo ->
             scope.launch {
                 repo.observeString(SettingsKeys.AUTOPLAY_RADIO_ENABLED).collect {
@@ -402,6 +421,9 @@ class PlayerViewModel(
     /* ---------------- transport ---------------- */
 
     fun togglePlay() {
+        // A deliberate transport press supersedes an automatic mute pause.
+        mutePausedTrackId = null
+        mutePauseConfirmed = false
         // After a failure the engine sits in error-idle where play() is a
         // no-op — route the press through recovery so the button never
         // appears dead on an error row.
@@ -481,13 +503,43 @@ class PlayerViewModel(
         return newValue
     }
 
-    fun setVolume(volume: Float) {
-        val inAppVolume = volume.coerceIn(0f, 1f)
-        val wasAudible = player.volume.value > 0f
-        player.setVolume(inAppVolume)
-        if (inAppVolume == 0f && wasAudible && _pauseOnMute.value && state.value is PlaybackState.Playing) {
+    fun setVolume(volume: Float) = player.setVolume(volume.coerceIn(0f, 1f))
+
+    private fun handleMuteSnapshot(snapshot: MuteSnapshot) {
+        val trackId = snapshot.track?.id
+        val zero = snapshot.volume <= 0f
+        if (!snapshot.enabled || (mutePausedTrackId != null && mutePausedTrackId != trackId) ||
+            snapshot.playback is PlaybackState.Idle || snapshot.playback is PlaybackState.Error
+        ) {
+            mutePausedTrackId = null
+            mutePauseConfirmed = false
+        }
+        if (mutePausedTrackId != null && snapshot.playback is PlaybackState.Paused) {
+            mutePauseConfirmed = true
+        }
+        // Another transport source resumed the track before unmute: our mute
+        // pause no longer owns the state, so an eventual unmute cannot play it.
+        if (mutePauseConfirmed && snapshot.playback is PlaybackState.Playing) {
+            mutePausedTrackId = null
+            mutePauseConfirmed = false
+        }
+        if (!zero) {
+            val shouldResume = lastVolumeWasZero && snapshot.enabled && mutePauseConfirmed &&
+                mutePausedTrackId == trackId && snapshot.playback is PlaybackState.Paused
+            mutePausedTrackId = null
+            mutePauseConfirmed = false
+            if (shouldResume) player.playPause()
+        } else if ((!lastVolumeWasZero || (!lastMuteSettingEnabled && snapshot.enabled) ||
+                lastMuteTrackId != trackId) && snapshot.enabled && trackId != null &&
+            snapshot.playback is PlaybackState.Playing
+        ) {
+            mutePausedTrackId = trackId
+            mutePauseConfirmed = false
             player.playPause()
         }
+        lastVolumeWasZero = zero
+        lastMuteSettingEnabled = snapshot.enabled
+        lastMuteTrackId = trackId
     }
 
     private suspend fun resetModesForNewQueue() {

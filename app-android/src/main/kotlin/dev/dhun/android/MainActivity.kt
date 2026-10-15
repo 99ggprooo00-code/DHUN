@@ -45,6 +45,7 @@ import androidx.core.view.WindowCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import dev.dhun.android.playback.AndroidDhunPlayer
+import dev.dhun.android.playback.AndroidMediaVolume
 import dev.dhun.android.playback.DhunPlaybackService
 import dev.dhun.android.playback.PlaybackGraph
 import dev.dhun.android.shortcuts.NowPlayingShortcutSync
@@ -380,7 +381,7 @@ class MainActivity : ComponentActivity() {
                 pending!!.await()
             }
             val cache = GlobalContext.get().get<dev.dhun.android.playback.DhunStreamCache>()
-            attach(AndroidDhunPlayer(controller, activityScope, cache))
+            attach(AndroidDhunPlayer(controller, activityScope, cache, AndroidMediaVolume(applicationContext)))
             connectState.value = ConnectUi.Ready(reason = null)
             logLine("connected to playback service")
             return
@@ -418,7 +419,7 @@ class MainActivity : ComponentActivity() {
                     null
                 }
                 val local = PlaybackGraph.buildExoPlayer(applicationContext, cache, segments, downloads)
-                attach(AndroidDhunPlayer(local, activityScope, cache))
+                attach(AndroidDhunPlayer(local, activityScope, cache, AndroidMediaVolume(applicationContext)))
                 logLine("local player ready — audio will play; session controls degraded")
                 connectState.value = ConnectUi.Ready(
                     reason = "Background/media-session controls unavailable on this device " +

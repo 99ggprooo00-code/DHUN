@@ -36,4 +36,6 @@ class WorkflowTestVersionTest(unittest.TestCase):
             self.assertIn('if [ "$DHUN_RELEASE_CHANNEL" = test ]; then', block)
         self.assertIn("      - 'scripts/**'", workflow)
         self.assertIn("      - '.github/workflows/test-release.yml'", workflow)
-        self.assertIn('--title "DHUN test $version (private draft)"', workflow)
+        self.assertIn('--title "DHUN beta"', workflow)
+        self.assertIn('--target "$GITHUB_SHA"', workflow)
+        self.assertIn('--title "DHUN v1.00.002 — public pre-release"', workflow)
