@@ -16,3 +16,18 @@ Verify the checksum sidecar before installing. On Android, enable installation f
 ### Important
 
 These artifacts use a public Android test key; the Windows MSI is unsigned. YouTube can change the endpoints used for playback. CI and emulator tests do not replace device testing. Do not install on a device where data or reliable playback is critical.
+
+### Increasing versions
+
+Every test-release workflow run assigns Android `1.00.<run>-test.<attempt>` and a
+strictly increasing Android versionCode. Reruns increase the attempt; the next run
+outranks all supported attempts of the previous run. Windows already uses the same
+workflow run/attempt counter for its increasing MSI ProductVersion. The rolling
+`test` tag and asset filenames stay stable; the release title and installed binary
+identity change. Public `v1.00.001` is a separate frozen release and is not rewritten.
+Android will reject installing that older public build over a newer test build.
+
+App-code/build changes merged or pushed to main update this private draft after
+both platform jobs succeed. Release-script/workflow changes also trigger it;
+documentation-only changes do not. PRs only produce Actions artifacts. As before,
+superseded main builds are canceled and cannot overwrite a newer main build.

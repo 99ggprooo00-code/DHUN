@@ -23,6 +23,18 @@ android {
         targetSdk = 35
         versionCode = 6
         versionName = "1.00.001"
+        // Test builds advance on every workflow run/rerun; public identity stays fixed.
+        val testName = providers.gradleProperty("dhunTestVersionName").orNull
+        val testCode = providers.gradleProperty("dhunTestVersionCode").orNull
+        require((testName == null) == (testCode == null)) { "Supply both test version properties" }
+        if (testName != null && testCode != null) {
+            require(dhunReleaseChannel == "test") { "Test identity requires the test channel" }
+            require(Regex("1\\.00\\.[1-9][0-9]*-test\\.[1-9][0-9]*").matches(testName)) { "Invalid test version name" }
+            val code = testCode.toIntOrNull()
+            require(code != null && code in 1001..2_100_000_000) { "Invalid test version code" }
+            versionName = testName
+            versionCode = code
+        }
         buildConfigField("String", "DHUN_RELEASE_CHANNEL", "\"$dhunReleaseChannel\"")
     }
 

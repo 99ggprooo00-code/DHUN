@@ -36,6 +36,8 @@ on:
       - 'gradle.properties'
       - 'gradlew'
       - 'gradlew.bat'
+      - 'scripts/**'
+      - '.github/workflows/test-release.yml'
 
 permissions:
   contents: read
@@ -67,8 +69,21 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Allocate increasing Android test identity
+        id: test_version
+        if: ${{ env.DHUN_RELEASE_CHANNEL == 'test' }}
+        run: python scripts/test_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
       - name: Build debug APK
-        run: ./gradlew :app-android:assembleDebug "-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL" --no-daemon
+        env:
+          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
+          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+        run: |
+          args=("-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL")
+          if [ "$DHUN_RELEASE_CHANNEL" = test ]; then
+            args+=("-PdhunTestVersionName=$TEST_VERSION_NAME" "-PdhunTestVersionCode=$TEST_VERSION_CODE")
+          fi
+          ./gradlew :app-android:assembleDebug "${args[@]}" --no-daemon
 
       - name: Stage universal and ABI APKs with checksums and provenance
         run: |
@@ -198,8 +213,21 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Allocate increasing Android test identity
+        id: test_version
+        if: ${{ env.DHUN_RELEASE_CHANNEL == 'test' }}
+        run: python scripts/test_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
       - name: Build debug-signed AAB
-        run: ./gradlew :app-android:bundleDebug "-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL" --no-daemon
+        env:
+          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
+          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+        run: |
+          args=("-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL")
+          if [ "$DHUN_RELEASE_CHANNEL" = test ]; then
+            args+=("-PdhunTestVersionName=$TEST_VERSION_NAME" "-PdhunTestVersionCode=$TEST_VERSION_CODE")
+          fi
+          ./gradlew :app-android:bundleDebug "${args[@]}" --no-daemon
 
       - name: Stage optional AAB
         run: |
@@ -257,13 +285,14 @@ jobs:
           gh release delete test --yes --cleanup-tag || true
           git push origin :refs/tags/test || true
 
+          version=$(python scripts/test_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" --field name)
           gh release create test \
             dist/dhun-test.apk dist/dhun-test.apk.sha256 dist/dhun-test.apk.provenance.txt \
             dist/dhun-test-arm64-v8a.apk dist/dhun-test-arm64-v8a.apk.sha256 dist/dhun-test-arm64-v8a.apk.provenance.txt \
             dist/dhun-test-armeabi-v7a.apk dist/dhun-test-armeabi-v7a.apk.sha256 dist/dhun-test-armeabi-v7a.apk.provenance.txt \
             dist/dhun-test.msi dist/dhun-test.msi.sha256 dist/dhun-test.msi.provenance.txt \
             --target "$GITHUB_SHA" \
-            --title "DHUN rolling test build (private draft)" \
+            --title "DHUN test $version (private draft)" \
             --notes-file docs/releases/rolling-test.md \
             --draft --prerelease
 
