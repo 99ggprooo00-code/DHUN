@@ -268,3 +268,13 @@ See [Provider / integration review](development/provider-integration-review.md) 
 DeepL paid-vs-Developer retention and credential requirements, and explicit go/no-go
 boundaries. Public-page retrieval is available for the reviewed pages; that does not
 prove authenticated service reliability or native secure-vault/device acceptance.
+
+## On-device translation decision and foundation
+
+The owner chose local-only translation and owner-run physical Android/Windows
+acceptance. See [offline translation review](development/offline-translation-review.md).
+The shared manual pipeline now has bounded batching/cache, cancellation, source
+snapshot guards and partial text-only overlays, covered by fake-provider tests.
+It is deliberately not wired to player/settings until an actual reviewed model and
+runtime are integrated. No cloud fallback, model download or new dependency is added;
+this is not yet a working end-user translation feature or physical-device acceptance.

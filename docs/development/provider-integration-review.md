@@ -41,7 +41,15 @@ DHUN already parses that format. Existing LRC/enhanced-LRC remains supported, an
 uses explicit local import. YAML ingestion would require a bounded safe-parser and
 format/fixture review before any claim of runtime word-sync parity for that format.
 
-## Translation: DeepL reviewed, implementation/acceptance still gated
+## Translation: owner chose on-device only
+
+The owner subsequently chose **on-device-only translation** and **physical Android/
+Windows testing by the owner**. The DeepL discussion below is a historical candidate
+review, not an approved integration or an outstanding request for keys. No remote
+translation adapter should be enabled. See [offline translation review](offline-translation-review.md)
+for the current local-only implementation boundary and model/runtime review.
+
+### Historical DeepL candidate review
 
 Public documents reviewed:
 
@@ -78,8 +86,9 @@ Important findings for the future implementation:
   account; mocks are insufficient. No translation toggle is added before it works.
 
 No API key was supplied or transmitted, no paid API call was made, and translation is
-not marked complete. The privacy/cost policy and physical credential-store acceptance
-must be settled before calling the integration production-ready.
+not marked complete. The owner has rejected the remote approach in favor of local-only
+processing; secure API credentials are therefore not needed for the selected translation
+plan. This review must not be presented as a production-ready integration.
 
 ## Other providers and integrations: explicit no-go pending evidence
 
