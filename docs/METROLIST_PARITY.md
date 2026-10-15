@@ -5,7 +5,7 @@ Audit: 2026-10-15. DHUN baseline `5107252`; reference
 `d99fd126631d45ebc32495725d858bade304b6f1`. README confirms maintenance mode.
 Reviewed README, lyrics model, parsing/romanization helpers, translation helper,
 provider interface and registry, and provider source files. Behavior reference only;
-no reference code copied or new dependencies introduced. Existing license notices
+no reference code copied. The later romanization slice adds ICU4J with its complete upstream notices. Existing license notices
 and attribution remain unchanged.
 
 Status is intentionally not a claim that all acceptance requirements are met.
@@ -22,7 +22,7 @@ The user subsequently prioritized detailed word-by-word synchronization.
 | Overlapping vocals | Partial | Explicit enhanced-LRC end markers allow multiple active lines; agent/background metadata and TTML are not implemented | Do not infer singer identities | Overlap/end boundary tests; multi-singer device test pending |
 | Per-song timing/resync | Implemented slice, device acceptance pending | Earlier/later in 100 ms increments and reset; persisted per-track via SettingsRepository; ±10 s bound; inverse seek correction | Local only, originals unchanged | LyricsTimingTest: persistence, track isolation, bounds, malformed settings, display/seek inversion |
 | TTML | Missing | Secure bounded XML parser with DTD/external entities disabled | XML entity and input-size risks; never use regex as XML parser | Malformed/XML security tests needed |
-| Romanization | Missing | Separate persisted toggle/override; platform transliteration service with off-thread bounded cache | Verify script-specific quality and library/data licenses; no translation label | Mixed scripts, punctuation, unknown language and immutable-original tests needed |
+| Romanization | Implemented slice; device/language-quality acceptance pending | Separate persisted player toggle and override; original + secondary line; worker-dispatched ICU4J engine and source/mode-keyed bounded cache | On-device only, no API/credentials; full Unicode/ICU notices bundled. Conservative auto leaves Han/Cyrillic ambiguous. Japanese kana only, no Kanji pronunciation guesses | Real ICU mode fixtures, mixed/punctuation/unknown text, caching, worker/cancellation/failure, controller persistence/source guards and Android API 24/35 smoke tests |
 | Opt-in translation | Missing | Provider abstraction, explicit request consent, target setting, cancellation/rate limits and hash-keyed cache; secure platform credential store before any keyed integration | External disclosure/retention, lyrics copyright, Android Keystore/desktop credential facilities; no credentials in settings or URLs | Fake provider/privacy tests and platform credential acceptance needed |
 | Personalized Quick Picks | Partial | Home already has remote Quick Picks and recommendations; local-history personalization needs a separate transparent ranking slice | Prefer on-device history, with clear/reset controls | Ranking/history state tests needed; do not duplicate existing shelves |
 | Sleep timer | Present | Preserve PlayerViewModel runtime timer and Home/shell controls | Local only | Existing playback/state suites |
@@ -112,3 +112,37 @@ or autonomously merged as if the original entire request were complete.
 - Device acceptance still needed: picker scrolling/input/accessibility, selecting and displaying
   an enhanced result, navigation/restart, automatic reset and failure/retry states. Live service
   reachability, rate limits and terms cannot be guaranteed by fake-client tests.
+
+## On-device romanization slice
+
+Implements Metrolist-like optional secondary romanization without copying its code.
+Both Android and desktop use ICU4J 76.1 for consistent transform data, not newer-only
+Android ICU APIs. This adds a sizable runtime/data dependency; review APK/MSI size
+and low-memory performance during device acceptance. Full upstream release notices
+are preserved verbatim in LICENSES and generated bundled legal pages.
+
+- Separate default-off **Romanized line** player toggle and persisted mode override.
+  Original synced/unsynced lines remain visible and unmodified; timings/seeking keep
+  using original text. Secondary text is never labeled translation.
+- Modes: Japanese kana (Kanji unchanged), Korean, Chinese Mandarin pinyin,
+  Devanagari/Gurmukhi script transliteration, Russian/Ukrainian BGN.
+- Conservative auto handles kana (+ unchanged Kanji), Hangul, Devanagari and Gurmukhi.
+  Han alone is ambiguous (Chinese/Japanese/etc.), and Cyrillic alone cannot identify a
+  language: those require an explicit override. Unsupported/mixed ambiguous scripts,
+  transform errors and oversized lines remain unchanged without duplicate secondary text.
+- CPU work runs on Dispatchers.Default, checks cancellation, and is cached by source
+  text + requested mode (256-entry LRU, input/output bounds). Track + exact source-line
+  guards prevent late secondary text being attached to a successor or different match.
+- Tests cover real transforms for all offered modes, punctuation/Latin/emoji retention,
+  script ambiguity, source immutability, eviction, worker dispatch, cancellation,
+  failures, saved preferences/recreation, track/source changes, and API 24/35 class use.
+- Privacy text corrected to reflect the existing working lyrics switch and actual
+  configured providers; local transliteration makes no new third-party request.
+  Contact-honesty tests exempt only the exact vendored ICU notice block (which contains
+  upstream authors' emails), while a new test requires that block verbatim exactly once.
+- Local website build/41 rule tests passed; after removing app-web/dist, Python suite
+  passed 385 tests. No local JDK; hosted Kotlin/Android/desktop results remain required.
+- Still needs fluent-speaker review (transliteration is not pronunciation inference),
+  Android/desktop glyph layout, pane scrolling, toggle/reset/restart behavior, API-floor
+  device performance and package-size acceptance. TTML, translation and broader gaps
+  above remain unfinished, so this is not full Metrolist parity and not merge approval.

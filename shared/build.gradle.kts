@@ -41,6 +41,7 @@ kotlin {
             implementation(kotlin("test"))
         }
         androidMain.dependencies {
+            implementation("com.ibm.icu:icu4j:76.1")
             api("app.cash.sqldelight:android-driver:2.1.0")
             // ADR-006 Android download transport: OkHttp, not CIO (InnerTune /
             // RiMusic / OuterTune all download over OkHttp on Android; CIO's
@@ -63,6 +64,7 @@ kotlin {
             implementation(compose.desktop.currentOs)
         }
         jvmMain.dependencies {
+            implementation("com.ibm.icu:icu4j:76.1")
             implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
             api("app.cash.sqldelight:sqlite-driver:2.1.0")
         }

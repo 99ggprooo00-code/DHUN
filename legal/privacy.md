@@ -1,7 +1,7 @@
 ---
 id: privacy
 title: Privacy Policy
-effectiveDate: 2026-10-10
+effectiveDate: 2026-10-15
 status: draft
 ---
 
@@ -25,8 +25,8 @@ Android and Windows. It has no account system, no server of its own, no
 analytics, no advertising and no crash reporting. **[source]**
 
 Everything it remembers about you is stored on your device. When you search,
-browse or play, the app talks directly to YouTube and, for synced lyrics, to
-LRCLIB — and those requests reveal your IP address to those services, as any
+browse or play, the app talks directly to YouTube and, when lyrics are enabled,
+to configured lyric providers including LRCLIB and KuGou — and those requests reveal your IP address to those services, as any
 internet request does. **[source]**
 
 ## 2. Who operates {{appTitle}}
@@ -51,7 +51,7 @@ Nothing in this section leaves your device by the app's own design. **[source]**
 | Recent searches | local SQLite database |
 | Track metadata you have browsed | local SQLite database |
 | Queue and now-playing position | local SQLite database |
-| Cached lyrics | local SQLite database |
+| Cached lyrics, explicit per-song lyric choices, timing offsets and romanization preferences | local SQLite database |
 | Settings (theme, accent, cache size, backdrop) | local SQLite database |
 | Downloaded audio and saved artwork | Android: the app's private files directory. Windows: the per-user install folder. |
 | Streamed-audio cache (size-capped) | Android: the app cache directory |
@@ -75,18 +75,29 @@ control how those parties process it.
 | YouTube / Google | Search terms; track, album, artist and playlist identifiers; the client name and version; the country code from settings; and a visitor identifier that YouTube returns and the app then reuses | Browsing, searching, resolving playback **[source]** |
 | YouTube / Google | Ordinary media requests, which include your IP address | Playing or downloading a track **[source]** |
 | YouTube / Google | Requests for artwork, which include your IP address | Showing artwork **[source]** |
-| LRCLIB (`lrclib.net`) | Track title, artist, album and duration | Every time a track loads **[source]** |
+| YouTube / Google | Current track identifier for lyrics | When lyrics are enabled and this configured source is used **[source]** |
+| LRCLIB (`lrclib.net`) | Track title, artist, album and duration; manual match-search query | When lyrics are enabled, no saved/cache result satisfies the request, and this configured source is tried; also explicit match searches **[source]** |
+| KuGou (`lyrics.kugou.com`) | Track title, artist and duration; returned candidate identifiers for lyric download | When lyrics are enabled and this configured source is tried; also explicit match searches **[source]** |
 
 Also: every network request carries your IP address and a user-agent string, as
 with any internet request. **[source]**
 
-### The lyrics lookup has no working off switch
+### Lyrics controls and on-device romanization
 
-The app defines a `lyrics_enabled` setting, but no code reads it: the lyric
-lookup runs on every track change regardless of that key. **[source]** Turning
-the setting off in a future build will not, by itself, stop the lookup — the
-setting must be wired to the lookup first. Until that is fixed, treat every track
-change as a metadata request to LRCLIB. **[maintainer]**
+The `lyrics_enabled` setting is read by both the player and lyrics repository.
+Turning it off prevents new lyric lookups through those paths; already transmitted
+requests cannot be recalled. Enabled lookups use saved choices and cache first, then
+configured providers with bounded fallback. **[source]**
+
+The match picker sends queries/track metadata only when Search is requested. A
+per-song choice is stored locally and survives clearing the automatic lyric cache;
+choose **Use automatic** in the match picker to remove that choice. **[source]**
+
+Optional romanization uses bundled ICU4J transforms on the device. It does not send
+lyric text to a transliteration service. Its bounded in-memory cache is keyed by
+source text and mode; it is not translation. The toggle and mode persist locally.
+Ambiguous Han/Cyrillic text needs an explicit mode override, and Japanese Kanji is
+not converted to phonetic readings. **[source]**
 
 ### What is not sent
 
@@ -170,7 +181,8 @@ audio playback from that origin is unproven. **[source]**
 1. Name the data controller, or state that the project is a personal,
    non-commercial open-source effort, and publish a contact channel.
    **[maintainer]**
-2. Wire the lyrics setting to the lookup, or keep this disclosure.
+2. Review lyric providers' current content rights, retention and rate-limit terms
+   before adding new providers or external translation services.
    **[maintainer]**
 3. Decide whether the desktop yt-dlp fallback needs its own disclosure.
    **[maintainer]**

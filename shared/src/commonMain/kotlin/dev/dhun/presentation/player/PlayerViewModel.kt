@@ -132,6 +132,7 @@ class PlayerViewModel(
 
     private val _lyricsState = MutableStateFlow<LyricsUiState>(LyricsUiState.Unavailable)
     val lyricsState: StateFlow<LyricsUiState> = _lyricsState.asStateFlow()
+    val lyricsRomanization = LyricsRomanizationController(settings, scope, currentTrack, lyricsState)
 
     private var relatedJob: Job? = null
     private var lyricsJob: Job? = null

@@ -408,6 +408,8 @@ internal fun LyricsTabContent(
     modifier: Modifier = Modifier,
 ) {
     val lyricsState by viewModel.lyricsState.collectAsState()
+    val romanizationEnabled by viewModel.lyricsRomanization.enabled.collectAsState()
+    val romanized by viewModel.lyricsRomanization.result.collectAsState()
     val savedTiming by viewModel.lyricsTiming.collectAsState()
     val positionMs by viewModel.positionMs.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
@@ -430,6 +432,7 @@ internal fun LyricsTabContent(
         }
     }
     Column(modifier = modifier.fillMaxSize()) {
+        LyricsRomanizationControls(viewModel.lyricsRomanization)
         if (matchController != null) TextButton(onClick = { showMatches = true }) { Text("Find lyrics matches for this song") }
         LyricsProviderPicker(
             selectedProvider = preferredProvider,
@@ -507,22 +510,29 @@ internal fun LyricsTabContent(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = DhunColors.textTertiary,
                             )
-                            Text(
-                                text = state.text,
-                                style = when (viewModel.lyricsTextSize.collectAsState().value) {
-                                    "small" -> MaterialTheme.typography.bodyLarge
-                                    "large" -> MaterialTheme.typography.titleLarge
-                                    else -> MaterialTheme.typography.titleMedium
-                                },
-                                color = DhunColors.textSecondary,
-                                lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
-                            )
+                            val plainLines = if (romanizationEnabled && state.text.lines().size <= 2_000) state.text.lines() else listOf(state.text)
+                            plainLines.forEachIndexed { index, original ->
+                                Text(
+                                    text = original,
+                                    style = when (viewModel.lyricsTextSize.collectAsState().value) {
+                                        "small" -> MaterialTheme.typography.bodyLarge
+                                        "large" -> MaterialTheme.typography.titleLarge
+                                        else -> MaterialTheme.typography.titleMedium
+                                    },
+                                    color = DhunColors.textSecondary,
+                                    lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
+                                )
+                                if (romanizationEnabled) romanized.line(track.id, index, original)?.let { secondary ->
+                                    Text(secondary, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textTertiary)
+                                }
+                            }
                             Spacer(modifier = Modifier.height(DhunSpacing.huge))
                         }
                     }
                 }
                 is LyricsUiState.Synced -> SyncedLyricsContent(
                     lines = state.lines,
+                    romanizedLines = if (romanizationEnabled) state.lines.mapIndexed { index, line -> romanized.line(track.id, index, line.text) } else emptyList(),
                     positionMs = timing.lyricPosition(positionMs),
                     accent = accent,
                     onSeek = { position ->

@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -66,6 +67,7 @@ internal fun SyncedLyricsContent(
     accent: Color,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    romanizedLines: List<String?> = emptyList(),
     autoScroll: Boolean = true,
     textSize: String = "default",
 ) {
@@ -95,7 +97,7 @@ internal fun SyncedLyricsContent(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val viewportHeight = constraints.maxHeight
-        LaunchedEffect(activeIndex, following, viewportHeight, lines, autoScroll) {
+        LaunchedEffect(activeIndex, following, viewportHeight, lines, autoScroll, romanizedLines) {
             if (autoScroll && following) {
                 // Includes index zero and the intro before the first timestamp:
                 // seeking to the beginning must not leave the last verse on screen.
@@ -136,60 +138,67 @@ internal fun SyncedLyricsContent(
                 )
                 val startMs = line.startTimeMs?.takeIf { it >= 0 }
                 var textLayout by remember(line) { mutableStateOf<TextLayoutResult?>(null) }
-                Text(
-                    text = karaokeText(line, positionMs, accent, color, active),
-                    onTextLayout = { textLayout = it },
-                    // Keep measurement stable while emphasis changes; changing
-                    // font size per line made wrapping fight the scroll animation —
-                    // we bump the base to headlineSmall (larger, more readable)
-                    // and use scale/weight/colour for the active pop.
-                    style = when (textSize) {
-                        "small" -> MaterialTheme.typography.titleLarge
-                        "large" -> MaterialTheme.typography.headlineMedium
-                        else -> MaterialTheme.typography.headlineSmall
-                    },
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                    color = color,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics { selected = active }
-                        .graphicsLayer { scaleX = emphasis; scaleY = emphasis }
-                        .clip(DhunShapes.medium)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    if (active) accent.copy(alpha = 0.16f) else Color.Transparent,
-                                    Color.Transparent,
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = karaokeText(line, positionMs, accent, color, active),
+                        onTextLayout = { textLayout = it },
+                        // Keep measurement stable while emphasis changes; changing
+                        // font size per line made wrapping fight the scroll animation —
+                        // we bump the base to headlineSmall (larger, more readable)
+                        // and use scale/weight/colour for the active pop.
+                        style = when (textSize) {
+                            "small" -> MaterialTheme.typography.titleLarge
+                            "large" -> MaterialTheme.typography.headlineMedium
+                            else -> MaterialTheme.typography.headlineSmall
+                        },
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        color = color,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics { selected = active }
+                            .graphicsLayer { scaleX = emphasis; scaleY = emphasis }
+                            .clip(DhunShapes.medium)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        Color.Transparent,
+                                        if (active) accent.copy(alpha = 0.16f) else Color.Transparent,
+                                        Color.Transparent,
+                                    ),
                                 ),
-                            ),
-                        )
-                        .then(
-                            if (startMs != null && line.words.isNotEmpty()) {
-                                Modifier.pointerInput(line, onSeek) {
-                                    detectTapGestures { point ->
-                                        val offset = textLayout?.getOffsetForPosition(point)
-                                        onSeek(wordSeekTime(line, offset) ?: startMs)
+                            )
+                            .then(
+                                if (startMs != null && line.words.isNotEmpty()) {
+                                    Modifier.pointerInput(line, onSeek) {
+                                        detectTapGestures { point ->
+                                            val offset = textLayout?.getOffsetForPosition(point)
+                                            onSeek(wordSeekTime(line, offset) ?: startMs)
+                                            following = true
+                                        }
+                                    }.semantics {
+                                        onClick("Seek to lyric line") { onSeek(startMs); following = true; true }
+                                    }
+                                } else if (startMs != null) {
+                                    Modifier.clickable(
+                                        role = Role.Button,
+                                        onClickLabel = "Seek to ${formatMs(startMs, startMs)}",
+                                    ) {
+                                        onSeek(startMs)
                                         following = true
                                     }
-                                }.semantics {
-                                    onClick("Seek to lyric line") { onSeek(startMs); following = true; true }
-                                }
-                            } else if (startMs != null) {
-                                Modifier.clickable(
-                                    role = Role.Button,
-                                    onClickLabel = "Seek to ${formatMs(startMs, startMs)}",
-                                ) {
-                                    onSeek(startMs)
-                                    following = true
-                                }
-                            } else {
-                                Modifier
-                            },
-                        )
-                        .padding(vertical = DhunSpacing.md),
-                )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .padding(vertical = DhunSpacing.md),
+                    )
+                    romanizedLines.getOrNull(index)?.let { romanized ->
+                        Text(romanized, style = MaterialTheme.typography.bodyLarge,
+                            color = DhunColors.textSecondary, textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = DhunSpacing.sm))
+                    }
+                }
             }
         }
 

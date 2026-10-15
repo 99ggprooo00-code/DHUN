@@ -20,6 +20,7 @@ GPL-3.0-compatible. Reused code gets: project, file, license, commit, date.
 | Jetpack Compose / activity-compose | Apache-2.0 | Android UI | Phase 03 |
 | kotlinx-coroutines / serialization | Apache-2.0 | concurrency + JSON | Phase 02 |
 | nanojson (TeamNewPipe fork) | Apache-2.0 | extractor's JSON parser | Phase 01 |
+| ICU4J 76.1 (`com.ibm.icu:icu4j`, Android + desktop) | Unicode License V3 plus upstream third-party notices (GPL-compatible permissive terms) | on-device lyric transliteration; not translation; no lyrics sent to a service. Upstream [release-76-1 license](https://github.com/unicode-org/icu/blob/release-76-1/LICENSE), reviewed 2026-10-15; full verbatim notices in `LICENSES/ICU4J-76.1.txt` and bundled legal pages | 2026-10-15 |
 | Coil 3 | Apache-2.0 | images | Phase 06 |
 | ~~Kermit~~ (removed — no build reference or code usage remains; row kept for history) | Apache-2.0 | was: logging | Phase 02–? |
 | LRCLIB (API/service) | open API | synced lyrics source | Phase 11 |
