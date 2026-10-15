@@ -51,7 +51,14 @@ class LiveAppearanceTest {
             val scope = Any()
             fun observe() = observer.observeReads(scope, { _: Any -> notifications++ }) {
                 val palette = DhunAppearance.tokens
-                if (DhunColors.accent != palette.accent || DhunColors.surface != palette.surface) invalid = true
+                val surface = DhunColors.surface
+                val expectedAlpha = if (palette.isLight) 0.701f else 0.592f
+                if (DhunColors.accent != palette.accent ||
+                    surface.red != palette.surface.red ||
+                    surface.green != palette.surface.green ||
+                    surface.blue != palette.surface.blue ||
+                    kotlin.math.abs(surface.alpha - expectedAlpha) > 0.01f
+                ) invalid = true
             }
             observe()
             for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
