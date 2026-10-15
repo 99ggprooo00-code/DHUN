@@ -108,3 +108,24 @@ After real model integration, supply builds and a checklist to the owner coverin
 
 Collect actual device/OS/build/model identities and observed results. CI, packaging
 and fake-provider tests are supporting evidence, not physical or linguistic acceptance.
+
+### Broader language candidate: M2M100 (not yet integrated)
+
+The subsequently reviewed upstream card
+<https://huggingface.co/facebook/m2m100_418M/raw/main/README.md> declares MIT and
+100 languages including Nepali, Hindi and English, with a forced target-language
+start token and a SentencePiece dependency. This is evidence of declared language
+coverage, not device performance or lyric quality. It avoids assuming that an
+English-to-Hindi model supports reverse translation: the shared provider contract
+now explicitly declares **directional language pairs**, with a regression test.
+
+The conversion metadata at
+<https://huggingface.co/api/models/Xenova/m2m100_418M?blobs=true> identifies revision
+`9c374f0b7aca709787cea97b047bfbbd1559d177`. Its merged quantized decoder alone is
+344,128,178 bytes, SHA-256
+`007654bcabb6cea6fd3bde34ce933137b431330b3755781145d7b6906270b45a`.
+That is only one required file, not the total download or RAM footprint. No weights
+were downloaded, hashed locally, redistributed or executed; artifact metadata is not
+verification of downloaded bytes. Full weights/tokenizer licensing, exact total size,
+Android/Windows support and real inference must still be established. Do not expose
+a download button or claim Nepali quality based only on the model card.

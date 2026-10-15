@@ -12,14 +12,15 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class OfflineTranslationTest {
     private class LocalFake : OfflineTranslationProvider {
         override var modelId = "fixture-v1"
-        override val languages = setOf("en", "hi", "ja")
+        override var languagePairs = setOf("en", "hi", "ja").let { languages ->
+            languages.flatMap { source -> languages.map { target -> TranslationLanguagePair(source, target) } }.toSet()
+        }
         val calls = mutableListOf<List<String>>()
         var action: suspend (List<String>) -> List<String?> = { lines -> lines.map { "translated:$it" } }
         override suspend fun translate(source: String, target: String, lines: List<String>): List<String?> {
@@ -43,7 +44,17 @@ class OfflineTranslationTest {
         assertEquals(listOf(OfflineTranslationUpdate.NeedsManualApproval), engine.translate(document, "en", "hi", isCurrent = { true }).toList())
         assertEquals(listOf(OfflineTranslationUpdate.UnsupportedLanguage), engine.request(target = "ne"))
         assertEquals(listOf(OfflineTranslationUpdate.UnsupportedLanguage), engine.request(target = "HI"))
+        assertEquals(listOf(OfflineTranslationUpdate.UnsupportedLanguage), engine.request(target = "en" + "-aa".repeat(10_000)))
         assertTrue(provider.calls.isEmpty())
+    }
+
+    @Test fun directionalModelsDoNotPretendToSupportReverseTranslation() = runTest {
+        val provider = LocalFake()
+        provider.languagePairs = setOf(TranslationLanguagePair("en", "hi"))
+        val engine = OfflineTranslationEngine(provider)
+        assertEquals(listOf(OfflineTranslationUpdate.UnsupportedLanguage), engine.request(source = "hi", target = "en"))
+        engine.request(source = "en", target = "hi")
+        assertEquals(1, provider.calls.size)
     }
 
     @Test fun preservesOriginalSlotsAndSnapshotsCallerInputBeforeCollection() = runTest {
@@ -137,6 +148,24 @@ class OfflineTranslationTest {
         assertTrue(second.isCancelled)
     }
 
+    @Test fun modelRevisionChangeCancelsInflightResultsAndStaleCacheHitsAreRejected() = runTest {
+        val provider = LocalFake()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        provider.action = { entered.complete(Unit); release.await(); it }
+        val engine = OfflineTranslationEngine(provider)
+        val work = async { engine.request() }
+        entered.await()
+        provider.modelId = "fixture-v2"
+        release.complete(Unit)
+        assertFailsWith<CancellationException> { work.await() }
+        provider.action = { it }
+        engine.request()
+        assertEquals(2, provider.calls.size)
+        assertFailsWith<CancellationException> { engine.request(current = { false }) }
+        assertEquals(2, provider.calls.size)
+    }
+
     @Test fun oversizedInputIsRejectedAndSameLanguageDoesNotRunInference() = runTest {
         val provider = LocalFake()
         val engine = OfflineTranslationEngine(provider)
@@ -147,6 +176,6 @@ class OfflineTranslationTest {
         )) assertEquals(listOf(OfflineTranslationUpdate.InputTooLarge), engine.request(doc))
         val result = engine.request(source = "en", target = "en").lastOverlay()
         assertEquals(listOf("one", null, "one", "two"), result.lines)
-        assertFalse(provider.calls.isNotEmpty())
+        assertTrue(provider.calls.isEmpty())
     }
 }

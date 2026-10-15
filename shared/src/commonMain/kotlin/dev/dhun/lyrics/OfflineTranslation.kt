@@ -9,14 +9,18 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
+data class TranslationLanguagePair(val source: String, val target: String)
+
 /** Local inference only. Implementations must never upload text or download models here.
  * Model acquisition/verification and explicit download consent belong outside this boundary.
  * A null result is an untranslated line, not permission to use a remote fallback.
+ * Native adapters must bound resources and implement cancellation/lifecycle safety themselves.
  */
 interface OfflineTranslationProvider {
     /** Stable runtime + model revision, NOT a credential or a filesystem path. */
     val modelId: String
-    val languages: Set<String>
+    /** Directional: an English-to-Hindi model does not imply Hindi-to-English support. */
+    val languagePairs: Set<TranslationLanguagePair>
     suspend fun translate(source: String, target: String, lines: List<String>): List<String?>
 }
 
@@ -35,6 +39,7 @@ sealed interface OfflineTranslationUpdate {
     data object NeedsManualApproval : OfflineTranslationUpdate
     data object UnsupportedLanguage : OfflineTranslationUpdate
     data object InputTooLarge : OfflineTranslationUpdate
+    /** finished means processing ended, not that every line translated successfully. */
     data class Progress(val overlay: TranslationOverlay, val finished: Boolean) : OfflineTranslationUpdate
 }
 
@@ -80,8 +85,12 @@ class OfflineTranslationEngine(
                 return@flow
             }
             val languagePattern = Regex("[a-z]{2,3}(-[a-z0-9]{2,8})*")
-            if (!languagePattern.matches(sourceLanguage) || !languagePattern.matches(targetLanguage) ||
-                sourceLanguage !in provider.languages || targetLanguage !in provider.languages) {
+            if (sourceLanguage.length !in 2..35 || targetLanguage.length !in 2..35 ||
+                !languagePattern.matches(sourceLanguage) || !languagePattern.matches(targetLanguage) ||
+                !(TranslationLanguagePair(sourceLanguage, targetLanguage) in provider.languagePairs ||
+                    (sourceLanguage == targetLanguage && provider.languagePairs.any {
+                        it.source == sourceLanguage || it.target == sourceLanguage
+                    }))) {
                 emit(OfflineTranslationUpdate.UnsupportedLanguage)
                 return@flow
             }
