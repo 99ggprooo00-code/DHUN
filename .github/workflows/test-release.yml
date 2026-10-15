@@ -40,6 +40,7 @@ on:
       - 'scripts/**'
       - '.github/workflows/test-release.yml'
       - '.github/release-intent/v1.00.002'
+      - '.github/release-intent/v1.00.002-provenance-repair'
 
 permissions:
   contents: read
@@ -56,6 +57,7 @@ jobs:
     outputs:
       channel: ${{ steps.plan.outputs.channel }}
       build_only: ${{ steps.plan.outputs.build_only }}
+      repair: ${{ steps.plan.outputs.repair }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -481,3 +483,21 @@ jobs:
             echo "::error::v1.00.002 must stay marked as a prerelease"
             exit 1
           fi
+
+  restore_public_provenance:
+    # Repair exactly the four sidecars that went missing after publishing the
+    # validated v1.00.002 draft. Only a reviewed ADDITION of the one-shot
+    # repair intent on main can activate this job. It never edits binaries,
+    # checksums, the tag, metadata or any earlier release.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release_plan.outputs.repair == 'true' && needs.release_plan.outputs.channel == 'test' }}
+    needs: [release_plan, apk, msi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore byte-identical public provenance sidecars
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/restore_public_provenance.py

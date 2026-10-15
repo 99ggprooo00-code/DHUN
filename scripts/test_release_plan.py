@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from release_plan import INTENT, MAIN, newly_added_intent, plan
+from release_plan import INTENT, REPAIR_INTENT, MAIN, newly_added_intent, plan
 
 
 class ReleasePlanTest(unittest.TestCase):
@@ -60,6 +60,18 @@ class ReleasePlanTest(unittest.TestCase):
             git("add", ".")
             git("commit", "-qm", "later")
             self.assertEqual(("test", "false"), plan("push", MAIN, "", git("rev-parse", "HEAD"), repo))
+            repair = repo / REPAIR_INTENT
+            repair.write_text("Reviewed, one-shot repair.\n")
+            git("add", ".")
+            git("commit", "-qm", "add repair request")
+            repair_added = git("rev-parse", "HEAD")
+            self.assertTrue(newly_added_intent(repo, repair_added, REPAIR_INTENT))
+            self.assertFalse(newly_added_intent(repo, repair_added, INTENT))
+            self.assertEqual(("test", "false"), plan("push", MAIN, "", repair_added, repo))
+            (repo / "README.md").write_text("still no retrigger\n")
+            git("add", ".")
+            git("commit", "-qm", "after repair")
+            self.assertFalse(newly_added_intent(repo, git("rev-parse", "HEAD"), REPAIR_INTENT))
             self.assertNotEqual(base, added)
 
 

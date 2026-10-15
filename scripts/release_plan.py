@@ -10,20 +10,21 @@ import subprocess
 from pathlib import Path
 
 INTENT = ".github/release-intent/v1.00.002"
+REPAIR_INTENT = ".github/release-intent/v1.00.002-provenance-repair"
 MAIN = "refs/heads/main"
 
 
-def newly_added_intent(repository: Path, sha: str) -> bool:
+def newly_added_intent(repository: Path, sha: str, intent: str = INTENT) -> bool:
     # A merge commit's first parent is the previous main tip. Compare against
     # that parent, not against the PR branch or the entire commit history.
     result = subprocess.run(
-        ["git", "diff", "--diff-filter=A", "--name-only", f"{sha}^1", sha, "--", INTENT],
+        ["git", "diff", "--diff-filter=A", "--name-only", f"{sha}^1", sha, "--", intent],
         cwd=repository,
         check=True,
         capture_output=True,
         text=True,
     )
-    return result.stdout.splitlines() == [INTENT]
+    return result.stdout.splitlines() == [intent]
 
 
 def plan(event: str, ref: str, manual_build_only: str, sha: str, repository: Path) -> tuple[str, str]:
@@ -47,10 +48,11 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     channel, build_only = plan(args.event, args.ref, args.manual_build_only, args.sha, args.repository)
+    repair = args.event == "push" and args.ref == MAIN and newly_added_intent(args.repository, args.sha, REPAIR_INTENT)
     # This plan is a gate: build/publish jobs must depend on its success.
     with args.output.open("a") as output:
-        output.write(f"channel={channel}\nbuild_only={build_only}\n")
-    print(f"Release plan: channel={channel}, build_only={build_only}")
+        output.write(f"channel={channel}\nbuild_only={build_only}\nrepair={str(repair).lower()}\n")
+    print(f"Release plan: channel={channel}, build_only={build_only}, repair={repair}")
 
 
 if __name__ == "__main__":

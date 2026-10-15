@@ -12,7 +12,19 @@ class BuildWorkflowTest(unittest.TestCase):
     def setUp(self):
         self.text = WORKFLOW.read_text()
         self.publish_test = self.text.split("\n  publish_test:\n", 1)[1].split("\n  publish:\n", 1)[0]
-        self.publish = self.text.split("\n  publish:\n", 1)[1]
+        self.publish = self.text.split("\n  publish:\n", 1)[1].split("\n  restore_public_provenance:\n", 1)[0]
+        self.restore = self.text.split("\n  restore_public_provenance:\n", 1)[1]
+
+    def test_one_shot_repair_requires_its_own_reviewed_main_push(self):
+        self.assertIn("- '.github/release-intent/v1.00.002-provenance-repair'", self.text)
+        self.assertIn("repair: ${{ steps.plan.outputs.repair }}", self.text)
+        self.assertIn("github.event_name == 'push'", self.restore)
+        self.assertIn("github.ref == 'refs/heads/main'", self.restore)
+        self.assertIn("needs.release_plan.outputs.repair == 'true'", self.restore)
+        self.assertIn("needs.release_plan.outputs.channel == 'test'", self.restore)
+        self.assertIn("needs: [release_plan, apk, msi]", self.restore)
+        self.assertIn("    permissions:\n      contents: write", self.restore)
+        self.assertIn("python scripts/restore_public_provenance.py", self.restore)
 
     def test_typed_manual_input_defaults_to_build_only(self):
         inputs = self.text.split("  workflow_dispatch:\n", 1)[1].split("  push:\n", 1)[0]
