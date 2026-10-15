@@ -69,6 +69,9 @@ object SettingsKeys {
     const val LYRICS_AUTO_SCROLL = "lyrics_auto_scroll"
     const val LYRICS_AUTO_SCROLL_DEFAULT = true
     /** Per-track timing corrections are dynamic keys, not a global playback preference. */
+    const val LYRICS_MATCH_PREFIX = "lyrics_match:"
+    fun lyricsMatchKey(trackId: String): String = LYRICS_MATCH_PREFIX + trackId
+
     const val LYRICS_OFFSET_PREFIX = "lyrics_offset_ms:"
     fun lyricsOffsetKey(trackId: String): String = LYRICS_OFFSET_PREFIX + trackId
 

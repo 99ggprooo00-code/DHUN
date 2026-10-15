@@ -421,7 +421,16 @@ internal fun LyricsTabContent(
         return
     }
 
+    var showMatches by remember(track.id) { mutableStateOf(false) }
+    val matchController = viewModel.lyricsMatches
+    if (showMatches && matchController != null) {
+        LyricsMatchPicker(track, matchController) {
+            matchController.cancelSearch()
+            showMatches = false
+        }
+    }
     Column(modifier = modifier.fillMaxSize()) {
+        if (matchController != null) TextButton(onClick = { showMatches = true }) { Text("Find lyrics matches for this song") }
         LyricsProviderPicker(
             selectedProvider = preferredProvider,
             onSelect = onPreferredProviderChange,

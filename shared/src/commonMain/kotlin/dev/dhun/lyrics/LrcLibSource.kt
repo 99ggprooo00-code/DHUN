@@ -15,6 +15,7 @@ import io.ktor.http.isSuccess
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * LRCLIB synced-lyrics source (Phase 11).
@@ -61,7 +62,7 @@ class LrcLibSource(
             val json = Json { ignoreUnknownKeys = true }.parseToJsonElement(body) as? JsonObject
                 ?: return DhunResult.Success(Lyrics.NotAvailable)
 
-            val synced = json["syncedLyrics"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            val synced = json["syncedLyrics"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
             if (!synced.isNullOrBlank()) {
                 val lines: List<LyricsLine> = LrcParser.parse(synced, allowUnsyncedFallback = false)
                 if (lines.isNotEmpty()) {
@@ -70,12 +71,14 @@ class LrcLibSource(
                 // LRCLIB sent empty LRC after parsing → fall through to plain
             }
 
-            val plain = json["plainLyrics"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            val plain = json["plainLyrics"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
             if (!plain.isNullOrBlank()) {
                 return DhunResult.Success(Lyrics.Unsynced(plain))
             }
 
             DhunResult.Success(Lyrics.NotAvailable)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             // Network/timeout → map to typed error but the repository will
             // still fall through to NotAvailable (lyrics are non-fatal)

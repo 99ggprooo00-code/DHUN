@@ -6,88 +6,123 @@ import dev.dhun.core.Track
 import dev.dhun.data.LyricsCacheRepository
 import dev.dhun.data.SettingsKeys
 import dev.dhun.data.SettingsRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeoutOrNull
 
-/**
- * Phase 11 repository — the single lyrics entry point the UI calls.
- *
- * Order per PROMPT_SEQUENCE.md:
- *  1. `cache` (SQLDelight `LyricsCache`) — instant, no network.
- *  2. `YTM` (`YouTubeLyricsSource` — InnerTube browse, unsynced text).
- *  3. `LRCLIB` (`LrcLibSource` — synced LRC, title+artist+duration match).
- *  4. `NotAvailable`.
- *
- * Successful `Synced`/`Unsynced` results are cached (so the second open
- * is instant). `NotAvailable` and `Failure` are not cached — the next
- * open retries the network sources (LRCLIB may have gained the track).
- *
- * This repository is intentionally `Track`-keyed (not `videoId`-only)
- * because LRCLIB matching needs title/artist/album/duration.
+/** Stable IDs are persisted in settings; adding adapters must not change existing source order. */
+data class LyricsProviderAdapter(val id: String, val source: LyricsSource)
+
+/** Single lyrics entry point: per-song choice → cache → bounded sequential source fallback.
+ * Candidate fan-out only occurs when the user explicitly opens/searches the match picker.
  */
 class LyricsRepository(
     private val cache: LyricsCacheRepository,
-    private val ytm: YouTubeLyricsSource,
-    private val lrcLib: LrcLibSource,
+    ytm: LyricsSource,
+    lrcLib: LyricsSource,
     private val settings: SettingsRepository? = null,
-    private val search: LyricsSource? = null,
-    private val kugou: LyricsSource? = null,
+    search: LyricsSource? = null,
+    kugou: LyricsSource? = null,
+    private val providerTimeoutMs: Long = 5_000,
 ) {
-    /**
-     * @return `DhunResult.Success(Lyrics.Synced/Unsynced/NotAvailable)` — never
-     *         `Failure` for the UI's purposes; network failures from the
-     *         sources are mapped to `NotAvailable` after both sources are tried.
-     *         The UI still shows `LyricsUiState.Error` only when the repository
-     *         itself fails to read the cache (disk I/O) — which is rare.
-     */
+    init { require(providerTimeoutMs > 0) }
+    private val registry = listOfNotNull(
+        LyricsProviderAdapter("ytm", ytm), LyricsProviderAdapter("lrclib", lrcLib),
+        search?.let { LyricsProviderAdapter("lrclib_search", it) },
+        kugou?.let { LyricsProviderAdapter("kugou", it) },
+    ).associateBy { it.id }
+
+    private suspend fun orderedProviders(): List<LyricsProviderAdapter> {
+        val preferred = settings?.getString(SettingsKeys.LYRICS_PREFERRED_PROVIDER) ?: "auto"
+        val enabled = (settings?.getString(SettingsKeys.LYRICS_PROVIDER_ORDER)
+            ?: if (settings == null) "ytm,lrclib" else SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT)
+            .split(',').map { it.trim() }.filter { it in registry }.distinct()
+        val ids = if (preferred == "auto") enabled else (listOf(preferred) + enabled).distinct()
+        return ids.mapNotNull { registry[it] }
+    }
+
     suspend fun getLyrics(track: Track): DhunResult<Lyrics> {
         if (settings?.getBoolean(SettingsKeys.LYRICS_ENABLED, true) == false)
             return DhunResult.Success(Lyrics.NotAvailable)
-        val preferred = settings?.getString(SettingsKeys.LYRICS_PREFERRED_PROVIDER)
-            ?: SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT
-        val syncedFirst = settings?.getBoolean(SettingsKeys.LYRICS_PREFER_SYNCED, true) ?: false
-        try {
-            val cached = cache.get(track.id)
-            if (cached != null && cached != Lyrics.NotAvailable) return DhunResult.Success(cached)
-        } catch (_: Exception) { /* cache failure must not block network */ }
-
-        val sources = mapOf("lrclib" to lrcLib, "ytm" to ytm, "lrclib_search" to search, "kugou" to kugou)
-        val enabled = (settings?.getString(SettingsKeys.LYRICS_PROVIDER_ORDER)
-            ?: if (settings == null) "ytm,lrclib" else SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT)
-            .split(',').filter { sources[it] != null }.distinct()
-        val order = if (preferred == "auto") enabled else {
-            // An explicitly preferred source is the primary even when its
-            // fallback toggle is off; the toggle controls whether it can be
-            // retried as a later fallback for other selections.
-            val selected = preferred.takeIf { sources[it] != null }
-            (listOfNotNull(selected) + enabled).distinct()
+        selectedMatch(track.id)?.let { return DhunResult.Success(it.lyrics) }
+        bestEffort { cache.get(track.id) }?.takeUnless { it == Lyrics.NotAvailable }?.let {
+            return DhunResult.Success(it)
         }
+        val preferred = settings?.getString(SettingsKeys.LYRICS_PREFERRED_PROVIDER) ?: "auto"
+        val syncedFirst = settings?.getBoolean(SettingsKeys.LYRICS_PREFER_SYNCED, true) ?: false
         var plain: Lyrics.Unsynced? = null
-        for (id in order) {
-            val result = try { sources[id]?.fetch(track) } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) { null }
+        for (adapter in orderedProviders()) {
+            val result = bounded { adapter.source.fetch(track) }
             val lyrics = (result as? DhunResult.Success)?.value
-            if (lyrics is Lyrics.Synced) {
-                runCatching { cache.put(track.id, lyrics) }
+            if (lyrics != null && (lyrics is Lyrics.Synced || (lyrics is Lyrics.Unsynced && (!syncedFirst || preferred != "auto")))) {
+                bestEffort { cache.put(track.id, lyrics) }
                 return DhunResult.Success(lyrics)
             }
-            if (lyrics is Lyrics.Unsynced) {
-                if (!syncedFirst || preferred != "auto") {
-                    runCatching { cache.put(track.id, lyrics) }
-                    return DhunResult.Success(lyrics)
-                }
-                if (plain == null) plain = lyrics
-            }
+            if (lyrics is Lyrics.Unsynced && plain == null) plain = lyrics
         }
         plain?.let {
-            runCatching { cache.put(track.id, it) }
+            bestEffort { cache.put(track.id, it) }
             return DhunResult.Success(it)
         }
         return DhunResult.Success(Lyrics.NotAvailable)
     }
 
-    /** For tests and “clear cache” diagnostics. */
-    suspend fun clearCache() = cache.clear()
+    /** Existing automatic source fallback is not used to filter manual search results. */
+    suspend fun searchMatches(track: Track, query: String): LyricsMatchSearch {
+        if (settings?.getBoolean(SettingsKeys.LYRICS_ENABLED, true) == false) return LyricsMatchSearch(emptyList())
+        val providers = orderedProviders()
+        return coroutineScope {
+            val results = providers.map { adapter -> async {
+                val result = bounded {
+                    val source = adapter.source
+                    if (source is LyricsCandidateSource) source.candidates(track, query.trim().take(240))
+                    else when (val fetched = source.fetch(track)) {
+                        is DhunResult.Failure -> fetched
+                        is DhunResult.Success -> DhunResult.Success(
+                            if (fetched.value == Lyrics.NotAvailable) emptyList() else listOf(
+                                // These legacy adapters don't expose their record metadata. Do not
+                                // falsely advertise requested title/artist as a verified source match.
+                                LyricsMatch("current-track", adapter.id, track.title, track.artistName,
+                                    fetched.value, metadataVerified = false)
+                            )
+                        )
+                    }
+                }
+                adapter.id to when (result) {
+                    is DhunResult.Success -> DhunResult.Success(result.value.map { it.copy(provider = adapter.id) })
+                    else -> result
+                }
+            } }.awaitAll()
+            val matches = results.flatMap { (_, result) -> (result as? DhunResult.Success)?.value.orEmpty() }
+                .filter { it.lyrics != Lyrics.NotAvailable }.distinctBy { it.provider to it.id }.take(60)
+            LyricsMatchSearch(matches, results.filter { it.second !is DhunResult.Success }.map { it.first })
+        }
+    }
 
-    /** Direct cache read without network (for “second open = instant” verification). */
+    suspend fun selectMatch(trackId: String, match: LyricsMatch) {
+        val store = checkNotNull(settings) { "Persistent song choices are unavailable" }
+        require(match.provider in registry) { "Unknown lyrics provider" }
+        store.putString(SettingsKeys.lyricsMatchKey(trackId), LyricsMatchCodec.encode(match))
+    }
+
+    suspend fun selectedMatch(trackId: String): LyricsMatch? = bestEffort {
+        LyricsMatchCodec.decode(settings?.getString(SettingsKeys.lyricsMatchKey(trackId)))
+    }
+
+    suspend fun resetMatch(trackId: String) { settings?.remove(SettingsKeys.lyricsMatchKey(trackId)) }
+    suspend fun clearCache() = cache.clear()
     suspend fun cached(trackId: String): Lyrics? = cache.get(trackId)
+
+    private suspend fun <T> bounded(block: suspend () -> T): T? = bestEffort {
+        withTimeoutOrNull(providerTimeoutMs) { block().also { currentCoroutineContext().ensureActive() } }
+    }
+
+    private suspend fun <T> bestEffort(block: suspend () -> T): T? = try {
+        block().also { currentCoroutineContext().ensureActive() }
+    } catch (e: CancellationException) { throw e }
+    catch (_: Exception) { null }
 }

@@ -250,6 +250,24 @@ class RepositoriesTest {
     /* ---------------- Lyrics cache ---------------- */
 
     @Test
+    fun songMatchPersistsThroughSqlDelightRepositoryRecreation(): Unit = runBlocking {
+        val db = newDb()
+        val source = object : dev.dhun.lyrics.LyricsSource {
+            override suspend fun fetch(track: dev.dhun.core.Track) = dev.dhun.core.DhunResult.Success(dev.dhun.core.Lyrics.NotAvailable)
+        }
+        val match = dev.dhun.lyrics.LyricsMatch("record", "lrclib", "Song", "Artist",
+            dev.dhun.core.Lyrics.Synced(dev.dhun.lyrics.LrcParser.parse("[00:01]<00:01>Word<00:02>")))
+        val cache = SqlDelightLyricsCacheRepository(db, FakeClock(), Dispatchers.Unconfined)
+        dev.dhun.lyrics.LyricsRepository(cache, source, source,
+            SqlDelightSettingsRepository(db, Dispatchers.Unconfined)).selectMatch("song", match)
+        cache.clear()
+        val reopened = dev.dhun.lyrics.LyricsRepository(cache, source, source,
+            SqlDelightSettingsRepository(db, Dispatchers.Unconfined))
+        assertEquals(match, reopened.selectedMatch("song"))
+        assertEquals(dev.dhun.core.DhunResult.Success(match.lyrics), reopened.getLyrics(dev.dhun.core.Track("song", "Song", "Artist")))
+    }
+
+    @Test
     fun enhancedLyricsSurviveRepositoryRecreation(): Unit = runBlocking {
         val db = newDb()
         val original = dev.dhun.core.Lyrics.Synced(dev.dhun.lyrics.LrcParser.parse(

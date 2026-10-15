@@ -19,6 +19,7 @@ import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -138,6 +139,12 @@ class PlayerViewModel(
     private var sleepTimerJob: Job? = null
     private var lastSeenTrackId: String? = null
 
+    val lyricsMatches: LyricsMatchController? = lyricsRepository?.let { repository ->
+        LyricsMatchController(repository, scope) { trackId ->
+            if (currentTrack.value?.id == trackId) refreshLyrics()
+        }
+    }
+
     /* ---------------- endless radio ---------------- */
 
     /**
@@ -250,6 +257,7 @@ class PlayerViewModel(
             currentTrack
                 .distinctUntilChanged { a, b -> a?.id == b?.id }
                 .collect { track ->
+                    lyricsMatches?.setTrack(track)
                     loadRelated(track)
                     loadLyrics(track)
                 }
@@ -663,11 +671,11 @@ class PlayerViewModel(
     }
 
     private fun loadLyrics(track: Track?, force: Boolean = false) {
+        lyricsJob?.cancel()
         if (track == null) {
             _lyricsState.value = LyricsUiState.Unavailable
             return
         }
-        lyricsJob?.cancel()
         lyricsJob = scope.launch {
             if (settings?.getBoolean(SettingsKeys.LYRICS_ENABLED, true) == false) {
                 _lyricsState.value = LyricsUiState.Disabled
@@ -682,6 +690,8 @@ class PlayerViewModel(
             } else {
                 provider.getLyrics(track.id)
             }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (currentTrack.value?.id != track.id) return@launch
             _lyricsState.value = when (result) {
                 is DhunResult.Success -> when (val lyrics = result.value) {
                     is Lyrics.Synced -> LyricsUiState.Synced(lyrics.lines)

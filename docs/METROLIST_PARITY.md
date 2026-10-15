@@ -1,4 +1,4 @@
-# Metrolist parity audit and word-sync slice
+# Metrolist parity audit and lyrics slices
 
 Audit: 2026-10-15. DHUN baseline `5107252`; reference
 [Metrolist-test](https://github.com/99ggprooo00-code/Metrolist-test) main
@@ -15,7 +15,7 @@ The user subsequently prioritized detailed word-by-word synchronization.
 |---|---|---|---|---|
 | Lyrics cache; YTM, LRCLIB, LRCLIB search, KuGou | Present | Preserve repository and SQLDelight cache | Existing external requests disclose track metadata; lyrics rights are separate from API code licensing | Existing repository/source fake-client tests |
 | Persisted source priority/order, synced-first, provider picker | Present | Preserve settings and full-player control | No new endpoints | Existing settings tests; not a match picker |
-| Per-song match search and persistent choice | Missing | Future vertical slice: candidate source adapter, track-keyed choice storage, cancellable VM state and search dialog | Only approved documented search endpoints; manual choice must survive cache clearing | Candidate details, persistence, stale track/cancellation tests still needed |
+| Per-song match search and persistent choice | Implemented slice; device/live-service acceptance pending | Separate player match dialog, manual LRCLIB query, bounded candidate fan-out, track-keyed persisted choice and automatic reset; not the global provider picker | Existing endpoints only; saved lyrics remain copyrighted; title/artist metadata not verified by legacy adapters is explicitly labeled | LyricsMatchTest: fake-client candidates, failures, timeouts, cancellation, track changes, persistence, malformed/oversize choices; SQLDelight recreation test |
 | Line LRC, follow and line seeking | Present | Preserve manual-scroll pause / resume and smooth centering | Local only | Existing parser and LyricsFollowTest |
 | Enhanced-LRC word timestamps | Partial → implemented slice | Preserve UTF-16 text ranges, times and explicit final end markers; repeated-line time shifts; cache round-trip at millisecond precision | Local parsing; no inferred timing advertised as real | EnhancedLrcTest; DB repository recreation test |
 | Word karaoke and seeking | Implemented slice, device acceptance pending | Highlight each timed segment as playback reaches it; emphasize current segment; tap word to seek, accessible line-seek fallback. One shaped Text paragraph for RTL/joined scripts | Local only; does not manufacture timestamps for plain lyrics | KaraokeTextTest covers boundaries, backward seek, inactive/plain fallback, logical text hit testing |
@@ -48,7 +48,7 @@ This sandbox's outbound host allowlist excludes these live provider hosts and th
 terms pages. Thus reachability, current API contracts, rate limits, retention and
 content licensing could not be validated. No additional provider or scraper was
 added; no live reliability claim is made. Existing source settings/order/fallback
-remain intact. Future adapters require dated terms/privacy review and reachable
+remain intact. Existing LRCLIB `/api/search` now exposes multiple matches only on explicit user request; no new endpoint was added. The LRCLIB upstream GitHub README was reviewed and describes machine-friendly free APIs; this is not a content-rights or current terms/privacy guarantee. Future adapters require dated terms/privacy review and reachable
 endpoint verification; routine playback must use bounded sequential fallback,
 while explicit match search can request bounded candidate sets.
 
@@ -82,3 +82,33 @@ are reported on the PR, not inferred from these unrelated tests. New determinist
 Kotlin tests do not contact lyric services. All broader missing features above remain
 open acceptance requirements, so this slice must not be represented as full parity
 or autonomously merged as if the original entire request were complete.
+
+## Per-song match selection and bounded fallback slice
+
+- A separate **Find lyrics matches for this song** dialog offers manual Search/Retry,
+  provider/title/artist details, language when the response supplies it, synced status,
+  word-timed status and preview. Unknown language is not guessed. Legacy source results
+  identify their metadata as requested/unverified rather than pretending it is a confirmed match.
+- LRCLIB search returns up to 40 records, including different recordings for manual choice.
+  Automatic LRCLIB fallback retains conservative title/artist/duration filtering.
+  Other existing adapters retry the current track; they do not pretend to search arbitrary text.
+- Choices use bounded versioned payloads in SettingsRepository, keyed by track ID, ahead
+  of the evictable cache. They retain enhanced timing through restart/repository recreation.
+  Clearing the cache does not clear a song choice; **Use automatic** explicitly removes it.
+- Provider registry adapters retain stable IDs and persisted source order/preference. Each
+  provider request has a 5 s coroutine deadline. Normal retrieval is sequential and short-circuits
+  on success (up to four enabled adapters / 20 s worst case); candidate fan-out happens only
+  after explicit Search. Synced-first and unsynced fallback remain unchanged.
+- Parent cancellation now propagates through LRCLIB and cache access/writes; stale matches
+  and stale lyric state cannot replace the new track. Track becoming null cancels lyric loading.
+  Controller generations guard search, retries and selecting while navigation changes.
+- New deterministic coverage: candidates, metadata/null JSON, alternate manual matches,
+  short-circuit playback, partial provider failures, timeouts, cancellation, saved timing,
+  corrupt/oversize choices, reset and controller track changes. SQLDelight settings recreation
+  verifies that choices survive outside fake stores.
+- Repeated local verification: website build + 41 rule tests passed, then removed app-web/dist
+  and ran all 384 Python tests successfully. Local Gradle remains unavailable (no JDK).
+  Hosted CI results for this slice must be checked on the current PR head.
+- Device acceptance still needed: picker scrolling/input/accessibility, selecting and displaying
+  an enhanced result, navigation/restart, automatic reset and failure/retry states. Live service
+  reachability, rate limits and terms cannot be guaranteed by fake-client tests.
