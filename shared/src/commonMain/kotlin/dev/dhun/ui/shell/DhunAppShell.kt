@@ -248,6 +248,7 @@ fun DhunAppShell(
 
     val countryCode by settingsVm.countryCode.collectAsState()
     val explicitContent by settingsVm.explicitContent.collectAsState()
+    val preferredLyricsProvider by settingsVm.preferredProvider.collectAsState()
     val settingsLoaded by settingsVm.loaded.collectAsState()
     LaunchedEffect(countryCode, explicitContent, settingsLoaded) {
         if (settingsLoaded) {
@@ -320,12 +321,30 @@ fun DhunAppShell(
             val mins = ((ms + 59_999L) / 60_000L).toInt().coerceAtLeast(1)
             "Sleep · ${mins}m"
         }
+        val accentMode = DhunAppearance.accentMode
+        val selectedAccentColor = DhunAppearance.selectedAccentColor
+        // Publish the active track tint into the shared appearance tokens so
+        // artwork mode is visible throughout the app, not only on player chrome.
+        LaunchedEffect(
+            currentTrack?.id,
+            currentTrack?.thumbnailUrl,
+            accentMode,
+            selectedAccentColor,
+            DhunAppearance.appearanceRevision,
+        ) {
+            val artworkAccent = if (accentMode == "static" || currentTrack == null) {
+                null
+            } else {
+                ArtworkColorExtractor.extractFromSeed(currentTrack.thumbnailUrl ?: currentTrack.id).controlAccent
+            }
+            DhunAppearance.setArtworkAccent(artworkAccent)
+        }
         // Ambient wash from now-playing art, derived from a seed hash so it
         // costs nothing per frame — it tints the shell over the real blurred
         // artwork backdrop below, it does not replace it.
         val ambient by animateColorAsState(
             targetValue = currentTrack?.let {
-                if (DhunAppearance.accentMode == "static") DhunColors.accent.copy(alpha = 0.10f)
+                if (accentMode == "static") selectedAccentColor.copy(alpha = 0.10f)
                 else ArtworkColorExtractor.extractFromSeed(it.thumbnailUrl ?: it.id).backgroundTint
             } ?: Color.Transparent,
             animationSpec = DhunAnimations.slowTween(),
@@ -604,6 +623,12 @@ fun DhunAppShell(
                     viewModel = playerViewModel,
                     isDesktop = isDesktop,
                     onCollapse = { nav.playerExpanded = false },
+                    preferredLyricsProvider = preferredLyricsProvider,
+                    onPreferredLyricsProviderChange = { id ->
+                        settingsVm.setPreferredProvider(id) {
+                            playerViewModel.refreshLyrics()
+                        }
+                    },
                     onOverflowTrack = { overflowTrack = it },
                     favoriteIds = favoriteIds,
                     onToggleFavorite = { homeViewModel.toggleFavorite(it) },

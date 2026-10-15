@@ -41,7 +41,8 @@ class LyricsRepository(
     suspend fun getLyrics(track: Track): DhunResult<Lyrics> {
         if (settings?.getBoolean(SettingsKeys.LYRICS_ENABLED, true) == false)
             return DhunResult.Success(Lyrics.NotAvailable)
-        val preferred = settings?.getString(SettingsKeys.LYRICS_PREFERRED_PROVIDER) ?: "ytm"
+        val preferred = settings?.getString(SettingsKeys.LYRICS_PREFERRED_PROVIDER)
+            ?: SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT
         val syncedFirst = settings?.getBoolean(SettingsKeys.LYRICS_PREFER_SYNCED, true) ?: false
         try {
             val cached = cache.get(track.id)
@@ -52,8 +53,13 @@ class LyricsRepository(
         val enabled = (settings?.getString(SettingsKeys.LYRICS_PROVIDER_ORDER)
             ?: if (settings == null) "ytm,lrclib" else SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT)
             .split(',').filter { sources[it] != null }.distinct()
-        val order = if (preferred == "auto") enabled else
-            (listOf(preferred) + enabled).distinct().filter { it in enabled }
+        val order = if (preferred == "auto") enabled else {
+            // An explicitly preferred source is the primary even when its
+            // fallback toggle is off; the toggle controls whether it can be
+            // retried as a later fallback for other selections.
+            val selected = preferred.takeIf { sources[it] != null }
+            (listOfNotNull(selected) + enabled).distinct()
+        }
         var plain: Lyrics.Unsynced? = null
         for (id in order) {
             val result = try { sources[id]?.fetch(track) } catch (e: kotlinx.coroutines.CancellationException) {

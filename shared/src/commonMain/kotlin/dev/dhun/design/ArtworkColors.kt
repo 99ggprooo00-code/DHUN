@@ -6,9 +6,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Palette extracted from artwork — used to tint the FullPlayer background
- * and accent the progress bar. Falls back to [DhunColors.accent] when
- * extraction is impossible (no bitmap, network error, solid-color art).
+ * Artwork-derived palette used for the player tint and the app-wide dynamic
+ * accent. When no bitmap can be read, the runtime falls back to a stable seed
+ * derived from the current artwork URL/track id; blank input uses the selected
+ * [DhunAppearance] accent.
  *
  * The extractor runs in commonMain by sampling [ImageBitmap] pixels; a
  * lightweight heuristic, not a Palette library — but deterministic and
@@ -49,10 +50,10 @@ data class ArtworkColors(
          * unaffected by it being recomputed.
          */
         val fallback: ArtworkColors get() = ArtworkColors(
-            primary = DhunColors.accent,
-            onPrimary = DhunColors.onAccent,
-            container = DhunColors.accentContainer,
-            backgroundTint = DhunColors.accent.copy(alpha = AMBIENT_ALPHA),
+            primary = DhunAppearance.selectedAccentColor,
+            onPrimary = DhunAppearance.selectedOnAccentColor,
+            container = DhunAppearance.selectedAccentContainerColor,
+            backgroundTint = DhunAppearance.selectedAccentColor.copy(alpha = AMBIENT_ALPHA),
         )
 
         fun fromPrimary(primary: Color) = ArtworkColors(
@@ -75,7 +76,7 @@ data class ArtworkColors(
 }
 
 /** Share of brand accent mixed into every artwork-derived control colour. */
-private const val BRAND_MIX_DEFAULT = 0.45f
+private const val BRAND_MIX_DEFAULT = 0.22f
 
 /**
  * Minimum lightness a control colour may have on the dark surfaces.
@@ -124,7 +125,7 @@ internal fun Color.mix(other: Color, t: Float): Color {
  * [LIGHT_LEGIBILITY_CEILING].
  */
 internal fun Color.tamedForControls(): Color {
-    val blended = mix(DhunColors.accent, BRAND_MIX_DEFAULT)
+    val blended = mix(DhunAppearance.selectedAccentColor, BRAND_MIX_DEFAULT)
     val lum = blended.luminance()
     return if (DhunAppearance.tokens.isLight) {
         if (lum > LIGHT_LEGIBILITY_CEILING) {

@@ -123,6 +123,9 @@ class SettingsViewModel(
             _providerOrder.value = get.string(SettingsKeys.LYRICS_PROVIDER_ORDER, SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT)
             _preferredProvider.value = get.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT)
             _countryCode.value = get.string(SettingsKeys.COUNTRY_CODE, SettingsKeys.COUNTRY_CODE_DEFAULT)
+                .uppercase()
+                .takeIf(CountryRegions::isSupportedCode)
+                ?: SettingsKeys.COUNTRY_CODE_DEFAULT
             _explicitContent.value = get.boolean(SettingsKeys.EXPLICIT_CONTENT, SettingsKeys.EXPLICIT_CONTENT_DEFAULT)
             _pauseOnMute.value = get.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT)
             _persistShuffleRepeat.value = get.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
@@ -259,19 +262,28 @@ class SettingsViewModel(
         clearPlayHistoryAction?.let { action -> scope.launch { action() } }
     }
 
-    fun setPreferredProvider(id: String) {
+    fun setPreferredProvider(id: String) = setPreferredProvider(id, afterPersist = {})
+
+    /**
+     * Selects a provider through the same persisted preference as Settings.
+     * [afterPersist] runs only after the new value is stored and the lyrics
+     * cache is cleared, so a caller can safely reload the current track.
+     */
+    fun setPreferredProvider(id: String, afterPersist: () -> Unit) {
         if (id !in listOf("auto", "lrclib", "ytm", "lrclib_search", "kugou")) return
         _preferredProvider.value = id
         enqueueWrite {
             update.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, id)
             clearLyricsCacheAction?.invoke()
+            afterPersist()
         }
     }
     fun setCountryCode(id: String) {
-        if (id !in listOf("US", "NP", "IN", "GB", "CA", "AU", "DE", "FR", "JP", "KR", "BR")) return
-        onCountryCodeChange(id)
-        _countryCode.value = id
-        enqueueWrite { update.string(SettingsKeys.COUNTRY_CODE, id) }
+        val code = id.trim().uppercase()
+        if (!CountryRegions.isSupportedCode(code)) return
+        onCountryCodeChange(code)
+        _countryCode.value = code
+        enqueueWrite { update.string(SettingsKeys.COUNTRY_CODE, code) }
     }
     fun setExplicitContent(enabled: Boolean) {
         // Publish the new UI value only after the provider's SQLDelight read

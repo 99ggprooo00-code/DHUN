@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,10 +83,18 @@ internal fun PlayerTabContent(
     tab: Int,
     viewModel: PlayerViewModel,
     accent: Color,
+    preferredLyricsProvider: String,
+    onPreferredLyricsProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (tab) {
-        LYRICS_TAB_INDEX -> LyricsTabContent(viewModel = viewModel, accent = accent, modifier = modifier)
+        LYRICS_TAB_INDEX -> LyricsTabContent(
+            viewModel = viewModel,
+            accent = accent,
+            preferredProvider = preferredLyricsProvider,
+            onPreferredProviderChange = onPreferredLyricsProviderChange,
+            modifier = modifier,
+        )
         2 -> RelatedTabContent(viewModel = viewModel, accent = accent, modifier = modifier)
         else -> QueueTabContent(viewModel = viewModel, accent = accent, modifier = modifier)
     }
@@ -392,6 +401,8 @@ internal fun EqualizerBars(
 internal fun LyricsTabContent(
     viewModel: PlayerViewModel,
     accent: Color,
+    preferredProvider: String,
+    onPreferredProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lyricsState by viewModel.lyricsState.collectAsState()
@@ -407,92 +418,150 @@ internal fun LyricsTabContent(
         return
     }
 
-    // Scroll position and manual-follow preference belong to this track, not
-    // the tab slot. This also resets plain-text lyrics on a track change.
-    key(track.id) {
-        when (val state = lyricsState) {
-            is LyricsUiState.Loading -> {
-                Column(
-                    modifier = modifier.fillMaxSize().padding(DhunSpacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
-                ) {
-                    repeat(7) {
-                        LoadingShimmer(
-                            modifier = Modifier
-                                .fillMaxWidth(if (it % 2 == 0) 0.9f else 0.6f)
-                                .height(DhunSpacing.lg),
-                        )
-                    }
-                }
-            }
-            is LyricsUiState.Disabled -> EmptyView(
-                title = "Lyrics disabled in Settings",
-                message = "Enable lyrics in Settings to see words for this song.",
-                modifier = modifier.fillMaxSize(),
-            )
-            is LyricsUiState.Unavailable -> {
-                EmptyView(
-                    title = "No lyrics",
-                    message = "Lyrics aren't available for this track yet.",
-                    modifier = modifier.fillMaxSize(),
-                    actionLabel = "Check again",
-                    onAction = viewModel::refreshLyrics,
-                )
-            }
-            is LyricsUiState.Error -> {
-                ErrorView(
-                    title = "Lyrics failed to load",
-                    message = state.message,
-                    onRetry = viewModel::refreshLyrics,
-                    modifier = modifier.fillMaxSize(),
-                )
-            }
-            is LyricsUiState.Unsynced -> {
-                if (state.text.isBlank()) {
-                    EmptyView(
-                        title = "No lyrics",
-                        message = "No lyric text was found for this track.",
-                        modifier = modifier.fillMaxSize(),
-                    )
-                } else {
+    Column(modifier = modifier.fillMaxSize()) {
+        LyricsProviderPicker(
+            selectedProvider = preferredProvider,
+            onSelect = onPreferredProviderChange,
+            accent = accent,
+        )
+        val lyricsBodyModifier = Modifier.fillMaxWidth().weight(1f)
+
+        // Scroll position and manual-follow preference belong to this track, not
+        // the tab slot. This also resets plain-text lyrics on a track change.
+        key(track.id) {
+            when (val state = lyricsState) {
+                is LyricsUiState.Loading -> {
                     Column(
-                        modifier = modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.md),
+                        modifier = lyricsBodyModifier.padding(DhunSpacing.lg),
                         verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                     ) {
-                        Text(
-                            text = "Not time-synced",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = DhunColors.textTertiary,
-                        )
-                        Text(
-                            text = state.text,
-                            style = when (viewModel.lyricsTextSize.collectAsState().value) {
-                                "small" -> MaterialTheme.typography.bodyLarge
-                                "large" -> MaterialTheme.typography.titleLarge
-                                else -> MaterialTheme.typography.titleMedium
-                            },
-                            color = DhunColors.textSecondary,
-                            lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
-                        )
-                        Spacer(modifier = Modifier.height(DhunSpacing.huge))
+                        repeat(7) {
+                            LoadingShimmer(
+                                modifier = Modifier
+                                    .fillMaxWidth(if (it % 2 == 0) 0.9f else 0.6f)
+                                    .height(DhunSpacing.lg),
+                            )
+                        }
                     }
                 }
+                is LyricsUiState.Disabled -> EmptyView(
+                    title = "Lyrics disabled in Settings",
+                    message = "Enable lyrics in Settings to see words for this song.",
+                    modifier = lyricsBodyModifier,
+                )
+                is LyricsUiState.Unavailable -> {
+                    EmptyView(
+                        title = "No lyrics",
+                        message = "Lyrics aren't available for this track yet.",
+                        modifier = lyricsBodyModifier,
+                        actionLabel = "Check again",
+                        onAction = viewModel::refreshLyrics,
+                    )
+                }
+                is LyricsUiState.Error -> {
+                    ErrorView(
+                        title = "Lyrics failed to load",
+                        message = state.message,
+                        onRetry = viewModel::refreshLyrics,
+                        modifier = lyricsBodyModifier,
+                    )
+                }
+                is LyricsUiState.Unsynced -> {
+                    if (state.text.isBlank()) {
+                        EmptyView(
+                            title = "No lyrics",
+                            message = "No lyric text was found for this track.",
+                            modifier = lyricsBodyModifier,
+                        )
+                    } else {
+                        Column(
+                            modifier = lyricsBodyModifier
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.md),
+                            verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+                        ) {
+                            Text(
+                                text = "Not time-synced",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = DhunColors.textTertiary,
+                            )
+                            Text(
+                                text = state.text,
+                                style = when (viewModel.lyricsTextSize.collectAsState().value) {
+                                    "small" -> MaterialTheme.typography.bodyLarge
+                                    "large" -> MaterialTheme.typography.titleLarge
+                                    else -> MaterialTheme.typography.titleMedium
+                                },
+                                color = DhunColors.textSecondary,
+                                lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
+                            )
+                            Spacer(modifier = Modifier.height(DhunSpacing.huge))
+                        }
+                    }
+                }
+                is LyricsUiState.Synced -> SyncedLyricsContent(
+                    lines = state.lines,
+                    positionMs = positionMs,
+                    accent = accent,
+                    onSeek = { position ->
+                        // An outgoing tab/track must never seek its successor.
+                        if (viewModel.currentTrack.value?.id == track.id) viewModel.seekTo(position)
+                    },
+                    modifier = lyricsBodyModifier,
+                    autoScroll = viewModel.lyricsAutoScroll.collectAsState().value,
+                    textSize = viewModel.lyricsTextSize.collectAsState().value,
+                )
             }
-            is LyricsUiState.Synced -> SyncedLyricsContent(
-                lines = state.lines,
-                positionMs = positionMs,
-                accent = accent,
-                onSeek = { position ->
-                    // An outgoing tab/track must never seek its successor.
-                    if (viewModel.currentTrack.value?.id == track.id) viewModel.seekTo(position)
-                },
-                modifier = modifier,
-                autoScroll = viewModel.lyricsAutoScroll.collectAsState().value,
-                textSize = viewModel.lyricsTextSize.collectAsState().value,
-            )
+        }
+    }
+}
+
+private val lyricsProviderOptions = listOf(
+    "auto" to "Auto (synced first)",
+    "lrclib" to "LRCLIB",
+    "ytm" to "YouTube Music",
+    "lrclib_search" to "LRCLIB search",
+    "kugou" to "KuGou",
+)
+
+@Composable
+private fun LyricsProviderPicker(
+    selectedProvider: String,
+    onSelect: (String) -> Unit,
+    accent: Color,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = lyricsProviderOptions.firstOrNull { it.first == selectedProvider }?.second
+        ?: lyricsProviderOptions.first().second
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Lyrics provider", style = MaterialTheme.typography.labelMedium, color = DhunColors.textSecondary)
+        Spacer(modifier = Modifier.weight(1f))
+        Box {
+            DhunTonalButton(onClick = { expanded = true }) {
+                Text(selectedLabel, color = accent, maxLines = 1)
+                Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                DhunIconView(
+                    icon = DhunIcon.ChevronDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = accent,
+                )
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                lyricsProviderOptions.forEach { (id, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            expanded = false
+                            if (id != selectedProvider) onSelect(id)
+                        },
+                    )
+                }
+            }
         }
     }
 }

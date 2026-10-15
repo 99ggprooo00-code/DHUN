@@ -17,16 +17,27 @@
 
 The test-release artifacts are run-scoped Actions artifacts, not release assets. The `apk`, `msi`, and `msi-install-check` artifacts were uploaded successfully and are listed on run 38140705490. The APK/MSI workflow manifests include their `.sha256` and `.provenance.txt` sidecars, and the upload steps use `if-no-files-found: error`. GitHub's artifact API reports archive digests `bd1055bc38d8711a18f91c3fc00a4aa0f42dc4899fb7fc1f6a26371bd14770a2` (APK) and `433f49defab5dfe009ac5330d20e3ddaa4e899405a84553e97f4871ae91d334d` (MSI); these are **artifact ZIP digests**, not the APK/MSI file checksums. The sandbox could not fetch the artifact ZIPs from GitHub's external Actions blob-storage host, so the sidecar contents and binary hashes were not independently re-read here. Artifacts are due to expire on 2026-10-25 UTC.
 
+## User device report (2026-10-15)
+
+| Platform | Report | Acceptance status |
+|---|---|---|
+| Android 15 | Test APK updated the existing installation; the user's existing app data remained intact. | **PASS for in-place update/data retention only.** Playback, lyrics, region filtering, cache, equalizer, and reset checks remain unreported. |
+| Windows 11 | MSI installation completed, then DHUN crashed. The crash stage, Windows build, exact error, and log have not yet been provided. | **FAIL / blocking.** Installer success is not an app-startup pass; do not accept Windows until the crash is diagnosed and the interactive test is repeated. |
+
+For the Windows report, the packaged startup log should be at `%LOCALAPPDATA%\DHUN\userdata\dhun-startup.log`; if startup could not create that folder, check `%TEMP%\dhun-startup.log`. Also capture the matching **Windows Logs → Application** Event Viewer entry (faulting application/module and exception code). Before another install or uninstall, copy `%LOCALAPPDATA%\DHUN\userdata` somewhere safe and quit DHUN, including its tray process.
+
 ## Human acceptance still required
 
 Mark each item **PASS**, **FAIL**, or **NOT RUN**. For failures, include exact reproduction steps and relevant startup-log/Event Viewer details. Do not treat JVM tests or MSI install checks as substitutes for these tests.
 
 ### Windows interactive GUI
 
-Test the MSI from the run-scoped artifact on a Windows installation (preferably a disposable test machine for install-over). Record Windows edition, version/build, architecture, display scaling, and artifact/run used.
+Test the MSI from the run-scoped artifact on a Windows installation (preferably a disposable test machine for install-over). Record Windows edition, version/build, architecture, display scaling, and artifact/run used. The current user report is a blocking app crash after MSI installation; the installer itself succeeding does not satisfy app acceptance.
 
+- [ ] Diagnose and retest the reported Windows 11 crash. Record whether it fails before the first window, after the window opens, or after an interaction; collect `dhun-startup.log` and the matching Application Event Viewer details.
 - [ ] Repeatedly switch Light, Dark, and System themes; while playback and lyrics are active, change the OS theme too. Watch for crashes, freezes, partial/stale colours, and startup-log or Windows Event Viewer errors.
-- [ ] Switch static and dynamic artwork accents repeatedly while playback and lyrics remain active.
+- [ ] Switch static and dynamic artwork accents repeatedly while playback and lyrics remain active; confirm dynamic mode noticeably updates accent-colored controls across the app, while static mode keeps the selected accent.
+- [ ] Change the preferred lyric provider directly from the lyrics view; confirm the current track reloads using that provider and the preference survives a restart.
 - [ ] Adjust blur and brightness together across their ranges; close/reopen and restart DHUN to confirm appearance preferences persist.
 - [ ] Test X/close-to-tray, reopen from the tray, and both Ctrl+Q and tray Quit. Confirm playback/lyrics do not leave a frozen or stranded window.
 - [ ] Reset window geometry and confirm the window returns to the documented centered size/position.
@@ -38,7 +49,7 @@ Record device/emulator model, Android version/API level, ABI, and APK artifact/r
 
 - [ ] Playback quality selection, keyboard seek step, endless radio, shuffle/repeat policy, and in-app zero-volume pause. Do not infer platform audio-focus-loss or task-clear behavior from the in-app zero-volume setting.
 - [ ] Lyrics enable/disable, synced preference, auto-scroll, text size, provider preference/order, and graceful fallback.
-- [ ] Country selection and explicit-content filtering in the relevant Home/Search/radio surfaces.
+- [ ] Search the full country/region picker by full name and code; verify the selected catalogue region and explicit-content filtering in Home/Search/radio surfaces.
 - [ ] Cache budget, audio-cache/history clearing, equalizer enable/preset/gains/preamp, and full Settings reset.
 - [ ] On API 31+, adjust blur and brightness together. Below API 31, verify the supported sharp-artwork brightness fallback rather than expecting hardware blur.
 
@@ -49,7 +60,7 @@ Record device/emulator model, Android version/API level, ABI, and APK artifact/r
 
 ## Evidence to return
 
-For each platform, send the environment and artifact details above, PASS/FAIL/NOT RUN per item, and reproduction steps for every failure. Include relevant DHUN startup logs or Windows Event Viewer error names/timestamps, with private account or personal data removed. Live lyrics failures should include provider, approximate time, network state, and whether fallback succeeded.
+For each platform, send the environment and artifact details above, PASS/FAIL/NOT RUN per item, and reproduction steps for every failure. For the Windows crash, specify whether it happens when launching immediately after install or only after a particular screen/action, the Windows edition/build, and the full exception/faulting-module details. Include `%LOCALAPPDATA%\DHUN\userdata\dhun-startup.log` (or `%TEMP%\dhun-startup.log`) and the matching Event Viewer entry, with private account or personal data removed. Live lyrics failures should include provider, approximate time, network state, and whether fallback succeeded.
 
 ## Release boundary
 
