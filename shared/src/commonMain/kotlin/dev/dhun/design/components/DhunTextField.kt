@@ -35,7 +35,7 @@ import dev.dhun.design.DhunSpacing
  * playlist sheet.
  *
  * This is the same control in the app's own language: a rounded, elevated
- * `surfaceElevated` field with a hairline border, the accent as the caret, a
+ * translucent tonal field with a hairline border, the accent as the caret, a
  * tertiary placeholder, and nothing else. It wraps its own content height
  * ([DhunSpacing.smPlus] vertical padding around one line), so it can never
  * reserve more room than the text it holds, and it takes the whole width its
@@ -79,7 +79,7 @@ fun DhunTextField(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(DhunShapes.medium)
-                    .background(DhunColors.surfaceElevated.copy(alpha = 0.78f))
+                    .background(contentRowFill())
                     .border(
                         BorderStroke(
                             DhunSpacing.border,

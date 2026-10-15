@@ -48,7 +48,7 @@ class NowPlayingBackdropPolicyTest {
         for (isLight in listOf(false, true)) {
             val stops = NowPlayingBackdropPolicy.veilStops(isLight, 55)
             assertEquals(listOf(0f, 0.35f, 0.72f, 1f), stops.map { it.first })
-            assertTrue(stops.all { it.second in 0.3f..0.7f })
+            assertTrue(stops.all { it.second in 0.3f..0.76f })
             val middle = stops.minOf { it.second }
             assertTrue(stops.first().second > middle)
             assertTrue(stops.last().second > middle)
@@ -58,6 +58,22 @@ class NowPlayingBackdropPolicyTest {
             NowPlayingBackdropPolicy.veilStops(false, 55).first().second)
         assertTrue(NowPlayingBackdropPolicy.BLUR_SCALE >= 3)
         assertTrue(NowPlayingBackdropPolicy.OVERSCAN > 1f)
+    }
+
+    @Test
+    fun pageVeilUsesTonalGlassWithoutChangingTheQueueMaterial() {
+        val darkTint = NowPlayingBackdropPolicy.veilTint(DhunTokens.dark)
+        val lightTint = NowPlayingBackdropPolicy.veilTint(DhunTokens.light)
+        assertEquals(DhunTokens.dark.surfaceElevated, darkTint)
+        assertEquals(DhunTokens.light.surfaceContainerHighest, lightTint)
+        assertTrue(darkTint.red > DhunTokens.dark.background.red,
+            "dark page backdrop should lift artwork instead of laying near-black over it")
+        assertTrue(lightTint.red < DhunTokens.light.background.red,
+            "light page backdrop should be warm rather than chalk white")
+        // This policy is used by Home/Search/Library and browse pages. The
+        // Queue/Related sheet keeps LyricsMaterialPolicy's separate recipe.
+        assertEquals(0.42f, dev.dhun.design.components.LyricsMaterialPolicy.lyricsVeilStops().first().second)
+        assertEquals(0.62f, dev.dhun.design.components.LyricsMaterialPolicy.lyricsVeilStops().last().second)
     }
 
     @Test

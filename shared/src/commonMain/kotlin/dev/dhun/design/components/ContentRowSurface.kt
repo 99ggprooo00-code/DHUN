@@ -9,16 +9,30 @@ import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 
-/** Theme-aware translucent material for in-page content, not navigation chrome. */
+/**
+ * In-page glass, not the Queue/Related sheet material. The old near-black
+ * surface / pure-white surface fills made every row a dark or white tile on
+ * top of the blurred artwork. Use the middle of each theme's tonal ladder
+ * instead, with enough opacity to keep text readable even over bright art.
+ */
 object ContentSurfacePolicy {
-    const val CONTENT_OPACITY = 0.74f
-    const val READING_OPACITY = 0.82f
+    const val CONTENT_OPACITY_DARK = 0.82f
+    const val CONTENT_OPACITY_LIGHT = 0.83f
+    const val READING_OPACITY_DARK = 0.88f
+    const val READING_OPACITY_LIGHT = 0.89f
 }
 
-internal fun contentRowFill(): Color = DhunColors.surface.copy(alpha = ContentSurfacePolicy.CONTENT_OPACITY)
-internal fun readingSurfaceFill(): Color =
-    (if (DhunAppearance.tokens.isLight) DhunColors.surfaceVariant else DhunColors.surface)
-        .copy(alpha = ContentSurfacePolicy.READING_OPACITY)
+internal fun contentRowFill(): Color = if (DhunAppearance.tokens.isLight) {
+    DhunColors.surfaceContainerHigh.copy(alpha = ContentSurfacePolicy.CONTENT_OPACITY_LIGHT)
+} else {
+    DhunColors.surfaceElevated.copy(alpha = ContentSurfacePolicy.CONTENT_OPACITY_DARK)
+}
+
+internal fun readingSurfaceFill(): Color = if (DhunAppearance.tokens.isLight) {
+    DhunColors.surfaceContainerHighest.copy(alpha = ContentSurfacePolicy.READING_OPACITY_LIGHT)
+} else {
+    DhunColors.surfaceElevated.copy(alpha = ContentSurfacePolicy.READING_OPACITY_DARK)
+}
 
 /**
  * Quiet surface for music rows and groups, readable over blurred artwork in

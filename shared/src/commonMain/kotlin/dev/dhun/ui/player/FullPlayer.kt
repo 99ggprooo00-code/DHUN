@@ -1457,7 +1457,7 @@ private fun ArtworkBackdrop(
 ) {
     val brightnessShift = (55 - DhunAppearance.backdropBrightnessPercent) / 100f * 0.12f
     val dimColor by animateColorAsState(
-        targetValue = DhunColors.background.copy(alpha =
+        targetValue = NowPlayingBackdropPolicy.veilTint(DhunAppearance.tokens).copy(alpha =
             ((if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM) + brightnessShift)
                 .coerceIn(0.02f, 0.54f)),
         animationSpec = DhunAnimations.slowTween(),
@@ -1507,8 +1507,8 @@ internal const val PLAYER_BACKDROP_DIM = 0.08f
 internal const val PLAYER_BACKDROP_DIM_LYRICS = 0.40f
 
 /**
- * Ambient scrim color stops (`offset to alpha`, alphas applied to the theme
- * background): clear across the middle so the blurred bleed glows, stronger towards
+ * Ambient scrim color stops (`offset to alpha`, alphas applied to the tonal
+ * page tint): clear across the middle so the blurred bleed glows, stronger towards
  * the bottom so titles, progress and transport stay legible, and light at the
  * very top so the "NOW PLAYING" strip reads under the status bar.
  *
@@ -1516,8 +1516,9 @@ internal const val PLAYER_BACKDROP_DIM_LYRICS = 0.40f
  * out in the middle, darkens monotonically towards the bottom, never fully
  * opaque — is unit-tested rather than eyeballed. Stops were lowered again
  * after the 2026-09-21 polish; dark mode keeps the ≥0.85 bottom floor
- * pinned by `PlayerSheetLayoutTest`. Light mode uses 80% of that opacity so
- * the warm background does not turn the entire control cluster white.
+ * pinned by `PlayerSheetLayoutTest`. Light mode uses 88% of that opacity
+ * against a warmer, less-white tint so the controls remain readable over
+ * dark artwork without painting a white slab over bright artwork.
  */
 internal fun playerAmbientScrimStops(isLight: Boolean = false): List<Pair<Float, Float>> = listOf(
     0.00f to 0.16f,
@@ -1527,15 +1528,19 @@ internal fun playerAmbientScrimStops(isLight: Boolean = false): List<Pair<Float,
     0.72f to 0.28f,
     0.86f to 0.50f,
     1.00f to 0.85f,
-).map { (offset, alpha) -> offset to if (isLight) alpha * 0.8f else alpha }
+).map { (offset, alpha) -> offset to if (isLight) alpha * 0.88f else alpha }
 
 /** [playerAmbientScrimStops] as the brush the backdrop actually paints. */
 @Composable
-private fun ambientScrimBrush(): Brush = Brush.verticalGradient(
-    colorStops = playerAmbientScrimStops(DhunAppearance.tokens.isLight)
-        .map { (offset, alpha) -> offset to DhunColors.background.copy(alpha = alpha) }
-        .toTypedArray(),
-)
+private fun ambientScrimBrush(): Brush {
+    val tokens = DhunAppearance.tokens
+    val tint = NowPlayingBackdropPolicy.veilTint(tokens)
+    return Brush.verticalGradient(
+        colorStops = playerAmbientScrimStops(tokens.isLight)
+            .map { (offset, alpha) -> offset to tint.copy(alpha = alpha) }
+            .toTypedArray(),
+    )
+}
 
 /**
  * The sharp artwork, fit to a square card in the upper field.

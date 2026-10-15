@@ -82,6 +82,7 @@ import dev.dhun.design.components.NowPlayingBackdrop
 import dev.dhun.design.components.TextInputFocusRegistry
 import dev.dhun.design.components.acrylicGlass
 import dev.dhun.design.components.lyricsVeil
+import dev.dhun.design.components.readingSurfaceFill
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.presentation.browse.AlbumViewModel
@@ -752,7 +753,7 @@ private fun AppNavigationRail(
     layout: DhunShellLayout,
 ) {
     NavigationRail(
-        containerColor = DhunColors.glassStrong,
+        containerColor = readingSurfaceFill(),
         contentColor = DhunColors.textPrimary,
         modifier = Modifier.fillMaxHeight(),
     ) {
