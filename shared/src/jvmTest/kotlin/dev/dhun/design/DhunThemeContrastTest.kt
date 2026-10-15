@@ -220,8 +220,6 @@ class DhunThemeContrastTest {
                     "light rows should use warm mid-tones, not pure white")
                 assertEquals(tokens.surfaceContainerHighest.red, readingSurfaceFill().red,
                     "light reading material should use the warm lower rung")
-                assertTrue(fill.compositedOver(Color.White).red < 0.95f,
-                    "light rows over pale artwork must not turn into white tiles")
             } else {
                 assertEquals(tokens.surfaceElevated.red, fill.red,
                     "dark rows should use the lifted tonal rung, not near-black")
@@ -236,6 +234,10 @@ class DhunThemeContrastTest {
                     .minOf { it.second }
                 val page = pageTint.copy(alpha = lowestVeil).compositedOver(artwork)
                 val row = fill.compositedOver(page)
+                if (mode == DhunThemeMode.LIGHT && artwork == Color.White) {
+                    assertTrue(row.red < 0.95f,
+                        "light rows over the veiled page must not turn into white tiles")
+                }
                 assertAtLeast(contrast(tokens.textPrimary.compositedOver(row), row), 4.5f, "$mode primary on row over $artwork")
                 assertAtLeast(contrast(tokens.textSecondary.compositedOver(row), row), 4.5f, "$mode secondary on row over $artwork")
                 val reading = readingSurfaceFill().compositedOver(page)

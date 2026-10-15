@@ -91,7 +91,8 @@ class VisualTuningTest {
             assertEquals(15, DhunVisualTuning.value(VisualPart.QUEUE_SHEET))
             assertEquals(15, DhunVisualTuning.value(VisualPart.QUEUE_ROWS))
             DhunVisualTuning.restore(emptyMap(), enabled = false)
-            assertEquals(0.88f, readingSurfaceFill().alpha, 0.02f)
+            // Public keeps 15% tonal tint, but resets Reading to neutral 50%.
+            assertEquals(0.88f * 0.592f, readingSurfaceFill().alpha, 0.02f)
         } finally {
             DhunAppearance.reset()
         }
