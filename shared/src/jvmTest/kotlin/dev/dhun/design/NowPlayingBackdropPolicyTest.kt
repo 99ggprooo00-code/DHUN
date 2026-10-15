@@ -44,51 +44,20 @@ class NowPlayingBackdropPolicyTest {
     }
 
     @Test
-    fun theScrimIsAWashNeverAPhoto() {
-        val stops = NowPlayingBackdropPolicy.scrimStops()
-        assertTrue(stops.isNotEmpty())
-        // Ordered across the screen, and every stop translucent.
-        var previous = -1f
-        stops.forEach { (offset, alpha) ->
-            assertTrue(offset >= previous, "scrim stops must ascend: $stops")
-            previous = offset
-            assertTrue(alpha in 0f..0.9f, "stop $offset is opaque enough to hide the artwork")
-            assertTrue(alpha > 0f, "stop $offset does nothing")
+    fun oneVeilStaysTranslucentInBothThemes() {
+        for (isLight in listOf(false, true)) {
+            val stops = NowPlayingBackdropPolicy.veilStops(isLight, 55)
+            assertEquals(listOf(0f, 0.35f, 0.72f, 1f), stops.map { it.first })
+            assertTrue(stops.all { it.second in 0.3f..0.7f })
+            val middle = stops.minOf { it.second }
+            assertTrue(stops.first().second > middle)
+            assertTrue(stops.last().second > middle)
         }
-        assertEquals(0f, stops.first().first, 0.0001f)
-        assertEquals(1f, stops.last().first, 0.0001f)
-    }
-
-    @Test
-    fun theScrimIsHeaviestWhereChromeAndListsSit() {
-        val stops = NowPlayingBackdropPolicy.scrimStops()
-        val top = stops.first().second
-        val bottom = stops.last().second
-        val middle = stops.minBy { it.second }.second
-        assertTrue(top > middle, "the search field / section headers sit at the top")
-        assertTrue(bottom > middle, "the docked mini-player sits at the bottom")
-    }
-
-    @Test
-    fun theDimKeepsContrastLowEnoughToRead() {
-        // Together with the scrim this is what stops a bright album cover from
-        // fighting the text on top of it. 0.40 is the light end of the band —
-        // Home/Search/Library were darkened past the player by sitting higher.
-        assertTrue(NowPlayingBackdropPolicy.DIM_ALPHA in 0.4f..0.75f)
-        assertTrue(NowPlayingBackdropPolicy.DIM_ALPHA <= 0.42f, "shell dim drifted back toward the old 0.55 wash")
-        assertTrue(NowPlayingBackdropPolicy.BLUR_SCALE >= 3, "a background must be heavily blurred")
-        assertTrue(NowPlayingBackdropPolicy.OVERSCAN > 1f, "the blur rim must never be visible")
-    }
-
-    @Test
-    fun theScrimStaysAWashAfterTheBrightnessPass() {
-        val stops = NowPlayingBackdropPolicy.scrimStops()
-        val lightest = stops.minOf { it.second }
-        val heaviest = stops.maxOf { it.second }
-        // Old stops were 0.62/0.42/0.58/0.78. A regression to that wash fails here.
-        assertTrue(lightest <= 0.36f, "middle wash too heavy: $lightest")
-        assertTrue(heaviest <= 0.70f, "edge wash too heavy: $heaviest")
-        assertTrue(heaviest > lightest, "the wash must still be heavier at the chrome")
+        // Light uses one lighter palette veil, NOT a black dim under a white scrim.
+        assertTrue(NowPlayingBackdropPolicy.veilStops(true, 55).first().second <
+            NowPlayingBackdropPolicy.veilStops(false, 55).first().second)
+        assertTrue(NowPlayingBackdropPolicy.BLUR_SCALE >= 3)
+        assertTrue(NowPlayingBackdropPolicy.OVERSCAN > 1f)
     }
 
     @Test
@@ -101,13 +70,18 @@ class NowPlayingBackdropPolicyTest {
     }
 
     @Test
-    fun brightnessMapsToAReadableDimRange() {
-        val dark = NowPlayingBackdropPolicy.dimAlphaForBrightness(0)
-        val mid = NowPlayingBackdropPolicy.dimAlphaForBrightness(55)
-        val light = NowPlayingBackdropPolicy.dimAlphaForBrightness(100)
-        assertTrue(dark in 0.75f..0.90f)
-        assertTrue(light in 0.15f..0.30f)
-        assertTrue(mid in light..dark)
+    fun brightnessChangesTheSameVeilWithoutMakingItOpaque() {
+        for (isLight in listOf(false, true)) {
+            val dark = NowPlayingBackdropPolicy.veilStops(isLight, 0)
+            val mid = NowPlayingBackdropPolicy.veilStops(isLight, 55)
+            val bright = NowPlayingBackdropPolicy.veilStops(isLight, 100)
+            dark.indices.forEach { i ->
+                assertTrue(dark[i].second > mid[i].second)
+                assertTrue(mid[i].second > bright[i].second)
+                assertTrue(dark[i].second < 0.9f)
+                assertTrue(bright[i].second > 0.15f)
+            }
+        }
         assertEquals(0f, NowPlayingBackdropPolicy.blurMultiplier(0), absoluteTolerance = 0.0001f)
         assertEquals(1f, NowPlayingBackdropPolicy.blurMultiplier(100), absoluteTolerance = 0.0001f)
         assertEquals(1f, NowPlayingBackdropPolicy.blurMultiplier(250), absoluteTolerance = 0.0001f)

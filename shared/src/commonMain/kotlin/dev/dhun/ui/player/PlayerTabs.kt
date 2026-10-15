@@ -30,8 +30,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import dev.dhun.lyrics.LyricsTiming
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -71,6 +69,7 @@ import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.LoadingShimmer
+import dev.dhun.lyrics.LyricsTiming
 import dev.dhun.presentation.player.LyricsUiState
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.player.RelatedUiState
@@ -85,16 +84,12 @@ internal fun PlayerTabContent(
     tab: Int,
     viewModel: PlayerViewModel,
     accent: Color,
-    preferredLyricsProvider: String,
-    onPreferredLyricsProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (tab) {
         LYRICS_TAB_INDEX -> LyricsTabContent(
             viewModel = viewModel,
             accent = accent,
-            preferredProvider = preferredLyricsProvider,
-            onPreferredProviderChange = onPreferredLyricsProviderChange,
             modifier = modifier,
         )
         2 -> RelatedTabContent(viewModel = viewModel, accent = accent, modifier = modifier)
@@ -403,8 +398,6 @@ internal fun EqualizerBars(
 internal fun LyricsTabContent(
     viewModel: PlayerViewModel,
     accent: Color,
-    preferredProvider: String,
-    onPreferredProviderChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lyricsState by viewModel.lyricsState.collectAsState()
@@ -423,32 +416,8 @@ internal fun LyricsTabContent(
         return
     }
 
-    var showMatches by remember(track.id) { mutableStateOf(false) }
-    val matchController = viewModel.lyricsMatches
-    if (showMatches && matchController != null) {
-        LyricsMatchPicker(track, matchController) {
-            matchController.cancelSearch()
-            showMatches = false
-        }
-    }
+    val timing = savedTiming.takeIf { it.trackId == track.id } ?: LyricsTiming(track.id)
     Column(modifier = modifier.fillMaxSize()) {
-        LyricsRomanizationControls(viewModel.lyricsRomanization)
-        if (matchController != null) TextButton(onClick = { showMatches = true }) { Text("Find lyrics matches for this song") }
-        LyricsProviderPicker(
-            selectedProvider = preferredProvider,
-            onSelect = onPreferredProviderChange,
-            accent = accent,
-        )
-        // Ignore the outgoing track's correction while the new settings flow starts.
-        val timing = savedTiming.takeIf { it.trackId == track.id } ?: LyricsTiming(track.id)
-        if (lyricsState is LyricsUiState.Synced) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = { viewModel.adjustLyricsTiming(track.id, -100) }) { Text("Earlier") }
-                Text("${timing.offsetMs} ms", style = MaterialTheme.typography.labelMedium)
-                TextButton(onClick = { viewModel.adjustLyricsTiming(track.id, 100) }) { Text("Later") }
-                TextButton(onClick = { viewModel.resetLyricsTiming(track.id) }) { Text("Reset") }
-            }
-        }
         val lyricsBodyModifier = Modifier.fillMaxWidth().weight(1f)
 
         // Scroll position and manual-follow preference belong to this track, not
@@ -557,7 +526,7 @@ private val lyricsProviderOptions = listOf(
 )
 
 @Composable
-private fun LyricsProviderPicker(
+internal fun LyricsProviderPicker(
     selectedProvider: String,
     onSelect: (String) -> Unit,
     accent: Color,
@@ -566,15 +535,11 @@ private fun LyricsProviderPicker(
     val selectedLabel = lyricsProviderOptions.firstOrNull { it.first == selectedProvider }?.second
         ?: lyricsProviderOptions.first().second
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
         Text("Lyrics provider", style = MaterialTheme.typography.labelMedium, color = DhunColors.textSecondary)
-        Spacer(modifier = Modifier.weight(1f))
         Box {
             DhunTonalButton(onClick = { expanded = true }) {
-                Text(selectedLabel, color = accent, maxLines = 1)
+                Text(selectedLabel, color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.width(DhunSpacing.xs))
                 DhunIconView(
                     icon = DhunIcon.ChevronDown,
@@ -587,6 +552,7 @@ private fun LyricsProviderPicker(
                 lyricsProviderOptions.forEach { (id, label) ->
                     DropdownMenuItem(
                         text = { Text(label) },
+                        modifier = Modifier.semantics { selected = id == selectedProvider },
                         onClick = {
                             expanded = false
                             if (id != selectedProvider) onSelect(id)

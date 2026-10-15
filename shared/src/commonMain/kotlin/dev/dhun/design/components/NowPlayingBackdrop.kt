@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -33,15 +32,14 @@ import dev.dhun.design.supportsRealtimeBlur
  *
  * On API 31+ / desktop the cover is heavily blurred (user-controlled). On
  * Android below API 31 `Modifier.blur` is a no-op, so the thumbnail is
- * drawn sharp. Brightness independently dims the artwork on all platforms. Nothing is
- * drawn when the current song has no thumbnail, the URL is blank, or the load
- * fails; the default DHUN background shows through.
+ * drawn sharp. A single theme-aware translucent veil follows the brightness
+ * setting. When the thumbnail is absent, loading or fails, the veil fades with
+ * it so only the DHUN fallback background remains.
  */
 @Composable
 fun NowPlayingBackdrop(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
-    dimColor: Color = Color.Black.copy(alpha = NowPlayingBackdropPolicy.DIM_ALPHA),
 ) {
     if (!NowPlayingBackdropPolicy.shouldRenderBackdrop(artworkUrl)) return
     val url = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) } ?: return
@@ -49,13 +47,12 @@ fun NowPlayingBackdrop(
     val blurPercent = DhunAppearance.backdropBlurPercent
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
     val canBlur = supportsRealtimeBlur
-    val overlay = dimColor.copy(alpha = NowPlayingBackdropPolicy.dimAlphaForBrightness(brightnessPercent))
+    val veilStops = NowPlayingBackdropPolicy.veilStops(DhunAppearance.tokens.isLight, brightnessPercent)
 
     val context = LocalPlatformContext.current
     var phase by remember(artworkUrl) { mutableStateOf(NowPlayingBackdropPhase.Idle) }
-    var loadedOnce by remember { mutableStateOf(false) }
     val artworkAlpha by animateFloatAsState(
-        targetValue = if (loadedOnce && phase != NowPlayingBackdropPhase.Failed) 1f else 0f,
+        targetValue = if (phase == NowPlayingBackdropPhase.Loaded) 1f else 0f,
         animationSpec = DhunAnimations.slowTween(),
         label = "nowPlayingBackdrop",
     )
@@ -87,26 +84,21 @@ fun NowPlayingBackdrop(
             contentScale = ContentScale.Crop,
             onLoading = { phase = NowPlayingBackdropPhase.Loading },
             onSuccess = {
-                loadedOnce = true
                 phase = NowPlayingBackdropPhase.Loaded
             },
             onError = { phase = NowPlayingBackdropPhase.Failed },
         )
+        // One theme-aware veil, faded with the image. No permanent overlay on
+        // the fallback background while a request is loading or has failed.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(overlay),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
+                .graphicsLayer { alpha = artworkAlpha }
                 .background(
                     Brush.verticalGradient(
-                        colorStops = NowPlayingBackdropPolicy.scrimStops()
-                            .map { (offset, alpha) ->
-                                offset to DhunColors.background.copy(alpha = alpha)
-                            }
-                            .toTypedArray(),
+                        colorStops = veilStops.map { (offset, alpha) ->
+                            offset to DhunColors.background.copy(alpha = alpha)
+                        }.toTypedArray(),
                     ),
                 ),
         )
@@ -125,8 +117,6 @@ enum class NowPlayingBackdropPhase { Idle, Loading, Loaded, Failed }
 
 object NowPlayingBackdropPolicy {
 
-    const val DIM_ALPHA = 0.40f
-
     const val BLUR_SCALE = 4
 
     const val OVERSCAN = 1.15f
@@ -144,19 +134,18 @@ object NowPlayingBackdropPolicy {
     fun blurMultiplier(percent: Int): Float =
         percent.coerceIn(0, 100) / 100f
 
-    /**
-     * Black overlay on the un-blurred thumbnail (API < 31). 0 = almost black,
-     * 100 = the cover is clearly visible. Default 55 → ~0.48.
+    /** A single translucent veil instead of stacking a black dim and a second scrim.
+     * Brightness changes its opacity, never its hue; light mode uses the warm
+     * light background and dark mode uses the dark background. Lists and reading
+     * surfaces supply their own local contrast rather than blacking out art.
      */
-    fun dimAlphaForBrightness(percent: Int): Float {
-        val t = percent.coerceIn(0, 100) / 100f
-        return 0.82f - 0.62f * t
+    fun veilStops(isLight: Boolean, brightnessPercent: Int): List<Pair<Float, Float>> {
+        val adjustment = (55 - brightnessPercent.coerceIn(0, 100)) / 100f * 0.30f
+        val base = if (isLight) listOf(
+            0f to 0.56f, 0.35f to 0.42f, 0.72f to 0.48f, 1f to 0.56f,
+        ) else listOf(
+            0f to 0.68f, 0.35f to 0.52f, 0.72f to 0.54f, 1f to 0.64f,
+        )
+        return base.map { (offset, alpha) -> offset to (alpha + adjustment).coerceIn(0.18f, 0.86f) }
     }
-
-    fun scrimStops(): List<Pair<Float, Float>> = listOf(
-        0.00f to 0.50f,
-        0.35f to 0.32f,
-        0.72f to 0.44f,
-        1.00f to 0.62f,
-    )
 }

@@ -7,14 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
@@ -23,93 +21,41 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 
 /**
- * Frosted Material 3 surface — **glass-morphism atmosphere**, not Liquid Glass.
- *
- * Recipe (lightweight, battery-safe):
- * 1. Soft elevation shadow
- * 2. Translucent multi-stop fill (what’s behind peeks through)
- * 3. Top-edge highlight hairline (fake specular)
- * 4. Content stays **sharp** — we never `Modifier.blur` the content layer
- *
- * Backdrop blur lives on layers *behind* this surface (FullPlayer artwork,
- * shell ambient wash). Blurring this box would smear titles/lyrics — banned.
- *
- * API 31+/Skiko still get real blur only on those backdrop layers.
+ * Shared content material. In-page cards use the same quiet translucent fill
+ * as music rows; dialogs have an opaque base so the page beneath cannot show
+ * through input labels. Blur stays on the artwork layer, never on text.
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.glass,
-    /** Kept for call-site compatibility; ignored — content must stay sharp. */
+    /** Kept for call-site compatibility; blur belongs behind the card. */
     blurRadius: Dp = DhunSpacing.glassBlur,
     contentPadding: androidx.compose.foundation.layout.PaddingValues? = null,
     elevated: Boolean = true,
     tint: Color = Color.Transparent,
-    /**
-     * Edge hairline. Dialogs/sheets pass a softer token so the surface melts
-     * into the scrim instead of drawing a hard boundary on dark glass.
-     */
     borderColor: Color = DhunColors.glassEdge,
-    /**
-     * Paints an opaque base under the translucent stack.
-     *
-     * Glass only works when there is something *behind* it. A `Dialog` floats
-     * over a dimmed scrim, so a purely translucent card let the page beneath
-     * bleed straight through the text — the device screenshots show a "New
-     * playlist" sheet whose fields are illegible against the list under it.
-     * Dialogs and sheets pass `true`; in-page glass leaves it `false`.
-     */
     opaqueBase: Boolean = false,
+    /** Use on an existing reading surface to avoid stacking two dark/light fills. */
+    subtle: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     @Suppress("UNUSED_VARIABLE")
     val ignoredBlur = blurRadius
-
     val base = if (elevated) {
-        modifier.shadow(DhunSpacing.sm, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.35f))
-    } else {
-        modifier
-    }
-
+        modifier.shadow(DhunSpacing.sm, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.15f))
+    } else modifier
     Box(
         modifier = base
             .clip(shape)
-            .then(
-                if (opaqueBase) Modifier.background(DhunColors.surface, shape) else Modifier,
-            )
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        DhunColors.glassHighlight,
-                        DhunColors.glass,
-                        DhunColors.glassDeep,
-                    ),
-                ),
-                shape,
-            )
-            .then(
-                if (tint.alpha > 0.01f) {
-                    Modifier.background(tint.copy(alpha = tint.alpha.coerceIn(0f, 0.28f)), shape)
-                } else {
-                    Modifier
-                },
-            )
+            .background(when {
+                opaqueBase -> DhunColors.surface
+                subtle -> DhunColors.overlayFocus
+                else -> readingSurfaceFill()
+            }, shape)
+            .then(if (tint.alpha > 0.01f) Modifier.background(tint.copy(alpha = tint.alpha.coerceAtMost(0.20f)), shape) else Modifier)
             .border(BorderStroke(DhunSpacing.border, borderColor), shape),
     ) {
-        // Specular top sheen — cheap glass cue without a blur pass.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.0f to DhunColors.glassSheen,
-                            0.22f to Color.Transparent,
-                            1.0f to Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
         if (contentPadding != null) {
             Box(modifier = Modifier.padding(contentPadding), content = content)
         } else {
@@ -119,17 +65,8 @@ fun GlassCard(
 }
 
 /**
- * The continuous bottom dock: the MiniPlayer and the navigation bar in ONE
- * clipped sheet. The artwork is blurred once per track (the lyrics-card
- * pipeline, [LyricsArtworkLayer]). This surface does **not** paint the old
- * `glassBarTop` → `glassStrong` slab — that near-black veil is what made the
- * dock read as translucent black. Callers veil each band themselves:
- * [acrylicGlass] on the mini-player row, [lyricsVeil] on the Home / Search /
- * Library tabs that sit below it. Content stays sharp.
- *
- * No new dependency and no per-frame work: the artwork is the same Coil
- * request the shell backdrop already makes (list tier via
- * [NowPlayingBackdropPolicy.resolveUrl]), keyed per track.
+ * Continuous bottom dock: its own artwork layer and controlled veils provide
+ * navigation chrome; ordinary content panels above it stay neutral.
  */
 @Composable
 fun GlassDock(
@@ -153,9 +90,7 @@ fun GlassDock(
     }
 }
 
-/**
- * Thin frosted panel for chips / compact chrome — translucent, pill-friendly.
- */
+/** Compact chrome shares the same neutral/selected fills as filter chips. */
 @Composable
 fun FrostedChipSurface(
     modifier: Modifier = Modifier,
@@ -163,18 +98,7 @@ fun FrostedChipSurface(
     selected: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val fill = if (selected) {
-        Brush.horizontalGradient(
-            listOf(
-                DhunColors.accent.copy(alpha = 0.88f),
-                DhunColors.accent.copy(alpha = 0.72f),
-            ),
-        )
-    } else {
-        Brush.verticalGradient(
-            listOf(DhunColors.glassHighlight, DhunColors.glass),
-        )
-    }
+    val fill = if (selected) DhunColors.accent else contentRowFill()
     Box(
         modifier = modifier
             .clip(shape)

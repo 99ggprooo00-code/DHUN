@@ -3,6 +3,8 @@ package dev.dhun.ui.library
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,8 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
@@ -53,7 +53,9 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
@@ -213,38 +215,23 @@ private fun LibraryTabRow(
 ) {
     val visibleTabs = listOf(LibraryTab.PLAYLISTS, LibraryTab.DOWNLOADS, LibraryTab.HISTORY)
     Row(
-        modifier = modifier.fillMaxWidth().height(DhunSpacing.touchTarget),
+        modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         visibleTabs.forEach { tab ->
-            val selected = (tab == selectedTab) || (tab == LibraryTab.PLAYLISTS && selectedTab == LibraryTab.FAVORITES)
+            val selected = tab == selectedTab || (tab == LibraryTab.PLAYLISTS && selectedTab == LibraryTab.FAVORITES)
             val label = when (tab) {
                 LibraryTab.PLAYLISTS -> "Playlists"
                 LibraryTab.DOWNLOADS -> "Downloads"
                 LibraryTab.HISTORY -> "History"
                 LibraryTab.FAVORITES -> "Favorites"
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clip(DhunShapes.full)
-                    .background(
-                        if (selected) {
-                            DhunColors.accent.copy(alpha = 0.82f)
-                        } else {
-                            DhunColors.glassHighlight
-                        },
-                    )
-                    .clickable { onSelect(tab) }
-                    .padding(horizontal = DhunSpacing.lg, vertical = DhunSpacing.sm),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (selected) DhunColors.onAccent else DhunColors.textSecondary,
-                )
-            }
+            DhunFilterChip(
+                selected = selected,
+                onClick = { onSelect(tab) },
+                label = { Text(label, style = MaterialTheme.typography.labelLarge) },
+            )
         }
     }
 }
@@ -357,24 +344,9 @@ private fun LikedSongsFolderCard(
     onPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    GlassCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = DhunShapes.large,
-    ) {
+    Box(modifier = modifier.fillMaxWidth().dhunContentRowSurface().clickable(onClick = onClick)) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            DhunColors.accentContainer.copy(alpha = 0.35f),
-                            Color.Transparent,
-                        ),
-                    ),
-                )
-                .padding(DhunSpacing.md),
+            modifier = Modifier.fillMaxWidth().padding(DhunSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
@@ -382,14 +354,7 @@ private fun LikedSongsFolderCard(
                 modifier = Modifier
                     .size(DhunSpacing.artworkThumb)
                     .clip(DhunShapes.medium)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                DhunColors.accent,
-                                DhunColors.accentContainer,
-                            ),
-                        ),
-                    ),
+                    .background(DhunColors.accent),
                 contentAlignment = Alignment.Center,
             ) {
                 DhunIconView(
@@ -580,11 +545,11 @@ private fun PlaylistRow(
     onClick: () -> Unit,
     onPlay: () -> Unit,
 ) {
-    GlassCard(
+    Box(
         modifier = Modifier.fillMaxWidth()
             .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs)
+            .dhunContentRowSurface()
             .clickable(onClick = onClick),
-        shape = DhunShapes.medium,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(DhunSpacing.md),

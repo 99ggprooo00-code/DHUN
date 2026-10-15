@@ -58,8 +58,11 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
+import dev.dhun.design.components.contentRowFill
+import dev.dhun.design.components.readingSurfaceFill
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunFilterChip
@@ -116,7 +119,10 @@ fun SearchScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Top Search Bar
+        Column(Modifier.padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.md)) {
+            Text("DHUN", style = DhunTypographyTokens.brand, color = DhunColors.accent)
+            Text("Search", style = MaterialTheme.typography.headlineMedium, color = DhunColors.textPrimary)
+        }
         SearchBarSection(
             query = query,
             onQueryChange = viewModel::onQueryChange,
@@ -243,9 +249,9 @@ private fun SearchBarSection(
             keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
             shape = DhunShapes.extraLarge,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = DhunColors.glassHighlight,
-                unfocusedContainerColor = DhunColors.glass,
-                disabledContainerColor = DhunColors.glassDeep,
+                focusedContainerColor = readingSurfaceFill(),
+                unfocusedContainerColor = contentRowFill(),
+                disabledContainerColor = contentRowFill(),
                 focusedTextColor = DhunColors.textPrimary,
                 unfocusedTextColor = DhunColors.textPrimary,
                 cursorColor = DhunColors.accent,
@@ -524,7 +530,6 @@ private fun SearchResultsList(
                         )
                     },
                 )
-                HorizontalDivider(color = DhunColors.border)
             }
         }
 
@@ -614,7 +619,6 @@ private fun SearchShimmerSkeleton(modifier: Modifier = Modifier) {
     ) {
         repeat(6) {
             TrackRowShimmer()
-            HorizontalDivider(color = DhunColors.border)
         }
     }
 }

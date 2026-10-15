@@ -15,7 +15,7 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 
 /**
- * Pill filter chip — frosted translucent unselected, accent-glass selected.
+ * Pill filter chip — quiet neutral unselected, solid accent selected.
  * M3 shape scale (`DhunShapes.chip` = full pill).
  */
 @Composable
@@ -36,10 +36,10 @@ fun DhunFilterChip(
         leadingIcon = leadingIcon,
         shape = DhunShapes.chip,
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = DhunColors.glassHighlight,
+            containerColor = contentRowFill(),
             labelColor = DhunColors.textSecondary,
             iconColor = DhunColors.textSecondary,
-            selectedContainerColor = DhunColors.accent.copy(alpha = 0.82f),
+            selectedContainerColor = DhunColors.accent,
             selectedLabelColor = DhunColors.onAccent,
             selectedLeadingIconColor = DhunColors.onAccent,
             disabledContainerColor = DhunColors.surface.copy(alpha = 0.5f),
@@ -54,7 +54,7 @@ fun DhunFilterChip(
     )
 }
 
-/** Assist / quick-action chip — frosted glass body, accent icon friendly. */
+/** Assist / quick-action chip — same neutral body as the filter chips. */
 @Composable
 fun DhunAssistChip(
     onClick: () -> Unit,
@@ -69,7 +69,7 @@ fun DhunAssistChip(
         leadingIcon = leadingIcon,
         shape = DhunShapes.chip,
         colors = AssistChipDefaults.assistChipColors(
-            containerColor = DhunColors.glassHighlight,
+            containerColor = contentRowFill(),
             labelColor = DhunColors.textPrimary,
             leadingIconContentColor = DhunColors.accent,
         ),
@@ -91,7 +91,7 @@ fun DhunInputChip(
         modifier = modifier,
         shape = DhunShapes.chip,
         colors = InputChipDefaults.inputChipColors(
-            containerColor = DhunColors.glass,
+            containerColor = contentRowFill(),
             labelColor = DhunColors.textSecondary,
             selectedContainerColor = DhunColors.accentContainer.copy(alpha = 0.9f),
             selectedLabelColor = DhunColors.onAccentContainer,

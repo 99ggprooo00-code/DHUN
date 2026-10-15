@@ -36,8 +36,10 @@ object NavStatePersistence {
     /**
      * @param savedInstanceState the Bundle handed to `onCreate`; null or
      *   partial bundles restore defaults (fresh start).
+     * @param allowThemeCatalogue true only for a package stamped with the test
+     *   release channel. Public/development restores discard the preview route.
      */
-    fun restore(savedInstanceState: Bundle?): AppNavState = AppNavState().apply {
+    fun restore(savedInstanceState: Bundle?, allowThemeCatalogue: Boolean = false): AppNavState = AppNavState().apply {
         savedInstanceState?.getString(KEY_NAV_TAB)?.let { name ->
             // CATALOG is developer scaffolding with no nav-bar entry and no
             // working close: restoring onto it would strand the user. An old
@@ -48,6 +50,7 @@ object NavStatePersistence {
         playerExpanded = savedInstanceState?.getBoolean(KEY_PLAYER_EXPANDED) ?: false
         savedInstanceState?.getStringArrayList(KEY_DETAIL_ROUTES).orEmpty()
             .mapNotNull(::decodeRoute)
+            .filter { allowThemeCatalogue || it != DetailRoute.ThemeCatalogPage }
             .forEach { route -> detailStack.add(route) }
         // Last, and a replace rather than an append: setting selectedTab above
         // has already recorded a default entry, and an unknown name is dropped

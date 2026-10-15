@@ -53,8 +53,7 @@ object LyricsMaterialPolicy {
     const val LYRICS_VEIL_BOTTOM = 0.62f
 
     /**
-     * Flat black laid under the acrylic veil only, and only where this surface
-     * paints its own artwork. The dock's art is undimmed (unlike the shell
+     * Theme background laid under the acrylic veil. The dock's art is undimmed (unlike the shell
      * backdrop); without this a bright cover blows out the title.
      */
     const val ACRYLIC_ART_DIM = 0.18f
@@ -119,8 +118,8 @@ fun Modifier.lyricsVeil(shape: Shape = RectangleShape): Modifier =
     background(lyricsVeilBrush(), shape)
 
 /**
- * Mini-player acrylic: a light dim, a veil lighter than the lyrics card, and
- * a white frost so the bar reads as glass rather than a near-black slab.
+ * Mini-player acrylic: a theme-aware veil lighter than the lyrics card;
+ * only dark mode needs the small white frost highlight.
  */
 @Composable
 fun Modifier.acrylicGlass(shape: Shape = RectangleShape): Modifier {
@@ -134,9 +133,9 @@ fun Modifier.acrylicGlass(shape: Shape = RectangleShape): Modifier {
             .map { (offset, alpha) -> offset to Color.White.copy(alpha = alpha) }
             .toTypedArray(),
     )
-    return background(Color.Black.copy(alpha = LyricsMaterialPolicy.ACRYLIC_ART_DIM), shape)
+    return background(DhunColors.background.copy(alpha = LyricsMaterialPolicy.ACRYLIC_ART_DIM), shape)
         .background(veil, shape)
-        .background(frost, shape)
+        .then(if (DhunAppearance.tokens.isLight) Modifier else Modifier.background(frost, shape))
 }
 
 /**
@@ -304,7 +303,8 @@ internal fun LyricsArtworkLayer(
             )
             Box(
                 modifier = Modifier.fillMaxSize().background(
-                    Color.Black.copy(alpha = NowPlayingBackdropPolicy.dimAlphaForBrightness(brightnessPercent)),
+                    DhunColors.background.copy(alpha =
+                        (0.16f + (55 - brightnessPercent) / 100f * 0.14f).coerceIn(0.08f, 0.30f)),
                 ),
             )
         }

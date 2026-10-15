@@ -1,6 +1,8 @@
 package dev.dhun.design
 
 import androidx.compose.ui.graphics.Color
+import dev.dhun.design.components.contentRowFill
+import dev.dhun.design.components.readingSurfaceFill
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -196,6 +198,32 @@ class DhunThemeContrastTest {
                 DhunAppearance.setAccentMode("static")
                 assertEquals(selected, DhunAppearance.tokens.accent, "static mode must restore the selected accent")
                 DhunAppearance.setArtworkAccent(null)
+            }
+        }
+    }
+
+    // -- calm content rows -------------------------------------------------
+
+    @Test
+    fun contentRowsKeepTextReadableEvenOverExtremeArtwork() {
+        eachMode { mode, tokens ->
+            // The same row treatment is used on Home, Search, Library and
+            // album/playlist pages. Its translucent fill must work in either
+            // theme even when a backdrop image reaches pure black or white.
+            val fill = contentRowFill()
+            assertTrue(fill.alpha > 0f && fill.alpha < 1f, "$mode row fill must be translucent")
+            if (mode == DhunThemeMode.LIGHT) {
+                assertEquals(tokens.surfaceVariant.red, readingSurfaceFill().red,
+                    "light reading material should be warm, not pure white")
+            }
+            listOf(Color.Black, Color.White).forEach { artwork ->
+                val row = fill.compositedOver(artwork)
+                assertAtLeast(contrast(tokens.textPrimary.compositedOver(row), row), 4.5f, "$mode primary on row over $artwork")
+                assertAtLeast(contrast(tokens.textSecondary.compositedOver(row), row), 4.5f, "$mode secondary on row over $artwork")
+                val reading = readingSurfaceFill().compositedOver(artwork)
+                assertAtLeast(contrast(tokens.textPrimary.compositedOver(reading), reading), 4.5f, "$mode primary on legal reader over $artwork")
+                assertAtLeast(contrast(tokens.textSecondary.compositedOver(reading), reading), 4.5f, "$mode secondary on legal reader over $artwork")
+                assertAtLeast(contrast(tokens.textTertiary.compositedOver(reading), reading), 3f, "$mode tertiary on legal reader over $artwork")
             }
         }
     }

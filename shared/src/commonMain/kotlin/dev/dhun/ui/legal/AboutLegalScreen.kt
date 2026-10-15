@@ -46,6 +46,7 @@ import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.dhunContentSurface
 import dev.dhun.legal.DhunAppInfo
 import dev.dhun.legal.LegalContent
 import dev.dhun.legal.LegalDocument
@@ -99,6 +100,8 @@ fun AboutLegalScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .padding(horizontal = DhunSpacing.sm)
+                .dhunContentSurface(reading = true)
                 .widthIn(max = DhunSpacing.legalContentMaxWidth),
             contentPadding = PaddingValues(bottom = DhunSpacing.xxl),
         ) {
@@ -227,7 +230,11 @@ fun LegalDocumentScreen(
         // unreachable -- on Open-Source Licenses that is real licence text the
         // reader can never scroll to. Box rather than a modifier on
         // SelectionContainer so the weight is not dependent on that overload.
-        Box(modifier = Modifier.weight(1f)) {
+        Box(
+            modifier = Modifier.weight(1f)
+                .padding(horizontal = DhunSpacing.sm)
+                .dhunContentSurface(reading = true),
+        ) {
             SelectionContainer {
                 LazyColumn(
                     modifier = Modifier
@@ -245,6 +252,8 @@ fun LegalDocumentScreen(
                             GlassCard(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = DhunSpacing.sm),
                                 contentPadding = PaddingValues(DhunSpacing.lg),
+                                elevated = false,
+                                subtle = true,
                             ) {
                                 Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
                                     Text(
@@ -295,6 +304,8 @@ private fun DraftBanner(document: LegalDocument) {
     GlassCard(
         modifier = Modifier.fillMaxWidth().padding(vertical = DhunSpacing.sm),
         contentPadding = PaddingValues(DhunSpacing.lg),
+        elevated = false,
+        subtle = true,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
             Text(
@@ -339,6 +350,8 @@ private fun LegalBlock(block: MarkdownBlock, onOpenUrl: (String) -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(vertical = DhunSpacing.sm),
             contentPadding = PaddingValues(DhunSpacing.lg),
             borderColor = DhunColors.glassEdge,
+            elevated = false,
+            subtle = true,
         ) {
             Text(
                 text = LegalText(block.spans, onOpenUrl),
@@ -368,7 +381,7 @@ private fun LegalBlock(block: MarkdownBlock, onOpenUrl: (String) -> Unit) {
             color = DhunColors.textSecondary,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(DhunColors.surfaceContainerLow)
+                .dhunContentSurface(reading = false)
                 .padding(DhunSpacing.md),
         )
 
@@ -404,6 +417,7 @@ private fun LegalTable(table: MarkdownBlock.Table, onOpenUrl: (String) -> Unit) 
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(DhunSpacing.lg),
                 elevated = false,
+                subtle = true,
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
                     row.forEachIndexed { column, cell ->
@@ -514,7 +528,9 @@ internal fun LegalTopBar(title: String, onBack: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.sm),
+            .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.sm)
+            .dhunContentSurface(reading = true)
+            .padding(horizontal = DhunSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DhunIconButton(

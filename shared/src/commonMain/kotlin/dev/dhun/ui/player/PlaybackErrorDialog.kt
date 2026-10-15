@@ -12,7 +12,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.compositeOver
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.diagnosticText
 import dev.dhun.design.DhunColors
@@ -24,11 +23,11 @@ import dev.dhun.design.DhunSpacing
 internal fun PlaybackErrorDialog(error: PlaybackState.Error, onDismiss: () -> Unit, onRetry: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DhunColors.glassStrong.compositeOver(DhunColors.surface),
+        containerColor = DhunColors.surface,
         titleContentColor = DhunColors.textPrimary,
         textContentColor = DhunColors.textSecondary,
         tonalElevation = DhunSpacing.zero,
-        shape = DhunShapes.extraLarge,
+        shape = DhunShapes.large,
         title = { Text("Playback details", style = MaterialTheme.typography.titleMedium) },
         text = {
             SelectionContainer {
