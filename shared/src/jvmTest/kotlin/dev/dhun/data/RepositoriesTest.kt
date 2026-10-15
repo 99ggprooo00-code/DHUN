@@ -250,6 +250,18 @@ class RepositoriesTest {
     /* ---------------- Lyrics cache ---------------- */
 
     @Test
+    fun enhancedLyricsSurviveRepositoryRecreation(): Unit = runBlocking {
+        val db = newDb()
+        val original = dev.dhun.core.Lyrics.Synced(dev.dhun.lyrics.LrcParser.parse(
+            "[00:01.123]<00:01.123>Hello <00:01.987>世界<00:03.456>"
+        ))
+        SqlDelightLyricsCacheRepository(db, FakeClock(), Dispatchers.Unconfined).put("word-track", original)
+        val reopened = SqlDelightLyricsCacheRepository(db, FakeClock(), Dispatchers.Unconfined)
+        assertEquals(original, reopened.get("word-track"))
+        assertEquals(original, reopened.observe("word-track").first())
+    }
+
+    @Test
     fun lyricsCacheSaveGetAndClear(): Unit = runBlocking {
         val clock = FakeClock()
         val repo = SqlDelightLyricsCacheRepository(newDb(), clock, Dispatchers.Unconfined)

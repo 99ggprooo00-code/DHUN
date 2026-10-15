@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
@@ -30,6 +31,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -37,6 +43,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +79,7 @@ internal fun SyncedLyricsContent(
 
     val listState = rememberLazyListState()
     val activeIndex = activeLyricIndex(lines, positionMs)
+    val activeIndices = activeLyricIndices(lines, positionMs)
     var following by remember { mutableStateOf(true) }
     val manualScroll = remember {
         object : NestedScrollConnection {
@@ -112,7 +120,7 @@ internal fun SyncedLyricsContent(
             verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
         ) {
             itemsIndexed(lines, key = { index, _ -> index }) { index, line ->
-                val active = index == activeIndex
+                val active = index in activeIndices
                 val color by animateColorAsState(
                     targetValue = if (active) accent else DhunColors.textSecondary.copy(alpha = 0.72f),
                     animationSpec = DhunAnimations.mediumTween(),
@@ -126,8 +134,10 @@ internal fun SyncedLyricsContent(
                     label = "lyricEmphasis$index",
                 )
                 val startMs = line.startTimeMs?.takeIf { it >= 0 }
+                var textLayout by remember(line) { mutableStateOf<TextLayoutResult?>(null) }
                 Text(
-                    text = line.text.ifBlank { " " },
+                    text = karaokeText(line, positionMs, accent, color, active),
+                    onTextLayout = { textLayout = it },
                     // Keep measurement stable while emphasis changes; changing
                     // font size per line made wrapping fight the scroll animation —
                     // we bump the base to headlineSmall (larger, more readable)
@@ -155,7 +165,17 @@ internal fun SyncedLyricsContent(
                             ),
                         )
                         .then(
-                            if (startMs != null) {
+                            if (startMs != null && line.words.isNotEmpty()) {
+                                Modifier.pointerInput(line, onSeek) {
+                                    detectTapGestures { point ->
+                                        val offset = textLayout?.getOffsetForPosition(point)
+                                        onSeek(wordSeekTime(line, offset) ?: startMs)
+                                        following = true
+                                    }
+                                }.semantics {
+                                    onClick("Seek to lyric line") { onSeek(startMs); following = true; true }
+                                }
+                            } else if (startMs != null) {
                                 Modifier.clickable(
                                     role = Role.Button,
                                     onClickLabel = "Seek to ${formatMs(startMs, startMs)}",
@@ -234,3 +254,43 @@ private suspend fun LazyListState.centerLyric(index: Int) {
     // list twitch on every position tick. Only a real offset scrolls.
     if (shouldRecenterLyric(delta)) animateScrollBy(delta)
 }
+
+/** One shaped text paragraph: spans retain BiDi order, ligatures and punctuation.
+ * Timing colours only; incomplete timing keeps the existing line-level emphasis.
+ */
+internal fun karaokeText(line: LyricsLine, positionMs: Long, accent: Color, lineColor: Color, active: Boolean = true): AnnotatedString =
+    buildAnnotatedString {
+        append(line.text.ifBlank { " " })
+        if (!active) return@buildAnnotatedString
+        for (word in line.words) {
+            if (word.startIndex < 0 || word.endIndex > line.text.length || word.endIndex <= word.startIndex) continue
+            val sung = positionMs >= word.startTimeMs
+            addStyle(
+                SpanStyle(
+                    color = if (sung) accent else lineColor.copy(alpha = 0.5f),
+                    fontWeight = if (sung && (word.endTimeMs == null || positionMs < word.endTimeMs)) FontWeight.ExtraBold else FontWeight.Medium,
+                ),
+                word.startIndex, word.endIndex,
+            )
+        }
+    }
+
+/** Explicit word end times allow simultaneous singers without guessing an overlap.
+ * Plain LRC still uses the established last-line fallback.
+ */
+internal fun activeLyricIndices(lines: List<LyricsLine>, positionMs: Long): Set<Int> {
+    val latest = activeLyricIndex(lines, positionMs)
+    return buildSet {
+        if (latest >= 0 && lines[latest].words.lastOrNull()?.endTimeMs == null) add(latest)
+        lines.forEachIndexed { index, line ->
+            val start = line.startTimeMs ?: return@forEachIndexed
+            val end = line.words.lastOrNull()?.endTimeMs ?: return@forEachIndexed
+            if (start <= positionMs && positionMs < end) add(index)
+        }
+    }
+}
+
+/** Text hit testing uses logical UTF-16 offsets supplied by Compose's BiDi layout. */
+internal fun wordSeekTime(line: LyricsLine, offset: Int?): Long? =
+    line.words.firstOrNull { offset != null && offset >= it.startIndex && offset < it.endIndex }
+        ?.startTimeMs ?: line.startTimeMs

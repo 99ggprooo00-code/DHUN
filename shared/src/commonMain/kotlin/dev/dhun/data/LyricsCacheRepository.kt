@@ -43,10 +43,9 @@ class SqlDelightLyricsCacheRepository(
         val now = clock.nowMs()
         when (lyrics) {
             is Lyrics.Synced -> {
-                // Serialize synced back to LRC-ish (join with timestamps) for cache.
-                // But we already have the raw LRC from the source? Here we only
-                // have parsed lines, so re-serialize minimally as LRC.
-                val lrc = linesToLrc(lyrics.lines)
+                // Retain enhanced word markers and full millisecond precision.
+                // Old line-only cache entries remain readable without a migration.
+                val lrc = LrcParser.serialize(lyrics.lines)
                 db.lyricsCacheQueries.insert(trackId, true, lrc, now)
             }
             is Lyrics.Unsynced -> {
@@ -77,23 +76,4 @@ class SqlDelightLyricsCacheRepository(
         }
     }
 
-    private fun linesToLrc(lines: List<dev.dhun.core.LyricsLine>): String = buildString {
-        for (line in lines) {
-            val ms = line.startTimeMs
-            if (ms != null) {
-                val m = (ms / 60_000).toInt()
-                val s = ((ms % 60_000) / 1_000).toInt()
-                val cs = ((ms % 1_000) / 10).toInt()
-                fun pad2(n: Int): String = if (n < 10) "0$n" else "$n"
-                append("[")
-                append(pad2(m))
-                append(":")
-                append(pad2(s))
-                append(".")
-                append(pad2(cs))
-                append("]")
-            }
-            appendLine(line.text)
-        }
-    }
 }
