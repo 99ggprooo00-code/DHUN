@@ -94,6 +94,16 @@ jobs:
           python scripts/stage_artifact.py out/dhun-test-arm64-v8a.apk --build-only "$BUILD_ONLY"
           python scripts/stage_artifact.py out/dhun-test-armeabi-v7a.apk --build-only "$BUILD_ONLY"
 
+      - name: Verify packaged test APK versions (all ABIs)
+        if: ${{ env.DHUN_RELEASE_CHANNEL == 'test' }}
+        env:
+          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
+          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+        run: |
+          aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          test -n "$aapt"
+          python scripts/check_android_identity.py "$aapt" out "$TEST_VERSION_NAME" "$TEST_VERSION_CODE"
+
       - uses: actions/upload-artifact@v6
         with:
           name: apk
