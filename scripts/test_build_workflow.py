@@ -1,5 +1,7 @@
 """Safety contracts for the release workflow without a third-party YAML parser."""
 
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -135,6 +137,19 @@ class BuildWorkflowTest(unittest.TestCase):
         for tag in ("dev-v0.1.0", "dev-v0.1.1", "dev"):
             self.assertNotIn(f"gh release delete {tag} ", self.publish_test)
 
+    @unittest.skipUnless(shutil.which("jq"), "jq is available on the Ubuntu release runner")
+    def test_asset_comparison_is_format_independent(self):
+        # gh --jq emits compact JSON; plain jq -s emits pretty JSON. Comparing
+        # those strings left a complete draft unpublished on the first run.
+        names = ["dhun-v1.00.002.apk", "dhun-v1.00.002.apk.sha256"]
+        expected = subprocess.check_output(
+            ["jq", "-sc", "sort"],
+            input=subprocess.check_output(["jq", "-R", "."], input=("\n".join(names) + "\n").encode()),
+        ).decode().strip()
+        gh_compact = '["dhun-v1.00.002.apk","dhun-v1.00.002.apk.sha256"]'
+        actual = subprocess.check_output(["jq", "-c", "."], input=gh_compact.encode()).decode().strip()
+        self.assertEqual(expected, actual)
+
     def test_fixed_version_is_created_once_as_public_prerelease(self):
         self.assertIn("Stage, verify and publish the fixed v1.00.002 prerelease once", self.publish)
         self.assertIn("python scripts/stage_versioned_release.py", self.publish)
@@ -149,6 +164,8 @@ class BuildWorkflowTest(unittest.TestCase):
             self.assertIn(f"dist/$version/{asset}.sha256", self.publish)
         self.assertIn("--draft --prerelease", self.publish)
         self.assertIn('gh release edit "$version" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease', self.publish)
+        self.assertIn("| jq -R . | jq -sc 'sort')", self.publish)
+        self.assertIn("--jq '[.assets[] | select(.size > 0) | .name] | sort' | jq -c .)", self.publish)
         self.assertIn('actual_assets=$(gh release view', self.publish)
         self.assertIn('if [ "$actual_assets" != "$expected_assets" ]; then', self.publish)
         self.assertIn('python scripts/check_android_identity.py "$aapt" out \'1.00.002\' 7', self.text)
