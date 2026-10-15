@@ -46,6 +46,7 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.VisualPart
 import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.ArtworkImage
@@ -140,7 +141,7 @@ fun ArtistScreen(
             if (toolbarCollapsed) {
                 // Match the page's warm/tonal reading material instead of a
                 // near-black bar in dark or an opaque white bar in light.
-                Box(modifier = Modifier.fillMaxSize().background(readingSurfaceFill()))
+                Box(modifier = Modifier.fillMaxSize().background(readingSurfaceFill(VisualPart.NAVIGATION)))
             }
             Row(
                 modifier = Modifier

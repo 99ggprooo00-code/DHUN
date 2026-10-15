@@ -8,6 +8,8 @@ import androidx.compose.ui.graphics.Shape
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
+import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.VisualPart
 
 /**
  * In-page glass, not the Queue/Related sheet material. The old near-black
@@ -22,16 +24,18 @@ object ContentSurfacePolicy {
     const val READING_OPACITY_LIGHT = 0.89f
 }
 
-internal fun contentRowFill(): Color = if (DhunAppearance.tokens.isLight) {
-    DhunColors.surfaceContainerHigh.copy(alpha = ContentSurfacePolicy.CONTENT_OPACITY_LIGHT)
-} else {
-    DhunColors.surfaceElevated.copy(alpha = ContentSurfacePolicy.CONTENT_OPACITY_DARK)
+internal fun contentRowFill(part: VisualPart = VisualPart.LIST_ROWS): Color {
+    val light = DhunAppearance.tokens.isLight
+    val base = if (light) ContentSurfacePolicy.CONTENT_OPACITY_LIGHT else ContentSurfacePolicy.CONTENT_OPACITY_DARK
+    val alpha = DhunVisualTuning.alpha(part, base, if (light) 0.78f else 0.75f, 0.98f)
+    return (if (light) DhunColors.surfaceContainerHigh else DhunColors.surfaceElevated).copy(alpha = alpha)
 }
 
-internal fun readingSurfaceFill(): Color = if (DhunAppearance.tokens.isLight) {
-    DhunColors.surfaceContainerHighest.copy(alpha = ContentSurfacePolicy.READING_OPACITY_LIGHT)
-} else {
-    DhunColors.surfaceElevated.copy(alpha = ContentSurfacePolicy.READING_OPACITY_DARK)
+internal fun readingSurfaceFill(part: VisualPart = VisualPart.READING): Color {
+    val light = DhunAppearance.tokens.isLight
+    val base = if (light) ContentSurfacePolicy.READING_OPACITY_LIGHT else ContentSurfacePolicy.READING_OPACITY_DARK
+    val alpha = DhunVisualTuning.alpha(part, base, 0.82f, 0.99f)
+    return (if (light) DhunColors.surfaceContainerHighest else DhunColors.surfaceElevated).copy(alpha = alpha)
 }
 
 /**

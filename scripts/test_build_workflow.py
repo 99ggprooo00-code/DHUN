@@ -89,6 +89,10 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("showThemeCatalogue = showThemeCatalogue", settings)
         self.assertIn("if (showThemeCatalogue)", hub)
         self.assertIn('"Theme catalogue"', hub)
+        # Visual tuning is an experimental companion to the test-only catalogue.
+        self.assertIn('if (category == SettingsCategory.APPEARANCE && showThemeCatalogue)', settings)
+        self.assertIn('VisualTuningControls(viewModel)', settings)
+        self.assertIn('DhunVisualTuning.restore(settingsVm.visualTuning.value, appInfo.isTestRelease)', shell)
         self.assertIn("allowThemeCatalogue = BuildConfig.DHUN_RELEASE_CHANNEL == \"test\"", activity)
         self.assertIn(".filter { allowThemeCatalogue || it != DetailRoute.ThemeCatalogPage }", persistence)
         self.assertIn("viewModel.setThemeId(mode.id)", shell)

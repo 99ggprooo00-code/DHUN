@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.VisualPart
 
 /**
  * Pill filter chip — quiet neutral unselected, solid accent selected.
@@ -36,7 +37,7 @@ fun DhunFilterChip(
         leadingIcon = leadingIcon,
         shape = DhunShapes.chip,
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = contentRowFill(),
+            containerColor = contentRowFill(VisualPart.CHIPS),
             labelColor = DhunColors.textSecondary,
             iconColor = DhunColors.textSecondary,
             selectedContainerColor = DhunColors.accent,
@@ -69,7 +70,7 @@ fun DhunAssistChip(
         leadingIcon = leadingIcon,
         shape = DhunShapes.chip,
         colors = AssistChipDefaults.assistChipColors(
-            containerColor = contentRowFill(),
+            containerColor = contentRowFill(VisualPart.CHIPS),
             labelColor = DhunColors.textPrimary,
             leadingIconContentColor = DhunColors.accent,
         ),
@@ -91,7 +92,7 @@ fun DhunInputChip(
         modifier = modifier,
         shape = DhunShapes.chip,
         colors = InputChipDefaults.inputChipColors(
-            containerColor = contentRowFill(),
+            containerColor = contentRowFill(VisualPart.CHIPS),
             labelColor = DhunColors.textSecondary,
             selectedContainerColor = DhunColors.accentContainer.copy(alpha = 0.9f),
             selectedLabelColor = DhunColors.onAccentContainer,

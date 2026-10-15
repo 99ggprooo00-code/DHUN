@@ -63,6 +63,19 @@ object SettingsKeys {
     const val BACKDROP_BRIGHTNESS = "backdrop_brightness"
     const val BACKDROP_BRIGHTNESS_DEFAULT = 55
 
+    // Internal test-build visual tuning. The public build ignores persisted values.
+    const val TUNE_PAGE_BACKDROP = "tune_page_backdrop"
+    const val TUNE_LIST_ROWS = "tune_list_rows"
+    const val TUNE_READING = "tune_reading"
+    const val TUNE_CHIPS = "tune_chips"
+    const val TUNE_INPUTS = "tune_inputs"
+    const val TUNE_PLAYER = "tune_player"
+    const val TUNE_LYRICS = "tune_lyrics"
+    const val TUNE_MINI_PLAYER = "tune_mini_player"
+    const val TUNE_NAVIGATION = "tune_navigation"
+    const val TUNE_QUEUE_SHEET = "tune_queue_sheet"
+    const val TUNE_QUEUE_ROWS = "tune_queue_rows"
+
     const val SEEK_STEP_SECONDS = "seek_step_seconds"
     const val SEEK_STEP_SECONDS_DEFAULT = 5
     const val AUTOPLAY_RADIO_ENABLED = "autoplay_radio_enabled"
@@ -103,6 +116,8 @@ object SettingsKeys {
         AUDIO_QUALITY, THEME, ACCENT, ACCENT_MODE, LYRICS_ENABLED, CACHE_SIZE_MB, COUNTRY_CODE,
         RECORD_LISTENING_HISTORY, EXPLICIT_CONTENT, CLOSE_TO_TRAY, RESUME_ON_LAUNCH, WINDOW_GEOMETRY,
         BACKDROP_BLUR, BACKDROP_BRIGHTNESS, SEEK_STEP_SECONDS, AUTOPLAY_RADIO_ENABLED,
+        TUNE_PAGE_BACKDROP, TUNE_LIST_ROWS, TUNE_READING, TUNE_CHIPS, TUNE_INPUTS,
+        TUNE_PLAYER, TUNE_LYRICS, TUNE_MINI_PLAYER, TUNE_NAVIGATION, TUNE_QUEUE_SHEET, TUNE_QUEUE_ROWS,
         LYRICS_ROMANIZATION_ENABLED, LYRICS_ROMANIZATION_MODE,
         LYRICS_PREFER_SYNCED, LYRICS_AUTO_SCROLL, LYRICS_TEXT_SIZE, LYRICS_PREFERRED_PROVIDER,
         LYRICS_PROVIDER_ORDER, PERSIST_SHUFFLE_REPEAT, PAUSE_ON_MUTE_OR_ZERO_VOLUME,
