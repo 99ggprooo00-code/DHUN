@@ -190,7 +190,7 @@ fun SettingsScreen(
                         viewModel.setProviderEnabled(id, it)
                     }
                 }
-                SettingsNavigationRow("Clear lyrics cache", "Fetch fresh lyrics next time", { confirmLyricsClear = true })
+                SettingsNavigationRow("Clear lyrics cache", "Refresh automatic lyrics; keep song choices", { confirmLyricsClear = true })
                 SettingsSwitchRow("Prefer synced lyrics", "Use timestamped lyrics when available",
                     viewModel.lyricsPreferSynced.collectAsState().value, viewModel::setLyricsPreferSynced)
                 SettingsSwitchRow("Auto-scroll synced lyrics", "Follow the current line until you scroll manually",
@@ -255,7 +255,7 @@ fun SettingsScreen(
         if (confirmLyricsClear) SettingsConfirmDialog(
             onDismissRequest = { confirmLyricsClear = false },
             title = { Text("Clear lyrics cache?") },
-            text = { Text("Saved lyrics will be fetched again when needed.") },
+            text = { Text("Automatic lyrics will be fetched again. Saved per-song choices remain; use Use automatic in the lyrics match picker to reset one.") },
             confirmButton = { TextButton(onClick = {
                 viewModel.clearLyricsCache()
                 confirmLyricsClear = false

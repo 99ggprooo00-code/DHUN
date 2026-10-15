@@ -17,6 +17,10 @@ import dev.dhun.data.PlayContext
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.player.DhunPlayer
 import dev.dhun.provider.MusicProvider
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
@@ -127,6 +131,31 @@ class PlayerQueueActionsTest {
         assertEquals(displayed[1], player.currentTrack.value)
     }
 
+    @Test
+    fun staleLyricsCannotReplaceSuccessorOrReturnAfterPlaybackStops() = runTest {
+        val player = RecordingPlayer()
+        val provider = MetadataProvider(lyrics = { id ->
+            if (id != "b") withContext(NonCancellable) { delay(1_000) }
+            DhunResult.Success(Lyrics.Unsynced("Lyrics $id"))
+        })
+        val vm = PlayerViewModel(player, provider, backgroundScope)
+        player.currentTrack.value = track("a")
+        runCurrent()
+        player.currentTrack.value = track("b")
+        runCurrent()
+        assertEquals(LyricsUiState.Unsynced("Lyrics b"), vm.lyricsState.value)
+        advanceTimeBy(1_500)
+        runCurrent()
+        assertEquals(LyricsUiState.Unsynced("Lyrics b"), vm.lyricsState.value)
+        player.currentTrack.value = track("c")
+        runCurrent()
+        player.currentTrack.value = null
+        runCurrent()
+        advanceTimeBy(1_500)
+        runCurrent()
+        assertEquals(LyricsUiState.Unavailable, vm.lyricsState.value)
+    }
+
     private class RecordingPlayer : DhunPlayer {
         override val state = MutableStateFlow<PlaybackState>(PlaybackState.Idle)
         override val currentTrack = MutableStateFlow<Track?>(null)
@@ -163,7 +192,10 @@ class PlayerQueueActionsTest {
         override fun stop() {}
     }
 
-    private class MetadataProvider(private val related: List<Track> = emptyList()) : MusicProvider {
+    private class MetadataProvider(
+        private val related: List<Track> = emptyList(),
+        private val lyrics: suspend (String) -> DhunResult<Lyrics> = { DhunResult.Success(Lyrics.NotAvailable) },
+    ) : MusicProvider {
         override suspend fun search(query: String, filter: SearchFilter) = DhunResult.Success(SearchResults(query))
         override suspend fun searchContinuation(continuationToken: String) = DhunResult.Success(SearchResults(""))
         override suspend fun searchSuggestions(query: String) = DhunResult.Success(emptyList<String>())
@@ -171,7 +203,7 @@ class PlayerQueueActionsTest {
         override suspend fun homeFeedPage() = DhunResult.Success(HomeFeedPage())
         override suspend fun homeFeedContinuation(continuationToken: String) = DhunResult.Success(HomeFeedPage())
         override suspend fun relatedTracks(videoId: String) = DhunResult.Success(related)
-        override suspend fun getLyrics(videoId: String) = DhunResult.Success(Lyrics.NotAvailable)
+        override suspend fun getLyrics(videoId: String) = lyrics(videoId)
         override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> = DhunResult.Failure(DhunError.Unavailable())
         override suspend fun artistPage(browseId: String): DhunResult<ArtistPage> = DhunResult.Failure(DhunError.Unavailable())
         override suspend fun albumPage(browseId: String): DhunResult<AlbumDetail> = DhunResult.Failure(DhunError.Unavailable())

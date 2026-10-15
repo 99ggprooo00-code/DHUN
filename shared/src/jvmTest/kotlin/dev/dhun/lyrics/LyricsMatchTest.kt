@@ -36,8 +36,12 @@ class LyricsMatchTest {
 
     private class Store : SettingsRepository {
         val values = mutableMapOf<String, String>()
+        var failWrites = false
         override suspend fun getString(key: String) = values[key]
-        override suspend fun putString(key: String, value: String) { values[key] = value }
+        override suspend fun putString(key: String, value: String) {
+            if (failWrites) error("disk unavailable")
+            values[key] = value
+        }
         override suspend fun getBoolean(key: String, default: Boolean) = values[key]?.toBooleanStrictOrNull() ?: default
         override suspend fun putBoolean(key: String, value: Boolean) = putString(key, value.toString())
         override suspend fun getInt(key: String, default: Int) = values[key]?.toIntOrNull() ?: default
@@ -208,6 +212,39 @@ class LyricsMatchTest {
         runCurrent()
         assertNull(repo.selectedMatch(track.id))
         assertEquals(2, refreshed.size)
+    }
+
+    @Test fun aNewSearchCancelsOldResultsAndSaveFailureIsNonFatal() = runTest {
+        val candidates = Candidates { _, query ->
+            if (query == "old") delay(1_000)
+            DhunResult.Success(listOf(match.copy(id = query)))
+        }
+        val settings = store("lrclib_search")
+        val source = emptySource()
+        val repo = LyricsRepository(Cache(), source, source, settings, candidates)
+        val refreshed = mutableListOf<String>()
+        val controller = LyricsMatchController(repo, backgroundScope) { refreshed += it }
+        controller.setTrack(track)
+        runCurrent()
+        controller.search(track.id, "old")
+        runCurrent()
+        controller.search(track.id, "new")
+        runCurrent()
+        advanceTimeBy(1_500)
+        runCurrent()
+        assertEquals("new", controller.state.value.matches.single().id)
+        settings.failWrites = true
+        controller.choose(track.id, controller.state.value.matches.single())
+        runCurrent()
+        assertFalse(controller.state.value.loading)
+        assertTrue(controller.state.value.message?.contains("Couldn't save") == true)
+        assertNull(repo.selectedMatch(track.id))
+        assertTrue(refreshed.isEmpty())
+        settings.failWrites = false
+        controller.choose(track.id, controller.state.value.matches.single())
+        runCurrent()
+        assertEquals("new", repo.selectedMatch(track.id)?.id)
+        assertEquals(listOf(track.id), refreshed)
     }
 
     @Test fun manualSearchKeepsDifferentMatchesAndHandlesJsonNullWithoutLiteralNullLyrics() = runTest {
