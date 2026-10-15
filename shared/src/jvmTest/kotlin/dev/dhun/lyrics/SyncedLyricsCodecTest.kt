@@ -15,6 +15,15 @@ class SyncedLyricsCodecTest {
         assertEquals(listOf(line), SyncedLyricsCodec.decode(" \n" + encoded))
     }
 
+    @Test fun oldPayloadsHaveNoInferredRolesAndMalformedMetadataIsRejected() {
+        val old = """{"dhunSyncedLyrics":1,"lines":[{"start":1000,"text":"Old","words":[]}]}"""
+        assertEquals(listOf(LyricsLine(1_000, "Old")), SyncedLyricsCodec.decode(old))
+        val invalid = """{"dhunSyncedLyrics":2,"lines":[{"start":1000,"text":"A","words":[],"agent":"","background":true}]}"""
+        assertTrue(SyncedLyricsCodec.decode(invalid).isEmpty())
+        assertTrue(SyncedLyricsCodec.decode(invalid.replace("\"agent\":\"\"", "\"agent\":123")).isEmpty())
+        assertTrue(SyncedLyricsCodec.decode(invalid.replace("\"agent\":\"\"", "\"agent\":\"v1\"").replace("true", "\"maybe\"")).isEmpty())
+    }
+
     @Test fun corruptUnknownOversizeAndDeepPayloadsAreNotReinterpretedAsLyrics() {
         val bad = listOf("{broken", "{\"dhunSyncedLyrics\":99,\"lines\":[]}",
             "{\"dhunSyncedLyrics\":1,\"lines\":[{\"start\":1,\"text\":\"A\",\"end\":0,\"words\":[]}]}",

@@ -268,6 +268,24 @@ class RepositoriesTest {
     }
 
     @Test
+    fun vocalRolesSurviveCacheAndSavedChoiceRecreation(): Unit = runBlocking {
+        val db = newDb()
+        val lines = dev.dhun.lyrics.TtmlParser.parse("""<tt xmlns="http://www.w3.org/ns/ttml" xmlns:m="http://www.w3.org/ns/ttml#metadata"><body><div><p begin="1s" end="5s" m:agent="v1">Main<span begin="1s" end="2s" m:role="x-bg" m:agent="v2">Backing</span></p></div></body></tt>""")
+        val lyrics = dev.dhun.core.Lyrics.Synced(lines)
+        val cache = SqlDelightLyricsCacheRepository(db, FakeClock(), Dispatchers.Unconfined)
+        cache.put("roles", lyrics)
+        assertEquals(lyrics, SqlDelightLyricsCacheRepository(db, FakeClock(), Dispatchers.Unconfined).get("roles"))
+        val source = object : dev.dhun.lyrics.LyricsSource {
+            override suspend fun fetch(track: dev.dhun.core.Track) = dev.dhun.core.DhunResult.Success(dev.dhun.core.Lyrics.NotAvailable)
+        }
+        val selected = dev.dhun.lyrics.LyricsMatch("local-ttml", "local_ttml", "Song", "Artist", lyrics, metadataVerified = false)
+        dev.dhun.lyrics.LyricsRepository(cache, source, source, SqlDelightSettingsRepository(db, Dispatchers.Unconfined)).selectMatch("roles", selected)
+        cache.clear()
+        val restored = dev.dhun.lyrics.LyricsRepository(cache, source, source, SqlDelightSettingsRepository(db, Dispatchers.Unconfined))
+        assertEquals(selected, restored.selectedMatch("roles"))
+    }
+
+    @Test
     fun ttmlLineEndsAndWordGapsSurviveCacheAndChoiceRecreation(): Unit = runBlocking {
         val db = newDb()
         val lines = dev.dhun.lyrics.TtmlParser.parse("""<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="6s"><span begin="0s" end="1s">A </span><span begin="3s" end="4s">B</span></p></div></body></tt>""")

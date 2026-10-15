@@ -12,6 +12,7 @@ object TtmlParser {
     const val MAX_INPUT_CHARS = 256_000
     private const val MAX_TIME = 86_400_000L
     private const val NS = "http://www.w3.org/ns/ttml"
+    private const val METADATA = "http://www.w3.org/ns/ttml#metadata"
     private const val XML = "http://www.w3.org/XML/1998/namespace"
     private const val PARAMETER = "http://www.w3.org/ns/ttml#parameter"
     private val clock = Regex("(\\d{2,}):(\\d{2}):(\\d{2})(?:\\.(\\d{1,9}))?")
@@ -47,18 +48,25 @@ object TtmlParser {
             require(stack.isEmpty() && document.name == "tt" && document.namespace == NS)
             require(document.attr("timeBase", PARAMETER).let { it == null || it == "media" })
             val lines = mutableListOf<LyricsLine>()
-            fun walk(node: Node, parent: Interval, preserve: Boolean) {
+            fun addLine(line: LyricsLine) {
+                require(lines.size < 2_000)
+                lines.add(line)
+            }
+            fun walk(node: Node, parent: Interval, preserve: Boolean, inheritedAgent: String?, background: Boolean) {
                 checkpoint()
                 if (node.namespace != NS || node.name !in setOf("tt", "body", "div", "p")) return
                 val interval = interval(node, parent)
                 val keepSpace = space(node, preserve)
+                val agent = sourceAgent(node, inheritedAgent)
+                val backing = background || isBacking(node)
                 if (node.name == "p") {
-                    require(lines.size < 2_000)
-                    line(node, interval, keepSpace, checkpoint)?.let(lines::add)
-                } else node.children.filterIsInstance<Node>().forEach { walk(it, interval, keepSpace) }
+                    line(node, interval, keepSpace, checkpoint, agent, backing, ::addLine)?.let(::addLine)
+                } else node.children.filterIsInstance<Node>().forEach { walk(it, interval, keepSpace, agent, backing) }
             }
-            walk(document, Interval(0, null, false), false)
-            lines.sortedBy { it.startTimeMs }
+            walk(document, Interval(0, null, false), false, null, false)
+            // At a shared onset show foreground before backing, without inventing a
+            // singer identity or merging simultaneously active vocal paragraphs.
+            lines.sortedWith(compareBy<LyricsLine> { it.startTimeMs }.thenBy { it.isBackground })
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { emptyList() }
     }
@@ -67,6 +75,12 @@ object TtmlParser {
         val children = mutableListOf<Any>()
         fun attr(name: String, namespace: String = "") = attributes.firstOrNull { it.name == name && it.namespace == namespace }?.value
     }
+    private fun sourceAgent(node: Node, inherited: String?): String? =
+        node.attr("agent", METADATA)?.let(::normalizeLyricsAgent) ?: inherited
+
+    private fun isBacking(node: Node): Boolean =
+        node.attr("role", METADATA)?.split(Regex("\\s+"))?.contains("x-bg") == true
+
     private data class Interval(val start: Long, val end: Long?, val explicit: Boolean)
     private data class Segment(val start: Int, val end: Int, val time: Interval)
 
@@ -91,7 +105,8 @@ object TtmlParser {
         return Interval(start, until, parent.explicit || begin != null || end != null || duration != null)
     }
 
-    private fun line(node: Node, timing: Interval, preserve: Boolean, checkpoint: () -> Unit): LyricsLine? {
+    private fun line(node: Node, timing: Interval, preserve: Boolean, checkpoint: () -> Unit,
+                     agent: String?, background: Boolean, addPart: (LyricsLine) -> Unit): LyricsLine? {
         val text = StringBuilder()
         val protectedWhitespace = mutableSetOf<Int>()
         val segments = mutableListOf<Segment>()
@@ -117,6 +132,11 @@ object TtmlParser {
                     if (child.name == "br") {
                         protectedWhitespace.add(text.length)
                         text.append('\n')
+                    } else if (sourceAgent(child, agent) != agent || (background || isBacking(child)) != background) {
+                        // A separately attributed/background part gets its own original
+                        // paragraph/ranges. Never duplicate it inside the foreground text.
+                        line(child, times, childSpace, checkpoint, sourceAgent(child, agent),
+                            background || isBacking(child), addPart)?.let(addPart)
                     } else {
                         val start = text.length
                         val before = segments.size
@@ -130,6 +150,9 @@ object TtmlParser {
             }
         }
         visit(node, timing, preserve)
+        if (node.name == "span" && node.attr("begin") != null && segments.isEmpty() && text.isNotEmpty()) {
+            segments.add(Segment(0, text.length, timing))
+        }
         val raw = text.toString()
         var leading = 0
         var trailing = raw.length
@@ -146,7 +169,7 @@ object TtmlParser {
         // paragraph remains usable as line-timed lyrics if word timings conflict.
         val ordered = words.zipWithNext().all { (a, b) -> a.endIndex <= b.startIndex && a.startTimeMs <= b.startTimeMs }
         val start = if (timing.explicit) timing.start else words.minOfOrNull { it.startTimeMs } ?: return null
-        return LyricsLine(start, original, if (ordered) words else emptyList(), timing.end)
+        return LyricsLine(start, original, if (ordered) words else emptyList(), timing.end, agent, background)
     }
 
     /** Decimal arithmetic avoids millisecond loss from binary floating-point rounding. */

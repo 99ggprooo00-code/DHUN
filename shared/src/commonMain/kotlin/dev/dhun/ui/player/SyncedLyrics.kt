@@ -81,8 +81,8 @@ internal fun SyncedLyricsContent(
     }
 
     val listState = rememberLazyListState()
-    val activeIndex = activeLyricIndex(lines, positionMs)
     val activeIndices = activeLyricIndices(lines, positionMs)
+    val activeIndex = followedLyricIndex(lines, positionMs, activeIndices)
     var following by remember { mutableStateOf(true) }
     val manualScroll = remember {
         object : NestedScrollConnection {
@@ -139,6 +139,11 @@ internal fun SyncedLyricsContent(
                 val startMs = line.startTimeMs?.takeIf { it >= 0 }
                 var textLayout by remember(line) { mutableStateOf<TextLayoutResult?>(null) }
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    lyricRoleLabel(line)?.let { label ->
+                        Text(label, style = MaterialTheme.typography.labelMedium,
+                            color = DhunColors.textSecondary, textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth())
+                    }
                     Text(
                         text = karaokeText(line, positionMs, accent, color, active),
                         onTextLayout = { textLayout = it },
@@ -146,9 +151,12 @@ internal fun SyncedLyricsContent(
                         // font size per line made wrapping fight the scroll animation —
                         // we bump the base to headlineSmall (larger, more readable)
                         // and use scale/weight/colour for the active pop.
-                        style = when (textSize) {
-                            "small" -> MaterialTheme.typography.titleLarge
-                            "large" -> MaterialTheme.typography.headlineMedium
+                        style = when {
+                            line.isBackground && textSize == "small" -> MaterialTheme.typography.bodyLarge
+                            line.isBackground && textSize != "large" -> MaterialTheme.typography.titleLarge
+                            line.isBackground -> MaterialTheme.typography.headlineSmall
+                            textSize == "small" -> MaterialTheme.typography.titleLarge
+                            textSize == "large" -> MaterialTheme.typography.headlineMedium
                             else -> MaterialTheme.typography.headlineSmall
                         },
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
@@ -304,3 +312,19 @@ internal fun activeLyricIndices(lines: List<LyricsLine>, positionMs: Long): Set<
 internal fun wordSeekTime(line: LyricsLine, offset: Int?): Long? =
     line.words.firstOrNull { offset != null && offset >= it.startIndex && offset < it.endIndex }
         ?.startTimeMs ?: line.startTimeMs
+
+/** Labels expose source references, never guessed singer names/genders. A real
+ * Text label (not color alone) also makes vocal roles available to screen readers.
+ */
+internal fun lyricRoleLabel(line: LyricsLine): String? = buildList {
+    if (line.isBackground) add("Backing vocals")
+    line.agent?.let { add("Voice reference: $it") }
+}.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+
+/** Keep the foreground in view during a simultaneous backing part, but allow
+ * a backing-only passage to be followed. Gaps keep the existing scroll target.
+ */
+internal fun followedLyricIndex(lines: List<LyricsLine>, positionMs: Long,
+                               active: Set<Int> = activeLyricIndices(lines, positionMs)): Int =
+    active.filter { !lines[it].isBackground }.maxOrNull()
+        ?: active.maxOrNull() ?: activeLyricIndex(lines, positionMs)

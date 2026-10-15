@@ -188,6 +188,10 @@ data class LyricsLine(
     val words: List<LyricsWord> = emptyList(),
     /** Explicit source line end, independent of the last word (TTML overlap/gaps). */
     val endTimeMs: Long? = null,
+    /** Source TTML agent references, never inferred artist/singer identities. */
+    val agent: String? = null,
+    /** Source explicitly marked this vocal part as background (ttm:role x-bg). */
+    val isBackground: Boolean = false,
 )
 
 /** UTF-16 ranges into the original line: never split/reorder joined scripts for rendering. */

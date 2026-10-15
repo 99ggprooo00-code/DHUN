@@ -25,6 +25,16 @@ class TtmlApiTest {
         assertEquals(listOf(line), TtmlParser.parse("<?xml version=\"1.0\"?>" + xml))
     }
 
+    @Test fun namespacedAgentAndNestedBackingPartsSurviveAndroidTokenization() {
+        val xml = """<tt xmlns="http://www.w3.org/ns/ttml" xmlns:m="http://www.w3.org/ns/ttml#metadata"><body><div><p begin="1s" end="5s" m:agent="v1">Main<span begin="1s" end="2s" m:role="x-bg" m:agent="v2">Backing</span></p></div></body></tt>"""
+        val parts = TtmlParser.parse(xml)
+        assertEquals(listOf("Main", "Backing"), parts.map { it.text })
+        assertEquals(listOf("v1", "v2"), parts.map { it.agent })
+        assertEquals(listOf(false, true), parts.map { it.isBackground })
+        assertEquals(2_000L, parts.last().words.single().startTimeMs)
+        assertEquals(3_000L, parts.last().words.single().endTimeMs)
+    }
+
     @Test fun dtdEntitiesMalformedAndOversizedInputFailClosedOnAndroid() {
         val prefix = """<!DOCTYPE tt [<!ENTITY secret SYSTEM "file:///etc/passwd">]>"""
         assertTrue(TtmlParser.parse(prefix + xml).isEmpty())

@@ -19,7 +19,7 @@ The user subsequently prioritized detailed word-by-word synchronization.
 | Line LRC, follow and line seeking | Present | Preserve manual-scroll pause / resume and smooth centering | Local only | Existing parser and LyricsFollowTest |
 | Enhanced-LRC word timestamps | Partial → implemented slice | Preserve UTF-16 text ranges, times and explicit final end markers; repeated-line time shifts; cache round-trip at millisecond precision | Local parsing; no inferred timing advertised as real | EnhancedLrcTest; DB repository recreation test |
 | Word karaoke and seeking | Implemented slice, device acceptance pending | Highlight each timed segment as playback reaches it; emphasize current segment; tap word to seek, accessible line-seek fallback. One shaped Text paragraph for RTL/joined scripts | Local only; does not manufacture timestamps for plain lyrics | KaraokeTextTest covers boundaries, backward seek, inactive/plain fallback, logical text hit testing |
-| Overlapping vocals | Partial | Explicit enhanced-LRC end markers allow multiple active lines; explicit TTML line ends now retain overlap; agent/background metadata presentation is not implemented | Do not infer singer identities | Overlap/end boundary tests; multi-singer device test pending |
+| Overlapping vocals | Partial | Explicit enhanced-LRC end markers allow multiple active lines; explicit TTML line ends now retain overlap; agent/background references now have explicit presentation; verified performer identities are not inferred | Do not infer singer identities | Overlap/end boundary tests; multi-singer device test pending |
 | Per-song timing/resync | Implemented slice, device acceptance pending | Earlier/later in 100 ms increments and reset; persisted per-track via SettingsRepository; ±10 s bound; inverse seek correction | Local only, originals unchanged | LyricsTimingTest: persistence, track isolation, bounds, malformed settings, display/seek inversion |
 | TTML | Implemented bounded media-time import subset; device acceptance pending | Explicit local paste, preview and per-song choice; platform XML tokenizers, parallel relative media clocks, line/word ends and independent gaps | DTDs/entities/external loads disabled; hard bounds; unsupported frame/tick/clock/sequential/repeated timing rejected; no new provider or content-rights claim | Parser/security/bounds/cancellation, cache/choice compatibility, controller and API 24/35 tests; see slice below |
 | Romanization | Implemented slice; device/language-quality acceptance pending | Separate persisted player toggle and override; original + secondary line; worker-dispatched ICU4J engine and source/mode-keyed bounded cache | On-device only, no API/credentials; full Unicode/ICU notices bundled. Conservative auto leaves Han/Cyrillic ambiguous. Japanese kana only, no Kanji pronunciation guesses | Real ICU mode fixtures, mixed/punctuation/unknown text, caching, worker/cancellation/failure, controller persistence/source guards and Android API 24/35 smoke tests |
@@ -67,7 +67,7 @@ while explicit match search can request bounded candidate sets.
   become word timed merely because the renderer supports it.
 - Word emphasis follows player position ticks, not a fabricated per-character sweep.
   Explicit end markers permit overlapping active lines; the local TTML subset now
-  preserves independent line/word ends. Vocalist/background presentation and per-word
+  preserves independent line/word ends. Verified performer identities and per-word
   gradient sweep remain outstanding. Per-track offset controls now correct both display and seeking without modifying source timing.
 - Android + desktop acceptance: playback/seek forward and backward across boundaries;
   word tapping, TalkBack/keyboard line seek; RTL/Devanagari/emoji shaping; user scroll
@@ -217,7 +217,7 @@ ownership/title/artist is not verified; users must have permission to use conten
   remain cancelable and track changes invalidate stale work. No unverified new lyric
   provider was added; this does not claim current remote sources serve TTML.
 - Supported subset deliberately excludes frame/tick/SMPTE/wall clocks, sequential
-  or repeated timing, layouts/styles/animation, agent/background-role presentation,
+  or repeated timing, layouts/styles/animation (source-attributed agent/background presentation is added below),
   translation and arbitrary embedded content. Unsupported timing/unsafe input fails
   closed; a bad preview never replaces the existing choice. Not full TTML2 conformance
   or full Metrolist parity.
@@ -234,3 +234,28 @@ ownership/title/artist is not verified; users must have permission to use conten
   validate the new tests. Physical Android/Windows import/layout/focus/accessibility
   and large-input performance acceptance remain required. Earlier translation,
   provider/integration and ICU physical-device checks remain outstanding; do not merge.
+
+## Source-attributed vocal roles
+
+- TTML `ttm:agent` references on body/div/p/span now survive import and persistence.
+  Labels explicitly say **Voice reference**, not a guessed singer/artist identity.
+  Up to four normalized references (32 characters each / 128 total) are accepted;
+  malformed/oversized/control-containing references reject the import.
+- Explicit `ttm:role="x-bg"` parts appear as **Backing vocals**, with smaller text
+  but the same real word timing, seeking, overlap activation and readable colors.
+  Agent/background spans are promoted to separate paragraphs instead of duplicated
+  inside the foreground text. Paragraph-level roles inherit through descendants;
+  a same-role span is not split again. Original logical text/ranges stay together
+  within each vocal part, including RTL, Devanagari and emoji.
+- Follow centers an active foreground part during overlap, or an active backing part
+  during backing-only passages. Manual-scroll pause/resume remains unchanged.
+- Synced payload v2 retains roles and source references; v1 payloads and historical
+  LRC read as un-attributed foreground, without inferring metadata. Song-choice
+  envelopes remain v2 and use the nested versioned synced codec.
+- Tests cover nested roles, no duplicated background text, separate agents and
+  original ranges/timing, inherited roles, reference bounds, cache/choice recreation,
+  role labels/follow focus, and actual Android tokenization on API 24/35.
+- This is not support for every TTML role, styling/layout or verified performer
+  identities. Native physical-device readability/accessibility acceptance, secure
+  opt-in translation, current provider/integration approval and earlier acceptance
+  requirements remain open; these must not be marked complete from unit tests.

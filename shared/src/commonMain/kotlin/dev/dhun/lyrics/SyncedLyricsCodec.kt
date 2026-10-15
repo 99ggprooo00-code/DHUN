@@ -21,12 +21,14 @@ internal object SyncedLyricsCodec {
     fun encode(lines: List<LyricsLine>): String {
         require(valid(lines)) { "Invalid or oversized timed lyrics" }
         val encoded = buildJsonObject {
-            put("dhunSyncedLyrics", 1)
+            put("dhunSyncedLyrics", 2)
             put("lines", buildJsonArray {
                 lines.forEach { line -> add(buildJsonObject {
                     put("start", line.startTimeMs)
                     put("text", line.text)
                     line.endTimeMs?.let { put("end", it) }
+                    line.agent?.let { put("agent", it) }
+                    put("background", line.isBackground)
                     put("words", buildJsonArray {
                         line.words.forEach { word -> add(buildJsonObject {
                             put("from", word.startIndex); put("to", word.endIndex); put("start", word.startTimeMs)
@@ -49,19 +51,34 @@ internal object SyncedLyricsCodec {
             fun JsonObject.end(): Long? = if ("end" in this) number("end") else null
             require(boundedLyricsJson(payload))
             val root = Json.parseToJsonElement(payload) as? JsonObject ?: error("Not an object")
-            require(root.value("dhunSyncedLyrics") == "1")
+            val version = root.value("dhunSyncedLyrics")
+            require(version in setOf("1", "2"))
             val array = root["lines"] as? JsonArray ?: error("Missing lines")
             require(array.size <= 2_000)
             val lines = array.map { item ->
                 val line = item as? JsonObject ?: error("Invalid line")
                 val words = line["words"] as? JsonArray ?: error("Missing words")
                 require(words.size <= 10_000)
+                val agent = if (version == "2" && "agent" in line) {
+                    val reference = line["agent"] as? JsonPrimitive ?: error("Invalid agent")
+                    require(reference.isString)
+                    reference.content
+                } else null
+                val background = if (version == "2" && "background" in line) {
+                    val flag = line["background"] as? JsonPrimitive ?: error("Invalid background flag")
+                    require(!flag.isString)
+                    when (flag.content) {
+                        "false" -> false
+                        "true" -> true
+                        else -> error("Invalid background flag")
+                    }
+                } else false
                 LyricsLine(line.number("start"), line.value("text") ?: error("Missing text"), words.map {
                     val word = it as? JsonObject ?: error("Invalid word")
                     val from = word.number("from"); val to = word.number("to")
                     require(from in 0..Int.MAX_VALUE.toLong() && to in 0..Int.MAX_VALUE.toLong())
                     LyricsWord(from.toInt(), to.toInt(), word.number("start"), word.end())
-                }, line.end())
+                }, line.end(), agent, background)
             }
             require(valid(lines))
             lines
@@ -73,7 +90,7 @@ internal object SyncedLyricsCodec {
             lines.sumOf { it.text.length.toLong() } > MAX_CHARS) return false
         return lines.all { line ->
             val start = line.startTimeMs
-            start != null && start >= 0 && line.text.length <= 256_000 &&
+            start != null && start >= 0 && line.text.length <= 256_000 && validLyricsAgent(line.agent) &&
                 (line.endTimeMs == null || line.endTimeMs > start) &&
                 line.words.all { word ->
                     word.startIndex >= 0 && word.endIndex <= line.text.length && word.startIndex < word.endIndex &&
@@ -104,3 +121,16 @@ internal fun boundedLyricsJson(value: String): Boolean {
     }
     return depth == 0 && !quoted
 }
+
+/** Bounded source references, not a lookup or a guess about a performer's identity. */
+internal fun normalizeLyricsAgent(value: String): String {
+    require(value.length <= 128)
+    val references = value.trim().split(Regex("\\s+"))
+    require(references.size in 1..4 && references.all { ref ->
+        ref.length in 1..32 && ref.none { it.isWhitespace() || it.isISOControl() }
+    })
+    return references.joinToString(" ")
+}
+
+private fun validLyricsAgent(value: String?): Boolean = value == null ||
+    runCatching { normalizeLyricsAgent(value) == value }.getOrDefault(false)

@@ -40,6 +40,19 @@ class KaraokeTextTest {
         assertTrue(karaokeText(plain, 2_000, Color.Red, Color.Gray).spanStyles.isEmpty())
     }
 
+    @Test fun sourceRolesAreTextuallyPresentedAndForegroundKeepsFocusDuringOverlap() {
+        val main = dev.dhun.core.LyricsLine(1_000, "Main", endTimeMs = 5_000, agent = "v1")
+        val backing = dev.dhun.core.LyricsLine(2_000, "Backing", endTimeMs = 6_000, agent = "v2", isBackground = true)
+        assertEquals("Voice reference: v1", lyricRoleLabel(main))
+        assertEquals("Backing vocals · Voice reference: v2", lyricRoleLabel(backing))
+        assertEquals("Backing vocals", lyricRoleLabel(backing.copy(agent = null)))
+        assertEquals(null, lyricRoleLabel(main.copy(agent = null)))
+        assertEquals(setOf(0, 1), activeLyricIndices(listOf(main, backing), 2_500))
+        assertEquals(0, followedLyricIndex(listOf(main, backing), 2_500))
+        assertEquals(1, followedLyricIndex(listOf(main, backing), 5_000))
+        assertEquals(0, followedLyricIndex(listOf(main, backing), 2_500))
+    }
+
     @Test fun explicitTtmlLineEndsOverlapEvenWithoutWordsAndRetainWordSilence() {
         val lines = dev.dhun.lyrics.TtmlParser.parse("""<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s">Main</p><p begin="2s" end="3s">Backing</p></div></body></tt>""")
         assertEquals(setOf(0, 1), activeLyricIndices(lines, 2_500))
