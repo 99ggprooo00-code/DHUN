@@ -791,7 +791,7 @@ private val desktopModule = module {
     single { YouTubeLyricsSource(get()) }
     single {
         val data: DataLayer = get()
-        LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get(),
+        LyricsRepository(cache = data.lyricsCache, ytm = get<YouTubeLyricsSource>(), lrcLib = get<LrcLibSource>(),
             settings = data.settings, search = dev.dhun.lyrics.LrcLibSearchSource(),
             kugou = dev.dhun.lyrics.KuGouLyricsSource())
     }
