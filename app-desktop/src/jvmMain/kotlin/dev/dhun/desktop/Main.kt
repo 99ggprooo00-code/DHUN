@@ -776,7 +776,7 @@ private val desktopModule = module {
             player = get<DesktopDhunPlayer>(),
             save = SaveNowPlayingUseCase(data.nowPlaying),
             restore = RestoreNowPlayingUseCase(data.nowPlaying, data.settings),
-            recordPlay = RecordPlayUseCase(data.history),
+            recordPlay = RecordPlayUseCase(data.history, data.settings),
             scope = get(),
             log = { println("DHUN persistence: $it") },
             settings = data.settings,
@@ -787,12 +787,13 @@ private val desktopModule = module {
     single { GetRecommendationsUseCase(get(), get<DataLayer>().history, get<DataLayer>().library) }
 
     // Phase 11 lyrics — cache → YTM → LRCLIB → NotAvailable, persisted in SQLDelight
-    single { LrcLibSource() }
+    single { dev.dhun.lyrics.LrcLibAccess(System.getProperty("dhun.installer.version") ?: "development") }
+    single { LrcLibSource(access = get()) }
     single { YouTubeLyricsSource(get()) }
     single {
         val data: DataLayer = get()
-        LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get(),
-            settings = data.settings, search = dev.dhun.lyrics.LrcLibSearchSource(),
+        LyricsRepository(cache = data.lyricsCache, ytm = get<YouTubeLyricsSource>(), lrcLib = get<LrcLibSource>(),
+            settings = data.settings, search = dev.dhun.lyrics.LrcLibSearchSource(access = get()),
             kugou = dev.dhun.lyrics.KuGouLyricsSource())
     }
 

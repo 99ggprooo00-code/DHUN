@@ -257,14 +257,23 @@ class ObservePlaylistsUseCase(private val playlists: PlaylistRepository) {
 
 /* ---------------- history ---------------- */
 
-class RecordPlayUseCase(private val history: HistoryRepository) {
-    /** Returns a handle the player calls when the track finishes naturally. */
-    suspend operator fun invoke(track: Track, context: PlayContext): PlayHandle {
+class RecordPlayUseCase(
+    private val history: HistoryRepository,
+    private val settings: SettingsRepository? = null,
+) {
+    /** Null when recording is paused; skipped plays are never added retrospectively.
+     * Existing rows and queue persistence are independent of this preference.
+     */
+    suspend operator fun invoke(track: Track, context: PlayContext): PlayHandle? {
+        if (settings?.getBoolean(SettingsKeys.RECORD_LISTENING_HISTORY, SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT) == false) return null
         val playedAt = history.recordPlay(track, context)
         return PlayHandle(track.id, playedAt)
     }
 
-    suspend fun complete(handle: PlayHandle) = history.markCompleted(handle.trackId, handle.playedAtEpochMs)
+    suspend fun complete(handle: PlayHandle) {
+        if (settings?.getBoolean(SettingsKeys.RECORD_LISTENING_HISTORY, SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT) == false) return
+        history.markCompleted(handle.trackId, handle.playedAtEpochMs)
+    }
 
     data class PlayHandle(val trackId: String, val playedAtEpochMs: Long)
 }

@@ -11,12 +11,15 @@ import dev.dhun.data.PlayContext
 import dev.dhun.data.SettingsKeys
 import dev.dhun.data.SettingsRepository
 import dev.dhun.domain.RadioSession
+import dev.dhun.lyrics.LyricsTiming
+import dev.dhun.lyrics.LyricsTimingRepository
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +27,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -96,6 +101,23 @@ class PlayerViewModel(
         ?.stateIn(scope, SharingStarted.Eagerly, SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT)
         ?: MutableStateFlow(SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT)
 
+    private val lyricsTimingRepository = settings?.let { LyricsTimingRepository(it) }
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val lyricsTiming: StateFlow<LyricsTiming> = currentTrack.flatMapLatest { track ->
+        if (track == null || lyricsTimingRepository == null) flowOf(LyricsTiming(track?.id))
+        else lyricsTimingRepository.observe(track.id)
+    }.stateIn(scope, SharingStarted.Eagerly, LyricsTiming(null))
+
+    fun adjustLyricsTiming(trackId: String, deltaMs: Int) {
+        if (currentTrack.value?.id != trackId) return
+        scope.launch { lyricsTimingRepository?.adjust(trackId, deltaMs) }
+    }
+
+    fun resetLyricsTiming(trackId: String) {
+        if (currentTrack.value?.id != trackId) return
+        scope.launch { lyricsTimingRepository?.reset(trackId) }
+    }
+
     val isPlaying: StateFlow<Boolean> = player.state
         .map { it is PlaybackState.Playing }
         .stateIn(scope, SharingStarted.Eagerly, false)
@@ -110,12 +132,19 @@ class PlayerViewModel(
 
     private val _lyricsState = MutableStateFlow<LyricsUiState>(LyricsUiState.Unavailable)
     val lyricsState: StateFlow<LyricsUiState> = _lyricsState.asStateFlow()
+    val lyricsRomanization = LyricsRomanizationController(settings, scope, currentTrack, lyricsState)
 
     private var relatedJob: Job? = null
     private var lyricsJob: Job? = null
     private var holdSeekJob: Job? = null
     private var sleepTimerJob: Job? = null
     private var lastSeenTrackId: String? = null
+
+    val lyricsMatches: LyricsMatchController? = lyricsRepository?.let { repository ->
+        LyricsMatchController(repository, scope) { trackId ->
+            if (currentTrack.value?.id == trackId) refreshLyrics()
+        }
+    }
 
     /* ---------------- endless radio ---------------- */
 
@@ -229,6 +258,7 @@ class PlayerViewModel(
             currentTrack
                 .distinctUntilChanged { a, b -> a?.id == b?.id }
                 .collect { track ->
+                    lyricsMatches?.setTrack(track)
                     loadRelated(track)
                     loadLyrics(track)
                 }
@@ -642,11 +672,11 @@ class PlayerViewModel(
     }
 
     private fun loadLyrics(track: Track?, force: Boolean = false) {
+        lyricsJob?.cancel()
         if (track == null) {
             _lyricsState.value = LyricsUiState.Unavailable
             return
         }
-        lyricsJob?.cancel()
         lyricsJob = scope.launch {
             if (settings?.getBoolean(SettingsKeys.LYRICS_ENABLED, true) == false) {
                 _lyricsState.value = LyricsUiState.Disabled
@@ -661,6 +691,8 @@ class PlayerViewModel(
             } else {
                 provider.getLyrics(track.id)
             }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (currentTrack.value?.id != track.id) return@launch
             _lyricsState.value = when (result) {
                 is DhunResult.Success -> when (val lyrics = result.value) {
                     is Lyrics.Synced -> LyricsUiState.Synced(lyrics.lines)

@@ -10,7 +10,7 @@ object SettingsKeys {
     const val AUDIO_QUALITY = "audio_quality"
     const val AUDIO_QUALITY_DEFAULT = "high"
 
-    /** "dark" | "light" | "system" — v1 ships dark-first. */
+    /** "dark" | "light" | "black" | "system" — v1 ships dark-first. */
     const val THEME = "theme"
     const val THEME_DEFAULT = "dark"
 
@@ -41,6 +41,9 @@ object SettingsKeys {
     const val COUNTRY_CODE = "country_code"
     const val COUNTRY_CODE_DEFAULT = "US"
 
+    const val RECORD_LISTENING_HISTORY = "record_listening_history"
+    const val RECORD_LISTENING_HISTORY_DEFAULT = true
+
     const val EXPLICIT_CONTENT = "explicit_content"
     const val EXPLICIT_CONTENT_DEFAULT = true
 
@@ -66,8 +69,17 @@ object SettingsKeys {
     const val AUTOPLAY_RADIO_ENABLED_DEFAULT = true
     const val LYRICS_PREFER_SYNCED = "lyrics_prefer_synced"
     const val LYRICS_PREFER_SYNCED_DEFAULT = true
+    const val LYRICS_ROMANIZATION_ENABLED = "lyrics_romanization_enabled"
+    const val LYRICS_ROMANIZATION_MODE = "lyrics_romanization_mode"
     const val LYRICS_AUTO_SCROLL = "lyrics_auto_scroll"
     const val LYRICS_AUTO_SCROLL_DEFAULT = true
+    /** Per-track timing corrections are dynamic keys, not a global playback preference. */
+    const val LYRICS_MATCH_PREFIX = "lyrics_match:"
+    fun lyricsMatchKey(trackId: String): String = LYRICS_MATCH_PREFIX + trackId
+
+    const val LYRICS_OFFSET_PREFIX = "lyrics_offset_ms:"
+    fun lyricsOffsetKey(trackId: String): String = LYRICS_OFFSET_PREFIX + trackId
+
     const val LYRICS_TEXT_SIZE = "lyrics_text_size"
     const val LYRICS_TEXT_SIZE_DEFAULT = "default"
     const val LYRICS_PREFERRED_PROVIDER = "lyrics_preferred_provider"
@@ -89,8 +101,9 @@ object SettingsKeys {
 
     val all: List<String> = listOf(
         AUDIO_QUALITY, THEME, ACCENT, ACCENT_MODE, LYRICS_ENABLED, CACHE_SIZE_MB, COUNTRY_CODE,
-        EXPLICIT_CONTENT, CLOSE_TO_TRAY, RESUME_ON_LAUNCH, WINDOW_GEOMETRY,
+        RECORD_LISTENING_HISTORY, EXPLICIT_CONTENT, CLOSE_TO_TRAY, RESUME_ON_LAUNCH, WINDOW_GEOMETRY,
         BACKDROP_BLUR, BACKDROP_BRIGHTNESS, SEEK_STEP_SECONDS, AUTOPLAY_RADIO_ENABLED,
+        LYRICS_ROMANIZATION_ENABLED, LYRICS_ROMANIZATION_MODE,
         LYRICS_PREFER_SYNCED, LYRICS_AUTO_SCROLL, LYRICS_TEXT_SIZE, LYRICS_PREFERRED_PROVIDER,
         LYRICS_PROVIDER_ORDER, PERSIST_SHUFFLE_REPEAT, PAUSE_ON_MUTE_OR_ZERO_VOLUME,
         EQUALIZER_ENABLED, EQUALIZER_PRESET, EQUALIZER_PREAMP_DB, EQUALIZER_GAINS_DB,

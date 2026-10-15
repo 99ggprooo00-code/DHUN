@@ -502,6 +502,7 @@ fun DhunAppShell(
                                 nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = false)
                             },
                             settingsVm = settingsVm,
+                            lyricsRomanization = playerViewModel.lyricsRomanization,
                             isDesktop = isDesktop,
                             equalizerSession = equalizerSession,
                             onOpenSettings = { nav.push(DetailRoute.SettingsPage) },
@@ -559,6 +560,7 @@ fun DhunAppShell(
                                     nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = true)
                                 },
                                 settingsVm = settingsVm,
+                                lyricsRomanization = playerViewModel.lyricsRomanization,
                                 isDesktop = isDesktop,
                                 equalizerSession = equalizerSession,
                                 onOpenSettings = { nav.push(DetailRoute.SettingsPage) },
@@ -578,6 +580,7 @@ fun DhunAppShell(
                                 onPlayPlaylist = onPlayPlaylist,
                                 onTrackOverflow = { overflowTrack = it },
                                 settingsVm = settingsVm,
+                                lyricsRomanization = playerViewModel.lyricsRomanization,
                                 isDesktop = isDesktop,
                                 equalizerSession = equalizerSession,
                                 appInfo = appInfo,
@@ -885,6 +888,7 @@ private fun ShellMasterPane(
     onOpenLiked: () -> Unit,
     onOpenOffline: () -> Unit,
     settingsVm: SettingsViewModel,
+    lyricsRomanization: dev.dhun.presentation.player.LyricsRomanizationController,
     isDesktop: Boolean,
     equalizerSession: EqualizerSession?,
     onOpenSettings: () -> Unit,
@@ -945,9 +949,12 @@ private fun ShellMasterPane(
                 onDeleted = { nav.popDetail() },
             )
         }
-        is DetailRoute.SettingsPage -> {
+        is DetailRoute.SettingsPage, is DetailRoute.SettingsCategoryPage -> {
             SettingsScreen(
                 viewModel = settingsVm,
+                category = (route as? DetailRoute.SettingsCategoryPage)?.category,
+                romanization = lyricsRomanization,
+                onOpenCategory = { nav.push(DetailRoute.SettingsCategoryPage(it)) },
                 onBack = { nav.closeTop() },
                 isDesktop = isDesktop,
                 equalizerSession = equalizerSession,
@@ -1010,6 +1017,7 @@ private fun ShellDetailPane(
     onPlayPlaylist: (Track, List<Track>, Int) -> Unit,
     onTrackOverflow: (Track) -> Unit,
     settingsVm: SettingsViewModel,
+    lyricsRomanization: dev.dhun.presentation.player.LyricsRomanizationController,
     isDesktop: Boolean,
     equalizerSession: EqualizerSession?,
     appInfo: DhunAppInfo,
@@ -1052,9 +1060,12 @@ private fun ShellDetailPane(
                 onDeleted = { nav.popDetail() },
             )
         }
-        is DetailRoute.SettingsPage -> {
+        is DetailRoute.SettingsPage, is DetailRoute.SettingsCategoryPage -> {
             SettingsScreen(
                 viewModel = settingsVm,
+                category = (route as? DetailRoute.SettingsCategoryPage)?.category,
+                romanization = lyricsRomanization,
+                onOpenCategory = { nav.push(DetailRoute.SettingsCategoryPage(it)) },
                 onBack = { nav.popDetail() },
                 isDesktop = isDesktop,
                 equalizerSession = equalizerSession,

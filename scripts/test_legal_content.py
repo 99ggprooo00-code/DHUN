@@ -231,6 +231,10 @@ class LicenceTextsAreNotTruncated(unittest.TestCase):
         self.assertIn(upstream, self.licences, "the Apache-2.0 text is not reproduced verbatim")
         self.assertIn("APPENDIX: How to apply the Apache License", self.licences)
 
+    def test_the_icu_notices_are_complete(self) -> None:
+        upstream = _read(ROOT / "LICENSES" / "ICU4J-76.1.txt").strip()
+        self.assertEqual(1, self.licences.count(upstream), "ICU notices must be reproduced verbatim exactly once")
+
     def test_the_licence_page_admits_what_it_does_not_reproduce(self) -> None:
         self.assertIn("not reproduced", self.licences.lower())
 
@@ -277,14 +281,23 @@ class PolicyTextIsHonest(unittest.TestCase):
     def test_deleting_local_data_is_not_confused_with_deleting_theirs(self) -> None:
         self.assertIn("does not delete anything YouTube or Google", norm(self.all_text))
 
-    def test_the_lyrics_setting_gap_is_disclosed(self) -> None:
-        """The setting exists and gates nothing; the policy must say so."""
+    def test_the_lyrics_setting_and_local_transliteration_are_disclosed(self) -> None:
         privacy = norm(self.pages["privacy"].markdown)
         self.assertIn("lyrics_enabled", privacy)
-        self.assertIn("no code reads it", privacy)
+        self.assertNotIn("no code reads it", privacy)
+        self.assertIn("does not send lyric text to a transliteration service", privacy)
+        self.assertIn("KuGou", privacy)
+        for path in ("lyrics/LyricsRepository.kt", "presentation/player/PlayerViewModel.kt"):
+            source = _read(ROOT / "shared/src/commonMain/kotlin/dev/dhun" / path)
+            self.assertIn("getBoolean(SettingsKeys.LYRICS_ENABLED", source)
 
     def test_no_contact_address_is_invented(self) -> None:
-        emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", self.all_text)
+        # Upstream legal notices are attribution, not DHUN contact promises.
+        # Exempt only the exact verbatim included file, not arbitrary email addresses
+        # or the whole license page; the completeness test above protects that file.
+        upstream = _read(ROOT / "LICENSES" / "ICU4J-76.1.txt").strip()
+        first_party = self.all_text.replace(upstream, "", 1)
+        emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", first_party)
         self.assertEqual([], emails, f"a contact address appears with no maintainer behind it: {emails}")
         for page_id in ("privacy", "support", "terms"):
             self.assertIn(

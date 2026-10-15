@@ -77,6 +77,22 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun blackThemeAndHistoryRecordingPersistAndReset(): Unit = runBlocking {
+        val d = data()
+        val original = loaded(vm(d, this))
+        assertTrue(original.recordListeningHistory.value)
+        original.setThemeId("black")
+        original.setRecordListeningHistory(false)
+        val restored = reloaded(d, this)
+        assertEquals("black", restored.themeId.value)
+        assertFalse(restored.recordListeningHistory.value)
+        restored.reset()
+        val reset = reloaded(d, this)
+        assertEquals(SettingsKeys.THEME_DEFAULT, reset.themeId.value)
+        assertTrue(reset.recordListeningHistory.value)
+    }
+
+    @Test
     fun accentRoundTripsAndRejectsBlanks(): Unit = runBlocking {
         val d = data()
         val v = reloaded(d, this)

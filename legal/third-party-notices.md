@@ -1,7 +1,7 @@
 ---
 id: third-party-notices
 title: Third-Party Notices
-effectiveDate: 2026-10-10
+effectiveDate: 2026-10-15
 status: reference
 ---
 

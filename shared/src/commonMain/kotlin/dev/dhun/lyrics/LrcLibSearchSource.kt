@@ -5,53 +5,76 @@ import dev.dhun.core.DhunResult
 import dev.dhun.core.Lyrics
 import dev.dhun.core.Track
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.parameter
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
 
-/** Tokenless fuzzy fallback when LRCLIB's exact /api/get misses. */
+/** Existing documented LRCLIB /api/search adapter. Broad results are only shown on request;
+ * automatic fallback retains conservative title/artist/duration matching.
+ */
 class LrcLibSearchSource(
     private val client: HttpClient = LrcLibSource.defaultClient(),
     private val baseUrl: String = "https://lrclib.net",
-) : LyricsSource {
+    private val access: LrcLibAccess = LrcLibAccess(),
+) : LyricsCandidateSource {
     override suspend fun fetch(track: Track): DhunResult<Lyrics> {
         if (track.title.isBlank() || track.artistName.isBlank()) return DhunResult.Success(Lyrics.NotAvailable)
-        return try {
-            val response = client.get("$baseUrl/api/search") {
-                timeout { requestTimeoutMillis = 12_000 }
-                parameter("q", "${track.artistName} ${track.title}")
+        return when (val result = candidates(track, "${track.artistName} ${track.title}")) {
+            is DhunResult.Failure -> result
+            is DhunResult.Success -> {
+                val closest = result.value.filter {
+                    it.title.equals(track.title, ignoreCase = true) &&
+                        it.artist.contains(track.artistName, ignoreCase = true) &&
+                        (track.durationSeconds == null || it.durationSeconds?.let { duration ->
+                            abs(duration - track.durationSeconds) <= 10.0
+                        } == true)
+                }.minByOrNull { abs((it.durationSeconds ?: 0.0) - (track.durationSeconds ?: 0)) }
+                DhunResult.Success(closest?.lyrics ?: Lyrics.NotAvailable)
             }
-            if (!response.status.isSuccess()) return DhunResult.Success(Lyrics.NotAvailable)
-            val results = Json.parseToJsonElement(response.bodyAsText()) as? JsonArray
-                ?: return DhunResult.Success(Lyrics.NotAvailable)
-            val matches = results.filterIsInstance<JsonObject>().filter { item ->
-                item["trackName"]?.jsonPrimitive?.content?.equals(track.title, ignoreCase = true) == true &&
-                    item["artistName"]?.jsonPrimitive?.content?.contains(track.artistName, ignoreCase = true) == true
-            }
-            val closest = matches.minByOrNull { item ->
-                abs((item["duration"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.0) -
-                    (track.durationSeconds ?: 0).toDouble())
-            } ?: return DhunResult.Success(Lyrics.NotAvailable)
-            val duration = track.durationSeconds
-            if (duration != null && abs((closest["duration"]?.jsonPrimitive?.content?.toDoubleOrNull()
-                    ?: 0.0) - duration.toDouble()) > 10.0) return DhunResult.Success(Lyrics.NotAvailable)
-            val synced = closest["syncedLyrics"]?.jsonPrimitive?.content
-            val lines = synced?.let { LrcParser.parse(it, allowUnsyncedFallback = false) }.orEmpty()
-            if (lines.isNotEmpty()) DhunResult.Success(Lyrics.Synced(lines))
-            else closest["plainLyrics"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-                ?.let { DhunResult.Success(Lyrics.Unsynced(it)) }
-                ?: DhunResult.Success(Lyrics.NotAvailable)
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            DhunResult.Failure(DhunError.Network())
         }
+    }
+
+    override suspend fun candidates(track: Track, query: String): DhunResult<List<LyricsMatch>> {
+        if (query.isBlank()) return DhunResult.Success(emptyList())
+        return try {
+            val response = access.get(client, "$baseUrl/api/search") {
+                timeout { requestTimeoutMillis = 12_000 }
+                parameter("q", query.trim().take(240))
+            }
+            if (response.status !in 200..299) return DhunResult.Failure(
+                if (response.status == 429) DhunError.RateLimited(response.retryAfterSeconds) else DhunError.Network()
+            )
+            val body = response.body
+            if (body.length > 2_000_000) return DhunResult.Failure(DhunError.Parse())
+            val results = Json.parseToJsonElement(body) as? JsonArray
+                ?: return DhunResult.Failure(DhunError.Parse())
+            val matches = results.take(40).mapIndexedNotNull { index, element ->
+                val item = element as? JsonObject ?: return@mapIndexedNotNull null
+                fun text(key: String) = (item[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+                val title = text("trackName") ?: return@mapIndexedNotNull null
+                val artist = text("artistName") ?: return@mapIndexedNotNull null
+                val lines = text("syncedLyrics")?.takeIf { it.length <= 256_000 }
+                    ?.let { LrcParser.parse(it, false) }.orEmpty()
+                val lyrics = if (lines.isNotEmpty()) Lyrics.Synced(lines) else {
+                    val plain = text("plainLyrics")?.takeIf { it.isNotBlank() && it.length <= 256_000 }
+                        ?: return@mapIndexedNotNull null
+                    Lyrics.Unsynced(plain)
+                }
+                LyricsMatch(
+                    text("id") ?: "result-$index", "lrclib_search", title, artist, lyrics,
+                    language = text("language"), durationSeconds = text("duration")?.toDoubleOrNull(),
+                )
+            }
+            DhunResult.Success(matches)
+        } catch (_: LrcLibInvalidResponse) { DhunResult.Failure(DhunError.Parse()) }
+        catch (e: LrcLibBackoff) { DhunResult.Failure(DhunError.RateLimited(e.seconds)) }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { DhunResult.Failure(DhunError.Network()) }
     }
 }

@@ -89,6 +89,9 @@ class SettingsViewModel(
     private val _persistShuffleRepeat = MutableStateFlow(SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
     val persistShuffleRepeat: StateFlow<Boolean> = _persistShuffleRepeat.asStateFlow()
 
+    private val _recordListeningHistory = MutableStateFlow(SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT)
+    val recordListeningHistory: StateFlow<Boolean> = _recordListeningHistory.asStateFlow()
+
     private val _loaded = MutableStateFlow(false)
     /** True once the persisted values have been read (flows hold defaults until then). */
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
@@ -129,6 +132,7 @@ class SettingsViewModel(
             _explicitContent.value = get.boolean(SettingsKeys.EXPLICIT_CONTENT, SettingsKeys.EXPLICIT_CONTENT_DEFAULT)
             _pauseOnMute.value = get.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT)
             _persistShuffleRepeat.value = get.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
+            _recordListeningHistory.value = get.boolean(SettingsKeys.RECORD_LISTENING_HISTORY, SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT)
             _loaded.value = true
         }
     }
@@ -138,7 +142,7 @@ class SettingsViewModel(
      * ignored so a corrupt write path can never poison the DB.
      */
     fun setThemeId(id: String) {
-        if (id !in listOf("dark", "light", "system")) return
+        if (id !in listOf("dark", "light", "black", "system")) return
         _themeId.value = id
         enqueueWrite { update.string(SettingsKeys.THEME, id) }
     }
@@ -302,7 +306,13 @@ class SettingsViewModel(
         _persistShuffleRepeat.value = enabled
         enqueueWrite { update.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, enabled) }
     }
+    fun setRecordListeningHistory(enabled: Boolean) {
+        _recordListeningHistory.value = enabled
+        enqueueWrite { update.boolean(SettingsKeys.RECORD_LISTENING_HISTORY, enabled) }
+    }
+
     fun reset() {
+        _recordListeningHistory.value = SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT
         _themeId.value = SettingsKeys.THEME_DEFAULT
         _accentId.value = SettingsKeys.ACCENT_DEFAULT
         _accentMode.value = SettingsKeys.ACCENT_MODE_DEFAULT

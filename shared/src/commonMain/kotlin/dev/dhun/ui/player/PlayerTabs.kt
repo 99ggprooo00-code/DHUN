@@ -30,6 +30,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import dev.dhun.lyrics.LyricsTiming
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -406,6 +408,9 @@ internal fun LyricsTabContent(
     modifier: Modifier = Modifier,
 ) {
     val lyricsState by viewModel.lyricsState.collectAsState()
+    val romanizationEnabled by viewModel.lyricsRomanization.enabled.collectAsState()
+    val romanized by viewModel.lyricsRomanization.result.collectAsState()
+    val savedTiming by viewModel.lyricsTiming.collectAsState()
     val positionMs by viewModel.positionMs.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
     val track = currentTrack
@@ -418,12 +423,32 @@ internal fun LyricsTabContent(
         return
     }
 
+    var showMatches by remember(track.id) { mutableStateOf(false) }
+    val matchController = viewModel.lyricsMatches
+    if (showMatches && matchController != null) {
+        LyricsMatchPicker(track, matchController) {
+            matchController.cancelSearch()
+            showMatches = false
+        }
+    }
     Column(modifier = modifier.fillMaxSize()) {
+        LyricsRomanizationControls(viewModel.lyricsRomanization)
+        if (matchController != null) TextButton(onClick = { showMatches = true }) { Text("Find lyrics matches for this song") }
         LyricsProviderPicker(
             selectedProvider = preferredProvider,
             onSelect = onPreferredProviderChange,
             accent = accent,
         )
+        // Ignore the outgoing track's correction while the new settings flow starts.
+        val timing = savedTiming.takeIf { it.trackId == track.id } ?: LyricsTiming(track.id)
+        if (lyricsState is LyricsUiState.Synced) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = { viewModel.adjustLyricsTiming(track.id, -100) }) { Text("Earlier") }
+                Text("${timing.offsetMs} ms", style = MaterialTheme.typography.labelMedium)
+                TextButton(onClick = { viewModel.adjustLyricsTiming(track.id, 100) }) { Text("Later") }
+                TextButton(onClick = { viewModel.resetLyricsTiming(track.id) }) { Text("Reset") }
+            }
+        }
         val lyricsBodyModifier = Modifier.fillMaxWidth().weight(1f)
 
         // Scroll position and manual-follow preference belong to this track, not
@@ -485,27 +510,34 @@ internal fun LyricsTabContent(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = DhunColors.textTertiary,
                             )
-                            Text(
-                                text = state.text,
-                                style = when (viewModel.lyricsTextSize.collectAsState().value) {
-                                    "small" -> MaterialTheme.typography.bodyLarge
-                                    "large" -> MaterialTheme.typography.titleLarge
-                                    else -> MaterialTheme.typography.titleMedium
-                                },
-                                color = DhunColors.textSecondary,
-                                lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
-                            )
+                            val plainLines = if (romanizationEnabled && state.text.lines().size <= 2_000) state.text.lines() else listOf(state.text)
+                            plainLines.forEachIndexed { index, original ->
+                                Text(
+                                    text = original,
+                                    style = when (viewModel.lyricsTextSize.collectAsState().value) {
+                                        "small" -> MaterialTheme.typography.bodyLarge
+                                        "large" -> MaterialTheme.typography.titleLarge
+                                        else -> MaterialTheme.typography.titleMedium
+                                    },
+                                    color = DhunColors.textSecondary,
+                                    lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
+                                )
+                                if (romanizationEnabled) romanized.line(track.id, index, original)?.let { secondary ->
+                                    Text(secondary, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textTertiary)
+                                }
+                            }
                             Spacer(modifier = Modifier.height(DhunSpacing.huge))
                         }
                     }
                 }
                 is LyricsUiState.Synced -> SyncedLyricsContent(
                     lines = state.lines,
-                    positionMs = positionMs,
+                    romanizedLines = if (romanizationEnabled) state.lines.mapIndexed { index, line -> romanized.line(track.id, index, line.text) } else emptyList(),
+                    positionMs = timing.lyricPosition(positionMs),
                     accent = accent,
                     onSeek = { position ->
                         // An outgoing tab/track must never seek its successor.
-                        if (viewModel.currentTrack.value?.id == track.id) viewModel.seekTo(position)
+                        if (viewModel.currentTrack.value?.id == track.id) viewModel.seekTo(timing.seekPosition(position, viewModel.durationMs.value))
                     },
                     modifier = lyricsBodyModifier,
                     autoScroll = viewModel.lyricsAutoScroll.collectAsState().value,

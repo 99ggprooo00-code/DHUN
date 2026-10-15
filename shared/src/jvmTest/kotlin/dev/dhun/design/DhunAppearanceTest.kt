@@ -272,21 +272,56 @@ class DhunAppearanceTest {
 
     @Test
     fun modeIdsMatchThePersistedVocabulary() {
-        // SettingsKeys.THEME already documents "dark" | "light" | "system" and
-        // defaults to "dark"; nothing consumes it yet, but when a host wires it
-        // up these ids go straight into the DB. If that vocabulary moves, this
-        // fails here rather than silently persisting an unreadable theme.
+        // These ids are consumed by both hosts and persisted in the settings DB.
+        // Reject vocabulary drift rather than silently restoring a wrong palette.
         assertEquals("dark", DhunThemeMode.DARK.id)
         assertEquals(SettingsKeys.THEME_DEFAULT, DhunThemeMode.default.id)
         DhunThemeMode.entries.forEach { mode ->
             assertTrue(
-                mode.id in setOf("dark", "light", "system"),
+                mode.id in setOf("dark", "light", "black", "system"),
                 "${mode.name}.id='${mode.id}' is not a SettingsKeys.THEME value",
             )
         }
-        // "system" is storable but not honoured yet (no expect/actual hook), so
-        // it must map to null and fall back to dark instead of lying.
+        // System is a live preference resolved by DhunTheme, not a concrete palette id.
         assertNull(DhunThemeMode.fromId("system"))
+    }
+
+    @Test
+    fun blackPreferenceRestoresPureBlackSurfacesAndCanReturnToSystem() {
+        DhunAppearance.applyPersistedAppearance("black", "jade")
+        assertEquals(DhunThemeMode.BLACK, DhunAppearance.mode)
+        assertEquals("black", DhunAppearance.themeId)
+        assertEquals(Color.Black, DhunColors.background)
+        assertEquals(Color.Black, DhunColors.surface)
+        assertFalse(DhunAppearance.tokens.isLight)
+        assertEquals(DhunAccent.JADE.dark.accent, DhunColors.accent)
+        assertEquals(Color.Black, resolveThemeTokens(DhunThemeMode.BLACK, DhunAccent.JADE).materialScheme.background)
+        DhunAppearance.setThemePreference("system", systemDark = false)
+        assertEquals(DhunThemeMode.LIGHT, DhunAppearance.mode)
+        DhunAppearance.setThemePreference("system", systemDark = true)
+        assertEquals(DhunThemeMode.DARK, DhunAppearance.mode)
+    }
+
+    @Test
+    fun materialPaletteFollowsArtworkAndRetainsExplicitPreviewFallback() {
+        DhunThemeMode.entries.forEach { mode ->
+            DhunAppearance.setThemePreference(mode.id, systemDark = false)
+            DhunAppearance.setArtworkAccent(ArtworkColorExtractor.extractFromSeed("dynamic-material").primary)
+            val active = resolveThemeTokens(mode, DhunAppearance.accent)
+            assertSame(DhunAppearance.tokens, active)
+            assertEquals(DhunColors.accent, active.materialScheme.primary)
+            assertEquals(DhunColors.onAccent, active.materialScheme.onPrimary)
+            assertEquals(DhunColors.background, active.materialScheme.background)
+            val previewMode = if (mode == DhunThemeMode.LIGHT) DhunThemeMode.DARK else DhunThemeMode.LIGHT
+            assertEquals(DhunTokens.forAppearance(previewMode, DhunAccent.AMBER),
+                resolveThemeTokens(previewMode, DhunAccent.AMBER))
+            DhunAppearance.setArtworkAccent(null)
+            assertEquals(DhunTokens.forAppearance(mode, DhunAppearance.accent), resolveThemeTokens(mode, DhunAppearance.accent))
+        }
+        DhunAppearance.setAccentMode("static")
+        DhunAppearance.setArtworkAccent(Color.Red)
+        assertEquals(DhunTokens.forAppearance(DhunAppearance.mode, DhunAppearance.accent),
+            resolveThemeTokens(DhunAppearance.mode, DhunAppearance.accent))
     }
 
     @Test

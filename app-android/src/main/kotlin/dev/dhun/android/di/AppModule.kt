@@ -136,7 +136,7 @@ val appModule = module {
     single { dev.dhun.android.download.DownloadServiceController() }
     single { SaveNowPlayingUseCase(get<DataLayer>().nowPlaying) }
     single { RestoreNowPlayingUseCase(get<DataLayer>().nowPlaying, get<DataLayer>().settings) }
-    single { RecordPlayUseCase(get<DataLayer>().history) }
+    single { RecordPlayUseCase(get<DataLayer>().history, get<DataLayer>().settings) }
     // Shared endless-radio bookkeeping (PlayerViewModel + ArtistViewModel).
     single { dev.dhun.domain.RadioSession() }
     single { GetHomeFeedUseCase(get(), get<DataLayer>().history, utcOffsetMs = { currentUtcOffsetMs() }) }
@@ -163,12 +163,13 @@ val appModule = module {
     }
 
     // Phase 11 lyrics — cache → YTM → LRCLIB
-    single { LrcLibSource(get()) }
+    single { dev.dhun.lyrics.LrcLibAccess(dev.dhun.android.BuildConfig.VERSION_NAME) }
+    single { LrcLibSource(get(), access = get()) }
     single { YouTubeLyricsSource(get()) }
     single {
         val data: DataLayer = get()
-        LyricsRepository(cache = data.lyricsCache, ytm = get(), lrcLib = get(),
-            settings = data.settings, search = dev.dhun.lyrics.LrcLibSearchSource(get()),
+        LyricsRepository(cache = data.lyricsCache, ytm = get<YouTubeLyricsSource>(), lrcLib = get<LrcLibSource>(),
+            settings = data.settings, search = dev.dhun.lyrics.LrcLibSearchSource(get(), access = get()),
             kugou = dev.dhun.lyrics.KuGouLyricsSource(get()))
     }
 

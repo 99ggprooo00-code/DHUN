@@ -1,12 +1,12 @@
 ---
 id: open-source-licenses
 title: Open-Source Licenses
-effectiveDate: 2026-10-10
+effectiveDate: 2026-10-15
 status: reference
 ---
 
 {{appTitle}} itself is licensed under the GNU General Public License v3.0. Its
-full text is reproduced below, followed by the full text of the other licence
+full text is reproduced below, followed by the full text of the other licences
 this repository carries.
 
 The dependency-by-dependency list — what each library is and what it is used
@@ -18,6 +18,8 @@ for — is on the **Third-Party Notices** page.
   GPL-3.0 dependencies it builds on.
 - **Apache License 2.0** — the licence of the Material Design icon geometry
   adapted into this app's icon set.
+
+- **Unicode License V3 and ICU upstream notices** — ICU4J 76.1 for local lyric transliteration.
 
 ## Licences referenced but not reproduced
 
@@ -42,3 +44,10 @@ Two runtime components deserve a separate note:
 ---
 
 {{include: LICENSES/MaterialDesignIcons-Apache-2.0.txt}}
+
+
+---
+
+## ICU4J 76.1 — upstream license and notices
+
+{{include: LICENSES/ICU4J-76.1.txt}}

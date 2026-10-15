@@ -8,13 +8,11 @@ import dev.dhun.core.Track
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.get
 import io.ktor.client.request.parameter
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.isSuccess
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * LRCLIB synced-lyrics source (Phase 11).
@@ -35,6 +33,7 @@ import kotlinx.serialization.json.jsonPrimitive
 class LrcLibSource(
     private val httpClient: HttpClient = defaultClient(),
     private val baseUrl: String = "https://lrclib.net",
+    private val access: LrcLibAccess = LrcLibAccess(),
 ) : LyricsSource {
 
     override suspend fun fetch(track: Track): DhunResult<Lyrics> {
@@ -43,25 +42,25 @@ class LrcLibSource(
             return DhunResult.Success(Lyrics.NotAvailable)
         }
         return try {
-            val response = httpClient.get("$baseUrl/api/get") {
+            val response = access.get(httpClient, "$baseUrl/api/get") {
                 parameter("artist_name", track.artistName)
                 parameter("track_name", track.title)
                 track.albumName?.takeIf { it.isNotBlank() }?.let { parameter("album_name", it) }
-                track.durationSeconds?.let { parameter("duration", it) }
+                track.durationSeconds?.takeIf { it > 0 && it <= 3_600 }?.let { parameter("duration", it) }
             }
-            if (response.status.value == 404) {
+            if (response.status == 404) {
                 return DhunResult.Success(Lyrics.NotAvailable)
             }
-            if (!response.status.isSuccess()) {
-                return DhunResult.Failure(mapHttpError(response.status.value))
+            if (response.status !in 200..299) {
+                return DhunResult.Failure(if (response.status == 429) DhunError.RateLimited(response.retryAfterSeconds) else mapHttpError(response.status))
             }
-            val body = response.bodyAsText()
+            val body = response.body
             if (body.isBlank()) return DhunResult.Success(Lyrics.NotAvailable)
 
             val json = Json { ignoreUnknownKeys = true }.parseToJsonElement(body) as? JsonObject
                 ?: return DhunResult.Success(Lyrics.NotAvailable)
 
-            val synced = json["syncedLyrics"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            val synced = json["syncedLyrics"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
             if (!synced.isNullOrBlank()) {
                 val lines: List<LyricsLine> = LrcParser.parse(synced, allowUnsyncedFallback = false)
                 if (lines.isNotEmpty()) {
@@ -70,12 +69,17 @@ class LrcLibSource(
                 // LRCLIB sent empty LRC after parsing → fall through to plain
             }
 
-            val plain = json["plainLyrics"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            val plain = json["plainLyrics"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
             if (!plain.isNullOrBlank()) {
                 return DhunResult.Success(Lyrics.Unsynced(plain))
             }
 
             DhunResult.Success(Lyrics.NotAvailable)
+        } catch (_: LrcLibInvalidResponse) { DhunResult.Failure(DhunError.Parse()) }
+        catch (e: LrcLibBackoff) {
+            DhunResult.Failure(DhunError.RateLimited(e.seconds))
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             // Network/timeout → map to typed error but the repository will
             // still fall through to NotAvailable (lyrics are non-fatal)

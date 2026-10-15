@@ -97,18 +97,47 @@ class NowPlayingPersistenceTest {
 
     private fun data() = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
 
-    private fun persistence(player: DhunPlayer, d: DataLayer, scope: CoroutineScope, interval: Long = 50) =
+    private fun persistence(player: DhunPlayer, d: DataLayer, scope: CoroutineScope, interval: Long = 50,
+                            record: RecordPlayUseCase = RecordPlayUseCase(d.history, d.settings)) =
         NowPlayingPersistence(
             player = player,
             save = SaveNowPlayingUseCase(d.nowPlaying),
             restore = RestoreNowPlayingUseCase(d.nowPlaying, d.settings),
-            recordPlay = RecordPlayUseCase(d.history),
+            recordPlay = record,
             scope = scope,
             progressIntervalMs = interval,
         )
 
     private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {
         withTimeout(timeoutMs) { while (!check()) delay(20) }
+    }
+
+    @Test
+    fun historyPauseLeavesQueueRestoreWorkingAndDoesNotReplayPrivateHistory(): Unit = runBlocking {
+        val d = data()
+        d.settings.putBoolean(dev.dhun.data.SettingsKeys.RECORD_LISTENING_HISTORY, false)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val player = FakePlayer()
+        val pausedRead = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val settings = object : dev.dhun.data.SettingsRepository by d.settings {
+            override suspend fun getBoolean(key: String, default: Boolean): Boolean {
+                val value = d.settings.getBoolean(key, default)
+                if (key == dev.dhun.data.SettingsKeys.RECORD_LISTENING_HISTORY && !value) pausedRead.complete(Unit)
+                return value
+            }
+        }
+        val persistence = persistence(player, d, scope, record = RecordPlayUseCase(d.history, settings))
+        try {
+            persistence.start()
+            player.prepareQueue(listOf(track("private"), track("public")), 0)
+            withTimeout(15_000) { pausedRead.await() }
+            eventually { d.nowPlaying.load()?.queue?.size == 2 }
+            assertTrue(d.history.observeHistory(100).first().isEmpty())
+            d.settings.putBoolean(dev.dhun.data.SettingsKeys.RECORD_LISTENING_HISTORY, true)
+            player.playAt(1)
+            eventually { d.history.observeHistory(100).first().isNotEmpty() }
+            assertEquals(listOf("public"), d.history.observeHistory(100).first().map { it.track.id })
+        } finally { persistence.stop(); scope.cancel() }
     }
 
     @Test

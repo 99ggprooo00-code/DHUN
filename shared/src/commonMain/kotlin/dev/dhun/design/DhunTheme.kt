@@ -2,7 +2,6 @@ package dev.dhun.design
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.foundation.isSystemInDarkTheme
 
@@ -34,7 +33,9 @@ fun DhunTheme(
             DhunAppearance.setAppearance(nextMode = resolvedMode)
         }
     }
-    val tokens = remember(resolvedMode, accent) { DhunTokens.forAppearance(resolvedMode, accent) }
+    // Material switches/sliders/dialogs must follow the same active artwork accent as
+    // DHUN token readers. Explicit catalogue previews still resolve their own palette.
+    val tokens = resolveThemeTokens(resolvedMode, accent)
     MaterialTheme(
         colorScheme = tokens.materialScheme,
         typography = DhunTypography,
@@ -48,3 +49,7 @@ fun DhunTheme(
         content = content,
     )
 }
+
+internal fun resolveThemeTokens(mode: DhunThemeMode, accent: DhunAccent): DhunTokens =
+    if (mode == DhunAppearance.mode && accent == DhunAppearance.accent) DhunAppearance.tokens
+    else DhunTokens.forAppearance(mode, accent)
