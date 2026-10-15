@@ -5,11 +5,8 @@ import dev.dhun.core.DhunResult
 import dev.dhun.core.Lyrics
 import dev.dhun.core.Track
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.parameter
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -24,6 +21,7 @@ import kotlin.math.abs
 class LrcLibSearchSource(
     private val client: HttpClient = LrcLibSource.defaultClient(),
     private val baseUrl: String = "https://lrclib.net",
+    private val access: LrcLibAccess = LrcLibAccess(),
 ) : LyricsCandidateSource {
     override suspend fun fetch(track: Track): DhunResult<Lyrics> {
         if (track.title.isBlank() || track.artistName.isBlank()) return DhunResult.Success(Lyrics.NotAvailable)
@@ -45,14 +43,14 @@ class LrcLibSearchSource(
     override suspend fun candidates(track: Track, query: String): DhunResult<List<LyricsMatch>> {
         if (query.isBlank()) return DhunResult.Success(emptyList())
         return try {
-            val response = client.get("$baseUrl/api/search") {
+            val response = access.get(client, "$baseUrl/api/search") {
                 timeout { requestTimeoutMillis = 12_000 }
                 parameter("q", query.trim().take(240))
             }
-            if (!response.status.isSuccess()) return DhunResult.Failure(
-                if (response.status.value == 429) DhunError.RateLimited() else DhunError.Network()
+            if (response.status !in 200..299) return DhunResult.Failure(
+                if (response.status == 429) DhunError.RateLimited(response.retryAfterSeconds) else DhunError.Network()
             )
-            val body = response.bodyAsText()
+            val body = response.body
             if (body.length > 2_000_000) return DhunResult.Failure(DhunError.Parse())
             val results = Json.parseToJsonElement(body) as? JsonArray
                 ?: return DhunResult.Failure(DhunError.Parse())
@@ -74,7 +72,9 @@ class LrcLibSearchSource(
                 )
             }
             DhunResult.Success(matches)
-        } catch (e: CancellationException) { throw e }
+        } catch (_: LrcLibInvalidResponse) { DhunResult.Failure(DhunError.Parse()) }
+        catch (e: LrcLibBackoff) { DhunResult.Failure(DhunError.RateLimited(e.seconds)) }
+        catch (e: CancellationException) { throw e }
         catch (_: Exception) { DhunResult.Failure(DhunError.Network()) }
     }
 }

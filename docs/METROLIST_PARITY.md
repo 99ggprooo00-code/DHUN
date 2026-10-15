@@ -259,3 +259,12 @@ ownership/title/artist is not verified; users must have permission to use conten
   identities. Native physical-device readability/accessibility acceptance, secure
   opt-in translation, current provider/integration approval and earlier acceptance
   requirements remain open; these must not be marked complete from unit tests.
+
+
+## Current provider contract review
+
+See [Provider / integration review](development/provider-integration-review.md) for
+2026-10-15 public-document evidence, LRCLIB's identification/sequential/backoff fixes,
+DeepL paid-vs-Developer retention and credential requirements, and explicit go/no-go
+boundaries. Public-page retrieval is available for the reviewed pages; that does not
+prove authenticated service reliability or native secure-vault/device acceptance.
