@@ -69,7 +69,8 @@ internal object SyncedLyricsCodec {
     } catch (_: Exception) { emptyList() }
 
     private fun valid(lines: List<LyricsLine>): Boolean {
-        if (lines.isEmpty() || lines.size > 2_000 || lines.sumOf { it.words.size } > 10_000) return false
+        if (lines.isEmpty() || lines.size > 2_000 || lines.sumOf { it.words.size } > 10_000 ||
+            lines.sumOf { it.text.length.toLong() } > MAX_CHARS) return false
         return lines.all { line ->
             val start = line.startTimeMs
             start != null && start >= 0 && line.text.length <= 256_000 &&

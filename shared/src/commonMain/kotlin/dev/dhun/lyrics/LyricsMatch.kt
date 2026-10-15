@@ -42,6 +42,13 @@ internal object LyricsMatchCodec {
     const val MAX_CHARS = 512_000
     fun encode(match: LyricsMatch): String {
         require(match.lyrics != Lyrics.NotAvailable)
+        require(match.id.length <= 512 && match.provider.length <= 64 &&
+            match.title.length <= 1_024 && match.artist.length <= 1_024 && (match.language?.length ?: 0) <= 64)
+        val content = when (val lyrics = match.lyrics) {
+            is Lyrics.Synced -> SyncedLyricsCodec.encode(lyrics.lines)
+            is Lyrics.Unsynced -> lyrics.text.also { require(it.length <= MAX_CHARS) }
+            Lyrics.NotAvailable -> error("Unavailable match")
+        }
         val encoded = buildJsonObject {
             put("version", 2)
             put("id", match.id); put("provider", match.provider)
@@ -49,11 +56,7 @@ internal object LyricsMatchCodec {
             put("synced", match.synced); put("verified", match.metadataVerified)
             match.language?.let { put("language", it) }
             match.durationSeconds?.let { put("duration", it) }
-            put("content", when (val lyrics = match.lyrics) {
-                is Lyrics.Synced -> SyncedLyricsCodec.encode(lyrics.lines)
-                is Lyrics.Unsynced -> lyrics.text
-                Lyrics.NotAvailable -> error("Unavailable match")
-            })
+            put("content", content)
         }.toString()
         require(encoded.length <= MAX_CHARS) { "Lyrics are too large to save" }
         return encoded

@@ -93,12 +93,16 @@ object TtmlParser {
 
     private fun line(node: Node, timing: Interval, preserve: Boolean, checkpoint: () -> Unit): LyricsLine? {
         val text = StringBuilder()
+        val protectedWhitespace = mutableSetOf<Int>()
         val segments = mutableListOf<Segment>()
         fun append(value: String, keepSpace: Boolean) {
             for (char in value) {
                 if (!keepSpace && char in " \t\r\n") {
                     if (text.isNotEmpty() && text.last() != ' ' && text.last() != '\n') text.append(' ')
-                } else text.append(char)
+                } else {
+                    if (keepSpace && char in " \t\r\n") protectedWhitespace.add(text.length)
+                    text.append(char)
+                }
             }
             require(text.length <= 16_000)
         }
@@ -111,6 +115,7 @@ object TtmlParser {
                     val times = interval(child, inherited)
                     val childSpace = space(child, keepSpace)
                     if (child.name == "br") {
+                        protectedWhitespace.add(text.length)
                         text.append('\n')
                     } else {
                         val start = text.length
@@ -126,8 +131,11 @@ object TtmlParser {
         }
         visit(node, timing, preserve)
         val raw = text.toString()
-        val leading = if (preserve) 0 else raw.length - raw.trimStart(' ', '\n', '\r', '\t').length
-        val original = if (preserve) raw else raw.trim(' ', '\n', '\r', '\t')
+        var leading = 0
+        var trailing = raw.length
+        while (leading < trailing && raw[leading] in " \t\r\n" && leading !in protectedWhitespace) leading++
+        while (trailing > leading && raw[trailing - 1] in " \t\r\n" && trailing - 1 !in protectedWhitespace) trailing--
+        val original = raw.substring(leading, trailing)
         if (original.isBlank()) return null
         val words = segments.mapNotNull {
             val start = (it.start - leading).coerceIn(0, original.length)

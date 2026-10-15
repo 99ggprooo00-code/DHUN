@@ -33,6 +33,10 @@ class SyncedLyricsCodecTest {
         assertFailsWith<IllegalArgumentException> {
             SyncedLyricsCodec.encode(listOf(LyricsLine(1_000, "Bad", listOf(LyricsWord(0, 2, 999)))))
         }
+        assertFailsWith<IllegalArgumentException> {
+            // Reject aggregate text before constructing a potentially huge JSON payload.
+            SyncedLyricsCodec.encode(List(2_000) { LyricsLine(1_000, "x".repeat(1_000)) })
+        }
         val lrc = "[00:01.123]<00:01.123>Hello <00:02.456>world<00:03.789>"
         assertEquals(LrcParser.parse(lrc, false), SyncedLyricsCodec.decode(lrc))
     }

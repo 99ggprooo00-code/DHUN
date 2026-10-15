@@ -19,7 +19,7 @@ The user subsequently prioritized detailed word-by-word synchronization.
 | Line LRC, follow and line seeking | Present | Preserve manual-scroll pause / resume and smooth centering | Local only | Existing parser and LyricsFollowTest |
 | Enhanced-LRC word timestamps | Partial → implemented slice | Preserve UTF-16 text ranges, times and explicit final end markers; repeated-line time shifts; cache round-trip at millisecond precision | Local parsing; no inferred timing advertised as real | EnhancedLrcTest; DB repository recreation test |
 | Word karaoke and seeking | Implemented slice, device acceptance pending | Highlight each timed segment as playback reaches it; emphasize current segment; tap word to seek, accessible line-seek fallback. One shaped Text paragraph for RTL/joined scripts | Local only; does not manufacture timestamps for plain lyrics | KaraokeTextTest covers boundaries, backward seek, inactive/plain fallback, logical text hit testing |
-| Overlapping vocals | Partial | Explicit enhanced-LRC end markers allow multiple active lines; agent/background metadata and TTML are not implemented | Do not infer singer identities | Overlap/end boundary tests; multi-singer device test pending |
+| Overlapping vocals | Partial | Explicit enhanced-LRC end markers allow multiple active lines; explicit TTML line ends now retain overlap; agent/background metadata presentation is not implemented | Do not infer singer identities | Overlap/end boundary tests; multi-singer device test pending |
 | Per-song timing/resync | Implemented slice, device acceptance pending | Earlier/later in 100 ms increments and reset; persisted per-track via SettingsRepository; ±10 s bound; inverse seek correction | Local only, originals unchanged | LyricsTimingTest: persistence, track isolation, bounds, malformed settings, display/seek inversion |
 | TTML | Implemented bounded media-time import subset; device acceptance pending | Explicit local paste, preview and per-song choice; platform XML tokenizers, parallel relative media clocks, line/word ends and independent gaps | DTDs/entities/external loads disabled; hard bounds; unsupported frame/tick/clock/sequential/repeated timing rejected; no new provider or content-rights claim | Parser/security/bounds/cancellation, cache/choice compatibility, controller and API 24/35 tests; see slice below |
 | Romanization | Implemented slice; device/language-quality acceptance pending | Separate persisted player toggle and override; original + secondary line; worker-dispatched ICU4J engine and source/mode-keyed bounded cache | On-device only, no API/credentials; full Unicode/ICU notices bundled. Conservative auto leaves Han/Cyrillic ambiguous. Japanese kana only, no Kanji pronunciation guesses | Real ICU mode fixtures, mixed/punctuation/unknown text, caching, worker/cancellation/failure, controller persistence/source guards and Android API 24/35 smoke tests |
@@ -66,8 +66,9 @@ while explicit match search can request bounded candidate sets.
 - Providers must actually supply enhanced timing. LRCLIB line-only content does not
   become word timed merely because the renderer supports it.
 - Word emphasis follows player position ticks, not a fabricated per-character sweep.
-  Explicit end markers permit overlapping active lines; vocalist/background tags,
-  TTML and per-word gradient sweep remain outstanding. Per-track offset controls now correct both display and seeking without modifying source timing.
+  Explicit end markers permit overlapping active lines; the local TTML subset now
+  preserves independent line/word ends. Vocalist/background presentation and per-word
+  gradient sweep remain outstanding. Per-track offset controls now correct both display and seeking without modifying source timing.
 - Android + desktop acceptance: playback/seek forward and backward across boundaries;
   word tapping, TalkBack/keyboard line seek; RTL/Devanagari/emoji shaping; user scroll
   pause/resume; overlapping timed lines; restart/cache reload; long lyrics performance.

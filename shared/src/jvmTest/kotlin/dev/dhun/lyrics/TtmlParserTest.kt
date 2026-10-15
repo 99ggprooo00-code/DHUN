@@ -49,6 +49,15 @@ class TtmlParserTest {
              B<br/><![CDATA[C < D]]> </p>""")).single().text)
     }
 
+    @Test fun preservedSpanBoundarySpacesAndExplicitBreaksSurviveDefaultParagraphWhitespace() {
+        val xml = document("""<p begin="1s"><span begin="0s" xml:space="preserve">  A  </span></p>""")
+        val line = TtmlParser.parse("\uFEFF" + xml).single()
+        assertEquals("  A  ", line.text)
+        assertEquals(0, line.words.single().startIndex)
+        assertEquals(5, line.words.single().endIndex)
+        assertEquals("\nA\n", TtmlParser.parse(document("""<p begin="1s"><br/>A<br/></p>""")).single().text)
+    }
+
     @Test fun nestedWordRangesAndNonMonotonicTimingNeverManufactureKaraoke() {
         val nested = TtmlParser.parse(document("""<p begin="1s"><span begin="1s"><span begin=".5s" dur="1s">A</span></span></p>""")).single()
         assertEquals(2_500L, nested.words.single().startTimeMs)

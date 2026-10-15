@@ -48,8 +48,8 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
                 OutlinedTextField(value = query, onValueChange = { query = it.take(240) },
                     label = { Text("Title, artist or manual search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row {
-                    TextButton(onClick = { controller.search(track.id, query) }, enabled = query.isNotBlank()) {
-                        Text(if (state.loading) "Search again" else "Search / Retry")
+                    TextButton(onClick = { controller.search(track.id, query) }, enabled = query.isNotBlank() && !state.loading) {
+                        Text("Search / Retry")
                     }
                     TextButton(onClick = { controller.choose(track.id, null) }, enabled = !state.loading) { Text("Use automatic") }
                 }
