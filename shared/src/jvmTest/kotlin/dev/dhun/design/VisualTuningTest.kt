@@ -84,7 +84,7 @@ class VisualTuningTest {
         try {
             DhunVisualTuning.restore(emptyMap(), enabled = true)
             val original = readingSurfaceFill()
-            assertEquals(0.88f * 0.592f, original.alpha, 0.02f)
+            assertEquals((0.82f + (0.88f - 0.82f) * 15f / 50f) * 0.592f, original.alpha, 0.02f)
             DhunVisualTuning.set(VisualPart.TONAL_SURFACES, 0)
             assertTrue(readingSurfaceFill().alpha < original.alpha)
             assertTrue(contentRowFill().alpha < original.alpha)
