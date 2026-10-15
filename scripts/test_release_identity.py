@@ -31,6 +31,9 @@ class ReleaseIdentityTest(unittest.TestCase):
         version = re.search(r'versionName = "(\d+\.\d+\.\d+)"', self.gradle).group(1)
         self.assertIn(f"version='v{version}'", self.workflow)
         self.assertIn(f"--version '{version}'", self.workflow)
+        code = int(re.search(r"\bversionCode = (\d+)", self.gradle).group(1))
+        self.assertEqual(7, code, "public Android update must outrank v1.00.001")
+        self.assertIn(f"out '{version}' {code}", self.workflow)
         for asset in (f"dhun-v{version}.apk", f"dhun-v{version}.msi"):
             self.assertIn(asset, self.workflow)
 

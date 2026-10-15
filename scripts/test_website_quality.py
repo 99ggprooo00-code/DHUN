@@ -705,7 +705,7 @@ class DistributionBoundary(DistCopyMixin):
     def test_the_public_release_page_is_reachable_not_the_private_test_tag(self):
         """Banning artifacts must not ban the honest pointer to the public release."""
         markup = (DIST / "features" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("/releases/tag/v1.00.001", markup)
+        self.assertIn("/releases/tag/v1.00.002", markup)
         self.assertNotIn("/releases/tag/test", markup)
         self.assertEqual(quality.distribution_boundary_violations(DIST), [])
 

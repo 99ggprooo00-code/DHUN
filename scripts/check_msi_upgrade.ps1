@@ -51,7 +51,8 @@ function Invoke-MsiCheck {
     throw "msiexec $Operation failed with exit $code; log: $Log"
 }
 
-# Prefer the published fixed public release, whose actual asset is `dhun.msi`.
+# Prefer the newest published fixed public release. Until v1.00.002 exists,
+# the published v1.00.001 release (whose actual asset is `dhun.msi`) is used.
 # Accept its older versioned filename too if the asset is renamed back. A
 # public test release used to be the fallback; the current `test` is a private
 # draft and can be unreadable by the read-scoped job. Never weaken this gate
@@ -59,6 +60,7 @@ function Invoke-MsiCheck {
 # A missing baseline is SKIPPED (and a failure on main); contradictory bytes
 # or checksums fail outright below.
 $baselineOptions = @(
+    @{ Tag = 'v1.00.002'; Name = 'dhun-v1.00.002.msi' },
     @{ Tag = 'v1.00.001'; Name = 'dhun.msi' },
     @{ Tag = 'v1.00.001'; Name = 'dhun-v1.00.001.msi' },
     @{ Tag = 'test'; Name = 'dhun-test.msi' }

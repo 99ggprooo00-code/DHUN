@@ -31,7 +31,7 @@ DHUN is a free, open-source music player for Android and Windows desktop. It use
 | ![DHUN Android Library Playlists tab with Liked Songs folder and custom playlists](website/src/assets/screenshots/android-library-playlists.webp) | ![DHUN Android Library Downloads tab with storage usage bar and offline track row](website/src/assets/screenshots/android-library-downloads.webp) | ![DHUN Android Library History tab with chronological Today play row and Clear all button](website/src/assets/screenshots/android-library-history.webp) |
 | Pinned `Liked Songs` folder, custom SQLDelight playlists, and `+ New playlist`.<br>[Open Playlists in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/library/playlists) | App-private resumable range downloads, storage usage bar, and `Clear all`.<br>[Open Downloads in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/library/downloads) | On-device chronological listening history with confirmation-backed `Clear all`.<br>[Open History in `/app/` →](https://99ggprooo00-code.github.io/DHUN/app/#/library/history) |
 
-### 4. Settings, Equalizer & Windows Desktop (`v1.00.001`)
+### 4. Settings, Equalizer & Windows Desktop (`v1.00.001` baseline; `v1.00.002` current)
 
 | Settings & Equalizer (`mock-settings-phone`) | Windows Desktop (`mock-desktop-window`) |
 | :---: | :---: |
@@ -51,7 +51,7 @@ The browser interface at [`/app/`](https://99ggprooo00-code.github.io/DHUN/app/)
 
 ## Install the pre-release
 
-Download builds from the [DHUN v1.00.001 pre-release](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.001). Read the [installation guide](docs/INSTALL.md) first, and verify each file against its `.sha256` sidecar before installing. These builds use a public test signing key and are not intended for a daily-use device. Security reports: see [SECURITY.md](SECURITY.md). Release rules: see [release policy (proposal)](docs/releases/RELEASE-POLICY.md).
+Download builds from the [DHUN v1.00.002 pre-release](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.002). Read the [installation guide](docs/INSTALL.md) first, and verify each file against its `.sha256` sidecar before installing. These builds use a public test signing key and are not intended for a daily-use device. Security reports: see [SECURITY.md](SECURITY.md). Release rules: see [release policy (proposal)](docs/releases/RELEASE-POLICY.md).
 
 - **Android:** Android 7.0 (API 24) or newer. Install the universal APK unless you specifically need an ABI split.
 - **Windows:** install the MSI per user. Windows SmartScreen may warn because the installer is unsigned; playback requires VLC installed separately.

@@ -6,16 +6,15 @@ All notable changes to DHUN are recorded here. The format follows
 should use [Semantic Versioning](https://semver.org/) unless requested
 otherwise.
 
-**Release status:** `v1.00.001` is published as a fixed **public pre-release**
-(GitHub tag `v1.00.001` → commit `6ebc45c`, published 2026-10-10). It is not a
-stable or store-ready release, and real-device acceptance remains open. The
-rolling `test` tag is a separate private draft for collaborators and is
-replaced on main updates. Both use the public Android test key; Windows MSI
-ProductVersion is a separate increasing installer sequence (`3.61.1` for the
-published MSI).
+**Release status:** `v1.00.002` is the current fixed **public pre-release**.
+The older `v1.00.001` tag remains immutable (published 2026-10-10). This
+is not a stable or store-ready build; real-device acceptance remains open.
+The rolling `test` tag is a separate private draft and can expose experimental
+UI controls that public builds do not. Both releases use a public Android test
+key; the Windows MSI ProductVersion is an independent increasing sequence.
 
-The release/version string `1.00.001` is preserved exactly as requested in the
-GitHub tag and Android `versionName`; it is not silently normalized.
+The padded release/version strings `1.00.001` and `1.00.002` are preserved
+exactly as requested; they are not silently normalized.
 
 The maintenance contract applies to every entry below: stream extraction
 rots; when it breaks, DHUN ships a patch release fast (see README and
@@ -1653,6 +1652,24 @@ See `.ai/KNOWN_LIMITATIONS.md` (honest > complete). Highlights: Web is not
 a v1 platform; SMTC round-trip unverified on hardware; blur floor is
 Android 12+ / Skiko; desktop first-play spends bandwidth twice (stream +
 cache fill); cache budget changes apply on next start.
+
+## [1.00.002] — 2026-10-15 (public pre-release)
+
+Includes the merged changes since `v1.00.001`, including PRs #154–#167.
+See [`docs/releases/v1.00.002.md`](docs/releases/v1.00.002.md) for install,
+signing, upgrade and acceptance warnings.
+
+- Added in-app About & Legal, a categorized Settings hub with Black (OLED) mode,
+  live blur/brightness preferences and more playback/data controls.
+- Improved word-timed lyrics, match selection, local TTML, optional
+  romanization and translation, and lyric-specific ⋮ controls when CC is open.
+- Balanced native player and in-page artwork surfaces. Public tonal surfaces
+  are fixed at 15%; the experimental per-component sliders and theme catalogue
+  remain exclusive to private test builds.
+- Updated public Android identity to `versionName` `1.00.002` and `versionCode`
+  7. The Windows MSI retains its stable UpgradeCode and increasing installer
+  version. Public assets are checksummed and staged from the same verified
+  release-workflow run; no published `v1.00.001` asset or tag is modified.
 
 ## [1.00.001] — 2026-10-10 (public pre-release)
 

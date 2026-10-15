@@ -96,8 +96,8 @@ CITATION = re.compile(
 
 # Facts that rot: a semantic version, a calendar date, a build number. The site
 # currently prints none of these except the verified pre-release version shown in
-# real screenshot provenance captions (`v1.00.001`, matching `versionName = "1.00.001"`
-# in `app-android/build.gradle.kts` and `.ai/WEBSITE_PLAN.md` Part A §9).
+# real screenshot provenance captions (`v1.00.001`, the actual version
+# captured in those historical photos, not the current app version).
 STALE_FACT_PATTERNS = (
     (re.compile(r"\bv?\d+\.\d+\.\d+\b"), "app version"),
     (re.compile(r"\b20\d\d-\d\d-\d\d\b"), "date"),
