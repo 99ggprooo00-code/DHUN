@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 
 import * as views from "../src/js/views.js";
 import { miniPlayer, fullPlayer } from "../src/js/player-ui.js";
-import { ENDPOINT_CONTRACT, failure, failureSummary, stateError, SOURCE_KIND } from "../src/js/source.js";
+import { ENDPOINT_CONTRACT, failure, failureSummary, stateError, SOURCE_KIND, HOME_MOODS } from "../src/js/source.js";
 import { AUDIO_STATUS } from "../src/js/audio.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -219,6 +219,8 @@ const SECTIONS = [
         currentId: null,
         demoTracks: TRACKS,
         source: demoSource,
+        greeting: "Good afternoon",
+        moods: HOME_MOODS.map(({ id, label }) => ({ id, label })),
       }),
   },
   {
@@ -233,7 +235,33 @@ const SECTIONS = [
     title: "Home, answered with nothing in it",
     where: "views.homeScreen({ shelves: [] })",
     note: "An empty answer is not an error, and it is not dressed as one.",
-    render: () => views.homeScreen({ shelves: [], loading: false, error: null, source: liveSource }),
+    render: () =>
+      views.homeScreen({
+        shelves: [],
+        loading: false,
+        error: null,
+        source: liveSource,
+        greeting: "Good evening",
+        moods: HOME_MOODS.map(({ id, label }) => ({ id, label })),
+      }),
+  },
+  {
+    id: "home-mood-empty",
+    title: "A mood, answered with nothing",
+    where: "views.homeScreen({ mood, moodQuery }) — a mood is its own request",
+    note: "The demo strip survives the empty state here: whether a screen is full or empty says nothing about who answered, and this one used to drop it.",
+    render: () =>
+      views.homeScreen({
+        shelves: [],
+        loading: false,
+        error: null,
+        source: demoSource,
+        greeting: "Good afternoon",
+        moods: HOME_MOODS.map(({ id, label }) => ({ id, label })),
+        mood: "chill",
+        moodLabel: "Chill",
+        moodQuery: "chill music",
+      }),
   },
   {
     id: "search-error",

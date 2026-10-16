@@ -48,6 +48,9 @@ import {
   stateError,
   SOURCE_KIND,
   ENDPOINT_CONTRACT,
+  HOME_MOODS,
+  moodById,
+  greetingForNow,
 } from "./source.js";
 import { createAudioEngine, AUDIO_STATUS } from "./audio.js";
 import { createPlayer, REPEAT } from "./player.js";
@@ -156,6 +159,14 @@ export function boot({
     route: parseRoute(win.location?.hash ?? ""),
     /** Home feed, per route. */
     home: { status: "idle", shelves: [], error: null },
+    /**
+     * The selected mood, and the answer to *its* request. A mood is a search
+     * against the source (`HomeMood.query`), so it carries its own state rather
+     * than borrowing the feed's: "Chill" failing to load is not "Home" failing,
+     * and a mood that failed must not empty the feed the visitor can go back to.
+     */
+    mood: "for-you",
+    moodFeed: { status: "idle", shelves: [], error: null, query: "" },
     search: { query: "", filter: "all", status: "idle", results: null, error: null },
     entity: { status: "idle", kind: null, id: null, data: null, error: null },
     lyrics: { status: "idle", lines: [], activeIndex: -1, message: "" },
@@ -258,6 +269,49 @@ export function boot({
     renderView();
   }
 
+  /**
+   * Ask the source for the selected mood and turn the answer into the one shelf
+   * `UseCases.moodSections` produces: title `"<label> songs"`, subtitle
+   * `"Songs for <label>"`, the songs as rows.
+   *
+   * The rows are the source's, unmapped and unfiltered — the demo catalogue
+   * answers when nothing live can, exactly as it does for the feed, and the
+   * badge and the demo strip say so because this request goes through the same
+   * `sources.rowsUsed` record.
+   */
+  async function loadMood(id) {
+    const mood = moodById(id);
+    if (!mood.query) {
+      // For you is the feed itself; going back to it must not re-fetch Home.
+      state.mood = mood.id;
+      renderView();
+      return;
+    }
+    state.mood = mood.id;
+    state.moodFeed = { status: "loading", shelves: [], error: null, query: mood.query };
+    renderView();
+    const result = await sources.search(mood.query);
+    if (state.mood !== mood.id) return; // the visitor moved on while it loaded
+    if (result.ok) {
+      const tracks = (result.tracks ?? []).filter((entry) => entry && (entry.id || entry.videoId));
+      state.moodFeed = {
+        status: "ready",
+        query: mood.query,
+        error: null,
+        shelves: tracks.length
+          ? [{
+              title: `${mood.label} songs`,
+              subtitle: `Songs for ${mood.label.toLowerCase()}`,
+              entries: tracks,
+            }]
+          : [],
+      };
+    } else {
+      state.moodFeed = { status: "error", shelves: [], query: mood.query, error: stateError(result) };
+    }
+    renderView();
+  }
+
   async function loadEntity(kind, id) {
     state.entity = { status: "loading", kind, id, data: null, error: null };
     renderView();
@@ -300,15 +354,25 @@ export function boot({
   /** The active data source, as the UI shows it. */
   function sourceState() {
     const lastUsed = sources.lastUsed;
+    const rows = sources.rowsUsed;
     const active = sources.describeActive();
     const chosen = settings.get("sourceId");
     const wantsEndpoint = chosen === SOURCE_KIND.ENDPOINT && !sources.endpoint.configured;
 
-    if (lastUsed.kind === SOURCE_KIND.DEMO && lastUsed.reason) {
+    /*
+     * "These rows are the demo catalogue" is a claim about the rows, so it is
+     * made about the rows: `rowsUsed`, not `lastUsed`. The two came apart the
+     * moment a stream failed — resolving a track is a request like any other and
+     * overwrites `lastUsed` with `kind: null`, so a track that would not play
+     * could talk this screen out of saying where the rows came from, and the
+     * banner would name YouTube Music over the demo catalogue's rows. A reason is
+     * still required: choosing the demo on purpose is not a warning.
+     */
+    if (rows.kind === SOURCE_KIND.DEMO && rows.reason) {
       return {
         tone: "warn",
         title: "Showing the demo catalogue",
-        body: `${failureSummary(lastUsed.reason)} These rows are the demo catalogue: invented titles with no audio.`,
+        body: `${failureSummary(rows.reason)} These rows are the demo catalogue: invented titles with no audio.`,
         actions: [{ id: "open-settings-source", label: "Data source" }],
         detail: active.detail,
         kind: SOURCE_KIND.DEMO,
@@ -372,7 +436,7 @@ export function boot({
             ? "Equaliser active on this stream"
             : "Equaliser off",
       context: state.context,
-      sourceLabel: sources.lastUsed.kind === SOURCE_KIND.DEMO ? "Demo catalogue" : null,
+      sourceLabel: sources.rowsUsed.kind === SOURCE_KIND.DEMO ? "Demo catalogue" : null,
     };
   }
 
@@ -591,7 +655,7 @@ export function boot({
           filter: state.search.filter,
           recentSearches: settings.get("recentSearches"),
           currentId,
-          source: sources.lastUsed,
+          source: sources.rowsUsed,
         });
         break;
       case "library":
@@ -653,16 +717,27 @@ export function boot({
         });
         break;
       case "home":
-      default:
+      default: {
+        // A mood is its own request with its own state, so the screen shows the
+        // mood's shelf when one is selected and the feed's when "For you" is.
+        const moodSelected = state.mood !== "for-you";
+        const source = moodSelected ? state.moodFeed : state.home;
+        const mood = moodById(state.mood);
         markup = views.homeScreen({
-          shelves: state.home.shelves,
-          loading: state.home.status === "loading",
-          error: state.home.error,
+          shelves: source.status === "loading" ? [] : source.shelves,
+          loading: source.status === "loading",
+          error: source.error,
           currentId,
           demoTracks: [],
-          source: sources.lastUsed,
+          source: sources.rowsUsed,
+          greeting: greetingForNow(Date.now(), -new Date().getTimezoneOffset() * 60_000),
+          moods: HOME_MOODS.map(({ id, label }) => ({ id, label })),
+          mood: state.mood,
+          moodLabel: mood.label,
+          moodQuery: mood.query,
         });
         break;
+      }
     }
     setRegion("dhun-view", markup);
     renderChrome();
@@ -698,7 +773,7 @@ export function boot({
             ? html`<button type="button" class="dhun-icon-button" data-action="back" aria-label="Back">${views.icon("ArrowBack", { size: 22 })}</button>`
             : html``}
           <h1 class="dhun-topbar__title">${title}</h1>
-          ${views.sourceBadge(sources.describeActive())}
+          ${views.sourceBadge(sources.describeRows())}
         </div>
         <div class="dhun-topbar__actions">
           <button type="button" class="dhun-icon-button" data-action="open-search" aria-label="Search">${views.icon("Search", { size: 22 })}</button>
@@ -912,6 +987,7 @@ export function boot({
       { label: "Build", value: `${WEB_VERSION} · ${BUILD_LABEL}` },
       { label: "Route", value: formatRoute(state.route) },
       { label: "Data source", value: sources.describeActive().label },
+      { label: "Rows on screen", value: sources.describeRows().label, state: sources.rowsUsed.kind === SOURCE_KIND.DEMO ? "warn" : "ok" },
       { label: "Last source used", value: sources.lastUsed.kind ?? "none yet", state: sources.lastUsed.kind === SOURCE_KIND.DEMO ? "warn" : "ok" },
       { label: "Library storage", value: libraryKind === "indexeddb" ? "IndexedDB" : "memory only", state: libraryKind === "indexeddb" ? "ok" : "warn" },
       { label: "Settings storage", value: settings.available ? "localStorage" : "not available", state: settings.available ? "ok" : "warn" },
@@ -1230,8 +1306,16 @@ export function boot({
       else if (kind === "artist") go({ name: "artist", id });
       else go({ name: "album", id });
     },
-    "retry-home": () => loadHome(),
+    "retry-home": () => (state.mood === "for-you" ? loadHome() : loadMood(state.mood)),
     "go-home": () => go({ name: "home" }),
+    // The rail is the app's `HomeMood` rail: choosing a mood asks the source for
+    // it. Re-pressing the selected mood does not re-ask — a tab that reloads
+    // itself on every tap is a tab nobody trusts.
+    "set-mood": (target) => {
+      const id = target.dataset.mood ?? "for-you";
+      if (id === state.mood) return;
+      loadMood(id);
+    },
 
     /* ---------------------------------------------------------- playback -- */
     "play-track": (target) => {
