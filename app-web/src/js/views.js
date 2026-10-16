@@ -22,7 +22,7 @@
 import { html, raw } from "./dom.js";
 import { iconSvg } from "./icons.js";
 import { parseMarkdown } from "./markdown.js";
-import { artworkInfo } from "./source.js";
+import { artworkInfo, failureDetail, failureSummary } from "./source.js";
 import { formatDuration, pluralise } from "./format.js";
 import { shortcutGroups, shortcutKeys } from "./shortcuts.js";
 import { WEB_VERSION, BUILD_LABEL } from "./version.js";
@@ -71,15 +71,26 @@ export function emptyState({ title, body = "", iconName = "Album" }) {
 }
 
 /**
- * A failure, with the reason and a way forward. `failureHelp` in `source.js`
- * supplies the sentence; this supplies the button.
+ * A failure, with the reason and a way forward.
+ *
+ * `body` is the sentence a person reads: what happened, and what to do about it.
+ * It comes from `failureHelp` in `source.js`, never from a thrown error — no
+ * screen of this app prints "Failed to fetch" as its message.
+ *
+ * `technical` is the browser's or the server's own words, when there are any.
+ * It is kept because a bug report is much easier to write when the app shows the
+ * string, and it is *labelled* and set on the quietest rung of the type scale, so
+ * it reads as evidence rather than as the message. A person who does not want it
+ * can ignore it; a person reporting a playback failure can copy it.
  */
-export function errorState({ title = "That did not work", body = "", detail = "", actions = [] } = {}) {
+export function errorState({ title = "That did not work", body = "", technical = "", actions = [] } = {}) {
   return html`<div class="dhun-state dhun-state--error" role="alert">
     <span class="dhun-state__icon">${icon("Error", { size: 32 })}</span>
     <p class="dhun-state__title">${title}</p>
     ${body ? html`<p class="dhun-state__body">${body}</p>` : html``}
-    ${detail ? html`<p class="dhun-state__detail">${detail}</p>` : html``}
+    ${technical
+      ? html`<p class="dhun-state__detail"><span class="dhun-state__detail-label">Technical detail</span> ${technical}</p>`
+      : html``}
     ${actions.length
       ? html`<div class="dhun-state__actions">${actions.map(
           (action) =>
@@ -107,11 +118,14 @@ export function loadingState(labels = ["Loading"]) {
  * not turn a check into a search for prose that no longer exists — which is
  * exactly what happened to this module's consumers until 2026-10-16.
  */
-export function notice({ tone = "info", title = "", body = "", actions = [], hook = "" } = {}) {
+export function notice({ tone = "info", title = "", body = "", technical = "", actions = [], hook = "" } = {}) {
   return html`<div class="dhun-notice dhun-notice--${tone}"${hook ? raw(` data-notice="${hook}"`) : raw("")} role="${tone === "error" ? "alert" : "status"}">
     <div class="dhun-notice__text">
       ${title ? html`<p class="dhun-notice__title">${title}</p>` : html``}
       ${body ? html`<p class="dhun-notice__body">${body}</p>` : html``}
+      ${technical
+        ? html`<p class="dhun-notice__detail"><span class="dhun-state__detail-label">Technical detail</span> ${technical}</p>`
+        : html``}
     </div>
     ${actions.length
       ? html`<div class="dhun-notice__actions">${actions.map(
@@ -195,7 +209,9 @@ export function trackRow(track, {
           <span class="dhun-track__title">${track.title}</span>
           <span class="dhun-track__subtitle">${meta || "Unknown artist"}</span>
         </span>
-        ${failed ? html`<span class="dhun-track__flag" title="${failed.message}">${icon("Error", { size: 18 })}</span>` : html``}
+        ${failed
+          ? html`<span class="dhun-track__flag" title="${failureDetail(failed) ?? failureSummary(failed)}">${icon("Error", { size: 18 })}</span>`
+          : html``}
       </button>
       ${duration ? html`<span class="dhun-track__time">${duration}</span>` : html``}
       ${variant === "queue"
@@ -215,20 +231,31 @@ export function trackRow(track, {
             ${icon("MoreVert", { size: 20 })}
           </button>`}
     </div>
-    ${failed ? html`<p class="dhun-row__failure" role="status">${failed.message}</p>` : html``}
+    ${failed
+      ? html`<p class="dhun-row__failure" role="status">
+          ${failureSummary(failed)}
+          ${failureDetail(failed) ? html`<span class="dhun-row__failure-detail">${failureDetail(failed)}</span>` : html``}
+        </p>`
+      : html``}
   </li>`;
 }
 
 export function trackList(tracks, options = {}) {
   if (!tracks?.length) return emptyState(options.empty ?? { title: "Nothing here yet" });
   return html`<ul class="dhun-tracklist">
-    ${tracks.map((track, index) =>
-      trackRow(track, {
+    ${tracks.map((track, index) => {
+      const rowIndex = options.indexOffset ? index + options.indexOffset : index;
+      return trackRow(track, {
         ...options,
-        index: options.indexOffset ? index + options.indexOffset : index,
+        index: rowIndex,
+        // A row's own failure, when the list was given one. `failures` was
+        // accepted and silently ignored before: a list showed no reason on the
+        // row that had one, which is the state the queue's own renderer never
+        // had because it passes `failed` row by row.
+        failed: options.failures?.[rowIndex] ?? options.failed ?? null,
         current: options.currentId && (options.currentId === track.id || options.currentId === track.videoId),
-      }),
-    )}
+      });
+    })}
   </ul>`;
 }
 
@@ -304,8 +331,8 @@ export function homeScreen({ shelves = [], loading = false, error = null, curren
   if (error) {
     return errorState({
       title: "The home feed could not be loaded",
-      body: error.message,
-      detail: error.help,
+      body: error.help,
+      technical: error.technical,
       actions: [
         { id: "retry-home", label: "Try again" },
         { id: "open-settings-source", label: "Change data source" },
@@ -352,8 +379,8 @@ export function searchScreen({ query = "", results = null, status = "idle", filt
     if (status === "error") {
       return errorState({
         title: "That search did not go through",
-        body: results?.message ?? "The request failed.",
-        detail: results?.help,
+        body: results?.help ?? "The request failed.",
+        technical: results?.technical ?? "",
         actions: [
           { id: "retry-search", label: "Try again" },
           { id: "open-settings-source", label: "Change data source" },

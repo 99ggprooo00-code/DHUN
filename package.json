@@ -15,12 +15,13 @@
     "test": "npm --prefix app-web test",
     "gen:icons": "npm --prefix app-web run gen:icons",
     "check:icons": "npm --prefix app-web run check:icons",
+    "states": "npm --prefix app-web run states",
     "check:docs": "python3 scripts/web_player_docs.py docs/web-player",
     "check:repo": "python3 -m unittest discover -s scripts -p 'test_*.py'",
     "check": "npm run check:icons && npm run build && npm test && npm run check:docs"
   },
   "comments": {
     "dependencies": "None, and none is planned. The app ships no runtime dependency; adding one would change what app-web/tools/build.mjs and scripts/test_app_web.py assert, so it is a decision rather than an install. The website has its own manifest (website/package.json) and its own toolchain.",
-    "check": "'check' is the web workstream's local gate. It is not the whole repository gate — the Kotlin/Android/desktop work is verified by CI (see .github/workflows/ci.yml) and cannot run in this sandbox."
+    "check": "'check' is the web workstream's local gate. It is not the whole repository gate \u2014 the Kotlin/Android/desktop work is verified by CI (see .github/workflows/ci.yml) and cannot run in this sandbox."
   }
 }

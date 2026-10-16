@@ -23,6 +23,7 @@ import { LEGAL_DOCUMENTS, legalDocumentById } from "../src/js/data/legal-content
 import { handledActions, actionsIn } from "./helpers/main-source.mjs";
 import { miniPlayer, fullPlayer, statusLine } from "../src/js/player-ui.js";
 import { AUDIO_STATUS } from "../src/js/audio.js";
+import { failure, stateError } from "../src/js/source.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const jsRoot = path.join(here, "..", "src", "js");
@@ -144,8 +145,7 @@ const screens = {
     }),
   homeEmpty: () => views.homeScreen({ shelves: [], loading: false, error: null, source: { kind: "innertube" } }),
   homeLoading: () => views.homeScreen({ shelves: [], loading: true, error: null }),
-  homeError: () =>
-    views.homeScreen({ shelves: [], loading: false, error: { message: "Failed to fetch", help: "…" } }),
+  homeError: () => views.homeScreen({ shelves: [], loading: false, error: refused() }),
   searchIdle: () => views.searchScreen({ query: "", results: null, status: "idle", source: { kind: "innertube" } }),
   searchRecent: () => views.searchScreen({ query: "", results: null, status: "idle", recentSearches: ["koshi"], source: { kind: "innertube" } }),
   searchReady: () =>
@@ -156,7 +156,7 @@ const screens = {
       source: { kind: "innertube" },
     }),
   searchEmpty: () => views.searchScreen({ query: "zzz", status: "ready", results: { tracks: [], albums: [], artists: [], playlists: [] } }),
-  searchError: () => views.searchScreen({ query: "x", status: "error", results: { message: "HTTP 500", help: "…" } }),
+  searchError: () => views.searchScreen({ query: "x", status: "error", results: stateError(failure("http", new Error("HTTP 500 from /youtubei/v1/search"))) }),
   libraryPlaylists: () => views.libraryScreen({ tab: "playlists", playlists: [{ id: "pl-1", name: "Mix", trackIds: ["a"] }] }),
   libraryLiked: () => views.libraryScreen({ tab: "liked", liked: [track("a")] }),
   libraryHistory: () => views.libraryScreen({ tab: "history", history: [track("a")] }),
@@ -196,6 +196,9 @@ const screens = {
  * be visible at the boundary, not assumed.
  */
 const text = (value) => String(value).replace(/\s+/g, " ");
+
+/** A refused cross-origin request, as a screen receives it. */
+const refused = () => stateError(failure("network", new TypeError("Failed to fetch")));
 for (const [name, render] of Object.entries(screens)) screens[name] = () => text(render());
 
 test("every screen renders, for an empty, a full and a failing view model", () => {
@@ -449,9 +452,103 @@ test("a failing row keeps its place and says why", () => {
     failures: undefined,
   }));
   assert.ok(markup.includes("dhun-tracklist"));
-  const withFailure = text(views.trackRow(track("a"), { failed: { message: "HTTP 500 from /player" } }));
-  assert.match(withFailure, /HTTP 500 from \/player/);
+  const withFailure = text(views.trackRow(track("a"), { failed: { kind: "http", message: "HTTP 500 from /player" } }));
+  assert.match(withFailure, /The source answered with an error \(HTTP 500\)\./);
+  assert.match(withFailure, /HTTP 500 from \/player/, "the raw string stays beside the sentence");
   assert.match(withFailure, /role="status"/);
+});
+
+/*
+ * The copy rules, at the surface where a person reads them.
+ *
+ * Every one of these exists because the app shipped the alternative: a failed
+ * screen whose headline was the browser's `TypeError: Failed to fetch`. That
+ * string is identical for a flat network, a DNS failure, an ad-blocker and a
+ * genuine cross-origin refusal, it names no remedy, and it tells the visitor
+ * nothing. The tests below pin the three registers — sentence, one-liner, raw
+ * diagnostic — and the *order* they appear in.
+ */
+test("a failed screen leads with the app's sentence and keeps the raw string as a labelled detail", () => {
+  const markup = text(views.homeScreen({ shelves: [], loading: false, error: refused() }));
+  assert.match(markup, /The home feed could not be loaded/);
+  assert.match(markup, /The browser refused the request before reading a response/);
+  assert.match(markup, /Technical detail/);
+  assert.match(markup, /Failed to fetch/);
+  assert.ok(
+    markup.indexOf("refused the request before reading a response") < markup.indexOf("Technical detail"),
+    "the sentence comes first; the diagnostic follows it",
+  );
+  // The browser's words are never the title or the body of the state.
+  assert.ok(!/dhun-state__body[^<]*Failed to fetch/.test(markup));
+});
+
+test("a failed search says the same kind of thing, with its own sentence", () => {
+  const markup = text(views.searchScreen({ query: "koshi", status: "error", results: refused() }));
+  assert.match(markup, /That search did not go through/);
+  assert.match(markup, /The browser refused the request before reading a response/);
+  assert.match(markup, /Technical detail/);
+  assert.match(markup, /Failed to fetch/);
+});
+
+test("a refusal in the player offers the explanation as well as a retry", () => {
+  const markup = text(fullPlayer(playerVm({ error: { kind: "network-or-cors", message: "Failed to fetch" } })));
+  assert.match(markup, /DHUN could not reach the source/);
+  assert.match(markup, /data-action="retry-track"/);
+  assert.match(markup, /data-action="open-about"/, "a refusal has an explanation, and the strip links to it");
+  // The raw string travels with the sentence here too, labelled — the strip is
+  // where somebody staring at a dead player is most likely to want to quote it.
+  assert.match(markup, /Technical detail/);
+  assert.ok(markup.indexOf("could not reach the source") < markup.indexOf("Failed to fetch"));
+});
+
+test("a failure offers one action per outcome, not two buttons to the same screen", () => {
+  // The demo failure used to render "Data source" *and* "Configure a source",
+  // both wired to `open-settings-source` — the same destination under two
+  // labels. A demo row has nothing to retry, so it gets the one action that
+  // could change its outcome.
+  const demo = actionsIn(fullPlayer(playerVm({ error: { kind: "demo", message: "no audio" } })));
+  assert.deepEqual(demo.filter((action) => action === "open-settings-source").length, 1);
+  assert.ok(!demo.includes("retry-track"), "there is nothing to retry on a demo row");
+
+  const refused = actionsIn(fullPlayer(playerVm({ error: { kind: "network-or-cors", message: "Failed to fetch" } })));
+  assert.ok(refused.includes("retry-track"));
+  assert.ok(refused.includes("open-settings-source"));
+  assert.ok(refused.includes("open-about"));
+});
+
+test("a list marks the row that failed, and only that row", () => {
+  const markup = text(
+    views.trackList([track("a"), track("b"), track("c")], {
+      failures: { 1: { kind: "network-or-cors", message: "Failed to fetch" } },
+    }),
+  );
+  const failures = markup.match(/class="dhun-row__failure"/g) ?? [];
+  assert.equal(failures.length, 1, "one failed row means one failure line");
+  assert.match(markup, /DHUN could not reach the source/);
+  assert.match(markup, /Failed to fetch/, "the raw string travels with it");
+});
+
+test("the lyrics panel never prints the browser's words either", () => {
+  // Found in the same sweep: the lyrics fetch rejected with the same
+  // `TypeError`, and the panel printed `Lyrics could not be fetched: Failed to
+  // fetch` — the sentence the whole change exists to remove.
+  const withRaw = text(fullPlayer(playerVm({ tab: "lyrics", lyrics: { status: "error", lines: [], kind: "lyrics", message: "Failed to fetch" } })));
+  assert.match(withRaw, /DHUN could not reach the lyrics service/);
+  assert.match(withRaw, /Failed to fetch/, "kept as the diagnostic");
+  assert.ok(!/could not be fetched: Failed to fetch/.test(withRaw));
+
+  const withoutKind = text(fullPlayer(playerVm({ tab: "lyrics", lyrics: { status: "error", lines: [], message: "Failed to fetch" } })));
+  assert.ok(!/could not be fetched: Failed to fetch/.test(withoutKind), "an unknown kind still cannot print it");
+});
+
+test("a demo row's lyrics tab explains itself rather than looking broken", () => {
+  const markup = text(fullPlayer(playerVm({ tab: "lyrics", lyrics: { status: "demo", lines: [], message: "Demo row — no lyrics exist for it." } })));
+  assert.match(markup, /No lyrics for this track|no lyrics/i);
+});
+
+test("the demo catalogue's own sentence is not replaced by a generic one", () => {
+  const markup = text(fullPlayer(playerVm({ error: { kind: "demo", message: '"A fictional song" is a fictional demo entry, so there is no audio to fetch' } })));
+  assert.match(markup, /fictional demo entry/);
 });
 
 test("every control a screen renders is answered by a handler", () => {

@@ -38,6 +38,7 @@ gate covers which claim.
 | Site quality | `python3 scripts/website_quality.py website/dist` | Design-system mirror, contrast in both schemes, touch targets, budgets, metadata, crawlability | 31 checks |
 | Site honesty | `python3 scripts/website_claims.py website/dist` | Forbidden claims, required caveats, no baked digests, no telemetry SDK | 4 pages, 9 rules |
 | Web documents | `python3 scripts/web_player_docs.py docs/web-player` | These documents: required sections, evidence beside every completion, no claim the repository cannot back | OK |
+| Failure copy | `app-web/tests/source.test.mjs`, `app-web/tests/views.test.mjs` | A failure never leads with a browser's or a server's own string; every kind and stage has a sentence; a help sentence stands without the summary above it; every state keeps its raw string as a labelled diagnostic | Pass |
 | Browser job (CI) | `.github/workflows/website.yml` | Rendering, overflow, contrast, tab order, keyboard, motion, print, axe — every route, both schemes | Pass |
 | Served-site check (CI, after a publish) | `scripts/website_smoke.py` | The bytes a visitor actually receives, re-read on the live site | Pass |
 | Minification proof | `cd website && node tools/verify-minify.mjs` | The committed build matches a fresh build | Pass |
@@ -96,6 +97,7 @@ device, and what happened, including "it refused and said so".
 | 8 | Zoom to 200% and reflow | Desktop browser | 🔲 Not run |
 | 9 | Reduced motion and forced colours | Desktop browser | 🔲 Partly covered by the browser job's preference passes |
 | 10 | Background the tab mid-track, and open a second tab | Desktop browser | 🔲 Not run |
+| 11 | Read every state on the review page (`npm run states`) and say whether the words are right | Desktop browser, no network needed | 🔲 Not run by a person; the copy was reviewed as rendered text on 2026-10-16, which is how the two defects in Phase 6 were found |
 
 ## Risks identified
 

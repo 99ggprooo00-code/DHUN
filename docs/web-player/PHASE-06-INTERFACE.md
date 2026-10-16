@@ -30,6 +30,9 @@ audio.
 - [x] Keyboard operable, with a shortcut sheet generated from the one shortcut
   table so the documentation cannot drift from the bindings.
 - [x] Reduced motion honoured.
+- [x] A failure is written, not dumped: the state leads with a sentence the app
+  owns, and the browser's or the server's own string is demoted to a labelled
+  **Technical detail** line — never the headline.
 
 ## What exists
 
@@ -41,6 +44,24 @@ audio.
 | Generated tokens (both schemes, six ramps) | `app-web/src/css/tokens.css` |
 | The marketing shell that reads as the same product | `website/css/shell.css`, `website/src/_includes/base.njk` |
 | The token tables on the site's interface page | `website/src/_data/designTokens.js` |
+
+### The failure surfaces
+
+Every one of these states is reachable by a real visitor, because the primary
+source is a cross-origin request to an origin this project does not control. Two
+of them were wrong until 2026-10-16, and both were found by rendering the states
+and reading them rather than by a gate:
+
+| Before | After |
+|---|---|
+| A failed screen whose body was `TypeError: Failed to fetch` — the same words for a flat network, a blocked origin and an ad-blocker, naming no remedy. | The app's own sentence, then a labelled diagnostic line carrying the raw string — kept, because a bug report is easier to write when the app shows the string instead of hiding it in a console. |
+| The player's demo failure offered **two** buttons to the same screen ("Data source" and "Configure a source"), and a demo row offered a Retry for a thing that cannot be retried. | One action per outcome: a demo row offers the source picker; a refusal offers Retry, the source picker, and the explanation. |
+
+The copy lives in one table in `app-web/src/js/source.js` with three registers —
+`summary` for a row or a toast, `help` for a state's body, and the raw string for
+the diagnostic — and `npm run states` renders all of them to a page, so that
+reading what a refused network actually says is a two-minute job instead of a
+browser session on a bad network.
 
 ## What has been measured, and what has not
 
@@ -60,7 +81,9 @@ Not measured, by anyone:
 
 - **What it looks like.** No person has watched a page render. Geometry and
   contrast are not taste, and the captures the browser job writes are CI
-  artifacts that no one has opened.
+  artifacts that no one has opened. `npm run states` exists so this can be done
+  without a network: it renders every state to a page, and reading it is a
+  person's job.
 - **A screen reader.** The markup uses the conventions CI can assert; a real
   screen-reader pass has not happened.
 - **A phone.** The viewport is the same width as a phone's, in a desktop engine.

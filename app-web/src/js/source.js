@@ -76,20 +76,195 @@ function classify(stage, message) {
   return stage;
 }
 
-/** A sentence the UI can show for a failure, with the remedy where one exists. */
-export function failureHelp(result) {
-  switch (result?.kind) {
-    case "network-or-cors":
-      return "The browser refused the request before reading a response. That is either no network, or the origin not permitting cross-origin calls from this site. The About & Legal screen explains what DHUN can do about it — and what it cannot.";
-    case "timeout":
-      return "The request was stopped after waiting. Retry, or switch the data source below.";
-    case "http":
-      return "The server answered with an error. Retry, or switch the data source below.";
-    case "shape":
-      return "The response did not have the structure this client expects. That usually means the upstream changed, and this client needs an update.";
-    default:
-      return "Retry, or switch the data source below.";
+/* ------------------------------------------------------------- failure copy -- */
+
+/*
+ * A `fetch` rejection carries the browser's own words: "Failed to fetch" in
+ * Chrome, "NetworkError when attempting to fetch resource." in Firefox, "Load
+ * failed" in Safari. Printing one of those as the headline of an error state is
+ * the single worst thing this app can do with it: it is the same sentence for a
+ * flat network, a DNS failure, a corporate proxy, an ad-blocker and a genuine
+ * cross-origin refusal, it names no remedy, and it tells a person staring at a
+ * dead player nothing they can act on. It is also embarrassing in a product
+ * whose whole claim is that it says what is happening.
+ *
+ * So the copy has three registers, and this table is the one source for all of
+ * them. `summary` is what a row, a toast or a strip says — one line, no jargon,
+ * the fact and nothing else. `help` is the explanation under it, with the remedy
+ * where a remedy exists. `technical` says whether the raw message is worth
+ * keeping: when it is (`"HTTP 502 from /youtubei/v1/player"`, `"Failed to
+ * fetch"`), `failureDetail` surfaces it as a labelled diagnostic line, because
+ * a user reporting a bug should not have to open developer tools to quote it —
+ * and when the message is already written for a person (the demo catalogue's,
+ * the endpoint's), it is the summary itself and there is nothing to demote.
+ *
+ * Rules this table keeps, asserted by `tests/source.test.mjs`:
+ *   - no `summary` is ever a browser string, and none is empty;
+ *   - every kind `failure()` can produce has an entry, including the stages;
+ *   - `summary` is one sentence, so it cannot become the wall of text again.
+ */
+const FALLBACK_COPY = Object.freeze({
+  summary: "The request could not be completed.",
+  help: "Retry, or switch the data source below.",
+});
+
+const FAILURE_COPY = Object.freeze({
+  "network-or-cors": {
+    summary: "DHUN could not reach the source.",
+    help: "The browser refused the request before reading a response. That is either no network, or the origin not permitting cross-origin calls from this site. The About & Legal screen explains what DHUN can do about it — and what it cannot.",
+    technical: true,
+  },
+  timeout: {
+    summary: "The source took too long to answer, so the request was stopped.",
+    help: "The request was stopped after waiting. A slow or unreachable source will do this. Retry, or switch the data source below.",
+    technical: true,
+  },
+  http: {
+    summary: "The source answered with an error.",
+    help: "The request arrived, and the server answered with an error rather than a result. That is the source's answer, not a problem on this device. Retry, or switch the data source below.",
+    technical: true,
+  },
+  shape: {
+    summary: "The source answered in a shape this client does not understand.",
+    help: "The response arrived but did not have the structure this client reads. That usually means the upstream changed what it sends, so this needs an update rather than a retry — the source badge above the list says who answered.",
+    technical: true,
+  },
+  fetch: {
+    summary: "This browser did not provide a way to make the request.",
+    help: "DHUN asks through the browser's own `fetch`. Without it there is nothing to ask with — a content blocker or a browser setting is the usual cause.",
+    technical: false,
+  },
+  endpoint: {
+    summary: "No endpoint address is configured.",
+    help: "You chose your own endpoint as the only source, but there is no address for DHUN to ask. Add one below, or switch to Automatic.",
+    technical: false,
+  },
+  cipher: {
+    summary: "The source offered this track only behind a signature it does not share.",
+    help: "DHUN will not guess one. Try another track, or switch the data source below — the native Android and Windows builds carry the full resolver chain.",
+    technical: false,
+  },
+  nostream: {
+    summary: "The source answered, but offered no audio for this track.",
+    help: "The row may be a video with no audio stream, or the source may have changed what it returns. Retry, or try another track.",
+    technical: false,
+  },
+  notfound: {
+    summary: "The source does not have that item.",
+    help: "The link may be stale, or the row was removed upstream. Go back and pick it again.",
+    technical: true,
+  },
+  playability: {
+    summary: "The source refused to play this track.",
+    help: "That sentence is the source's own reason, usually regional or age-related. Nothing on this page can work around it, and DHUN will not pretend otherwise.",
+    technical: false,
+  },
+  lyrics: {
+    summary: "DHUN could not reach the lyrics service.",
+    help: "Lyrics come from LRCLIB, a third-party service the app sends the track's name and artist to. The request did not get an answer. Nothing else in the app is affected, and the setting that stops these lookups is in Settings → Playback.",
+    technical: true,
+  },
+  demo: {
+    summary: "This row is part of the demo catalogue, which has no audio.",
+    help: "The demo rows are invented so the interface stays usable while no real source answers. Settings → Data source lists what DHUN can ask instead.",
+    technical: false,
+  },
+});
+
+/** Kinds whose plain message is the source's own words and already reads like a
+ *  sentence a person would say — the demo catalogue's, and the upstream's own
+ *  "Video unavailable". Shown as-is rather than replaced by a generic line. */
+const SPEAKS_FOR_ITSELF = new Set(["demo", "playability"]);
+
+function copyFor(result) {
+  const kind = result?.kind;
+  const entry = FAILURE_COPY[kind];
+  if (entry) {
+    // A message the source wrote for a person wins over the table's generic
+    // version of it: "Video unavailable" is more useful than "the source refused".
+    if (SPEAKS_FOR_ITSELF.has(kind) && typeof result?.message === "string" && result.message.trim()) {
+      return { ...entry, summary: result.message.trim() };
+    }
+    if (kind === "http") {
+      const status = Number(/\bHTTP\s+(\d{3})\b/.exec(String(result?.message ?? ""))?.[1]) || null;
+      if (status) return { ...entry, summary: `The source answered with an error (HTTP ${status}).` };
+    }
+    return entry;
   }
+  // No entry: the kind may be a stage name, or missing altogether. The message
+  // is still evidence — so classify it before giving up, and a bare
+  // `{ message: "Failed to fetch" }` gets the network sentence rather than a
+  // shrug.
+  const guessed = FAILURE_COPY[classify("", String(result?.message ?? ""))];
+  if (guessed) return guessed;
+  return { ...FALLBACK_COPY, technical: true };
+}
+
+/**
+ * The one-line sentence for a row, a toast or a strip.
+ *
+ * Never the browser's words: `failureSummary({ kind: "network-or-cors", message:
+ * "Failed to fetch" })` is "DHUN could not reach the source.", and the raw string
+ * lives in `failureDetail` for whoever wants to report it.
+ */
+export function failureSummary(result) {
+  const summary = String(copyFor(result).summary ?? "").trim();
+  return summary || FALLBACK_COPY.summary;
+}
+
+/** The longer explanation, with the remedy where one exists. */
+export function failureHelp(result) {
+  return copyFor(result).help;
+}
+
+/**
+ * The technical string to keep as a diagnostic line, or `null` when the failure
+ * is already written for a person. Callers label it ("Technical detail") so it
+ * reads as evidence rather than as the message.
+ */
+export function failureDetail(result) {
+  if (!copyFor(result).technical) return null;
+  const message = typeof result?.message === "string" ? result.message.trim() : "";
+  if (!message) return null;
+  return message === failureSummary(result) ? null : message;
+}
+
+/** True when a failure should be shown as a cross-origin/offline refusal rather
+ *  than a generic error — the one failure with its own explanation and remedy. */
+export function isRefusal(result) {
+  return result?.kind === "network-or-cors";
+}
+
+/**
+ * A failure as a screen consumes it.
+ *
+ * `help` is what the state prints, `summary` is the same fact in one line for a
+ * toast or a strip, and `technical` is the raw string (or `null`). It lives here,
+ * beside the copy table, rather than inside the boot sequence: a screen's shape
+ * is data, and a shape assembled in the middle of a 1,500-line module is a shape
+ * no test can reach.
+ */
+export function stateError(result) {
+  if (!result) return null;
+  const summary = failureSummary(result);
+  const help = failureHelp(result);
+  return {
+    kind: result.kind ?? null,
+    stage: result.stage ?? null,
+    summary,
+    /**
+     * The state's body.
+     *
+     * A screen renders `help` *without* `summary`, which is why the copy table's
+     * help sentences each open with a sentence that stands on its own — and why
+     * a failure that speaks for itself (the source's own "Video unavailable",
+     * the demo catalogue's "this row is fictional") is carried into the body
+     * rather than dropped. Dropping it would show an explanation of a reason
+     * nobody can see.
+     */
+    help: SPEAKS_FOR_ITSELF.has(result.kind) && summary ? `${summary} ${help}` : help,
+    technical: failureDetail(result),
+  };
 }
 
 /* ------------------------------------------------------------- utilities -- */
