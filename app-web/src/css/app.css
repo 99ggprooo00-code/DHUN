@@ -862,6 +862,31 @@ a {
   padding: 0 var(--dhun-space-sm);
 }
 
+/* ============================================================== home head == */
+
+/* DHUN's wordmark and the time-of-day greeting, exactly where `HomeScreen.kt`
+   draws them: above the state, above the mood rail. The wordmark is the one
+   "brand moment" in the product (`DhunTypographyTokens.brand` — same sans, wide
+   tracking), and the greeting is `headlineMedium`. */
+.dhun-home__head {
+  padding: var(--dhun-space-md) var(--dhun-space-screen-padding) 0;
+}
+
+.dhun-home__brand {
+  margin: 0;
+  font: var(--dhun-text-label-small);
+  font-weight: 700;
+  letter-spacing: var(--dhun-tracking-brand);
+  color: var(--dhun-accent);
+  text-transform: uppercase;
+}
+
+.dhun-home__greeting {
+  margin: 0;
+  font: var(--dhun-text-headline-medium);
+  color: var(--dhun-text);
+}
+
 /* =============================================================== artwork == */
 
 .dhun-art {
@@ -1374,11 +1399,9 @@ a {
   display: none;
 }
 
-.dhun-search__hint {
-  margin: var(--dhun-space-xs) 0 0;
-  font: var(--dhun-text-body-small);
-  color: var(--dhun-text-tertiary);
-}
+/* Search's demo line is the same notice the app's other screens carry
+   (`views.notice`, `data-notice="demo"`), so there is no search-only hint rule
+   any more: one surface per message, and the strip is the one with the way out. */
 
 /* ============================================================== settings == */
 

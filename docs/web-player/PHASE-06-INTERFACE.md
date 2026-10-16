@@ -96,6 +96,28 @@ changed because of it. Every number is a measurement from that session
 | The toast covered the mini player: a tap on **expand** hit the toast, so the full player could not be opened on a phone at all (dock measured **166px**, toast offset 112px) | — | The toast's offset is made of the dock it actually has, and opening the player clears a toast it inherited |
 | Pressing Queue or Lyrics threw the visitor back to the cover: the player's scroll reset **613 → 0** and the panel they asked for moved from y=327 to **y=940**, off a 844px screen | — | Where they were is kept across a re-render of the same track; a different track still starts at the cover |
 
+### What the interface claimed, and did not know (2026-10-16, later the same day)
+
+The layout pass above found things that were drawn wrong. Reading the app's Home
+again — instead of assuming the web's version of it was close enough — found
+things the interface *said* that it had no basis for.
+
+| What it said | What was true | What changed |
+|---|---|---|
+| The source badge: **"YouTube Music"**, on every screen, including `#/search` | The rows on screen were the demo catalogue's: the source was unreachable and the demo had answered. `source.js`'s own contract says *"Whichever answers is recorded in `lastUsed.kind` and shown in the UI"*, and the badge asked `describeActive()` — the source DHUN would have asked | A second record, `rowsUsed`, for the source that produced the rows; `describeRows()` feeds the badge, the demo strip, the settings banner and the dock label. Verified live in five routes × two schemes |
+| Search's demo claim was a one-line hint with no `data-notice` | The browser job's rule — *"the demo answered, so this page must say those rows are fictional and have no audio"* — keys on `data-kind="demo"`. With the badge reading `innertube` on every route, **that rule could never fire on any route**, including the one it was written for | The same strip as every other screen, in every state, and Search's weaker line is gone |
+| An empty mood: *"Search for something, or point DHUN at your own data source"* | That is the **feed's** empty copy, shown to a visitor who had just pressed **Chill** | The mood's states speak for the mood and name the query that came back empty |
+| *(nothing — Home had no header and no moods)* | `HomeScreen.kt` opens with the `DHUN` wordmark, a `headlineMedium` greeting from `GetHomeFeedUseCase.greetingForCurrentTime`, and a `DhunHorizontalRail` of `HomeMood.kt`'s five moods | All three, above the state, so a failed feed still says hello. A mood **is a search against the source** (`FOCUS("Focus", "focus instrumental music")`), shaped into `UseCases.moodSections`' one shelf — measured: pressing Chill issues `POST music.youtube.com/youtubei/v1/search`, and returning to *For you* issues none |
+
+The greeting is worth a note of its own. This repository has already shipped the
+UTC version of it once — Android, 2026-10-10, *"Home always said 'Good night'"* —
+so the mirror takes the device offset (`greetingForNow`), and Nepal's +5:45 is
+asserted directly, along with both sides of every boundary.
+
+`app-web/tests/source.test.mjs` now reads `HomeMood.kt` itself and fails if the
+web's labels or queries drift from it: the same mirror rule the token sheet lives
+under, applied to the one thing on Home a visitor presses.
+
 ## What has been measured, and what has not
 
 Measured, by the `browser` job on every route and both colour schemes:
@@ -142,7 +164,7 @@ Those three are the Phase 8 work, listed in
 | `app-web/tests/shell.test.mjs`, `actions.test.mjs`, `tokens.test.mjs`, `dom.test.mjs` | Pass |
 | `browser` job (the table above) | Pass |
 | `python3 scripts/website_quality.py website/dist` | 31 checks pass |
-| A human looking at the built app's captures (33, four widths, both themes) | Looked at on 2026-10-16 — seven defects found and fixed, listed above. Still not a phone and still not a screen reader |
+| A human looking at the built app's captures (34, four widths, both themes) | Looked at on 2026-10-16 — seven drawing defects and four claims the interface could not back, all fixed and listed above. Still not a phone and still not a screen reader |
 
 ## Completion decision
 

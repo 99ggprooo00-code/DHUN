@@ -22,7 +22,70 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### The interface gets its first real layout review, and loses seven defects (2026-10-16, session `arena/126d4a83-dhun`)
+### The badge stops lying, and Home gets its greeting and moods (2026-10-16, session `arena/85bacb28-dhun`)
+
+Found by opening the captures of the built `/app/` that the previous round
+started producing, and by reading the app's own Home one more time instead of
+assuming the web's version of it was close enough.
+
+- **Fixed: the source badge named a source that had not answered.** Every screen
+  asked `describeActive()` — *"the source DHUN would ask first"* — so with the
+  source unreachable the demo catalogue's rows sat under a badge reading
+  **"YouTube Music"**, and on `#/search` they sat under no demo notice at all.
+  The interface's own rule is the opposite, and `source.js` already said so in a
+  comment: *"Whichever answers is recorded in `lastUsed.kind` **and shown in the
+  UI**"*. Worse, this silently disabled a CI gate: `browser.mjs` fails a route
+  when `data-kind === "demo"` and no `[data-notice="demo"]` element is present,
+  so a badge that never read `demo` meant the honesty rule could never fire on
+  the exact state it exists for. The source manager now records **two** facts —
+  `lastUsed` for "what happened last", and `rowsUsed` for "where the rows on
+  screen came from" — and the badge, the screens' demo strip, the settings
+  banner and the dock label all read the second. Verified live: `/app/`,
+  `#/search?q=` and `#/settings` report `demo`/`Demo data` with the demo strip
+  present; library routes, which hold no rows, still report the live source.
+- **Fixed: a mood's empty or failed answer forgot who answered.** The demo strip
+  was appended after the shelves, so it vanished from every empty screen — and
+  Search carried the claim in a one-line hint instead of the strip, with no
+  `data-notice` for the gate to find. Whether the source is the demo is a fact
+  about the request, so the strip is now drawn in every state, on every screen
+  that holds rows, and Search's weaker hint is gone.
+- **Fixed: an empty mood told the visitor to go and search.** `homeScreen`'s
+  empty state is the feed's copy — *"Search for something, or point DHUN at your
+  own data source in Settings"* — and a mood that came back empty rendered it,
+  to someone who had just pressed **Chill**. The mood's states now speak for the
+  mood and name the query that came back empty.
+- **Added: Home's header and mood rail, mirrored rather than invented.** The app
+  draws `Text("DHUN", brand)` over a `headlineMedium` greeting
+  (`GetHomeFeedUseCase.greetingForCurrentTime`), then a `DhunHorizontalRail` of
+  `HomeMood.kt`'s five moods. The web did none of it. All three are now there,
+  above the state — so a feed that failed still says hello and still offers
+  another way in. The moods are honest by construction: four of them carry a
+  `query` (`FOCUS("Focus", "focus instrumental music")` …) and choosing one
+  **is a search against the source**, shaped into the single shelf
+  `UseCases.moodSections` produces (`"<label> songs"` / `"Songs for <label>"`).
+  Nothing filters rows that are already loaded, which would have looked like a
+  mood and been a sort. Measured: pressing Chill issues a real
+  `POST music.youtube.com/youtubei/v1/search`; returning to *For you* issues
+  none.
+- **The greeting keeps the app's clock, including the trap the app already paid
+  for.** 5..11 morning, 12..16 afternoon, 17..21 evening, else night, on the
+  **local** hour — `greetingForNow` adds the device offset, as the Kotlin does.
+  This project has shipped the UTC version of this bug once already (Android,
+  2026-10-10: *"Home always said 'Good night'"*), so the boundaries are pinned on
+  both sides and Nepal's +5:45 is asserted directly.
+- Moods carry their own request state, so a mood that fails cannot empty the feed
+  the visitor came from, and a late answer is dropped if the visitor moved on.
+
+**Tests:** `app-web/tests/source.test.mjs` reads
+`shared/src/commonMain/kotlin/dev/dhun/domain/HomeMood.kt` and fails if the
+labels or the queries drift from the web's rail — the same mirror rule the token
+sheet lives under — plus the greeting's boundaries and offset, and the
+provenance rule (a stream that resolves must not relabel rows it did not
+produce). `views.test.mjs` pins the mood states' copy and the strip's presence.
+The provenance tests were mutation-checked: turning the rows record back into a
+plain list of request stages makes them fail.
+
+### The interface gets its first real layout review, and loses seven defects (2026-10-16, session `arena/126d4a83-dhun`), and loses seven defects (2026-10-16, session `arena/126d4a83-dhun`)
 
 The web build has been measured by CI since Phase 6 — overflow, contrast, tab
 order, axe, print — but geometry and contrast are not taste, and **nobody had
@@ -99,12 +162,9 @@ estimate.
   like it did nothing. A re-render of the same track now keeps their place; a
   different track still starts at the cover. Mutation-tested.
 
-**Not fixed in this round, and known:** the native Home leads with a greeting
-and a mood-chip row that the web Home does not have — mood filtering is a
-*source* feature in the app, not a coat of paint, so it is a later phase rather
-than a CSS change. A real phone and a real screen reader are still unvisited
-(Phase 8), and no claim about playback has changed: `PHASE-02-PLAYBACK-POC.md`
-is still open.
+**Not fixed in this round, and known:** a real phone and a real screen reader
+are still unvisited (Phase 8), and no claim about playback has changed:
+`PHASE-02-PLAYBACK-POC.md` is still open.
 
 ### The app stops printing the browser's errors as its own words (2026-10-16, session `arena/063cb1a6-dhun`)
 

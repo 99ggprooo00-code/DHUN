@@ -343,36 +343,68 @@ function shelvesToRows(shelves = [], { currentId, demoTracks }) {
     .reduce((out, piece) => html`${out}${piece}`, html``);
 }
 
-export function homeScreen({ shelves = [], loading = false, error = null, currentId, demoTracks = [], source }) {
-  if (loading) return loadingState(["Loading your home feed"]);
+export function homeScreen({
+  shelves = [],
+  loading = false,
+  error = null,
+  currentId,
+  demoTracks = [],
+  source,
+  greeting = "",
+  moods = [],
+  mood = "for-you",
+  moodLabel = "",
+  moodQuery = null,
+}) {
+  // The greeting and the mood rail are drawn above the state, as the app draws
+  // them: a feed that failed still says hello, and still offers the moods,
+  // which are their own requests against the source.
+  const header = homeHeader({ greeting, moods, mood });
+  /*
+   * The demo strip belongs to every state, not just a full one. It used to be
+   * appended after the shelves, so an *empty* screen — the state a mood lands in
+   * when the source has no songs for it — silently dropped the one sentence that
+   * says where the answer came from. Whether the source is the demo is a fact
+   * about the request, and a request that returned nothing is still a request.
+   */
+  const demoStrip = source?.kind === "demo"
+    ? notice({
+        tone: "warn",
+        title: "Demo catalogue",
+        body: "These fictional rows have no audio. DHUN reached no real source — Settings explains the data-source options.",
+        actions: [{ id: "open-settings-source", label: "Data source" }],
+        hook: "demo",
+      })
+    : html``;
+
+  if (loading) {
+    return html`${header}${loadingState([moodQuery ? `Loading ${moodLabel}` : "Loading your home feed"])}${demoStrip}`;
+  }
   if (error) {
-    return errorState({
-      title: "The home feed could not be loaded",
+    return html`${header}${errorState({
+      title: moodQuery ? `${moodLabel} could not be loaded` : "The home feed could not be loaded",
       body: error.help,
       technical: error.technical,
       actions: [
         { id: "retry-home", label: "Try again" },
         { id: "open-settings-source", label: "Change data source" },
       ],
-    });
+    })}${demoStrip}`;
   }
   if (!shelves.length) {
-    return emptyState({
-      title: "Nothing to show yet",
-      body: "Search for something, or point DHUN at your own data source in Settings.",
+    // A mood asks the source one question, so an empty answer is that question
+    // having no songs — not an empty app. "Search for something, or point DHUN
+    // at your own data source" is the *feed's* empty copy, and it was telling a
+    // visitor who had just pressed Chill to go and search.
+    return html`${header}${emptyState({
+      title: moodQuery ? `No ${moodLabel} songs` : "Nothing to show yet",
+      body: moodQuery
+        ? `The source answered with no songs for “${moodQuery}”. Another mood, or the search screen, is the way on.`
+        : "Search for something, or point DHUN at your own data source in Settings.",
       iconName: "Search",
-    });
+    })}${demoStrip}`;
   }
-  return html`${shelvesToRows(shelves, { currentId, demoTracks })}
-    ${source?.kind === "demo"
-      ? notice({
-          tone: "warn",
-          title: "Demo catalogue",
-          body: "These fictional rows have no audio. DHUN reached no real source — Settings explains the data-source options.",
-          actions: [{ id: "open-settings-source", label: "Data source" }],
-          hook: "demo",
-        })
-      : html``}`;
+  return html`${header}${shelvesToRows(shelves, { currentId, demoTracks })}${demoStrip}`;
 }
 
 const SEARCH_FILTERS = Object.freeze([
@@ -382,6 +414,41 @@ const SEARCH_FILTERS = Object.freeze([
   { id: "albums", label: "Albums" },
   { id: "playlists", label: "Playlists" },
 ]);
+
+/**
+ * The Home header: DHUN's wordmark and the time-of-day greeting, then the mood
+ * rail.
+ *
+ * Both are the app's, mirrored rather than invented. `HomeScreen.kt` opens with
+ * `Text("DHUN", brand)` and a `headlineMedium` greeting above the mood
+ * `DhunHorizontalRail`, and the greeting itself is
+ * `GetHomeFeedUseCase.greetingForCurrentTime` — "Good morning" for 5..11,
+ * "Good afternoon" for 12..16, "Good evening" for 17..21, "Good night"
+ * otherwise, on the *local* hour.
+ *
+ * The moods are `HomeMood.kt`'s five entries. Four of them are a search against
+ * the source (`FOCUS("Focus", "focus instrumental music")` …), so a mood is a
+ * real request and a real answer — not a client-side sort of rows that happen to
+ * be loaded, which would have been a filter dressed up as a mood.
+ *
+ * The header sits outside the loading/error switch on purpose: the app draws it
+ * above the state, so a feed that failed still says hello and still offers
+ * another way in.
+ */
+function homeHeader({ greeting, moods = [], mood = "for-you" }) {
+  return html`<div class="dhun-home__head">
+      <p class="dhun-home__brand">DHUN</p>
+      <h1 class="dhun-home__greeting">${greeting}</h1>
+    </div>
+    ${moods.length
+      ? html`<div class="dhun-chip-row" role="tablist" aria-label="Home mood">
+          ${moods.map(
+            (entry) => html`<button type="button" role="tab" class="dhun-chip" data-action="set-mood" data-mood="${entry.id}"
+              aria-selected="${mood === entry.id ? "true" : "false"}">${entry.label}</button>`,
+          )}
+        </div>`
+      : html``}`;
+}
 
 export function searchScreen({ query = "", results = null, status = "idle", filter = "all", recentSearches = [], currentId, source }) {
   const chips = html`<div class="dhun-chip-row" role="tablist" aria-label="Result type">
@@ -465,8 +532,16 @@ export function searchScreen({ query = "", results = null, status = "idle", filt
           autocomplete="off" spellcheck="false" aria-label="Search" />
         ${query ? html`<button type="button" class="dhun-icon-button dhun-icon-button--small" data-action="clear-search" aria-label="Clear the search">${icon("Close", { size: 18 })}</button>` : html``}
       </form>
-      ${source?.kind === "demo" ? html`<p class="dhun-search__hint">Searching the demo catalogue — fictional rows, no audio.</p>` : html``}
     </div>
+    ${source?.kind === "demo" && results
+      ? notice({
+          tone: "warn",
+          title: "Demo catalogue",
+          body: "These fictional rows have no audio. DHUN reached no real source — Settings explains the data-source options.",
+          actions: [{ id: "open-settings-source", label: "Data source" }],
+          hook: "demo",
+        })
+      : html``}
     ${chips}
     ${body}`;
 }

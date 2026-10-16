@@ -226,3 +226,24 @@ test("re-rendering the player does not throw the visitor back to the cover", () 
   assert.ok(key, "no track key is computed");
   assert.ok(!/tab/i.test(key[0]), "the tab must not be part of the key — that is the bug");
 });
+
+test("the mood rail's control is wired to a real request", () => {
+  assert.ok(handledActions().has("set-mood"), "no handler answers data-action=\"set-mood\"");
+  // The rail is a tablist of requests, so re-pressing the selected tab must not
+  // re-ask: a tab that reloads itself on every tap is a tab nobody trusts.
+  const start = main.indexOf('"set-mood":');
+  assert.notEqual(start, -1, "main.js has no set-mood handler");
+  const body = main.slice(start, main.indexOf("\n    },", start));
+  assert.match(body, /if \(id === state\.mood\) return;/, "pressing the selected mood re-fetches it");
+  assert.match(body, /loadMood\(id\)/, "choosing a mood does not load it");
+  // And the mood's own load path is a *source request*, not a client-side sort.
+  const load = main.indexOf("async function loadMood(");
+  assert.notEqual(load, -1, "there is no mood loader");
+  const loadBody = main.slice(load, main.indexOf("\n  }", load));
+  assert.match(loadBody, /sources\.search\(mood\.query\)/, "a mood must go to the source, not sort loaded rows");
+  assert.match(loadBody, /if \(!mood\.query\)/, "\"For you\" has no query and must not be fetched");
+  // A mood that arrives late must not overwrite a mood the visitor moved to.
+  assert.match(loadBody, /if \(state\.mood !== mood\.id\) return;/, "a stale mood answer can overwrite the current one");
+  // And a mood carries its own state, so its failure cannot empty the feed.
+  assert.match(main, /moodFeed: \{ status: "idle"/, "the mood borrows the feed's state");
+});

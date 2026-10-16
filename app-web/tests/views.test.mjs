@@ -23,7 +23,7 @@ import { LEGAL_DOCUMENTS, legalDocumentById } from "../src/js/data/legal-content
 import { handledActions, actionsIn } from "./helpers/main-source.mjs";
 import { miniPlayer, fullPlayer, statusLine } from "../src/js/player-ui.js";
 import { AUDIO_STATUS } from "../src/js/audio.js";
-import { failure, stateError } from "../src/js/source.js";
+import { failure, stateError, HOME_MOODS } from "../src/js/source.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const jsRoot = path.join(here, "..", "src", "js");
@@ -294,6 +294,24 @@ test("the honesty notices are in the rendered copy, not only in a doc", () => {
   // demo catalogue is answering and this strip is not on screen, so the strip
   // has to carry the name the moment the screen knows the source is the demo.
   assert.match(demoHome, /data-notice="demo"/);
+
+  // Search, too. It used to carry a one-line hint under the query bar instead
+  // of the strip (`Searching the demo catalogue — fictional rows, no audio.`),
+  // which is the same claim in smaller type and without the way out — and
+  // measured 2026-10-16 the search route carried no `data-notice` at all, so the
+  // browser job's rule ("the demo answered, so this page must say so") had
+  // nothing to find. Rows are rows on every screen.
+  const demoSearch = text(views.searchScreen({
+    query: "koshi",
+    status: "ready",
+    results: { tracks: [track("a", { demo: true })], albums: [], artists: [], playlists: [] },
+    source: { kind: "demo" },
+  }));
+  assert.match(demoSearch, /no audio/);
+  assert.match(demoSearch, /data-notice="demo"/);
+  // And a search still in flight makes no claim about rows it does not have.
+  const pendingSearch = text(views.searchScreen({ query: "koshi", status: "loading", source: { kind: "demo" } }));
+  assert.ok(!/data-notice="demo"/.test(pendingSearch), "an unfinished search has no rows to label");
 
   const noAudioBrowser = text(views.settingsScreen({ settings, ...shell, capabilities: { ...shell.platform, audioContext: false } }));
   assert.match(noAudioBrowser, /no Web Audio API/);
@@ -574,4 +592,66 @@ test("every control a screen renders is answered by a handler", () => {
     .filter(([action]) => !handled.has(action))
     .map(([action, where]) => `${action} (${[...where].sort().join(", ")})`);
   assert.deepEqual(dead, [], `these controls do nothing when pressed: ${dead.join("; ")}`);
+});
+
+test("a mood's states speak for the mood, and never drop the provenance strip", () => {
+  // Three defects this pins, all measured 2026-10-16 on a 390x844 phone with the
+  // source unreachable:
+  //   1. the demo strip was appended *after* the shelves, so an empty screen
+  //      silently lost the one sentence that says where the answer came from;
+  //   2. an empty mood reused the feed's empty copy — it told a visitor who had
+  //      just pressed Chill to "search for something, or point DHUN at your own
+  //      data source", which is a different screen's advice;
+  //   3. the mood's query was nowhere in the copy, so the sentence could not say
+  //      what had been asked.
+  const moods = [
+    { id: "for-you", label: "For you" },
+    { id: "chill", label: "Chill" },
+  ];
+  const source = { kind: "demo" };
+
+  const empty = text(views.homeScreen({
+    shelves: [], moods, mood: "chill", moodLabel: "Chill", moodQuery: "chill music",
+    greeting: "Good afternoon", source,
+  }));
+  assert.match(empty, /No Chill songs/);
+  assert.match(empty, /chill music/, "the copy names the request that came back empty");
+  assert.ok(!/Search for something/.test(empty), "the feed's empty copy is not the mood's");
+  assert.match(empty, /data-notice="demo"/, "an empty answer still says who answered");
+
+  const failed = text(views.homeScreen({
+    shelves: [], error: stateError(failure("http", new Error("HTTP 502 from /youtubei/v1/search"))),
+    moods, mood: "chill", moodLabel: "Chill", moodQuery: "chill music", greeting: "Good afternoon", source,
+  }));
+  assert.match(failed, /Chill could not be loaded/);
+  assert.match(failed, /data-notice="demo"/, "a failed request still says who answered");
+
+  const loading = text(views.homeScreen({
+    shelves: [], loading: true, moods, mood: "chill", moodLabel: "Chill", moodQuery: "chill music", source,
+  }));
+  assert.match(loading, /Loading Chill/);
+  assert.match(loading, /data-notice="demo"/);
+
+  // And the feed itself keeps its own words, and the header survives every
+  // state: the app draws the greeting above the state, not instead of it.
+  const feedEmpty = text(views.homeScreen({ shelves: [], moods, greeting: "Good evening", source: { kind: "innertube" } }));
+  assert.match(feedEmpty, /Nothing to show yet/);
+  assert.match(feedEmpty, /Good evening/);
+  assert.ok(!/data-notice="demo"/.test(feedEmpty), "a live source is not labelled a demo");
+});
+
+test("the header carries the app's brand and greeting, and the rail is the app's five moods", () => {
+  const body = text(views.homeScreen({
+    shelves: [{ title: "Quick picks", entries: [track("a")] }],
+    moods: HOME_MOODS.map(({ id, label }) => ({ id, label })),
+    mood: "focus",
+    greeting: "Good morning",
+  }));
+  assert.match(body, /dhun-home__brand">DHUN/);
+  assert.match(body, /Good morning/);
+  // HOME_MOODS is asserted against HomeMood.kt in source.test.mjs; here it is the
+  // rail's rendering that matters — five tabs, one selected, each addressable.
+  assert.equal(body.match(/data-action="set-mood"/g).length, 5);
+  assert.match(body, /data-mood="focus"[^>]*aria-selected="true"/);
+  assert.match(body, /role="tablist"/);
 });

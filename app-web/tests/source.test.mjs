@@ -10,6 +10,11 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 import {
   parseDuration,
@@ -34,6 +39,10 @@ import {
   walkJson,
   findRenderer,
   SOURCE_KIND,
+  HOME_MOODS,
+  moodById,
+  greetingForHour,
+  greetingForNow,
 } from "../src/js/source.js";
 
 /** A responsive list item, the renderer every list page uses. */
@@ -599,3 +608,154 @@ function jsonResponse(body, status = 200) {
     json: async () => body,
   };
 }
+
+test("the badge names the source that produced the rows, not the one it would have used", () => {
+  // Measured 2026-10-16: with the source unreachable, every screen showed the
+  // demo catalogue's rows under a badge reading "YouTube Music", because the
+  // badge asked `describeActive()` — the source DHUN would ask *first*. The
+  // browser job keys its honesty rule on `data-kind="demo"`, so a lying badge
+  // also switched that rule off: `kind === "demo" && !demoNotice` could never
+  // fire while the demo was the source.
+  const settings = {
+    values: { sourceId: "auto", endpointUrl: "" },
+    get(key) {
+      return this.values[key];
+    },
+  };
+  const failing = async () => {
+    throw new TypeError("Failed to fetch");
+  };
+  const manager = createSourceManager({ settings, fetchImpl: failing });
+
+  // Before anything is asked there are no rows, and naming what DHUN is about
+  // to ask is not a claim about data — that is the honest default.
+  assert.equal(manager.rowsUsed.kind, SOURCE_KIND.INNERTUBE, "nothing asked yet: name the source that will be asked");
+  assert.equal(manager.describeRows().kind, SOURCE_KIND.INNERTUBE);
+
+  return manager.home().then(() => {
+    assert.equal(manager.rowsUsed.kind, SOURCE_KIND.DEMO, "the demo answered, so the badge says demo");
+    assert.equal(manager.describeRows().kind, SOURCE_KIND.DEMO);
+    assert.equal(manager.rowsUsed.reason.kind, "network-or-cors", "and it carries why the real source was not used");
+
+    // A track that will not play is a request like any other, and it used to
+    // overwrite this answer with `kind: null`.
+    return manager.resolveStream("dQw4w9WgXcQ").then((result) => {
+      assert.equal(result.ok, false, "the demo is never a stream");
+      assert.equal(manager.lastUsed.kind, null, "the last request failed, and says so");
+      assert.equal(manager.rowsUsed.kind, SOURCE_KIND.DEMO, "the rows on screen are still the demo's");
+      assert.equal(manager.describeRows().kind, SOURCE_KIND.DEMO, "so the badge still says demo");
+    });
+  });
+});
+
+test("a stream that resolves does not relabel rows it did not produce", () => {
+  // The dangerous transition, and the one that makes "rows" a separate record
+  // rather than a *list of stages*: the live source comes back mid-session. The
+  // rows on screen are still the demo's — a stream request produces no rows —
+  // so a successful resolve must not turn the badge into a claim about them.
+  const settings = {
+    values: { sourceId: "auto", endpointUrl: "https://example.org/dhun/" },
+    get(key) {
+      return this.values[key];
+    },
+  };
+  const fetchImpl = async (url) => {
+    if (String(url).endsWith("/stream")) {
+      return jsonResponse({ url: "https://cdn.test/a", mimeType: "audio/webm", title: "One", durationMs: 1000 });
+    }
+    throw new TypeError("Failed to fetch");
+  };
+  const manager = createSourceManager({ settings, fetchImpl });
+
+  return manager
+    .home()
+    .then((home) => {
+      assert.equal(home.usedKind, SOURCE_KIND.DEMO, "nothing list-shaped answered, so the demo did");
+      assert.equal(manager.rowsUsed.kind, SOURCE_KIND.DEMO);
+      return manager.resolveStream("v1");
+    })
+    .then((stream) => {
+      assert.equal(stream.ok, true, "the endpoint came back for the stream");
+      assert.equal(manager.lastUsed.kind, SOURCE_KIND.ENDPOINT, "the last request was the endpoint's");
+      assert.equal(manager.rowsUsed.kind, SOURCE_KIND.DEMO, "but the rows on screen are still the demo's");
+      assert.equal(manager.describeRows().kind, SOURCE_KIND.DEMO, "and the badge still has to say so");
+    });
+});
+
+test("a search answered by the demo is labelled like a home feed answered by it", () => {
+  const settings = {
+    values: { sourceId: "auto", endpointUrl: "" },
+    get(key) {
+      return this.values[key];
+    },
+  };
+  const manager = createSourceManager({
+    settings,
+    fetchImpl: async () => {
+      throw new TypeError("Failed to fetch");
+    },
+  });
+  return manager.search("koshi").then((result) => {
+    assert.equal(result.usedKind, SOURCE_KIND.DEMO);
+    assert.equal(manager.rowsUsed.kind, SOURCE_KIND.DEMO, "a search's rows are rows too");
+    const search = settings.get("sourceId");
+    assert.equal(search, "auto");
+  });
+});
+
+test("the mood rail is HomeMood.kt, not a guess at it", () => {
+  // This is the mirror rule the token sheet lives under, applied to the one
+  // thing on Home a visitor presses: if the Kotlin's labels or its queries
+  // change, the web's rail has to change with them, and the only way to know is
+  // to read the file.
+  const kotlin = readFileSync(
+    path.resolve(here, "..", "..", "shared/src/commonMain/kotlin/dev/dhun/domain/HomeMood.kt"),
+    "utf8",
+  );
+  const entries = [...kotlin.matchAll(/^\s{4}([A-Z_]+)\("([^"]+)"(?:,\s*"([^"]+)")?\)/gm)].map((match) => ({
+    constant: match[1],
+    label: match[2],
+    query: match[3] ?? null,
+  }));
+  assert.equal(entries.length, 5, "HomeMood.kt no longer has five moods");
+  assert.deepEqual(
+    HOME_MOODS.map((mood) => ({ label: mood.label, query: mood.query })),
+    entries.map((entry) => ({ label: entry.label, query: entry.query })),
+    "the web's mood rail drifts from HomeMood.kt",
+  );
+  // The ids are the web's own, and every one has to be addressable by the action.
+  assert.deepEqual(HOME_MOODS.map((mood) => mood.id), ["for-you", "focus", "chill", "workout", "party"]);
+  assert.equal(moodById("nope").id, "for-you", "an unknown mood falls back to the feed");
+  // "For you" is the feed itself: no query means no request, which is what makes
+  // the other four real requests rather than a filter.
+  assert.equal(HOME_MOODS[0].query, null);
+  assert.ok(HOME_MOODS.slice(1).every((mood) => typeof mood.query === "string" && mood.query.length > 0));
+});
+
+test("the greeting keeps the app's clock, boundaries and all", () => {
+  // UseCases.greetingForHour: 5..11 morning, 12..16 afternoon, 17..21 evening,
+  // else night. Every boundary is asserted on both sides, because an off-by-one
+  // here is a wrong greeting twice a day.
+  const boundaries = [
+    [0, "Good night"], [4, "Good night"], [5, "Good morning"], [11, "Good morning"],
+    [12, "Good afternoon"], [16, "Good afternoon"], [17, "Good evening"], [21, "Good evening"],
+    [22, "Good night"], [23, "Good night"],
+  ];
+  for (const [hour, expected] of boundaries) {
+    assert.equal(greetingForHour(hour), expected, `hour ${hour}`);
+  }
+
+  // The Kotlin adds the *device* offset before taking the hour, and Nepal is
+  // +5:45 — the case a UTC-only greeting gets wrong every evening.
+  const nepal = 5.75 * 3_600_000;
+  const afternoonUtc = Date.UTC(2026, 9, 16, 13, 0, 0);
+  assert.equal(greetingForNow(afternoonUtc, 0), "Good afternoon", "13:00 UTC is afternoon in UTC");
+  assert.equal(greetingForNow(afternoonUtc, nepal), "Good evening", "and 18:45 in Dharan");
+  const lateUtc = Date.UTC(2026, 9, 16, 20, 0, 0);
+  assert.equal(greetingForNow(lateUtc, nepal), "Good night", "01:45 next day in Dharan is night");
+  // `greetingForNow` reads the clock through the same integer arithmetic the
+  // Kotlin uses, so an invalid hour cannot produce a greeting.
+  assert.equal(greetingForHour(Number.NaN), "Good night");
+  assert.equal(greetingForHour(24), "Good night", "hour 24 wraps to midnight");
+  assert.equal(greetingForHour(-1), "Good night", "and so does an hour before midnight");
+});

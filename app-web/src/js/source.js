@@ -43,6 +43,54 @@ export const SOURCE_KIND = Object.freeze({
   DEMO: "demo",
 });
 
+/* ----------------------------------------------------------------- moods -- */
+
+/**
+ * Home's mood rail, mirrored from `domain/HomeMood.kt`.
+ *
+ * Every mood but the first carries a `query`, and that query is what the app
+ * sends to the source: choosing a mood is a real request whose answer becomes a
+ * shelf (`UseCases.moodSections`: title `"<label> songs"`, subtitle
+ * `"Songs for <label>"`). Nothing here filters rows that are already loaded —
+ * a mood that silently narrowed the current list would look like a mood and be
+ * a sort.
+ */
+export const HOME_MOODS = Object.freeze([
+  Object.freeze({ id: "for-you", label: "For you", query: null }),
+  Object.freeze({ id: "focus", label: "Focus", query: "focus instrumental music" }),
+  Object.freeze({ id: "chill", label: "Chill", query: "chill music" }),
+  Object.freeze({ id: "workout", label: "Workout", query: "workout music" }),
+  Object.freeze({ id: "party", label: "Party", query: "party music" }),
+]);
+
+export function moodById(id) {
+  return HOME_MOODS.find((mood) => mood.id === id) ?? HOME_MOODS[0];
+}
+
+/**
+ * `GetHomeFeedUseCase.greetingForHour`: 5..11 morning, 12..16 afternoon,
+ * 17..21 evening, everything else night. Boundaries are inclusive and the hour
+ * is local, which is why `greetingForNow` takes the offset rather than reading
+ * UTC — Nepal is +5:45, and an app that greeted a Dharan evening with "Good
+ * morning" would be wrong twice a day.
+ */
+export function greetingForHour(hour24) {
+  const hour = Number(hour24);
+  if (!Number.isFinite(hour)) return "Good night";
+  const wrapped = ((Math.trunc(hour) % 24) + 24) % 24;
+  if (wrapped >= 5 && wrapped <= 11) return "Good morning";
+  if (wrapped >= 12 && wrapped <= 16) return "Good afternoon";
+  if (wrapped >= 17 && wrapped <= 21) return "Good evening";
+  return "Good night";
+}
+
+/** The mirror of `greetingForCurrentTime(clock, utcOffsetMs)`. */
+export function greetingForNow(nowMs = Date.now(), utcOffsetMs = 0) {
+  const shifted = nowMs + utcOffsetMs;
+  const totalHours = Math.floor(shifted / 3_600_000);
+  return greetingForHour(((totalHours % 24) + 24) % 24);
+}
+
 /* ------------------------------------------------------------ failure type -- */
 
 /**
@@ -1122,6 +1170,20 @@ export function createSourceManager({ settings, fetchImpl } = {}) {
   let innertube = createInnertubeSource({ fetchImpl });
 
   let lastUsed = { kind: SOURCE_KIND.DEMO, reason: null, at: 0 };
+  /*
+   * Where the *rows on screen* came from — a different question from "what
+   * happened last", and the one the badge answers.
+   *
+   * `lastUsed` is overwritten by every request, including stream resolution,
+   * which never produces a row: resolving a track fails with `kind: null`, so a
+   * badge reading `lastUsed` would say "no source" while the demo catalogue's
+   * rows sat on screen, and while they were in fact on screen it said "YouTube
+   * Music" — the source it *would* have used. Both are claims about provenance
+   * that nothing supports. This records only the list stages, so the badge and
+   * the demo strip describe the rows a person is actually looking at.
+   */
+  const LIST_STAGES = new Set(["home", "search", "browse"]);
+  let rowsUsed = { kind: null, reason: null, at: 0 };
 
   function configuredId() {
     return settings?.get?.("sourceId") ?? "auto";
@@ -1164,6 +1226,9 @@ export function createSourceManager({ settings, fetchImpl } = {}) {
           at: Date.now(),
           demo: source.kind === SOURCE_KIND.DEMO,
         };
+        if (LIST_STAGES.has(stage)) {
+          rowsUsed = { kind: source.kind, reason: lastFailure, at: Date.now() };
+        }
         return { ...result, usedKind: source.kind, reason: lastFailure };
       }
       if (result?.ok === false) lastFailure = result;
@@ -1175,15 +1240,39 @@ export function createSourceManager({ settings, fetchImpl } = {}) {
     return failure(stage, new Error("no data source is available"));
   }
 
+  /** The source DHUN would ask first, per the configured policy. */
+  function describeActive() {
+    const active = order()[0];
+    return active?.describe?.() ?? demo.describe();
+  }
+
   return {
     get lastUsed() {
       return lastUsed;
     },
+    /** The source that produced the rows on screen. Until a list request has been
+     *  answered there are no such rows, so its kind falls back to the source DHUN
+     *  is about to ask — which is not a claim about data already shown, and is
+     *  what the badge says before the first answer arrives. */
+    get rowsUsed() {
+      return rowsUsed.kind ? rowsUsed : { ...rowsUsed, kind: describeActive().kind };
+    },
     refresh,
-    /** What the UI prints for "where did these rows come from". */
-    describeActive() {
-      const active = order()[0];
-      return active?.describe?.() ?? demo.describe();
+    /** What the UI prints for "where is the data coming from". */
+    describeActive,
+    /** What the UI prints for "where did the rows on screen come from" — the
+     *  badge's question, and the demo strip's. */
+    describeRows() {
+      switch (rowsUsed.kind) {
+        case SOURCE_KIND.ENDPOINT:
+          return endpoint.describe();
+        case SOURCE_KIND.INNERTUBE:
+          return innertube.describe();
+        case SOURCE_KIND.DEMO:
+          return demo.describe();
+        default:
+          return describeActive();
+      }
     },
     search: (query) => run((source) => source.search(query), { allowDemo: true, stage: "search" }),
     home: () => run((source) => source.home(), { allowDemo: true, stage: "home" }),
