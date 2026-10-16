@@ -1,5 +1,7 @@
 """Safety contracts for the release workflow without a third-party YAML parser."""
 
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -134,6 +136,19 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("gh release delete test --yes --cleanup-tag", self.publish_test)
         for tag in ("dev-v0.1.0", "dev-v0.1.1", "dev"):
             self.assertNotIn(f"gh release delete {tag} ", self.publish_test)
+
+    @unittest.skipUnless(shutil.which("jq"), "jq is available on the Ubuntu release runner")
+    def test_draft_asset_comparison_normalizes_json_presentation(self):
+        # GitHub CLI --jq prints compact JSON while jq -s prints multi-line
+        # JSON. The old byte-for-byte comparison falsely rejected a complete
+        # twelve-asset draft. Normalize both before comparing.
+        self.assertIn("| jq -R . | jq -sc 'sort')", self.publish)
+        self.assertIn("--jq '[.assets[] | select(.size > 0) | .name] | sort' | jq -c .)", self.publish)
+        names = "z.apk\na.apk\n"
+        quoted = subprocess.check_output(["jq", "-R", "."], input=names.encode())
+        expected = subprocess.check_output(["jq", "-sc", "sort"], input=quoted).decode().strip()
+        actual = subprocess.check_output(["jq", "-c", "."], input=b'["a.apk","z.apk"]').decode().strip()
+        self.assertEqual(expected, actual)
 
     def test_fixed_version_is_created_once_as_public_prerelease(self):
         self.assertIn("Stage, verify and publish the fixed v1.00.002 prerelease once", self.publish)

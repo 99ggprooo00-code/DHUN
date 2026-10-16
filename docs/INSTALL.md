@@ -1,17 +1,17 @@
 # Installing DHUN 1.00.002
 
-DHUN 1.00.002 is a **public pre-release for testing**, not a stable, store-signed, or hardware-accepted release. Use it only if you are comfortable with experimental software and possible playback breakage. The release is built from this repository; DHUN is not affiliated with YouTube or Google.
+DHUN 1.00.002 is an **experimental public build for testing**, not a stable, store-signed, or hardware-accepted release. GitHub currently marks the published release as a regular release rather than a prerelease; that label is not hardware acceptance. Use it only if you are comfortable with experimental software and possible playback breakage. The release is built from this repository; DHUN is not affiliated with YouTube or Google.
 
 ## Which file to download
 
 | Platform | File | Notes |
 |---|---|---|
-| Android (most devices) | `dhun-v1.00.002.apk` | Universal APK. Use this unless you know you need a split. |
+| Android (most devices) | `dhun-universal-v1.00.002.apk` | Universal APK. Use this unless you know you need a split. |
 | Android, 64-bit ARM | `dhun-v1.00.002-arm64-v8a.apk` | Optional split. Same app version. |
 | Android, 32-bit ARM | `dhun-v1.00.002-armeabi-v7a.apk` | Optional split. Same app version. |
 | Windows (desktop) | `dhun-v1.00.002.msi` | Per-user installer, built on a hosted x64 Windows runner. Unsigned. Windows versions and the MSI architecture have not been verified on user hardware. |
 
-Each file has a matching `.sha256` sidecar and a plain-text `.provenance.txt` record. The older v1.00.001 release keeps its historical `*.build-info.json` files.
+Each published binary has a `.sha256` sidecar. The four `.provenance.txt` records staged in the original draft are **not currently listed** among the published v1.00.002 assets; do not rely on them being available. The older v1.00.001 release keeps its historical `*.build-info.json` files.
 
 Open the [DHUN v1.00.002 release page](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.002) to download the files.
 
@@ -22,7 +22,16 @@ A checksum proves the file you downloaded is byte-identical to the file the rele
 Linux or macOS (run in the folder that contains both files):
 
 ```sh
-sha256sum -c dhun-v1.00.002.apk.sha256
+# The universal APK asset was renamed after publication, but its checksum
+# sidecar still names the original filename. Compare the digests explicitly.
+expected=$(awk '{print $1}' dhun-universal-v1.00.002.apk.sha256)
+actual=$(sha256sum dhun-universal-v1.00.002.apk | awk '{print $1}')
+if [ -n "$expected" ] && [ "$actual" = "$expected" ]; then
+    echo 'OK: checksum matches'
+else
+    echo 'MISMATCH: do not install' >&2
+    exit 1
+fi
 ```
 
 Windows PowerShell (run in the folder that contains both files):
