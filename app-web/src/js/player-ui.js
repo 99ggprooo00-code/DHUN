@@ -261,25 +261,27 @@ export function fullPlayer(state) {
           : html``}
       </div>
 
-      ${playerNotice(state)}
-      ${seekBar(state)}
-      ${transport(state)}
-      ${volumeRow(state)}
+      <div class="dhun-full__controls">
+        ${playerNotice(state)}
+        ${seekBar(state)}
+        ${transport(state)}
+        ${volumeRow(state)}
 
-      <div class="dhun-full__actions">
-        <button type="button" class="dhun-icon-button ${state.liked ? "dhun-icon-button--active" : ""}" data-action="toggle-like"
-          aria-pressed="${state.liked ? "true" : "false"}" aria-label="Like this track">${icon(state.liked ? "Favorite" : "FavoriteBorder", { size: 22 })}</button>
-        <button type="button" class="dhun-icon-button ${state.eqActive ? "dhun-icon-button--active" : ""}" data-action="open-equalizer"
-          aria-label="Equaliser" title="${state.eqLabel}">${icon("GraphicEq", { size: 22 })}</button>
-        <button type="button" class="dhun-icon-button" data-action="track-menu" aria-label="Add to playlist">${icon("Add", { size: 22 })}</button>
-        <span class="dhun-full__tabs">
-          <button type="button" class="dhun-chip" data-action="player-tab" data-tab="queue" aria-selected="${state.tab === "queue" ? "true" : "false"}" role="tab">
-            Queue${state.queue.length ? html` <span class="dhun-chip__count">${state.queue.length}</span>` : html``}
-          </button>
-          <button type="button" class="dhun-chip" data-action="player-tab" data-tab="lyrics" aria-selected="${state.tab === "lyrics" ? "true" : "false"}" role="tab">
-            Lyrics
-          </button>
-        </span>
+        <div class="dhun-full__actions">
+          <button type="button" class="dhun-icon-button ${state.liked ? "dhun-icon-button--active" : ""}" data-action="toggle-like"
+            aria-pressed="${state.liked ? "true" : "false"}" aria-label="Like this track">${icon(state.liked ? "Favorite" : "FavoriteBorder", { size: 22 })}</button>
+          <button type="button" class="dhun-icon-button ${state.eqActive ? "dhun-icon-button--active" : ""}" data-action="open-equalizer"
+            aria-label="Equaliser" title="${state.eqLabel}">${icon("GraphicEq", { size: 22 })}</button>
+          <button type="button" class="dhun-icon-button" data-action="track-menu" aria-label="Add to playlist">${icon("Add", { size: 22 })}</button>
+          <span class="dhun-full__tabs">
+            <button type="button" class="dhun-chip" data-action="player-tab" data-tab="queue" aria-selected="${state.tab === "queue" ? "true" : "false"}" role="tab">
+              Queue${state.queue.length ? html` <span class="dhun-chip__count">${state.queue.length}</span>` : html``}
+            </button>
+            <button type="button" class="dhun-chip" data-action="player-tab" data-tab="lyrics" aria-selected="${state.tab === "lyrics" ? "true" : "false"}" role="tab">
+              Lyrics
+            </button>
+          </span>
+        </div>
       </div>
 
       <div class="dhun-full__panel" role="tabpanel">

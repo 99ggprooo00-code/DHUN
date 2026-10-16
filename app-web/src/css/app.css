@@ -140,10 +140,21 @@ a {
  * `ui/shell/DhunShellLayout.kt` decides it.
  * ========================================================================= */
 
+/* The shell owns the viewport and the scroll region inside it owns the
+   scrolling — that is the whole point of `.dhun-scroll`. `min-height` alone
+   does not do it: the app grew to the height of its content instead (measured
+   2026-10-16: 2210px tall in a 900px window), so the *document* scrolled, the
+   app bar and the navigation rail slid out of view, and a `position: fixed`
+   toast drifted over whatever row happened to be under it. `height` bounds the
+   column, which is what lets `.dhun-scroll`'s own `overflow-y: auto` ever
+   engage. `dvh` follows the mobile URL bar; `vh` is the fallback for the
+   browsers that do not know `dvh` yet. */
 #app {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -351,10 +362,25 @@ a {
   z-index: 50;
 }
 
+/* The toast floats over everything, so it has to float *clear of the dock* —
+   and the dock is not one height. The scroll region ends at the dock's top
+   edge, but a fixed overlay is measured against the viewport, and this one
+   used the content inset (112px) as its offset. Measured 2026-10-16 at
+   390x844: the dock is a 85px mini player over an 81px navigation bar — 166px
+   — so the toast sat squarely across the mini player and a tap on its expand
+   control landed on the toast instead (the player could not be opened on a
+   phone at all). The offset is now made of the dock it actually has. */
 .dhun-toast-mount {
   z-index: 55;
   top: auto;
-  bottom: var(--dhun-space-content-bottom-inset);
+  bottom: var(--dhun-space-bottom-nav-height);
+}
+
+#app:has(.dhun-mini) .dhun-toast-mount {
+  bottom: calc(
+    var(--dhun-space-mini-player-height) + var(--dhun-space-bottom-nav-height) +
+      var(--dhun-space-sm)
+  );
 }
 
 .dhun-overlay-mount > *,
@@ -575,6 +601,20 @@ a {
   min-width: 0;
 }
 
+/* A notice's message *is* the notice, so it must never be squeezed into a
+   column of single words to make room for its own buttons. `flex-wrap` alone
+   does not save it: the text's flex basis is 0 and `min-width: 0` lets it
+   shrink past its longest word, so the buttons keep their width and the
+   message collapses. Measured 2026-10-16 at 1280x900: inside the player's
+   343px control column, "This track could not be played" rendered one word per
+   line beside Retry / Data source / Why?. The message now takes its own line
+   and the actions sit under it, which is also how the app's
+   PlayerControlCluster arranges the same notice in the same narrow column. */
+.dhun-full__controls .dhun-notice {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .dhun-notice__title {
   margin: 0;
   font: var(--dhun-text-title-small);
@@ -591,6 +631,15 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: var(--dhun-space-xs);
+}
+
+/* A phone is narrower than the player's control column, so a notice in a list
+   gets the same treatment there: message first, actions underneath. */
+@media (max-width: 479px) {
+  .dhun-notice {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .dhun-notice__actions .dhun-button {
@@ -854,15 +903,21 @@ a {
   border-radius: var(--dhun-shape-card);
 }
 
-.dhun-art--quick {
-  width: var(--dhun-space-quick-pick-width);
-  height: var(--dhun-space-quick-pick-width);
-  border-radius: var(--dhun-shape-card-large);
+.dhun-art--quickrow {
+  width: var(--dhun-space-touch-target);
+  height: var(--dhun-space-touch-target);
+  border-radius: var(--dhun-shape-medium);
 }
 
+/* The hero fills the field it is given and stops at the app's own ceiling.
+   It used to stop at --dhun-space-artwork-large (280px) instead — the size the
+   app draws on a *playlist* header — which is why a 390px phone showed a 280px
+   cover with 55px of dead gutter either side. Entity headers are unaffected:
+   they sit inside .dhun-entity__art, which caps itself at the playlist
+   measure and leaves this to fill it. */
 .dhun-art--hero {
   width: 100%;
-  max-width: var(--dhun-space-artwork-large);
+  max-width: var(--dhun-player-artwork-max);
   aspect-ratio: 1;
   border-radius: var(--dhun-shape-artwork-hero);
 }
@@ -1057,8 +1112,7 @@ a {
 
 /* One scroller, two shapes. A card shelf is the same album card as the grid, so
    it keeps the grid's column width — the two read as the same shelf whatever the
-   screen puts them in. A quick-pick shelf holds artwork-first tiles that bring
-   their own width, and their gap is the larger one because the tiles are. */
+   screen puts them in. */
 .dhun-shelf--cards .dhun-card-item {
   min-width: var(--dhun-grid-card-min);
 }
@@ -1067,52 +1121,85 @@ a {
   height: 100%;
 }
 
+/* Quick picks are the app's `QuickPicksGrid`: its 12 tracks chunked two to a
+   column, each column as wide as `DhunSpacing.dialogMinWidth` and scrolled
+   sideways as one rail (`DhunHorizontalRail`). The web used to draw these as
+   260px artwork-first tiles instead, which was neither the app's component nor
+   even self-consistent — the 260px artwork sat inside a 260px tile that had
+   8px of padding and a 2px border, so every cover hung 18px out of its own
+   card. The rows below are the real component: a 48dp square
+   (`Modifier.size(DhunSpacing.touchTarget)`), title over artist, on the
+   content-row surface (`dhunContentRowSurface` = the content fill at
+   `DhunShapes.medium`). */
 .dhun-shelf--quick {
   align-items: flex-start;
-  gap: var(--dhun-space-md-plus);
+  gap: var(--dhun-space-md);
 }
 
-.dhun-quickpick-item,
+.dhun-quickcol-item,
 .dhun-card-item {
   flex: 0 0 auto;
   list-style: none;
 }
 
-.dhun-quickpick {
+.dhun-quickcol {
   display: flex;
   flex-direction: column;
-  gap: var(--dhun-space-xs);
-  width: var(--dhun-space-quick-pick-width);
+  gap: var(--dhun-space-sm);
+  width: var(--dhun-space-dialog-min-width);
+}
+
+.dhun-quickrow {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  width: 100%;
   padding: var(--dhun-space-sm);
-  border-radius: var(--dhun-shape-card-large);
+  border-radius: var(--dhun-shape-medium);
   background: var(--dhun-glass);
-  border: var(--dhun-space-border) solid var(--dhun-border);
   text-align: left;
   transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
 }
 
-.dhun-quickpick:hover {
+.dhun-quickrow:hover {
   background: var(--dhun-overlay-hover);
 }
 
-.dhun-quickpick__art,
-.dhun-card__art {
-  display: block;
+.dhun-quickrow[aria-current="true"] {
+  background: var(--dhun-accent-container);
 }
 
-.dhun-quickpick__title,
-.dhun-quickpick__sub {
+.dhun-quickrow[aria-current="true"] .dhun-quickrow__title,
+.dhun-quickrow[aria-current="true"] .dhun-quickrow__sub {
+  color: var(--dhun-on-accent-container);
+}
+
+.dhun-quickrow__art,
+.dhun-card__art {
+  display: block;
+  flex: none;
+}
+
+.dhun-quickrow__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dhun-quickrow__title,
+.dhun-quickrow__sub {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dhun-quickpick__title {
+.dhun-quickrow__title {
   font: var(--dhun-text-track-title);
 }
 
-.dhun-quickpick__sub {
+.dhun-quickrow__sub {
   font: var(--dhun-text-body-small);
   color: var(--dhun-text-secondary);
 }
@@ -1678,7 +1765,12 @@ input[type="range"]:disabled {
   gap: var(--dhun-space-md);
   padding: var(--dhun-space-md) var(--dhun-space-screen-padding)
     calc(var(--dhun-space-xl) + env(safe-area-inset-bottom));
-  max-width: var(--dhun-player-controls-max);
+  /* The stacked composition is a content column, so it keeps the app's
+     reading measure rather than the player's control measure. It was pinned to
+     --dhun-player-controls-max (400px) — the transport column — which squeezed
+     the whole player, hero included, into a 400px strip down the middle of a
+     desktop window. */
+  max-width: var(--dhun-pane-master-max);
   margin-inline: auto;
   width: 100%;
 }
@@ -1718,11 +1810,25 @@ input[type="range"]:disabled {
 
 .dhun-full__art {
   width: 100%;
-  max-width: var(--dhun-space-artwork-large);
+  max-width: var(--dhun-player-artwork-max);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--dhun-space-md);
+}
+
+/* The control cluster is the app's PlayerControlCluster: notice, timeline,
+   transport, volume and the action row, as one column that can be given a
+   width without touching any of its rows. Stacked, that width is the
+   comfortable transport measure (DhunSpacing.playerTransportMaxWidth); the
+   wide layout below swaps it for the app's own clamp. */
+.dhun-full__controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-md);
+  width: 100%;
+  max-width: var(--dhun-player-controls-max);
+  margin-inline: auto;
 }
 
 .dhun-visualiser {
@@ -1822,6 +1928,7 @@ input[type="range"]:disabled {
 .dhun-visualiser {
   display: block;
   width: 100%;
+  max-width: var(--dhun-player-artwork-max);
   height: auto;
   color: var(--dhun-accent);
 }
@@ -1859,13 +1966,33 @@ input[type="range"]:disabled {
   color: var(--dhun-text-secondary);
 }
 
-/* Wide layout: the cover and the controls sit side by side, as the app's
-   PlayerLayout does above its own 480dp threshold. */
+/* Wide layout — the app's FullPlayerLayoutMode.Wide: taken when the viewport is
+   at least DhunSpacing.playerWideLayoutMinWidth (480dp) *and* is wider than it
+   is tall, so a landscape phone or a desktop window puts the control cluster
+   beside the hero instead of collapsing the cover into the few pixels left
+   above a tall bottom stack.
+
+   `orientation: landscape` is the closest media feature to `width > height`;
+   it is deliberately paired with the width floor, exactly as the Kotlin does.
+
+   The split is the Kotlin's own arithmetic, not an eyeballed pair of halves:
+   the controls column is clamp(0.34 · width, 240dp, 400dp)
+   (PlayerLayout.playerWideControlsWidth) and *all* remaining width is the
+   artwork field, which then fits its cover to min(field width, field height,
+   640dp) (PlayerLayout.fittedPlayerArtworkSize). The old rule gave both
+   columns `1 1 45%` inside a 400px-tall column, so the "wide" player was a
+   400px strip split in two.
+
+   The controls cluster is bottom-aligned in its column because that is where
+   the app draws it — `contentAlignment = Alignment.BottomCenter`. */
 @media (min-width: 480px) and (orientation: landscape) {
   .dhun-full__inner {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: flex-start;
+    max-width: calc(
+      var(--dhun-player-artwork-max) + var(--dhun-player-controls-max) + var(--dhun-space-sm)
+    );
   }
 
   .dhun-full__bar,
@@ -1874,22 +2001,40 @@ input[type="range"]:disabled {
   }
 
   .dhun-full__stage {
-    flex: 1 1 45%;
-    position: sticky;
-    top: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-self: stretch;
+    justify-content: center;
   }
 
-  .dhun-full__art {
-    max-width: var(--dhun-space-artwork-playlist);
-  }
-
-  .dhun-seek,
-  .dhun-transport,
-  .dhun-volume,
-  .dhun-full__actions,
-  .dhun-notice {
-    flex: 1 1 45%;
+  .dhun-full__controls {
+    flex: none;
+    width: clamp(
+      var(--dhun-player-controls-min),
+      34%,
+      var(--dhun-player-controls-max)
+    );
+    max-width: none;
     margin-inline: 0;
+    justify-content: flex-end;
+    align-self: stretch;
+  }
+}
+
+/* A short viewport compacts the player's spacing so the hero and every control
+   still fit (PlayerLayout.usesCompactPlayerControls, at DhunSpacing's
+   playerCompactControlsHeight = 640dp). Spacing only — "all interactive
+   controls retain their existing target sizes", as that function's own comment
+   says, so nothing here touches a target. */
+@media (max-height: 640px) {
+  .dhun-full__inner {
+    gap: var(--dhun-space-sm);
+  }
+
+  .dhun-full__stage,
+  .dhun-full__art,
+  .dhun-full__controls {
+    gap: var(--dhun-space-sm);
   }
 }
 
@@ -2252,10 +2397,30 @@ h4.dhun-legal__heading {
     border: var(--dhun-space-border) solid var(--dhun-border);
   }
 
+  /* Wide screens hide the navigation bar and give the mini player its own
+     margins, so the content inset already clears the whole dock here. */
+  .dhun-toast-mount,
+  #app:has(.dhun-mini) .dhun-toast-mount {
+    bottom: var(--dhun-space-content-bottom-inset);
+  }
+
   .dhun-scroll {
     padding-bottom: var(--dhun-space-lg);
   }
 
+  /* The large-screen reading measure is the app's *master pane* ceiling, not
+     the player's control column. DhunShellPolicy.masterPaneMaxWidth is
+     DhunSpacing.playerContentMaxWidth (720dp) precisely because "a list of
+     rows does not improve when it gets wider": rows and quick-picks were
+     designed at roughly phone width, so past 720dp the extra space belongs to
+     the detail pane, not to the list.
+
+     This block used to cap the same regions at --dhun-player-controls-max
+     (400dp) — the Full Player's transport column — which at 1280x900 left a
+     400px column marooned in a 1200px area: 800px of dead glass. It is the
+     same ceiling the app has, now taken from the same token; the legal pages
+     keep their own narrower 680px measure because body copy is a different
+     problem from a list of rows. */
   .dhun-section,
   .dhun-entity,
   .dhun-searchbar,
@@ -2268,16 +2433,22 @@ h4.dhun-legal__heading {
   .dhun-eq,
   .dhun-eq__actions,
   .dhun-diagnostics,
-  .dhun-details,
+  .dhun-details {
+    max-width: var(--dhun-pane-master-max);
+    margin-inline: auto;
+  }
+
+  /* The legal pages keep their own reading measure at every width — their
+     base rules already set it, and this block is only what centres them. */
   .dhun-legal__intro,
   .dhun-legal__index,
   .dhun-legal__body {
-    max-width: var(--dhun-player-controls-max);
+    max-width: var(--dhun-space-legal-content-max);
     margin-inline: auto;
   }
 
   .dhun-notice {
-    max-width: var(--dhun-player-controls-max);
+    max-width: var(--dhun-pane-master-max);
     margin-inline: auto;
   }
 }

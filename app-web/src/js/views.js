@@ -287,17 +287,35 @@ export function shelf(entries, options = {}) {
   </ul>`;
 }
 
-/** Quick picks: the wide, artwork-first tiles the app uses above the fold. */
+/** Quick picks: the app's `QuickPickItem` — a 48dp cover, title over artist, on
+ *  the content-row surface — two to a column. */
 function quickPick(track, { index, currentId }) {
   const current = currentId && (currentId === track.id || currentId === track.videoId);
-  return html`<li class="dhun-quickpick-item">
-    <button type="button" class="dhun-quickpick" data-action="play-track" data-index="${index}" data-id="${track.id}"
-      ${current ? raw('aria-current="true"') : raw("")}>
-      <span class="dhun-quickpick__art">${artwork(track, { size: "quick" })}</span>
-      <span class="dhun-quickpick__title">${track.title}</span>
-      <span class="dhun-quickpick__sub">${track.artist ?? ""}</span>
-    </button>
-  </li>`;
+  return html`<button type="button" class="dhun-quickrow" data-action="play-track" data-index="${index}" data-id="${track.id}"
+    ${current ? raw('aria-current="true"') : raw("")}>
+    <span class="dhun-quickrow__art">${artwork(track, { size: "quickrow" })}</span>
+    <span class="dhun-quickrow__meta">
+      <span class="dhun-quickrow__title">${track.title}</span>
+      <span class="dhun-quickrow__sub">${track.artist ?? ""}</span>
+    </span>
+  </button>`;
+}
+
+/** Two tracks per column, as `QuickPicksGrid` chunks them (`chunked(2)`). */
+function quickPickShelf(tracks, { indexFor, currentId }) {
+  const columns = [];
+  for (let i = 0; i < tracks.length; i += 2) columns.push(tracks.slice(i, i + 2));
+  return html`<ul class="dhun-shelf dhun-shelf--quick">
+    ${columns.map(
+      (column, columnIndex) => html`<li class="dhun-quickcol-item">
+        <div class="dhun-quickcol">
+          ${column.map((track, rowIndex) =>
+            quickPick(track, { index: indexFor(columnIndex * 2 + rowIndex), currentId }),
+          )}
+        </div>
+      </li>`,
+    )}
+  </ul>`;
 }
 
 /* --------------------------------------------------------------- screens -- */
@@ -313,11 +331,10 @@ function shelvesToRows(shelves = [], { currentId, demoTracks }) {
         ${sectionHeader(shelfEntry.title)}
         ${tracks.length
           ? shelfEntry.title.toLowerCase().includes("quick")
-            ? html`<ul class="dhun-shelf dhun-shelf--quick">
-                ${tracks.map((track, index) =>
-                  quickPick(track, { index: offset >= 0 ? offset + index : index, currentId }),
-                )}
-              </ul>`
+            ? quickPickShelf(tracks, {
+                indexFor: (position) => (offset >= 0 ? offset + position : position),
+                currentId,
+              })
             : trackList(tracks, { currentId, view: "home", indexOffset: offset >= 0 ? offset : 0 })
           : html``}
         ${cards.length ? shelf(cards) : html``}

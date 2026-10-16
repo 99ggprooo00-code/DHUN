@@ -80,6 +80,21 @@ the diagnostic — and `npm run states` renders all of them to a page, so that
 reading what a refused network actually says is a two-minute job instead of a
 browser session on a bad network.
 
+### The layout pass of 2026-10-16
+
+The captures below are what a person saw in the built `/app/`, and what was
+changed because of it. Every number is a measurement from that session
+(headless Chromium, the built app, not a mock-up), not an estimate.
+
+| What the captures showed | What the app says | What changed |
+|---|---|---|
+| The whole interface was a 400px column marooned in a 1200px window — 800px of dead glass, rows at 360px | `DhunShellPolicy.masterPaneMaxWidth` is `DhunSpacing.playerContentMaxWidth` (**720dp**), chosen because "a list of rows does not improve when it gets wider" | The 840px block now caps content with `--dhun-pane-master-max` (720px), the token that already mirrored that measure. The legal pages keep their own narrower 680px |
+| The document scrolled, not the list: `#app` measured **2210px tall in a 900px window**, so the app bar, the rail and the bottom navigation slid away on every screen | `.dhun-scroll` is the scroll region; that only works if the shell is height-bounded | `#app` is bounded (`100dvh`, `100vh` fallback). Measured after: `#app` 1280x900, scroll region 1200x718 |
+| Quick picks was an artwork-tile shelf that did not fit itself — a 260px cover inside a 260px tile with padding and a border, hanging 18px out of its own card (`scrollWidth 269 > clientWidth 260`) | `HomeScreen.kt` draws `QuickPicksGrid`: twelve tracks chunked two to a column, columns `dialogMinWidth` (**280dp**) wide, each row a **48dp** cover over title and artist on the content-row surface | The rows are the app's rows, and the overflow is gone |
+| A phone showed a **280px** cover with 55px of dead gutter either side; the "wide" layout was a 400px strip split `1 1 45% / 1 1 45%` | `PlayerLayout`: the cover is fitted to `min(field width, field height, playerArtworkMaxSize = 640dp)`; the wide mode needs ≥ `playerWideLayoutMinWidth` (480dp) **and** width > height, and gives the controls `clamp(0.34 · width, 240dp, 400dp)` | Stacked: the hero fills its field (measured 350x350 on a 390x844 phone, transport fully on screen). Wide: 1048px composition — 640 cover, 343 controls column, cluster bottom-aligned as the app draws it |
+| In the player's 343px control column, "This track could not be played" wrapped to **one word per line** beside its own buttons | The app's control cluster stacks its notice in that column | The message takes its own line with the actions beneath it, on phones and in the player alike |
+| The toast covered the mini player: a tap on **expand** hit the toast, so the full player could not be opened on a phone at all (dock measured **166px**, toast offset 112px) | — | The toast's offset is made of the dock it actually has, and opening the player clears a toast it inherited |
+
 ## What has been measured, and what has not
 
 Measured, by the `browser` job on every route and both colour schemes:
@@ -96,11 +111,12 @@ Measured, by the `browser` job on every route and both colour schemes:
 
 Not measured, by anyone:
 
-- **What it looks like.** No person has watched a page render. Geometry and
-  contrast are not taste, and the captures the browser job writes are CI
-  artifacts that no one has opened. `npm run states` exists so this can be done
-  without a network: it renders every state to a page, and reading it is a
-  person's job.
+- **What it looks like, beyond the pass below.** Geometry and contrast are not
+  taste. The first look at the real captures happened on 2026-10-16 and is
+  recorded above; it found six defects, which is the argument for doing it
+  again rather than an argument that it is finished. `npm run states` still
+  exists so the copy and the states can be read without a network, and the
+  Phase 8 rows are still open.
 - **A screen reader.** The markup uses the conventions CI can assert; a real
   screen-reader pass has not happened.
 - **A phone.** The viewport is the same width as a phone's, in a desktop engine.
@@ -125,7 +141,7 @@ Those three are the Phase 8 work, listed in
 | `app-web/tests/shell.test.mjs`, `actions.test.mjs`, `tokens.test.mjs`, `dom.test.mjs` | Pass |
 | `browser` job (the table above) | Pass |
 | `python3 scripts/website_quality.py website/dist` | 31 checks pass |
-| A human looking at it | **Not tested** |
+| A human looking at the built app's captures (33, four widths, both themes) | Looked at on 2026-10-16 — six defects found and fixed, listed above. Still not a phone and still not a screen reader |
 
 ## Completion decision
 

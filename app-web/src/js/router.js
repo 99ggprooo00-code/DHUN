@@ -204,6 +204,42 @@ export function formatRoute(route) {
   return `#${path}${query ? `?${query}` : ""}`;
 }
 
+/**
+ * Whether entering `route` should fetch its data.
+ *
+ * This exists because the decision was made inline, from `sameRoute(previous,
+ * route)`, and the initial route is *by construction* the same as the route the
+ * app starts on — `main.js` seeds its state with `parseRoute(location.hash)`.
+ * So on a fresh visit the comparison was true, the fetch was skipped, and `/app/`
+ * opened on an idle Home: no request to any source was ever made, a deep link to
+ * `#/search?q=…` never searched, and `#/album/<id>` never loaded. Rendered to a
+ * screenshot, a first-time visitor got "Nothing to show yet" over an empty feed
+ * with no error, because there was no error — nothing had been tried.
+ *
+ * `initial` is the router's own signal (`onRoute` passes `{ initial: !started }`)
+ * and it is the only reliable one: "the URL did not change" and "the app has
+ * never loaded anything" are different facts, and only the second one decides
+ * whether there is data to fetch.
+ */
+export function needsData(previous, route, { initial = false } = {}) {
+  if (initial) return true;
+  if (!previous) return true;
+  return !sameData(previous, route);
+}
+
+/**
+ * Two routes read the same data when they ask the same question.
+ *
+ * Deliberately *not* `sameRoute`, which also compares the player's open state
+ * and tab: those are presentation, and treating them as a route change made
+ * opening the player re-run the screen's query — a second network request, and a
+ * flash of the loading state, every time somebody played a track from a list.
+ */
+export function sameData(a, b) {
+  if (!a || !b) return false;
+  return a.name === b.name && a.id === b.id && a.query === b.query && a.libTab === b.libTab && a.doc === b.doc;
+}
+
 /** Two routes are the same screen when every field the view reads matches. */
 export function sameRoute(a, b) {
   if (!a || !b) return false;
@@ -234,6 +270,17 @@ export function createRouter({
 } = {}) {
   let current = null;
   let started = false;
+  /**
+   * Whether any route has been delivered yet.
+   *
+   * Separate from `started`, and that separation is the fix for a bug that made
+   * `initial` permanently false: `start()` set `started = true` and *then* called
+   * `handle()`, which passed `{ initial: !started }` — always `false`. Nothing
+   * could tell "this is the first route" from "the URL did not change", so
+   * `main.js` fell back to comparing routes, and its pre-seeded state made the
+   * first comparison equal. `/app/` therefore opened idle and fetched nothing.
+   */
+  let delivered = false;
 
   function read() {
     return parseRoute(win.location?.hash ?? "", { defaultTab });
@@ -256,8 +303,10 @@ export function createRouter({
         win.location.hash = canonical;
       }
     }
+    const initial = !delivered;
+    delivered = true;
     current = route;
-    onRoute(route, { initial: !started });
+    onRoute(route, { initial });
   }
 
   return {
@@ -281,6 +330,7 @@ export function createRouter({
     stop() {
       win.removeEventListener?.("hashchange", handle);
       started = false;
+      delivered = false;
     },
     /** Push a new URL. `replace` is for corrections (a legacy link, a bad id). */
     navigate(route, { replace = false } = {}) {

@@ -173,3 +173,34 @@ test("no view emits an action name from an undefined value", () => {
   const playerUi = readFileSync(path.join(jsRoot, "player-ui.js"), "utf8");
   assert.ok(playerUi.includes('data-action="seek"'), "the seek range drives playback through its action");
 });
+
+test("a playback failure is reported once, not twice", () => {
+  // The expanded player draws the failure in its own control cluster, from the
+  // same `playerState.error` this handler is handed. The toast repeated it word
+  // for word and, being fixed above the dock, sat on top of the player's own
+  // title and artist while it did — measured 2026-10-16 at 1280x900. So the
+  // toast must stay for the screens that have no such strip, and only for those.
+  const start = main.indexOf("function onTrackFailed(");
+  assert.notEqual(start, -1, "main.js has no failure handler");
+  const body = main.slice(start, main.indexOf("\n  }", start));
+  const guard = body.indexOf('state.route.player === "open"');
+  const toast = body.indexOf("showToast(");
+  assert.notEqual(guard, -1, "the failure toast is not guarded by the player's own notice");
+  assert.notEqual(toast, -1, "the failure handler stopped reporting anything at all");
+  assert.ok(guard < toast, "the guard has to run before the toast is raised");
+  assert.match(body, /return;/, "the guard has to end the handler, not just test the flag");
+});
+
+test("opening the player clears a toast raised before it", () => {
+  // Measured 2026-10-16 on a 390x844 phone: the failure toast raised by the very
+  // tap that expands the player rode in with it and covered the player's own
+  // notice and its buttons. The player is a full-screen surface with its own
+  // status strip, so it starts clean — and only on the transition, so a toast
+  // raised while the player is already open still shows.
+  assert.match(main, /function clearToast\(\)/, "nothing can take a toast down early");
+  assert.match(
+    main,
+    /route\.player === "open" &&\s*\n?\s*previous\.player !== "open"\s*\)\s*clearToast\(\)/,
+    "the player does not clear a toast it inherited",
+  );
+});

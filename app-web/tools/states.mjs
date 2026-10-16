@@ -157,6 +157,23 @@ const DEMO_FAILURE = stateError(
 
 /* --------------------------------------------------------------- sections -- */
 
+/**
+ * The frame a state needs.
+ *
+ * Some states are full-screen overlays: the player is `position: absolute;
+ * inset: 0` and the mini-player docks to the bottom edge. Undecorated in a long
+ * review page, the first of them covers everything after it — which is exactly
+ * what happened the first time this page was read. So each section is rendered
+ * inside its own relatively-positioned frame, at the size the state is designed
+ * for: a phone for the player and the sheets, a wide pane for the screens.
+ */
+const FRAME = Object.freeze({
+  phone: { width: 390, height: 844, label: "390 × 844" },
+  phoneTall: { width: 390, height: 620, label: "390 × 620" },
+  wide: { width: 1024, height: 900, label: "1024 × 900" },
+  flow: { width: 0, height: 0, label: "natural height" },
+});
+
 /** name, what produces it in the app, and the markup itself. */
 const SECTIONS = [
   {
@@ -257,6 +274,7 @@ const SECTIONS = [
       }),
   },
   {
+    frame: FRAME.phone,
     id: "row-failure",
     title: "A track that could not be resolved",
     where: "player-ui.js → the queue, with player.js's recorded failure on the row",
@@ -343,6 +361,7 @@ const SECTIONS = [
     render: () => views.libraryScreen({ tab: "playlists", playlists: [], liked: [], history: [], libraryKind: "indexeddb" }),
   },
   {
+    frame: FRAME.phone,
     id: "player-gesture",
     title: "The browser is waiting for a gesture",
     where: "fullPlayer(viewModel with needsGesture) — the autoplay policy",
@@ -350,6 +369,7 @@ const SECTIONS = [
     render: () => fullPlayer(playerVm({ playing: false, audioStatus: AUDIO_STATUS.BLOCKED, needsGesture: true, error: null })),
   },
   {
+    frame: FRAME.phone,
     id: "player-refused",
     title: "The player, refused",
     where: "fullPlayer(viewModel with error.kind === \"network-or-cors\")",
@@ -357,6 +377,7 @@ const SECTIONS = [
     render: () => fullPlayer(playerVm({ error: REFUSED, audioStatus: AUDIO_STATUS.ERROR })),
   },
   {
+    frame: FRAME.phone,
     id: "player-demo",
     title: "The player, on a demo row",
     where: "fullPlayer(viewModel with error.kind === \"demo\")",
@@ -364,6 +385,7 @@ const SECTIONS = [
     render: () => fullPlayer(playerVm({ error: DEMO_FAILURE })),
   },
   {
+    frame: FRAME.phone,
     id: "player-playing",
     title: "The player, playing",
     where: "fullPlayer(viewModel with audioStatus PLAYING)",
@@ -380,13 +402,22 @@ const SECTIONS = [
       ),
   },
   {
+    frame: FRAME.phoneTall,
     id: "mini-player",
     title: "The docked mini-player",
     where: "miniPlayer(viewModel)",
     note: "What sits above the bottom navigation on every route.",
-    render: () => miniPlayer(playerVm({ playing: true, audioStatus: AUDIO_STATUS.PLAYING, positionMs: 74_000 })),
+    render: () => html`<div class="dhun-dock" style="position:absolute;inset:auto 0 0 0">
+      ${miniPlayer(playerVm({ playing: true, audioStatus: AUDIO_STATUS.PLAYING, positionMs: 74_000 }))}
+      <nav class="dhun-bottom-nav" aria-label="Primary">
+        <span class="dhun-nav-item" aria-current="page"><span class="dhun-nav-item__label">Home</span></span>
+        <span class="dhun-nav-item"><span class="dhun-nav-item__label">Search</span></span>
+        <span class="dhun-nav-item"><span class="dhun-nav-item__label">Your library</span></span>
+      </nav>
+    </div>`,
   },
   {
+    frame: FRAME.phoneTall,
     id: "framed",
     title: "DHUN inside somebody else's frame",
     where: "views.framedRefusal() — platform.isFramed()",
@@ -394,6 +425,7 @@ const SECTIONS = [
     render: () => views.framedRefusal(),
   },
   {
+    frame: FRAME.wide,
     id: "settings",
     title: "Settings",
     where: "views.settingsScreen({ … })",
@@ -487,6 +519,37 @@ ${appCss}
       .state > .note { margin: 0 0 var(--dhun-space-md); max-width: 68ch; font: var(--dhun-text-body-small); color: var(--dhun-text-secondary); }
       .stage { border: var(--dhun-space-border) solid var(--dhun-border); border-radius: var(--dhun-shape-card); padding: var(--dhun-space-md); background: var(--dhun-surface); }
       .review code { font-family: var(--dhun-font-mono); }
+      /* The frame each state is designed for. The relative position is what
+         keeps a full-screen overlay inside its own section instead of
+         covering the page; the size is the size the state is for, so what is
+         on screen is what a visitor's device shows. */
+      .review__frame {
+        position: relative;
+        overflow: hidden;
+        border: var(--dhun-space-border) solid var(--dhun-border);
+        border-radius: var(--dhun-shape-card-large, 16px);
+        background: var(--dhun-background);
+        margin-inline: auto;
+        max-width: 100%;
+      }
+      .review__frame--flow { overflow: visible; border: 0; border-radius: 0; }
+      .review__frame-label {
+        display: block;
+        margin: var(--dhun-space-xs) 0 0;
+        font: var(--dhun-text-label-small);
+        letter-spacing: var(--dhun-tracking-label-small);
+        color: var(--dhun-text-secondary);
+        text-align: center;
+      }
+      /* A sheet or an overlay that is fixed-positioned in the app is anchored
+         to its frame here. Only the position is overridden; every other
+         declaration — including the layout the state actually uses — is the
+         app's. */
+      .review__frame .dhun-overlay-mount,
+      .review__frame .dhun-sheet-mount,
+      .review__frame .dhun-toast-mount {
+        position: absolute;
+      }
     </style>
   </head>
   <body>
@@ -516,17 +579,23 @@ mkdirSync(outDir, { recursive: true });
 const wanted = scheme === "both" ? ["dark", "light"] : [scheme];
 const written = [];
 for (const theme of wanted) {
-  const body = SECTIONS.map(
-    (section) => `      <hr />
+  const body = SECTIONS.map((section) => {
+    const frame = section.frame ?? FRAME.flow;
+    const style = frame.width
+      ? `max-width:${frame.width}px;${frame.height ? `height:${frame.height}px;` : ""}`
+      : "";
+    const open = `<div class="review__frame${frame.width ? "" : " review__frame--flow"}" style="${style}">`;
+    return `      <hr />
       <section class="state" id="${section.id}">
         <h2>${section.title}</h2>
         <p class="where">${section.where.replace(/`([^`]+)`/g, "<code>$1</code>")}</p>
         <p class="note">${section.note}</p>
-        <div class="stage">
+        ${open}
 ${section.render()}
         </div>
-      </section>`,
-  ).join("\n");
+        <span class="review__frame-label">${frame.label}${frame === FRAME.flow ? "" : " · the state's own frame"}</span>
+      </section>`;
+  }).join("\n");
   const file = path.join(outDir, `states-${theme}.html`);
   writeFileSync(file, page(`DHUN web states — ${theme}`, body, theme), "utf8");
   written.push(file);
