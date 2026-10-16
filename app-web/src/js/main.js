@@ -689,6 +689,24 @@ export function boot({
     renderSheet();
   }
 
+  /**
+   * Clear the first-run strip the first time the visitor does anything at all.
+   *
+   * Capture-phase listeners on the window, removed as soon as one fires: the
+   * strip has done its job once the app is being used, and a banner that stays
+   * for the session stops being orientation and becomes furniture. It is not
+   * persisted anywhere — a reload starts a fresh visit and shows it once more.
+   */
+  function dismissWelcomeOnFirstInteraction() {
+    const once = () => {
+      clearBanner("info");
+      win.removeEventListener("pointerdown", once, true);
+      win.removeEventListener("keydown", once, true);
+    };
+    win.addEventListener("pointerdown", once, true);
+    win.addEventListener("keydown", once, true);
+  }
+
   function renderDock() {
     const vm = playerViewModel();
     const banner = renderBanner();
@@ -1793,10 +1811,22 @@ export function boot({
     }
     if (playerState.needsGesture) showBanner("gesture");
   });
+  /*
+   * The first-run strip.
+   *
+   * Two things were wrong with it. It said "Search and play from YouTube Music"
+   * — the one claim this app cannot make from its own chrome, since playback
+   * depends on an origin nobody here controls, and the project's rule is that no
+   * surface promises it (see `docs/web-player/PHASE-02-PLAYBACK-POC.md`). And it
+   * was permanent: nothing ever called `clearBanner("info")`, so "Welcome to
+   * DHUN" sat above the dock on every route for the whole session. Orientation
+   * is for the first minute; it is dismissed by the visitor's first interaction.
+   */
   showBanner("info", {
-    title: "Welcome to DHUN in the browser",
-    body: "Search and play from YouTube Music anonymously, or point DHUN at your own data source. Your library stays in this browser.",
+    title: "DHUN in the browser",
+    body: "Search YouTube Music anonymously, or point DHUN at your own data source. Your library stays in this browser, and when a source will not answer, DHUN says so instead of pretending.",
   });
+  dismissWelcomeOnFirstInteraction();
 
   return { state, player, engine, settings, sources, router, pwa, platform, libraryStore: () => libraryStore, library: () => library };
 }

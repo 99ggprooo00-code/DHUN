@@ -39,6 +39,7 @@ gate covers which claim.
 | Site honesty | `python3 scripts/website_claims.py website/dist` | Forbidden claims, required caveats, no baked digests, no telemetry SDK | 4 pages, 9 rules |
 | Web documents | `python3 scripts/web_player_docs.py docs/web-player` | These documents: required sections, evidence beside every completion, no claim the repository cannot back | OK |
 | Failure copy | `app-web/tests/source.test.mjs`, `app-web/tests/views.test.mjs` | A failure never leads with a browser's or a server's own string; every kind and stage has a sentence; a help sentence stands without the summary above it; every state keeps its raw string as a labelled diagnostic | Pass |
+| The app's own copy | `app-web/tests/actions.test.mjs` | No string the app renders — a screen, the chrome, the document's title and description, the install manifest — promises playback or names an audio quality. Deliberately narrower than the site's lexicon, because Python cannot render these screens | Pass |
 | Browser job (CI) | `.github/workflows/website.yml` | Rendering, overflow, contrast, tab order, keyboard, motion, print, axe — every route, both schemes | Pass |
 | Served-site check (CI, after a publish) | `scripts/website_smoke.py` | The bytes a visitor actually receives, re-read on the live site | Pass |
 | Minification proof | `cd website && node tools/verify-minify.mjs` | The committed build matches a fresh build | Pass |

@@ -67,6 +67,23 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   `Lyrics could not be fetched: Failed to fetch`. It now names the service
   (LRCLIB), keeps the raw string as a quiet second line, and — like every other
   failure — is classified from the message even when it arrives with no kind.
+- **Fixed: the app's own chrome promised playback.** The document's `<title>`
+  read "DHUN — play YouTube Music in your browser", its meta description and the
+  install manifest's description said "search and play YouTube Music
+  anonymously", and the first-run strip said "Search and play from YouTube
+  Music" — on screen at boot, on every route, for the whole session, since
+  nothing ever cleared an `info` banner. Playback is the one thing this build
+  cannot promise from its own chrome, so all four now describe what the app does
+  — search anonymously, keep the library on the device, and say plainly when a
+  source will not answer — and the first-run strip is dismissed by the visitor's
+  first interaction.
+- **Added: a copy gate over the app's rendered strings.** `app-web/tests/actions.test.mjs`
+  fails if any string the app shows — a screen, the chrome, the document's title
+  and description, the manifest — promises playback or names an audio quality.
+  It is deliberately narrower than the site's lexicon in
+  `scripts/website_claims.py`, which cannot read these strings: every screen is
+  assembled in the browser, so `/app/` serves an empty `<div id="app">` and
+  Python has nothing to read.
 - **Changed: `docs/web-player/`** records all of it — the rule and its
   enforcement in the README's hard-rules table, the failure surfaces in
   `PHASE-06`, the copy gate in `PHASE-08`, and the review page in the development

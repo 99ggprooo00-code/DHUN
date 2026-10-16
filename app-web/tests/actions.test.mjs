@@ -20,6 +20,7 @@ import {
   jsRoot,
   main,
   modules,
+  shellHtml,
   handledActions,
   shellRegionIds,
   declaredIds,
@@ -91,6 +92,74 @@ test("the keyboard map only points at handlers that exist", () => {
   const reachable = new Set([...handledActions(), ...switchActions()]);
   const dangling = [...keyboardActions()].filter((action) => !reachable.has(action));
   assert.deepEqual(dangling, [], `shortcuts point at handlers that do not exist: ${dangling.join(", ")}`);
+});
+
+/*
+ * The app's own copy is a claim surface, and these are the claims it may not
+ * make — the ones about playback.
+ *
+ * The authoritative lexicon is `scripts/website_claims.py`, which checks the
+ * built site and the bytes a visitor receives. It cannot read these strings:
+ * every screen here is assembled in the browser, so `/app/` serves an empty
+ * `<div id="app">` and a module graph. Python cannot render the screens, and
+ * hand-copying the lexicon into a second language is how two rule sets start to
+ * disagree — so this check is deliberately *narrower* than the Python one and
+ * covers the one class of claim the app could over-promise in its own chrome:
+ * that audio comes out.
+ *
+ * The finding it was written for: the first-run strip read "Search and play from
+ * YouTube Music anonymously", on screen at boot, on every route, for the whole
+ * session — the exact claim `PHASE-02` exists to record as unproven.
+ */
+const PLAYBACK_PROMISES = [
+  /plays in (any|every) browser/i,
+  /works in (any|every) browser/i,
+  /guaranteed playback/i,
+  /offline playback/i,
+  /downloads? (songs|tracks|music)/i,
+  /play(s|able)? from YouTube Music/i,
+  /YouTube Music,? playable/i,
+  /\bFLAC\b|\blossless\b|\bbitrate\b|\bkbps\b/i,
+];
+
+/** Code, not copy: comments explain rules and quote the mistakes they prevent,
+ *  so a rule scanning the *copy* has to read past them. */
+const withoutComments = (body) =>
+  body.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'\`])\/\/[^\n]*/g, "$1 ");
+
+test("the app's own copy never promises playback", () => {
+  // The manifest's description is copy too — it is what the install prompt and
+  // an app list would show.
+  const manifest = JSON.parse(readFileSync(path.join(jsRoot, "..", "manifest.webmanifest"), "utf8"));
+  const copy = [
+    ["main.js (chrome and boot copy)", withoutComments(main)],
+    ["index.html", withoutComments(shellHtml)],
+    ["manifest.webmanifest", `${manifest.name} ${manifest.description} ${JSON.stringify(manifest.shortcuts)}`],
+  ];
+  for (const [file, body] of modules) copy.push([file, withoutComments(body)]);
+
+  for (const [where, body] of copy) {
+    for (const promise of PLAYBACK_PROMISES) {
+      const match = promise.exec(body);
+      if (!match) continue;
+      // A word inside quoted copy a person could read. Identifiers, property
+      // names and URL paths are not claims: `bitrate:` as a key, `bitrate` as a
+      // stream field, and the endpoint they travel in are all fine.
+      const escaped = match[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const quoted = new RegExp(`["'\`][^"'\`]{0,120}${escaped}`);
+      assert.ok(!quoted.test(body), `${where} promises playback: ${match[0]}`);
+    }
+  }
+});
+
+test("the first-run strip is dismissed by the visitor's first interaction", () => {
+  // It used to sit above the dock on every route, for the whole session: nothing
+  // ever cleared an `info` banner.
+  assert.match(main, /dismissWelcomeOnFirstInteraction\(\)/, "nothing dismisses the strip");
+  assert.match(main, /clearBanner\("info"\)/);
+  assert.match(main, /removeEventListener\("pointerdown", once, true\)/);
+  assert.match(main, /removeEventListener\("keydown", once, true\)/);
+  assert.match(main, /addEventListener\("pointerdown", once, true\)/);
 });
 
 test("no view emits an action name from an undefined value", () => {

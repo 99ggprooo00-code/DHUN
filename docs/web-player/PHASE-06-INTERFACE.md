@@ -57,6 +57,23 @@ and reading them rather than by a gate:
 | A failed screen whose body was `TypeError: Failed to fetch` — the same words for a flat network, a blocked origin and an ad-blocker, naming no remedy. | The app's own sentence, then a labelled diagnostic line carrying the raw string — kept, because a bug report is easier to write when the app shows the string instead of hiding it in a console. |
 | The player's demo failure offered **two** buttons to the same screen ("Data source" and "Configure a source"), and a demo row offered a Retry for a thing that cannot be retried. | One action per outcome: a demo row offers the source picker; a refusal offers Retry, the source picker, and the explanation. |
 
+**The app's own copy is gated too.** The document's `<title>`, its meta
+description and the install manifest's description are the lines a tab, a share
+sheet, a search result and an install prompt show, and they are the app's
+chrome as much as any screen is. Three of them read "play YouTube Music in your
+browser" — the one claim this build cannot make from its own chrome, and the
+claim [PHASE-02](PHASE-02-PLAYBACK-POC.md) exists to keep open. They now describe
+what the app does: search anonymously, keep the library on the device, and say
+plainly when a source will not answer. `app-web/tests/actions.test.mjs` checks
+them, along with every string the screens render.
+
+Two smaller findings from the same pass, both about the chrome rather than a
+failure:
+
+| Before | After |
+|---|---|
+| The first-run strip read "Search and play from YouTube Music anonymously" — on screen at boot, on every route, for the whole session. | It says what the app does and what it will not pretend to do, and it is dismissed by the visitor's first interaction (a pointer or a key). It used to be permanent: nothing ever cleared an `info` banner. |
+
 The copy lives in one table in `app-web/src/js/source.js` with three registers —
 `summary` for a row or a toast, `help` for a state's body, and the raw string for
 the diagnostic — and `npm run states` renders all of them to a page, so that
