@@ -255,41 +255,39 @@ fun main(args: Array<String>) {
     runCatching { Class.forName("uk.co.caprica.vlcj.factory.MediaPlayerFactory") }
         .onSuccess { logStartup("DHUN probe: vlcj MediaPlayerFactory available") }
         .onFailure { e -> logStartup("DHUN probe FAILED: vlcj missing: $e") }
+    // Initialize Koin OUTSIDE the Compose `application {}` composition so it runs
+    // exactly once per process. Keeping it inside the composition re-executed it
+    // on every recomposition, re-invoking `startKoin` and raising
+    // KoinApplicationAlreadyStartedException (shown to users as the startup
+    // error window). Mirrors the re-boot-safe pattern in DhunApp (Android).
+    var initError: Throwable? = null
+    var koinInstance: org.koin.core.Koin? = null
+    try {
+        runCatching { org.koin.core.context.GlobalContext.stopKoin() }
+        val koinApp = startKoin { modules(desktopModule) }
+        koinInstance = koinApp.koin
+        // Probe the most failure-prone singletons eagerly so their exceptions
+        // are captured here, not later on a collector thread.
+        runCatching { koinInstance!!.get<DataLayer>() }.onFailure { e ->
+            logStartupFailure(e)
+            System.err.println("DHUN DataLayer probe failed: $e")
+            throw e
+        }
+        runCatching { koinInstance!!.get<DesktopDhunPlayer>() }.onFailure { e ->
+            // VLC failure is already degraded inside the player; log but don't abort.
+            logStartupFailure(e)
+            System.err.println("DHUN DesktopDhunPlayer probe failed (degraded mode): $e")
+        }
+        logStartup("DHUN Koin initialized successfully")
+    } catch (e: Throwable) {
+        initError = e
+        logStartupFailure(e)
+        System.err.println("DHUN initialization failed before window: $e")
+        e.printStackTrace()
+    }
+
     try {
         application {
-            // Eagerly capture any initialization failure so the Windows MSI
-            // user sees the single error window + log instead of a silent exit or the
-            // generic \"Failed to launch JVM\" from the launcher.
-            var initError: Throwable? = null
-            var koinInstance: org.koin.core.Koin? = null
-
-            // Attempt to boot Koin + critical singletons. DataLayer and
-            // DesktopDhunPlayer are the two that can throw before the window
-            // opens (DB driver / VLC). The try/catch ensures we log them and
-            // can still open a minimal error window.
-            try {
-                val koinApp = startKoin { modules(desktopModule) }
-                koinInstance = koinApp.koin
-                // Probe the most failure-prone singletons eagerly so their
-                // exceptions are captured here, not later on a collector thread.
-                runCatching { koinInstance.get<DataLayer>() }.onFailure { e ->
-                    logStartupFailure(e)
-                    System.err.println("DHUN DataLayer probe failed: $e")
-                    throw e
-                }
-                runCatching { koinInstance.get<DesktopDhunPlayer>() }.onFailure { e ->
-                    // VLC failure is already degraded inside the player; log but don't abort.
-                    logStartupFailure(e)
-                    System.err.println("DHUN DesktopDhunPlayer probe failed (degraded mode): $e")
-                }
-                logStartup("DHUN Koin initialized successfully")
-            } catch (e: Throwable) {
-                initError = e
-                logStartupFailure(e)
-                System.err.println("DHUN initialization failed before window: $e")
-                e.printStackTrace()
-            }
-
             if (initError != null && koinInstance == null) {
                 // Cannot boot at all — show a minimal error window so the user
                 // at least sees that the app *did* launch but failed to init
