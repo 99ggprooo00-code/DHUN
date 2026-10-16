@@ -121,6 +121,30 @@ FORBIDDEN_TERMS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
 )
 
+# Claims that are forbidden *because they deny a surface that ships*.
+#
+# These are not scanned through `NEGATION_CUES` — the denial *is* the claim, so
+# a "no" in the clause is the evidence rather than the excuse. That distinction
+# is the whole point of the tuple: on 2026-10-16 the site shipped the web app at
+# /app/ while `/features/` still read "No iOS, no web player, no browser client,
+# no PWA." Every mention in that sentence sat in a clause with its own "no", so
+# the rule engine above — which exists to let the site say what it does not do —
+# excused a sentence that told visitors the product did not exist. Found by
+# reading the deployed page, not by a gate: the fix is this tuple.
+FORBIDDEN_DENIALS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "denies the browser client that ships at /app/",
+        re.compile(
+            r"\b(?:no|not a|without a)\s+(?:web|browser)[\s-]*(?:player|client|apps?|build|version)\b"
+            r"|\bno\s+pwa\b"
+            r"|\b(?:web|browser)\s+(?:app|client|player|version|build)\s+"
+            r"(?:does\s+not|doesn't|do\s+not|don't|is\s+not|isn't|will\s+not|won't)\s+"
+            r"(?:ship|exist|be\s+available|be\s+supported)\b",
+            re.I,
+        ),
+    ),
+)
+
 # A clause carrying one of these may name a forbidden term: the site is
 # allowed (indeed required) to say what it does *not* do.
 NEGATION_CUES = re.compile(
@@ -156,25 +180,45 @@ def _clause_index_of(clauses: list[str], offset: int) -> int:
     return len(clauses) - 1
 
 
+def forbidden_claims_in(text: str) -> list[tuple[str, str]]:
+    """Every forbidden claim in `text`, as (label, matched text) pairs.
+
+    The one place either kind of rule is applied, so the built pages
+    (`forbidden_claim_violations`) and the served bytes
+    (`scripts/website_smoke.py`, which runs after a deploy to `main`) cannot
+    drift apart — on 2026-10-16 they held the same loop copied twice, and the
+    served copy is the one that would have caught a stale denial on the live
+    site if it had carried the rule.
+    """
+    found: list[tuple[str, str]] = []
+    clauses = _clauses(text)
+    for label, pattern in FORBIDDEN_TERMS:
+        for match in pattern.finditer(text):
+            # A negation cue must sit in the *same* clause as the mention:
+            # "DHUN has no accounts. Sync across devices is coming" is a claim
+            # about sync, and the earlier "no" does not excuse it.
+            clause = clauses[_clause_index_of(clauses, match.start())]
+            if NEGATION_CUES.search(clause):
+                continue
+            found.append((label, match.group(0)))
+    for label, pattern in FORBIDDEN_DENIALS:
+        for match in pattern.finditer(text):
+            found.append((label, match.group(0)))
+    return found
+
+
 def forbidden_claim_violations(pages: dict[str, str]) -> list[str]:
     """pages: route -> built HTML. Returns human-readable violations."""
     violations: list[str] = []
     for route, markup in sorted(pages.items()):
         text = html_to_text(markup)
-        for label, pattern in FORBIDDEN_TERMS:
-            for match in pattern.finditer(text):
-                clauses = _clauses(text)
-                # A negation cue must sit in the *same* clause as the mention:
-                # "DHUN has no accounts. Sync across devices is coming" is a
-                # claim about sync, and the earlier "no" does not excuse it.
-                clause = clauses[_clause_index_of(clauses, match.start())]
-                if NEGATION_CUES.search(clause):
-                    continue
-                snippet = text[max(0, match.start() - 60) : match.end() + 60]
-                violations.append(
-                    f"{route}: forbidden claim ({label}): "
-                    f"‘{match.group(0)}’ in “…{snippet.strip()}…”"
-                )
+        for label, matched in forbidden_claims_in(text):
+            index = text.find(matched)
+            snippet = text[max(0, index - 60) : index + len(matched) + 60]
+            violations.append(
+                f"{route}: forbidden claim ({label}): "
+                f"‘{matched}’ in “…{snippet.strip()}…”"
+            )
     return violations
 
 
@@ -401,7 +445,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"OK: {len(pages)} built page(s) pass the honesty contract "
-        f"({len(FORBIDDEN_TERMS)} forbidden-claim rules, "
+        f"({len(FORBIDDEN_TERMS) + len(FORBIDDEN_DENIALS)} forbidden-claim rules, "
         f"{len(REQUIRED_CAVEATS)} required caveats, {len(DIGEST_PATTERNS)} digest rules, "
         f"{len(TELEMETRY_SDKS)} telemetry-SDK rules against the shipped dependency graph)."
     )

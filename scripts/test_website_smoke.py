@@ -73,6 +73,22 @@ class ResponseRules(unittest.TestCase):
         markup = front_page("<h1>DHUN</h1><p>There is no iOS build.</p>")
         self.assertEqual(smoke.smoke_problems(served(**{"/": (200, markup)})), [])
 
+    def test_a_denial_of_the_shipped_web_app_fails_on_the_served_bytes(self):
+        """This is the check that would have caught the live /features/ page.
+
+        `No iOS, no web player, no browser client, no PWA.` was published at
+        99ggprooo00-code.github.io/DHUN/features/ while the web app shipped at
+        /app/ — and the served-site smoke check passed, because its copy of the
+        rule loop carried only the terms that a negation excuses.
+        """
+        for body in (
+            "<h1>DHUN</h1><p>No iOS, no web player, no browser client, no PWA.</p>",
+            "<h1>DHUN</h1><p>There is no web app, and no browser client.</p>",
+        ):
+            with self.subTest(body=body):
+                problems = smoke.smoke_problems(served(**{"/": (200, front_page(body))}))
+                self.assertTrue(any("denies the browser client" in p for p in problems), problems)
+
 
 class RequiredCaveats(unittest.TestCase):
     """The three disclosures must be on the *served* front page, not just in Git."""

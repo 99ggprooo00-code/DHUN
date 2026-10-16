@@ -93,7 +93,43 @@ class ForbiddenClaims(unittest.TestCase):
         pages = {
             "/features/": page(
                 "<p>DHUN has no accounts, so there is no cross-device sync, "
-                "no iOS build, no web player and no FLAC claim.</p>"
+                "no iOS build and no FLAC claim.</p>"
+            )
+        }
+        self.assertEqual(claims.forbidden_claim_violations(pages), [])
+
+    def test_flags_a_denial_of_the_browser_client_that_ships(self):
+        """The one sentence in this file that had to change twice, and why.
+
+        `test_allows_a_negated_mention` used to end "…, no iOS build, **no web
+        player** and no FLAC claim", and passed: every mention sat in a clause
+        with its own "no", which is exactly what the negation escape is for.
+        The web app ships at /app/, so that fixture was asserting that a false
+        sentence is allowed — and the same false sentence was live on
+        /features/ until 2026-10-16, published, with no gate objecting.
+        """
+        for body in (
+            "<p>No iOS, no web player, no browser client, no PWA.</p>",
+            "<p>DHUN has no browser client.</p>",
+            "<p>There is no web app.</p>",
+            "<p>A browser player does not exist.</p>",
+        ):
+            with self.subTest(body=body):
+                violations = claims.forbidden_claim_violations({"/features/": page(body)})
+                self.assertTrue(
+                    any("denies the browser client" in v for v in violations), violations
+                )
+
+    def test_naming_what_ships_is_not_a_denial(self):
+        """The rule is about denying a surface, not about the word "browser".
+
+        The site has to be able to say the web app exists, at /app/, in a
+        browser, and that it talks to YouTube from there.
+        """
+        pages = {
+            "/features/": page(
+                "<p>The browser is served by the web app at /app/, which keeps "
+                "its library in the browser and installs from the page.</p>"
             )
         }
         self.assertEqual(claims.forbidden_claim_violations(pages), [])
