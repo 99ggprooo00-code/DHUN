@@ -451,8 +451,8 @@ jobs:
             "dhun-$version.apk" "dhun-$version.apk.sha256" "dhun-$version.apk.provenance.txt" \
             "dhun-$version-arm64-v8a.apk" "dhun-$version-arm64-v8a.apk.sha256" "dhun-$version-arm64-v8a.apk.provenance.txt" \
             "dhun-$version-armeabi-v7a.apk" "dhun-$version-armeabi-v7a.apk.sha256" "dhun-$version-armeabi-v7a.apk.provenance.txt" \
-            "dhun-$version.msi" "dhun-$version.msi.sha256" "dhun-$version.msi.provenance.txt" | jq -R . | jq -s 'sort')
-          actual_assets=$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[] | select(.size > 0) | .name] | sort')
+            "dhun-$version.msi" "dhun-$version.msi.sha256" "dhun-$version.msi.provenance.txt" | jq -R . | jq -sc 'sort')
+          actual_assets=$(gh release view "$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[] | select(.size > 0) | .name] | sort' | jq -c .)
           if [ "$actual_assets" != "$expected_assets" ]; then
             echo "::error::$version draft assets are missing, empty or unexpected; leaving the draft unpublished."
             exit 1
