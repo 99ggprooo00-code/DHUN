@@ -11,6 +11,8 @@
 #
 #   scripts/website_claims.py      the forbidden-claim rules and the required caveats
 #   scripts/website_quality.py     the design-system, contrast and accessibility rules
+#   scripts/web_player_docs.py     the rules over docs/web-player/, where a phase's
+#                                  status and its evidence are checked against each other
 #   app-web/src/index.html         the Content Security Policy for the deployed app
 #
 # Nothing here grants permissions; GitHub still needs branch protection to make
@@ -20,4 +22,5 @@
 
 /scripts/website_claims.py @99ggprooo00-code
 /scripts/website_quality.py @99ggprooo00-code
+/scripts/web_player_docs.py @99ggprooo00-code
 /app-web/src/index.html @99ggprooo00-code
