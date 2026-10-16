@@ -54,7 +54,7 @@ import { createPlayer, REPEAT } from "./player.js";
 import { createMediaSession } from "./mediasession.js";
 import { createTabSync, openTabChannel } from "./tabsync.js";
 import { createPwa } from "./pwa.js";
-import { createRouter, parseRoute, formatRoute, sameRoute, LIBRARY_TABS } from "./router.js";
+import { createRouter, parseRoute, formatRoute, needsData, LIBRARY_TABS } from "./router.js";
 import { BANDS_HZ, PRESETS, CUSTOM_ID, clampGains, matchingPreset } from "./equalizer.js";
 import { createNavState, backAction, ShellBackAction, RAIL_BREAKPOINT_PX } from "./nav.js";
 import { parseLrc, activeLineIndex } from "./lyrics.js";
@@ -176,11 +176,21 @@ export function boot({
 
   /* -------------------------------------------------------------- helpers */
 
+  function clearToast() {
+    if (toastTimer) win.clearTimeout?.(toastTimer);
+    toastTimer = null;
+    if (state.toast) {
+      state.toast = null;
+      renderSheet();
+    }
+  }
+
   function showToast(message) {
+    if (toastTimer) win.clearTimeout?.(toastTimer);
     state.toast = message;
     renderSheet();
-    if (toastTimer) win.clearTimeout?.(toastTimer);
     toastTimer = win.setTimeout?.(() => {
+      toastTimer = null;
       state.toast = null;
       renderSheet();
     }, TOAST_MS);
@@ -394,6 +404,18 @@ export function boot({
   }
 
   function onTrackFailed(track, failure) {
+    /*
+     * One surface per message. The expanded player draws this same failure —
+     * same summary, same technical line, same actions — in its own control
+     * cluster, from the same `playerState.error` this handler is handed. The
+     * toast would repeat it word for word *and*, being fixed above the dock,
+     * land on top of the player's own title and artist while it did: measured
+     * 2026-10-16 at 1280x900, the toast covered "Monsoon Over Dharan" and left
+     * its name unreadable. Everywhere else — Home, Search, the library, the
+     * queue on the page — there is no such strip, and the toast is the only
+     * thing that can say the tap did not play anything.
+     */
+    if (state.route.player === "open") return;
     showToast(`${track.title} could not be played: ${failureSummary(failure)}`);
   }
 
@@ -766,10 +788,27 @@ export function boot({
     return html``;
   }
 
+  /* The overlay's scroller is a child — `.dhun-full__inner` — so `setRegion`'s
+     own scroll restore (which reads `data-scroll` off the region itself) never
+     reached it, and the region's markup is replaced on every tab press.
+     Measured 2026-10-16 on a 390x844 phone: switching to Lyrics reset the
+     player's scroll 613 → 0 and moved the panel the visitor had just asked for
+     from y=327 to y=940 — off the bottom of the screen, so the tab they pressed
+     appeared to do nothing. A re-render of the *same* track keeps the visitor
+     where they were; a different track is the one case that should start back
+     at the cover. */
+  const playerScroll = { trackKey: null, top: 0 };
+
   function renderOverlay() {
     const vm = playerViewModel();
     const open = state.route.player === "open";
+    const scroller = root?.querySelector?.("#dhun-overlay .dhun-full__inner");
+    if (scroller) playerScroll.top = scroller.scrollTop;
     setRegion("dhun-overlay", open && vm.track ? fullPlayer(vm) : html``);
+    const trackKey = open && vm.track ? String(vm.track.id ?? vm.track.videoId ?? "") : null;
+    const next = root?.querySelector?.("#dhun-overlay .dhun-full__inner");
+    if (next && trackKey && trackKey === playerScroll.trackKey) next.scrollTop = playerScroll.top;
+    playerScroll.trackKey = trackKey;
     drawVisualiser();
   }
 
@@ -928,13 +967,16 @@ export function boot({
 
   const router = createRouter({
     win,
-    onRoute: (route) => {
+    onRoute: (route, meta) => {
       const previous = state.route;
       state.route = route;
       applyTheme();
-      if (!sameRoute(previous, route) || previous === null) {
+      if (needsData(previous, route, meta)) {
         // Data fetching is driven by the route, so a deep link and a click take
-        // exactly the same path.
+        // exactly the same path — including the *first* one: `meta.initial` is
+        // how the router says "the app has not loaded anything yet", which the
+        // old `sameRoute(previous, route)` test could not tell from "the URL did
+        // not change" (see `needsData` in router.js).
         if (route.name === "home" && state.home.status === "idle") loadHome();
         if (route.name === "search") {
           state.search = { ...state.search, query: route.query ?? "", filter: "all" };
@@ -948,6 +990,13 @@ export function boot({
       if (route.redirectedFrom === "downloads") {
         showToast("Downloads are not part of the web app — a browser cannot keep a signed stream offline.");
       }
+      // A toast raised before the player opened would ride in with it and, being
+      // fixed above the dock, cover the player's own notice and its buttons —
+      // measured 2026-10-16 on a 390x844 phone, where the tap that expanded the
+      // player had just raised "could not be played" and the toast sat across
+      // Retry / Data source / Why?. The player is a full-screen surface with its
+      // own status strip; it starts clean.
+      if (route.player === "open" && previous.player !== "open") clearToast();
       renderView();
     },
   });

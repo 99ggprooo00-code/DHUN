@@ -173,3 +173,56 @@ test("no view emits an action name from an undefined value", () => {
   const playerUi = readFileSync(path.join(jsRoot, "player-ui.js"), "utf8");
   assert.ok(playerUi.includes('data-action="seek"'), "the seek range drives playback through its action");
 });
+
+test("a playback failure is reported once, not twice", () => {
+  // The expanded player draws the failure in its own control cluster, from the
+  // same `playerState.error` this handler is handed. The toast repeated it word
+  // for word and, being fixed above the dock, sat on top of the player's own
+  // title and artist while it did — measured 2026-10-16 at 1280x900. So the
+  // toast must stay for the screens that have no such strip, and only for those.
+  const start = main.indexOf("function onTrackFailed(");
+  assert.notEqual(start, -1, "main.js has no failure handler");
+  const body = main.slice(start, main.indexOf("\n  }", start));
+  const guard = body.indexOf('state.route.player === "open"');
+  const toast = body.indexOf("showToast(");
+  assert.notEqual(guard, -1, "the failure toast is not guarded by the player's own notice");
+  assert.notEqual(toast, -1, "the failure handler stopped reporting anything at all");
+  assert.ok(guard < toast, "the guard has to run before the toast is raised");
+  assert.match(body, /return;/, "the guard has to end the handler, not just test the flag");
+});
+
+test("opening the player clears a toast raised before it", () => {
+  // Measured 2026-10-16 on a 390x844 phone: the failure toast raised by the very
+  // tap that expands the player rode in with it and covered the player's own
+  // notice and its buttons. The player is a full-screen surface with its own
+  // status strip, so it starts clean — and only on the transition, so a toast
+  // raised while the player is already open still shows.
+  assert.match(main, /function clearToast\(\)/, "nothing can take a toast down early");
+  assert.match(
+    main,
+    /route\.player === "open" &&\s*\n?\s*previous\.player !== "open"\s*\)\s*clearToast\(\)/,
+    "the player does not clear a toast it inherited",
+  );
+});
+
+test("re-rendering the player does not throw the visitor back to the cover", () => {
+  // The overlay's scroller is a child, so `setRegion`'s own `data-scroll`
+  // restore never reached it and every tab press replaced the markup under the
+  // visitor's finger. Measured 2026-10-16 on a 390x844 phone: switching to
+  // Lyrics reset the scroll 613 → 0 and moved the panel from y=327 to y=940 —
+  // the tab they pressed looked like it did nothing. Where they were is kept
+  // for the same track, and only the track decides that.
+  const start = main.indexOf("function renderOverlay(");
+  assert.notEqual(start, -1, "main.js has no overlay renderer");
+  const body = main.slice(start, main.indexOf("\n  }", start));
+  assert.match(body, /\.dhun-full__inner/, "the player's own scroller is never read");
+  assert.match(body, /playerScroll\.top = scroller\.scrollTop/, "the scroll position is not captured");
+  assert.match(
+    body,
+    /trackKey === playerScroll\.trackKey\) next\.scrollTop = playerScroll\.top/,
+    "the scroll position is not restored for the same track",
+  );
+  const key = body.match(/const trackKey = [^;]+;/);
+  assert.ok(key, "no track key is computed");
+  assert.ok(!/tab/i.test(key[0]), "the tab must not be part of the key — that is the bug");
+});

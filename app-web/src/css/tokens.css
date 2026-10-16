@@ -145,6 +145,10 @@
    */
   --dhun-breakpoint-two-pane: 840px; /* DhunSpacing.navigationRailBreakpoint */
   --dhun-breakpoint-wide-player: 480px; /* DhunSpacing.playerWideLayoutMinWidth */
+  /* The hero's own ceiling, not a device guess: PlayerLayout.fittedPlayerArtworkSize
+     fits the cover to the *field* it is handed and only then stops here, so a
+     phone fills its width and a desktop cannot grow a wall of artwork. */
+  --dhun-player-artwork-max: 640px; /* DhunSpacing.playerArtworkMaxSize */
   --dhun-pane-master-min: 320px;
   --dhun-pane-master-max: 720px; /* DhunSpacing.playerContentMaxWidth */
   --dhun-space-legal-content-max: 680px; /* DhunSpacing.legalContentMaxWidth */

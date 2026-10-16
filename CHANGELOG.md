@@ -22,6 +22,90 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The interface gets its first real layout review, and loses seven defects (2026-10-16, session `arena/126d4a83-dhun`)
+
+The web build has been measured by CI since Phase 6 — overflow, contrast, tab
+order, axe, print — but geometry and contrast are not taste, and **nobody had
+looked at it**. This round opened 33 real captures (headless Chromium, the built
+`/app/`, dark and light, 320 / 390 / 834 / 1280 / 1440 px) and fixed what the
+look showed. Every number below is from a measurement in this session, not an
+estimate.
+
+- **Fixed: the shell did not own the viewport.** `#app` set `min-height: 100dvh`
+  only, so the app grew to the height of its content — measured **2210px tall in
+  a 900px window** — and the *document* scrolled: the app bar, the navigation
+  rail and the bottom navigation slid out of view on every list, and the fixed
+  toast drifted over whichever row happened to be under it. `#app` is now
+  height-bounded (`100dvh`, with `100vh` for browsers that predate `dvh`), which
+  is what lets the scroll region inside it do the scrolling — measured after the
+  fix: `#app` 1280x900, the scroll region 1200x718, nothing else moves.
+- **Fixed: the wide layout capped the whole interface at the player's control
+  column.** Above 840px every content region — sections, shelves, grids, rows,
+  settings, the legal pages — was capped at `--dhun-player-controls-max`
+  (**400px**, `DhunSpacing.playerWideControlsMaxWidth`) and centred, so a
+  1280x900 window drew a 400px column marooned in a 1200px area: 800px of dead
+  glass and rows at 360px. The cap is the app's own **master-pane reading
+  measure**, `DhunSpacing.playerContentMaxWidth` (720px), which `tokens.css`
+  already carried as `--dhun-pane-master-max` and which `DhunShellPolicy`
+  chooses for exactly this reason ("a list of rows does not improve when it gets
+  wider"). The legal pages keep their narrower 680px measure at every width.
+- **Fixed: Quick picks was not the app's component.** `HomeScreen.kt` draws
+  `QuickPicksGrid`: twelve tracks chunked two to a column, each column
+  `DhunSpacing.dialogMinWidth` (280dp) wide, each row a 48dp cover over title
+  and artist on the content-row surface. The web drew artwork-first 260px
+  *tiles* instead — and they did not even fit themselves: the 260px artwork sat
+  inside a 260px tile with 8px of padding and a 2px border, so every cover hung
+  18px out of its own card (`scrollWidth 269 > clientWidth 260`, measured). The
+  rows are now the app's rows, and the overflow is gone.
+- **Fixed: the full player never used the width it was given.** The hero was
+  capped at `--dhun-space-artwork-large` (280px) and the composition at 400px,
+  so a phone showed a 280px cover with 55px of dead gutter either side and a
+  desktop showed a 400px strip. `PlayerLayout.kt` says otherwise: the cover is
+  fitted to `min(field width, field height, playerArtworkMaxSize = 640dp)`, and
+  a viewport at least `playerWideLayoutMinWidth` (480dp) wide *and* wider than
+  tall puts the control cluster beside the hero with
+  `playerWideControlsWidth = clamp(0.34 · width, 240dp, 400dp)`. The web now
+  does both: measured at 390x844 the cover is 350x350 (it was 280) with the
+  transport fully on screen; measured at 1280x900 the player is a 1048px
+  composition — 640 cover, 343 controls column — with the cluster bottom-aligned
+  in its column, which is where the app draws it. The web's fake half-and-half
+  `flex: 1 1 45%` split inside a 400px column is gone.
+- **Fixed: a failure notice wrapped to one word per line.** In the player's
+  343px control column, "This track could not be played" rendered as a vertical
+  stack of single words beside Retry / Data source / Why?. The text's flex basis
+  is 0 and `min-width: 0` lets it shrink past its longest word, so `flex-wrap`
+  never fired. The message now takes its own line with the actions beneath it —
+  the arrangement the app's own control cluster uses — on phones and in the
+  player's column alike.
+- **Fixed: the toast sat on top of the mini player, and the player inherited
+  it.** The toast is fixed against the viewport and offset by the *content*
+  inset (112px), but a phone's dock is a 85px mini player over an 81px
+  navigation bar — **166px** — so the toast landed squarely across the mini
+  player: measured, a tap on its expand control hit the toast and **the full
+  player could not be opened on a phone at all**. The offset is now made of the
+  dock the visitor actually has. Opening the player also clears a toast it
+  inherited (measured 390x844: the failure toast raised by the expand tap rode
+  in and covered the player's own notice buttons), and a playback failure no
+  longer toasts *while* the player is open, because the player draws the same
+  failure from the same `playerState.error` in its own strip. Two new tests in
+  `app-web/tests/actions.test.mjs` pin both halves; both were mutation-checked.
+
+- **Fixed: the player threw the visitor back to the cover on every tab press.**
+  The overlay's scroller is a *child* (`.dhun-full__inner`), so `setRegion`'s own
+  `data-scroll` restore never reached it, and the region's markup is replaced on
+  every tab press. Measured 2026-10-16 on a 390x844 phone: switching to Lyrics
+  reset the scroll **613 → 0** and moved the panel the visitor had just asked for
+  from y=327 to y=940, off the bottom of the screen — the tab they pressed looked
+  like it did nothing. A re-render of the same track now keeps their place; a
+  different track still starts at the cover. Mutation-tested.
+
+**Not fixed in this round, and known:** the native Home leads with a greeting
+and a mood-chip row that the web Home does not have — mood filtering is a
+*source* feature in the app, not a coat of paint, so it is a later phase rather
+than a CSS change. A real phone and a real screen reader are still unvisited
+(Phase 8), and no claim about playback has changed: `PHASE-02-PLAYBACK-POC.md`
+is still open.
+
 ### The app stops printing the browser's errors as its own words (2026-10-16, session `arena/063cb1a6-dhun`)
 
 - **Fixed: a failed screen led with `TypeError: Failed to fetch`.** That string

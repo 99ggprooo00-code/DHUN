@@ -9,7 +9,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parseRoute, formatRoute, sameRoute, DEFAULT_ROUTE, LIBRARY_TABS } from "../src/js/router.js";
+import { parseRoute, formatRoute, sameRoute, DEFAULT_ROUTE, LIBRARY_TABS, needsData, createRouter } from "../src/js/router.js";
 
 test("the empty hash is the home route, not an error", () => {
   assert.equal(parseRoute("").name, "home");
@@ -76,6 +76,69 @@ test("a hostile or truncated hash cannot throw", () => {
     assert.doesNotThrow(() => parseRoute(hash));
     assert.ok(parseRoute(hash).name);
   }
+});
+
+/*
+ * The bug these pin: `/app/` opened on an idle Home and never fetched anything.
+ *
+ * `main.js` seeds its state with `parseRoute(location.hash)`, so by the time the
+ * router's first `onRoute` fired, the "previous" route was already the current
+ * one — `sameRoute` returned true, and every load was skipped. The screenshot
+ * was "Nothing to show yet" with no error, because nothing had been tried.
+ */
+test("needsData fetches on the first route, whatever the URL is", () => {
+  for (const hash of ["", "#/home", "#/search?q=koshi", "#/album/MPREb_1", "#/library/history", "#/settings"]) {
+    const route = parseRoute(hash);
+    // What main.js does: seed the state from the URL before the router starts.
+    const seeded = parseRoute(hash);
+    assert.equal(
+      needsData(seeded, route, { initial: true }),
+      true,
+      `${hash || "(no hash)"} must fetch on the initial route`,
+    );
+  }
+});
+
+test("needsData re-fetches when the route actually changes", () => {
+  const home = parseRoute("#/home");
+  assert.equal(needsData(home, parseRoute("#/search?q=a"), { initial: false }), true);
+  assert.equal(needsData(home, parseRoute("#/album/x"), { initial: false }), true);
+  assert.equal(needsData(null, home, { initial: false }), true, "a router with no previous route still fetches");
+});
+
+test("needsData does not re-fetch the route already on screen", () => {
+  // `router.navigate()` to the current hash re-runs the handler so the view is
+  // correct (the layer stack is UI state, not URL state). That must not become a
+  // second network request for the same screen.
+  const home = parseRoute("#/home");
+  assert.equal(needsData(home, parseRoute("#/home"), { initial: false }), false);
+  const search = parseRoute("#/search?q=koshi");
+  assert.equal(needsData(search, parseRoute("#/search?q=koshi"), { initial: false }), false);
+  // Opening the player is a different URL, and it is a *presentation* change:
+  // it re-renders, and it must not re-query. (This failed when `needsData` used
+  // `sameRoute`, which compares the player's open state.)
+  assert.equal(needsData(search, parseRoute("#/search?q=koshi&player=open"), { initial: false }), false,
+    "opening the player is not a reason to re-query the source");
+  assert.equal(needsData(parseRoute("#/home?player=open"), parseRoute("#/home?ptab=lyrics"), { initial: false }), false);
+});
+
+test("the router tells the app which call is the first one", () => {
+  // The signal `needsData` depends on. A router that stopped passing it would
+  // silently reintroduce the idle-first-render bug.
+  const seen = [];
+  const fakeWin = {
+    location: { hash: "" },
+    history: { replaceState: () => {} },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+  const router = createRouter({ win: fakeWin, onRoute: (route, meta) => seen.push(meta) });
+  router.start();
+  // `replace` so the handler runs without a real hashchange event: the point
+  // here is the flag, not the event plumbing.
+  router.navigate({ ...parseRoute("#/search"), query: "koshi" }, { replace: true });
+  assert.equal(seen[0]?.initial, true, "the first call must be marked initial");
+  assert.equal(seen.at(-1)?.initial, false, "later calls must not be");
 });
 
 test("sameRoute compares what the view renders, and nothing else", () => {
