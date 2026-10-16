@@ -61,7 +61,7 @@
         including in Windows High Contrast, in website/tests/browser.mjs. -#}
     <a class="wordmark" href="{{ '/' | sitePath }}" aria-label="DHUN home"{% if page.url == "/" %} aria-current="page"{% endif %}>
       <span class="wordmark-mark" aria-hidden="true">{% icon "play" %}</span>
-      <span>DHUN</span>
+      <span class="wordmark-text">DHUN</span>
     </a>
     <p class="app-bar__title">{{ appBarTitle or "Music without an account" }}</p>
     <div class="app-bar__actions">
@@ -81,7 +81,10 @@
   </ul>
 </nav>
 {#- The docked bar, where the app keeps its mini-player: the one destination
-    this site exists to hand a visitor. -#}
+    this site exists to hand a visitor. It sits in a landmark of its own, because
+    axe's `region` rule requires every node to be inside one — a link loose in
+    the body was its one finding per page (browser job, 2026-10-16). -#}
+<aside class="dock-landmark" aria-label="The DHUN web app">
 <a class="dock" href="{{ '/app/' | sitePath }}">
   <span class="dock__art" aria-hidden="true">{% icon "play" %}</span>
   <span class="dock__text">
@@ -90,6 +93,7 @@
   </span>
   <span class="dock__go" aria-hidden="true">{% icon "skipNext" %}</span>
 </a>
+</aside>
 <main id="main" tabindex="-1">
 {{ content | safe }}
 </main>

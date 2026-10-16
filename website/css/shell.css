@@ -76,6 +76,17 @@
   align-items: center;
   gap: var(--sp-2);
   justify-content: flex-end;
+  /* The bar's controls hold their size. A flex item shrinks by default, so a
+     narrow viewport used to squeeze the icon button instead of overflowing —
+     the browser job measured it at 27.9x48 (280px) and 33.4x48 (320px), a
+     control below the 44px floor that no static check could see. The
+     narrow-width rules below drop whole controls instead of shrinking them,
+     and anything that still does not fit overflows visibly, which is the
+     failure the overflow check reports. */
+  flex: none;
+}
+.app-bar__actions > * {
+  flex: none;
 }
 .app-bar__actions .btn {
   min-height: var(--target);
@@ -85,6 +96,7 @@
 .icon-btn {
   display: inline-grid;
   place-items: center;
+  flex: none;
   width: var(--target);
   height: var(--target);
   border-radius: var(--r-full);
@@ -184,6 +196,25 @@
   }
 }
 
+/* Phone widths, where the app itself shows a compact top bar: the brand and the
+   primary action, and nothing left to compete for the same row. The source link
+   gives up its slot below 480px (its destination is the footer's own "Source"
+   link, which stays), so the primary action keeps its full label; the brand's
+   wordmark text gives up its slot below 360px, leaving the mark, which is still
+   the home link and still announces "DHUN home". Both breakpoints come from
+   `website/tests/browser.mjs`, which fails on a control narrower than the target
+   or on a page wider than its viewport at 280px and 320px. */
+@media (max-width: 479px) {
+  .app-bar__actions .icon-btn {
+    display: none;
+  }
+}
+@media (max-width: 359px) {
+  .wordmark-text {
+    display: none;
+  }
+}
+
 /* The app's navigation rail, above DhunSpacing.navigationRailBreakpoint (840dp):
    the same three destinations, vertical, at the leading edge. */
 @media (min-width: 840px) {
@@ -212,6 +243,15 @@
 }
 
 /* -------------------------------------------------------------- dock -- */
+
+/* The dock is content in its own right — the site's one standing invitation into
+   the app — rather than part of the page's flow, so it sits in a landmark.
+   axe's `region` rule wants every node inside one (this link was its one finding
+   per page), and the wrapper adds nothing: the anchor inside it is positioned
+   against the viewport, so this box is always empty. */
+.dock-landmark {
+  display: block;
+}
 
 .dock {
   display: flex;
