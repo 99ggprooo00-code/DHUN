@@ -244,3 +244,41 @@ export function anchorLandingProblem({
   }
   return null;
 }
+
+/**
+ * Whether a radio group behaves as *one* tab stop — the checked member takes the
+ * tab, the arrow keys move the selection inside the group.
+ *
+ * This is the browser's own behaviour for radios, not a site choice, and a
+ * checker that does not know it reports every unchecked member as a control
+ * nobody can reach. That is exactly what happened on 2026-10-16: the appearance
+ * control's two groups (three themes, six accents) were reported as "7 visibly
+ * focusable element(s) never took focus" — a correct control and an incomplete
+ * rule. Exempting them would hide a group whose arrows do nothing, so the caller
+ * presses ArrowRight and this decides whether the group actually moved, kept
+ * exactly one member selected, kept focus, and stayed one tab stop.
+ */
+export function radioGroupProblem({ name, members, before, after, checkedCount, focusInside, tabLeftGroup }) {
+  if (members < 2) {
+    return `radio group “${name}” has ${members} member(s): a group of one is not a choice`;
+  }
+  if (before < 0) {
+    return `radio group “${name}” starts with no member checked, so no member is its tab stop`;
+  }
+  if (after < 0) {
+    return `radio group “${name}” has no member checked after ArrowRight`;
+  }
+  if (after === before) {
+    return `ArrowRight did not move the selection in radio group “${name}” (still member ${before + 1} of ${members})`;
+  }
+  if (checkedCount !== 1) {
+    return `radio group “${name}” has ${checkedCount} members checked at once after ArrowRight; a group is one choice`;
+  }
+  if (!focusInside) {
+    return `focus left radio group “${name}” when ArrowRight moved the selection`;
+  }
+  if (!tabLeftGroup) {
+    return `Tab did not leave radio group “${name}”, so the group is more than one tab stop`;
+  }
+  return null;
+}

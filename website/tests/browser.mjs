@@ -59,6 +59,7 @@ import {
   focusChanged,
   forcedColorsBoundaryMissing,
   headingOrderProblem,
+  radioGroupProblem,
   targetProblem,
 } from "./rules.mjs";
 
@@ -1070,26 +1071,41 @@ async function checkStructure(browser) {
  * *unfocused* style (recorded before the walk, so the walk is never interrupted
  * by a blur), and fails on: an element that cannot be reached at all, and an
  * element that takes focus without any visible change.
+ *
+ * Radio groups are one tab stop, not one per member: the checked member takes the
+ * tab and the arrow keys move the selection. The walk therefore probes the
+ * checked member of each group and skips the rest — and `checkRadioGroups` below
+ * is the check that the skipped members are still reachable, so a group whose
+ * arrows have stopped working is a failure rather than an exemption (measured
+ * 2026-10-16: the appearance control's 9 radios looked like 7 unreachable
+ * controls to the version that did not know this rule).
  */
 async function checkTabStops(browser, route = "/") {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
   await page.goto(url(route), { waitUntil: "load" });
 
-  const probes = await page.evaluate(() => {
+  const collected = await page.evaluate(() => {
     const focusable = "a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex=\"-1\"])";
     const found = [];
+    const groups = new Map();
     for (const element of document.querySelectorAll(focusable)) {
       if (element.closest('[aria-hidden="true"]')) continue;
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
       if (rect.width <= 0 || rect.height <= 0) continue;
       if (style.display === "none" || style.visibility === "hidden") continue;
+      const group = element.matches('input[type="radio"]') ? element.name : null;
+      if (group && !element.checked) {
+        groups.set(group, (groups.get(group) ?? 0) + 1);
+        continue;
+      }
       element.dataset.dhunProbe = String(found.length);
       found.push((element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24));
     }
-    return found;
+    return { probes: found, groups: [...groups.keys()] };
   });
+  const probes = collected.probes;
 
   // The unfocused style of every probe, recorded before the walk: blurring an
   // element mid-walk would move focus and make the walk test its own
@@ -1156,6 +1172,80 @@ async function checkTabStops(browser, route = "/") {
   }
   if (!unreachable.length && !noRing.length) {
     record(`focus ring ${route}`, `${visited.size} tab stop(s) visited, every one shows a visible change when focused`);
+  }
+
+  await context.close();
+}
+
+/**
+ * Proves each radio group is one tab stop with arrow-key movement inside it.
+ *
+ * The tab-stop walk cannot see this: a group's unchecked members are not tab
+ * stops by design, and a rule that simply ignored them would also ignore a group
+ * whose arrows had stopped working. So each group is measured: focus its checked
+ * member, press ArrowRight, and require that the selection moved, that exactly
+ * one member is checked, that focus stayed in the group, and that Tab then
+ * leaves the group — i.e. that the whole group costs a keyboard user one stop.
+ */
+async function checkRadioGroups(browser, route = "/") {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  await page.goto(url(route), { waitUntil: "load" });
+  const groups = await page.evaluate(() => {
+    const names = new Set();
+    for (const radio of document.querySelectorAll('input[type="radio"]')) {
+      if (!radio.closest('[aria-hidden="true"]')) names.add(radio.name);
+    }
+    return [...names];
+  });
+  if (!groups.length) {
+    record(`radio groups ${route}`, "no radio group on this page; the appearance control is not here");
+    await context.close();
+    return;
+  }
+  // Read twice: once for the state the group starts in, once after the arrow key.
+  const readGroup = (group) => {
+    const members = [...document.querySelectorAll(`input[type="radio"][name="${group}"]`)];
+    return {
+      members: members.length,
+      checked: members.findIndex((member) => member.checked),
+      checkedCount: members.filter((member) => member.checked).length,
+      focusInside: members.includes(document.activeElement),
+    };
+  };
+  for (const name of groups) {
+    const before = await page.evaluate(readGroup, name);
+    // Focus the checked member, which is the group's tab stop: `:focus()` is the
+    // same state Tab would leave it in.
+    await page.evaluate((group) => {
+      const checked = document.querySelector(`input[type="radio"][name="${group}"]:checked`);
+      if (checked) checked.focus();
+    }, name);
+    await page.keyboard.press("ArrowRight");
+    const after = await page.evaluate(readGroup, name);
+    await page.keyboard.press("Tab");
+    const tabLeftGroup = await page.evaluate((group) => {
+      const active = document.activeElement;
+      return !active || active.getAttribute("name") !== group;
+    }, name);
+
+    const problem = radioGroupProblem({
+      name,
+      members: after.members,
+      before: before.checked,
+      after: after.checked,
+      checkedCount: after.checkedCount,
+      focusInside: after.focusInside,
+      tabLeftGroup,
+    });
+    if (problem) {
+      fail(`radio group ${route}`, problem);
+    } else {
+      record(
+        `radio group ${route}`,
+        `“${name}”: ${after.members} members, one tab stop; ArrowRight moved the selection and Tab left the group`,
+      );
+    }
   }
   await context.close();
 }
@@ -1606,6 +1696,7 @@ const CHECKS = [
   ["keyboard", () => checkKeyboard(browser)],
   ["structure", () => checkStructure(browser)],
   ["tab stops", () => checkTabStops(browser)],
+  ["radio groups", () => checkRadioGroups(browser)],
   ["current page", () => checkCurrentPage(browser)],
   ["anchor landings", () => checkAnchorLanding(browser)],
   ["contrast", () => checkContrast(browser)],

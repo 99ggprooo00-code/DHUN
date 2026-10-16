@@ -61,6 +61,33 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   DHUN proxy exist (ADR-008 boundary 1), and no claim that browser playback is
   proven is made anywhere (boundary 4) — the native builds remain the supported
   players.
+- **Fixed: the app bar at phone widths, and the dock's landmark.** The browser
+  job's first pass found the bar overflowing at 280 px and squeezing its icon
+  button to 27.9×48 — below the 44 px floor — because a flex item shrinks by
+  default. The bar's controls are now `flex: none`, so nothing can be squeezed;
+  below 480 px the pill gives up its slot instead (the docked bar above the
+  navigation is the standing invitation on a phone), so the brand and the round
+  48 px control keep their size. The dock, previously a link loose in the body
+  and outside every landmark, sits in its own `<aside>` — which is also what
+  axe's `region` rule wanted.
+- **Fixed: tertiary text in the light scheme was below the floor.** The app's own
+  `--dhun-text-tertiary` is a 0.549-alpha ink: 3.95:1 on `--surface` in light,
+  under the 4.5:1 body floor, and the site had painted nav labels, dock
+  subtitles, source-traceability lines and platform statuses with it. The site
+  now derives `--text-muted` from the same ink (0.65 alpha: 5.06:1 on the darkest
+  light surface, 5.55:1 on white; dark keeps the app's own rung, 5.51:1 at its
+  worst), the app's `--text-3` stays declared so the sheet still mirrors the app,
+  and the contrast rule now (a) checks **both** schemes — it read only the dark
+  declarations before, which is how this reached a browser at all — and (b) fails
+  if any rule paints text with the unreadable rung.
+- **Fixed: the tab-stop check did not know what a radio group is.** A group of
+  radios is one tab stop, with the arrow keys moving the selection; the walk
+  treated every unchecked member as a control nobody can reach and reported the
+  appearance control as "7 visibly focusable element(s) never took focus". The
+  walk now probes the checked member of each group, and a new `radio groups`
+  check (own crash guard, pure decision in `tests/rules.mjs`, 7 new unit tests)
+  proves each group still moves, keeps exactly one member selected, keeps focus
+  and costs one tab stop.
 - **Fixed (docs):** the web app is no longer described as a preview, a mirror or
   a demo in `README.md`, `app-web/README.md`, `docs/INSTALL.md`, `docs/TRD.md`,
   `docs/PRD.md`, `docs/app-flow.md`, `docs/implementation-plan.md`,

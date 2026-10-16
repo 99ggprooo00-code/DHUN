@@ -343,7 +343,12 @@ class Contrast(unittest.TestCase):
             self.assertTrue(quality.contrast_violations(root))
 
     def test_high_contrast_pair_passes(self):
-        css = ":root{--text:#ffffff;--bg:#000000;--text-2:#ffffff;--text-3:#ffffff;--accent:#ffffff;--on-accent:#000000;--on-accent-container:#ffffff;--accent-container:#000000;--surface:#000000;--surface-variant:#000000;--warning:#ffffff;}"
+        css = (
+            ":root{--text:#ffffff;--bg:#000000;--text-2:#ffffff;--text-muted:#ffffff;"
+            "--accent:#ffffff;--on-accent:#000000;--on-accent-container:#ffffff;"
+            "--accent-container:#000000;--surface:#000000;--surface-variant:#000000;"
+            "--surface-highest:#000000;--warning:#ffffff;}"
+        )
         with tempfile.TemporaryDirectory() as tmp:
             root = write_tree(Path(tmp), minimal_site(**{"assets/styles.css": css}))
             self.assertEqual(quality.contrast_violations(root), [])
@@ -1769,6 +1774,75 @@ class DesignSystemMirrorsTheApp(DistCopyMixin):
             any("/features/" in v and "theme-light" in v for v in violations), violations
         )
 
+
+class ContrastInBothSchemes(DistCopyMixin):
+    """The rule that grew its missing half (2026-10-16).
+
+    It used to read only the plain declaration of each colour — the app's dark
+    set — so every light value living inside `light-dark(…)` was unchecked, and
+    the browser job found tertiary text at 3.95:1 in a light page while this rule
+    was green. Each test here mutates the built sheet and expects the rule to
+    catch what it used to miss, plus the rung ban that keeps the unreadable token
+    out of `color:`.
+    """
+
+    def mutate(self, old: str, new: str, route: str = "index.html") -> list[str]:
+        dist = self.copy_dist()
+        page = dist / route
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn(old, markup)
+        page.write_text(markup.replace(old, new, 1), encoding="utf-8")
+        return quality.contrast_violations(dist)
+
+    def test_the_committed_site_passes_both_schemes(self):
+        self.assertEqual(quality.contrast_violations(DIST), [])
+
+    def test_an_unreadable_light_side_is_caught(self):
+        """The shadowed half: the rule read only the dark declaration until 2026-10-16.
+
+        The browser job measured 3.95:1 for tertiary text in the light scheme
+        while this rule was green, because every light value lives inside
+        `light-dark(…)` and the parser stopped at the plain declaration.
+        """
+        violations = self.mutate(
+            "--text-muted:light-dark(rgba(26,23,20,0.65),rgba(255,255,255,0.6));",
+            "--text-muted:light-dark(rgba(26,23,20,0.2),rgba(255,255,255,0.6));",
+        )
+        self.assertTrue(
+            any("--text-muted" in v and "light scheme" in v for v in violations), violations
+        )
+
+    def test_an_unreadable_dark_side_is_still_caught(self):
+        violations = self.mutate(
+            "--text-muted:rgba(255,255,255,0.6);", "--text-muted:rgba(255,255,255,0.05);"
+        )
+        self.assertTrue(
+            any("--text-muted" in v and "dark scheme" in v for v in violations), violations
+        )
+
+    def test_the_first_pair_wins_so_the_accent_ramps_do_not_decide(self):
+        """Otherwise the last ramp in the sheet would be the one checked."""
+        violations = self.mutate(
+            "--accent:light-dark(#6750a4,#bb86fc);",
+            "--accent:light-dark(#6750a4,#bb86fc);--accent:light-dark(#123456,#123456);",
+        )
+        self.assertFalse(
+            any("--accent" in v and "light scheme" in v for v in violations), violations
+        )
+
+    def test_text_painted_with_the_apps_tertiary_rung_fails(self):
+        violations = self.mutate("color:var(--text-muted)", "color:var(--text-3)")
+        self.assertTrue(
+            any("--text-3" in v and "readable rung" in v for v in violations), violations
+        )
+
+    def test_the_ban_does_not_fire_on_a_non_text_property(self):
+        """`--text-3` may still draw a hairline; only `color:` is body text."""
+        violations = self.mutate("color:var(--text-muted)", "border-color:var(--text-3)")
+        self.assertEqual(violations, [])
+
+
+
 class HighContrastPreference(DistCopyMixin):
     """A visitor who asks the OS for more contrast gets more contrast.
 
@@ -1778,7 +1852,7 @@ class HighContrastPreference(DistCopyMixin):
     numbers it uses are re-derived from the sheet rather than restated here.
     """
 
-    BLOCK = "@media (prefers-contrast:more){:root{--text-2:var(--text);--text-3:var(--text)}}"
+    BLOCK = "@media (prefers-contrast:more){:root{--text-2:var(--text);--text-muted:var(--text)}}"
 
     def test_the_committed_site_raises_contrast_when_asked(self):
         self.assertEqual(quality.high_contrast_violations(DIST), [])
@@ -1802,7 +1876,7 @@ class HighContrastPreference(DistCopyMixin):
         """A literal is one scheme's colour: it cannot improve both."""
         violations = self.mutate(
             "features/index.html",
-            "@media (prefers-contrast:more){:root{--text-2:var(--text);--text-3:#3d3934}}",
+            "@media (prefers-contrast:more){:root{--text-2:var(--text);--text-muted:#3d3934}}",
         )
         self.assertTrue(
             any(
@@ -1814,7 +1888,7 @@ class HighContrastPreference(DistCopyMixin):
 
     def test_a_block_that_restates_the_default_fails(self):
         violations = self.mutate(
-            "ui/index.html", "@media (prefers-contrast:more){:root{--text-3:var(--text-3)}}"
+            "ui/index.html", "@media (prefers-contrast:more){:root{--text-muted:var(--text-muted)}}"
         )
         self.assertTrue(
             any(
@@ -1826,7 +1900,7 @@ class HighContrastPreference(DistCopyMixin):
 
     def test_a_reference_to_an_undefined_token_fails(self):
         violations = self.mutate(
-            "404.html", "@media (prefers-contrast:more){:root{--text-3:var(--text-missing)}}"
+            "404.html", "@media (prefers-contrast:more){:root{--text-muted:var(--text-missing)}}"
         )
         self.assertTrue(
             any("/404.html" in v and "--text-missing" in v and "does not define" in v for v in violations),

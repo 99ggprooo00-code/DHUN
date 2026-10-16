@@ -95,6 +95,7 @@ const ALIASES = {
   "--text": { app: "--dhun-text" },
   "--text-2": { app: "--dhun-text-secondary" },
   "--text-3": { app: "--dhun-text-tertiary" },
+  "--text-muted": { app: null },
   "--text-4": { app: null },
   "--accent": { app: "--dhun-accent" },
   "--on-accent": { app: "--dhun-on-accent" },
@@ -140,6 +141,18 @@ const ALIASES = {
  * backdrop as a full-bleed album cover.
  */
 const SITE_ONLY = {
+  "--text-muted": {
+    // Dark is the app's own rung; light is the same ink at the alpha that
+    // clears the floor on every light surface.
+    dark: "rgba(255, 255, 255, 0.6)",
+    light: "rgba(26, 23, 20, 0.65)",
+    why: "the site's tertiary rung: the app's --dhun-text-tertiary is 3.95:1 on "
+      + "--surface in light (measured by the browser job, 2026-10-16, below the "
+      + "4.5:1 body floor) because it is a 0.549-alpha ink; the site paints its "
+      + "tertiary text with the same ink at 0.65, which is 5.06:1 on "
+      + "--surface-highest and 5.55:1 on --surface. --text-3 stays declared above "
+      + "so the sheet still mirrors the app, and no rule paints text with it",
+  },
   "--text-4": {
     dark: "rgba(255, 255, 255, 0.45)",
     light: "rgba(26, 23, 20, 0.42)",
@@ -344,7 +357,7 @@ export function render(appCss) {
   lines.push("@media (prefers-contrast: more) {");
   lines.push("  :root {");
   lines.push("    --text-2: var(--text);");
-  lines.push("    --text-3: var(--text);");
+  lines.push("    --text-muted: var(--text);");
   lines.push("  }");
   lines.push("}");
   lines.push("");

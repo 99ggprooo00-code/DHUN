@@ -86,6 +86,18 @@ Evidence: live `gh` API reads, public-download attempts, CI annotations, source 
   enforced by the app's own failure states, by `scripts/test_app_web.py` on the
   source, and by the served check on the bytes a visitor gets. The native
   Android/Windows builds remain the supported players.
+- **The app's light tertiary rung does not meet WCAG AA — recorded, not
+  silently fixed (2026-10-16).** `--dhun-text-tertiary` in the light theme is
+  `rgba(26, 23, 20, 0.549)`, which measures 3.95:1 on `--dhun-surface` (#ffffff)
+  and 3.71:1 on `--dhun-surface-highest` — below the 4.5:1 floor for body text.
+  The marketing site no longer paints text with it: it derives `--text-muted`
+  from the same ink at 0.65 alpha (5.06:1 at its worst) and
+  `scripts/website_quality.py` fails if a `color: var(--text-3)` comes back. The
+  web app, whose token file mirrors the app and must keep doing so, still carries
+  the app's value, and the native Compose themes are out of scope for this
+  change — changing them is a design decision for the maintainer, not a
+  side-effect of a website rewrite. Measured by the browser job; the number is
+  the light scheme's, not the dark one's (dark is 6.77:1 on `--surface`).
 - **The served check of `/app/` is shape-only.** It asserts the shell, the
   `noindex`, the strict CSP, and that the module and stylesheets return 200 —
   it does not execute the application (the `served` job has no JS engine).

@@ -1390,6 +1390,17 @@ sheet, the appearance rules). The ratchet baseline was regenerated deliberately:
 `/` 47.1 kB, `/features/` 48.0 kB, `/ui/` 58.1 kB against the 60 kB budget in §10.
 The next growth has to be argued for again, which is what the ratchet is for.
 
+**Readable text, and the rung the site does not paint with.** The browser job
+measured the app's own `--dhun-text-tertiary` at 3.95:1 on white in the light
+scheme — below the 4.5:1 body floor — on nav labels, the dock subtitle, the
+source-traceability lines and platform statuses. The site therefore derives
+`--text-muted` from the same ink at 0.65 alpha (5.06:1 at its worst), keeps
+`--text-3` declared so the sheet still mirrors the app, and the Python contrast
+rule both checks **both** schemes (it read only the dark declarations before,
+which is why a browser had to find this) and fails when any rule paints text with
+the unreadable rung. The app's own light rung is unchanged and the finding is
+recorded in `.ai/KNOWN_LIMITATIONS.md`.
+
 **Left open (not claimed done):** no browser binary exists in this environment, so
 the rendered shell is checked by the site workflow's browser job and by a human —
 not by the suites here.

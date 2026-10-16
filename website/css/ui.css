@@ -25,7 +25,7 @@
 }
 .swatch-name { font-weight: 600; font-size: 0.92rem; }
 .swatch-value { font-family: var(--mono); font-size: 0.82rem; color: var(--text-2); }
-.swatch-use { font-size: 0.82rem; color: var(--text-3); }
+.swatch-use { font-size: 0.82rem; color: var(--text-muted); }
 
 /* ------------------------------------------------- shape + spacing scale -- */
 .scales {
@@ -42,7 +42,7 @@
 }
 .scales--spacing .scale-bar { height: 0.6rem; background: var(--accent); }
 .scale-name { font-family: var(--mono); font-size: 0.82rem; color: var(--text-2); }
-.scale-value { font-family: var(--mono); font-size: 0.82rem; color: var(--text-3); }
+.scale-value { font-family: var(--mono); font-size: 0.82rem; color: var(--text-muted); }
 
 /* ------------------------------------------------------------ type ramp -- */
 .type-ramp { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
@@ -80,7 +80,7 @@
 .inventory code { overflow-wrap: anywhere; }
 .inventory caption {
   text-align: left; padding: 0 var(--sp-2) var(--sp-3);
-  color: var(--text-3); font-size: 0.85rem;
+  color: var(--text-muted); font-size: 0.85rem;
 }
 .inventory th, .inventory td {
   text-align: left; padding: var(--sp-3); border-top: 1px solid var(--hairline);

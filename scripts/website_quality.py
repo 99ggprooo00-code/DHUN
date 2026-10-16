@@ -126,18 +126,34 @@ ACTIVE_BACKLOG_STATUSES = ("shipped", "captured")
 CONTRAST_PAIRS = (
     ("--text", "--bg", 4.5),
     ("--text-2", "--bg", 4.5),
-    ("--text-3", "--bg", 4.5),
+    ("--text-muted", "--bg", 4.5),
     ("--accent", "--bg", 4.5),
     ("--text", "--surface", 4.5),
     ("--text", "--surface-variant", 4.5),  # the current-page pill in the nav
+    ("--text", "--surface-highest", 4.5),
     ("--text-2", "--surface", 4.5),
-    ("--text-3", "--surface", 4.5),
+    # The tertiary rung the site paints with. `--text-3` — the app's own value —
+    # is deliberately NOT here: its light side is 3.95:1 (see `TEXT_RUNG_UNDER_FLOOR`).
+    ("--text-muted", "--surface", 4.5),
+    ("--text-muted", "--surface-variant", 4.5),
+    ("--text-muted", "--surface-highest", 4.5),
     ("--accent", "--surface", 4.5),
     ("--on-accent", "--accent", 4.5),
     ("--on-accent-container", "--accent-container", 4.5),
     ("--accent", "--surface-variant", 3.0),
     ("--warning", "--surface", 4.5),
 )
+
+# A token the sheet carries for fidelity but that no rule may paint text with,
+# and why. `--text-3` is the app's own tertiary rung: 0.549-alpha ink, which is
+# 3.95:1 on `--surface` in the light scheme — below the 4.5:1 body floor. The
+# browser job measured it on the built pages on 2026-10-16 (nav labels, the dock
+# subtitle, source-traceability lines, platform statuses); `--text-muted` is the
+# readable rung derived from the same ink, and this constant is what keeps a
+# `color: var(--text-3)` from coming back unnoticed.
+TEXT_RUNG_UNDER_FLOOR = {
+    "--text-3": "3.95:1 on --surface in the light scheme (the app's own 0.549-alpha ink)",
+}
 
 
 # --------------------------------------------------------------------------
@@ -2121,30 +2137,64 @@ def _colour(value: str, background: str | None = None) -> tuple[float, float, fl
 
 
 def contrast_violations(dist: pathlib.Path) -> list[str]:
+    """The declared text pairs, in **both** schemes, plus the rung ban.
+
+    The sheet states every colour twice: the app's dark value written out plainly
+    and then a `light-dark(light, dark)` pair. Checking only the first (dark)
+    declaration is how the light scheme went unchecked until the browser job
+    measured it, so both are checked here — the light map is the pairs' light
+    sides on top of the shared declarations, which is exactly what a browser
+    computes for a visitor whose system asks for a light page.
+    """
     violations: list[str] = []
-    css = _read_css(dist).get("styles.css", "")
+    sheets = _read_css(dist)
+    css = sheets.get("styles.css", "")
     tokens = _parse_tokens(css)
     if not tokens:
         return ["styles.css: no :root token block found to check contrast"]
-    for foreground, background, minimum in CONTRAST_PAIRS:
-        if foreground not in tokens or background not in tokens:
-            violations.append(f"styles.css: token {foreground} or {background} is missing")
-            continue
-        fg = _colour(tokens[foreground], tokens[background])
-        bg = _colour(tokens[background])
-        if fg is None or bg is None:
-            violations.append(
-                f"styles.css: cannot resolve {foreground} ({tokens[foreground]}) "
-                f"or {background} ({tokens[background]})"
+    # First pair per token wins, like `_parse_tokens` above and for the same
+    # reason: the base `:root` block is the one being checked, and the accent
+    # ramps restate `--accent` further down the sheet — last-wins would check the
+    # last ramp in the file instead of the sheet's own default.
+    light: dict[str, str] = {}
+    for name, value, _dark in light_dark_pairs(css):
+        light.setdefault(name, value)
+    for scheme, values in (("dark", tokens), ("light", {**tokens, **light})):
+        for foreground, background, minimum in CONTRAST_PAIRS:
+            if foreground not in values or background not in values:
+                violations.append(
+                    f"styles.css: token {foreground} or {background} is missing ({scheme} scheme)"
+                )
+                continue
+            fg = _colour(values[foreground], values[background])
+            bg = _colour(values[background])
+            if fg is None or bg is None:
+                violations.append(
+                    f"styles.css: cannot resolve {foreground} ({values[foreground]}) "
+                    f"or {background} ({values[background]}) in the {scheme} scheme"
+                )
+                continue
+            lighter, darker = sorted(
+                (_relative_luminance(fg), _relative_luminance(bg)), reverse=True
             )
-            continue
-        lighter, darker = sorted((_relative_luminance(fg), _relative_luminance(bg)), reverse=True)
-        ratio = (lighter + 0.05) / (darker + 0.05)
-        if ratio < minimum:
-            violations.append(
-                f"styles.css: {foreground} on {background} is {ratio:.2f}:1, "
-                f"below the {minimum}:1 requirement"
-            )
+            ratio = (lighter + 0.05) / (darker + 0.05)
+            if ratio < minimum:
+                violations.append(
+                    f"styles.css: {foreground} on {background} is {ratio:.2f}:1 in the {scheme} "
+                    f"scheme, below the {minimum}:1 requirement"
+                )
+    for rung, reason in sorted(TEXT_RUNG_UNDER_FLOOR.items()):
+        for name, sheet in sorted(sheets.items()):
+            # `(?<![\w-])` so a `border-color:` or `background-color:` is not read
+            # as text — only `color` paints glyphs, and only the property
+            # boundaries are allowed to precede it.
+            for declaration in re.finditer(
+                rf"(?<![\w-])color\s*:\s*var\(\s*{re.escape(rung)}\s*\)", sheet
+            ):
+                violations.append(
+                    f"{name}: text is painted with {rung}, which is {reason}; use the readable "
+                    f"rung instead (--text-muted) — the colour is {declaration.group(0)!r}"
+                )
     return violations
 
 

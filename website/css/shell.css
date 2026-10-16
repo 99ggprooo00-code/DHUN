@@ -129,7 +129,7 @@
   min-height: var(--target);
   min-width: var(--target);
   padding: var(--sp-1) var(--sp-2);
-  color: var(--text-3);
+  color: var(--text-muted);
   text-decoration: none;
   font-size: 0.7rem;
   font-weight: 600;
@@ -197,20 +197,19 @@
 }
 
 /* Phone widths, where the app itself shows a compact top bar: the brand and the
-   primary action, and nothing left to compete for the same row. The source link
-   gives up its slot below 480px (its destination is the footer's own "Source"
-   link, which stays), so the primary action keeps its full label; the brand's
-   wordmark text gives up its slot below 360px, leaving the mark, which is still
-   the home link and still announces "DHUN home". Both breakpoints come from
-   `website/tests/browser.mjs`, which fails on a control narrower than the target
-   or on a page wider than its viewport at 280px and 320px. */
+   one action. Below 480px the pill gives up its slot, not the icon button — the
+   bar keeps the brand's wordmark and the round 48px control, and the standing
+   invitation into the app is the docked bar above the navigation, which is a
+   bigger target in a better place than a pill squeezed into the app bar.
+
+   What is dropped is dropped whole, and what is kept keeps its size: a control
+   narrowed below the 44px floor is worse than one that is not there, and a
+   hidden icon reports "rendered no geometry" to the icon check. Both rules come
+   from `website/tests/browser.mjs`, which fails on a control narrower than the
+   target or on a page wider than its viewport at 280px and 320px (measured
+   2026-10-16: a.wordmark 32x48 and the pill's overflow at 280px). */
 @media (max-width: 479px) {
-  .app-bar__actions .icon-btn {
-    display: none;
-  }
-}
-@media (max-width: 359px) {
-  .wordmark-text {
+  .app-bar__actions .btn {
     display: none;
   }
 }
@@ -305,7 +304,7 @@
 }
 .dock__sub {
   font-size: 0.78rem;
-  color: var(--text-3);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -341,7 +340,7 @@
   font-weight: 600;
 }
 .appearance__lead {
-  color: var(--text-3);
+  color: var(--text-muted);
   font-size: 0.86rem;
   max-width: 78ch;
 }
@@ -363,7 +362,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-muted);
 }
 .appearance__choices {
   display: flex;
