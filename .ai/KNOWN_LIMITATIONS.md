@@ -98,6 +98,23 @@ Evidence: live `gh` API reads, public-download attempts, CI annotations, source 
   change — changing them is a design decision for the maintainer, not a
   side-effect of a website rewrite. Measured by the browser job; the number is
   the light scheme's, not the dark one's (dark is 6.77:1 on `--surface`).
+- **Framing is refused in JavaScript, because no header can be sent
+  (2026-10-16).** `/app/` used to declare `frame-ancestors 'none'` inside its
+  `<meta>` CSP. The specification requires a meta-delivered policy to ignore
+  that directive (Chrome logs "The Content Security Policy directive
+  'frame-ancestors' is ignored when delivered via a <meta> element" on every
+  load, which the browser job reported as a console problem on all four `/app/`
+  passes), and GitHub Pages serves a project site with no response-header
+  control, so it could not be sent as a header either — the declaration was dead
+  configuration that looked like protection. It is removed and the rule is
+  enforced in the app: `isFramed()` (`platform.js`) is the first thing `boot()`
+  does, and a framed document renders an explanation with a link out of the
+  frame instead of the player. **Not proven:** a real cross-origin embed of the
+  app has not been tested in CI — what the tests cover is the decision (an
+  identity comparison; an unreadable `top` answers "not framed") and the guard's
+  position before storage, sources or audio are touched. A browser that refuses
+  to answer the comparison gets the app, which is the safe default for a
+  document that cannot read its host.
 - **The served check of `/app/` is shape-only.** It asserts the shell, the
   `noindex`, the strict CSP, and that the module and stylesheets return 200 —
   it does not execute the application (the `served` job has no JS engine).

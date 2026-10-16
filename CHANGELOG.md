@@ -88,6 +88,53 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   check (own crash guard, pure decision in `tests/rules.mjs`, 7 new unit tests)
   proves each group still moves, keeps exactly one member selected, keeps focus
   and costs one tab stop.
+- **Fixed: the desktop rail no longer spills.** The app's navigation rail is as
+  wide as the app's own `NavigationRail` (80 px) and its items were sized by
+  their longest label, so at 1280×800 the item row measured 90 px inside a 79 px
+  rail — the browser job's `overflowReport` calls that spilling and prints each
+  child's width. The rail's items are now pinned to the rail (`width: 100%`) and
+  their labels wrap, the way a Material rail wraps them: a rail that grows with
+  the longest translation would move the page's content column sideways on the
+  visitor's machine. The bottom bar keeps truncating its labels, and for the
+  reason it always had — the bar's height is what keeps the thumb's targets
+  still, and a rail grows downward without moving anything under a finger.
+- **Fixed: `frame-ancestors` was declared where it cannot take effect.** The
+  `/app/` head carried `frame-ancestors 'none'` in its `<meta>` CSP, which the
+  specification requires a meta-delivered policy to *ignore* — Chrome logs
+  exactly that, and the browser job reported it as a console problem on all four
+  `/app/` passes. GitHub Pages serves a project site with no response-header
+  control, so it could not be sent as a header either; the declaration was dead
+  configuration that looked like protection. It is gone from the policy, and the
+  rule it stated is enforced where this build can enforce it: `isFramed()`
+  (`platform.js`) is the first thing `boot()` asks, and a framed DHUN renders an
+  explanation with a way out instead of a music client wearing somebody else's
+  page as a costume. `scripts/test_app_web.py` and `app-web/tests/shell.test.mjs`
+  now assert the guard exists *and* that the inert directive does not come back.
+- **Fixed: the browser job was asserting a notice the web app no longer has.**
+  Its `/app/` pass failed four times with "the engineering-preview notice is
+  absent — the mirror may be claiming more than it proves", looking for
+  `data-testid="preview-notice"`: an element from the interface-preview framing
+  that `/app/` deliberately dropped when it became the web app. The check now
+  asserts the honesty the app actually carries — the always-visible source badge
+  (`.dhun-source[data-kind]`, "the source that produced the rows on screen") must
+  name who answered, and when that source is the bundled demo catalogue the page
+  must carry the strip that says those rows are fictional and have no audio.
+  `views.notice()` gained a `hook` option so a strip has a stable name to be
+  found by, rather than a sentence to be matched.
+- **Fixed: `/app/` had lost the `noindex` the served-site check asserts.** The
+  rebuilt web app dropped `<meta name="robots" content="noindex, nofollow">`,
+  which the deployed build has carried since ADR-008 boundary 4 and which the
+  `served` job re-asserts against the bytes a visitor actually gets. That job
+  runs only on a push to `main`, and only after a real Pages publish, so the
+  regression would have passed every pull-request check and failed the first
+  time it mattered. The line is back, with its reason restated for a real web
+  app rather than for a preview: what a crawler receives at `/app/` is an empty
+  `<div id="app">` and a module graph, so there is no page there to rank. The
+  rule is now asserted in `app-web/tests/shell.test.mjs` and
+  `scripts/test_app_web.py` as well — a check that only runs after a merge
+  reports the mistake too late to prevent it. Found by running
+  `python3 scripts/website_smoke.py http://127.0.0.1:8080` against the assembled
+  tree, which is the same tree the workflow tests.
 - **Fixed (docs):** the web app is no longer described as a preview, a mirror or
   a demo in `README.md`, `app-web/README.md`, `docs/INSTALL.md`, `docs/TRD.md`,
   `docs/PRD.md`, `docs/app-flow.md`, `docs/implementation-plan.md`,

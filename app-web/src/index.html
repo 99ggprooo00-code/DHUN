@@ -8,6 +8,14 @@
       name="description"
       content="DHUN is a free, open-source music player. This is its web build: search and play YouTube Music anonymously from your browser, with a library that stays on your device."
     />
+    <!-- Out of the index, and not as a hedge: what a crawler gets here is an
+         empty `<div id="app">` and a module graph, because the interface is
+         built in the browser from the visitor's own library. There is no page
+         here to rank, and an app shell in search results would be a result
+         that cannot show anything until it runs. The site's own routes are what
+         belong in the index; `scripts/website_smoke.py` asserts this line on
+         the served bytes, and the site's sitemap lists no `/app/` route. -->
+    <meta name="robots" content="noindex, nofollow" />
     <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#161616" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#F6F4F1" media="(prefers-color-scheme: light)" />
@@ -31,10 +39,21 @@
       a blocked network. What is *not* allowed is being widened: no
       `script-src 'unsafe-eval'`, no `frame-src`, no `object-src`, no inline
       event handlers, and `base-uri`/`form-action` stay locked to 'none'.
+
+      `frame-ancestors 'none'` is deliberately absent, and its absence is a
+      limitation rather than a choice. It is a response-header directive: the
+      specification requires a `<meta>` CSP to ignore it, Chrome logs exactly
+      that on every load, and GitHub Pages serves a project site with no header
+      control — so the directive would have been dead configuration that looked
+      like protection. The rule itself is still enforced, in the one place this
+      build can enforce it: the app refuses to boot inside a frame
+      (`isFramed` in js/platform.js, the guard at the top of `boot()`), and the
+      visitor gets an explanation instead of a Play button wearing somebody
+      else's page as a costume.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: blob:; connect-src 'self' https:; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: blob:; connect-src 'self' https:; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />

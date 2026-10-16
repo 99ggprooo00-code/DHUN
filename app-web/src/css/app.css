@@ -193,6 +193,33 @@ a {
   backdrop-filter: blur(var(--dhun-space-lg));
 }
 
+/* The rail is 80px because the app's own NavigationRail is, so its items are
+   pinned to the rail's width instead of being sized by their longest label: a
+   rail that grows when a label does would push every page's content column
+   sideways, and it would do it on the visitor's machine rather than in review.
+
+   The label wraps here (see the override below) rather than truncating as it
+   does in the bottom bar. The bottom bar truncates because its height is what
+   keeps the thumb's targets still; a rail grows downward without moving
+   anything under a finger, and "Your library" cut to "Your librar…" is a
+   destination the visitor has to guess at.
+
+   Measured 2026-10-16, browser job of website run 38850405071: the item row was
+   90px wide inside a 79px rail at 1280x800 (`overflowReport` in
+   website/tests/browser.mjs reports that as spilling, with each child's
+   width). Nothing else about the rail changed. */
+.dhun-rail .dhun-nav-item {
+  width: 100%;
+  min-width: 0;
+  padding-inline: var(--dhun-space-xs);
+}
+
+.dhun-rail .dhun-nav-item__label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
 .dhun-brand-block {
   display: flex;
   flex-direction: column;

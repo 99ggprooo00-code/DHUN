@@ -65,6 +65,29 @@ export function canProcessAudio() {
 }
 
 /**
+ * True when this document is running inside somebody else's frame.
+ *
+ * `frame-ancestors` is a *response-header* directive. The specification requires
+ * a `<meta http-equiv="Content-Security-Policy">` to ignore it — Chrome says so
+ * in the console on every load — and a static host cannot send the header
+ * (GitHub Pages serves a project site with no header control at all). So the
+ * rule DHUN wants, "no site may frame this app", is enforced where it can be:
+ * `main.js` refuses to boot, and the visitor gets an explanation instead of a
+ * set of controls that appear to belong to the page around them.
+ *
+ * The comparison is identity, which is allowed across origins even though
+ * reading `top`'s properties is not; anything unreadable answers `false`, so a
+ * browser that will not answer gets the app rather than the refusal.
+ */
+export function isFramed(win = globalThis) {
+  return safely(() => {
+    const top = win.top;
+    if (!top || !win.self) return false;
+    return top !== win.self;
+  });
+}
+
+/**
  * Network reachability, reported by the browser rather than inferred.
  *
  * `navigator.onLine` is famously optimistic (a captive portal reports online),

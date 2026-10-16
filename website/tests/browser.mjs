@@ -465,9 +465,16 @@ function overflowReport() {
   };
 }
 
-// The web mirror's state, gathered in the page (page scope only: this function
+// The web app's state, gathered in the page (page scope only: this function
 // must stay self-contained — see the harness guard in
 // scripts/test_website_workflow.py). It gathers; Node decides.
+//
+// What it reads is the app's own honesty device rather than a test-only hook:
+// `views.js` renders one `.dhun-source[data-kind]` badge on every screen — "the
+// source that produced the rows on screen, always visible, never implied" — and
+// a strip the app marks `data-notice="demo"` when that source is the bundled
+// demo catalogue. Both are real interface elements with real jobs; the job of
+// this report is to notice whether they are there.
 function webAppReport() {
   const state = (selector) => {
     const el = document.querySelector(selector);
@@ -475,13 +482,23 @@ function webAppReport() {
     const rect = el.getBoundingClientRect();
     return { visible: rect.width > 0 && rect.height > 0, text: (el.textContent || "").trim().slice(0, 60) };
   };
+  const badge = document.querySelector(".dhun-source");
+  let source = null;
+  if (badge) {
+    const rect = badge.getBoundingClientRect();
+    const label = badge.querySelector(".dhun-source__label");
+    source = {
+      kind: String(badge.dataset.kind || ""),
+      label: ((label ? label.textContent : "") || "").trim().slice(0, 40),
+      visible: rect.width > 0 && rect.height > 0,
+    };
+  }
   return {
     mounted: (document.querySelector("#app") || { children: [] }).children.length > 0,
     navItems: document.querySelectorAll(".dhun-nav-item").length,
     title: document.title,
-    previewNotice: state('[data-testid="preview-notice"]'),
-    sampleDataNotice: state('[data-testid="sample-data-notice"]'),
-    backendNotice: state('[data-testid="backend-notice"]'),
+    source,
+    demoNotice: state('[data-notice="demo"]'),
   };
 }
 
@@ -1521,14 +1538,23 @@ async function checkPrint(browser) {
   await context.close();
 }
 
-// The web mirror, deployed at /app/ under the same published path (ADR-008
+// The web app, deployed at /app/ under the same published path (ADR-008
 // amendment 2026-10-09 (2)). Its gates are deliberately narrower than the
 // marketing site's — it is a JavaScript application, not a static document,
-// and it is noindex: it must boot, it must say what it is (the engineering-
-// preview notice is honesty, not decoration), nothing unhandled may throw,
-// and it must not overflow. Which catalogue answered (live or sample) is
-// recorded, not gated: on a runner with no upstream, the app falls back and
-// says so, and that fallback is the correct behaviour.
+// and it is noindex: it must boot, it must name the data source that answered
+// it, nothing unhandled may throw, and it must not overflow. Which catalogue
+// answered (live or sample) is recorded, not gated: on a runner with no
+// upstream, the app falls back and says so, and that fallback is the correct
+// behaviour.
+//
+// The check that stood here until 2026-10-16 looked for
+// `data-testid="preview-notice"` and failed with "the mirror may be claiming
+// more than it proves" when it was missing — an assertion about the
+// "engineering preview" badge of a build that no longer exists. The web app
+// stopped being a preview of the app and became the web app, so the check now
+// asserts the honesty the app actually carries: the source badge that names
+// who answered, and, when the demo catalogue answered, the strip that says
+// those rows are fictional and have no audio.
 const NETWORK_NOISE = /Failed to load resource|net::ERR_|ERR_NAME_NOT_RESOLVED/i;
 async function checkWebApp(browser) {
   const viewports = [
@@ -1568,17 +1594,21 @@ async function checkWebApp(browser) {
       if (!report.mounted) {
         fail(`web app ${label}`, "the application did not render: #app is empty");
       } else {
-        const source = report.sampleDataNotice
-          ? "sample catalogue (the live source did not answer, and the page says so)"
-          : "live source answered";
+        const source = report.source
+          ? `${report.source.label || "unnamed"} (data-kind=${report.source.kind || "none"})`
+          : "no source badge on screen";
         record(
           `web app ${label}`,
-          `mounted, ${report.navItems} nav item(s), ${report.title ? report.title : "no title"}, ${source}` +
-            (report.backendNotice ? `; backend notice: ${report.backendNotice.text}` : ""),
+          `mounted, ${report.navItems} nav item(s), ${report.title ? report.title : "no title"}, ${source}`,
         );
       }
-      if (!report.previewNotice || !report.previewNotice.text) {
-        fail(`web app ${label}`, "the engineering-preview notice is absent — the mirror may be claiming more than it proves");
+      if (!report.source || !report.source.visible || !report.source.kind) {
+        fail(`web app ${label}`, "the app does not name the data source behind what is on screen — the source badge is absent or unlabelled");
+      } else if (report.source.kind === "demo" && !report.demoNotice) {
+        fail(
+          `web app ${label}`,
+          `the demo catalogue answered (${report.source.label || "unlabelled"}), so the page must say those rows are fictional and have no audio, and this one does not`,
+        );
       }
       if (report.navItems < 3) {
         fail(`web app ${label}`, `only ${report.navItems} nav item(s); the shell mirrors Home/Search/Library(+Settings)`);

@@ -18,6 +18,8 @@ What is enforced:
   nothing from node_modules, no build step that needs a package install;
 * the page is a real, installable web app: strict CSP, manifest with a maskable
   icon, a working `<noscript>` explanation, and an entry module that boots;
+* the app refuses to run framed — `frame-ancestors` cannot be delivered from a
+  meta tag or by GitHub Pages, so the rule is enforced in JavaScript;
 * every surface the shell renders into exists, and every control the app emits
   is wired to a handler;
 * the things a browser cannot do are **not sold**: no Downloads tab, no cache
@@ -230,9 +232,79 @@ class IsARealWebAppNotAPreview(unittest.TestCase):
         policy = re.search(r'http-equiv="Content-Security-Policy"\s*\n?\s*content="([^"]*)"', self.index_html)
         self.assertIsNotNone(policy, "index.html has no Content-Security-Policy")
         body = policy.group(1)
-        for directive in ("default-src 'none'", "script-src 'self'", "base-uri 'none'", "frame-ancestors 'none'"):
+        for directive in ("default-src 'none'", "script-src 'self'", "base-uri 'none'"):
             self.assertIn(directive, body, f"the policy is missing {directive}")
         self.assertNotIn("unsafe-eval", body, "the policy must not allow eval")
+        # `frame-ancestors` only works as a response header, and a meta tag is
+        # required to ignore it: declaring it here is dead configuration that
+        # logs "The Content Security Policy directive 'frame-ancestors' is
+        # ignored when delivered via a <meta> element" on every page load, which
+        # the browser job reports as a console problem. The app refuses to boot
+        # inside a frame instead (test_framing_is_refused_in_javascript below).
+        self.assertNotIn(
+            "frame-ancestors",
+            body,
+            "frame-ancestors cannot be delivered from a meta tag — enforce it in the app",
+        )
+
+    def test_framing_is_refused_in_javascript(self) -> None:
+        """`frame-ancestors` cannot be sent here, so the app enforces the rule.
+
+        The specification requires a `<meta http-equiv="Content-Security-Policy">`
+        to ignore `frame-ancestors` (Chrome logs it as a console problem on every
+        load, which the browser job reported until 2026-10-16), and GitHub Pages
+        serves a project site with no header control. Removing dead configuration
+        is only half a fix: the rule it was meant to state has to hold somewhere,
+        or the removal is a downgrade. It holds in `boot()`, before the app
+        builds anything at all.
+        """
+        platform_js = _read(JS_DIR / "platform.js")
+        views_js = _read(JS_DIR / "views.js")
+        self.assertIn("export function isFramed(", platform_js)
+        self.assertIn("isFramed", self.main_js, "main.js never asks whether it is framed")
+        self.assertIn("views.framedRefusal()", self.main_js)
+        self.assertIn("export function framedRefusal(", views_js)
+        guard = self.main_js.index("isFramed(win)")
+        for later in ("createSettingsStore(", "createSourceManager(", "root.innerHTML = html"):
+            self.assertLess(
+                guard,
+                self.main_js.index(later),
+                "the framing guard runs after the app has already touched storage or the DOM",
+            )
+
+    def test_the_rail_pins_its_items_to_its_own_width(self) -> None:
+        """The desktop rail is as wide as the app's NavigationRail, and stays it.
+
+        Measured 2026-10-16 (browser job of website run 38850405071): the rail's
+        item row was 90px inside a 79px rail at 1280x800, which the browser job's
+        `overflowReport` reports as spilling with each child's width. An item
+        sized by its longest label moves the page's own content column when a
+        translation changes; the label wraps inside the rail instead of widening
+        it.
+        """
+        app_css = _read(CSS_DIR / "app.css")
+        block = re.search(r"\.dhun-rail \.dhun-nav-item \{([^}]*)\}", app_css)
+        self.assertIsNotNone(block, "app.css has no rule pinning the rail's items to the rail")
+        self.assertIn("width: 100%", block.group(1))
+        label = re.search(r"\.dhun-rail \.dhun-nav-item__label \{([^}]*)\}", app_css)
+        self.assertIsNotNone(label, "the rail's labels need a rule of their own")
+        self.assertIn("white-space: normal", label.group(1), "a rail label wraps rather than clipping")
+
+    def test_the_app_shell_stays_out_of_the_search_index(self) -> None:
+        """`/app/` is a shell, not a page to rank, and the deploy check agrees.
+
+        What a crawler receives is an empty `<div id="app">` and a module graph;
+        an app shell in search results is a result that shows nothing until it
+        runs. `scripts/website_smoke.py` asserts this on the served bytes after
+        a deploy to `main` — a job the pull request never runs — so a rewrite
+        can drop the line, pass every PR check, and only fail once merged. It
+        is asserted here as well for that reason.
+        """
+        self.assertRegex(
+            self.index_html,
+            r'<meta name="robots" content="noindex, nofollow"\s*/>',
+            "the web app must stay noindex, as the served-site smoke check asserts",
+        )
 
     def test_the_page_declares_a_title_viewport_and_manifest(self) -> None:
         self.assertIn("<title>", self.index_html)

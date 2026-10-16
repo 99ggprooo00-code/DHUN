@@ -27,7 +27,7 @@
  */
 
 import { html, raw, delegate, focusWithoutScroll } from "./dom.js";
-import { detectPlatform, unavailableCapabilities } from "./platform.js";
+import { detectPlatform, unavailableCapabilities, isFramed } from "./platform.js";
 import {
   createSettingsStore,
   createLibraryStore,
@@ -76,6 +76,23 @@ export function boot({
   audioElement = null,
 } = {}) {
   if (!root || !doc) throw new Error("boot() needs a root element and a document");
+
+  /* ------------------------------------------------------- framing refusal */
+
+  /**
+   * Before anything is built, and why it is here rather than in a header:
+   * `frame-ancestors` is ignored in a `<meta>` CSP (the specification says so,
+   * and Chrome logs it on every load), and this app is served by GitHub Pages,
+   * which sends no custom response headers. A framed DHUN is a Play button that
+   * appears to belong to whatever page surrounds it, so the app declines to
+   * start in one. Nothing is constructed first — no settings read, no storage
+   * opened, no source or audio engine created — because a refusal that has
+   * already touched the visitor's data is not a refusal.
+   */
+  if (isFramed(win)) {
+    root.innerHTML = views.framedRefusal();
+    return { framed: true };
+  }
 
   /* ------------------------------------------------------------- foundation */
 

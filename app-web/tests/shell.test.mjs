@@ -223,12 +223,25 @@ test("the page declares the CSP, the manifest and the viewport", () => {
   // what the app refuses to allow, and naming a directive is not using it.
   const policy = html.match(/http-equiv="Content-Security-Policy"\s*\n?\s*content="([^"]*)"/);
   assert.ok(policy, "index.html has no Content-Security-Policy");
-  for (const directive of ["default-src 'none'", "script-src 'self'", "base-uri 'none'", "frame-ancestors 'none'"]) {
+  for (const directive of ["default-src 'none'", "script-src 'self'", "base-uri 'none'"]) {
     assert.ok(policy[1].includes(directive), `the policy is missing ${directive}`);
   }
+  // `frame-ancestors` is a response-header directive and a meta tag is required
+  // to ignore it, so declaring it here would be dead configuration that logs a
+  // console error on every load. The app enforces the rule itself instead; the
+  // test below reads the guard, and the browser job proves it in a real frame.
+  assert.ok(
+    !policy[1].includes("frame-ancestors"),
+    "frame-ancestors cannot be delivered from a meta tag — it must not be declared there",
+  );
   assert.ok(!policy[1].includes("unsafe-eval"), "the policy must not allow eval");
   assert.ok(!policy[1].includes("unsafe-inline'") || policy[1].match(/script-src 'self'/), "scripts must not be inline");
 
+  // The app shell is what a crawler would get: an empty #app and a module graph
+  // that crawlers mostly will not run. `scripts/website_smoke.py` asserts this
+  // on the served bytes after a deploy; asserting it here means a rewrite cannot
+  // quietly publish the app into search results again.
+  assert.match(html, /<meta name="robots" content="noindex, nofollow" \/>/);
   assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
   assert.match(html, /name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/);
   assert.match(html, /<script type="module" src="\.\/js\/main\.js"><\/script>/);

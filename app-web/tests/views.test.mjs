@@ -287,6 +287,10 @@ test("the honesty notices are in the rendered copy, not only in a doc", () => {
   }));
   assert.match(demoHome, /Demo catalogue/);
   assert.match(demoHome, /no audio/);
+  // The hook is what the browser job's `/app/` pass reads: it fails when the
+  // demo catalogue is answering and this strip is not on screen, so the strip
+  // has to carry the name the moment the screen knows the source is the demo.
+  assert.match(demoHome, /data-notice="demo"/);
 
   const noAudioBrowser = text(views.settingsScreen({ settings, ...shell, capabilities: { ...shell.platform, audioContext: false } }));
   assert.match(noAudioBrowser, /no Web Audio API/);
@@ -408,6 +412,28 @@ test("an empty state always offers the next step rather than a dead end", () => 
   assert.match(screens.libraryEmpty(), /⋮/, "an empty library tells you how to make a playlist");
   assert.match(screens.searchIdle(), /Songs, albums, artists and playlists/);
   assert.match(screens.homeEmpty(), /Search for something/);
+});
+
+test("a notice can carry a stable name for the browser job", () => {
+  const named = text(views.notice({ tone: "warn", title: "Demo catalogue", hook: "demo" }));
+  assert.match(named, /data-notice="demo"/);
+  assert.match(named, /role="status"/);
+  // Unnamed notices are unchanged: the hook is additive, not a new requirement
+  // on every call site.
+  const plain = text(views.notice({ title: "Heads up" }));
+  assert.ok(!plain.includes("data-notice"), "a notice with no hook carries no name");
+});
+
+test("the framing refusal explains itself without the shell", () => {
+  const markup = text(views.framedRefusal());
+  assert.match(markup, /data-notice="framed"/);
+  assert.match(markup, /will not run inside a frame/i);
+  // A refusal with no way out is a dead end; the link goes to the app itself,
+  // out of the frame rather than inside it.
+  assert.match(markup, /target="_top"/);
+  // No action ids: nothing in the refusal is wired to a handler, because the
+  // app's delegated listener is never attached.
+  assert.deepEqual(actionsIn(markup), []);
 });
 
 test("the source badge names who answered, for every kind", () => {

@@ -98,9 +98,17 @@ export function loadingState(labels = ["Loading"]) {
   </div>`;
 }
 
-/** Notice strip: source state, demo data, offline, gestures, errors. */
-export function notice({ tone = "info", title = "", body = "", actions = [] } = {}) {
-  return html`<div class="dhun-notice dhun-notice--${tone}" role="${tone === "error" ? "alert" : "status"}">
+/**
+ * Notice strip: source state, demo data, offline, gestures, errors.
+ *
+ * `hook` gives a strip a stable name (`data-notice="demo"`) so the browser job
+ * can ask for "the notice that says the demo catalogue is answering" instead of
+ * matching a sentence. A reworded sentence should stay a reworded sentence and
+ * not turn a check into a search for prose that no longer exists — which is
+ * exactly what happened to this module's consumers until 2026-10-16.
+ */
+export function notice({ tone = "info", title = "", body = "", actions = [], hook = "" } = {}) {
+  return html`<div class="dhun-notice dhun-notice--${tone}"${hook ? raw(` data-notice="${hook}"`) : raw("")} role="${tone === "error" ? "alert" : "status"}">
     <div class="dhun-notice__text">
       ${title ? html`<p class="dhun-notice__title">${title}</p>` : html``}
       ${body ? html`<p class="dhun-notice__body">${body}</p>` : html``}
@@ -124,6 +132,35 @@ export function sourceBadge(source) {
     <span class="dhun-source__label">${label}</span>
     <span class="dhun-visually-hidden">— ${source?.detail ?? ""}</span>
   </span>`;
+}
+
+/**
+ * What a browser shows when somebody else's page has framed DHUN.
+ *
+ * This is not a screen of the app: the app does not start (see `isFramed` in
+ * platform.js and the guard at the top of `main.js`). A framed music client is
+ * a click target that looks like it belongs to the page around it, and the
+ * directive that normally forbids that — `frame-ancestors` — cannot be sent by
+ * a static host, so it is enforced here instead. The block reuses the
+ * scripting-off layout: same type scale, same measure, no shell, because there
+ * is no shell to render.
+ */
+export function framedRefusal() {
+  return html`<div class="dhun-noscript" data-notice="framed">
+    <h1>DHUN will not run inside a frame</h1>
+    <p>
+      This page is embedded in another site, so the app has not started. A music player in a frame is a
+      set of controls that appear to belong to whatever page surrounds them, and DHUN does not lend
+      itself to that.
+    </p>
+    <p>
+      <a class="dhun-button" href="./" target="_top" rel="noopener">Open DHUN directly</a>
+    </p>
+    <p>
+      Anyone can run this app: the source is at
+      <a href="https://github.com/99ggprooo00-code/DHUN">github.com/99ggprooo00-code/DHUN</a>.
+    </p>
+  </div>`;
 }
 
 /* ------------------------------------------------------------------ rows -- */
@@ -289,6 +326,7 @@ export function homeScreen({ shelves = [], loading = false, error = null, curren
           title: "Demo catalogue",
           body: "These fictional rows have no audio. DHUN reached no real source — Settings explains the data-source options.",
           actions: [{ id: "open-settings-source", label: "Data source" }],
+          hook: "demo",
         })
       : html``}`;
 }
@@ -634,6 +672,7 @@ export function settingsScreen({
         title: sourceState.title,
         body: sourceState.body,
         actions: sourceState.actions,
+        hook: sourceState.kind === "demo" ? "demo" : "",
       })}
       ${settingRow({
         title: "Where metadata comes from",

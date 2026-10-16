@@ -16,6 +16,7 @@ import {
   networkState,
   detectPlatform,
   unavailableCapabilities,
+  isFramed,
 } from "../src/js/platform.js";
 
 test("storage is judged by writing, not by existing", () => {
@@ -104,4 +105,22 @@ test("every missing capability produces a sentence, and a working browser produc
   }
   assert.match(missing.find((entry) => entry.id === "audio").body, /hidden rather than shown/);
   assert.match(missing.find((entry) => entry.id === "storage").body, /private window|blocking/);
+});
+
+test("framing is detected by identity, and a browser that will not answer is not a frame", () => {
+  const self = { name: "self" };
+  const other = { name: "top" };
+  assert.equal(isFramed({ self, top: other }), true);
+  assert.equal(isFramed({ top: self, self }), false, "a top-level document is not framed");
+  // A window that exposes no `top` (Node, a worker, a fake) is not a frame: the
+  // answer must degrade to "run the app", never to "refuse for no reason".
+  assert.equal(isFramed({ self }), false);
+  assert.equal(isFramed({}), false);
+  const hostile = {};
+  Object.defineProperty(hostile, "top", {
+    get() {
+      throw new Error("Blocked a frame from accessing a cross-origin frame");
+    },
+  });
+  assert.equal(isFramed(hostile), false, "an unreadable `top` is reported, not thrown");
 });
