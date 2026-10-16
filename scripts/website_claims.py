@@ -74,8 +74,16 @@ FORBIDDEN_TERMS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "cross-device sync",
         # "Synced lyrics" is a real DHUN feature (Phase 11); sync *of a
         # library or between devices* is not, and that is what this catches.
+        #
+        # The `(?<![\w-])`/`(?![\w-])` pair is the same hardening
+        # `scripts/website_quality.py` uses on its rung regex: a hyphen is not a
+        # word character, so `\b` treats the `sync` inside a file name as a
+        # standalone word, and `website/tools/sync-tokens.mjs` — a generator
+        # these documents are required to cite — came back as a claim that DHUN
+        # syncs a library. A rule that fails on the evidence for an honest
+        # sentence teaches people to stop citing the evidence.
         re.compile(
-            r"(?<!lyrics )(?<!lyric )\bsync(s|ed|ing)?\b(?!\s+lyrics?\b)",
+            r"(?<![\w-])(?<!lyrics )(?<!lyric )sync(s|ed|ing)?(?![\w-])(?!\s+lyrics?\b)",
             re.I,
         ),
     ),

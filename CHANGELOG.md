@@ -22,6 +22,56 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The web workstream gets a plan a machine can check (2026-10-16, session `arena/59c43e0a-dhun`)
+
+- **Added: `docs/web-player/`, the browser build's plan and status ledger.** A
+  bootstrap plan written for a new `dhun-webapp` repository is applied *here*,
+  as a retro-mapping over the code that already exists: `README.md` (priority
+  order, the hard rules with the mechanism that enforces each one, and a table of
+  the plan's deviations), `IMPLEMENTATION-STATUS.md` (every phase with its
+  status, its evidence and what remains, plus the release-readiness checklist
+  that is the definition of done), `KNOWN-LIMITATIONS.md`, `DEVELOPMENT-GUIDE.md`
+  and one report per phase, `PHASE-00-AUDIT.md` … `PHASE-10-MAINTENANCE-ROADMAP.md`.
+  The statuses follow the evidence rather than the plan's order: the interface,
+  library and persistence phases are complete, while **Phase 2 — real browser
+  playback — is blocked**, and both facts are stated together because the
+  optimistic half is the one people read.
+- **Added: a gate for the documents themselves.** `scripts/web_player_docs.py`
+  fails if a phase report loses a required section, if a phase is marked
+  complete without evidence that names its own phase file, if a ticked box in the
+  release checklist has nothing behind it, if the tracker stops saying the
+  project is not verified for release while the release gate is still open, or if
+  any document here carries a claim the repository cannot back — the site's own
+  honesty rules, applied to prose. `scripts/test_web_player_docs.py` feeds it
+  eighteen deliberately broken copies, so a rule that stops matching is a red
+  test rather than a quiet gap. Wired up as `npm run check:docs`.
+- **Fixed: the `sync` rule flagged the token generator's own file name.**
+  `website/tools/sync-tokens.mjs` is the script the web documents are required to
+  cite, and a hyphen is not a word character, so `\bsync\b` read the file name as
+  a claim that DHUN syncs a library — the new documents failed the gate for
+  stating a fact. The pattern now uses the same `(?<![\w-])` / `(?![\w-])`
+  hardening `scripts/website_quality.py` uses, and two tests pin both directions:
+  a hyphenated file name is not a claim, and a real cross-device sync claim still
+  fails.
+- **Added: repository entry points for the web workstream.** A dependency-free
+  root `package.json` (`npm run dev|build|test|check:icons|check:docs|check`,
+  each delegating to `app-web/` or to the Python gates), `.editorconfig`,
+  `.github/CODEOWNERS`, three issue templates — including one for a playback
+  failure, which asks for the browser, the network and the state the app showed —
+  a web section in the pull-request template, and a `.env.example` that
+  documents the absence of configuration rather than inventing one. The app needs
+  no environment variable: no key, no token, no account, no analytics id.
+- **Changed: `docs/README.md`** now describes the browser build as the surface it
+  is — the same interface in a browser — and indexes `docs/web-player/`. Its
+  intro paragraph had been carrying stale narrative about an earlier fix branch;
+  the index describes the repository as it is.
+- **Not done, and recorded as such:** no second repository was created; the
+  license stays GPL-3.0-or-later rather than the plan's MIT; the plan's
+  `deploy.yml` was folded into the existing `website.yml`, because two workflows
+  publishing one Pages environment race each other; no placeholder provider
+  modules were added; and no project board or branch-protection change was made
+  from this workstream, which needs the repository owner.
+
 ### The site rebuilt as the app's shell, and the web app made a web app (2026-10-16, session `arena/dda0fee4-dhun`)
 
 - **Changed: the marketing site renders the application's own shell.** The
