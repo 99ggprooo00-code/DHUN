@@ -1,0 +1,23 @@
+# CODEOWNERS
+#
+# Every path in this repository is owned by the repository owner, and this file
+# says so once rather than leaving it implicit. It exists because the web
+# workstream touches three places that a stranger's pull request could otherwise
+# reach without a reviewer: the deployed site, the web app's Content Security
+# Policy, and the honesty rules that decide what the site is allowed to claim.
+#
+# The three paths below are called out individually because a change to any of
+# them can *weaken a gate* rather than merely break a feature:
+#
+#   scripts/website_claims.py      the forbidden-claim rules and the required caveats
+#   scripts/website_quality.py     the design-system, contrast and accessibility rules
+#   app-web/src/index.html         the Content Security Policy for the deployed app
+#
+# Nothing here grants permissions; GitHub still needs branch protection to make
+# review mandatory (see docs/web-player/DEVELOPMENT-GUIDE.md).
+
+* @99ggprooo00-code
+
+/scripts/website_claims.py @99ggprooo00-code
+/scripts/website_quality.py @99ggprooo00-code
+/app-web/src/index.html @99ggprooo00-code

@@ -1,6 +1,6 @@
 # DHUN documentation index
 
-These documents describe the current Kotlin Multiplatform product, the static marketing website, and the separately maintained browser engineering mirror. They must be read alongside the live source, accepted ADRs, and current verification evidence. The active fix branch also addresses Clear all downloads result handling and the GitHub Pages `/DHUN/` base path; neither is considered verified until its workflow and any required hardware/origin checks pass.
+These documents describe the current Kotlin Multiplatform product, the static marketing website, and the browser build that ships at `/app/` — the same interface in a browser, not a mock-up and not a second native client. The phase-by-phase record for that workstream is in [`web-player/`](web-player/README.md). Read these alongside the live source, accepted ADRs, and current verification evidence; where a document and the code disagree, the code is the truth and the document is a bug to fix in the same change.
 
 ## Product and design specifications
 
@@ -11,6 +11,16 @@ These documents describe the current Kotlin Multiplatform product, the static ma
 - [Backend and data schema](backend-schema.md) — local persistence and data consistency; confirms no custom backend is currently authorized.
 - [Implementation plan](implementation-plan.md) — prioritized defect fixes, test strategy and release verification.
 - [UI/UX audit](ux-audit.md) — source-grounded severity-ranked findings, evidence, required fixes and verification checklist.
+
+## The web workstream
+
+The browser build and the site that publishes it have their own plan, status ledger and rules. They are machine-checked by `scripts/web_player_docs.py` (run as `npm run check:docs`), so a phase cannot be marked complete without the evidence sitting beside it.
+
+- [Web workstream README](web-player/README.md) — the priority order, the hard rules and what enforces each one, and the deviations from the bootstrap plan the directory implements.
+- [Implementation status](web-player/IMPLEMENTATION-STATUS.md) — every phase with its status and evidence, and the release-readiness checklist that is the definition of done. **Currently: in development, not verified for release.**
+- [Known limitations](web-player/KNOWN-LIMITATIONS.md) — what is unproven, unsupported or awkward, for a reader deciding whether to rely on it.
+- [Development guide](web-player/DEVELOPMENT-GUIDE.md) — how to run, test, build and deploy, in the repository as it actually is.
+- Phase reports: `PHASE-00` (audit) through `PHASE-10` (maintenance), each with its own objective, evidence and go/no-go decision. [PHASE-02](web-player/PHASE-02-PLAYBACK-POC.md) is the open release gate.
 
 ## Binding references
 

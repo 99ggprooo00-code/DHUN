@@ -1,0 +1,26 @@
+{
+  "name": "dhun-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Entry points for the DHUN web workstream. This manifest declares no dependency and runs no install: it exists so that 'the web app' has one command for each thing a person wants to do, without anyone having to remember which directory the tool lives in. The application itself is app-web/ and has its own manifest.",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/99ggprooo00-code/DHUN.git"
+  },
+  "scripts": {
+    "dev": "npm --prefix app-web run dev",
+    "build": "npm --prefix app-web run build",
+    "test": "npm --prefix app-web test",
+    "gen:icons": "npm --prefix app-web run gen:icons",
+    "check:icons": "npm --prefix app-web run check:icons",
+    "check:docs": "python3 scripts/web_player_docs.py docs/web-player",
+    "check:repo": "python3 -m unittest discover -s scripts -p 'test_*.py'",
+    "check": "npm run check:icons && npm run build && npm test && npm run check:docs"
+  },
+  "comments": {
+    "dependencies": "None, and none is planned. The app ships no runtime dependency; adding one would change what app-web/tools/build.mjs and scripts/test_app_web.py assert, so it is a decision rather than an install. The website has its own manifest (website/package.json) and its own toolchain.",
+    "check": "'check' is the web workstream's local gate. It is not the whole repository gate — the Kotlin/Android/desktop work is verified by CI (see .github/workflows/ci.yml) and cannot run in this sandbox."
+  }
+}
