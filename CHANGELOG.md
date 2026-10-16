@@ -22,7 +22,7 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### The interface gets its first real layout review, and loses four defects (2026-10-16, session `arena/126d4a83-dhun`)
+### The interface gets its first real layout review, and loses seven defects (2026-10-16, session `arena/126d4a83-dhun`)
 
 The web build has been measured by CI since Phase 6 — overflow, contrast, tab
 order, axe, print — but geometry and contrast are not taste, and **nobody had
@@ -89,6 +89,15 @@ estimate.
   longer toasts *while* the player is open, because the player draws the same
   failure from the same `playerState.error` in its own strip. Two new tests in
   `app-web/tests/actions.test.mjs` pin both halves; both were mutation-checked.
+
+- **Fixed: the player threw the visitor back to the cover on every tab press.**
+  The overlay's scroller is a *child* (`.dhun-full__inner`), so `setRegion`'s own
+  `data-scroll` restore never reached it, and the region's markup is replaced on
+  every tab press. Measured 2026-10-16 on a 390x844 phone: switching to Lyrics
+  reset the scroll **613 → 0** and moved the panel the visitor had just asked for
+  from y=327 to y=940, off the bottom of the screen — the tab they pressed looked
+  like it did nothing. A re-render of the same track now keeps their place; a
+  different track still starts at the cover. Mutation-tested.
 
 **Not fixed in this round, and known:** the native Home leads with a greeting
 and a mood-chip row that the web Home does not have — mood filtering is a

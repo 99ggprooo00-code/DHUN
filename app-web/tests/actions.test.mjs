@@ -204,3 +204,25 @@ test("opening the player clears a toast raised before it", () => {
     "the player does not clear a toast it inherited",
   );
 });
+
+test("re-rendering the player does not throw the visitor back to the cover", () => {
+  // The overlay's scroller is a child, so `setRegion`'s own `data-scroll`
+  // restore never reached it and every tab press replaced the markup under the
+  // visitor's finger. Measured 2026-10-16 on a 390x844 phone: switching to
+  // Lyrics reset the scroll 613 → 0 and moved the panel from y=327 to y=940 —
+  // the tab they pressed looked like it did nothing. Where they were is kept
+  // for the same track, and only the track decides that.
+  const start = main.indexOf("function renderOverlay(");
+  assert.notEqual(start, -1, "main.js has no overlay renderer");
+  const body = main.slice(start, main.indexOf("\n  }", start));
+  assert.match(body, /\.dhun-full__inner/, "the player's own scroller is never read");
+  assert.match(body, /playerScroll\.top = scroller\.scrollTop/, "the scroll position is not captured");
+  assert.match(
+    body,
+    /trackKey === playerScroll\.trackKey\) next\.scrollTop = playerScroll\.top/,
+    "the scroll position is not restored for the same track",
+  );
+  const key = body.match(/const trackKey = [^;]+;/);
+  assert.ok(key, "no track key is computed");
+  assert.ok(!/tab/i.test(key[0]), "the tab must not be part of the key — that is the bug");
+});

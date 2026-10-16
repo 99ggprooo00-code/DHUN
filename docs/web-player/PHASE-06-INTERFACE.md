@@ -94,6 +94,7 @@ changed because of it. Every number is a measurement from that session
 | A phone showed a **280px** cover with 55px of dead gutter either side; the "wide" layout was a 400px strip split `1 1 45% / 1 1 45%` | `PlayerLayout`: the cover is fitted to `min(field width, field height, playerArtworkMaxSize = 640dp)`; the wide mode needs ≥ `playerWideLayoutMinWidth` (480dp) **and** width > height, and gives the controls `clamp(0.34 · width, 240dp, 400dp)` | Stacked: the hero fills its field (measured 350x350 on a 390x844 phone, transport fully on screen). Wide: 1048px composition — 640 cover, 343 controls column, cluster bottom-aligned as the app draws it |
 | In the player's 343px control column, "This track could not be played" wrapped to **one word per line** beside its own buttons | The app's control cluster stacks its notice in that column | The message takes its own line with the actions beneath it, on phones and in the player alike |
 | The toast covered the mini player: a tap on **expand** hit the toast, so the full player could not be opened on a phone at all (dock measured **166px**, toast offset 112px) | — | The toast's offset is made of the dock it actually has, and opening the player clears a toast it inherited |
+| Pressing Queue or Lyrics threw the visitor back to the cover: the player's scroll reset **613 → 0** and the panel they asked for moved from y=327 to **y=940**, off a 844px screen | — | Where they were is kept across a re-render of the same track; a different track still starts at the cover |
 
 ## What has been measured, and what has not
 
@@ -113,7 +114,7 @@ Not measured, by anyone:
 
 - **What it looks like, beyond the pass below.** Geometry and contrast are not
   taste. The first look at the real captures happened on 2026-10-16 and is
-  recorded above; it found six defects, which is the argument for doing it
+  recorded above; it found seven defects, which is the argument for doing it
   again rather than an argument that it is finished. `npm run states` still
   exists so the copy and the states can be read without a network, and the
   Phase 8 rows are still open.
@@ -141,7 +142,7 @@ Those three are the Phase 8 work, listed in
 | `app-web/tests/shell.test.mjs`, `actions.test.mjs`, `tokens.test.mjs`, `dom.test.mjs` | Pass |
 | `browser` job (the table above) | Pass |
 | `python3 scripts/website_quality.py website/dist` | 31 checks pass |
-| A human looking at the built app's captures (33, four widths, both themes) | Looked at on 2026-10-16 — six defects found and fixed, listed above. Still not a phone and still not a screen reader |
+| A human looking at the built app's captures (33, four widths, both themes) | Looked at on 2026-10-16 — seven defects found and fixed, listed above. Still not a phone and still not a screen reader |
 
 ## Completion decision
 

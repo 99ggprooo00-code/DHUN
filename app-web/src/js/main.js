@@ -788,10 +788,27 @@ export function boot({
     return html``;
   }
 
+  /* The overlay's scroller is a child — `.dhun-full__inner` — so `setRegion`'s
+     own scroll restore (which reads `data-scroll` off the region itself) never
+     reached it, and the region's markup is replaced on every tab press.
+     Measured 2026-10-16 on a 390x844 phone: switching to Lyrics reset the
+     player's scroll 613 → 0 and moved the panel the visitor had just asked for
+     from y=327 to y=940 — off the bottom of the screen, so the tab they pressed
+     appeared to do nothing. A re-render of the *same* track keeps the visitor
+     where they were; a different track is the one case that should start back
+     at the cover. */
+  const playerScroll = { trackKey: null, top: 0 };
+
   function renderOverlay() {
     const vm = playerViewModel();
     const open = state.route.player === "open";
+    const scroller = root?.querySelector?.("#dhun-overlay .dhun-full__inner");
+    if (scroller) playerScroll.top = scroller.scrollTop;
     setRegion("dhun-overlay", open && vm.track ? fullPlayer(vm) : html``);
+    const trackKey = open && vm.track ? String(vm.track.id ?? vm.track.videoId ?? "") : null;
+    const next = root?.querySelector?.("#dhun-overlay .dhun-full__inner");
+    if (next && trackKey && trackKey === playerScroll.trackKey) next.scrollTop = playerScroll.top;
+    playerScroll.trackKey = trackKey;
     drawVisualiser();
   }
 
