@@ -98,6 +98,19 @@ Evidence: live `gh` API reads, public-download attempts, CI annotations, source 
   change — changing them is a design decision for the maintainer, not a
   side-effect of a website rewrite. Measured by the browser job; the number is
   the light scheme's, not the dark one's (dark is 6.77:1 on `--surface`).
+- **What only a person can close on the rebuilt site and `/app/`
+  (2026-10-16).** The `browser` job now passes on every route it renders, but it
+  measures geometry, contrast and semantics — it does not judge taste, and no
+  human has watched a page render. Open, and nothing in this repository can
+  close them: the site at a phone width and at a desktop width; the appearance
+  control across dark/light and each of the six accent ramps; `/ui/`'s swatch
+  tables against the app's own Settings → Appearance; the desktop rail with its
+  labels now wrapping; and `/app/` doing something real — a search, a play
+  attempt (expected to end in a refusal on some networks, which is the state the
+  app is built to show), a reload with the library kept, and the offline shell
+  after a hard reload with the network off. The full-page captures the browser
+  job takes are CI artifacts (`browser-evidence`), never committed, because this
+  repository contains no image files on purpose.
 - **Framing is refused in JavaScript, because no header can be sent
   (2026-10-16).** `/app/` used to declare `frame-ancestors 'none'` inside its
   `<meta>` CSP. The specification requires a meta-delivered policy to ignore

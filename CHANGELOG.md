@@ -152,6 +152,17 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   is replaced with the truth (Android and Windows are the native targets; the
   browser is served by the web app at `/app/`), and the fixture that had been
   asserting the false sentence was allowed is gone with it.
+- **Fixed (docs): the plan documents stop putting the web app out of scope.**
+  The rebuilding work swept the documents that *describe* the web app; this
+  sweeps the ones that *plan* it. `MASTER_PROMPT.md`'s "Explicitly NOT in
+  S1–S6" list opened with "Production Web/PWA" and no longer names it;
+  `PROMPT_SEQUENCE.md` says web was "deferred to v2, not stubbed" and now says
+  so as history rather than as scope; `WEBSITE_PLAN.md` §1's D1 prohibition on a
+  web player carries the dated amendment it points to; `.ai/ROADMAP.md`'s §8
+  backlog entry — an evaluation whose leading outcome was "likely no" — is
+  marked resolved and built; `docs/decisions/README.md` states the ADR-008
+  amendment in its index line. `docs/verification/20-marketing-site.md` is a
+  historical build record and keeps its text, with a superseded note.
 - **Fixed (docs):** the web app is no longer described as a preview, a mirror or
   a demo in `README.md`, `app-web/README.md`, `docs/INSTALL.md`, `docs/TRD.md`,
   `docs/PRD.md`, `docs/app-flow.md`, `docs/implementation-plan.md`,

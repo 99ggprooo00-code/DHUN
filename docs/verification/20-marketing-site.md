@@ -3,6 +3,12 @@
 Session `arena/fc918d37-dhun`, 2026-10-08. Branch point and `main` at the start:
 `ae44c7a74191950c00385f705e9617b3ef71658c` (PR #137 merge).
 
+> **Superseded in part, 2026-10-16.** The site's build, gates and deployment are
+> unchanged; what changed is the site's scope and shell, and the paragraph below
+> that lists "no web player, no PWA" as out of scope. The web app now ships at
+> `/app/` and the site is its shell — see the ADR-008 amendment of 2026-10-16 and
+> the dated amendment to `.ai/WEBSITE_PLAN.md`.
+
 Status vocabulary is the one `.ai/WEBSITE_PLAN.md` Part A fixes: **verified**
 read from a tool output in this session · **expected** plausible but unchecked ·
 **not verified** explicitly unchecked.

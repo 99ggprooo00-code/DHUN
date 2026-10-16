@@ -1,5 +1,42 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/38ac4712-dhun` — the web app's honesty gates, closed out (2026-10-16)
+
+Continues `arena/dda0fee4-dhun`, whose PR **#172** merged the rebuilt site and
+the real web app into `main` (`ad6e0f1`). This session exists because that merge
+was not the end of the job: the *deployed* pages were read after it, and a gate
+that runs only on `main` had been asserting a rule the PR never ran.
+
+### What this session changed
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | **`/features/` told visitors there is no web app.** Published, live, and passing every gate: *"No iOS, no web player, no browser client, no PWA."* The claim engine lets the site say what it does *not* do, and every mention sat in a clause with its own "no" — so the escape that keeps the site honest about sign-in excused a sentence denying the product. | `FORBIDDEN_DENIALS` in `scripts/website_claims.py`: claims forbidden *because* they deny a surface that ships, scanned without the negation escape. Applied through one `forbidden_claims_in()` so the served-bytes check carries every rule the build-time check does (the loop had lived twice, which is why `website_smoke` passed on the live page). The item now says Android and Windows are the native targets and the browser is served by the web app at `/app/`. |
+| 2 | **The plan documents still put the web app out of scope.** `MASTER_PROMPT.md`'s "Explicitly NOT in S1–S6" list opened with Production Web/PWA; `PROMPT_SEQUENCE.md` said web was "deferred to v2, not stubbed"; `WEBSITE_PLAN.md` §1's D1 forbade a player; `.ai/ROADMAP.md` §8 still listed a Web/PWA evaluation whose leading outcome was "likely no"; `docs/decisions/README.md` and `docs/verification/20` repeated the old decision. | Each now records the 2026-10-16 decision in place — a dated superseding note, or the line corrected where the section is prescriptive (the backlog entry that has shipped is an instruction to build it twice). `docs/verification/20` is a historical build record and carries a superseded note rather than a rewrite. |
+
+### Verification for this session
+
+- `python3 -m unittest discover -s scripts -p 'test_*.py'` → **434 OK**
+- `python3 scripts/website_quality.py website/dist` → **OK: 31 quality checks**
+- `python3 scripts/website_claims.py website/dist` → **OK: 4 built pages** (**9** forbidden-claim rules, 3 required caveats, 5 digest rules, 12 telemetry rules)
+- `python3 scripts/website_smoke.py http://127.0.0.1:8080` on the assembled tree (site at `/`, `app-web/dist` at `/app/`) → the three marketing routes carry the three caveats and trip no rule, every internal link resolves, `/app/` serves the shell with its CSP
+- `cd website && npm run build && npm run test:rules && node tools/verify-minify.mjs && npx html-validate "dist/**/*.html"` → byte-accurate `dist/`, **48/48**, `86623 bytes saved`, no findings
+- `cd app-web && npm test && node tools/build.mjs` → **165 pass**, 32 files / 518017 B
+- The denial rule was proven against the *old* build first: `test_no_forbidden_claims` reported `/features/` before the rebuild, and the fixture that had been asserting the false sentence was allowed (`test_allows_a_negated_mention`) was cut down.
+
+**Still open, and the only thing that can close it: a person looking at the
+result.** The CI browser job measures geometry, contrast and semantics — it
+cannot judge taste — and no human has watched a page render, on the site or in
+`/app/`. The specific list is in the PR body and `.ai/KNOWN_LIMITATIONS.md`:
+a phone and a desktop width, the appearance control across dark/light and the
+six ramps, `/ui/`'s tables against the app's own Settings → Appearance, and
+`/app/` doing something real — a search, a play attempt, a reload with the
+library kept, and the offline shell after a hard reload with the network off.
+**Playback from the deployed origin remains unproven** (ADR-008 B1): a
+cross-origin request from a static page can be refused by YouTube's origin, and
+that is exactly what the app now says on screen instead of hiding.
+
+
 ## Session `arena/dda0fee4-dhun` — the site rebuilt as the app's shell, and the web app made a web app (2026-10-16)
 
 **User direction for this session (verbatim):** "The website needs redoing from
@@ -2567,11 +2604,12 @@ split — but do not plan for it now.)
 Source: retired trajectory candidates + open issues + recorded
 follow-ups. None are designed, stubbed, or promised.
 
-- Web/PWA evaluation — **ADR-008 B1 ran and is BLOCKED** (metadata readable;
-  player request blocked in the available Chromium-family browser; Firefox and
-  Safari unavailable). Likely "no" for third-party browser streaming; a written
-  "no" is a valid completion and is now the leading B2 option. Any continuation
-  is a separate B2 user decision.
+- ~~Web/PWA evaluation~~ — **resolved 2026-10-16 by user decision, and built.**
+  The web app ships at `/app/` and this site is its shell (ADR-008 amendment of
+  2026-10-16). The B1 result stands as history — metadata readable, the player
+  request blocked in the one available Chromium-family browser — and is the
+  reason the app surfaces a refusal instead of promising playback. No longer an
+  idea to schedule: there is nothing here for a future session to pick up.
 - Android Auto · Cast · cross-device sync (explicitly experimental)
 - Optional cookie sign-in (issue #60 direction; ADR + user sign-off
   required; core stays guest-first)
