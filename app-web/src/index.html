@@ -3,10 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>DHUN — play YouTube Music in your browser</title>
+    <title>DHUN — the web build</title>
+    <!--
+      The document's own copy is copy: it is the tab title, the install prompt
+      and the line a search engine or a share sheet shows. It used to read "play
+      YouTube Music in your browser", which is the one claim this build cannot
+      make from its own chrome — playback depends on an origin nobody here
+      controls. What the app actually does is search it, attempt it, and say
+      plainly when the answer is no. `tests/actions.test.mjs` checks these lines
+      along with every string the screens render.
+    -->
     <meta
       name="description"
-      content="DHUN is a free, open-source music player. This is its web build: search and play YouTube Music anonymously from your browser, with a library that stays on your device."
+      content="DHUN's web build: search YouTube Music anonymously from your browser, keep your library on your device, and see plainly when a source will not answer."
     />
     <!-- Out of the index, and not as a hedge: what a crawler gets here is an
          empty `<div id="app">` and a module graph, because the interface is

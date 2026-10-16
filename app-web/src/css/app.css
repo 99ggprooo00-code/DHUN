@@ -589,6 +589,7 @@ a {
 
 .dhun-notice__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--dhun-space-xs);
 }
 
@@ -629,9 +630,52 @@ a {
   color: var(--dhun-text-secondary);
 }
 
-.dhun-state__detail {
+/*
+ * The technical detail line, and the label that introduces it.
+ *
+ * A failure says what happened in the app's own words (`failureHelp`), and the
+ * browser's or the server's string sits underneath, quiet, named, monospaced.
+ * The rung matters: it is the lowest contrast step in the palette, so it cannot
+ * be mistaken for the message — and because it is *legible*, a person reporting
+ * a playback failure can read the string off the screen instead of opening
+ * developer tools, which is what the bug template asks them for.
+ */
+.dhun-state__detail,
+.dhun-notice__detail {
+  margin: 0;
+  max-width: 52ch;
   font: var(--dhun-text-body-small);
-  color: var(--dhun-text-tertiary);
+  /* Secondary, not tertiary. The app's tertiary rung is a 0.549 alpha ink in the
+     light scheme, which measures below the 4.5:1 floor on every one of the app's
+     light surfaces — the site's own gate fails that rung for exactly this reason
+     (`scripts/website_quality.py`). A line that carries the one string worth
+     copying out of the app has to be readable, and secondary is still a step
+     quieter than the message above it. */
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-notice__detail {
+  margin-top: var(--dhun-space-xs);
+}
+
+.dhun-state__detail-label,
+.dhun-lyrics__detail {
+  display: block;
+  margin-top: var(--dhun-space-xs);
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.dhun-row__failure-detail {
+  font-family: var(--dhun-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: var(--dhun-tracking-label-small);
+  text-transform: uppercase;
+}
+
+.dhun-state__detail-label {
+  margin-inline-end: var(--dhun-space-xs);
 }
 
 .dhun-state__actions {
@@ -920,9 +964,23 @@ a {
 }
 
 .dhun-row__failure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--dhun-space-xs);
   margin: 0 0 0 var(--dhun-space-artwork-thumb);
   font: var(--dhun-text-body-small);
   color: var(--dhun-error);
+}
+
+/* The raw string, beside the sentence rather than replacing it. Muted on
+   purpose: on a row it is the small print, and the sentence is the message.
+   It wraps rather than truncating — a status code cut in half is worse than a
+   tall row — and the row is already the thing that grew to hold it. */
+.dhun-row__failure-detail {
+  color: var(--dhun-text-secondary);
+  opacity: 0.85;
+  overflow-wrap: anywhere;
 }
 
 .dhun-row__main > .dhun-icon-button {

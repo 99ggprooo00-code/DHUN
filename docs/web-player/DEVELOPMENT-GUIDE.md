@@ -63,6 +63,31 @@ Then `/`, `/features/`, `/ui/` and `/app/`. This matters more than it looks:
 root-hosted local servers do not reproduce the `/DHUN/` project sub-path that
 the deployed site runs under, and this repository has shipped that bug once.
 
+### Looking at the states without a network
+
+```bash
+npm run states                       # → /tmp/dhun-states/states-dark.html and states-light.html
+npm run states -- --scheme dark      # or --out <dir>
+```
+
+The app's failure states are not edge cases: the primary source is a cross-origin
+request to an origin nobody here controls, so "the source refused" is one of the
+first things a real visitor can meet. That makes them exactly the states nobody
+looks at, and this app shipped the consequence once — an error screen whose
+headline was the browser's `TypeError: Failed to fetch`.
+
+`app-web/tools/states.mjs` renders **every** state the chrome can be in, from the
+real modules, into one page per colour scheme: the refusal, a 502 from a search, a
+shape change, a timeout, the demo catalogue, an empty library, a browser that
+refuses to store anything, the gesture prompt, the framed refusal, the player
+playing. It is a development tool: it writes outside the repository by default,
+it is never copied into `app-web/dist`, and the build would fail on it if it
+were. The buttons carry the app's action names and are inert — nothing on the
+page is wired up.
+
+It measures nothing, and it is not a substitute for the browser job. Its job is
+the one thing a person is still needed for: reading the words on the screen.
+
 ## Testing
 
 | Command | What it proves |
@@ -75,6 +100,7 @@ the deployed site runs under, and this repository has shipped that bug once.
 | `cd website && npm run test:rules` | The browser job's decision rules, as pure functions, with unit tests. |
 | `cd website && node tools/verify-minify.mjs` | The committed `website/dist` matches a fresh build byte for byte. |
 | `cd website && npx html-validate "dist/**/*.html"` | Markup validity on the built pages. |
+| `npm run states` | Not a test: renders every app state to a page for a person to read, including the ones that only appear when somebody else's server says no. |
 
 `npm run check` at the repository root runs the web workstream's local gate in
 one command (icons, build, tests, documents).

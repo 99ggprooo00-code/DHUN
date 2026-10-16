@@ -22,6 +22,73 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The app stops printing the browser's errors as its own words (2026-10-16, session `arena/063cb1a6-dhun`)
+
+- **Fixed: a failed screen led with `TypeError: Failed to fetch`.** That string
+  is the browser's, and it is the *same* string for a flat network, a DNS
+  failure, a corporate proxy, an ad-blocker and a genuine cross-origin refusal.
+  It named no remedy and told a person staring at a dead player nothing — and
+  because the primary source is a cross-origin request to an origin nobody here
+  controls, it was one of the first things a real visitor could meet. Failures
+  now have three registers, in one table in `app-web/src/js/source.js`: a
+  `summary` for a row, a toast or a strip; a `help` sentence for a state's body;
+  and the raw string, kept and **labelled** as a *Technical detail* line under
+  the sentence. The string stays on screen because a playback bug report is
+  easier to write with it than without it — and it is never the headline.
+- **Fixed: the demo strip offered two buttons to the same screen.** The player's
+  demo failure rendered "Data source" and "Configure a source", both wired to
+  `open-settings-source`, and offered a Retry for a row that has nothing to
+  fetch. Failures now offer one action per outcome: a demo row gets the source
+  picker; a refusal gets Retry, the source picker, and a new **Why?** that opens
+  the app's own explanation of the cross-origin position.
+- **Fixed: a list could not show which row failed.** `trackList` accepted a
+  `failures` map and silently ignored it, so a screen using it rendered a failing
+  row with no reason on it. It is honoured now, and the queue's own renderer was
+  already doing this row by row.
+- **Fixed: three help sentences that pointed at something the reader could not
+  see.** A screen renders `help` without the `summary`, so "The reason above is
+  the source's own" referred to a line that was not on screen, and two others
+  opened mid-thought. A failure that speaks for itself — the source's own "Video
+  unavailable", the demo catalogue's "this row is fictional" — is now carried
+  into the state's body instead of being dropped.
+- **Added: `npm run states`, a page of every state the app can be in.** Built
+  from the real modules (`views.js`, `player-ui.js`, `source.js`), one file per
+  colour scheme, written outside the repository by default and never copied into
+  `app-web/dist`. It is how the defects above were found: the failure states only
+  appear when somebody else's server says no, so they are the states nobody
+  looks at. It measures nothing — the browser job in CI does that — but the words
+  on a screen are still a thing a person has to read.
+- **Added: fifteen tests for the copy rules**, including that no summary is ever
+  a browser string, that every kind and stage has a sentence, that a help
+  sentence stands on its own, that the raw string survives as a diagnostic and
+  comes *after* the sentence, and that a failure offers one action per outcome.
+- **Fixed: the same leak in the lyrics panel.** A refused lyrics lookup rejected
+  with the same `TypeError`, and the Lyrics tab printed
+  `Lyrics could not be fetched: Failed to fetch`. It now names the service
+  (LRCLIB), keeps the raw string as a quiet second line, and — like every other
+  failure — is classified from the message even when it arrives with no kind.
+- **Fixed: the app's own chrome promised playback.** The document's `<title>`
+  read "DHUN — play YouTube Music in your browser", its meta description and the
+  install manifest's description said "search and play YouTube Music
+  anonymously", and the first-run strip said "Search and play from YouTube
+  Music" — on screen at boot, on every route, for the whole session, since
+  nothing ever cleared an `info` banner. Playback is the one thing this build
+  cannot promise from its own chrome, so all four now describe what the app does
+  — search anonymously, keep the library on the device, and say plainly when a
+  source will not answer — and the first-run strip is dismissed by the visitor's
+  first interaction.
+- **Added: a copy gate over the app's rendered strings.** `app-web/tests/actions.test.mjs`
+  fails if any string the app shows — a screen, the chrome, the document's title
+  and description, the manifest — promises playback or names an audio quality.
+  It is deliberately narrower than the site's lexicon in
+  `scripts/website_claims.py`, which cannot read these strings: every screen is
+  assembled in the browser, so `/app/` serves an empty `<div id="app">` and
+  Python has nothing to read.
+- **Changed: `docs/web-player/`** records all of it — the rule and its
+  enforcement in the README's hard-rules table, the failure surfaces in
+  `PHASE-06`, the copy gate in `PHASE-08`, and the review page in the development
+  guide.
+
 ### The web workstream gets a plan a machine can check (2026-10-16, session `arena/59c43e0a-dhun`)
 
 - **Added: `docs/web-player/`, the browser build's plan and status ledger.** A

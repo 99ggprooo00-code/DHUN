@@ -39,7 +39,16 @@ import {
   writeSession,
   clearSession,
 } from "./storage.js";
-import { createSourceManager, failureHelp, SOURCE_KIND, ENDPOINT_CONTRACT } from "./source.js";
+import {
+  createSourceManager,
+  failure,
+  failureDetail,
+  failureSummary,
+  isRefusal,
+  stateError,
+  SOURCE_KIND,
+  ENDPOINT_CONTRACT,
+} from "./source.js";
 import { createAudioEngine, AUDIO_STATUS } from "./audio.js";
 import { createPlayer, REPEAT } from "./player.js";
 import { createMediaSession } from "./mediasession.js";
@@ -189,11 +198,6 @@ export function boot({
     }
   }
 
-  /** The failure shape `views.errorState` renders: message + the helpful half. */
-  function asStateError(result) {
-    return result ? { message: result.message, help: failureHelp(result) } : null;
-  }
-
   function libraryCounts() {
     return {
       playlists: library.playlists.length,
@@ -239,7 +243,7 @@ export function boot({
     if (result.ok) {
       state.home = { status: "ready", shelves: result.shelves ?? [], error: null };
     } else {
-      state.home = { status: "error", shelves: [], error: asStateError(result) };
+      state.home = { status: "error", shelves: [], error: stateError(result) };
     }
     renderView();
   }
@@ -251,7 +255,7 @@ export function boot({
     if (result.ok) {
       state.entity = { status: "ready", kind: result.kind ?? kind, id, data: result, error: null };
     } else {
-      state.entity = { status: "error", kind, id, data: null, error: asStateError(result) };
+      state.entity = { status: "error", kind, id, data: null, error: stateError(result) };
     }
     renderView();
     if (result.ok && result.kind === "playlist") renderChrome();
@@ -270,7 +274,7 @@ export function boot({
       state.search = { query, filter: state.search.filter, status: "ready", results: result, error: null };
       rememberSearch(query);
     } else {
-      state.search = { query, filter: state.search.filter, status: "error", results: null, error: asStateError(result) };
+      state.search = { query, filter: state.search.filter, status: "error", results: null, error: stateError(result) };
     }
     renderView();
     if (focus) focusWithoutScroll(doc.querySelector("#search-input"));
@@ -294,7 +298,7 @@ export function boot({
       return {
         tone: "warn",
         title: "Showing the demo catalogue",
-        body: `${active.detail} The real source did not answer: ${lastUsed.reason.message}`,
+        body: `${failureSummary(lastUsed.reason)} These rows are the demo catalogue: invented titles with no audio.`,
         actions: [{ id: "open-settings-source", label: "Data source" }],
         detail: active.detail,
         kind: SOURCE_KIND.DEMO,
@@ -390,7 +394,7 @@ export function boot({
   }
 
   function onTrackFailed(track, failure) {
-    showToast(`${track.title} could not be played: ${failure.message}`);
+    showToast(`${track.title} could not be played: ${failureSummary(failure)}`);
   }
 
   async function preResolveUpcoming() {
@@ -421,7 +425,15 @@ export function boot({
       return;
     }
     if (typeof fetchImpl !== "function") {
-      state.lyrics = { status: "error", lines: [], activeIndex: -1, message: "fetch() is unavailable" };
+      const missing = failure("fetch", new Error("this browser did not provide fetch()"));
+      state.lyrics = {
+        status: "error",
+        lines: [],
+        activeIndex: -1,
+        kind: missing.kind,
+        message: failureSummary(missing),
+        technical: failureDetail(missing),
+      };
       renderOverlay();
       return;
     }
@@ -448,11 +460,23 @@ export function boot({
       };
     } catch (error) {
       if (request !== lyricRequest) return;
+      /*
+       * The same copy rules as every other failure in the app, and for the same
+       * reason: a refused request rejects with the browser's own `TypeError`,
+       * whose message is "Failed to fetch" — one sentence for a flat network, a
+       * blocked host and a content blocker. The lyrics panel used to print it.
+       * A refusal is mapped to the lyrics-specific entry so the sentence names
+       * the service the visitor is actually waiting on.
+       */
+      const result = failure("lyrics", error);
+      const kind = isRefusal(result) ? "lyrics" : result.kind;
       state.lyrics = {
         status: "error",
         lines: [],
         activeIndex: -1,
-        message: error?.message ?? "the lyrics request failed",
+        kind,
+        message: failureSummary({ ...result, kind }),
+        technical: failureDetail({ ...result, kind }),
       };
     }
     renderOverlay();
@@ -663,6 +687,24 @@ export function boot({
     renderDock();
     renderOverlay();
     renderSheet();
+  }
+
+  /**
+   * Clear the first-run strip the first time the visitor does anything at all.
+   *
+   * Capture-phase listeners on the window, removed as soon as one fires: the
+   * strip has done its job once the app is being used, and a banner that stays
+   * for the session stops being orientation and becomes furniture. It is not
+   * persisted anywhere — a reload starts a fresh visit and shows it once more.
+   */
+  function dismissWelcomeOnFirstInteraction() {
+    const once = () => {
+      clearBanner("info");
+      win.removeEventListener("pointerdown", once, true);
+      win.removeEventListener("keydown", once, true);
+    };
+    win.addEventListener("pointerdown", once, true);
+    win.addEventListener("keydown", once, true);
   }
 
   function renderDock() {
@@ -1432,7 +1474,11 @@ export function boot({
       }
       showToast("Asking the endpoint…");
       const result = await sources.endpoint.health();
-      showToast(result.ok ? `Endpoint answered${result.version ? ` (v${result.version})` : ""}.` : `Endpoint did not answer: ${result.message}`);
+      showToast(
+        result.ok
+          ? `Endpoint answered${result.version ? ` (v${result.version})` : ""}.`
+          : `Endpoint did not answer: ${failureSummary(result)} ${failureDetail(result) ?? ""}`.trim(),
+      );
       renderView();
     },
     "endpoint-url": () => {},
@@ -1765,10 +1811,22 @@ export function boot({
     }
     if (playerState.needsGesture) showBanner("gesture");
   });
+  /*
+   * The first-run strip.
+   *
+   * Two things were wrong with it. It said "Search and play from YouTube Music"
+   * — the one claim this app cannot make from its own chrome, since playback
+   * depends on an origin nobody here controls, and the project's rule is that no
+   * surface promises it (see `docs/web-player/PHASE-02-PLAYBACK-POC.md`). And it
+   * was permanent: nothing ever called `clearBanner("info")`, so "Welcome to
+   * DHUN" sat above the dock on every route for the whole session. Orientation
+   * is for the first minute; it is dismissed by the visitor's first interaction.
+   */
   showBanner("info", {
-    title: "Welcome to DHUN in the browser",
-    body: "Search and play from YouTube Music anonymously, or point DHUN at your own data source. Your library stays in this browser.",
+    title: "DHUN in the browser",
+    body: "Search YouTube Music anonymously, or point DHUN at your own data source. Your library stays in this browser, and when a source will not answer, DHUN says so instead of pretending.",
   });
+  dismissWelcomeOnFirstInteraction();
 
   return { state, player, engine, settings, sources, router, pwa, platform, libraryStore: () => libraryStore, library: () => library };
 }

@@ -23,6 +23,7 @@ import { html, raw } from "./dom.js";
 import { icon, artwork, trackRow, emptyState, notice } from "./views.js";
 import { formatDuration } from "./format.js";
 import { AUDIO_STATUS } from "./audio.js";
+import { failureDetail, failureSummary, isRefusal } from "./source.js";
 
 /** Status → the sentence the player prints under the transport. */
 export function statusLine(state) {
@@ -153,7 +154,14 @@ function lyricsPanel(state) {
   const lyrics = state.lyrics ?? { status: "idle", lines: [] };
   if (lyrics.status === "loading") return html`<p class="dhun-lyrics__status">Looking for lyrics…</p>`;
   if (lyrics.status === "error") {
-    return html`<p class="dhun-lyrics__status">Lyrics could not be fetched: ${lyrics.message}</p>`;
+    // The sentence, and the raw string only when there is one worth keeping —
+    // it is `failureSummary` that is guaranteed not to be the browser's words.
+    const summary = failureSummary({ kind: lyrics.kind, message: lyrics.message });
+    const detail = failureDetail({ kind: lyrics.kind, message: lyrics.message });
+    return html`<p class="dhun-lyrics__status">
+      Lyrics could not be fetched: ${summary}
+      ${detail ? html`<span class="dhun-lyrics__detail">${detail}</span>` : html``}
+    </p>`;
   }
   if (!lyrics.lines.length) {
     return emptyState({
@@ -175,14 +183,32 @@ function lyricsPanel(state) {
 /** The error/gesture/status strip inside the expanded player. */
 function playerNotice(state) {
   if (state.error) {
+    /*
+     * The actions a failure can offer, and no more than one of each.
+     *
+     * The demo failure used to get *two* buttons to the same screen — "Data
+     * source" and "Configure a source" — which is a control that does nothing
+     * new wearing a second label. A demo row cannot be retried (there is
+     * nothing to fetch), and a retry cannot configure a source, so each kind of
+     * failure gets the actions that could actually change its outcome.
+     */
     const actions = [];
-    if (state.error.kind !== "demo") actions.push({ id: "retry-track", label: "Retry" });
-    actions.push({ id: "open-settings-source", label: "Data source" });
-    if (state.error.kind === "demo") actions.push({ id: "open-settings-source", label: "Configure a source" });
+    if (state.error.kind === "demo") {
+      actions.push({ id: "open-settings-source", label: "Choose a source" });
+    } else {
+      actions.push({ id: "retry-track", label: "Retry" });
+      actions.push({ id: "open-settings-source", label: "Data source" });
+      // A refusal is the one failure with a written explanation rather than a
+      // fix, and the explanation is already in the app's own legal bundle — so
+      // the strip links to it instead of leaving the visitor with "try again"
+      // forever.
+      if (isRefusal(state.error)) actions.push({ id: "open-about", label: "Why?" });
+    }
     return notice({
       tone: state.error.kind === "demo" ? "info" : "error",
       title: statusLine(state),
-      body: state.error.message,
+      body: failureSummary(state.error),
+      technical: failureDetail(state.error),
       actions,
     });
   }

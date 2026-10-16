@@ -21,7 +21,11 @@ import {
   mapResponsiveItem,
   pickAudioFormat,
   failure,
+  failureDetail,
   failureHelp,
+  failureSummary,
+  isRefusal,
+  stateError,
   createDemoSource,
   createInnertubeSource,
   createEndpointSource,
@@ -282,8 +286,154 @@ test("failures classify a refused cross-origin request distinctly", () => {
   assert.equal(cors.ok, false);
   assert.equal(cors.kind, "network-or-cors");
   assert.match(failureHelp(cors), /cross-origin/);
-  assert.match(failureHelp(failure("http", new Error("HTTP 500"))), /server answered/i);
-  assert.match(failureHelp(failure("shape", new Error("x"))), /structure this client expects/);
+  assert.match(failureHelp(failure("http", new Error("HTTP 500"))), /server answered with an error/i);
+  assert.match(failureHelp(failure("shape", new Error("x"))), /what it sends|upstream changed/);
+});
+
+/*
+ * The interface's copy rules, and the reason they are tests rather than taste.
+ *
+ * A `fetch` rejection carries the browser's own words — "Failed to fetch" in
+ * Chrome, "NetworkError when attempting to fetch resource." in Firefox, "Load
+ * failed" in Safari — and this app used to print one of those as the headline of
+ * a failed screen. It is the same sentence for a flat network, a DNS failure, an
+ * ad-blocker and a real cross-origin refusal, and it names nothing a person can
+ * do. These tests exist so that cannot come back.
+ */
+
+/** The three strings browsers use when a request never gets an answer. */
+const BROWSER_WORDS = [
+  "Failed to fetch",
+  "NetworkError when attempting to fetch resource.",
+  "Load failed",
+];
+
+test("a browser's own words are never the message a person reads", () => {
+  for (const message of BROWSER_WORDS) {
+    const result = failure("network", new TypeError(message));
+    assert.equal(result.kind, "network-or-cors", message);
+    const summary = failureSummary(result);
+    assert.notEqual(summary, message);
+    assert.ok(!summary.includes(message), `summary must not quote ${message}: ${summary}`);
+    assert.match(summary, /could not reach the source/i);
+    assert.ok(summary.length <= 120, `a summary is one line, not a paragraph: ${summary}`);
+    assert.equal(isRefusal(result), true);
+  }
+});
+
+test("the browser's string survives as a diagnostic, and the screen keeps it", () => {
+  const result = failure("network", new TypeError("Failed to fetch"));
+  assert.equal(failureDetail(result), "Failed to fetch");
+  const error = stateError(result);
+  assert.equal(error.help, failureHelp(result), "the screen's body is the app's sentence");
+  assert.equal(error.technical, "Failed to fetch", "the raw string is kept, not thrown away");
+  assert.equal(error.summary, failureSummary(result));
+  assert.equal(stateError(null), null);
+});
+
+test("an HTTP status reaches the sentence and the path stays in the detail", () => {
+  const result = failure("http", new Error("HTTP 502 from /youtubei/v1/player"));
+  assert.equal(failureSummary(result), "The source answered with an error (HTTP 502).");
+  assert.equal(failureDetail(result), "HTTP 502 from /youtubei/v1/player");
+});
+
+test("a failure that already speaks for itself is not replaced", () => {
+  const demo = failure("demo", new Error("\"A fictional song\" is a fictional demo entry, so there is no audio to fetch"), { kind: "demo" });
+  assert.equal(failureSummary(demo), "\"A fictional song\" is a fictional demo entry, so there is no audio to fetch");
+  assert.equal(failureDetail(demo), null, "nothing to demote when the message is already a sentence");
+
+  const refused = failure("playability", new Error("Video unavailable"), { kind: "playability" });
+  assert.equal(failureSummary(refused), "Video unavailable", "the source's own reason beats a generic line");
+});
+
+test("every kind and stage this module can produce has copy, and the copy is not empty", () => {
+  const kinds = [
+    "network-or-cors",
+    "timeout",
+    "http",
+    "shape",
+    "fetch",
+    "endpoint",
+    "cipher",
+    "nostream",
+    "notfound",
+    "playability",
+    "demo",
+    "search",
+    "home",
+    "browse",
+    "stream",
+    "resolve",
+    "queue",
+  ];
+  for (const kind of kinds) {
+    const result = failure(kind, new Error("some internal string"), { kind });
+    const summary = failureSummary(result);
+    const help = failureHelp(result);
+    assert.ok(summary.length > 0, `${kind} has no summary`);
+    assert.ok(help.length > 0, `${kind} has no help`);
+    assert.ok(summary.length <= 120, `${kind}'s summary is a paragraph: ${summary}`);
+    assert.ok(!/undefined|\[object Object\]/.test(summary + help), `${kind} renders a hole: ${summary}`);
+    assert.notEqual(failureDetail(result), summary, `${kind} keeps no raw string to demote`);
+  }
+});
+
+test("every help sentence stands on its own, because a screen renders it without the summary", () => {
+  // Found by reading the rendered states page: a state shows `help` as its body
+  // and never the summary, so a help that began "That usually means…" or "The
+  // reason above…" pointed at a sentence the reader could not see.
+  const kinds = [
+    "network-or-cors",
+    "timeout",
+    "http",
+    "shape",
+    "fetch",
+    "endpoint",
+    "cipher",
+    "nostream",
+    "notfound",
+    "demo",
+    "search",
+  ];
+  const dangling = /^(That|This|These|Those|It |The reason above|The sentence above)\b/;
+  for (const kind of kinds) {
+    const help = failureHelp(failure(kind, new Error("an internal string"), { kind }));
+    assert.ok(!dangling.test(help), `${kind}'s help opens by pointing at something the reader cannot see: ${help}`);
+    assert.match(help, /^[A-Z]/, `${kind}'s help does not open with a sentence: ${help}`);
+    assert.ok(/[.!?]$/.test(help), `${kind}'s help does not end a sentence: ${help}`);
+  }
+});
+
+test("a failure that speaks for itself keeps the source's words in the state's body", () => {
+  const refused = failure("playability", new Error("Video unavailable"), { kind: "playability" });
+  const error = stateError(refused);
+  assert.match(error.help, /^Video unavailable/, "the reason is carried into the body, not dropped");
+  assert.match(error.summary, /^Video unavailable$/);
+
+  const demo = failure("demo", new Error("this row is fictional"), { kind: "demo" });
+  assert.match(stateError(demo).help, /^this row is fictional/);
+});
+
+test("a failure with no kind is classified from its message before being answered generically", () => {
+  for (const message of BROWSER_WORDS) {
+    assert.match(failureSummary({ message }), /could not reach the source/i);
+  }
+  assert.equal(failureSummary({ message: "something else entirely" }), "The request could not be completed.");
+});
+
+test("a missing or unreadable failure still produces a sentence", () => {
+  for (const value of [null, undefined, {}, { kind: null, message: null }, "boom"]) {
+    const summary = failureSummary(value);
+    assert.ok(summary.length > 0, `no summary for ${JSON.stringify(value)}`);
+    assert.ok(!/undefined|\[object Object\]/.test(summary));
+  }
+});
+
+test("timeouts are their own sentence, not a network claim", () => {
+  const slow = failure("network", new TypeError("The operation was aborted"));
+  assert.equal(slow.kind, "timeout");
+  assert.match(failureSummary(slow), /took too long|stopped/i);
+  assert.equal(isRefusal(slow), false, "a timeout is not a cross-origin refusal");
 });
 
 test("the demo catalogue answers every browse kind and admits it has no audio", async () => {
