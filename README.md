@@ -8,7 +8,7 @@ DHUN is a free, open-source music player for Android and Windows desktop. It use
 
 ## Screenshots & Live Interface Preview
 
-> **Try the interface right now:** Open the live interactive preview at **[`99ggprooo00-code.github.io/DHUN/app/`](https://99ggprooo00-code.github.io/DHUN/app/)** (or see the full token and screenshot walkthrough on **[`/ui/`](https://99ggprooo00-code.github.io/DHUN/ui/)**). Every screen below is captured from an Android phone or Windows desktop running DHUN `v1.00.001` (third-party artwork and lyrics blurred for copyright safety; full provenance in [`docs/verification/SCREENSHOT_PROVENANCE.md`](docs/verification/SCREENSHOT_PROVENANCE.md)).
+> **Try it right now:** the web app runs at **[`99ggprooo00-code.github.io/DHUN/app/`](https://99ggprooo00-code.github.io/DHUN/app/)** — installable from the browser, offline-capable once loaded, with keyboard shortcuts and the same shell as the native builds (or see the full token and screenshot walkthrough on **[`/ui/`](https://99ggprooo00-code.github.io/DHUN/ui/)**). Every screen below is captured from an Android phone or Windows desktop running DHUN `v1.00.001` (third-party artwork and lyrics blurred for copyright safety; full provenance in [`docs/verification/SCREENSHOT_PROVENANCE.md`](docs/verification/SCREENSHOT_PROVENANCE.md)).
 
 ### 1. Home & Search (Android)
 
@@ -47,7 +47,7 @@ DHUN is a free, open-source music player for Android and Windows desktop. It use
 - A Windows desktop app with a system tray, media controls, and taskbar jump lists.
 - Appearance and playback settings. Desktop audio uses the system's VLC/libVLC installation.
 
-The browser interface at [`/app/`](https://99ggprooo00-code.github.io/DHUN/app/) is an engineering preview: it has sample/live metadata but **does not play audio**.
+The web app at [`/app/`](https://99ggprooo00-code.github.io/DHUN/app/) is a real client, not a mock-up: it installs from the browser, runs offline once loaded, keeps your library in browser storage, and carries the same shell, shortcuts, equaliser and legal pages as the native builds. It talks to YouTube Music directly from your browser and reports a refusal on screen; the native builds remain the supported players.
 
 ## Install the pre-release
 
@@ -70,7 +70,7 @@ The committed Android test key is public and for test builds only. Do not use it
 
 ## Status and scope
 
-DHUN has no DHUN-hosted account, cloud sync, iOS app, or production browser audio player. The web interface is only a preview. YouTube extraction is a maintenance risk, and passing CI does not replace testing playback and installation on real devices.
+DHUN has no DHUN-hosted account, no cloud sync and no iOS app. It ships two supported clients (Android, Windows) and a web app at `/app/`. YouTube extraction is a maintenance risk for all three, a browser cannot be guaranteed to reach YouTube's endpoints, and passing CI does not replace playing a track on a real device.
 
 ## Website
 

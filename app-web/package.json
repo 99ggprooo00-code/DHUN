@@ -1,18 +1,20 @@
 {
   "name": "dhun-web",
-  "version": "0.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "DHUN's interface in the browser — a mirror of the app's Compose UI. Engineering preview: audio playback is not proven from this origin. Ships no runtime dependency.",
+  "description": "DHUN in the browser: a working music player for the web — YouTube Music search and playback, no account, no DHUN server, library stored on the device. Ships no runtime dependency.",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "dev": "node tools/serve.mjs",
     "build": "node tools/build.mjs",
-    "gen:icons": "node tools/gen-icons.mjs",
-    "check:icons": "node tools/gen-icons.mjs --check",
-    "test": "node --test \"tests/*.test.mjs\""
+    "start": "node tools/build.mjs && node tools/serve.mjs",
+    "gen:icons": "node tools/gen-icons.mjs && node tools/gen-icons-png.mjs",
+    "check:icons": "node tools/gen-icons.mjs --check && node tools/gen-icons-png.mjs --check",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "test:only": "node --test --test-only \"tests/*.test.mjs\""
   },
   "comments": {
-    "dependencies": "None, deliberately. The app ships no runtime dependency: no framework, no CDN, no icon library, no webfont, no analytics. Dev tooling is Node's own (http, test runner) for the same reason."
+    "dependencies": "None, deliberately. The app ships no runtime dependency: no framework, no CDN, no icon library, no webfont, no analytics. Dev tooling is Node's own (http, test runner, zlib) for the same reason."
   }
 }

@@ -11,16 +11,17 @@ import { test } from "node:test";
 
 import {
   INLINE_TARGET_FLOOR,
-  anchorLandingProblem,
-  currentPageProblem,
-  markerPerceivable,
   TARGET_FLOOR,
+  anchorLandingProblem,
   caveatsHiddenInPrint,
+  currentPageProblem,
   duplicateLinkTargets,
   focusChanged,
   focusSignature,
   forcedColorsBoundaryMissing,
   headingOrderProblem,
+  markerPerceivable,
+  radioGroupProblem,
   targetProblem,
 } from "./rules.mjs";
 
@@ -272,4 +273,97 @@ test("anchor landings: a missing target or an unmeasurable header fails", () => 
     }),
     /no header to measure against/,
   );
+});
+
+test("radio group: a group that moves, keeps one choice and stays one tab stop passes", () => {
+  assert.equal(
+    radioGroupProblem({
+      name: "dhun-accent",
+      members: 6,
+      before: 0,
+      after: 1,
+      checkedCount: 1,
+      focusInside: true,
+      tabLeftGroup: true,
+    }),
+    null,
+  );
+});
+
+test("radio group: arrows that do nothing fail", () => {
+  const problem = radioGroupProblem({
+    name: "dhun-theme",
+    members: 3,
+    before: 1,
+    after: 1,
+    checkedCount: 1,
+    focusInside: true,
+    tabLeftGroup: true,
+  });
+  assert.match(problem, /ArrowRight did not move the selection/);
+});
+
+test("radio group: two members checked at once fail", () => {
+  const problem = radioGroupProblem({
+    name: "dhun-theme",
+    members: 3,
+    before: 0,
+    after: 2,
+    checkedCount: 2,
+    focusInside: true,
+    tabLeftGroup: true,
+  });
+  assert.match(problem, /2 members checked at once/);
+});
+
+test("radio group: focus leaving the group fails", () => {
+  const problem = radioGroupProblem({
+    name: "dhun-theme",
+    members: 3,
+    before: 0,
+    after: 1,
+    checkedCount: 1,
+    focusInside: false,
+    tabLeftGroup: true,
+  });
+  assert.match(problem, /focus left radio group/);
+});
+
+test("radio group: a group that costs two tab stops fails", () => {
+  const problem = radioGroupProblem({
+    name: "dhun-theme",
+    members: 3,
+    before: 0,
+    after: 1,
+    checkedCount: 1,
+    focusInside: true,
+    tabLeftGroup: false,
+  });
+  assert.match(problem, /more than one tab stop/);
+});
+
+test("radio group: a group with nothing checked has no tab stop at all", () => {
+  const problem = radioGroupProblem({
+    name: "dhun-theme",
+    members: 3,
+    before: -1,
+    after: 0,
+    checkedCount: 1,
+    focusInside: true,
+    tabLeftGroup: true,
+  });
+  assert.match(problem, /starts with no member checked/);
+});
+
+test("radio group: a single-radio group is not a choice", () => {
+  const problem = radioGroupProblem({
+    name: "lonely",
+    members: 1,
+    before: 0,
+    after: 0,
+    checkedCount: 1,
+    focusInside: true,
+    tabLeftGroup: true,
+  });
+  assert.match(problem, /a group of one is not a choice/);
 });

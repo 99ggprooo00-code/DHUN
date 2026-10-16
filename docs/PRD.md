@@ -6,10 +6,10 @@
 
 DHUN is a GPL-3.0 open-source music player for Android (primary) and desktop JVM (Windows first; Linux/macOS where supported by the JVM build), using YouTube Music as a metadata/stream source. The native application is Kotlin Multiplatform + Compose Multiplatform, with shared domain/presentation code, Android Media3 playback and desktop VLCJ playback. This is the repository's actual architecture; React 19, Tauri, Zustand, and a React-based production web player are **not** the current native-app stack and must not be described as shipped architecture.
 
-There are three distinct surfaces. They must never be conflated:
-1. **Native app:** Android + desktop; source of truth for product behavior and visual design.
-2. **Marketing website:** static Eleventy site in `website/`, intended to explain DHUN and link to source, features, interface, issues, changelog and the rolling test release. It is not a music player.
-3. **`app-web/` engineering mirror:** a separate browser UI experiment. Current limitations documented in `app-web/README.md` and `docs/verification/29-web-app-mirror.md` include no audible playback, sample metadata fallback and no deployed product support. Do not market it as a production web player. Any future browser-player commitment requires the applicable ADR/gate to be satisfied.
+There are three codebases and one product:
+1. **Native app (Android + desktop):** source of truth for product behavior and visual design, and the supported players.
+2. **Marketing website:** static Eleventy site in `website/`, explaining DHUN and linking to source, features, interface, issues, changelog and the rolling test release. It is not a music player, and it no longer looks like a generic one: since the ADR-008 amendment of 2026-10-16 it renders the application's own shell — glass app bar, bottom navigation/rail, a docked bar into the app — and its stylesheet is **generated** from `app-web/src/css/tokens.css`, so it cannot drift from the application's design system.
+3. **Web app (`app-web/`, published at `/app/`):** the browser client — installable, offline-capable, hash-routed with deep links, keyboard-driven, media-session aware, its library in browser storage, device-only surfaces (offline downloads, the cache budget) removed rather than stubbed. It resolves real streams and surfaces every refusal as a state, with a labelled fictional catalogue as the last resort. No claim that browser playback is proven, no DHUN-operated backend or proxy (ADR-008 boundaries 1 and 4).
 
 Source of truth order when statements conflict: current code + current CI/hardware evidence; accepted ADRs for locked decisions; `.ai/MASTER_PROMPT.md` and `.ai/ROADMAP.md`; verification records; then this document. Historical notes are not active requirements.
 
@@ -81,9 +81,9 @@ The same contract applies to clear history, delete selected downloads, remove a 
 
 ### Navigation and website links
 - Native app: Home/Search/Library are the only primary tabs; detail pages, settings and FullPlayer are stacked overlays/routes following the shared AppNavState back contract. Back closes FullPlayer, then detail, then returns through tab history, then delegates to the platform.
-- Marketing website: every page shares the same header/footer; Home/Features/Interface are linked from each page; the brand returns Home; active page is announced; CTAs go to verified destinations.
+- Marketing website: every page renders the app's shell — a glass app bar, and one navigation element that is the app's bottom navigation below 840 px and a rail above it; Home/Features/Interface are linked from each page; the brand returns Home; active page is announced; the appearance control offers the app's two schemes and six accent ramps with CSS only; CTAs go to verified destinations.
 - Internal website links must be generated relative to the configured deployment base path (currently a GitHub Pages project site under `/DHUN/`) rather than hard-coded domain-root paths that escape the project. Validate rendered links from the actual deployed origin.
-- Do not link the marketing site to `app-web/` as a supported player until playback and deployment are explicitly approved and verified.
+- Link the marketing site to `/app/` as what it is — the browser client of the same app — and never as a guarantee that audio plays in a browser. The site's copy and the app's own notices both say that the native builds are the supported players.
 
 ## 7. Acceptance criteria
 

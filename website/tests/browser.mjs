@@ -59,6 +59,7 @@ import {
   focusChanged,
   forcedColorsBoundaryMissing,
   headingOrderProblem,
+  radioGroupProblem,
   targetProblem,
 } from "./rules.mjs";
 
@@ -464,9 +465,16 @@ function overflowReport() {
   };
 }
 
-// The web mirror's state, gathered in the page (page scope only: this function
+// The web app's state, gathered in the page (page scope only: this function
 // must stay self-contained — see the harness guard in
 // scripts/test_website_workflow.py). It gathers; Node decides.
+//
+// What it reads is the app's own honesty device rather than a test-only hook:
+// `views.js` renders one `.dhun-source[data-kind]` badge on every screen — "the
+// source that produced the rows on screen, always visible, never implied" — and
+// a strip the app marks `data-notice="demo"` when that source is the bundled
+// demo catalogue. Both are real interface elements with real jobs; the job of
+// this report is to notice whether they are there.
 function webAppReport() {
   const state = (selector) => {
     const el = document.querySelector(selector);
@@ -474,13 +482,23 @@ function webAppReport() {
     const rect = el.getBoundingClientRect();
     return { visible: rect.width > 0 && rect.height > 0, text: (el.textContent || "").trim().slice(0, 60) };
   };
+  const badge = document.querySelector(".dhun-source");
+  let source = null;
+  if (badge) {
+    const rect = badge.getBoundingClientRect();
+    const label = badge.querySelector(".dhun-source__label");
+    source = {
+      kind: String(badge.dataset.kind || ""),
+      label: ((label ? label.textContent : "") || "").trim().slice(0, 40),
+      visible: rect.width > 0 && rect.height > 0,
+    };
+  }
   return {
     mounted: (document.querySelector("#app") || { children: [] }).children.length > 0,
     navItems: document.querySelectorAll(".dhun-nav-item").length,
     title: document.title,
-    previewNotice: state('[data-testid="preview-notice"]'),
-    sampleDataNotice: state('[data-testid="sample-data-notice"]'),
-    backendNotice: state('[data-testid="backend-notice"]'),
+    source,
+    demoNotice: state('[data-notice="demo"]'),
   };
 }
 
@@ -1070,26 +1088,41 @@ async function checkStructure(browser) {
  * *unfocused* style (recorded before the walk, so the walk is never interrupted
  * by a blur), and fails on: an element that cannot be reached at all, and an
  * element that takes focus without any visible change.
+ *
+ * Radio groups are one tab stop, not one per member: the checked member takes the
+ * tab and the arrow keys move the selection. The walk therefore probes the
+ * checked member of each group and skips the rest — and `checkRadioGroups` below
+ * is the check that the skipped members are still reachable, so a group whose
+ * arrows have stopped working is a failure rather than an exemption (measured
+ * 2026-10-16: the appearance control's 9 radios looked like 7 unreachable
+ * controls to the version that did not know this rule).
  */
 async function checkTabStops(browser, route = "/") {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
   await page.goto(url(route), { waitUntil: "load" });
 
-  const probes = await page.evaluate(() => {
+  const collected = await page.evaluate(() => {
     const focusable = "a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex=\"-1\"])";
     const found = [];
+    const groups = new Map();
     for (const element of document.querySelectorAll(focusable)) {
       if (element.closest('[aria-hidden="true"]')) continue;
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
       if (rect.width <= 0 || rect.height <= 0) continue;
       if (style.display === "none" || style.visibility === "hidden") continue;
+      const group = element.matches('input[type="radio"]') ? element.name : null;
+      if (group && !element.checked) {
+        groups.set(group, (groups.get(group) ?? 0) + 1);
+        continue;
+      }
       element.dataset.dhunProbe = String(found.length);
       found.push((element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24));
     }
-    return found;
+    return { probes: found, groups: [...groups.keys()] };
   });
+  const probes = collected.probes;
 
   // The unfocused style of every probe, recorded before the walk: blurring an
   // element mid-walk would move focus and make the walk test its own
@@ -1156,6 +1189,80 @@ async function checkTabStops(browser, route = "/") {
   }
   if (!unreachable.length && !noRing.length) {
     record(`focus ring ${route}`, `${visited.size} tab stop(s) visited, every one shows a visible change when focused`);
+  }
+
+  await context.close();
+}
+
+/**
+ * Proves each radio group is one tab stop with arrow-key movement inside it.
+ *
+ * The tab-stop walk cannot see this: a group's unchecked members are not tab
+ * stops by design, and a rule that simply ignored them would also ignore a group
+ * whose arrows had stopped working. So each group is measured: focus its checked
+ * member, press ArrowRight, and require that the selection moved, that exactly
+ * one member is checked, that focus stayed in the group, and that Tab then
+ * leaves the group — i.e. that the whole group costs a keyboard user one stop.
+ */
+async function checkRadioGroups(browser, route = "/") {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  await page.goto(url(route), { waitUntil: "load" });
+  const groups = await page.evaluate(() => {
+    const names = new Set();
+    for (const radio of document.querySelectorAll('input[type="radio"]')) {
+      if (!radio.closest('[aria-hidden="true"]')) names.add(radio.name);
+    }
+    return [...names];
+  });
+  if (!groups.length) {
+    record(`radio groups ${route}`, "no radio group on this page; the appearance control is not here");
+    await context.close();
+    return;
+  }
+  // Read twice: once for the state the group starts in, once after the arrow key.
+  const readGroup = (group) => {
+    const members = [...document.querySelectorAll(`input[type="radio"][name="${group}"]`)];
+    return {
+      members: members.length,
+      checked: members.findIndex((member) => member.checked),
+      checkedCount: members.filter((member) => member.checked).length,
+      focusInside: members.includes(document.activeElement),
+    };
+  };
+  for (const name of groups) {
+    const before = await page.evaluate(readGroup, name);
+    // Focus the checked member, which is the group's tab stop: `:focus()` is the
+    // same state Tab would leave it in.
+    await page.evaluate((group) => {
+      const checked = document.querySelector(`input[type="radio"][name="${group}"]:checked`);
+      if (checked) checked.focus();
+    }, name);
+    await page.keyboard.press("ArrowRight");
+    const after = await page.evaluate(readGroup, name);
+    await page.keyboard.press("Tab");
+    const tabLeftGroup = await page.evaluate((group) => {
+      const active = document.activeElement;
+      return !active || active.getAttribute("name") !== group;
+    }, name);
+
+    const problem = radioGroupProblem({
+      name,
+      members: after.members,
+      before: before.checked,
+      after: after.checked,
+      checkedCount: after.checkedCount,
+      focusInside: after.focusInside,
+      tabLeftGroup,
+    });
+    if (problem) {
+      fail(`radio group ${route}`, problem);
+    } else {
+      record(
+        `radio group ${route}`,
+        `“${name}”: ${after.members} members, one tab stop; ArrowRight moved the selection and Tab left the group`,
+      );
+    }
   }
   await context.close();
 }
@@ -1431,14 +1538,23 @@ async function checkPrint(browser) {
   await context.close();
 }
 
-// The web mirror, deployed at /app/ under the same published path (ADR-008
+// The web app, deployed at /app/ under the same published path (ADR-008
 // amendment 2026-10-09 (2)). Its gates are deliberately narrower than the
 // marketing site's — it is a JavaScript application, not a static document,
-// and it is noindex: it must boot, it must say what it is (the engineering-
-// preview notice is honesty, not decoration), nothing unhandled may throw,
-// and it must not overflow. Which catalogue answered (live or sample) is
-// recorded, not gated: on a runner with no upstream, the app falls back and
-// says so, and that fallback is the correct behaviour.
+// and it is noindex: it must boot, it must name the data source that answered
+// it, nothing unhandled may throw, and it must not overflow. Which catalogue
+// answered (live or sample) is recorded, not gated: on a runner with no
+// upstream, the app falls back and says so, and that fallback is the correct
+// behaviour.
+//
+// The check that stood here until 2026-10-16 looked for
+// `data-testid="preview-notice"` and failed with "the mirror may be claiming
+// more than it proves" when it was missing — an assertion about the
+// "engineering preview" badge of a build that no longer exists. The web app
+// stopped being a preview of the app and became the web app, so the check now
+// asserts the honesty the app actually carries: the source badge that names
+// who answered, and, when the demo catalogue answered, the strip that says
+// those rows are fictional and have no audio.
 const NETWORK_NOISE = /Failed to load resource|net::ERR_|ERR_NAME_NOT_RESOLVED/i;
 async function checkWebApp(browser) {
   const viewports = [
@@ -1478,17 +1594,21 @@ async function checkWebApp(browser) {
       if (!report.mounted) {
         fail(`web app ${label}`, "the application did not render: #app is empty");
       } else {
-        const source = report.sampleDataNotice
-          ? "sample catalogue (the live source did not answer, and the page says so)"
-          : "live source answered";
+        const source = report.source
+          ? `${report.source.label || "unnamed"} (data-kind=${report.source.kind || "none"})`
+          : "no source badge on screen";
         record(
           `web app ${label}`,
-          `mounted, ${report.navItems} nav item(s), ${report.title ? report.title : "no title"}, ${source}` +
-            (report.backendNotice ? `; backend notice: ${report.backendNotice.text}` : ""),
+          `mounted, ${report.navItems} nav item(s), ${report.title ? report.title : "no title"}, ${source}`,
         );
       }
-      if (!report.previewNotice || !report.previewNotice.text) {
-        fail(`web app ${label}`, "the engineering-preview notice is absent — the mirror may be claiming more than it proves");
+      if (!report.source || !report.source.visible || !report.source.kind) {
+        fail(`web app ${label}`, "the app does not name the data source behind what is on screen — the source badge is absent or unlabelled");
+      } else if (report.source.kind === "demo" && !report.demoNotice) {
+        fail(
+          `web app ${label}`,
+          `the demo catalogue answered (${report.source.label || "unlabelled"}), so the page must say those rows are fictional and have no audio, and this one does not`,
+        );
       }
       if (report.navItems < 3) {
         fail(`web app ${label}`, `only ${report.navItems} nav item(s); the shell mirrors Home/Search/Library(+Settings)`);
@@ -1606,6 +1726,7 @@ const CHECKS = [
   ["keyboard", () => checkKeyboard(browser)],
   ["structure", () => checkStructure(browser)],
   ["tab stops", () => checkTabStops(browser)],
+  ["radio groups", () => checkRadioGroups(browser)],
   ["current page", () => checkCurrentPage(browser)],
   ["anchor landings", () => checkAnchorLanding(browser)],
   ["contrast", () => checkContrast(browser)],

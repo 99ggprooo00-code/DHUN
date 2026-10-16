@@ -83,13 +83,13 @@ On code-equivalent commit `650a65e`, Build APK succeeded and the website build/p
 
 **Required fix:** use shared Dhun form components and shared glass/dialog policies; add checks for bright/dark backdrop contrast, dialog focus, text entry, small-window overflow and cancel/confirm.
 
-### P2 — App, marketing website and browser mirror are easy to conflate
+### P2 — App, marketing website and web app are easy to conflate — **resolved 2026-10-16**
 
-**Evidence:** the repo has native Android/Desktop product code, a static `website/`, and separate `app-web/` engineering mirror. The browser mirror README says it has no audible playback, sample catalogue fallback and is not deployed as the product.
+**Evidence at the time of this audit:** the repo had native Android/Desktop product code, a static `website/`, and a separate `app-web/` surface the README called an engineering preview with no audible playback.
 
-**Impact:** plans can promise a React/Tauri app or working web player when neither is the current production architecture; website CTAs can mislead users toward an engineering preview.
+**Impact then:** plans could promise a React/Tauri app or a working web player when neither was the current production architecture.
 
-**Required fix:** all product documents distinguish native app, marketing site and browser mirror. No production web claim or link to a fake player until ADR-008 gates are passed and the deployed-origin result is verified.
+**Resolved:** the surfaces are now one product with one design system — the site renders the app's shell and its token sheet is generated from the app's — and `/app/` is documented as the web client (installable, offline shell, real stream attempts with failures surfaced as states) rather than a preview. What is *not* claimed, and must stay unclaimed, is that browser playback is proven; the native builds remain the supported players (ADR-008 boundaries 1 and 4, amendment of 2026-10-16).
 
 ### P2 — Documentation is not synchronized to the current repository
 
@@ -109,7 +109,7 @@ On code-equivalent commit `650a65e`, Build APK succeeded and the website build/p
 - [ ] Test native navigation/back stack and overlay hit targets on Android and desktop.
 - [ ] Visually inspect dialogs, FullPlayer, lyrics mode, list rows, short screens and wide two-pane layout on hardware.
 - [ ] Verify glass contrast, fallback, reduced motion and high contrast.
-- [ ] Keep `app-web/` visibly labelled as an engineering preview until its limitations are removed and approved.
+- [x] Keep `/app/` documented as what it is — the browser client of the same app, installable and offline-capable, with its playback failures surfaced as states. No surface may call it a preview again, and none may claim browser playback is proven.
 - [ ] Update `.ai/ROADMAP.md`, `.ai/KNOWN_LIMITATIONS.md` and relevant verification record with actual evidence.
 
 ## Limits of this audit

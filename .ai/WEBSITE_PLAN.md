@@ -1338,3 +1338,69 @@ nothing downstream is authorized. Before choosing **B2.1** Kotlin browser,
 stop/fallback, the user must make an explicit B2 decision; “stop” is a
 legitimate and currently acceptable outcome. B1 is not to be restarted, and the
 static Option-A fallback is not to be implemented as if it had been selected.
+
+---
+
+## Dated amendment — 2026-10-16 (session `arena/dda0fee4-dhun`): the site is the app's shell
+
+The user's direction for this session: the site "doesn't look like the app", the
+two surfaces must read as one product, and — separately — the web app must be a
+real web app rather than an interface demo (see the ADR-008 amendment of the same
+date). What this changed in Part A:
+
+**Design system.** `website/css/tokens.css` is now a **generated file**.
+`website/tools/sync-tokens.mjs` reads `app-web/src/css/tokens.css` — itself the
+mirror of `DhunAppearance.kt` / `DhunShapes.kt` / `DhunTypography.kt` /
+`DhunSpacing.kt` — and writes the site's sheet from it: every declaration names
+the `--dhun-*` property it came from, and every colour carries both schemes in
+one `light-dark()` pair, preceded by the app's dark value written out plainly so
+a reader (or the Python rule) sees the default without evaluating the function.
+That leading line is documentation, not a fallback: a custom property keeps the
+later declaration whatever tokens it holds, so the sheet has a browser floor —
+`light-dark()` needs Chrome/Edge 123, Firefox 120 or Safari 17.5, and the
+appearance control already needs `:has()` (Chrome 105, Firefox 121, Safari 15.4).
+`npm run build` runs the generator first, so a stale sheet cannot be committed
+quietly, and `design_system_violations` in `scripts/website_quality.py` re-derives
+the same comparison with Python only for app CI.
+
+**Shell.** The marketing header is gone. `website/css/shell.css` gives every page
+the app's shell: a glass app bar, the navigation as bottom tabs below the app's
+840 dp breakpoint and as a rail above it (one element, so there is exactly one
+`aria-current` and one set of tab stops), and a docked bar where the app keeps
+its mini-player — the one destination this site exists to hand a visitor. Cards,
+chips, buttons and caveats were re-shaped to the app's own components.
+
+**Appearance.** The app's two settings — theme (dark first, light optional) and
+one of six accent ramps — are offered at the foot of every page as radio groups,
+applied with `:has()` and `color-scheme`. No JavaScript: the site still ships
+zero client-side script, which `javascript_violations` continues to assert.
+
+**The `/ui/` token tables** (`src/_data/designTokens.js`) are parsed from the
+app's token file at build time and painted with the site's generated aliases, so
+the page cannot show a ramp the app no longer has. Every token that used to be
+typed into `src/_data/site.js` was removed from it.
+
+**Copy and claims.** "Preview" is retired from the site, the README, `docs/` and
+the app's own README. `scripts/website_claims.py` swapped one rule: naming the web
+app is no longer a forbidden claim (it ships), while promising browser playback
+or offline audio still is — that is the part no author can promise.
+
+**Budget.** Page weights grew by ~12 kB per route (the shell, the two-scheme token
+sheet, the appearance rules). The ratchet baseline was regenerated deliberately:
+`/` 47.1 kB, `/features/` 48.0 kB, `/ui/` 58.1 kB against the 60 kB budget in §10.
+The next growth has to be argued for again, which is what the ratchet is for.
+
+**Readable text, and the rung the site does not paint with.** The browser job
+measured the app's own `--dhun-text-tertiary` at 3.95:1 on white in the light
+scheme — below the 4.5:1 body floor — on nav labels, the dock subtitle, the
+source-traceability lines and platform statuses. The site therefore derives
+`--text-muted` from the same ink at 0.65 alpha (5.06:1 at its worst), keeps
+`--text-3` declared so the sheet still mirrors the app, and the Python contrast
+rule both checks **both** schemes (it read only the dark declarations before,
+which is why a browser had to find this) and fails when any rule paints text with
+the unreadable rung. The app's own light rung is unchanged and the finding is
+recorded in `.ai/KNOWN_LIMITATIONS.md`.
+
+**Left open (not claimed done):** no browser binary exists in this environment, so
+the rendered shell is checked by the site workflow's browser job and by a human —
+not by the suites here.

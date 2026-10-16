@@ -30,8 +30,8 @@ The public build is an experimental pre-release:
 
 - It is not stable, not store-signed, and has not been accepted on real hardware
   as a release. **[maintainer]**
-- The Android APK is signed with a **public test key that is committed to the
-  repository**, so a matching signature does not prove who built the file.
+- The Android APK is signed with a **public test key** that is committed to this
+  repository, so a matching signature does not prove who built the file.
   **[source]**
 - The Windows MSI is **unsigned**, so Windows may warn when you run it.
   **[source]**

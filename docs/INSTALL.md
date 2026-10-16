@@ -71,7 +71,7 @@ Do not share cookies, credentials, signed stream URLs, or unredacted logs when r
 - YouTube can change or restrict the endpoints DHUN uses; playback may fail or require a future update.
 - Not signed for Google Play or the Microsoft Store. Android uses a public test key, and the Windows MSI is unsigned. Do not treat either as stable or suitable for a daily-use device.
 - CI and emulator tests do not prove real-device playback, audio quality, battery behavior, or every installer path. Hardware acceptance remains in progress.
-- The `/app/` browser interface is an engineering preview and produces no audible audio.
+- The web app at `/app/` installs from the browser (manifest + service worker) and works offline once loaded. Audio playback depends on YouTube answering a cross-origin request from a static page, which no one controls: when it refuses, the app says so on screen instead of pretending. The Android and Windows builds are the supported players.
 - Uninstalling the Android app removes its app-private library and downloads. Back up anything you cannot replace.
 
 Report a playback problem with the track title, device/OS, and the app's bounded **Playback details** text. Never include cookies, tokens, signed media URLs, or account credentials.

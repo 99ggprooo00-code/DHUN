@@ -296,7 +296,7 @@ may paper over: the About page shows each platform's own value with its own labe
 - **Route resolution on refresh:** covered in §2 above, including what was and
   was not measured. Short version: hash routing needs no server support, which is
   why these pages use it.
-- **CSP on the web preview** (`app-web/src/index.html` L12-15):
+- **CSP on the web app** (`app-web/src/index.html` L12-15):
   `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
   img-src 'self' data:; media-src 'self' https:; connect-src 'self'
   https://music.youtube.com https://lrclib.net; base-uri 'none'; form-action 'none'`.

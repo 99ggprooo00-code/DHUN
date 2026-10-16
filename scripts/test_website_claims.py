@@ -42,9 +42,33 @@ class ForbiddenClaims(unittest.TestCase):
         violations = claims.forbidden_claim_violations(pages)
         self.assertTrue(any("iOS" in v for v in violations), violations)
 
-    def test_flags_a_web_player_claim(self):
-        pages = {"/": page("<p>Try the web player at app.dhun.example.</p>")}
-        self.assertTrue(claims.forbidden_claim_violations(pages))
+    def test_naming_the_web_app_is_not_a_claim(self):
+        """The browser client ships (app-web/src), so naming it is allowed —
+        and the caveat that comes with it is required elsewhere."""
+        pages = {
+            "/": page(
+                "<p>DHUN's web app runs at /app/ and talks to YouTube Music "
+                "directly from your browser.</p>"
+            )
+        }
+        self.assertEqual([], claims.forbidden_claim_violations(pages))
+
+    def test_flags_a_browser_promise_dhun_cannot_keep(self):
+        """What is still forbidden: promising browser playback or offline audio,
+        neither of which this repository can support (ADR-008 boundary; ADR-006
+        keeps offline audio on Android and Windows)."""
+        for body in (
+            "<p>It plays in every browser.</p>",
+            "<p>Offline playback is part of the web app.</p>",
+            "<p>The browser version downloads songs in your browser.</p>",
+        ):
+            with self.subTest(body=body):
+                violations = claims.forbidden_claim_violations({"/": page(body)})
+                self.assertTrue(violations, body)
+
+    def test_a_negated_browser_promise_is_not_a_claim(self):
+        pages = {"/": page("<p>There is no offline playback in the web app.</p>")}
+        self.assertEqual([], claims.forbidden_claim_violations(pages))
 
     def test_flags_a_sync_claim(self):
         pages = {"/": page("<p>DHUN syncs your library across devices.</p>")}

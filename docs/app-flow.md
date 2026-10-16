@@ -6,7 +6,7 @@
 
 - **Native app:** Home, Search, Library, detail destinations, Settings and FullPlayer.
 - **Marketing website:** Home (`/`), Features (`/features/`), Interface (`/ui/`), 404 and external source/support/release destinations.
-- **Browser mirror:** separate engineering preview; not the marketing site and not a production audio player.
+- **Web app (`/app/`):** the browser client — the same shell, tokens, navigation and settings as the native app, installable and offline-capable, published under the project site's base path. It is the destination of the site's primary call to action, not a separate product surface, and not a claim that browser playback is proven (ADR-008 boundary 4).
 
 ## 2. Native app global navigation
 
@@ -26,13 +26,21 @@
 
 ## 3. Website information architecture
 
-Every page uses the same global header and footer:
-- Brand wordmark → Home.
-- Main navigation → Home, Features, Interface; current route is marked accessibly.
-- Footer → Features, Interface, repository, issues, changelog, test release, license/third-party information.
+Every page renders the application's shell rather than a marketing header:
+- A glass app bar: brand wordmark → Home, and the appearance control (theme, accent).
+- One navigation element carries Home, Features and Interface, presented as the
+  app's bottom navigation below the app's 840 px breakpoint and as a rail above
+  it. It is one element in the markup, so there is exactly one `aria-current`
+  and one set of tab stops; the current route is marked accessibly.
+- A docked bar where the app keeps its mini-player: the standing invitation into
+  `/app/`, plus repository, issues, changelog, releases, license and third-party
+  destinations in the footer beneath it.
+- The appearance of every page follows the application's two schemes and six
+  accent ramps, applied with CSS only (`:has()` on the radio groups) — the site
+  ships no client-side JavaScript, and that is asserted.
 - Home links to Features and Interface; Features links back to Home/Interface and to source/release; Interface links to Features/Home and source/release; 404 provides all three internal destinations.
 - All internal links must resolve from the deployed GitHub Pages project base `https://99ggprooo00-code.github.io/DHUN/`. Do not hard-code `/`, `/features/`, or `/ui/` unless a build step demonstrably prefixes them. Use one base-path helper/filter for generated internal URLs and validate the emitted HTML.
-- Never point visitors to the engineering preview as a functioning player. Do not say the website can stream audio unless a production web-player decision and deployed-origin proof exist.
+- Sound the boundaries when describing the web app: it is linked as what it is (the browser client, with its own failure states), never as a guarantee that audio plays in a browser, never as offline audio, and never as a second product with its own design. The site and the client share one design system by construction (`website/css/tokens.css` is generated from the app's token file).
 
 ### Required website journeys
 1. Direct-open Home → click Features → click Interface → click wordmark → return Home.

@@ -1,5 +1,14 @@
 # HANDOFF — PR #136 merged; ADR-008 B1 is BLOCKED and closed; B2 is a separate user decision
 
+> **Read first (2026-10-16):** the web app is no longer described as a preview or
+> a demo. `/app/` is the DHUN web app (installable, offline shell, real stream
+> attempts with failures surfaced as states, downloads removed), and the
+> marketing site was rebuilt as the app's own shell with its token sheet
+> generated from `app-web/src/css/tokens.css`. The decisions are in the ADR-008
+> amendment of 2026-10-16 and the dated amendment in `.ai/WEBSITE_PLAN.md`;
+> older passages in this file that call the web surface a preview describe the
+> state before that date.
+
 > **Historical snapshot warning (superseded 2026-10-09):** The handoff below describes
 > the state as of 2026-10-08 and is not the current active task. In particular,
 > its old “Do not touch Android, Windows, FullPlayer (ADR-002), lyrics or ABI

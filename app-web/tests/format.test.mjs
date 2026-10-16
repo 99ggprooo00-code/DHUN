@@ -1,14 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  formatDuration,
-  cacheOptionLabel,
-  CACHE_OPTIONS_MB,
-  trackSubtitle,
-  pluralise,
-  escapeHtml,
-} from "../src/js/format.js";
+import { formatDuration, trackSubtitle, pluralise } from "../src/js/format.js";
 
 test("durations read the way a music player writes them", () => {
   assert.equal(formatDuration(0), "0:00");
@@ -20,14 +13,12 @@ test("durations read the way a music player writes them", () => {
   assert.equal(formatDuration(undefined), "0:00");
 });
 
-test("cache labels match SettingsViewModel.cacheOptionLabel", () => {
-  assert.equal(cacheOptionLabel(0), "Unlimited");
-  assert.equal(cacheOptionLabel(256), "256 MB");
-  assert.equal(cacheOptionLabel(1023), "1023 MB");
-  assert.equal(cacheOptionLabel(1024), "1 GB");
-  assert.equal(cacheOptionLabel(4096), "4 GB");
-  assert.deepEqual(CACHE_OPTIONS_MB, [256, 512, 1024, 2048, 4096, 0]);
-});
+// Escaping lives in `dom.js` (the `html` tag) and is asserted in dom.test.mjs —
+// a second copy here would be a second thing to keep correct.
+//
+// The cache-budget helpers (`cacheOptionLabel`, `CACHE_OPTIONS_MB`) used to be
+// asserted here. They are gone with the Downloads screen: a browser tab does not
+// have a cache the user should be asked to budget, so the app stopped asking.
 
 test("track subtitles and counts read like the app's", () => {
   assert.equal(trackSubtitle({ artist: "Naya Koirala", album: "Dharan Nights" }), "Naya Koirala • Dharan Nights");
@@ -35,12 +26,4 @@ test("track subtitles and counts read like the app's", () => {
   assert.equal(pluralise(1, "song"), "1 song");
   assert.equal(pluralise(4, "song"), "4 songs");
   assert.equal(pluralise(0, "track"), "0 tracks");
-});
-
-test("interpolated values are escaped — a title is data, never markup", () => {
-  assert.equal(escapeHtml('<img src=x onerror="alert(1)">'), "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
-  assert.equal(escapeHtml("a & b"), "a &amp; b");
-  assert.equal(escapeHtml("'quote'"), "&#39;quote&#39;");
-  assert.equal(escapeHtml(null), "");
-  assert.equal(escapeHtml(undefined), "");
 });

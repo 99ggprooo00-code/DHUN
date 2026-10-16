@@ -333,3 +333,63 @@ Playwright boot/honesty/console/overflow pass on `/app/`; served job: the
 smoke check fetches `/app/` and re-asserts the notices on the bytes a
 visitor gets). The first *served* verification happens on the merge to
 `main`, from the `served` job — not before.
+
+---
+
+## Amendment 2026-10-16 — the web app is a web app, and the site is its shell
+
+Appended, not rewritten. This records a user decision that supersedes the
+*packaging* in B3 and the honesty notices named in the 2026-10-09 (2)
+amendment, while leaving ADR-008's six boundaries untouched.
+
+### User directive (2026-10-16)
+
+> "The webapp must not just be the app interface demo but the actual working
+> fully functional webapp with all the characteristics for the webapp and solve
+> all the problems that a Webapp would face, remove the things like downloads
+> and other things that is no need for the webapp."
+
+And, for the site: it must follow the application's UI/UX components and theme,
+and the two surfaces must read as one product.
+
+### What changed
+
+- **The framing.** `/app/` is no longer described anywhere as an "engineering
+  preview" or a "mirror". It is the DHUN web app: it installs from the browser
+  (manifest + service worker), opens offline once loaded, keeps the library in
+  browser storage, has a hash router with deep links, keyboard shortcuts, media
+  session integration, cross-tab state reconciliation, and a media-query-driven
+  responsive shell (bottom navigation below 840 px, rail above it).
+- **B3 row 6 and row 12 (Downloads).** Downloads are *removed*, not rendered
+  empty: `LIBRARY_TABS` has no `DOWNLOADS`, the cache-budget setting is gone, and
+  no surface promises offline audio. ADR-006 stays an Android/Windows decision.
+- **B3 row 13 (playback).** Real stream resolution is implemented: the anonymous
+  InnerTube `player` endpoint, plus an endpoint the *user* configures in
+  Settings. Failure is a first-class state (CORS refusal, HTTP error, dead
+  stream) and a row that cannot resolve says why and keeps its place. The
+  labelled fictional catalogue is the last resort, never a silent substitute.
+- **Boundary 4, restated.** No Web-support claim before proof — and now: no
+  claim the repository cannot keep. The site and the app say that a browser may
+  be refused by YouTube's origin, that the native builds are the supported
+  players, and that offline caching covers the app's files, not audio.
+- **Boundary 1, unchanged.** No DHUN-operated backend or proxy was added. A
+  user-configured endpoint is the user's own infrastructure, documented as such.
+- **The site's call to action.** It is now "Open the web app" (was "See the
+  interface"); the destination is unchanged — `/app/`.
+- **The site (Part A of `.ai/WEBSITE_PLAN.md`).** The marketing site now renders
+  the app's shell — glass app bar, bottom navigation/rail, a docked "open the
+  app" bar, the app's cards, chips and buttons — with its token sheet generated
+  from `app-web/src/css/tokens.css` by `website/tools/sync-tokens.mjs`, and the
+  app's theme and six accent ramps offered as a CSS-only appearance control.
+  The claim rules were updated with it: naming the web app is no longer a
+  forbidden claim, promising browser playback or offline audio still is.
+
+### Verification (this amendment)
+
+- `app-web`: the full `node --test` suite, plus `scripts/test_app_web.py` in app
+  CI step 1 (Python only), which asserts the real-web-app properties and the
+  claim/honesty rules on the source.
+- `website`: `npm run build` regenerates the tokens, the site gates
+  (`scripts/website_quality.py`, `scripts/website_claims.py`) run on the built
+  bytes, and `website/tests/browser.mjs` measures the rendered shell in a browser
+  in the site workflow.

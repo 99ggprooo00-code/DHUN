@@ -1,5 +1,43 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/dda0fee4-dhun` — the site rebuilt as the app's shell, and the web app made a web app (2026-10-16)
+
+**User direction for this session (verbatim):** "The website needs redoing from
+the scratch to the working condition following the application ui ux components
+and theme." Clarified in session: both surfaces, as one product; the site must
+use the app's components and theme; full app shell fidelity (glass app bar,
+bottom navigation, docked bar, dark-first, six accent ramps); free hand on stack.
+Then: "The webapp must not just be the app interface demo but the actual working
+fully functional webapp with all the characteristics for the webapp and solve all
+the problems that a Webapp would face, remove the things like downloads and other
+things that is no need for the webapp."
+
+### What "done" means for this task
+
+| # | Acceptance | State |
+|---|---|---|
+| 1 | One design system: the site's tokens are the app's | **done** — `website/css/tokens.css` is generated from `app-web/src/css/tokens.css` by `website/tools/sync-tokens.mjs`; `design_system_violations` re-derives the comparison in Python |
+| 2 | The site renders the app's shell | **done** — glass app bar, one navigation element that is tabs below 840 px and a rail above it, a docked "open the app" bar, app-shaped cards/chips/buttons/caveats |
+| 3 | The app's appearance is offered on the site | **done** — theme (dark first, light optional) and six accent ramps as CSS-only radio groups; the site still ships zero JavaScript |
+| 4 | `/app/` is a real web app, not a demo | **done** — installable (manifest + service worker), offline shell, hash router with deep links, browser storage, keyboard shortcuts, media session, cross-tab reconciliation, responsive shell |
+| 5 | Device-only surfaces removed, not stubbed | **done** — Downloads tab, its panes and the cache-budget setting are gone; the Library is playlists, likes and history |
+| 6 | Playback attempts the real thing and names failures | **done** — anonymous InnerTube `player` plus a user-configured endpoint; CORS/HTTP/dead-stream refusals become states; the labelled demo catalogue is the last resort |
+| 7 | No plan, README, TRD or ADR still calls the web app a preview | **done** — see the ADR-008 amendment of 2026-10-16 and the dated amendment in `.ai/WEBSITE_PLAN.md`; historical records (`docs/releases/*`, older verification records) carry a superseded note rather than being rewritten |
+
+### Verification for this task
+
+- `python3 -m unittest discover -s scripts -p 'test_*.py'` → **410 OK**
+- `python3 scripts/website_quality.py website/dist` → **OK: 31 quality checks**
+- `python3 scripts/website_claims.py website/dist` → **OK: 4 built pages** (8 forbidden-claim rules, 3 required caveats, 5 digest rules, 12 telemetry rules)
+- `cd website && npm run build && node tools/verify-minify.mjs` → byte-accurate `dist/`, `75040 bytes saved`
+- `npm run test:rules` → **41/41**; `npx html-validate "dist/**/*.html"` → no findings
+- `app-web`: `npm test`, `node tools/build.mjs`, `gen-icons --check`
+
+**Not verified here, and not claimed:** the rendered shell in a real browser (no
+browser binary exists in this environment), and playback from the deployed
+origin. Both are the site workflow's `browser` job and a human's eyes.
+
+
 ## Session `arena/7884ea99-dhun` — release-readiness audit and safe prep (2026-10-10)
 
 - **Status:** BLOCKED — RELEASE NOT READY for any new public release. The fixed `v1.00.001` public prerelease was not changed.
@@ -163,7 +201,7 @@ retitled **SUPERSEDED** and left open rather than closed.
    publish `app-web/dist` alongside `website/dist` with its path filters updated.
 2. **Run `app-web` in a real browser.** Layout, paint, touch and pointer input
    are unverified — no browser exists in this sandbox and no browser binary can
-   be fetched. The `boot.test.mjs` DOM stub proves wiring, not rendering.
+   be fetched. The `app-web` node suites prove wiring and rendered output as strings, not pixels.
 3. **InnerTube search** (`js/catalog.js` `createLiveSource().search`) is
    deliberately unimplemented: the browse-response → Track/Album/Artist mapping
    needs its own module and its own tests.

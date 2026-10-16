@@ -31,7 +31,7 @@ SECRET_PATTERNS = {
 # project credential (see .ai/DEPENDENCY_AUDIT.md, 2026-10-10 entry). Its value
 # is deliberately not written here.
 ALLOWED_PUBLIC_VALUES = {
-    ("app-web/src/js/catalog.js", "Google API key"): 1,
+    ("app-web/src/js/source.js", "Google API key"): 1,
 }
 
 KEY_SUFFIXES = (".p12", ".pfx", ".jks", ".keystore", ".pem", ".key")
