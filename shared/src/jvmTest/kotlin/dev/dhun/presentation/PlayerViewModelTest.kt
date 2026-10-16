@@ -58,7 +58,13 @@ class PlayerViewModelTest {
 
         var nextCalls = 0
         var previousCalls = 0
-        var playPauseCalls = 0
+        @Volatile var playPauseCalls = 0
+        var deferPauseAck = false
+        private var pendingPausedTrack: Track? = null
+        fun acknowledgePause() {
+            pendingPausedTrack?.let { state.value = PlaybackState.Paused(it) }
+            pendingPausedTrack = null
+        }
         var playAtCalls = mutableListOf<Int>()
         var removedAt = mutableListOf<Int>()
         var moves = mutableListOf<Pair<Int, Int>>()
@@ -91,7 +97,12 @@ class PlayerViewModelTest {
         override fun playPause() {
             playPauseCalls++
             state.value = when (val current = state.value) {
-                is PlaybackState.Playing -> PlaybackState.Paused(current.track)
+                is PlaybackState.Playing -> {
+                    if (deferPauseAck) {
+                        pendingPausedTrack = current.track
+                        current
+                    } else PlaybackState.Paused(current.track)
+                }
                 is PlaybackState.Paused -> PlaybackState.Playing(current.track)
                 else -> current
             }
@@ -255,7 +266,14 @@ class PlayerViewModelTest {
 
     private suspend fun awaitCalls(player: FakePlayer, count: Int) {
         withTimeout(3_000) {
-            while (player.playPauseCalls != count) delay(10)
+            while (player.playPauseCalls < count) delay(10)
+        }
+        assertEquals(count, player.playPauseCalls, "unexpected extra transport action")
+    }
+
+    private suspend fun awaitPaused(player: FakePlayer) {
+        withTimeout(3_000) {
+            while (player.state.value !is PlaybackState.Paused) delay(10)
         }
     }
 
@@ -274,7 +292,7 @@ class PlayerViewModelTest {
             // Simulate a HARDWARE volume key: the VM did not call setVolume.
             player.volume.value = 0f
             awaitCalls(player, 1)
-            assertTrue(player.state.value is PlaybackState.Paused)
+            awaitPaused(player)
             player.volume.value = 0.5f
             awaitCalls(player, 2)
             assertTrue(player.state.value is PlaybackState.Playing)
@@ -284,8 +302,32 @@ class PlayerViewModelTest {
 
             vm.setVolume(0f)
             awaitCalls(player, 3)
+            awaitPaused(player)
             vm.setVolume(0.4f)
             awaitCalls(player, 4)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun fastUnmuteWaitsForAsyncPauseAcknowledgement(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val settings = FakeSettingsRepository(mapOf(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to "true"))
+            val player = FakePlayer().apply { deferPauseAck = true }
+            player.prepareQueue(listOf(track("pending-pause")), 0, playWhenReady = true)
+            PlayerViewModel(player, FakeProvider(), scope, settings = settings)
+            settings.pauseOnMuteObserved.await()
+            player.volume.value = 0f
+            awaitCalls(player, 1)
+            player.volume.value = 0.5f
+            // The engine is still reporting Playing after the volume has risen.
+            delay(50)
+            assertEquals(1, player.playPauseCalls)
+            player.acknowledgePause()
+            awaitCalls(player, 2)
+            assertTrue(player.state.value is PlaybackState.Playing)
         } finally {
             scope.cancel()
         }
