@@ -7,7 +7,7 @@
 - One coherent branch/PR per focused workstream; no parallel agents unless the user explicitly changes the current single-agent decision.
 - Before editing, read `.ai/README.md`, the CURRENT ACTIVE TASK at the top of `.ai/ROADMAP.md`, `.ai/DEBUG_LOG.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/MASTER_PROMPT.md`, relevant accepted ADRs and tests.
 - Code + current CI + device/browser evidence outrank stale prose. Do not infer success from compilation or a DOM stub.
-- Do not change native stack, add a backend, or promote the browser mirror to a product without an accepted ADR.
+- Do not change the native stack or add a backend or proxy (ADR-008 boundary 1). The browser client *is* a product surface as of the ADR-008 amendment of 2026-10-16; what stays gated is any claim that browser playback is proven.
 - Every fix includes a regression test that fails on the old behavior; update verification and known-limitations records.
 - Keep documentation claims scoped: “implemented in source,” “unit-tested,” “verified on hardware,” and “verified on deployed site” are different statuses.
 
@@ -41,7 +41,7 @@ Tasks:
 5. Verify route direct-load, refresh, back/forward and current-page marker on deployed origin.
 6. Verify Pages workflow configuration and actual served bytes/commit; do not trust stale README or historical `.ai/WEBSITE_PLAN.md` status alone.
 7. Ensure Home, Features and Interface link to each other; 404 has recovery links; CTAs land at the intended repository/issues/changelog/test-release destinations.
-8. Keep the marketing site separate from the experimental `app-web/`; no unsupported browser-playback claims.
+8. The marketing site and `app-web/` share one design system — the site's sheet is generated from the app's tokens — and neither makes a browser-playback claim the repository cannot keep.
 
 **Exit gate:** deployed-origin link walk passes from Home and every secondary route; exact deployed commit and URL recorded.
 
@@ -82,7 +82,7 @@ Audit all dialogs and overflow sheets, not just Clear downloads:
 
 ## P5 — Browser mirror contract and honest status
 
-- Keep `app-web/` separate from the marketing site.
+- Keep `app-web/` and the marketing site on the same design system; the site's `css/tokens.css` is generated, never hand-typed.
 - Keep no-audio/sample-catalogue notices visible while the corresponding limitations remain.
 - Verify its navigation/state/action semantics mirror native where feasible.
 - Test browser actual render, pointer/touch/keyboard and layout when a browser runner is available; DOM stubs prove wiring only.

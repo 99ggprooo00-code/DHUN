@@ -1,130 +1,194 @@
 /* ============================================================================
-   DHUN marketing site — one stylesheet, no client-side JavaScript.
+   GENERATED FILE — DO NOT EDIT.
+   Written by: node website/tools/sync-tokens.mjs
+   Source:     app-web/src/css/tokens.css (which mirrors DhunAppearance.kt / DhunShapes.kt /
+               DhunTypography.kt / DhunSpacing.kt in the app)
 
-   Colour, shape, spacing and type values are read out of the app's Compose
-   design system in shared/src/commonMain/kotlin/dev/dhun/design/:
-     DhunAppearance.kt (dark + light token sets, accent ramps)
-     DhunTypography.kt (type scale)  DhunShapes.kt  DhunSpacing.kt
-   The dark set is the default; the light set mirrors the app's light scheme.
-   Every paired colour below was checked for >= 4.5:1 text contrast; the
-   assertions live in scripts/website_quality.py.
+   Every declaration below names the `--dhun-*` property it was read from and
+   carries that property's two values in one `light-dark()` pair, so the dark
+   and light sets cannot drift apart and neither can drift from the app.
+
+   The pair is preceded by the app's dark value written out plainly. That line
+   is what a reader — or the Python rule — sees without evaluating the
+   function; it is NOT a fallback for an old engine, because a custom property
+   keeps the later declaration whatever tokens it holds. The sheet therefore
+   has a floor: `light-dark()` needs Chrome/Edge 123, Firefox 120 or Safari
+   17.5, and the appearance control already needs `:has()` (Chrome 105,
+   Firefox 121, Safari 15.4).
    ========================================================================== */
 
 :root {
-  /* Surfaces — dark (DhunTokens defaults) */
-  --bg: #161616;
-  --surface: #1e1e1e;
-  --surface-variant: #262626;
-  --surface-elevated: #303030;
-  --surface-highest: #363636;
-  --surface-card: #2a2a2a;
+  /* Dark is the app's default. The plain value on each line is what a reader
+     that does not evaluate `light-dark()` reads; the pair below it is what a
+     browser computes. */
+  color-scheme: dark;
+  --bg: #161616;  /* --dhun-background */
+  --bg: light-dark(#f6f4f1, #161616);
+  --surface: #1e1e1e;  /* --dhun-surface */
+  --surface: light-dark(#ffffff, #1e1e1e);
+  --surface-variant: #262626;  /* --dhun-surface-variant */
+  --surface-variant: light-dark(#efece8, #262626);
+  --surface-elevated: #303030;  /* --dhun-surface-elevated */
+  --surface-elevated: light-dark(#ffffff, #303030);
+  --surface-highest: #363636;  /* --dhun-surface-highest */
+  --surface-highest: light-dark(#e9e5e0, #363636);
+  --surface-card: #2a2a2a;  /* --dhun-surface-card */
+  --surface-card: light-dark(#ffffff, #2a2a2a);
+  --text: #ffffff;  /* --dhun-text */
+  --text: light-dark(rgba(26, 23, 20, 0.949), #ffffff);
+  --text-2: rgba(255, 255, 255, 0.8);  /* --dhun-text-secondary */
+  --text-2: light-dark(rgba(26, 23, 20, 0.749), rgba(255, 255, 255, 0.8));
+  --text-3: rgba(255, 255, 255, 0.6);  /* --dhun-text-tertiary */
+  --text-3: light-dark(rgba(26, 23, 20, 0.549), rgba(255, 255, 255, 0.6));
+  --text-4: rgba(255, 255, 255, 0.45);  /* site value: non-text affordances only: 0.45-alpha white is ~3.9:1 and fails the 4.5:1 body floor, so no text uses it */
+  --text-4: light-dark(rgba(26, 23, 20, 0.42), rgba(255, 255, 255, 0.45));
+  --accent: #bb86fc;  /* --dhun-accent */
+  --accent: light-dark(#6750a4, #bb86fc);
+  --on-accent: #000000;  /* --dhun-on-accent */
+  --on-accent: light-dark(#ffffff, #000000);
+  --accent-container: #3a2a5a;  /* --dhun-accent-container */
+  --accent-container: light-dark(#eaddff, #3a2a5a);
+  --on-accent-container: #e8d5ff;  /* --dhun-on-accent-container */
+  --on-accent-container: light-dark(#21005d, #e8d5ff);
+  --warning: #ffb74d;  /* --dhun-warning */
+  --warning: light-dark(#8a5300, #ffb74d);
+  --success: #4caf50;  /* --dhun-success */
+  --success: light-dark(#1b7a3d, #4caf50);
+  --error: #d5798a;  /* --dhun-error */
+  --error: light-dark(#b00020, #d5798a);
+  --error-readable: #ec9fae;  /* site value: the app's --dhun-error is 3.99:1 on --surface-highest in dark (measured by the browser job), so dark uses the same hue lightened to 5.83:1; light passes with the app's own value */
+  --error-readable: light-dark(#b00020, #ec9fae);
+  --glass: rgba(22, 22, 30, 0.439);  /* --dhun-glass */
+  --glass: light-dark(rgba(255, 255, 255, 0.478), rgba(22, 22, 30, 0.439));
+  --glass-strong: rgba(18, 18, 24, 0.722);  /* --dhun-glass-strong */
+  --glass-strong: light-dark(rgba(255, 255, 255, 0.769), rgba(18, 18, 24, 0.722));
+  --glass-bar-top: rgba(28, 28, 38, 0.784);  /* --dhun-glass-bar-top */
+  --glass-bar-top: light-dark(rgba(255, 255, 255, 0.839), rgba(28, 28, 38, 0.784));
+  --glass-edge: rgba(255, 255, 255, 0.22);  /* --dhun-glass-edge */
+  --glass-edge: light-dark(rgba(0, 0, 0, 0.161), rgba(255, 255, 255, 0.22));
+  --hairline: rgba(255, 255, 255, 0.102);  /* --dhun-border */
+  --hairline: light-dark(rgba(0, 0, 0, 0.078), rgba(255, 255, 255, 0.102));
+  --hairline-strong: rgba(255, 255, 255, 0.2);  /* --dhun-border-strong */
+  --hairline-strong: light-dark(rgba(0, 0, 0, 0.18), rgba(255, 255, 255, 0.2));
+  --scrim: rgba(0, 0, 0, 0.502);  /* --dhun-scrim */
+  --scrim: light-dark(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.502));
+  --scrim-strong: rgba(0, 0, 0, 0.8);  /* --dhun-scrim-strong */
+  --scrim-strong: light-dark(rgba(0, 0, 0, 0.702), rgba(0, 0, 0, 0.8));
+  --r-xs: 4px;  /* --dhun-shape-extra-small */
+  --r-sm: 8px;  /* --dhun-shape-small */
+  --r-md: 12px;  /* --dhun-shape-medium */
+  --r-lg: 16px;  /* --dhun-shape-large */
+  --r-xl: 28px;  /* --dhun-shape-extra-large */
+  --r-xxl: 32px;  /* --dhun-shape-extra-extra-large */
+  --r-full: 999px;  /* --dhun-shape-full */
+  --sp-1: 4px;  /* --dhun-space-xs */
+  --sp-2: 8px;  /* --dhun-space-sm */
+  --sp-3: 12px;  /* --dhun-space-md */
+  --sp-4: 16px;  /* --dhun-space-lg */
+  --sp-5: 20px;  /* --dhun-space-xl */
+  --sp-6: 24px;  /* --dhun-space-xxl */
+  --sp-8: 32px;  /* --dhun-space-xxxl */
+  --sp-12: 48px;  /* --dhun-space-huge */
+  --target: 48px;  /* --dhun-space-touch-target */
+  --font: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;  /* --dhun-font-sans */
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;  /* --dhun-font-mono */
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.45);  /* site value: the app draws elevation with its surface ladder, not with a shadow; the site keeps one shadow for the couple of places a page needs depth */
+  --shadow: light-dark(0 18px 48px rgba(26, 23, 20, 0.14), 0 18px 48px rgba(0, 0, 0, 0.45));
+  --wrap: 1120px;  /* site value: page scaffolding: the reading measure, not a design-system value */
 
-  /* Glass (translucent fills + 10% white hairline) */
-  --glass: rgba(22, 22, 30, 0.70);
-  --glass-strong: rgba(18, 18, 24, 0.82);
-  --glass-bar-top: rgba(28, 28, 38, 0.78);
-  --glass-edge: rgba(255, 255, 255, 0.22);
-  --hairline: rgba(255, 255, 255, 0.10);
-  --hairline-strong: rgba(255, 255, 255, 0.20);
+  /* The six accent ramps as flat aliases, for the appearance chips and the
+     /ui/ swatch table. `--accent` above is the ramp in force. */
+  --ramp-brand: #bb86fc;  /* --dhun-accent-brand-dark */
+  --ramp-brand: light-dark(#6750a4, #bb86fc);
+  --ramp-azure: #7fb3ff;  /* --dhun-accent-azure-dark */
+  --ramp-azure: light-dark(#0b57d0, #7fb3ff);
+  --ramp-jade: #79e0b4;  /* --dhun-accent-jade-dark */
+  --ramp-jade: light-dark(#00694a, #79e0b4);
+  --ramp-amber: #ffc46b;  /* --dhun-accent-amber-dark */
+  --ramp-amber: light-dark(#8a5300, #ffc46b);
+  --ramp-rose: #ff9ec0;  /* --dhun-accent-rose-dark */
+  --ramp-rose: light-dark(#a63a63, #ff9ec0);
+  --ramp-cyan: #6fe3f0;  /* --dhun-accent-cyan-dark */
+  --ramp-cyan: light-dark(#00668b, #6fe3f0);
+}
 
-  /* Text ladder (white alpha ladder in dark) */
-  --text: #ffffff;
-  --text-2: rgba(255, 255, 255, 0.80);
-  --text-3: rgba(255, 255, 255, 0.62);
-  /* Kept for non-text affordances only: 0.45-alpha white is ~3.9:1 and
-     fails the 4.5:1 body-text floor, so no text uses it. */
-  --text-4: rgba(255, 255, 255, 0.45);
+/* The five ramps a visitor can choose. `light-dark()` resolves the scheme, so
+   each ramp is one block rather than one per scheme. */
+:root:has(#accent-azure:checked) {
+  --accent: light-dark(#0b57d0, #7fb3ff);
+  --on-accent: light-dark(#ffffff, #000000);
+  --accent-container: light-dark(#d3e3fd, #12314f);
+  --on-accent-container: light-dark(#041e49, #d6e6ff);
+}
 
-  /* Accent — DhunAccent.BRAND dark ramp */
-  --accent: #bb86fc;
-  --on-accent: #000000;
-  --accent-container: #3a2a5a;
-  --on-accent-container: #e8d5ff;
+:root:has(#accent-jade:checked) {
+  --accent: light-dark(#00694a, #79e0b4);
+  --on-accent: light-dark(#ffffff, #000000);
+  --accent-container: light-dark(#b8f2d6, #0e3b2c);
+  --on-accent-container: light-dark(#00211a, #cff5e4);
+}
 
-  /* Semantic */
-  --warning: #ffb74d;
-  --success: #4caf50;
-  --error: #d5798a;
-  /* Text-safe error. The app's --error is 3.99:1 on --surface-highest in dark
-     (measured by the browser job), so dark uses the same ramp lightened to
-     5.83:1; light passes with the pure token (5.21:1 on #e9e5e0). */
-  --error-readable: #ec9fae;
+:root:has(#accent-amber:checked) {
+  --accent: light-dark(#8a5300, #ffc46b);
+  --on-accent: light-dark(#ffffff, #000000);
+  --accent-container: light-dark(#ffdcbe, #4e3311);
+  --on-accent-container: light-dark(#2e1500, #ffe8c7);
+}
 
-  /* Shapes — DhunShapes */
-  --r-xs: 4px;
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 28px;
-  --r-xxl: 32px;
-  --r-full: 999px;
+:root:has(#accent-rose:checked) {
+  --accent: light-dark(#a63a63, #ff9ec0);
+  --on-accent: light-dark(#ffffff, #000000);
+  --accent-container: light-dark(#ffd9e3, #4e1c31);
+  --on-accent-container: light-dark(#3e001d, #ffd9e6);
+}
 
-  /* Spacing — DhunSpacing */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 20px;
-  --sp-6: 24px;
-  --sp-8: 32px;
-  --sp-12: 48px;
-  --target: 44px;
+:root:has(#accent-cyan:checked) {
+  --accent: light-dark(#00668b, #6fe3f0);
+  --on-accent: light-dark(#ffffff, #000000);
+  --accent-container: light-dark(#c2e8ff, #0d3f4a);
+  --on-accent-container: light-dark(#001e2c, #cff6ff);
+}
 
-  --wrap: 1120px;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    "Noto Sans", sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
-    monospace;
-  --shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+/* ---------------------------------------------------------------------------
+   Appearance — the app's own two choices, with no JavaScript.
+
+   The app ships a theme (dark by default, light optional) and six accent
+   ramps, and its Settings screen is where a visitor changes them. A static
+   site cannot run that screen, so the same two controls are offered as radio
+   groups at the foot of every page and applied with `:has()`. The palette is
+   the app's, so picking an accent here picks the ramp the app would use.
+
+   Dark is still the default and the OS preference is still respected: light
+   applies when the OS asks for it and the visitor has not chosen dark, or
+   when the visitor has chosen light. The choice is remembered for this page
+   only — no JavaScript, no storage, no cookie.
+   --------------------------------------------------------------------------- */
+
+/* The two themes, as `color-scheme` states: `light-dark()` above resolves
+   against it, and so does every form control and scrollbar on the page. */
+:root:has(#theme-light:checked) {
+  color-scheme: light;
+}
+
+:root:has(#theme-dark:checked) {
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f6f4f1;
-    --surface: #ffffff;
-    --surface-variant: #efece8;
-    --surface-elevated: #ffffff;
-    --surface-highest: #e9e5e0;
-    --surface-card: #ffffff;
-    --glass: rgba(255, 255, 255, 0.72);
-    --glass-strong: rgba(255, 255, 255, 0.86);
-    --glass-bar-top: rgba(255, 255, 255, 0.90);
-    --glass-edge: rgba(0, 0, 0, 0.16);
-    --hairline: rgba(0, 0, 0, 0.08);
-    --hairline-strong: rgba(0, 0, 0, 0.18);
-    --text: #1a1714;
-    --text-2: rgba(26, 23, 20, 0.78);
-    --text-3: rgba(26, 23, 20, 0.62);
-    --text-4: rgba(26, 23, 20, 0.42);
-    --accent: #6750a4;
-    --on-accent: #ffffff;
-    --accent-container: #eaddff;
-    --on-accent-container: #21005d;
-    --warning: #8a5300;
-    --success: #1b7a3d;
-    --error: #b00020;
-    --error-readable: var(--error);
-    --shadow: 0 18px 48px rgba(26, 23, 20, 0.14);
+  :root:not(:has(#theme-dark:checked)) {
+    color-scheme: light;
   }
 }
 
 /* `prefers-contrast: more` — the operating system's "increase contrast"
-   setting, which a visitor turns on because the normal ladder is not enough.
-   The secondary rungs are the ones that need it. Measured from this file's own
-   tokens: in the light set `--text-3` is 4.83:1 on `--bg` and 4.71:1 on the
-   variant surface (above the 4.5:1 body floor this sheet was built to, below the
-   7:1 a reader asking for more contrast wants); in the dark set it is 7.47:1 on
-   `--bg` but 6.71:1 on the variant surface. Both secondary rungs therefore
-   become the primary text colour — 18.10:1 on `--bg` in the dark set, 16.26:1 in
-   the light set — and because the value is a reference rather than a colour, the
-   same declaration raises both schemes.
-   `high_contrast_violations` (scripts/website_quality.py) asserts that this
-   block exists, that it resolves in both schemes, and that every token it
-   redefines strictly raises its contrast against each surface to at least 7:1. */
+   setting. The secondary rungs become the primary text colour, which is
+   >= 7:1 against every surface in both schemes (re-derived from these tokens
+   by `high_contrast_violations` in scripts/website_quality.py). A reader who
+   asks for more contrast and gets the same ladder has been told no for no
+   reason. */
 @media (prefers-contrast: more) {
   :root {
     --text-2: var(--text);
     --text-3: var(--text);
   }
 }
-

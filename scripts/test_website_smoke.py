@@ -156,7 +156,7 @@ class RootRelativeResolution(unittest.TestCase):
 
 
 def app_page() -> str:
-    """The mirror's shell as it ships: noindex, strict CSP, one mount point."""
+    """The web app's shell as it ships: noindex, strict CSP, one mount point."""
     return (
         "<!doctype html><html lang=\"en\"><head>"
         '<meta charset="utf-8" />'
@@ -170,7 +170,7 @@ def app_page() -> str:
 
 
 class ServedWebApp(unittest.TestCase):
-    """The /app/ mirror on the served origin: up, honest about being a preview.
+    """The web app on the served origin: up, and shaped like the app shell.
 
     Its copy is bound by scripts/test_app_web.py (source), not by the
     marketing honesty contract; the served bytes are bound by shape — the

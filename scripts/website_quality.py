@@ -882,7 +882,15 @@ def anchor_landing_violations(dist: pathlib.Path) -> list[str]:
                 value
                 for value in (
                     [_length_px(declarations["scroll-padding-top"])]
-                    + [_length_px(value) for value in overrides.values()]
+                    # Only the same property. A conditional `:root` block also
+                    # carries token *overrides* (the appearance ramps), and
+                    # reading every length in it made a 4px spacing token look
+                    # like a scroll offset that "falls to 4px".
+                    + [
+                        _length_px(value)
+                        for name, value in overrides.items()
+                        if name == "scroll-padding-top"
+                    ]
                 )
                 if value is not None
             ]
@@ -1055,7 +1063,17 @@ def _parse_scheme_tokens(css: str, light: bool = False) -> dict[str, str]:
 
     def absorb(body: str) -> None:
         for name, value in re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;}]+)", body):
-            tokens[name] = value.strip()
+            value = value.strip()
+            # The sheet declares each colour twice (plain, then a `light-dark()`
+            # pair). For the light map the pair's first argument is the value;
+            # for the default map the plain declaration is, so the first mention
+            # of a token names the value and a pair never overwrites it with an
+            # unreadable function.
+            pair = split_light_dark(value)
+            if light and pair:
+                tokens[name] = pair[0]
+            else:
+                tokens.setdefault(name, value)
 
     for unit in css_units(css):
         if unit["kind"] == "rule" and ":root" in unit["prelude"]:
@@ -1069,6 +1087,9 @@ def _parse_scheme_tokens(css: str, light: bool = False) -> dict[str, str]:
             for child in unit["children"]:
                 if child["kind"] == "rule" and ":root" in child["prelude"]:
                     absorb(child["body"])
+    if light:
+        for name, light_value, _dark in light_dark_pairs(css):
+            tokens[name] = light_value
     return tokens
 
 
@@ -1967,8 +1988,18 @@ def responsive_violations(dist: pathlib.Path) -> list[str]:
             violations.append(f"styles.css: no breakpoint at {width}px")
     if "clamp(" not in css:
         violations.append("styles.css: fluid type via clamp() is not used")
-    if "--target:44px" not in compact:
-        violations.append("styles.css: the 44px touch-target token is missing")
+    target = re.search(r"--target:\s*([\d.]+)px", css)
+    if target is None:
+        violations.append(
+            "styles.css: the --target token is missing, so no declared minimum "
+            "control size exists"
+        )
+    elif float(target.group(1)) < 44:
+        violations.append(
+            f"styles.css: --target is {target.group(1)}px, below the 44px floor this "
+            f"site's own controls are built to (WCAG 2.5.8 asks for 24px; the app's "
+            f"DhunSpacing.touchTarget is 48px)"
+        )
     for page in page_paths(dist).values():
         markup = page.read_text(encoding="utf-8")
         if 'content="width=device-width' not in markup:
@@ -1985,12 +2016,74 @@ def responsive_violations(dist: pathlib.Path) -> list[str]:
 
 
 def _parse_tokens(css: str) -> dict[str, str]:
+    """The `:root` tokens, first declaration wins.
+
+    First, not last, because the generated token sheet declares every colour
+    twice: the plain value (the app's dark set, which is also the fallback a
+    browser without `light-dark()` keeps) and then a `light-dark(light, dark)`
+    pair. The plain value is the one these checks can resolve to a colour, and it
+    is the scheme the site is dark-first in; `light_dark_pairs` below checks the
+    other side of every pair.
+    """
     block = re.search(r":root\s*\{(.*?)\}", css, re.S)
     tokens: dict[str, str] = {}
     if block:
         for name, value in re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;]+);", block.group(1)):
-            tokens[name] = value.strip()
+            tokens.setdefault(name, value.strip())
     return tokens
+
+
+# `light-dark(<light>, <dark>)` — the one pair function the token sheet uses.
+# Parsed with balanced parentheses rather than a regular expression: the light
+# side of a pair is often `rgba(26, 23, 20, 0.949)`, and a `[^()]+` character
+# class silently refuses to match it, which is how every light value first looked
+# like the dark one and the contrast rule reported a 1.00:1 pair.
+LIGHT_DARK_CALL = "light-dark("
+
+
+def split_light_dark(value: str) -> tuple[str, str] | None:
+    """`(light, dark)` for a `light-dark(…)` value, or None for anything else."""
+    at = value.find(LIGHT_DARK_CALL)
+    if at == -1:
+        return None
+    index = at + len(LIGHT_DARK_CALL)
+    depth = 0
+    parts: list[str] = []
+    current = ""
+    while index < len(value):
+        char = value[index]
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            if depth == 0:
+                parts.append(current)
+                break
+            depth -= 1
+        elif char == "," and depth == 0:
+            parts.append(current)
+            current = ""
+            index += 1
+            continue
+        current += char
+        index += 1
+    if len(parts) != 2:
+        return None
+    return parts[0].strip(), parts[1].strip()
+
+
+def light_dark_pairs(css: str) -> list[tuple[str, str, str]]:
+    """Every `--token: light-dark(light, dark)` in the sheet, by name.
+
+    Returns (token, light value, dark value). This is what makes both schemes
+    checkable without a browser: the pair names both, so a rule that only reads
+    the default scheme can still be run against the light one.
+    """
+    pairs: list[tuple[str, str, str]] = []
+    for name, value in re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;]+);", css):
+        split = split_light_dark(value)
+        if split:
+            pairs.append((name, split[0], split[1]))
+    return pairs
 
 
 def _relative_luminance(rgb: tuple[float, float, float]) -> float:
@@ -2220,6 +2313,189 @@ def write_baseline(dist: pathlib.Path, baseline_path: pathlib.Path | None = None
     return baseline_path
 
 
+# --------------------------------------------------------------------------
+# The design system the site is painted from.
+# --------------------------------------------------------------------------
+
+APP_TOKENS = REPO_ROOT / "app-web" / "src" / "css" / "tokens.css"
+# The header `website/tools/sync-tokens.mjs` writes. The rule reads the built
+# sheet rather than the generator's source, so it holds for the bytes a visitor
+# gets: this is what app CI can check with Python alone.
+GENERATED_TOKENS_MARKER = "GENERATED FILE — DO NOT EDIT."
+GENERATED_TOKENS_ORIGIN = "node website/tools/sync-tokens.mjs"
+
+# The appearance control's choices, as the radios the layout emits. The accent
+# list and the default are the app's (`DhunAccent.default = BRAND`).
+APPEARANCE_THEMES = ("theme-dark", "theme-light")
+RAMPS = ("brand", "azure", "jade", "amber", "rose", "cyan")
+DEFAULT_RAMP = "brand"
+
+
+def _app_token_values() -> tuple[dict[str, str], dict[str, str]]:
+    """(dark, light) custom properties from the app's token file.
+
+    The file declares the scales once (shapes, spacing, fonts, type) in an
+    unconditional `:root` block and the colours per scheme, so the dark map is the
+    unconditional block plus the dark block, and the light map is the light block
+    plus whatever it does not restate. Folding both into one map made every dark
+    alias look wrong — the light block is later in the file, so it won.
+    The per-ramp override blocks are skipped: they restate `--dhun-accent`, and
+    folding them in would make the last ramp in the file the app's default.
+    """
+    dark: dict[str, str] = {}
+    light: dict[str, str] = {}
+    text = APP_TOKENS.read_text(encoding="utf-8")
+    for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", text):
+        if "[data-dhun-accent" in selector:
+            continue
+        is_light = '[data-dhun-theme="light"]' in selector
+        is_dark = bool(re.search(r"(?:^|[,\s]):root\b", selector)) or (
+            '[data-dhun-theme="dark"]' in selector
+        )
+        if not is_light and not is_dark:
+            continue
+        for name, value in re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;]+)", body):
+            (light if is_light else dark)[name] = value.strip()
+    return dark, light
+
+
+def _app_value(name: str, dark: dict[str, str], light: dict[str, str], scheme: str = "dark") -> str | None:
+    """One app token, in one scheme, with the shared scale as the fallback."""
+    if scheme == "light":
+        return light.get(name) or dark.get(name)
+    return dark.get(name) or light.get(name)
+
+
+def design_system_violations(dist: pathlib.Path) -> list[str]:
+    """The site is painted with the app's tokens, and the app's two choices work.
+
+    The whole point of the rework this rule was written for: the marketing site and
+    the web app must read as one product, which means one palette, one scale, one
+    set of accent ramps — not a copy taken once and left to drift. Three parts:
+
+    1. **The sheet is generated.** `website/css/tokens.css` must carry the
+       generator's header, and the value after each alias must be the app's value
+       for the property the line names. The app file is the source: change a
+       colour there and this rule fails until the sheet is regenerated.
+    2. **Both schemes are stated, and the light one is not decoration.** Every
+       colour token is declared as the app's dark value written out plainly, and
+       then as a `light-dark(light, dark)` pair whose light side must be the app's
+       light value. (The plain line is documentation and what a parser that does
+       not evaluate the function reads — not a fallback for an old engine; the
+       generated header states the floor.)
+    3. **The appearance control is real.** The built page offers the app's theme
+       and all six accent ramps, and the stylesheet reacts to the radios by id — a
+       control that changes nothing is worse than no control.
+
+    The rendered half — that a visitor's choice actually repaints the page, and
+    that the swatches show the values printed beside them — runs in a browser in
+    `website/tests/browser.mjs`.
+    """
+    violations: list[str] = []
+    if not APP_TOKENS.is_file():
+        where = APP_TOKENS.relative_to(REPO_ROOT) if APP_TOKENS.is_relative_to(REPO_ROOT) else APP_TOKENS
+        return [f"{where} is missing: the design system has no source"]
+    app_dark, app_light = _app_token_values()
+    sheet = (REPO_ROOT / "website" / "css" / "tokens.css").read_text(encoding="utf-8")
+
+    header = "\n".join(sheet.split("\n")[:6])
+    if GENERATED_TOKENS_MARKER not in header or GENERATED_TOKENS_ORIGIN not in header:
+        violations.append(
+            "website/css/tokens.css is not the generated sheet (its header does not name "
+            f"{GENERATED_TOKENS_ORIGIN}), so nothing keeps it in step with the app"
+        )
+
+    # 1. Every alias that names an app property must carry that property's value.
+    declared: dict[str, str] = {}
+    pair_light: dict[str, str] = {}
+    for name, value in re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;]+);", sheet):
+        value = value.strip()
+        split = split_light_dark(value)
+        if split:
+            pair_light[name] = split[0]
+        else:
+            declared.setdefault(name, value)
+    aliased = 0
+    for line_no, line in enumerate(sheet.split("\n"), 1):
+        match = re.match(r"\s*(--[a-z0-9-]+)\s*:\s*([^;]+);\s*/\*\s*(--dhun-[a-z0-9-]+)\s*\*/", line)
+        if not match:
+            continue
+        alias, value, source = match.group(1), match.group(2).strip(), match.group(3)
+        aliased += 1
+        expected = _app_value(source, app_dark, app_light)
+        if expected is None:
+            violations.append(
+                f"website/css/tokens.css:{line_no}: {alias} claims to mirror {source}, which "
+                f"the app's token file does not declare"
+            )
+        elif value != expected:
+            violations.append(
+                f"website/css/tokens.css:{line_no}: {alias} is {value}, but the app's {source} "
+                f"is {expected} — regenerate with '{GENERATED_TOKENS_ORIGIN}'"
+            )
+    if aliased < 20:
+        violations.append(
+            f"website/css/tokens.css names only {aliased} app token(s): the sheet is supposed to "
+            f"be read out of {APP_TOKENS.relative_to(REPO_ROOT)}, not typed by hand"
+        )
+
+    # 2. Both schemes, per colour token, with the app's light value on the light side.
+    base = re.search(r":root\s*\{(.*?)\n\}", sheet, re.S)
+    base_sheet = base.group(1) if base else sheet
+    schemes = {name: light for name, light, _dark in light_dark_pairs(base_sheet)}
+    if not schemes:
+        violations.append(
+            "website/css/tokens.css declares no light-dark() pair, so the light scheme is a "
+            "second hand-written palette that can drift from the dark one"
+        )
+    for alias, source in (("--bg", "--dhun-background"), ("--accent", "--dhun-accent")):
+        if alias not in schemes:
+            continue
+        light_expected = _app_value(source, app_dark, app_light, "light")
+        if schemes[alias] != light_expected and not schemes[alias].startswith("var("):
+            violations.append(
+                f"website/css/tokens.css: {alias} resolves to {schemes[alias]} in the light "
+                f"scheme, but the app's light value is {light_expected}"
+            )
+
+    # 3. The appearance control, and the CSS that answers it.
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for theme in APPEARANCE_THEMES:
+            if f'id="{theme}"' not in markup:
+                violations.append(
+                    f"{route}: the appearance control has no {theme} radio, so a visitor cannot "
+                    f"choose the theme the app offers"
+                )
+        for ramp in RAMPS:
+            if f'id="accent-{ramp}"' not in markup:
+                violations.append(
+                    f"{route}: the appearance control is missing the {ramp} accent ramp"
+                )
+            if ramp == DEFAULT_RAMP:
+                # The default ramp is the base palette: it needs no override, and
+                # it must be the one the control starts on.
+                if not re.search(rf'id="accent-{ramp}"[^>]*\bchecked', markup):
+                    violations.append(
+                        f"{route}: {ramp} is the app's default accent but the control does not "
+                        f"start on it"
+                    )
+                continue
+            if f"#accent-{ramp}:checked" not in sheet:
+                violations.append(
+                    f"{route}: the sheet does not react to #accent-{ramp}:checked"
+                )
+        css = page_stylesheet(dist, route)
+        if ":has(#theme-light:checked)" not in css:
+            violations.append(
+                f"{route}: this page's own CSS never resolves :has(#theme-light:checked), so the "
+                f"light choice does nothing on it"
+            )
+        if "light-dark(" not in css:
+            violations.append(f"{route}: this page's own CSS carries no light-dark() pair")
+    return violations
+
+
 CHECKS = (
     ("page weight budget", weight_violations),
     ("no client-side JavaScript", javascript_violations),
@@ -2242,6 +2518,7 @@ CHECKS = (
     ("print stylesheet", print_style_violations),
     ("forced-colours fallback", forced_colors_violations),
     ("token contrast", contrast_violations),
+    ("design system mirrors the app", design_system_violations),
     ("licence notice", footer_licence_violations),
     ("class coverage", css_coverage_violations),
     ("icon sprite integrity", sprite_violations),

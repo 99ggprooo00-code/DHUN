@@ -1,5 +1,12 @@
 # 29 — The browser mirror of the app (`app-web/`)
 
+> **Superseded in part, 2026-10-16.** This record is kept as what was measured on
+> its date. The framing it uses ("mirror", "engineering preview", a labelled
+> clock instead of playback) is retired: the web app now attempts real playback
+> and surfaces refusals, removes the device-only surfaces, and is described in
+> the ADR-008 amendment of 2026-10-16 and `app-web/README.md`. The measurements
+> below remain true for the build they describe.
+
 Session `arena/967513fd-dhun`, 2026-10-09. Branch point and GitHub `main` at
 boot `d82aa190b702cd0e3fe42dbff34c7a0c6e84e2cc` (PR #143).
 
@@ -57,7 +64,7 @@ and this sandbox's egress allowlist blocks everything but github.com, npm and
 pypi. So the transport advances a *labelled clock*: the seek bar, queue,
 lyrics sync and equaliser can all be exercised, nothing is audible, and the
 page says so in a persistent notice (`data-testid="backend-notice"`, asserted
-by both `tests/boot.test.mjs` and `scripts/test_app_web.py`).
+by both the `app-web` node suites (`tests/*.test.mjs`) and `scripts/test_app_web.py`).
 
 The metadata shown is a **fictional sample catalogue** bundled with the module
 (`js/data/sample-catalog.js`), again labelled on screen. It exists so the

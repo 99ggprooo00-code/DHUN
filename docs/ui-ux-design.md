@@ -25,6 +25,7 @@ Use the existing shared design tokens and components, not ad hoc styling:
 - `DhunTypography.kt`, `DhunShapes.kt`, `DhunSpacing.kt`, `DhunAnimations.kt`, `DhunIcons.kt`
 - Existing glass component and material policies, including dialog opacity policy and lyrics material policy.
 - `app-web/src/css/tokens.css` and generated `app-web/src/js/icons.js` must mirror native values; icons are generated from native source, not manually duplicated.
+- `website/css/tokens.css` is **generated** from `app-web/src/css/tokens.css` by `website/tools/sync-tokens.mjs` (name the `--dhun-*` source in every declaration, carry both schemes in one `light-dark()` pair). Never hand-edit it; `npm run build` regenerates it and `scripts/website_quality.py` re-derives the comparison without Node.
 
 When tokens conflict with an old prose document, the accepted updated design contract and current token source must be reconciled in a deliberate commit. Do not quietly reintroduce Material 3 default styling.
 
@@ -93,11 +94,11 @@ The current code calls the clear callback and dismisses the dialog immediately, 
 - Back, Escape and dismiss actions close only the topmost layer.
 
 ### Marketing website
-- The site is a separate static marketing/download discovery surface, not the app itself.
-- Shared header/footer on Home, Features, Interface and 404. Brand → Home; every route links to other internal routes; active route has accessible current-page semantics.
+- The site is a static discovery surface — not the app — but it wears the app's clothes: since 2026-10-16 every route renders the application's shell (glass app bar, bottom navigation below 840 px and a rail above it, a docked bar into `/app/`) and the app's appearance controls, and it still ships zero client-side JavaScript.
+- One navigation element on Home, Features, Interface and 404. Brand → Home; every route links to other internal routes; active route has accessible current-page semantics, exactly one per page.
 - All internal links must include the `/DHUN/` project base path at deployment. Hard-coded root links like `/features/` can send visitors to the wrong location.
 - Verify direct URL, refresh, back/forward, CTA and footer links on the deployed canonical origin. A local test at `/` alone cannot prove project-page URLs work.
-- Do not imply that the browser mirror is a production music player.
+- Do not imply that the browser client is guaranteed to play audio: it resolves streams and names its failures, and the native builds stay the supported players.
 
 ## 9. Motion and interaction
 

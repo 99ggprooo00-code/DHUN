@@ -29,8 +29,11 @@ Before acting on old session notes, read the current active task at the top of
 `ROADMAP.md` and the binding correction in `MASTER_PROMPT.md`. The current
 visual target is translucent frosted glass, not “Material 3 only”. Old handoff
 restrictions and old branch/commit snapshots are historical unless the current
-active task explicitly adopts them. The native KMP app, static `website/`
-marketing site, and experimental `app-web/` mirror are separate products/surfaces.
+active task explicitly adopts them. The native KMP app and the `app-web/`
+browser client are one product with one design system; the static `website/` is
+that product's front door and renders the same shell and tokens (ADR-008
+amendment 2026-10-16). What a browser cannot be promised — that YouTube answers a
+cross-origin request from a static page — is said on screen, not hidden.
 
 Destructive operations must expose pending/success/failure and must not dismiss
 confirmation or clear selection before success. GitHub Pages internal links must

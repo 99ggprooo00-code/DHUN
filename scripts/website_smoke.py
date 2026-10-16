@@ -107,13 +107,14 @@ def page_problems(route: str, status: int, markup: str) -> list[str]:
     return problems
 
 
-# The web mirror deploys at /app/ under the same origin (ADR-008 amendment,
+# The web app deploys at /app/ under the same origin (ADR-008 amendment,
 # 2026-10-09 (2)). It is not a marketing route — noindex, out of the sitemap —
 # so the marketing honesty contract does not bind its copy; its own contract
-# (engineering-preview and sample-data notices) is asserted against the source
-# by scripts/test_app_web.py. What the *served* bytes must still show: the
-# page is the application shell, it stays unindexable, its CSP is intact and
-# the bytes the page depends on are actually there.
+# (real playback attempted, failures surfaced as states, the demo catalogue
+# labelled and last) is asserted against the source by scripts/test_app_web.py.
+# What the *served* bytes must still show: the page is the application shell, it
+# stays unindexable, its CSP is intact and the bytes the page depends on are
+# actually there.
 APP_ROUTE = "/app/"
 APP_ASSETS = ("js/main.js", "css/tokens.css", "css/app.css")
 
@@ -126,12 +127,12 @@ def app_problems(status: int, markup: str) -> list[str]:
     problems: list[str] = []
     if '<meta name="robots" content="noindex' not in markup:
         problems.append(
-            f"{APP_ROUTE}: no longer noindex — the mirror is a preview, not a product surface"
+            f"{APP_ROUTE}: no longer noindex — the web app stays out of the index, the sitemap is the site's"
         )
     if "default-src 'none'" not in markup:
         problems.append(f"{APP_ROUTE}: the strict CSP is missing from the served page")
     if '<div id="app">' not in markup:
-        problems.append(f"{APP_ROUTE}: the application mount point is missing — not the mirror")
+        problems.append(f"{APP_ROUTE}: the application mount point is missing — not the app shell")
     return problems
 
 
@@ -223,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"OK: {len(ROUTES)} served route(s) carry the three required caveats, "
         f"trip no forbidden-claim rule, every internal link resolves, "
-        f"and the mirror at {APP_ROUTE} serves the application shell with its CSP intact."
+        f"and the web app at {APP_ROUTE} serves the application shell with its CSP intact."
     )
     return 0
 

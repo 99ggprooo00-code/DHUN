@@ -76,13 +76,16 @@ Evidence: live `gh` API reads, public-download attempts, CI annotations, source 
   honesty notice, no unhandled errors, no overflow). A human has not looked at
   it; the full-page captures are CI artifacts (`browser-evidence`), never
   committed, because the repository still contains no image files on purpose.
-- **Audio playback from the deployed origin remains unproven.** B1's finding
-  is unchanged: no stream is reachable from a browser origin, so the transport
-  advances a labelled clock and the page says it makes no sound. Publishing
-  the mirror changed where the preview is seen, not what it proves. ADR-008
-  boundary 4 (no Web-support claim before proof) is enforced by the page's own
-  notice, by `scripts/test_app_web.py` on the source, and now by the served
-  check on the bytes a visitor gets.
+- **Audio playback from the deployed origin remains unproven — restated
+  2026-10-16.** The web app now *attempts* real playback (anonymous InnerTube
+  `player`, or an endpoint the user configures) and surfaces a refusal instead of
+  hiding it, and the labelled clock is gone. What is still true: no author can
+  make YouTube's origin answer a cross-origin request from a static page, no
+  browser in the build environment can play a note, and no claim that browser
+  playback works appears on the site or in the app. ADR-008 boundary 4 is
+  enforced by the app's own failure states, by `scripts/test_app_web.py` on the
+  source, and by the served check on the bytes a visitor gets. The native
+  Android/Windows builds remain the supported players.
 - **The served check of `/app/` is shape-only.** It asserts the shell, the
   `noindex`, the strict CSP, and that the module and stylesheets return 200 —
   it does not execute the application (the `served` job has no JS engine).
@@ -2051,7 +2054,7 @@ The build now drops every CSS rule a route cannot match
   reports its own failure verbatim; while it fails, a permanent on-screen notice
   says the data is a sample.
 - **Layout, paint, touch and pointer input are unverified.** No browser exists in
-  this environment and no browser binary can be fetched. `tests/boot.test.mjs`
+  this environment and no browser binary can be fetched. The `app-web` node suites
   drives `boot()` against a hand-written DOM stub: it proves the module graph
   loads, the first render produces the app's real markup, and the player state
   machine works. It cannot see a pixel, a hover, a focus ring or a scroll.

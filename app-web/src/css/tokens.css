@@ -62,6 +62,12 @@
   --dhun-tracking-brand: 3px;
   --dhun-tracking-compact-letter-spacing: 1px;
 
+  /* -- Mono stack (legal pages and the endpoint contract print code) --
+     The app itself ships no monospace role: nothing in its UI shows code. The
+     web build does, in two places, so the stack is a token rather than a
+     literal in app.css. */
+  --dhun-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
   /* -- Shape scale (DhunShapes) -- */
   --dhun-shape-extra-small: 4px;
   --dhun-shape-small: 8px;

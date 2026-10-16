@@ -1,5 +1,11 @@
 # 30 — The deployed base path, and the interface mirror at `/app/`
 
+> **Superseded in part, 2026-10-16.** The deployment facts below are unchanged
+> (`/app/` is still published by the site workflow at the project site's base
+> path). What changed is what is deployed and how it is described: see the
+> ADR-008 amendment of 2026-10-16. Byte sizes in this record are those of its
+> own date.
+
 Session `arena/90cb6d2c-dhun`, 2026-10-09. Branch point and GitHub `main` at
 boot `8b35dcf1c9a6808ed6720ff44179d72bf4e2cc96` (PR #145 merge).
 

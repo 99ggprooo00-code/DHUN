@@ -22,6 +22,55 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The site rebuilt as the app's shell, and the web app made a web app (2026-10-16, session `arena/dda0fee4-dhun`)
+
+- **Changed: the marketing site renders the application's own shell.** The
+  generic marketing header is gone: every route now carries a glass app bar, one
+  navigation element that is the app's bottom navigation below 840 px and a rail
+  above it, a docked bar into `/app/` where the app keeps its mini-player, and
+  the app's cards, chips, buttons and caveat frames. Dark first, light optional,
+  and the app's six accent ramps are offered as CSS-only radio groups — the site
+  still ships **zero client-side JavaScript**, which its gate asserts.
+- **Changed: the site's design system is generated, not retyped.**
+  `website/css/tokens.css` is written by `website/tools/sync-tokens.mjs` from
+  `app-web/src/css/tokens.css` (itself the mirror of `DhunAppearance.kt`,
+  `DhunShapes.kt`, `DhunTypography.kt`, `DhunSpacing.kt`). Every declaration names
+  the `--dhun-*` property it came from; every colour carries both schemes in one
+  `light-dark()` pair, preceded by the app's dark value written out plainly. That
+  leading line is documentation, not a fallback — a custom property keeps the
+  later declaration whatever tokens it holds — so the sheet states its floor:
+  `light-dark()` needs Chrome/Edge 123, Firefox 120 or Safari 17.5, and the
+  appearance control already needs `:has()`. `npm run build`
+  regenerates it, so a stale sheet cannot be committed, and the new
+  `design_system_violations` rule in `scripts/website_quality.py` re-derives the
+  comparison in Python only (no Node on the CI runner).
+- **Changed: `/app/` is the web app, not an interface preview.** It installs from
+  the browser (manifest + service worker), opens offline once loaded, keeps its
+  library in browser storage, routes with hash deep links, answers the keyboard,
+  drives the media session, reconciles state across tabs, and has a
+  media-query-driven responsive shell.
+- **Removed: the device-only surfaces.** The Downloads tab, its panes and the
+  cache-budget setting are gone rather than rendered empty — a browser has no
+  equivalent of ADR-006's device-side store. The Library is playlists, likes and
+  history.
+- **Added: real stream resolution, with the failures on screen.** The web app
+  attempts the anonymous InnerTube `player` endpoint and accepts an endpoint the
+  *user* configures in Settings; a CORS refusal, an HTTP error or a dead stream
+  becomes a state on the row that could not resolve. The labelled fictional
+  catalogue is the last resort, never a silent substitute. No DHUN backend and no
+  DHUN proxy exist (ADR-008 boundary 1), and no claim that browser playback is
+  proven is made anywhere (boundary 4) — the native builds remain the supported
+  players.
+- **Fixed (docs):** the web app is no longer described as a preview, a mirror or
+  a demo in `README.md`, `app-web/README.md`, `docs/INSTALL.md`, `docs/TRD.md`,
+  `docs/PRD.md`, `docs/app-flow.md`, `docs/implementation-plan.md`,
+  `docs/ui-ux-design.md`, `.ai/{AUTONOMY_PROMPT,README,MASTER_PROMPT,ROADMAP,KNOWN_LIMITATIONS,HANDOFF_NEXT_SESSION,WEBSITE_PLAN}.md` and `legal/privacy.md`;
+  the ADR-008 amendment of 2026-10-16 records the decision and the older
+  verification records carry a superseded note instead of being rewritten.
+- **Not claimed:** playback from the deployed origin, and the site's rendered
+  pixels — no browser binary exists in this environment. Both are the site
+  workflow's browser job and a human's eyes.
+
 ### Repository cleanup and release hygiene (2026-10-10)
 
 - **Changed:** the manual `publish` job deletes the legacy `dev`, `dev-v0.1.0` and `dev-v0.1.1` releases only when the new `purge_legacy_dev_releases` input is ticked (default off). The rolling `test` draft replacement is unchanged.

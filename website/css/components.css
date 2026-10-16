@@ -5,8 +5,8 @@
 }
 .stats li {
   margin: 0; padding: var(--sp-5) var(--sp-4); text-align: center;
-  background: var(--surface); border: 1px solid var(--hairline);
-  border-radius: var(--r-lg);
+  background: var(--glass); border: 1px solid var(--hairline);
+  border-radius: var(--r-xl);
 }
 .stat-value {
   display: block; font-size: clamp(1.5rem, 4vw, 2.1rem);
@@ -36,10 +36,18 @@
   align-items: center; padding: var(--sp-8) 0;
   border-top: 1px solid var(--hairline);
 }
+/* The app separates its sections with a hairline and a header row rather than
+   with whitespace alone; the site's feature blocks do the same. */
+.feature-body h2,
+.feature-body h3 { letter-spacing: -0.005em; }
 .feature-body p { color: var(--text-2); }
 .feature-points { margin: 0; padding-left: 1.1em; color: var(--text-2); font-size: 0.95rem; }
 .feature-points li::marker { color: var(--accent); }
 .feature-visual { display: grid; place-items: center; }
+
+/* A trailing glyph on a link that leaves the site. Used by the page CTAs as
+   well as the navigation, so it lives with the components. */
+.ext { font-size: 0.85em; opacity: 0.85; }
 
 /* ---------------------------------------------------------------- cards -- */
 .card {
@@ -62,8 +70,14 @@
 .risk h2 { color: var(--text); }
 .risk p { color: var(--text-2); }
 .risk .risk-flag { color: var(--warning); font-weight: 700; }
+/* The app marks a caveat with its warning colour on a hairline frame, not with a
+   coloured bar: the frame survives Windows High Contrast, a border-left colour
+   does not. */
 .notice {
-  border-left: 3px solid var(--accent); padding-left: var(--sp-4);
+  border: 1px solid var(--warning);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--glass);
   color: var(--text-2); font-size: 0.95rem;
 }
 

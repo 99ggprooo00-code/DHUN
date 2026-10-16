@@ -1,9 +1,9 @@
 ---
 layout: base.njk
-title: "DHUN's interface — real device captures, design tokens, and live /app/ preview"
+title: "DHUN's interface — real device captures, design tokens, and the live web app"
 ogTitle: "The DHUN interface"
-description: "DHUN's Android and Windows screens captured on real hardware alongside the shared design system tokens and direct deep links into the working /app/ preview."
-cssModules: ["tokens", "base", "components", "mockups", "ui"]
+description: "DHUN's Android and Windows screens captured on real hardware alongside the shared design system tokens and direct deep links into the running web app."
+cssModules: ["tokens", "base", "shell", "components", "mockups", "ui"]
 ---
 <div class="wrap">
   <section class="hero" aria-labelledby="ui-title">
@@ -28,36 +28,54 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
     </div>
 
     <h3 class="sub-title">Colour</h3>
+    <!--{{ designTokens.source }}-->
     <ul class="swatches">
-      {%- for color in site.ui.tokens.colors %}
+      {%- for color in designTokens.colours %}
       <li class="swatch">
-        <span class="swatch-chip" style="background: {{ color.value }}" aria-hidden="true"></span>
+        <span class="swatch-chip" style="background: var({{ color.alias }}, {{ color.dark }})" aria-hidden="true"></span>
         <span class="swatch-name">{{ color.name }}</span>
-        <span class="swatch-value">{{ color.value }}</span>
+        <span class="swatch-value">{{ color.dark }}{% if color.light != color.dark %} · light {{ color.light }}{% endif %}</span>
         <span class="swatch-use">{{ color.use }}</span>
+      </li>
+      {%- endfor %}
+    </ul>
+
+    <h3 class="sub-title">The six accent ramps</h3>
+    <p class="lede">
+      The app ships one accent at a time, chosen in Settings. The site's appearance control
+      in the footer offers the same six, and both are painted from
+      <code>{{ designTokens.file }}</code>.
+    </p>
+    <ul class="swatches">
+      {%- for ramp in designTokens.ramps %}
+      <li class="swatch">
+        <span class="swatch-chip" style="background: var({{ ramp.alias }}, {{ ramp.dark }})" aria-hidden="true"></span>
+        <span class="swatch-name">{{ ramp.name }}</span>
+        <span class="swatch-value">{{ ramp.dark }} · light {{ ramp.light }}</span>
+        <span class="swatch-use">accent ramp</span>
       </li>
       {%- endfor %}
     </ul>
 
     <h3 class="sub-title">Shape and spacing</h3>
     <ul class="scales">
-      {%- for shape in site.ui.tokens.shapes %}
+      {%- for shape in designTokens.shapes %}
       <li class="scale"><span class="scale-bar" style="border-radius: {{ shape.value }}; width: {{ shape.value }}"></span><span class="scale-name">{{ shape.name }}</span><span class="scale-value">{{ shape.value }}</span></li>
       {%- endfor %}
     </ul>
     <ul class="scales scales--spacing">
-      {%- for step in site.ui.tokens.spacing %}
-      <li class="scale"><span class="scale-bar" style="width: {{ step.value }}px"></span><span class="scale-name">{{ step.name }}</span><span class="scale-value">{{ step.value }}</span></li>
+      {%- for step in designTokens.spacing %}
+      <li class="scale"><span class="scale-bar" style="width: {{ step.value }}"></span><span class="scale-name">{{ step.name }}</span><span class="scale-value">{{ step.value }}</span></li>
       {%- endfor %}
     </ul>
 
     <h3 class="sub-title">Type ramp</h3>
     <ul class="type-ramp">
-      {%- for type in site.ui.tokens.type %}
+      {%- for type in designTokens.type %}
       <li><span class="type-name">{{ type.name }}</span><span class="type-value">{{ type.value }}</span></li>
       {%- endfor %}
     </ul>
-    <p class="notice">{{ site.ui.tokens.target }}</p>
+    <p class="notice">{{ designTokens.target }}</p>
   </section>
 </div>
 
@@ -68,7 +86,7 @@ cssModules: ["tokens", "base", "components", "mockups", "ui"]
     <p class="lede">
       Each walkthrough card below pairs a real Android phone or Windows
       desktop screenshot with the Kotlin source path that builds it and a
-      direct link into that exact screen in the live /app/ preview.
+      direct link into that exact screen in the live app.
     </p>
     <!-- Each surface below is its own <section> with its own citation; listing
          them here rather than nesting them keeps one citation per section.

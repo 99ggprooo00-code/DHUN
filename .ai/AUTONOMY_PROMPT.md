@@ -38,48 +38,58 @@ every checkpoint and append one line to `.ai/AUTONOMY_LOG.md`:
 
 ## 1. The mission
 
-**The actual web version of the app: DHUN, in a browser, looking and behaving
-like the app.** Not a marketing page, not a mockup, not a demo shell.
+**DHUN in a browser, as a web app.** Not a marketing page, not a mockup, not an
+interface demo: `/app/` is the DHUN web app, and the marketing site is its
+shell — the same design system, the same chrome, one product.
 
 **"As it is on the app" is literal.** The Compose source is the specification:
 
 - Every screen, control, label, order and interaction the app has, the web has.
 - The same colours, type, radii, spacing, icons and motion — read out of the
-  app's token files, never invented and never "improved".
-- Nothing added that the app does not have.
-- Where a browser has no equivalent (system tray, SMTC, jump lists, widgets,
-  offline downloads, Media Session), the feature is **omitted and written down**
-  in the B3 table — never faked.
+  app's token files, never invented and never "improved". The site's sheet is
+  *generated* from the app's (`website/tools/sync-tokens.mjs`), so it cannot
+  drift quietly.
+- Nothing added that the app does not have — and, in the other direction,
+  nothing the browser cannot honestly offer. Device-install affordances the web
+  has no equivalent for (offline downloads, the cache budget) are **removed**,
+  not stubbed; features a web app *does* need (persistence across reloads,
+  installable/offline shell, deep links, keyboard and desktop ergonomics, media
+  session, honest failure states) are expected to be present and working.
 
 ### What already exists (read before you build anything)
 
-Session `arena/967513fd-dhun` shipped `app-web/`, a dependency-free ES-module
-client. **Do not rebuild it from zero; extend it.**
+`app-web/` is a dependency-free ES-module client — **extend it, do not rebuild
+it from zero**, and keep the dependency-free property.
 
 ```bash
-app-web/src/css/tokens.css       # mirrors design/Dhun{Appearance,Typography,Shapes,Spacing,Animations}
+app-web/src/css/tokens.css       # the mirror of design/Dhun{Appearance,Typography,Shapes,Spacing,Animations}
 app-web/src/css/app.css          # shell, screens, players — token-only, no raw hex/px
-app-web/src/js/{nav,store,catalog,player,player-ui,equalizer,lyrics,format,views,main}.js
+app-web/src/js/                  # nav, store, router, audio, source, storage, shortcuts, pwa,
+                                 #   tabsync, mediasession, player, player-ui, equalizer, lyrics, format, views, main
 app-web/src/js/icons.js          # GENERATED from design/DhunIcons.kt — npm run gen:icons
 app-web/tools/{serve,build,gen-icons}.mjs
-app-web/tests/*.test.mjs         # 60 tests: nav, equalizer, lyrics, format, tokens, player, boot
-scripts/test_app_web.py          # 23 assertions, runs in app CI step 1 without Node
+app-web/tests/*.test.mjs         # node --test: shell, shortcuts, views, actions, modules, tokens, format, player
+scripts/test_app_web.py          # the same rules without Node, in app CI step 1
 ```
 
-Mirrored so far: shell (Home/Search/Library, detail stack, two-pane ≥ 840),
-Home, Search, Library (Playlists/Downloads/History), artist/album/playlist
-pages, Settings (appearance, cache budget, resume on launch), mini + full
-player, queue, repeat/shuffle, LRC parsing and sync, the 18 VLC EQ presets.
-Verified: `npm test` (60), `node tools/build.mjs`, `gen-icons --check`.
+Implemented: the shell (Home / Search / Library, detail stack, bottom navigation
+below the app's 840 px breakpoint and a rail above it), Home, Search, Library
+(Playlists, Likes, History — no Downloads), artist/album/playlist pages,
+Settings (appearance, resume, a user-configured stream endpoint), mini + full
+player, queue, repeat/shuffle, LRC parsing and sync, the 18 VLC EQ presets, a
+hash router with deep links, cross-tab state reconciliation, a service worker +
+manifest, and a media session.
 
-**Not done, and honest about it:** no audio (the transport runs a labelled
-clock and the page says so), no live catalogue (a fictional sample catalogue is
-bundled and labelled), no browser verification of layout or paint, and
-`app-web/` is **not deployed** to Pages.
+**How playback is handled, honestly:** the app *tries* the anonymous InnerTube
+`player` endpoint (and an endpoint the user configures in Settings), and every
+failure — CORS refusal, HTTP error, dead stream — becomes a state on screen with
+its reason. There is no DHUN proxy and no DHUN backend (ADR-008 boundary 1), no
+attestation in browser code, and no claim that browser playback works. The
+labelled fictional catalogue is the **last resort**, never a silent substitute.
 
-Your job is whatever moves that forward: real playback evidence, deployment,
-InnerTube search, the missing screens, or the marketing site — pick by
-§3 and record the choice.
+Your job is whatever moves that forward: fidelity sweeps against the Compose
+files, further InnerTube signal, the missing screens, or the marketing site —
+pick by §3 and record the choice.
 
 ## 2. The ADR that governs the mission
 
@@ -96,8 +106,11 @@ Boundaries that survive every decision:
    visitor credentials, PO tokens, BotGuard, secrets.
 3. **No extraction or probe changes.** `shared/`, the resolver chain and
    `tools/playback-probe` stay untouched.
-4. **No Web-support claim before proof.** The web app ships `noindex`, unlinked
-   from the marketing site, and labelled a preview.
+4. **No Web-support claim before proof.** The web app ships `noindex` and out of
+   the sitemap, and nothing — site, README, docs or app copy — may claim that
+   browser playback is proven, that it works in any browser, or that audio is
+   available offline. Naming the web app, and linking it from the site, is
+   allowed and is now the point.
 5. **Gates stay separate.** A working web build closes no Android/Windows gate.
 6. **GPL-3.0 is non-negotiable**; every dependency gets a licence line in
    `THIRD_PARTY.md`.
@@ -144,8 +157,10 @@ needs them:
    `app-web/src/js/catalog.js`, with its own tests.
 4. **Fidelity sweep** — put each web screen beside its Compose file and close
    the remaining differences.
-5. **Marketing-site improvements** — responsive, performance, accessibility,
-   without breaching its 29 quality checks or its byte-accurate `dist/`.
+5. **Site work** — the site is the app's shell: keep it inside
+   `scripts/website_quality.py` (31 checks, including `design_system_violations`)
+   and `scripts/website_claims.py`, keep its byte-accurate `dist/` and its zero
+   client-side JavaScript, and keep `website/css/tokens.css` generated.
 
 **P2 — quality gate.** One more assertion per gap closed. Every new check gets
 a mutation proof: make it fail on purpose once and watch it go red.

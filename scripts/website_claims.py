@@ -9,7 +9,8 @@ and their sources are in `.ai/WEBSITE_PLAN.md` Part A §4.
 Three checks:
 
 1. `check_forbidden_claims` — the built pages must not claim a platform or a
-   capability DHUN does not ship (iOS, a web player, cross-device sync, library
+   capability DHUN does not ship (iOS, unqualified browser playback, cross-device
+   sync, library
    import, FLAC/lossless, any audio bitrate, any store channel, and so on).
    A mention is allowed only inside a clause that negates it, which is how the
    "not in DHUN" list can name them honestly.
@@ -49,10 +50,20 @@ ROUTES = {
 FORBIDDEN_TERMS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("Apple/iOS platform", re.compile(r"\b(iOS|iPadOS|iPhone|iPad|App Store)\b", re.I)),
     (
-        "web player / browser client",
+        # The browser client now ships (`app-web/src`: a service worker, a
+        # manifest, keyboard shortcuts, an endpoint setting), so naming it is no
+        # longer a forbidden claim — what stays forbidden is promising more than
+        # a browser can be promised. Playback depends on YouTube's origin
+        # answering a cross-origin request from a static page, which no author
+        # controls; offline audio is Android/Windows-only (ADR-006) and the web
+        # app does not download it. Evidence for what does ship:
+        # `scripts/test_app_web.py` (`DoesNotSellWhatABrowserCannotDo`,
+        # `IsARealWebAppNotAPreview`).
+        "a browser promise DHUN cannot keep",
         re.compile(
-            r"\b(web ?player|browser (client|player)|progressive web app|PWA|"
-            r"web app|in your browser|play in the browser)\b",
+            r"\b(plays in (any|every) browser|works in (any|every) browser|"
+            r"guaranteed playback|offline playback|"
+            r"downloads? (songs|tracks|music) in your browser)\b",
             re.I,
         ),
     ),

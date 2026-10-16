@@ -33,10 +33,31 @@ export default {
     "DHUN is a free, open-source YouTube Music client for Android and Windows. No sign-in, no cookies, no ads, no telemetry — and downloads that stay on your device.",
   ogType: "website",
 
+  // The navigation the shell renders. Three destinations and one external link,
+  // each carrying the icon its label draws — the same geometry the app's own
+  // navigation uses for Home, Search and Library (see website/eleventy.config.js).
   nav: [
-    { href: "/features/", label: "Features" },
-    { href: "/ui/", label: "Interface" },
-    { href: REPO, label: "Source", external: true },
+    { href: "/features/", label: "Features", icon: "check" },
+    { href: "/ui/", label: "Interface", icon: "widget" },
+    { href: REPO, label: "Source", icon: "external", external: true },
+  ],
+
+  // The app's six accent ramps, in the app's order, offered by the appearance
+  // control in the footer. The colours come from css/tokens.css (generated from
+  // the app's token file); these are the names.
+  // Where the appearance control's two choices come from. Cited in the emitted
+  // HTML so the claim-traceability rule (`scripts/website_quality.py`) can follow
+  // it: the ramps and the theme names are the app's, read out of its token file
+  // by website/tools/sync-tokens.mjs.
+  appearanceSource:
+    "app-web/src/css/tokens.css (generated from DhunAppearance.kt by website/tools/sync-tokens.mjs); website/css/shell.css",
+  accents: [
+    { id: "brand", label: "Brand", default: true },
+    { id: "azure", label: "Azure" },
+    { id: "jade", label: "Jade" },
+    { id: "amber", label: "Amber" },
+    { id: "rose", label: "Rose" },
+    { id: "cyan", label: "Cyan" },
   ],
 
   // Badge row. Each is a fact, not a slogan.
@@ -51,12 +72,12 @@ export default {
   lead:
     "DHUN plays YouTube Music on Android and Windows through its own tokenless extraction chain. There is no sign-in to create, no cookie to hand over, and no PO token to solve — and what you save for offline listening stays on your device.",
   leadSource: "ADR-001 (extraction engine), ADR-003 (staged identity chain), ADR-006 (offline downloads)",
-  ctaPrimary: { href: "/app/", label: "Try the live /app/ interface" },
+  ctaPrimary: { href: "/app/", label: "Open the web app" },
   ctaSecondary: { href: REPO, label: "Source on GitHub", external: true },
   ctaNote:
-    "The interface runs live at /app/ from this site — the app's own screens, navigation, equaliser, lyrics and legal pages, with sample data where the live catalogue is unreachable. Audio playback from this static origin is unproven, and the preview states that boundary.",
+    "DHUN's web app runs at /app/ — the same shell, navigation, keyboard shortcuts, equaliser, synced lyrics and legal pages as the Android and Windows builds, installed from this page by your browser and usable offline once it has loaded. It talks to YouTube Music directly from your browser, so a refusal by that origin is shown on screen rather than hidden.",
   ctaNoteSource:
-    "ADR-008 amendment 2026-10-09 (2) (deployment); docs/verification/29-web-app-mirror.md (labelled clock, sample catalogue)",
+    "ADR-008 amendment 2026-10-09 (2) (deployment); app-web/src (service worker, keyboard shortcuts, endpoint setting)",
 
   // Verified real device captures (`website/src/assets/screenshots/*.webp`),
   // mapped 1-to-1 to `.ai/WEBSITE_PLAN.md` Part A §9 and deep-linked into `/app/`.
@@ -74,7 +95,7 @@ export default {
       caption:
         "Home screen with mood filter chips, Recommended songs, Listen again, docked mini-player, and three-tab navigation.",
       appHref: "/app/",
-      appLabel: "Open Home in /app/ preview",
+      appLabel: "Open Home in the app",
     },
     "player-phone": {
       id: "mock-player-phone",
@@ -89,7 +110,7 @@ export default {
       caption:
         "Full-screen player sheet with blurred artwork backdrop, seek scrubber, shuffle, previous, play, next, and repeat transport, and queue and lyrics actions.",
       appHref: "/app/#/player",
-      appLabel: "Open Full player in /app/ preview",
+      appLabel: "Open Full player in the app",
     },
     "lyrics-phone": {
       id: "mock-lyrics",
@@ -104,7 +125,7 @@ export default {
       caption:
         "Synced lyrics overlay inside the full player with active CC toggle and timestamped Devanagari lines.",
       appHref: "/app/#/player/lyrics",
-      appLabel: "Open Synced lyrics in /app/ preview",
+      appLabel: "Open Synced lyrics in the app",
     },
     "queue-phone": {
       id: "mock-queue-phone",
@@ -119,7 +140,7 @@ export default {
       caption:
         "Up next queue and Related sheet inside the full player with drag-to-reorder handles and active track indicator.",
       appHref: "/app/#/player/queue",
-      appLabel: "Open Up next queue in /app/ preview",
+      appLabel: "Open Up next queue in the app",
     },
     "search-phone": {
       id: "mock-search-phone",
@@ -134,7 +155,7 @@ export default {
       caption:
         "Search screen with YouTube Music query bar and filter chips for All, Songs, Artists, Albums, Playlists, and Videos.",
       appHref: "/app/#/search",
-      appLabel: "Open Search in /app/ preview",
+      appLabel: "Open Search in the app",
     },
     "playlists-phone": {
       id: "mock-playlists-phone",
@@ -149,7 +170,7 @@ export default {
       caption:
         "Library Playlists tab with the pinned Liked Songs folder, custom playlists, and New playlist action.",
       appHref: "/app/#/library/playlists",
-      appLabel: "Open Playlists in /app/ preview",
+      appLabel: "Open Playlists in the app",
     },
     "downloads-phone": {
       id: "mock-downloads-phone",
@@ -164,7 +185,7 @@ export default {
       caption:
         "Library Downloads tab showing device storage usage bar, Clear all control, and offline track management.",
       appHref: "/app/#/library/downloads",
-      appLabel: "Open Downloads in /app/ preview",
+      appLabel: "Open Downloads in the app",
     },
     "history-phone": {
       id: "mock-history-phone",
@@ -179,7 +200,7 @@ export default {
       caption:
         "Library History tab with chronological Today play entries and confirmation-backed Clear all control.",
       appHref: "/app/#/library/history",
-      appLabel: "Open History in /app/ preview",
+      appLabel: "Open History in the app",
     },
     "settings-phone": {
       id: "mock-settings-phone",
@@ -194,7 +215,7 @@ export default {
       caption:
         "Settings & Equalizer with Dark and Light modes, six accent palettes, cache cap, About & Legal entry, presets, preamp, and 5-band sliders.",
       appHref: "/app/#/settings",
-      appLabel: "Open Settings in /app/ preview",
+      appLabel: "Open Settings in the app",
     },
     "desktop-window": {
       id: "mock-desktop-window",
@@ -209,13 +230,13 @@ export default {
       caption:
         "Windows desktop window (Compose Multiplatform JVM) with wide four-column grids and bottom mini-player with volume slider.",
       appHref: "/app/#/home",
-      appLabel: "Open Desktop layout in /app/ preview",
+      appLabel: "Open Desktop layout in the app",
     },
   },
 
   // Live /app/ centerpiece showcase on the front page.
   appShowcase: {
-    kicker: "WORKING INTERFACE PREVIEW",
+    kicker: "THE WEB APP ITSELF",
     title: "Click through the real interface at /app/ before installing anything.",
     lede:
       "Alongside the Android and Windows captures on this site, the shipped interface runs at /app/ with the same design tokens, navigation state machine, 10-band equaliser curves, synced lyrics parser, and About & Legal pages. Pick any destination below to jump straight into that screen.",
@@ -377,7 +398,7 @@ export default {
   closing: {
     title: "Read it, try /app/, or build it yourself.",
     body:
-      "The whole project is GPL-3.0 source. You can inspect every screen in the live /app/ preview right now, or view the public pre-release and its warnings on GitHub Releases. If a claim on this site is wrong, the honesty tests in the repository fail the build — and you can check them.",
+      "The whole project is GPL-3.0 source. You can inspect every screen in the live app right now, or view the public pre-release and its warnings on GitHub Releases. If a claim on this site is wrong, the honesty tests in the repository fail the build — and you can check them.",
     source: "scripts/test_website_claims.py",
   },
 
@@ -385,7 +406,7 @@ export default {
   ui: {
     h1: "Real captures, shared tokens, and the live /app/ interface.",
     lead:
-      "DHUN's screens are built from one Compose design system — the same colour tokens, shapes, spacing scale and type ramp on Android and Windows. Below are ten real captures from Android phone and Windows desktop builds alongside direct deep links into the working /app/ preview and the token values compiled into the app.",
+      "DHUN's screens are built from one Compose design system — the same colour tokens, shapes, spacing scale and type ramp on Android and Windows. Below are ten real captures from Android phone and Windows desktop builds alongside direct deep links into the running app and the token values compiled into the app.",
     source:
       "shared/src/commonMain/kotlin/dev/dhun/design/ (DhunAppearance, DhunShapes, DhunSpacing, DhunTypography) and .../ui/ (home, search, browse, library, player, settings, legal)",
     whyNoShots: {
@@ -539,50 +560,13 @@ export default {
     tokens: {
       title: "The design system behind every screen",
       lead:
-        "These are the values the app compiles with, not a palette invented for a website. The dark set is the default; the light scheme mirrors it, and the site uses the same two schemes so every page matches the shipped app.",
-      source: "shared/.../design/DhunAppearance.kt, DhunShapes.kt, DhunSpacing.kt, DhunTypography.kt",
-      colors: [
-        { name: "background", value: "#161616", use: "app canvas" },
-        { name: "surface", value: "#1E1E1E", use: "cards, sheets" },
-        { name: "surfaceVariant", value: "#262626", use: "raised rows" },
-        { name: "surfaceElevated", value: "#303030", use: "dialogs" },
-        { name: "surfaceHighest", value: "#363636", use: "controls on top" },
-        { name: "accent", value: "#BB86FC", use: "brand ramp, dark" },
-        { name: "accentContainer", value: "#3A2A5A", use: "selected states" },
-        { name: "warning", value: "#FFB74D", use: "gates, warnings" },
-      ],
-      shapes: [
-        { name: "xs", value: "4 px" },
-        { name: "sm", value: "8 px" },
-        { name: "md", value: "12 px" },
-        { name: "lg", value: "16 px" },
-        { name: "xl", value: "28 px" },
-        { name: "xxl", value: "32 px" },
-        { name: "full", value: "999 px" },
-      ],
-      spacing: [
-        { name: "sp-1", value: 4 },
-        { name: "sp-2", value: 8 },
-        { name: "sp-3", value: 12 },
-        { name: "sp-4", value: 16 },
-        { name: "sp-5", value: 20 },
-        { name: "sp-6", value: 24 },
-        { name: "sp-8", value: 32 },
-        { name: "sp-12", value: 48 },
-      ],
-      type: [
-        { name: "display", value: "57 / 45 / 36" },
-        { name: "headline", value: "32 / 28 / 24" },
-        { name: "title", value: "22 / 16 / 14" },
-        { name: "body", value: "16 / 14 / 12" },
-        { name: "brand", value: "12 sp, 3 sp tracking" },
-      ],
-      target: "Touch targets: 44 dp minimum, 48 dp in lists",
+        "These are the values the app compiles with, not a palette invented for a website. The table below is read out of the app's token file when this page is built, so a ramp the app changes is a ramp this page changes; the dark set is the default and the light scheme is shown beside it.",
+      source: "app-web/src/css/tokens.css (from shared/.../design/DhunAppearance.kt, DhunShapes.kt, DhunSpacing.kt, DhunTypography.kt)",
     },
     contract: {
       title: "Every screenshot on this site, its provenance, and its live /app/ route",
       body:
-        "Every figure on this site is a real capture from an Android phone or Windows desktop running DHUN, converted to metadata-stripped WebP and paired with a deep link into the live /app/ preview.",
+        "Every figure on this site is a real capture from an Android phone or Windows desktop running DHUN, converted to metadata-stripped WebP and paired with a deep link into the live app.",
       rows: [
         { id: "mock-home-phone", surface: "Android Home, portrait (android-home-portrait.webp)", page: "/, /ui/" },
         { id: "mock-player-phone", surface: "Android FullPlayer (android-full-player.webp)", page: "/, /ui/" },

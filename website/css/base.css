@@ -15,6 +15,20 @@ body {
   overflow-x: hidden;
 }
 
+/* The navigation and the docked bar are fixed to the bottom edge on a phone
+   (`css/shell.css`), so the page reserves their height: content that ran under
+   them would be content a visitor cannot read or reach. 56px nav + 68px dock +
+   the safe area is the tallest the two get. */
+body {
+  padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 840px) {
+  body {
+    padding-bottom: var(--sp-8);
+  }
+}
+
 img, svg { max-width: 100%; }
 
 /* Inline icon geometry (the markup only carries class + viewBox). */
@@ -64,59 +78,6 @@ hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--sp-8) 0; }
 }
 .skip-link:focus { top: var(--sp-4); }
 
-/* ---------------------------------------------------------------- header -- */
-.site-header {
-  position: sticky; top: 0; z-index: 20;
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--hairline);
-}
-.header-inner {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--sp-4); min-height: 64px; flex-wrap: wrap;
-}
-.wordmark {
-  display: inline-flex; align-items: center; gap: var(--sp-2);
-  /* Browser-measured: the wordmark link was 90.9x28, under the 44px target
-     floor. The header row keeps its height; the hit area grows to the token. */
-  min-height: var(--target);
-  color: var(--text); text-decoration: none; font-weight: 700;
-  letter-spacing: 0.18em; font-size: 0.85rem;
-}
-.wordmark-mark {
-  display: grid; place-items: center; width: 28px; height: 28px;
-  border-radius: var(--r-full); background: var(--accent); color: var(--on-accent);
-  font-size: 0.9rem;
-}
-.site-nav ul {
-  display: flex; align-items: center; gap: var(--sp-1);
-  margin: 0; padding: 0; list-style: none; flex-wrap: wrap;
-}
-.site-nav a {
-  display: inline-flex; align-items: center; gap: 0.3em;
-  min-height: var(--target); padding: 0 var(--sp-3);
-  color: var(--text-2); text-decoration: none; font-size: 0.95rem;
-  border-radius: var(--r-full);
-}
-.site-nav a:hover { color: var(--text); background: var(--surface-variant); }
-/* The page the visitor is on, marked twice over: a filled pill for mouse and
-   sighted keyboard users, and an underline that survives Windows High Contrast
-   — where the engine drops the background but keeps text decoration. Asserted by
-   `navigation_state_violations` (scripts/website_quality.py) and measured in a
-   real browser, including in forced colours, by website/tests/browser.mjs. */
-.site-nav a[aria-current="page"] {
-  color: var(--text); background: var(--surface-variant);
-}
-.site-nav a[aria-current="page"],
-.wordmark[aria-current="page"] {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-decoration-color: var(--accent);
-  text-underline-offset: 0.35em;
-}
-.ext { font-size: 0.8em; opacity: 0.8; }
-
 /* --------------------------------------------------------- anchor landings -- */
 
 /* The header sticks to the top, so anything the browser scrolls to — the skip
@@ -147,25 +108,31 @@ hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--sp-8) 0; }
   display: flex; flex-wrap: wrap; gap: var(--sp-2);
   margin: 0 0 var(--sp-5); padding: 0; list-style: none;
 }
+/* The app's chips, in the row the app uses for metadata. */
 .badges li {
   border: 1px solid var(--hairline-strong); border-radius: var(--r-full);
   padding: 0.35em 0.85em; font-size: 0.72rem; font-weight: 600;
   letter-spacing: 0.09em; color: var(--text-2); background: var(--glass);
   margin: 0;
+  min-height: 28px; display: inline-flex; align-items: center;
 }
 .hero-lead { font-size: clamp(1.02rem, 2vw, 1.18rem); color: var(--text-2); max-width: 62ch; }
 .cta-row { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: var(--sp-6) 0 var(--sp-5); }
 .cta-note { margin: 0; font-size: 0.85rem; color: var(--text-2); max-width: 52ch; }
+/* The app's own button (`DhunButtons`): a full-radius pill, the accent ramp for
+   the primary action, the touch-target height, and the label size of a Material
+   label-large. `.btn--secondary` is the app's tonal/outlined variant. */
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.5em;
-  min-height: 48px; padding: 0 var(--sp-6); border-radius: var(--r-full);
-  font-weight: 600; font-size: 1rem; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: var(--target); padding: 0 var(--sp-6); border-radius: var(--r-full);
+  font-weight: 600; font-size: 0.95rem; text-decoration: none;
+  letter-spacing: 0.01em;
   border: 1px solid transparent;
 }
 .btn--primary { background: var(--accent); color: var(--on-accent); }
 .btn--primary:hover { filter: brightness(1.08); }
 .btn--secondary {
-  background: transparent; color: var(--text);
+  background: var(--glass); color: var(--text);
   border-color: var(--hairline-strong);
 }
 .btn--secondary:hover { background: var(--surface-variant); }

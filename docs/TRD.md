@@ -9,21 +9,21 @@
 | Android app | Kotlin / Compose Multiplatform shared UI + Android host; Media3 playback | Primary production app; lifecycle, audio focus, media session and device behavior require Android verification |
 | Desktop app | Kotlin/JVM + Compose Multiplatform; VLCJ playback; Windows integrations | Native desktop client; test Windows-specific tray, SMTC, jump lists and single-instance behavior on Windows |
 | Shared core | `shared/`, common domain, provider, player, UI, persistence | Keep UI independent of InnerTube/provider implementation details |
-| Marketing website | Static Eleventy project under `website/` | Content/navigation/download discovery only; no playback or account backend |
-| Browser app mirror | Dependency-free ES modules under `app-web/` | Engineering preview, not a production-supported audio client; sample catalogue and clock must remain clearly labelled until real capability is proven |
+| Marketing website | Static Eleventy project under `website/`, zero client-side JavaScript; its `css/tokens.css` is **generated** from the web app's token sheet by `tools/sync-tokens.mjs` | Content/navigation/download discovery and the way into the app; no playback, no account backend, and since 2026-10-16 the application's own shell (glass app bar, bottom navigation/rail, docked app bar) rather than a generic marketing header |
+| Web app | Dependency-free ES modules under `app-web/`: a real app shell, installable PWA, offline shell, keyboard shortcuts, persisted library | Playback depends on YouTube's origin allowing a cross-origin request from a static page, so failures are surfaced as states; the labelled demo catalogue is the last resort, never a silent substitute for real results |
 
 No custom DHUN backend is part of the current architecture. Local persistence is used for library/history/preferences/download metadata; the audio cache is not the same thing as persistent user downloads.
 
 ## 2. Architectural rules
 
 - Preserve the shared `MusicProvider` / resolver boundary; UI code must not parse provider-specific InnerTube payloads.
-- Keep one authoritative player/queue state per running client. The web mirror, where maintained, mirrors the app's behavior but is not a shared production runtime.
-- Navigation state is the custom shared `AppNavState` / shell policy, not Navigation Compose. Any change to back behavior must update shared tests and mirror tests.
+- Keep one authoritative player/queue state per running client. The browser client mirrors the app's behavior but is not a shared production runtime.
+- Navigation state is the custom shared `AppNavState` / shell policy, not Navigation Compose. Any change to back behavior must update shared tests and the browser client's tests.
 - Use existing design tokens/components in `shared/design/`; do not invent ad hoc colors, radii, blur values, spacing, icons or one-off dialog styles.
 - Keep I/O, database access, network access, artwork processing and downloads off the UI thread. Expose progress/results through observable state.
 - Treat provider output, artwork URLs, links and file paths as untrusted. Validate IDs and URLs; never log cookies, tokens, personal data or stream URLs with sensitive query parameters.
 - Do not add authentication, server-side proxying, a web-player framework, new extraction mechanism or platform target without an accepted ADR.
-- Keep `website/` and `app-web/` isolated. The marketing site does not import app runtime code; the mirror must not be linked as a supported product until its gates pass.
+- Keep `website/` and `app-web/` isolated in code but identical in design. The marketing site does not import app runtime code — it ships none — yet it renders the app's shell and reads the app's tokens at build time; neither surface may promise browser playback the repository cannot keep.
 
 ## 3. Required layers
 
@@ -58,8 +58,8 @@ Primary tabs: Home, Search, Library. Details (artist/album/playlist), Settings, 
 ### Marketing website
 Routes currently authored: `/`, `/features/`, `/ui/`, plus `/404.html`. Every route must use the same base layout and navigation data. The project is deployed under a repository path (`/DHUN/`); root-absolute links such as `/features/` can escape to the domain root. All internal paths must be base-path aware and tested against the built artifact and deployed URL. Include Home, Features, Interface, source, issues, changelog and test-release destinations. A link that works only on localhost root is not sufficient.
 
-### Browser mirror
-Use the same visible navigation contract and source-derived design tokens/icons. It must visibly disclose lack of audible playback/live catalogue when applicable. No proxy, credentials, or false success state. Do not assume it is production web support.
+### Web app (`/app/`)
+Use the same navigation contract, components and source-derived design tokens/icons as the native app. Surface every playback failure as a state; the labelled demo catalogue is the last resort. No proxy, no credentials, no false success state, and no claim that browser playback is proven.
 
 ## 6. Design-system technical requirements
 
@@ -85,12 +85,12 @@ The intended visual identity is **translucent frosted glass** with artwork-led c
 
 - Unit tests for reducers/state machines and repository behavior.
 - UI tests for action-to-result behavior, focus, dialog cancel/confirm, error and loading states.
-- Contract tests ensuring browser mirror tokens/icons/navigation remain derived from native sources.
-- Static website build checks: all output routes exist; internal anchors resolve; page nav/footer links resolve under `/DHUN/`; each page marks exactly one current navigation item; no false product claims.
+- Contract tests ensuring the browser client's tokens/icons/navigation remain derived from native sources, and that the site's stylesheet is generated from the client's token sheet (`design_system_violations` in `scripts/website_quality.py`, Python-only for CI).
+- Static website build checks: all output routes exist; internal anchors resolve; shell navigation links resolve under `/DHUN/`; each page marks exactly one current navigation item; no false product claims.
 - Browser tests at compact phone, large phone, tablet, desktop and narrow/wide desktop widths; keyboard-only tab path; forced colors/high contrast; reduced motion; print where applicable.
 - Hardware acceptance for Android and Windows; note that source-level/unit tests do not substitute for audio, offline, lifecycle, rotation, storage, tray or SMTC checks.
 - Update verification record, `.ai/ROADMAP.md` and `.ai/KNOWN_LIMITATIONS.md` with commit-specific evidence.
 
 ## 9. Non-goals
 
-No new server, cloud account, proxy, React/Tauri migration, production browser playback, or provider/extraction redesign is implied by this TRD. Such work requires an accepted ADR, risk review and separate validation gate.
+No new server, cloud account, proxy, React/Tauri migration, guarantee of browser playback, or provider/extraction redesign is implied by this TRD. Such work requires an accepted ADR, risk review and separate validation gate.

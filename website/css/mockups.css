@@ -1,7 +1,7 @@
 /* ============================= SCREENSHOTS ============================== */
 /* Real Android phone and Windows desktop captures (`website/src/assets/screenshots/*.webp`),
    framed without fake CSS bezels or synthetic status bars, and paired with direct
-   deep links into the live `/app/` interface preview. */
+   deep links into the web app at `/app/`. */
 
 .mock {
   margin: 0;
@@ -15,7 +15,7 @@
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow);
   overflow: hidden;
   min-width: 0;
 }

@@ -52,7 +52,7 @@ Also: every network request carries your IP address and a user-agent string, as 
 
 A targeted search of the Gradle build files and Kotlin sources found **no analytics, advertising, or crash-reporting SDK** (for example Firebase, Crashlytics, Sentry). This is a source-level search only. The full resolved dependency tree was not inspected, because the Gradle build could not be run in the audit sandbox. Confirm before publication.
 
-The public website (GitHub Pages) has no client-side script: the only `<script>` elements are JSON-LD data blocks. GitHub, as the host, processes requests under its own policies. The `/app/` web preview is a separate static page with its own notices; see its README.
+The public website (GitHub Pages) has no client-side script: the only `<script>` elements are JSON-LD data blocks. GitHub, as the host, processes requests under its own policies. The `/app/` web app is the same client in a browser: no account, no service of its own, its library in browser storage, and network requests only to its own origin and YouTube's; see its README.
 
 ## 5. Permissions
 

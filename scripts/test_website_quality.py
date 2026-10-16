@@ -1579,13 +1579,19 @@ class AnchorLandings(DistCopyMixin):
         )
 
     def test_a_base_padding_below_the_three_row_case_fails(self):
-        """Below 480px the navigation itself can wrap: 8rem is too little."""
+        """Below 480px the navigation itself can wrap: 8rem is too little.
+
+        The floors are the page's own tokens: two rows of `--target` plus
+        `--sp-4` for the two-row case (48 + 16 + 48 = 112px) and three rows
+        (176px) for the narrow one, which is what makes this test fail if either
+        token changes without the padding being revisited.
+        """
         violations = self.mutate(
             "index.html", "scroll-padding-top:12rem", "scroll-padding-top:8rem"
         )
         self.assertTrue(
             any(
-                v.startswith("/:") and "128px" in v and "164px" in v and "three rows" in v
+                v.startswith("/:") and "128px" in v and "176px" in v and "three rows" in v
                 for v in violations
             ),
             violations,
@@ -1597,7 +1603,7 @@ class AnchorLandings(DistCopyMixin):
         )
         self.assertTrue(
             any(
-                "/features/" in v and "64px" in v and "104px" in v and "two rows" in v
+                "/features/" in v and "64px" in v and "112px" in v and "two rows" in v
                 for v in violations
             ),
             violations,
@@ -1628,6 +1634,140 @@ class AnchorLandings(DistCopyMixin):
         page.write_text(markup, encoding="utf-8")
         self.assertEqual(quality.anchor_landing_violations(dist), [])
 
+
+
+class DesignSystemMirrorsTheApp(DistCopyMixin):
+    """The new rule (2026-10-16): the sheet is generated, and the app's choices work.
+
+    Three things have to be true for the site to read as the app, and each is
+    mutated here: the sheet carries the generator's header and the app's values,
+    every colour states both schemes with the app's light value, and every built
+    page offers the theme and all six ramps with CSS that answers them.
+    """
+
+    SHEET = Path(quality.REPO_ROOT) / "website" / "css" / "tokens.css"
+    APP = Path(quality.APP_TOKENS)
+
+    def synthetic_repo(self, sheet: str, app: str | None = None, write_app: bool = True) -> Path:
+        """A temporary repo root holding the two token files this rule reads.
+
+        The rule reads `website/css/tokens.css` and the app's file from the module
+        constants, and the built pages from the dist it is handed — so the sheet
+        can be mutated without touching the working tree, and the pages stay real.
+        """
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        (root / "website" / "css").mkdir(parents=True)
+        (root / "website" / "css" / "tokens.css").write_text(sheet, encoding="utf-8")
+        (root / "app-web" / "src" / "css").mkdir(parents=True)
+        if write_app:
+            (root / "app-web" / "src" / "css" / "tokens.css").write_text(
+                app if app is not None else self.APP.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+        self.addCleanup(setattr, quality, "REPO_ROOT", quality.REPO_ROOT)
+        self.addCleanup(setattr, quality, "APP_TOKENS", quality.APP_TOKENS)
+        quality.REPO_ROOT = root
+        quality.APP_TOKENS = root / "app-web" / "src" / "css" / "tokens.css"
+        return root
+
+    def mutate_sheet(self, old: str, new: str) -> list[str]:
+        sheet = self.SHEET.read_text(encoding="utf-8")
+        self.assertIn(old, sheet)
+        self.synthetic_repo(sheet.replace(old, new, 1))
+        violations = quality.design_system_violations(DIST)
+        self.assertTrue(violations, f"mutation {old!r} -> {new!r} was not caught")
+        return violations
+
+    def mutate_page(self, relative: str, old: str, new: str) -> list[str]:
+        sheet = self.SHEET.read_text(encoding="utf-8")
+        root = self.synthetic_repo(sheet)
+        dist = root / "dist"
+        shutil.copytree(DIST, dist)
+        page = dist / relative
+        markup = page.read_text(encoding="utf-8")
+        self.assertIn(old, markup)
+        page.write_text(markup.replace(old, new, 1), encoding="utf-8")
+        violations = quality.design_system_violations(dist)
+        self.assertTrue(violations, f"mutation {old!r} -> {new!r} was not caught")
+        return violations
+
+    def test_the_committed_site_passes(self):
+        self.assertEqual(quality.design_system_violations(DIST), [])
+
+    def test_a_sheet_without_the_generated_header_fails(self):
+        sheet = self.SHEET.read_text(encoding="utf-8")
+        self.synthetic_repo(sheet.replace("GENERATED FILE — DO NOT EDIT.", "TOKENS", 1))
+        violations = quality.design_system_violations(DIST)
+        self.assertTrue(any("not the generated sheet" in v for v in violations), violations)
+
+    def test_a_missing_app_token_file_fails(self):
+        self.synthetic_repo(self.SHEET.read_text(encoding="utf-8"), write_app=False)
+        violations = quality.design_system_violations(DIST)
+        self.assertTrue(any("no source" in v for v in violations), violations)
+
+    def test_a_value_that_disagrees_with_the_app_fails(self):
+        """The mutation this rule exists for: a colour changed on one side."""
+        violations = self.mutate_sheet(
+            "--bg: #161616;  /* --dhun-background */", "--bg: #101010;  /* --dhun-background */"
+        )
+        self.assertTrue(
+            any("--bg" in v and "#101010" in v and "regenerate" in v for v in violations),
+            violations,
+        )
+
+    def test_a_source_the_app_does_not_declare_fails(self):
+        violations = self.mutate_sheet("/* --dhun-background */", "/* --dhun-not-a-token */")
+        self.assertTrue(
+            any("--dhun-not-a-token" in v and "does not declare" in v for v in violations),
+            violations,
+        )
+
+    def test_a_sheet_with_the_app_values_stripped_fails(self):
+        """"Read out of the app" is the claim; a sheet with the notes removed is hand-typed."""
+        sheet = self.SHEET.read_text(encoding="utf-8")
+        self.synthetic_repo(re.sub(r"\s*/\*\s*--dhun-[a-z0-9-]+\s*\*/", "", sheet))
+        violations = quality.design_system_violations(DIST)
+        self.assertTrue(any("typed by hand" in v for v in violations), violations)
+
+    def test_a_light_side_that_is_not_the_app_light_value_fails(self):
+        violations = self.mutate_sheet(
+            "--accent: light-dark(#6750a4, #bb86fc);", "--accent: light-dark(#123456, #bb86fc);"
+        )
+        self.assertTrue(
+            any("--accent" in v and "#123456" in v and "light" in v for v in violations),
+            violations,
+        )
+
+    def test_a_sheet_with_no_pairs_at_all_fails(self):
+        sheet = self.SHEET.read_text(encoding="utf-8")
+        self.synthetic_repo(re.sub(r"\n\s*--[a-z0-9-]+: light-dark\([^;]*\);", "", sheet))
+        violations = quality.design_system_violations(DIST)
+        self.assertTrue(any("declares no light-dark() pair" in v for v in violations), violations)
+
+    def test_a_page_without_a_ramp_radio_fails(self):
+        violations = self.mutate_page(
+            "ui/index.html", 'id="accent-amber"', 'id="accent-amber-renamed"'
+        )
+        self.assertTrue(any("amber" in v and "/ui/" in v for v in violations), violations)
+
+    def test_a_page_that_does_not_start_on_the_default_ramp_fails(self):
+        page = DIST / "index.html"
+        markup = page.read_text(encoding="utf-8")
+        match = re.search(r'<input\b[^>]*id="accent-brand"[^>]*>', markup)
+        self.assertIsNotNone(match, "the built home page has no #accent-brand input")
+        violations = self.mutate_page("index.html", match.group(0), match.group(0).replace(" checked", ""))
+        self.assertTrue(
+            any("default accent" in v or "start on it" in v for v in violations), violations
+        )
+
+    def test_a_page_whose_css_ignores_the_light_choice_fails(self):
+        violations = self.mutate_page(
+            "features/index.html", ":has(#theme-light:checked)", ":has(#theme-nope:checked)"
+        )
+        self.assertTrue(
+            any("/features/" in v and "theme-light" in v for v in violations), violations
+        )
 
 class HighContrastPreference(DistCopyMixin):
     """A visitor who asks the OS for more contrast gets more contrast.

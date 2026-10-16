@@ -1,716 +1,824 @@
 /**
- * Screens.
+ * Every screen, as a pure function of its view model.
  *
- * Each function renders one screen the way its Compose counterpart composes
- * it — same order, same headings, same copy. The copy strings are the app's
- * own (HomeScreen's "Quick picks" / "Recommended songs" / "Listen again",
- * SearchScreen's "Search YouTube Music for songs, albums, and artists",
- * LibraryScreen's "No downloads yet", SettingsScreen's section headers).
+ * The screens are strings, not a component tree, and the reason is the same one
+ * that keeps this module dependency-free: a view that is a function of data can
+ * be rendered in Node and asserted by a test, which is how the escaping rules,
+ * the empty states and the honesty notices are proven without a browser.
  *
- * Every screen is a pure function of its inputs: no reading of global state,
- * no DOM writes. `main.js` owns state and swaps the HTML.
+ * What changed from the mirror build, and why it matters:
+ *
+ *   - **Downloads are gone.** A browser cannot keep a signed stream URL working
+ *     offline, and a PWA cannot silently store hundreds of megabytes of audio for
+ *     a service the visitor may not be signed into. The old build showed a
+ *     Downloads tab that explained it could not download, which is worse than
+ *     not offering it. Library is now Playlists / Liked / History.
+ *   - **Empty states name the next action.** "No playlists yet" is a dead end;
+ *     "No playlists yet — make one from any track's ⋮ menu" is a route.
+ *   - **Every live failure is visible with its own sentence.** A row that could
+ *     not resolve keeps its place in the queue and says why.
  */
 
 import { html, raw } from "./dom.js";
 import { iconSvg } from "./icons.js";
-import { escapeHtml, formatDuration, trackSubtitle, pluralise, cacheOptionLabel, CACHE_OPTIONS_MB } from "./format.js";
-import { artworkStyle } from "./catalog.js";
-import { BANDS_HZ, frequencyLabel, formatDb, PRESETS, CUSTOM_ID, MIN_GAIN_DB, MAX_GAIN_DB } from "./equalizer.js";
-import { parseMarkdown, blockText } from "./markdown.js";
+import { parseMarkdown } from "./markdown.js";
+import { artworkInfo } from "./source.js";
+import { formatDuration, pluralise } from "./format.js";
+import { shortcutGroups, shortcutKeys } from "./shortcuts.js";
+import { WEB_VERSION, BUILD_LABEL } from "./version.js";
 
-export function icon(name, { size = 24, className = "" } = {}) {
-  return raw(iconSvg(name, { size, className }));
+/** Every icon gets the `dhun-icon` class, plus whatever the call site needs.
+ *  Without it the stylesheet's `.dhun-icon` rules (block layout, no shrink,
+ *  `fill: currentColor`) applied to nothing — the SVG carried a size and no
+ *  identity, which `tests/shell.test.mjs` catches. */
+export function icon(name, options = {}) {
+  const { className = "", ...rest } = options;
+  return raw(iconSvg(name, { ...rest, className: className ? `dhun-icon ${className}` : "dhun-icon" }));
 }
 
-/** SectionHeader — titleLarge over a row of content. */
-export function sectionHeader(title, hint = "") {
-  // Nested templates must be raw(): the html tag escapes anything that is
-  // not explicitly marked, and an escaped <p> renders as literal text
-  // (2026-10-09: the same bug escaped the trackRow overflow button, which
-  // then rendered as a line of text that overflowed phone rows).
-  return html`<h2 class="dhun-section__header">${title}</h2>
-    ${hint ? raw(html`<p class="dhun-section__hint">${hint}</p>`) : ""}`;
-}
+/* ------------------------------------------------------------- primitives -- */
 
-/** The persistent honesty notice. Required by ADR-008 boundary 4 and asserted
- *  by scripts/test_app_web.py — it is not decorative. */
-export function previewNotice() {
-  return html`<div class="dhun-notice" role="note" data-testid="preview-notice">
-    <p>
-      <strong>Engineering preview.</strong> This is the DHUN interface running in a browser.
-      Audio playback is <strong>not proven</strong> from this origin — the transport advances a labelled
-      clock so the interface can be exercised, and produces no sound. Do not describe this as a web player.
-    </p>
+export function sectionHeader(title, { hint = "", action = null } = {}) {
+  return html`<div class="dhun-section__head">
+    <h2 class="dhun-section__header">${title}${
+      action
+        ? html`<button type="button" class="dhun-section__action" data-action="${action.id}">${action.label}</button>`
+        : html``
+    }</h2>
+    ${hint ? html`<p class="dhun-section__hint">${hint}</p>` : html``}
   </div>`;
 }
 
-export function dataSourceNotice(source) {
-  if (source === "live") return "";
-  return html`<div class="dhun-notice" role="note" data-testid="sample-data-notice">
-    <p>
-      <strong>Sample data.</strong> Titles and artwork below are a fictional catalogue bundled with this
-      build — the live catalogue is not reachable from this origin. Layout, navigation and the player are real.
-    </p>
-  </div>`;
+/** Artwork: a real image when the source gave one, a deterministic gradient
+ *  otherwise. Both are labelled so a screenshot never misleads. */
+export function artwork(entry, { size = "thumb", className = "" } = {}) {
+  const info = artworkInfo(entry);
+  const classNames = `dhun-art dhun-art--${size}${className ? ` ${className}` : ""}`;
+  if (info.url) {
+    return html`<img class="${classNames}" src="${info.url}" alt="" width="256" height="256" loading="lazy" decoding="async" />`;
+  }
+  // A gradient placeholder is decorative: the row's text already names the item,
+  // so it carries an empty alt and no role.
+  return html`<span class="${classNames}" style="background-image:${raw(info.gradient)}" aria-hidden="true"><span class="dhun-art__mark">${icon("Music")}</span></span>`;
 }
 
-/** ErrorView — the app's retry-capable error state, same three parts. */
-export function errorState({ title = "Something went wrong", body = "", actionLabel = "Try again" } = {}) {
-  return html`<div class="dhun-state" role="alert">
-    ${icon("Error", { size: 32, className: "dhun-state__icon" })}
-    <h2 class="dhun-state__title">${title}</h2>
-    ${body ? raw(html`<p class="dhun-state__body">${body}</p>`) : ""}
-    <button class="dhun-button dhun-button--tonal" type="button" data-action="retry">${actionLabel}</button>
-  </div>`;
-}
-
-export function emptyState({ title, body = "", iconName = "Album" } = {}) {
+export function emptyState({ title, body = "", iconName = "Album" }) {
   return html`<div class="dhun-state">
-    ${icon(iconName, { size: 32, className: "dhun-state__icon" })}
-    <h2 class="dhun-state__title">${title}</h2>
-    ${body ? raw(html`<p class="dhun-state__body">${body}</p>`) : ""}
+    <span class="dhun-state__icon">${icon(iconName, { size: 32 })}</span>
+    <p class="dhun-state__title">${title}</p>
+    ${body ? html`<p class="dhun-state__body">${body}</p>` : html``}
   </div>`;
 }
 
-/** LoadingShimmer — three skeleton rows at the app's skeleton widths. */
-export function loadingState(rows = 3) {
-  return html`<div class="dhun-tracklist" aria-busy="true" aria-live="polite">
-    ${raw(
-      Array.from({ length: rows }, () => html`
-      <div class="dhun-track" aria-hidden="true">
-        <div class="dhun-track__art dhun-shimmer"></div>
-        <div class="dhun-track__meta">
-          <div class="dhun-shimmer" style="height:var(--dhun-space-md-plus);width:60%;border-radius:var(--dhun-shape-small)"></div>
-          <div class="dhun-shimmer" style="height:var(--dhun-space-sm-plus);width:40%;margin-top:var(--dhun-space-sm);border-radius:var(--dhun-shape-small)"></div>
-        </div>
-      </div>`).join(""),
+/**
+ * A failure, with the reason and a way forward. `failureHelp` in `source.js`
+ * supplies the sentence; this supplies the button.
+ */
+export function errorState({ title = "That did not work", body = "", detail = "", actions = [] } = {}) {
+  return html`<div class="dhun-state dhun-state--error" role="alert">
+    <span class="dhun-state__icon">${icon("Error", { size: 32 })}</span>
+    <p class="dhun-state__title">${title}</p>
+    ${body ? html`<p class="dhun-state__body">${body}</p>` : html``}
+    ${detail ? html`<p class="dhun-state__detail">${detail}</p>` : html``}
+    ${actions.length
+      ? html`<div class="dhun-state__actions">${actions.map(
+          (action) =>
+            html`<button type="button" class="dhun-button dhun-button--tonal" data-action="${action.id}">${action.label}</button>`,
+        )}</div>`
+      : html``}
+  </div>`;
+}
+
+export function loadingState(labels = ["Loading"]) {
+  return html`<div class="dhun-state dhun-state--loading" aria-live="polite">
+    ${labels.map(
+      (label) =>
+        html`<span class="dhun-shimmer" aria-hidden="true"></span><span class="dhun-visually-hidden">${label}</span>`,
     )}
   </div>`;
 }
 
-/** TrackRow — 56dp thumb, trackTitle + bodySmall subtitle, overflow menu. */
-export function trackRow(track, { index = null, playing = false, overflow = true } = {}) {
-  return html`<li>
-    <button
-      class="dhun-track"
-      type="button"
-      data-action="play-track"
-      data-track-id="${track.id}"
-      data-playing="${playing ? "true" : "false"}"
-    >
-      <span class="dhun-track__art" style="${raw(artworkStyle(track.id))}" aria-hidden="true"></span>
-      <span class="dhun-track__meta">
-        <span class="dhun-track__title">${track.title}</span>
-        <span class="dhun-track__subtitle">${trackSubtitle(track)}</span>
-      </span>
-      <span class="dhun-track__time">${formatDuration(track.durationMs)}</span>
-    </button>
-    ${overflow
-      ? raw(html`<button
-          class="dhun-icon-button"
-          type="button"
-          data-action="track-overflow"
-          data-track-id="${track.id}"
-          aria-label="More actions for ${track.title}"
-        >
-          ${icon("MoreVert")}
-        </button>`)
-      : ""}
+/** Notice strip: source state, demo data, offline, gestures, errors. */
+export function notice({ tone = "info", title = "", body = "", actions = [] } = {}) {
+  return html`<div class="dhun-notice dhun-notice--${tone}" role="${tone === "error" ? "alert" : "status"}">
+    <div class="dhun-notice__text">
+      ${title ? html`<p class="dhun-notice__title">${title}</p>` : html``}
+      ${body ? html`<p class="dhun-notice__body">${body}</p>` : html``}
+    </div>
+    ${actions.length
+      ? html`<div class="dhun-notice__actions">${actions.map(
+          (action) =>
+            html`<button type="button" class="dhun-button dhun-button--ghost" data-action="${action.id}">${action.label}</button>`,
+        )}</div>`
+      : html``}
+  </div>`;
+}
+
+/** Which source produced the rows on screen — always visible, never implied. */
+export function sourceBadge(source) {
+  const kind = source?.kind ?? "demo";
+  const label =
+    kind === "innertube" ? "YouTube Music" : kind === "endpoint" ? "Your endpoint" : "Demo data";
+  return html`<span class="dhun-source" data-kind="${kind}" title="${source?.detail ?? ""}">
+    <span class="dhun-source__dot" aria-hidden="true"></span>
+    <span class="dhun-source__label">${label}</span>
+    <span class="dhun-visually-hidden">— ${source?.detail ?? ""}</span>
+  </span>`;
+}
+
+/* ------------------------------------------------------------------ rows -- */
+
+/**
+ * One track row.
+ *
+ * `variant` is "list" (default), "queue" (with reorder controls) or "compact"
+ * (search results, where the artwork is smaller).
+ */
+export function trackRow(track, {
+  index = null,
+  current = false,
+  playing = false,
+  failed = null,
+  liked = false,
+  variant = "list",
+  subtitle = null,
+} = {}) {
+  const duration = track.durationMs ? formatDuration(track.durationMs) : "";
+  const meta = subtitle ?? [track.artist, track.album].filter(Boolean).join(" • ");
+  const action = variant === "queue" ? "play-queue-row" : "play-track";
+  return html`<li class="dhun-row" data-index="${index ?? ""}" data-row-id="${track.id ?? track.videoId ?? ""}">
+    <div class="dhun-row__main${variant === "queue" ? " dhun-row__main--queue" : ""}">
+      ${variant === "queue"
+        ? html`<span class="dhun-queue__index" aria-hidden="true">${(index ?? 0) + 1}</span>`
+        : html``}
+      <button type="button" class="dhun-track" data-action="${action}" data-index="${index ?? ""}" data-id="${track.id ?? track.videoId ?? ""}"
+        ${current ? raw('aria-current="true"') : raw("")} data-playing="${playing ? "true" : "false"}">
+        ${artwork(track, { size: variant === "compact" ? "thumb" : "row" })}
+        <span class="dhun-track__meta">
+          <span class="dhun-track__title">${track.title}</span>
+          <span class="dhun-track__subtitle">${meta || "Unknown artist"}</span>
+        </span>
+        ${failed ? html`<span class="dhun-track__flag" title="${failed.message}">${icon("Error", { size: 18 })}</span>` : html``}
+      </button>
+      ${duration ? html`<span class="dhun-track__time">${duration}</span>` : html``}
+      ${variant === "queue"
+        ? html`<span class="dhun-queue__controls">
+            <button type="button" class="dhun-icon-button dhun-icon-button--up" data-action="queue-up" data-index="${index ?? ""}" aria-label="Move up">
+              ${icon("ChevronDown", { size: 18 })}
+            </button>
+            <button type="button" class="dhun-icon-button" data-action="queue-down" data-index="${index ?? ""}" aria-label="Move down">
+              ${icon("ChevronDown", { size: 18 })}
+            </button>
+            <button type="button" class="dhun-icon-button" data-action="queue-remove" data-index="${index ?? ""}" aria-label="Remove from queue">
+              ${icon("Close", { size: 18 })}
+            </button>
+          </span>`
+        : html`<button type="button" class="dhun-icon-button" data-action="track-menu" data-index="${index ?? ""}" data-id="${track.id ?? track.videoId ?? ""}"
+            aria-label="More options for ${track.title}">
+            ${icon("MoreVert", { size: 20 })}
+          </button>`}
+    </div>
+    ${failed ? html`<p class="dhun-row__failure" role="status">${failed.message}</p>` : html``}
   </li>`;
 }
 
-export function trackList(tracks, { currentTrackId = null } = {}) {
-  return html`<ol class="dhun-tracklist">
-    ${raw(
-      tracks
-        .map((track, index) =>
-          trackRow(track, { index, playing: track.id === currentTrackId }),
-        )
-        .join(""),
+export function trackList(tracks, options = {}) {
+  if (!tracks?.length) return emptyState(options.empty ?? { title: "Nothing here yet" });
+  return html`<ul class="dhun-tracklist">
+    ${tracks.map((track, index) =>
+      trackRow(track, {
+        ...options,
+        index: options.indexOffset ? index + options.indexOffset : index,
+        current: options.currentId && (options.currentId === track.id || options.currentId === track.videoId),
+      }),
     )}
-  </ol>`;
+  </ul>`;
 }
 
-/* ------------------------------------------------------------------- home -- */
-
-export function homeScreen({ feed, source, currentTrackId }) {
-  if (!feed) return loadingState(4);
-  const [quickPicks, ...rest] = feed.sections;
-  return html`
-    ${raw(dataSourceNotice(source))}
-    ${raw(
-      quickPicks
-        ? html`<section class="dhun-section">
-            ${raw(sectionHeader(quickPicks.title))}
-            <div class="dhun-shelf">
-              ${raw(
-                quickPicks.tracks
-                  .map(
-                    (track) => html`<button class="dhun-quickpick" type="button" data-action="play-track" data-track-id="${track.id}">
-                      <span class="dhun-quickpick__art" style="${raw(artworkStyle(track.id))}" aria-hidden="true"></span>
-                      <span class="dhun-track__meta">
-                        <span class="dhun-track__title">${track.title}</span>
-                        <span class="dhun-track__subtitle">${track.artist}</span>
-                      </span>
-                    </button>`,
-                  )
-                  .join(""),
-              )}
-            </div>
-          </section>`
-        : "",
-    )}
-    ${raw(
-      rest
-        .map(
-          (section) => html`<section class="dhun-section">
-            ${raw(sectionHeader(section.title))}
-            ${raw(trackList(section.tracks, { currentTrackId }))}
-          </section>`,
-        )
-        .join(""),
-    )}
-  `;
+/** A card: album, playlist or artist, with the action that opens it. */
+export function card(entry, { action = "open-entity" } = {}) {
+  const title = entry.title ?? entry.name ?? "";
+  const subtitle = entry.artist ?? entry.year ?? entry.trackCount ? `${entry.artist ?? entry.year ?? ""}` : "";
+  const kind = entry.kind ?? (entry.name ? "artist" : "album");
+  return html`<li class="dhun-card-item">
+    <button type="button" class="dhun-card" data-action="${action}" data-kind="${kind}" data-id="${entry.id}" aria-label="Open ${title}">
+      <span class="dhun-card__art">${artwork(entry, { size: "card" })}</span>
+      <span class="dhun-grid__title">${title}</span>
+      <span class="dhun-grid__subtitle">${subtitle}</span>
+    </button>
+  </li>`;
 }
 
-/* ----------------------------------------------------------------- search -- */
+export function cardGrid(entries, options = {}) {
+  if (!entries?.length) return emptyState(options.empty ?? { title: "Nothing to show" });
+  return html`<ul class="dhun-grid dhun-grid--list">
+    ${entries.map((entry) => card(entry, options))}
+  </ul>`;
+}
 
-export function searchScreen({ query, results, source, recentSearches, status }) {
-  if (status === "loading") return loadingState(5);
-  if (status === "error") {
-    return errorState({ title: "Search failed", body: "The catalogue could not be reached." });
+export function shelf(entries, options = {}) {
+  if (!entries?.length) return html``;
+  return html`<ul class="dhun-shelf dhun-shelf--cards">
+    ${entries.map((entry) => card(entry, options))}
+  </ul>`;
+}
+
+/** Quick picks: the wide, artwork-first tiles the app uses above the fold. */
+function quickPick(track, { index, currentId }) {
+  const current = currentId && (currentId === track.id || currentId === track.videoId);
+  return html`<li class="dhun-quickpick-item">
+    <button type="button" class="dhun-quickpick" data-action="play-track" data-index="${index}" data-id="${track.id}"
+      ${current ? raw('aria-current="true"') : raw("")}>
+      <span class="dhun-quickpick__art">${artwork(track, { size: "quick" })}</span>
+      <span class="dhun-quickpick__title">${track.title}</span>
+      <span class="dhun-quickpick__sub">${track.artist ?? ""}</span>
+    </button>
+  </li>`;
+}
+
+/* --------------------------------------------------------------- screens -- */
+
+function shelvesToRows(shelves = [], { currentId, demoTracks }) {
+  return shelves
+    .map((shelfEntry) => {
+      const tracks = shelfEntry.entries.filter((entry) => !entry.kind || entry.kind === "track");
+      const cards = shelfEntry.entries.filter((entry) => entry.kind && entry.kind !== "track");
+      if (tracks.length === 0 && cards.length === 0) return html``;
+      const offset = demoTracks.findIndex((track) => track.id === tracks[0]?.id);
+      return html`<section class="dhun-section">
+        ${sectionHeader(shelfEntry.title)}
+        ${tracks.length
+          ? shelfEntry.title.toLowerCase().includes("quick")
+            ? html`<ul class="dhun-shelf dhun-shelf--quick">
+                ${tracks.map((track, index) =>
+                  quickPick(track, { index: offset >= 0 ? offset + index : index, currentId }),
+                )}
+              </ul>`
+            : trackList(tracks, { currentId, view: "home", indexOffset: offset >= 0 ? offset : 0 })
+          : html``}
+        ${cards.length ? shelf(cards) : html``}
+      </section>`;
+    })
+    .reduce((out, piece) => html`${out}${piece}`, html``);
+}
+
+export function homeScreen({ shelves = [], loading = false, error = null, currentId, demoTracks = [], source }) {
+  if (loading) return loadingState(["Loading your home feed"]);
+  if (error) {
+    return errorState({
+      title: "The home feed could not be loaded",
+      body: error.message,
+      detail: error.help,
+      actions: [
+        { id: "retry-home", label: "Try again" },
+        { id: "open-settings-source", label: "Change data source" },
+      ],
+    });
   }
-  if (query.trim() === "") {
-    return html`
-      ${raw(dataSourceNotice(source))}
-      ${raw(recentSearches.length > 0
+  if (!shelves.length) {
+    return emptyState({
+      title: "Nothing to show yet",
+      body: "Search for something, or point DHUN at your own data source in Settings.",
+      iconName: "Search",
+    });
+  }
+  return html`${shelvesToRows(shelves, { currentId, demoTracks })}
+    ${source?.kind === "demo"
+      ? notice({
+          tone: "warn",
+          title: "Demo catalogue",
+          body: "These fictional rows have no audio. DHUN reached no real source — Settings explains the data-source options.",
+          actions: [{ id: "open-settings-source", label: "Data source" }],
+        })
+      : html``}`;
+}
+
+const SEARCH_FILTERS = Object.freeze([
+  { id: "all", label: "All" },
+  { id: "tracks", label: "Songs" },
+  { id: "artists", label: "Artists" },
+  { id: "albums", label: "Albums" },
+  { id: "playlists", label: "Playlists" },
+]);
+
+export function searchScreen({ query = "", results = null, status = "idle", filter = "all", recentSearches = [], currentId, source }) {
+  const chips = html`<div class="dhun-chip-row" role="tablist" aria-label="Result type">
+    ${SEARCH_FILTERS.map(
+      (entry) => html`<button type="button" role="tab" class="dhun-chip" data-action="search-filter" data-filter="${entry.id}"
+        aria-selected="${filter === entry.id ? "true" : "false"}">${entry.label}</button>`,
+    )}
+  </div>`;
+
+  const body = (() => {
+    if (status === "loading") return loadingState(["Searching"]);
+    if (status === "error") {
+      return errorState({
+        title: "That search did not go through",
+        body: results?.message ?? "The request failed.",
+        detail: results?.help,
+        actions: [
+          { id: "retry-search", label: "Try again" },
+          { id: "open-settings-source", label: "Change data source" },
+        ],
+      });
+    }
+    if (!results) {
+      return recentSearches.length
         ? html`<section class="dhun-section">
-            ${raw(sectionHeader("Recent searches"))}
-            <div class="dhun-tracklist">
-              ${raw(
-                recentSearches
-                  .map(
-                    (term) => html`<li style="display:flex;align-items:center;gap:var(--dhun-space-sm)">
-                      <button class="dhun-menu__row" type="button" data-action="recent-search" data-term="${term}">
-                        ${icon("History")}
-                        <span>${term}</span>
-                      </button>
-                      <button
-                        class="dhun-icon-button"
-                        type="button"
-                        data-action="forget-search"
-                        data-term="${term}"
-                        aria-label="Delete recent search ${term}"
-                      >
-                        ${icon("Close")}
-                      </button>
-                    </li>`,
-                  )
-                  .join(""),
+            ${sectionHeader("Recent searches", {
+              action: { id: "clear-searches", label: "Clear" },
+            })}
+            <ul class="dhun-chip-row dhun-chip-row--wrap">
+              ${recentSearches.map(
+                (entry) => html`<li class="dhun-recent">
+                  <button type="button" class="dhun-chip" data-action="search-again" data-query="${entry}">
+                    ${icon("Search", { size: 16 })}<span>${entry}</span>
+                  </button>
+                  <button type="button" class="dhun-icon-button dhun-icon-button--small" data-action="forget-search" data-query="${entry}"
+                    aria-label="Remove ${entry} from recent searches">${icon("Close", { size: 16 })}</button>
+                </li>`,
               )}
-            </div>
+            </ul>
           </section>`
         : emptyState({
-            title: "Search",
-            body: "Search for songs, albums, artists and playlists.",
+            title: "Search YouTube Music",
+            body: "Songs, albums, artists and playlists. Everything you type stays on this device.",
             iconName: "Search",
-          }))}
-    `;
-  }
+          });
+    }
 
-  const { tracks = [], albums = [], artists = [], playlists = [] } = results ?? {};
-  const total = tracks.length + albums.length + artists.length + playlists.length;
-  if (total === 0) {
-    return emptyState({ title: "No results found", body: `Nothing matched “${query}”.`, iconName: "Search" });
-  }
+    const groups = [
+      { id: "tracks", label: "Songs", items: results.tracks ?? [], type: "tracks" },
+      { id: "artists", label: "Artists", items: results.artists ?? [], type: "entities" },
+      { id: "albums", label: "Albums", items: results.albums ?? [], type: "entities" },
+      { id: "playlists", label: "Playlists", items: results.playlists ?? [], type: "entities" },
+    ].filter((group) => filter === "all" || filter === group.id);
 
-  return html`
-    ${raw(dataSourceNotice(source))}
-    ${raw(tracks.length
-      ? html`<section class="dhun-section">
-          ${raw(sectionHeader("Songs"))}
-          ${raw(trackList(tracks))}
-        </section>`
-      : "")}
-    ${raw(artists.length
-      ? html`<section class="dhun-section">
-          ${raw(sectionHeader("Artists"))}
-          <ul class="dhun-grid">
-            ${raw(
-              artists
-                .map(
-                  (artist) => html`<li>
-                    <button class="dhun-grid__item" type="button" data-action="open-artist" data-id="${artist.id}">
-                      <span class="dhun-artwork-card" style="${raw(artworkStyle(artist.id))}" aria-hidden="true"></span>
-                      <p class="dhun-grid__title">${artist.name}</p>
-                      <p class="dhun-grid__subtitle">Artist</p>
-                    </button>
-                  </li>`,
-                )
-                .join(""),
-            )}
-          </ul>
-        </section>`
-      : "")}
-    ${raw(albums.length
-      ? html`<section class="dhun-section">
-          ${raw(sectionHeader("Albums"))}
-          <ul class="dhun-grid">
-            ${raw(
-              albums
-                .map(
-                  (album) => html`<li>
-                    <button class="dhun-grid__item" type="button" data-action="open-album" data-id="${album.id}">
-                      <span class="dhun-artwork-card" style="${raw(artworkStyle(album.id))}" aria-hidden="true"></span>
-                      <p class="dhun-grid__title">${album.title}</p>
-                      <p class="dhun-grid__subtitle">${album.artist}</p>
-                    </button>
-                  </li>`,
-                )
-                .join(""),
-            )}
-          </ul>
-        </section>`
-      : "")}
-    ${raw(playlists.length
-      ? html`<section class="dhun-section">
-          ${raw(sectionHeader("Playlists"))}
-          <ul class="dhun-grid">
-            ${raw(
-              playlists
-                .map(
-                  (playlist) => html`<li>
-                    <button class="dhun-grid__item" type="button" data-action="open-playlist" data-id="${playlist.id}">
-                      <span class="dhun-artwork-card" style="${raw(artworkStyle(playlist.id))}" aria-hidden="true"></span>
-                      <p class="dhun-grid__title">${playlist.name}</p>
-                      <p class="dhun-grid__subtitle">${pluralise(playlist.trackIds.length, "track")}</p>
-                    </button>
-                  </li>`,
-                )
-                .join(""),
-            )}
-          </ul>
-        </section>`
-      : "")}
-  `;
-}
+    const total = groups.reduce((sum, group) => sum + group.items.length, 0);
+    if (total === 0) {
+      return emptyState({
+        title: `No results for “${query}”`,
+        body: "Check the spelling, or try fewer words.",
+        iconName: "Search",
+      });
+    }
 
-/* ---------------------------------------------------------------- library -- */
+    const offset = 0;
+    return html`${groups.map((group) =>
+      group.items.length === 0
+        ? html``
+        : html`<section class="dhun-section">
+            ${sectionHeader(`${group.label} (${group.items.length})`)}
+            ${group.type === "tracks"
+              ? trackList(group.items, { currentId, indexOffset: offset, view: "search" })
+              : cardGrid(group.items, { empty: { title: `No ${group.label.toLowerCase()}` } })}
+          </section>`,
+    )}`;
+  })();
 
-export const LIBRARY_TABS = Object.freeze(["PLAYLISTS", "DOWNLOADS", "HISTORY"]);
-
-export function libraryScreen({ tab, playlists, history, favourites, downloadsAvailable }) {
-  return html`
-    <div class="dhun-chip-row" role="tablist" aria-label="Library">
-      ${raw(
-        LIBRARY_TABS.map(
-          (name) => html`<button
-            class="dhun-chip"
-            type="button"
-            role="tab"
-            data-action="library-tab"
-            data-tab="${name}"
-            aria-selected="${tab === name ? "true" : "false"}"
-          >
-            ${name === "PLAYLISTS" ? "Playlists" : name === "DOWNLOADS" ? "Downloads" : "History"}
-          </button>`,
-        ).join(""),
-      )}
-    </div>
-    ${tab === "PLAYLISTS" ? raw(playlistsPane({ playlists, favourites })) : ""}
-    ${tab === "DOWNLOADS" ? raw(downloadsPane({ downloadsAvailable })) : ""}
-    ${tab === "HISTORY" ? raw(historyPane({ history })) : ""}
-  `;
-}
-
-function playlistsPane({ playlists, favourites }) {
-  return html`
-    <section class="dhun-section">
-      ${raw(sectionHeader("Your Playlists"))}
-      ${raw(playlists.length === 0
-        ? emptyState({
-            title: "No playlists yet — create one below.",
-            iconName: "QueueMusic",
-          })
-        : html`<ul class="dhun-tracklist">
-            ${raw(
-              playlists
-                .map((playlist) => {
-                  const count = playlist.isLikedFolder
-                    ? favourites.length
-                    : playlist.trackIds.length;
-                  return html`<li>
-                    <button class="dhun-track" type="button" data-action="open-playlist" data-id="${playlist.id}">
-                      <span class="dhun-track__art" style="${raw(artworkStyle(playlist.id))}" aria-hidden="true"></span>
-                      <span class="dhun-track__meta">
-                        <span class="dhun-track__title">${playlist.name}</span>
-                        <span class="dhun-track__subtitle">${pluralise(count, "song")}</span>
-                      </span>
-                    </button>
-                    <button class="dhun-icon-button" type="button" data-action="play-playlist" data-id="${playlist.id}" aria-label="Play ${playlist.name}">
-                      ${icon("Play")}
-                    </button>
-                  </li>`;
-                })
-                .join(""),
-            )}
-          </ul>`)}
-      <form class="dhun-search" data-action="new-playlist" style="margin-top:var(--dhun-space-lg)">
-        <input type="text" name="name" placeholder="My playlist" aria-label="New playlist name" maxlength="60" />
-        <button class="dhun-button dhun-button--tonal" type="submit">New playlist</button>
+  return html`<div class="dhun-searchbar">
+      <form class="dhun-search" data-action="search-submit" role="search">
+        <span class="dhun-search__icon">${icon("Search", { size: 20 })}</span>
+        <input id="search-input" type="search" name="q" value="${query}" placeholder="Songs, artists, albums…"
+          autocomplete="off" spellcheck="false" aria-label="Search" />
+        ${query ? html`<button type="button" class="dhun-icon-button dhun-icon-button--small" data-action="clear-search" aria-label="Clear the search">${icon("Close", { size: 18 })}</button>` : html``}
       </form>
-    </section>
-  `;
+      ${source?.kind === "demo" ? html`<p class="dhun-search__hint">Searching the demo catalogue — fictional rows, no audio.</p>` : html``}
+    </div>
+    ${chips}
+    ${body}`;
 }
 
-function downloadsPane({ downloadsAvailable }) {
-  return html`
-    ${raw(downloadsAvailable
-      ? ""
-      : html`<div class="dhun-notice" role="note">
-          <p>
-            <strong>Downloads are not available in the browser build.</strong> Offline downloads
-            (ADR-006) write media files to the device through the Android and desktop clients. A browser
-            has no equivalent private store, so the two sections below are shown empty rather than filled
-            with something that cannot be played offline.
-          </p>
-        </div>`)}
-    <section class="dhun-section">
-      ${raw(sectionHeader("Active downloads"))}
-      ${raw(emptyState({ title: "Nothing downloading", body: "Downloads started in the app do not appear here.", iconName: "Pending" }))}
-    </section>
-    <section class="dhun-section">
-      ${raw(sectionHeader("Downloaded"))}
-      ${raw(emptyState({ title: "No downloads yet", body: "Tracks you download in the Android or desktop client are stored on that device.", iconName: "Offline" }))}
-    </section>
-  `;
-}
+/** The user's own playlists, likes and history. No downloads tab: see the
+ *  module docstring. */
+export function libraryScreen({ tab = "playlists", playlists = [], liked = [], history = [], currentId, libraryKind = "indexeddb" }) {
+  const tabs = [
+    { id: "playlists", label: "Playlists", count: playlists.length },
+    { id: "liked", label: "Liked", count: liked.length },
+    { id: "history", label: "History", count: history.length },
+  ];
 
-function historyPane({ history }) {
-  if (history.length === 0) {
+  const header = html`<div class="dhun-chip-row" role="tablist" aria-label="Library sections">
+    ${tabs.map(
+      (entry) => html`<button type="button" role="tab" class="dhun-chip" data-action="library-tab" data-tab="${entry.id}"
+        aria-selected="${tab === entry.id ? "true" : "false"}">${entry.label}${entry.count ? html` <span class="dhun-chip__count">${entry.count}</span>` : html``}</button>`,
+    )}
+  </div>`;
+
+  const pane = (() => {
+    if (tab === "liked") {
+      return liked.length
+        ? html`<section class="dhun-section">
+            ${sectionHeader("Liked songs", {
+              action: { id: "play-liked", label: "Play all" },
+            })}
+            ${trackList(liked, { currentId })}
+          </section>`
+        : emptyState({
+            title: "No liked songs yet",
+            body: "Press L while something plays, or use a track's ⋮ menu and choose Like.",
+            iconName: "Favorite",
+          });
+    }
+    if (tab === "history") {
+      return history.length
+        ? html`<section class="dhun-section">
+            ${sectionHeader("Recently played", {
+              hint: "Kept on this device only.",
+              action: { id: "clear-history", label: "Clear" },
+            })}
+            ${trackList(history, { currentId, empty: { title: "Nothing played yet" } })}
+          </section>`
+        : emptyState({
+            title: "No history yet",
+            body: "Tracks you play appear here, on this device, and nowhere else.",
+            iconName: "History",
+          });
+    }
     return html`<section class="dhun-section">
-      ${raw(sectionHeader("History"))}
-      ${raw(emptyState({ title: "No history yet", body: "Tracks you play in this browser will be listed here.", iconName: "History" }))}
-    </section>`;
-  }
-  return html`<section class="dhun-section">
-    ${raw(sectionHeader("History"))}
-    <ul class="dhun-tracklist">
-      ${raw(
-        history
-          .map(
-            (track) => html`<li>
-              <button class="dhun-track" type="button" data-action="play-track" data-track-id="${track.id}">
-                <span class="dhun-track__art" style="${raw(artworkStyle(track.id))}" aria-hidden="true"></span>
-                <span class="dhun-track__meta">
-                  <span class="dhun-track__title">${track.title}</span>
-                  <span class="dhun-track__subtitle">${trackSubtitle(track)}</span>
-                </span>
-              </button>
-              <button
-                class="dhun-icon-button"
-                type="button"
-                data-action="remove-history"
-                data-track-id="${track.id}"
-                aria-label="Remove ${track.title} from history"
-              >
-                ${icon("Close")}
-              </button>
-            </li>`,
-          )
-          .join(""),
-      )}
-    </ul>
-  </section>`;
-}
-
-/* ----------------------------------------------------------------- browse -- */
-
-export function artistScreen({ artist, tracks, albums }) {
-  return html`
-    <div class="dhun-state" style="padding-top:var(--dhun-space-xl)">
-      <span class="dhun-artwork-hero" style="${raw(artworkStyle(artist.id))}" aria-hidden="true"></span>
-      <h2 class="dhun-state__title">${artist.name}</h2>
-      <p class="dhun-state__body">${pluralise(tracks.length, "song")} · ${pluralise(albums.length, "album")}</p>
-      <button class="dhun-button dhun-button--tonal" type="button" data-action="play-collection">
-        ${icon("Play")} Play
-      </button>
-    </div>
-    ${raw(albums.length
-      ? html`<section class="dhun-section">
-          ${raw(sectionHeader("Albums"))}
-          <ul class="dhun-grid">
-            ${raw(
-              albums
-                .map(
-                  (album) => html`<li>
-                    <button class="dhun-grid__item" type="button" data-action="open-album" data-id="${album.id}">
-                      <span class="dhun-artwork-card" style="${raw(artworkStyle(album.id))}" aria-hidden="true"></span>
-                      <p class="dhun-grid__title">${album.title}</p>
-                      <p class="dhun-grid__subtitle">${album.year}</p>
-                    </button>
-                  </li>`,
-                )
-                .join(""),
+      ${sectionHeader("Your playlists", {
+        action: { id: "new-playlist", label: "New playlist" },
+      })}
+      ${playlists.length
+        ? html`<ul class="dhun-grid dhun-grid--list">
+            ${playlists.map(
+              (playlist) => html`<li class="dhun-card-item">
+                <button type="button" class="dhun-card dhun-card--row" data-action="open-playlist" data-id="${playlist.id}">
+                  <span class="dhun-card__art">${artwork({ id: playlist.id, title: playlist.name }, { size: "card" })}</span>
+                  <span class="dhun-card__meta">
+                    <span class="dhun-grid__title">${playlist.name}</span>
+                    <span class="dhun-grid__subtitle">${pluralise(playlist.trackIds.length, "track")}</span>
+                  </span>
+                </button>
+              </li>`,
             )}
-          </ul>
-        </section>`
-      : "")}
-    <section class="dhun-section">${raw(sectionHeader("Songs"))} ${raw(trackList(tracks))}</section>
-  `;
+          </ul>`
+        : emptyState({
+            title: "No playlists yet",
+            body: "Use a track's ⋮ menu to add it to a new playlist.",
+            iconName: "LibraryMusic",
+          })}
+    </section>`;
+  })();
+
+  return html`${header}${pane}
+    ${libraryKind === "memory"
+      ? notice({
+          tone: "warn",
+          title: "This browser is not saving your library",
+          body: "IndexedDB is unavailable here (private window, or storage blocked for this site), so playlists, likes and history last only until the tab closes.",
+          actions: [{ id: "open-settings-data", label: "Details" }],
+        })
+      : html``}`;
 }
 
-export function albumScreen({ album, tracks }) {
-  return html`
-    <div class="dhun-state" style="padding-top:var(--dhun-space-xl)">
-      <span class="dhun-artwork-hero" style="${raw(artworkStyle(album.id))}" aria-hidden="true"></span>
-      <h2 class="dhun-state__title">${album.title}</h2>
-      <p class="dhun-state__body">${album.artist} · ${album.year} · ${pluralise(tracks.length, "track")}</p>
-      <button class="dhun-button dhun-button--tonal" type="button" data-action="play-collection">
-        ${icon("Play")} Play
-      </button>
-    </div>
-    <section class="dhun-section">${raw(sectionHeader("Tracks"))} ${raw(trackList(tracks))}</section>
-  `;
-}
-
-export function playlistScreen({ playlist, tracks }) {
-  return html`
-    <div class="dhun-state" style="padding-top:var(--dhun-space-xl)">
-      <span class="dhun-artwork-hero" style="${raw(artworkStyle(playlist.id))}" aria-hidden="true"></span>
-      <h2 class="dhun-state__title">${playlist.name}</h2>
-      <p class="dhun-state__body">${pluralise(tracks.length, "track")}</p>
-      <button class="dhun-button dhun-button--tonal" type="button" data-action="play-collection">
-        ${icon("Play")} ${playlist.isLikedFolder ? "Play Liked Songs" : "Play"}
-      </button>
-    </div>
-    <section class="dhun-section">
-      ${raw(sectionHeader("Tracks"))}
-      ${tracks.length === 0
-        ? raw(emptyState({ title: "No songs in this playlist yet", iconName: "QueueMusic" }))
-        : raw(trackList(tracks))}
-    </section>
-  `;
-}
-
-/* --------------------------------------------------------------- settings -- */
-
-export function settingsScreen({ theme, accent, cacheSizeMb, resumeOnLaunch, equalizer }) {
-  return html`
-    <section class="dhun-section" style="margin-top:var(--dhun-space-md)">
-      ${raw(sectionHeader("Appearance"))}
-      <div class="dhun-chip-row" role="radiogroup" aria-label="Theme">
-        ${raw(
-          [
-            ["dark", "Dark"],
-            ["light", "Light"],
-          ]
-            .map(
-              ([id, label]) => html`<button
-                class="dhun-chip"
-                type="button"
-                role="radio"
-                data-action="set-theme"
-                data-theme="${id}"
-                aria-checked="${theme === id ? "true" : "false"}"
-              >
-                ${label}
-              </button>`,
-            )
-            .join(""),
-        )}
-      </div>
-      <div class="dhun-chip-row" role="radiogroup" aria-label="Accent" style="margin-top:var(--dhun-space-sm)">
-        ${raw(
-          ["brand", "azure", "jade", "amber", "rose", "cyan"]
-            .map(
-              (id) => html`<button
-                class="dhun-chip"
-                type="button"
-                role="radio"
-                data-action="set-accent"
-                data-accent="${id}"
-                aria-checked="${accent === id ? "true" : "false"}"
-              >
-                ${id[0].toUpperCase()}${id.slice(1)}
-              </button>`,
-            )
-            .join(""),
-        )}
-      </div>
-    </section>
-
-    <section class="dhun-section">
-      ${raw(sectionHeader("Playback & storage"))}
-      <div style="padding:0 var(--dhun-space-screen-padding)">
-        <p class="dhun-track__subtitle" style="margin:0 0 var(--dhun-space-sm)">Audio cache size</p>
-        <div class="dhun-chip-row" style="padding:0" role="radiogroup" aria-label="Audio cache size">
-          ${raw(
-            CACHE_OPTIONS_MB.map(
-              (mb) => html`<button
-                class="dhun-chip"
-                type="button"
-                role="radio"
-                data-action="set-cache"
-                data-mb="${mb}"
-                aria-checked="${cacheSizeMb === mb ? "true" : "false"}"
-              >
-                ${cacheOptionLabel(mb)}
-              </button>`,
-            ).join(""),
-          )}
-        </div>
-        <p class="dhun-track__subtitle" style="margin:var(--dhun-space-sm) 0 0">
-          Space reserved for streamed audio. Applies on next launch.
-        </p>
-      </div>
-      <div class="dhun-settings-row">
-        <span class="dhun-settings-row__text">
-          <span class="dhun-settings-row__title">Resume on launch</span>
-          <span class="dhun-settings-row__subtitle">Restore the last queue when the app starts</span>
-        </span>
-        <button
-          class="dhun-switch"
-          type="button"
-          role="switch"
-          data-action="toggle-resume"
-          aria-checked="${resumeOnLaunch ? "true" : "false"}"
-          aria-label="Resume on launch"
-        ></button>
-      </div>
-    </section>
-
-    <section class="dhun-section">
-      ${raw(sectionHeader("About & Legal"))}
-      <!-- One entry, not seven: the legal pages are long documents on their own
-           routes, and listing all of them here would turn Settings into an index. -->
-      <div class="dhun-settings-row dhun-settings-row--link" data-action="open-about-legal" role="link" tabindex="0">
-        <span class="dhun-settings-row__text">
-          <span class="dhun-settings-row__title">About & Legal</span>
-          <span class="dhun-settings-row__subtitle">About this build, privacy, terms, licenses, support</span>
-        </span>
-      </div>
-    </section>
-
-    <section class="dhun-section">
-      ${raw(sectionHeader("Equalizer"))}
-      <div class="dhun-settings-row">
-        <span class="dhun-settings-row__text">
-          <span class="dhun-settings-row__title">Enabled</span>
-        </span>
-        <button
-          class="dhun-switch"
-          type="button"
-          role="switch"
-          data-action="toggle-equalizer"
-          aria-checked="${equalizer.enabled ? "true" : "false"}"
-          aria-label="Enabled"
-        ></button>
-      </div>
-      <div style="padding:0 var(--dhun-space-screen-padding)">
-        <p class="dhun-track__subtitle" style="margin:0 0 var(--dhun-space-sm)">Preset</p>
-        <div class="dhun-chip-row" style="padding:0" role="radiogroup" aria-label="Preset">
-          ${raw(
-            PRESETS.map(
-              (preset) => html`<button
-                class="dhun-chip"
-                type="button"
-                role="radio"
-                data-action="set-preset"
-                data-preset="${preset.id}"
-                aria-checked="${equalizer.presetId === preset.id ? "true" : "false"}"
-              >
-                ${preset.displayName}
-              </button>`,
-            ).join(""),
-          )}
-          ${raw(
-            equalizer.presetId === CUSTOM_ID
-              ? html`<span class="dhun-chip" aria-checked="true" role="radio" aria-disabled="true">Custom</span>`
-              : "",
-          )}
+export function playlistScreen({ playlist, tracks, currentId, isOwn = false, missing = 0 }) {
+  if (!playlist) {
+    return errorState({
+      title: "That playlist could not be loaded",
+      body: "It may have been removed, or the link may be stale.",
+      actions: [{ id: "go-home", label: "Go home" }],
+    });
+  }
+  return html`<header class="dhun-entity">
+      <span class="dhun-entity__art">${artwork(playlist, { size: "hero" })}</span>
+      <div class="dhun-entity__text">
+        <p class="dhun-entity__kind">Playlist</p>
+        <h1 class="dhun-entity__title">${playlist.name}</h1>
+        <p class="dhun-entity__meta">${pluralise(tracks.length, "track")}${playlist.description ? html` · ${playlist.description}` : html``}</p>
+        <div class="dhun-entity__actions">
+          <button type="button" class="dhun-button" data-action="play-entity">${icon("Play", { size: 20 })}<span>Play</span></button>
+          <button type="button" class="dhun-button dhun-button--tonal" data-action="queue-entity">${icon("QueueMusic", { size: 20 })}<span>Queue</span></button>
+          ${isOwn
+            ? html`<button type="button" class="dhun-button dhun-button--ghost" data-action="rename-playlist">Rename</button>
+                <button type="button" class="dhun-button dhun-button--ghost" data-action="delete-playlist">Delete</button>`
+            : html``}
         </div>
       </div>
-      <div style="padding:var(--dhun-space-md) var(--dhun-space-screen-padding) 0">
-        ${raw(
-          sliderRow({
-            label: "Preamp",
-            value: equalizer.preampDb,
-            action: "set-preamp",
-          }),
-        )}
-        ${raw(
-          BANDS_HZ.map((hz, index) =>
-            sliderRow({
-              label: frequencyLabel(hz),
-              value: equalizer.gainsDb[index] ?? 0,
-              action: "set-band",
-              index,
-              enabled: equalizer.enabled,
-            }),
-          ).join(""),
-        )}
-      </div>
-    </section>
-  `;
+    </header>
+    ${missing > 0
+      ? notice({
+          tone: "info",
+          body: `${pluralise(missing, "track")} in this list could not be matched to a row DHUN can show. The playlist itself is intact.`,
+        })
+      : html``}
+    ${tracks.length
+      ? trackList(tracks, { currentId, view: "playlist" })
+      : emptyState({
+          title: "This playlist is empty",
+          body: "Add tracks from any ⋮ menu.",
+          iconName: "LibraryMusic",
+        })}`;
 }
 
-function sliderRow({ label, value, action, index = null, enabled = true }) {
-  return html`<div class="dhun-slider-row">
-    <span class="dhun-slider-row__label">${label}</span>
-    <input
-      type="range"
-      min="${MIN_GAIN_DB}"
-      max="${MAX_GAIN_DB}"
-      step="0.1"
-      value="${value}"
-      ${raw(enabled ? "" : "disabled")}
-      aria-label="${label}"
-      data-action="${action}"
-      ${raw(index === null ? "" : `data-index="${index}"`)}
-    />
-    <span class="dhun-slider-row__value">${formatDb(value)}</span>
+export function artistScreen({ artist, tracks = [], albums = [], currentId }) {
+  if (!artist) {
+    return errorState({
+      title: "That artist could not be loaded",
+      body: "The link may be stale, or the source did not answer.",
+      actions: [{ id: "go-home", label: "Go home" }],
+    });
+  }
+  return html`<header class="dhun-entity">
+      <span class="dhun-entity__art dhun-entity__art--round">${artwork(artist, { size: "hero" })}</span>
+      <div class="dhun-entity__text">
+        <p class="dhun-entity__kind">Artist</p>
+        <h1 class="dhun-entity__title">${artist.name}</h1>
+        ${artist.description ? html`<p class="dhun-entity__meta">${artist.description}</p>` : html``}
+        <div class="dhun-entity__actions">
+          <button type="button" class="dhun-button" data-action="play-entity">${icon("Play", { size: 20 })}<span>Play</span></button>
+          <button type="button" class="dhun-button dhun-button--tonal" data-action="queue-entity">${icon("QueueMusic", { size: 20 })}<span>Queue</span></button>
+        </div>
+      </div>
+    </header>
+    ${tracks.length
+      ? html`<section class="dhun-section">${sectionHeader("Songs")}${trackList(tracks, { currentId })}</section>`
+      : html``}
+    ${albums.length ? html`<section class="dhun-section">${sectionHeader("Albums")}${cardGrid(albums)}</section>` : html``}`;
+}
+
+export function albumScreen({ album, tracks = [], currentId }) {
+  if (!album) {
+    return errorState({
+      title: "That album could not be loaded",
+      body: "The link may be stale, or the source did not answer.",
+      actions: [{ id: "go-home", label: "Go home" }],
+    });
+  }
+  return html`<header class="dhun-entity">
+      <span class="dhun-entity__art">${artwork(album, { size: "hero" })}</span>
+      <div class="dhun-entity__text">
+        <p class="dhun-entity__kind">Album</p>
+        <h1 class="dhun-entity__title">${album.title}</h1>
+        <p class="dhun-entity__meta">${[album.artist, album.year].filter(Boolean).join(" · ")}${tracks.length ? html` · ${pluralise(tracks.length, "track")}` : html``}</p>
+        <div class="dhun-entity__actions">
+          <button type="button" class="dhun-button" data-action="play-entity">${icon("Play", { size: 20 })}<span>Play</span></button>
+          <button type="button" class="dhun-button dhun-button--tonal" data-action="queue-entity">${icon("QueueMusic", { size: 20 })}<span>Queue</span></button>
+        </div>
+      </div>
+    </header>
+    ${tracks.length ? trackList(tracks, { currentId }) : emptyState({ title: "No tracks were listed for this album" })}`;
+}
+
+/* -------------------------------------------------------------- settings -- */
+
+function settingRow({ title, subtitle = "", control = "", id = null }) {
+  return html`<div class="dhun-settings-row">
+    <span class="dhun-settings-row__text">
+      <span class="dhun-settings-row__title">${title}</span>
+      ${subtitle ? html`<span class="dhun-settings-row__subtitle">${subtitle}</span>` : html``}
+    </span>
+    <span class="dhun-settings-row__control"${id ? html` data-control="${id}"` : raw("")}>${control}</span>
   </div>`;
 }
 
-/* ----------------------------------------------------------------- dialogs -- */
+function switchControl({ id, label, checked, disabled = false }) {
+  return html`<button type="button" class="dhun-switch" role="switch" aria-checked="${checked ? "true" : "false"}"
+    data-action="${id}" aria-label="${label}"${disabled ? raw(" disabled") : raw("")}><span class="dhun-switch__thumb"></span></button>`;
+}
 
-/* ------------------------------------------------------------ about & legal -- */
+function chipChoice({ action, name, options, value }) {
+  return html`<div class="dhun-chip-row dhun-chip-row--wrap" role="radiogroup" aria-label="${name}">
+    ${options.map(
+      (option) => html`<button type="button" class="dhun-chip" role="radio" data-action="${action}" data-value="${option.id}"
+        aria-checked="${value === option.id ? "true" : "false"}"${option.disabled ? raw(" disabled") : raw("")}>${option.label}</button>`,
+    )}
+  </div>`;
+}
+
+function slideRow({ label, value, action, min, max, step, unit = "", disabled = false, id = null }) {
+  return html`<div class="dhun-slider-row"${id ? html` data-slider="${id}"` : raw("")}>
+    <span class="dhun-slider-row__label">${label}</span>
+    <input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-action="${action}"
+      aria-label="${label}"${disabled ? raw(" disabled") : raw("")} />
+    <span class="dhun-slider-row__value">${value}${unit}</span>
+  </div>`;
+}
+
+/** One equaliser band. Ten of these, at the app's own band centres. */
+function bandSlider(band, gain, disabled) {
+  return html`<div class="dhun-eq__band">
+    <span class="dhun-eq__gain">${gain > 0 ? "+" : ""}${gain.toFixed(1)}</span>
+    <input type="range" min="-20" max="20" step="0.1" value="${gain}" data-action="set-band" data-index="${band.index}"
+      aria-label="${band.label} band gain"${disabled ? raw(" disabled") : raw("")} />
+    <span class="dhun-eq__freq">${band.label}</span>
+  </div>`;
+}
+
+export function settingsScreen({
+  settings,
+  platform,
+  capabilities,
+  sources,
+  sourceState,
+  equalizer,
+  library,
+  pwa,
+  diagnostics,
+}) {
+  const themeOptions = [
+    { id: "dark", label: "Dark" },
+    { id: "light", label: "Light" },
+    { id: "system", label: "System" },
+  ];
+  const accentOptions = ["brand", "azure", "jade", "amber", "rose", "cyan"].map((id) => ({
+    id,
+    label: id[0].toUpperCase() + id.slice(1),
+  }));
+
+  return html`
+    <section class="dhun-section">
+      ${sectionHeader("Data source", { hint: sourceState.detail })}
+      ${notice({
+        tone: sourceState.tone,
+        title: sourceState.title,
+        body: sourceState.body,
+        actions: sourceState.actions,
+      })}
+      ${settingRow({
+        title: "Where metadata comes from",
+        subtitle: "Automatic prefers your endpoint, then YouTube Music directly, then the demo rows.",
+        control: chipChoice({
+          action: "set-source",
+          name: "Data source",
+          options: sources,
+          value: settings.sourceId,
+        }),
+      })}
+      ${settingRow({
+        title: "Your endpoint address",
+        subtitle: "Optional. Any HTTPS base URL that speaks the small contract below. DHUN never proxies it.",
+        control: html`<span class="dhun-input-pair">
+          <input type="url" inputmode="url" class="dhun-input" data-action="endpoint-url" value="${settings.endpointUrl}"
+            placeholder="https://example.org/dhun" aria-label="Endpoint address" />
+          <button type="button" class="dhun-button dhun-button--tonal" data-action="test-endpoint">Test</button>
+        </span>`,
+      })}
+      <details class="dhun-details">
+        <summary>Endpoint contract</summary>
+        <ul class="dhun-contract">
+          ${diagnostics.contract.map(
+            (entry) => html`<li><code>${entry.method} ${entry.path}</code> → ${entry.returns}${
+              entry.body ? html` <span class="dhun-contract__body">body ${entry.body}</span>` : html``
+            }</li>`,
+          )}
+        </ul>
+      </details>
+    </section>
+
+    <section class="dhun-section">
+      ${sectionHeader("Appearance")}
+      ${settingRow({ title: "Theme", subtitle: "Dark is the app's default.", control: chipChoice({ action: "set-theme", name: "Theme", options: themeOptions, value: settings.theme }) })}
+      ${settingRow({
+        title: "Accent",
+        subtitle: "The same six ramps the Android and desktop builds offer.",
+        control: chipChoice({ action: "set-accent", name: "Accent", options: accentOptions, value: settings.accent }),
+      })}
+    </section>
+
+    <section class="dhun-section">
+      ${sectionHeader("Playback")}
+      ${settingRow({
+        title: "Volume",
+        control: slideRow({ label: "Volume", value: Math.round(settings.volume * 100), action: "set-volume", min: 0, max: 100, step: 1, unit: "%" }),
+      })}
+      ${settingRow({ title: "Resume where you left off", subtitle: "Restores the queue and position on the next visit.", control: switchControl({ id: "toggle-resume", label: "Resume where you left off", checked: settings.resumeOnLaunch }) })}
+      ${settingRow({ title: "Even volume", subtitle: "A compressor that evens out loud and quiet sources. It cannot undo a bad master.", control: switchControl({ id: "toggle-compressor", label: "Even volume", checked: settings.normalizeVolume, disabled: !capabilities.audioContext }) })}
+      ${settingRow({ title: "Lyrics", subtitle: "Fetch and show synced lyrics when the source provides them.", control: switchControl({ id: "toggle-lyrics", label: "Lyrics", checked: settings.lyricsEnabled }) })}
+      ${settingRow({ title: "Romanise lyrics", subtitle: "Show a Latin transliteration under non-Latin scripts where the source includes one.", control: switchControl({ id: "toggle-romanize", label: "Romanise lyrics", checked: settings.romanizeLyrics, disabled: !settings.lyricsEnabled }) })}
+    </section>
+
+    <section class="dhun-section">
+      ${sectionHeader("Equaliser", {
+        hint: capabilities.audioContext
+          ? equalizer.status
+          : "This browser has no Web Audio API, so the equaliser is hidden rather than shown as a control that does nothing.",
+      })}
+      ${capabilities.audioContext
+        ? html`
+            ${settingRow({ title: "Enable", subtitle: "Applies to the bytes being played, in real time.", control: switchControl({ id: "toggle-equalizer", label: "Enable equaliser", checked: settings.equalizerEnabled }) })}
+            ${settingRow({
+              title: "Preset",
+              control: chipChoice({
+                action: "set-eq-preset",
+                name: "Equaliser preset",
+                options: equalizer.presets.map((preset) => ({ id: preset.id, label: preset.name })),
+                value: equalizer.activePresetId,
+              }),
+            })}
+            ${settingRow({ title: "Preamp", control: slideRow({ label: "Preamp", value: settings.equalizerPreampDb, action: "set-preamp", min: -20, max: 20, step: 0.5, unit: " dB", disabled: !settings.equalizerEnabled }) })}
+            <div class="dhun-eq" role="group" aria-label="Equaliser bands">
+              ${equalizer.bands.map((band) => bandSlider(band, settings.equalizerGains[band.index] ?? 0, !settings.equalizerEnabled))}
+            </div>
+            <div class="dhun-eq__actions">
+              <button type="button" class="dhun-button dhun-button--ghost" data-action="reset-eq">Reset to flat</button>
+            </div>`
+        : html``}
+    </section>
+
+    <section class="dhun-section">
+      ${sectionHeader("Library & storage")}
+      ${settingRow({
+        title: "Where your library lives",
+        subtitle: library.kind === "indexeddb" ? "IndexedDB in this browser profile, on this device." : "Memory only — anything you add is gone when the tab closes.",
+        control: html`<span class="dhun-stat">${pluralise(library.counts.playlists, "playlist")} · ${pluralise(library.counts.likes, "like")} · ${pluralise(library.counts.history, "play")}</span>`,
+      })}
+      ${settingRow({
+        title: "Export library",
+        subtitle: "A versioned JSON file with your playlists, likes and history. It is the only file DHUN writes.",
+        control: html`<button type="button" class="dhun-button dhun-button--tonal" data-action="export-library">Download .json</button>`,
+      })}
+      ${settingRow({
+        title: "Import library",
+        subtitle: "Merges a DHUN export into this profile. Nothing leaves the device.",
+        control: html`<label class="dhun-button dhun-button--tonal dhun-button--file">
+          <input type="file" accept="application/json,.json" data-action="import-library" />
+          <span>Choose file</span>
+        </label>`,
+      })}
+      ${settingRow({
+        title: "Clear library",
+        subtitle: "Removes playlists, likes and history from this device. It cannot be undone.",
+        control: html`<span class="dhun-input-pair">
+          ${settings.confirmClearLibrary
+            ? html`<button type="button" class="dhun-button dhun-button--danger" data-action="clear-library-confirm">Really clear</button>
+                <button type="button" class="dhun-button dhun-button--ghost" data-action="clear-library-cancel">Cancel</button>`
+            : html`<button type="button" class="dhun-button dhun-button--ghost" data-action="clear-library">Clear…</button>`}
+        </span>`,
+      })}
+      ${settingRow({
+        title: "Stream cache",
+        subtitle: "Resolved stream URLs are reused for a few minutes so skipping back and forth does not re-request them.",
+        control: html`<span class="dhun-input-pair">
+          <span class="dhun-stat">${pluralise(diagnostics.streamCacheSize, "resolved URL")}</span>
+          <button type="button" class="dhun-button dhun-button--ghost" data-action="clear-stream-cache">Clear</button>
+        </span>`,
+      })}
+    </section>
+
+    <section class="dhun-section">
+      ${sectionHeader("This browser")}
+      ${settingRow({ title: "Install as an app", subtitle: pwa.installed ? "Already running as an installed app." : pwa.installable ? "Adds DHUN to your home screen or applications menu." : "Your browser has not offered an install prompt. In Chromium browsers, check the address bar's install icon.", control: pwa.installable && !pwa.installed ? html`<button type="button" class="dhun-button dhun-button--tonal" data-action="install">Install</button>` : html`<span class="dhun-stat">${pwa.installed ? "Installed" : "Not available"}</span>` })}
+      ${settingRow({ title: "Offline shell", subtitle: pwa.offlineReady ? "The interface is cached, so a reload without a connection still opens the app. Audio cannot be cached: stream URLs are signed and expire." : "Not cached in this browser — see the diagnostics below.", control: pwa.updateReady ? html`<button type="button" class="dhun-button dhun-button--tonal" data-action="apply-update">Reload to update</button>` : html`<button type="button" class="dhun-button dhun-button--ghost" data-action="check-update">Check for update</button>` })}
+      ${settingRow({ title: "Keyboard shortcuts", subtitle: "Space, arrows, / to search, and more.", control: html`<button type="button" class="dhun-button dhun-button--ghost" data-action="show-shortcuts">Show</button>` })}
+      ${settingRow({ title: "About, privacy & legal", subtitle: "What DHUN is, what it sends, and the licence.", control: html`<button type="button" class="dhun-button dhun-button--ghost" data-action="open-about">Open</button>` })}
+    </section>
+
+    <section class="dhun-section">
+      ${sectionHeader("Diagnostics", { hint: "Everything the app can see about this browser and this build." })}
+      <dl class="dhun-diagnostics">
+        ${diagnostics.rows.map(
+          (row) => html`<div class="dhun-diagnostics__row">
+            <dt>${row.label}</dt>
+            <dd data-state="${row.state ?? "neutral"}">${row.value}</dd>
+          </div>`,
+        )}
+      </dl>
+      ${platform.unavailable.length
+        ? html`<ul class="dhun-caveats">
+            ${platform.unavailable.map((entry) => html`<li><strong>${entry.title}.</strong> ${entry.body}</li>`)}
+          </ul>`
+        : html``}
+    </section>`;
+}
+
+/* ------------------------------------------------------------ about/legal -- */
 
 /**
- * This build's identity, for the About page.
+ * This build's identity, for the bundled pages.
  *
- * Deliberately NOT `package.json`'s `"version"`: that field is `0.0.0` and is a
- * module version, not a release version, so showing it would state a version the
- * app does not have. The app reads its version from build metadata (Android from
- * the installed package, Windows from `-Ddhun.installer.version`); the browser
- * preview has no such metadata, and saying so is the honest mirror of that.
- * Relabelling `0.0.0` as the app version needs a maintainer decision first.
+ * Deliberately not the module version in `package.json`: that is a packaging
+ * version, not a release of the app. The web build is deployed from `main`, so
+ * the honest answer is the app version plus the fact that this is a static web
+ * build — and the About screen says exactly that.
  */
 export const WEB_APP_INFO = Object.freeze({
-  versionName: "not applicable",
+  versionName: WEB_VERSION,
   versionCode: null,
-  releaseChannel: "engineering preview",
-  platform: "web (browser preview)",
+  releaseChannel: "web (static build)",
+  platform: "browser",
 });
 
-/** Render-time tokens, mirroring `LegalContent.TOKEN_*` in the app. */
-const LEGAL_TOKENS = {
-  "{{appVersion}}": WEB_APP_INFO.versionName,
-  "{{appVersionCode}}": WEB_APP_INFO.versionCode ?? "unknown",
-  "{{releaseChannel}}": WEB_APP_INFO.releaseChannel,
-  "{{platform}}": WEB_APP_INFO.platform,
-};
+/** Render-time tokens, mirroring `LegalContent.TOKEN_*` in the app. Values the
+ *  document cannot know are filled from *this* build's metadata, never typed in. */
+function legalTokenTable(appInfo) {
+  return {
+    "{{appVersion}}": appInfo.versionName,
+    "{{appVersionCode}}": appInfo.versionCode ?? "not applicable",
+    "{{releaseChannel}}": appInfo.releaseChannel,
+    "{{platform}}": appInfo.platform,
+  };
+}
 
-/** Fills the About page's placeholders from this build's metadata. */
-export function substituteLegalTokens(markdown) {
-  return String(markdown).replace(
-    /\{\{[a-zA-Z][a-zA-Z0-9]*\}\}/g,
-    (token) => (token in LEGAL_TOKENS ? LEGAL_TOKENS[token] : token),
+/** Fills the pages' placeholders from this build's metadata. */
+export function substituteLegalTokens(markdown, appInfo = WEB_APP_INFO) {
+  const table = legalTokenTable(appInfo);
+  return String(markdown).replace(/\{\{[a-zA-Z][a-zA-Z0-9]*\}\}/g, (token) =>
+    token in table ? table[token] : token,
   );
 }
 
-/** Token literals still present — a page that keeps one is rendered with a warning. */
+/** Token literals still present — a page that keeps one renders with a warning. */
 export function unresolvedLegalTokens(markdown) {
   return [...new Set(String(markdown).match(/\{\{[a-zA-Z][a-zA-Z0-9]*\}\}/g) ?? [])];
 }
@@ -721,37 +829,27 @@ function isSafeUrl(url) {
 }
 
 /**
- * One span as an HTML string.
+ * One span as markup.
  *
- * Returns a plain string, never a `raw()` marker: these are concatenated with
- * `join("")` by [spansMarkup], and joining marker objects yields the literal
- * "[object Object]" — which is exactly how every link and heading on this page
- * first shipped. Every interpolated value is escaped here, so the joined result
- * is marked raw exactly once, by the caller.
+ * Every interpolated value is escaped here, and the result is marked once by the
+ * caller. A span that is not a safe link is escaped text, so a future edit to the
+ * corpus cannot turn a policy page into a `javascript:` launcher.
  */
 function spanMarkup(span) {
   if (span.kind === "link") {
-    // http(s) only. The corpus is http(s), but a future edit must not be able to
-    // turn a policy page into a javascript: launcher.
-    if (!isSafeUrl(span.url)) return escapeHtml(span.text);
-    // External links open in a new tab with the full rel triple: this page is a
-    // browser preview, and navigating away from it loses the reader's place.
-    return `<a class="dhun-legal__link" href="${escapeHtml(span.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(span.text)}</a>`;
+    // Escaping is the interpolation's job: returning the text plain means a
+    // future edit cannot forget it.
+    if (!isSafeUrl(span.url)) return span.text;
+    return html`<a class="dhun-legal__link" href="${span.url}" target="_blank" rel="noopener noreferrer">${span.text}</a>`;
   }
-  const classes = [
-    span.bold ? "dhun-legal__strong" : "",
-    span.code ? "dhun-legal__code" : "",
-    span.strike ? "dhun-legal__strike" : "",
-  ]
+  const classes = [span.bold ? "dhun-legal__strong" : "", span.code ? "dhun-legal__code" : "", span.strike ? "dhun-legal__strike" : ""]
     .filter(Boolean)
     .join(" ");
-  return classes
-    ? `<span class="${classes}">${escapeHtml(span.text)}</span>`
-    : escapeHtml(span.text);
+  return classes ? html`<span class="${classes}">${span.text}</span>` : span.text;
 }
 
 function spansMarkup(spans) {
-  return raw(spans.map(spanMarkup).join(""));
+  return html`${spans.map(spanMarkup)}`;
 }
 
 /** Cell contents are parsed too, so a link inside a table cell still works. */
@@ -759,49 +857,41 @@ function cellSpans(cell) {
   return parseMarkdown(cell).flatMap((block) => block.spans ?? []);
 }
 
-/** One Markdown block as an HTML string, the way the app's LegalBlock composes it. */
+/** One Markdown block, the way the app's LegalBlock composes it. */
 function blockMarkup(block) {
   switch (block.kind) {
     case "heading": {
       const level = Math.min(Math.max(block.level, 1), 6);
-      // h2 is the top level here: the screen's own <h1> is the page title, and a
+      // h2 is the top level here: the screen's own h1 is the page title, and a
       // second h1 would break the document outline.
       const tag = level === 1 ? "h2" : level === 2 ? "h3" : "h4";
-      return `<${tag} class="dhun-legal__heading dhun-legal__heading--${level}">${spansMarkup(block.spans).value}</${tag}>`;
+      return html`<${raw(tag)} class="dhun-legal__heading dhun-legal__heading--${level}">${spansMarkup(block.spans)}</${raw(tag)}>`;
     }
     case "paragraph":
-      return `<p class="dhun-legal__para">${spansMarkup(block.spans).value}</p>`;
+      return html`<p class="dhun-legal__para">${spansMarkup(block.spans)}</p>`;
     case "quote":
-      return `<blockquote class="dhun-legal__quote">${spansMarkup(block.spans).value}</blockquote>`;
+      return html`<blockquote class="dhun-legal__quote">${spansMarkup(block.spans)}</blockquote>`;
     case "bullet":
-      return `<li class="dhun-legal__li" data-indent="${block.indent}">${spansMarkup(block.spans).value}</li>`;
+      return html`<li class="dhun-legal__li" data-indent="${block.indent}">${spansMarkup(block.spans)}</li>`;
     case "numbered":
-      return `<li class="dhun-legal__li" data-indent="${block.indent}" value="${block.number}">${spansMarkup(block.spans).value}</li>`;
+      return html`<li class="dhun-legal__li" data-indent="${block.indent}" value="${block.number}">${spansMarkup(block.spans)}</li>`;
     case "code":
-      return `<pre class="dhun-legal__pre"><code>${escapeHtml(block.text)}</code></pre>`;
+      return html`<pre class="dhun-legal__pre"><code>${block.text}</code></pre>`;
     case "rule":
-      return '<hr class="dhun-legal__rule" />';
+      return html`<hr class="dhun-legal__rule" />`;
     case "table":
       // Stacked label/value records, not a grid: a four-column table on a 360px
       // phone is either illegible or sideways-scrollable, and a policy that
       // scrolls sideways is a policy nobody finishes reading.
-      return block.rows
-        .map(
-          (row) =>
-            `<dl class="dhun-legal__record">${row
-              .map((cell, column) => {
-                const label = block.headers[column];
-                const heading =
-                  label && label.trim() !== ""
-                    ? `<dt class="dhun-legal__label">${escapeHtml(label)}</dt>`
-                    : "";
-                return `${heading}<dd class="dhun-legal__value">${spansMarkup(cellSpans(cell)).value}</dd>`;
-              })
-              .join("")}</dl>`,
-        )
-        .join("");
+      return html`${block.rows.map(
+        (row) => html`<dl class="dhun-legal__record">${row.map((cell, column) => {
+          const label = block.headers[column];
+          return html`${label && label.trim() !== "" ? html`<dt class="dhun-legal__label">${label}</dt>` : html``}
+            <dd class="dhun-legal__value">${spansMarkup(cellSpans(cell))}</dd>`;
+        })}</dl>`,
+      )}`;
     default:
-      return "";
+      return html``;
   }
 }
 
@@ -814,7 +904,7 @@ function blocksMarkup(blocks) {
   const flush = () => {
     if (!open.length) return;
     const tag = listKind === "numbered" ? "ol" : "ul";
-    out.push(`<${tag} class="dhun-legal__list">${open.join("")}</${tag}>`);
+    out.push(html`<${raw(tag)} class="dhun-legal__list">${open}</${raw(tag)}>`);
     open = [];
     listKind = null;
   };
@@ -830,139 +920,208 @@ function blocksMarkup(blocks) {
     }
   }
   flush();
-  return raw(out.join(""));
+  return html`${out}`;
 }
 
-/** Settings -> About & Legal: the page index. */
-export function legalIndexScreen(documents) {
+/**
+ * About & legal.
+ *
+ * The documents are the project's own pages, generated from `legal/*.md` into
+ * `data/legal-content.js` — the same bytes the Android and desktop builds
+ * compile in. `blocks` is Markdown from that bundle, rendered here by the HTML
+ * mirror of the app's `Markdown.kt`. It is app content, not visitor data, which
+ * is why it renders as markup rather than as text.
+ */
+export function aboutLegalScreen({ documents, activeId, document, platform, build }) {
+  const appInfo = { ...WEB_APP_INFO, ...(build ?? {}) , versionName: build?.version ?? WEB_APP_INFO.versionName };
+  const markdown = document ? substituteLegalTokens(document.markdown, appInfo) : "";
+  const unresolved = document ? unresolvedLegalTokens(markdown) : [];
   return html`
-    <p class="dhun-legal__intro">
-      These pages ship inside the app, so they open with no connection. Every
-      statement carries a status tag saying whether it was read from the source,
-      observed by running the app, taken from a third party, or is still awaiting
-      a decision.
-    </p>
-    <ul class="dhun-legal__index">
-      ${raw(
-        documents
-          .map(
-            (doc) => html`<li>
-              <a class="dhun-legal__entry" href="#/legal/${doc.id}" data-action="open-legal" data-id="${doc.id}">
-                <span class="dhun-legal__entry-title">${doc.title}</span>
-                <span class="dhun-legal__entry-meta${doc.status === "draft" ? " dhun-legal__entry-meta--draft" : ""}">
-                  ${doc.status === "draft" ? `Draft · effective ${doc.effectiveDate}` : `Effective ${doc.effectiveDate}`}
-                </span>
-              </a>
-            </li>`,
-          )
-          .join(""),
-      )}
-    </ul>`;
+    <section class="dhun-section">
+      ${sectionHeader("About DHUN in a browser", { hint: `Build ${build.version} · ${build.label}` })}
+      <div class="dhun-legal__intro">
+        <p>
+          DHUN is a free, open-source music player. This is its web build: the same design system,
+          the same navigation rules and the same queue behaviour as the Android and desktop apps, running
+          entirely in your browser.
+        </p>
+        <p>
+          <strong>What it is not.</strong> It is not an official YouTube or YouTube Music client, and it is not
+          affiliated with Google. It reads YouTube Music's public endpoints anonymously — no account is used, no
+          cookie is sent, and nothing is proxied through a DHUN server, because there is no DHUN server.
+        </p>
+        <p>
+          <strong>What can break.</strong> Upstream endpoints change, and an origin can refuse cross-origin
+          requests from a browser entirely. When that happens DHUN says so on screen and offers the data-source
+          options in Settings, rather than showing invented rows as if they were real.
+        </p>
+      </div>
+      <div class="dhun-input-pair">
+        <button type="button" class="dhun-button dhun-button--tonal" data-action="show-shortcuts">Keyboard shortcuts</button>
+        <button type="button" class="dhun-button dhun-button--ghost" data-action="export-library">Export my library</button>
+      </div>
+    </section>
+
+    <section class="dhun-section">
+      ${sectionHeader("Privacy, in one screen")}
+      <ul class="dhun-caveats">
+        <li><strong>No account.</strong> There is no sign-in, no session cookie and no DHUN user record anywhere.</li>
+        <li><strong>Your library stays here.</strong> Playlists, likes and history live in this browser's storage on this device. Export is the only way they leave it.</li>
+        <li><strong>Requests go to a music service, not to us.</strong> Metadata and audio are fetched from YouTube Music directly by your browser, or from an endpoint you configure. DHUN operates no server, so there is nothing for DHUN to collect.</li>
+        <li><strong>No analytics, no telemetry, no advertising.</strong> Nothing in this build reports usage anywhere.</li>
+        <li><strong>The service worker</strong> caches the app's own files so it opens offline. It does not cache audio.</li>
+        <li><strong>Diagnostics</strong> (${platform.language ?? "an unknown language"}; online: ${String(platform.network.online)}) are shown to you on the Settings screen and are never uploaded.</li>
+      </ul>
+    </section>
+
+    <section class="dhun-section">
+      ${sectionHeader("Bundled documents", { hint: "Generated from legal/*.md — the same text the apps carry." })}
+      <ul class="dhun-legal__index">
+        ${documents.map(
+          (entry) => html`<li>
+            <a class="dhun-legal__entry" href="${entry.href}" ${entry.id === activeId ? raw('aria-current="true"') : raw("")}>
+              <span class="dhun-legal__entry-title">${entry.title}</span>
+              <span class="dhun-legal__entry-meta${entry.status === "draft" ? " dhun-legal__entry-meta--draft" : ""}">
+                ${entry.status === "draft" ? `Draft · effective ${entry.effectiveDate}` : `Effective ${entry.effectiveDate}`}
+              </span>
+            </a>
+          </li>`,
+        )}
+      </ul>
+      ${document && document.status === "missing"
+        ? notice({
+            tone: "warn",
+            title: document.title,
+            body: `The link asked for a document this build does not carry (${document.id}). The list above is what is bundled.`,
+          })
+        : html``}
+      ${document && document.status !== "missing"
+        ? html`<article class="dhun-legal__document">
+            ${unresolved.length
+              ? html`<p class="dhun-legal__warn" role="alert">
+                  This page still contains an unfilled placeholder (${unresolved.join(", ")}), so part of it
+                  may read incorrectly.
+                </p>`
+              : html``}
+            ${document.status === "draft"
+              ? html`<aside class="dhun-legal__banner" role="note">
+                  <strong>Draft — not yet in force</strong>
+                  <p>
+                    This page has not been reviewed by a lawyer and no contact channel has been published.
+                    It is effective ${document.effectiveDate}.
+                  </p>
+                </aside>`
+              : html``}
+            <div class="dhun-legal__body" data-doc-id="${document.id}" data-sha256="${document.sha256}">
+              ${blocksMarkup(parseMarkdown(markdown))}
+            </div>
+          </article>`
+        : html`<p class="dhun-state__body">Choose a document above.</p>`}
+    </section>`;
 }
 
-/** One legal document, rendered from the bundled Markdown. */
-export function legalDocumentScreen(document, { appInfo = WEB_APP_INFO } = {}) {
-  const markdown = substituteLegalTokens(document.markdown);
-  const unresolved = unresolvedLegalTokens(markdown);
-  const blocks = parseMarkdown(markdown);
+/* ---------------------------------------------------------------- sheets -- */
 
-  return html`
-    ${unresolved.length > 0
-      ? html`<p class="dhun-legal__warn" role="alert">
-          This page still contains an unfilled placeholder (${unresolved.join(", ")}), so part of it
-          may read incorrectly.
-        </p>`
-      : ""}
-    ${document.status === "draft"
-      ? html`<aside class="dhun-legal__banner" role="note">
-          <strong>Draft — not yet in force</strong>
-          <p>
-            This page has not been reviewed by a lawyer and no contact channel has been
-            published. It is effective ${document.effectiveDate}.
-          </p>
-        </aside>`
-      : ""}
-    <dl class="dhun-legal__buildinfo">
-      <dt>Version</dt><dd>${appInfo.versionName}</dd>
-      <dt>Version code</dt><dd>${appInfo.versionCode ?? "not applicable"}</dd>
-      <dt>Release channel</dt><dd>${appInfo.releaseChannel}</dd>
-      <dt>Platform</dt><dd>${appInfo.platform}</dd>
-    </dl>
-    <div class="dhun-legal__body" data-testid="legal-body" data-doc-id="${document.id}"
-         data-sha256="${document.sha256}">
-      ${blocksMarkup(blocks)}
-    </div>`;
-}
-
-/** A legal id that this build does not carry — a wiring bug, said out loud. */
-export function legalMissingScreen(documentId) {
-  return html`<p class="dhun-legal__para">
-    This page (<code>${documentId}</code>) is not in this build.
-  </p>`;
-}
-
-export function trackOverflowSheet(track, { inFavourites }) {
-  return html`<div class="dhun-sheet" role="dialog" aria-modal="true" aria-label="More actions for ${track.title}">
-    <h2 class="dhun-sheet__title">${track.title}</h2>
-    <ul class="dhun-menu">
-      <li>
-        <button class="dhun-menu__row" type="button" data-action="queue-next">
-          ${icon("QueueMusic")} Play next
-        </button>
-      </li>
-      <li>
-        <button class="dhun-menu__row" type="button" data-action="toggle-favourite">
-          ${icon(inFavourites ? "Favorite" : "FavoriteBorder")}
-          ${inFavourites ? "Remove from liked songs" : "Add to liked songs"}
-        </button>
-      </li>
-      <li>
-        <button class="dhun-menu__row" type="button" data-action="add-to-playlist">
-          ${icon("QueueMusic")} Add to playlist
-        </button>
-      </li>
-      <li>
-        <button class="dhun-menu__row" type="button" data-action="go-to-artist">
-          ${icon("Person")} Go to artist
-        </button>
-      </li>
-      <li>
-        <button class="dhun-menu__row" type="button" data-action="go-to-album">
-          ${icon("Album")} Go to album
-        </button>
-      </li>
-      <li>
-        <button class="dhun-menu__row" type="button" data-action="close-sheet">${icon("Close")} Close</button>
-      </li>
-    </ul>
+/** The ⋮ menu for a track. Every action here works on a real data source. */
+export function trackMenuSheet({ track, inQueue = false, liked = false, playlists = [] }) {
+  return html`<div class="dhun-sheet" role="dialog" aria-modal="true" aria-label="Track actions">
+    <div class="dhun-menu-header">
+      ${artwork(track, { size: "thumb" })}
+      <span class="dhun-menu-header__text">
+        <span class="dhun-menu-header__title">${track.title}</span>
+        <span class="dhun-menu-header__sub">${track.artist ?? ""}</span>
+      </span>
+      <button type="button" class="dhun-icon-button" data-action="close-sheet" aria-label="Close">${icon("Close", { size: 20 })}</button>
+    </div>
+    <div class="dhun-menu" role="menu">
+      <button type="button" class="dhun-menu__row" role="menuitem" data-action="menu-play-now">${icon("Play", { size: 20 })}<span>Play now</span></button>
+      <button type="button" class="dhun-menu__row" role="menuitem" data-action="menu-play-next">${icon("QueueMusic", { size: 20 })}<span>Play next</span></button>
+      <button type="button" class="dhun-menu__row" role="menuitem" data-action="menu-queue-last">${icon("Add", { size: 20 })}<span>Add to queue</span></button>
+      <button type="button" class="dhun-menu__row" role="menuitem" data-action="menu-like">${icon("Favorite", { size: 20 })}<span>${liked ? "Remove from liked" : "Like"}</span></button>
+      <button type="button" class="dhun-menu__row" role="menuitem" data-action="menu-add-playlist">${icon("Add", { size: 20 })}<span>Add to playlist…</span></button>
+      ${inQueue ? html`<button type="button" class="dhun-menu__row" role="menuitem" data-action="queue-remove" data-index="${track.queueIndex ?? ""}">${icon("Close", { size: 20 })}<span>Remove from queue</span></button>` : html``}
+      ${track.albumId
+        ? html`<button type="button" class="dhun-menu__row" role="menuitem" data-action="menu-open-album" data-id="${track.albumId}">${icon("Album", { size: 20 })}<span>Go to album</span></button>`
+        : html``}
+      ${track.artistId
+        ? html`<button type="button" class="dhun-menu__row" role="menuitem" data-action="menu-open-artist" data-id="${track.artistId}">${icon("Person", { size: 20 })}<span>Go to artist</span></button>`
+        : html``}
+      <button type="button" class="dhun-menu__row" role="menuitem" data-action="menu-copy-link">${icon("Link", { size: 20 })}<span>Copy link to this track</span></button>
+    </div>
   </div>`;
 }
 
-export function addToPlaylistSheet(track, playlists) {
-  return html`<div class="dhun-sheet" role="dialog" aria-modal="true" aria-label="Add ${track.title} to a playlist">
-    <h2 class="dhun-sheet__title">Add to playlist</h2>
-    <ul class="dhun-menu">
-      ${raw(
-        playlists
-          .map(
-            (playlist) => html`<li>
-              <button
-                class="dhun-menu__row"
-                type="button"
-                data-action="confirm-add-to-playlist"
-                data-playlist-id="${playlist.id}"
-              >
-                ${icon("QueueMusic")} ${playlist.name}
-              </button>
-            </li>`,
-          )
-          .join(""),
-      )}
-      <li>
-        <button class="dhun-menu__row" type="button" data-action="close-sheet">${icon("Close")} Close</button>
-      </li>
-    </ul>
+export function playlistPickerSheet({ track, playlists }) {
+  return html`<div class="dhun-sheet" role="dialog" aria-modal="true" aria-label="Add to playlist">
+    <div class="dhun-menu-header">
+      <span class="dhun-menu-header__text">
+        <span class="dhun-menu-header__title">Add to playlist</span>
+        <span class="dhun-menu-header__sub">${track?.title ?? ""}</span>
+      </span>
+      <button type="button" class="dhun-icon-button" data-action="close-sheet" aria-label="Close">${icon("Close", { size: 20 })}</button>
+    </div>
+    ${playlists.length
+      ? html`<div class="dhun-menu" role="menu">
+          ${playlists.map(
+            (playlist) => html`<button type="button" class="dhun-menu__row" role="menuitem" data-action="add-to-playlist" data-id="${playlist.id}">
+              ${icon("Add", { size: 20 })}<span>${playlist.name}</span>
+            </button>`,
+          )}
+        </div>`
+      : emptyState({ title: "No playlists yet", body: "Create one below.", iconName: "LibraryMusic" })}
+    <form class="dhun-newplaylist" data-action="new-playlist">
+      <input class="dhun-input" type="text" name="name" placeholder="New playlist name" aria-label="New playlist name" maxlength="120" />
+      <button type="submit" class="dhun-button dhun-button--tonal">Create</button>
+    </form>
   </div>`;
 }
 
-export { escapeHtml };
+export function confirmSheet({ title, body, confirmLabel, action, cancelLabel = "Cancel" }) {
+  return html`<div class="dhun-sheet" role="dialog" aria-modal="true" aria-label="${title}">
+    <div class="dhun-menu-header">
+      <span class="dhun-menu-header__text">
+        <span class="dhun-menu-header__title">${title}</span>
+        ${body ? html`<span class="dhun-menu-header__sub">${body}</span>` : html``}
+      </span>
+    </div>
+    <div class="dhun-menu">
+      <button type="button" class="dhun-menu__row dhun-menu__row--danger" role="menuitem" data-action="${action}">${icon("Delete", { size: 20 })}<span>${confirmLabel}</span></button>
+      <button type="button" class="dhun-menu__row" role="menuitem" data-action="close-sheet">${icon("Close", { size: 20 })}<span>${cancelLabel}</span></button>
+    </div>
+  </div>`;
+}
+
+/** The keyboard map, generated from `shortcuts.js` so it cannot drift. */
+export function shortcutsSheet({ platform }) {
+  return html`<div class="dhun-sheet dhun-sheet--help" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <div class="dhun-menu-header">
+      <span class="dhun-menu-header__text">
+        <span class="dhun-menu-header__title">Keyboard shortcuts</span>
+        <span class="dhun-menu-header__sub">They never fire while you are typing in a field.</span>
+      </span>
+      <button type="button" class="dhun-icon-button" data-action="close-sheet" aria-label="Close">${icon("Close", { size: 20 })}</button>
+    </div>
+    <div class="dhun-help">
+      ${shortcutGroups().map(
+        (group) => html`<section class="dhun-help__group">
+          <h3 class="dhun-help__title">${group.name}</h3>
+          <dl class="dhun-help__list">
+            ${group.items.map(
+              (item) => html`<div class="dhun-help__row">
+                <dt><kbd class="dhun-kbd">${shortcutKeys(item, platform)}</kbd></dt>
+                <dd>${item.label}</dd>
+              </div>`,
+            )}
+          </dl>
+        </section>`,
+      )}
+    </div>
+  </div>`;
+}
+
+/** A transient confirmation ("Added to queue"). Announced, never blocking. */
+export function toast(message) {
+  return html`<p class="dhun-toast" role="status">${message}</p>`;
+}
+
+export { WEB_VERSION, BUILD_LABEL };

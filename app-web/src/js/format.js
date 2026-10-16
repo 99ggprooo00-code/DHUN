@@ -12,17 +12,6 @@ export function formatDuration(ms) {
     : `${mm}:${String(seconds).padStart(2, "0")}`;
 }
 
-/** SettingsViewModel.cacheOptionLabel — 0 → "Unlimited", <1024 → "512 MB",
- *  else → "2 GB". */
-export function cacheOptionLabel(mb) {
-  if (mb === 0) return "Unlimited";
-  if (mb >= 1 && mb <= 1023) return `${mb} MB`;
-  return `${Math.floor(mb / 1024)} GB`;
-}
-
-/** SettingsViewModel.CACHE_OPTIONS_MB. */
-export const CACHE_OPTIONS_MB = Object.freeze([256, 512, 1024, 2048, 4096, 0]);
-
 /** TrackRow subtitle: "Artist • Album". */
 export function trackSubtitle(track) {
   return [track.artist, track.album].filter(Boolean).join(" • ");
@@ -33,14 +22,3 @@ export function pluralise(count, singular) {
   return `${count} ${singular}${count === 1 ? "" : "s"}`;
 }
 
-/** Escape for interpolation into HTML built with template strings. Every
- *  value that comes from a catalogue (including a live one) goes through
- *  here — a track title is data, never markup. */
-export function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}

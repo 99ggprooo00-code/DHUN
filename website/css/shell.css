@@ -1,0 +1,396 @@
+/* ============================================================================
+   The app shell.
+
+   Every rule here is the web app's own chrome, expressed for a document:
+     .site-header  — DhunTopAppBar: a glass bar, 64 dp tall, a hairline bottom
+                     edge, a brand mark at the leading edge and one action
+                     button at the trailing edge.
+     .site-nav     — DhunBottomNavigation below the app's 840 dp breakpoint and
+                     DhunNavigationRail above it. One element, two layouts: two
+                     navs would mean two `aria-current` markers and two sets of
+                     tab stops for the same three links.
+     .dock         — the docked mini-player's slot, which is where a visitor who
+                     has just read about the app expects the way in to be.
+
+   The values are the app's tokens (see css/tokens.css, generated from
+   app-web/src/css/tokens.css by tools/sync-tokens.mjs), and the component names
+   are the ones the web app uses, so the two shells can be read side by side.
+   ========================================================================== */
+
+/* ------------------------------------------------------------- app bar -- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--glass-bar-top);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.app-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 64px;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--target);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  font-size: 0.85rem;
+}
+.wordmark-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.95rem;
+}
+/* The screen title, in the slot the app's top bar gives it. It is the first
+   thing the bar drops: below 640px the bar has room for the brand and the one
+   action, and a truncated title between them would read as noise. */
+.app-bar__title {
+  margin: 0;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+.app-bar__actions .btn {
+  min-height: var(--target);
+  font-size: 0.92rem;
+}
+/* A round icon button: the app bar's trailing action, sized to the target. */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: var(--target);
+  height: var(--target);
+  border-radius: var(--r-full);
+  color: var(--text-2);
+  text-decoration: none;
+  border: 1px solid var(--hairline);
+  background: var(--glass);
+}
+.icon-btn:hover {
+  color: var(--text);
+  border-color: var(--hairline-strong);
+}
+
+/* --------------------------------------------------------------- nav -- */
+
+.site-nav ul {
+  display: flex;
+  align-items: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-height: var(--target);
+  min-width: var(--target);
+  padding: var(--sp-1) var(--sp-2);
+  color: var(--text-3);
+  text-decoration: none;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: var(--r-lg);
+}
+.site-nav a:hover {
+  color: var(--text);
+  background: var(--surface-variant);
+}
+
+/* The app's nav indicator: a tinted capsule behind the icon. Forced colours
+   drops backgrounds, so the current item carries a frame and an underline too —
+   `navigation_state_violations` in scripts/website_quality.py refuses a marker
+   that is a background colour alone, and measures the same thing in a real
+   browser via website/tests/browser.mjs. */
+.site-nav a[aria-current="page"] {
+  color: var(--text);
+  background: var(--accent-container);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.3em;
+}
+.site-nav a[aria-current="page"] .i {
+  color: var(--accent);
+}
+.wordmark[aria-current="page"] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 0.35em;
+}
+/* Phones: DhunBottomNavigation. Fixed to the bottom edge, glass, safe-area
+   padded, with the app's own 3-destination row. */
+.site-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 25;
+  background: var(--glass-bar-top);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border-top: 1px solid var(--hairline);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.site-nav ul {
+  width: min(100% - 2rem, var(--wrap));
+  margin-inline: auto;
+  gap: var(--sp-1);
+}
+.site-nav li {
+  flex: 1;
+  margin: 0;
+}
+.site-nav a {
+  min-height: 56px;
+}
+
+@media (min-width: 640px) {
+  .app-bar__title {
+    display: block;
+  }
+}
+
+/* The app's navigation rail, above DhunSpacing.navigationRailBreakpoint (840dp):
+   the same three destinations, vertical, at the leading edge. */
+@media (min-width: 840px) {
+  .site-nav {
+    position: fixed;
+    top: 64px;
+    bottom: 0;
+    left: 0;
+    right: auto;
+    width: 96px;
+    border-top: 0;
+    border-right: 1px solid var(--hairline);
+    padding: var(--sp-3) var(--sp-2);
+  }
+  .site-nav ul {
+    width: auto;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+  .site-nav a {
+    min-height: 68px;
+  }
+  body {
+    padding-left: 96px;
+  }
+}
+
+/* -------------------------------------------------------------- dock -- */
+
+.dock {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  /* Sits directly above the bottom navigation / the rail's foot, at the same
+     width the page content uses. */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 68px;
+  z-index: 24;
+  margin-inline: auto;
+  width: min(100% - 1rem, 40rem);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-xl);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  text-decoration: none;
+}
+.dock:hover {
+  border-color: var(--hairline-strong);
+}
+.dock__art {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-lg);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 1.1rem;
+}
+.dock__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.dock__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dock__sub {
+  font-size: 0.78rem;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dock__go {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--hairline-strong);
+  color: var(--accent);
+}
+
+@media (min-width: 840px) {
+  .dock {
+    left: 96px;
+    width: min(100% - 7rem, 40rem);
+    bottom: var(--sp-4);
+  }
+}
+
+/* --------------------------------------------------------- appearance -- */
+
+.appearance {
+  border-top: 1px solid var(--hairline);
+  padding-top: var(--sp-5);
+}
+.appearance__title {
+  margin: 0 0 var(--sp-2);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.appearance__lead {
+  color: var(--text-3);
+  font-size: 0.86rem;
+  max-width: 78ch;
+}
+.appearance__groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+  margin-top: var(--sp-3);
+}
+.appearance__group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.appearance__group legend {
+  padding: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.appearance__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+/* The radio is the label's own hit area, spread over it at zero opacity: the
+   control keeps its keyboard behaviour, its role and its accessible name, and
+   the target a pointer gets is the whole chip (>= 44px) rather than a 1px
+   clipped box. website/tests/browser.mjs measures every target on the page,
+   including these. */
+.appearance__choice {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--target);
+  padding: 0 var(--sp-4) 0 var(--sp-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-full);
+  background: var(--glass);
+  color: var(--text-2);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.appearance__choice input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.appearance__choice:has(input:checked) {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-container);
+}
+.appearance__choice:has(input:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+/* The accent chips are the app's six ramps, drawn with the ramp they stand for
+   — the same swatch the app's Settings screen shows. */
+.appearance__chip {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--r-full);
+  border: 1px solid var(--glass-edge);
+}
+.appearance__chip--brand { background: var(--dhun-accent-brand-dark); }
+.appearance__chip--azure { background: var(--dhun-accent-azure-dark); }
+.appearance__chip--jade { background: var(--dhun-accent-jade-dark); }
+.appearance__chip--amber { background: var(--dhun-accent-amber-dark); }
+.appearance__chip--rose { background: var(--dhun-accent-rose-dark); }
+.appearance__chip--cyan { background: var(--dhun-accent-cyan-dark); }
+
+@media (prefers-color-scheme: light) {
+  .appearance__chip--brand { background: var(--dhun-accent-brand-light); }
+  .appearance__chip--azure { background: var(--dhun-accent-azure-light); }
+  .appearance__chip--jade { background: var(--dhun-accent-jade-light); }
+  .appearance__chip--amber { background: var(--dhun-accent-amber-light); }
+  .appearance__chip--rose { background: var(--dhun-accent-rose-light); }
+  .appearance__chip--cyan { background: var(--dhun-accent-cyan-light); }
+}

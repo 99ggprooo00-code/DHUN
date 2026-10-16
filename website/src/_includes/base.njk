@@ -1,5 +1,8 @@
-{#- Base layout: head, skip link, header, footer. One <h1> per page comes from
-    the page template, never from here. -#}
+{#- Base layout: the app's shell. Head, skip link, glass app bar, navigation
+    (bottom tabs on phones, rail above 840px), the docked bar that leads into
+    the live app, and the footer that carries the appearance controls.
+
+    One <h1> per page comes from the page template, never from here. -#}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,6 +11,9 @@
 <title>{{ title }}</title>
 <meta name="description" content="{{ description }}">
 <link rel="canonical" href="{{ site.url }}{{ page.url }}">
+{#- The app is dark-first (DhunThemeMode.default = DARK) and offers light; the
+    bar's own colour follows the scheme in use. Kept in step with the tokens by
+    `design_system_violations` in scripts/website_quality.py. -#}
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#161616" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#F6F4F1" media="(prefers-color-scheme: light)">
@@ -31,7 +37,7 @@
     scripts/website_quality.py asserts every one of those omissions, so this
     comment cannot drift from the JSON below it. -#}
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DHUN","applicationCategory":"MultimediaApplication","operatingSystem":"Android 7.0+, Windows","isAccessibleForFree":true,"license":"{{ site.licence }}","url":"{{ site.url }}/","codeRepository":"{{ site.repo }}"}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DHUN","applicationCategory":"MultimediaApplication","operatingSystem":"Android 7.0+, Windows, any modern browser","isAccessibleForFree":true,"license":"{{ site.licence }}","url":"{{ site.url }}/","codeRepository":"{{ site.repo }}"}
 </script>
 <link rel="icon" href="{{ favicon.dataUri }}" type="image/svg+xml">
 {#- One request per route: the stylesheet the page needs is inlined here from
@@ -47,7 +53,7 @@
 <!--icon-sprite-->
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header">
-  <div class="wrap header-inner">
+  <div class="wrap app-bar">
     {#- aria-current marks the destination the visitor is on. `/` is the wordmark,
         which is the site's home link; the nav items mark themselves when their
         href is this page's URL. Exactly one per page, asserted by
@@ -57,15 +63,33 @@
       <span class="wordmark-mark" aria-hidden="true">{% icon "play" %}</span>
       <span>DHUN</span>
     </a>
-    <nav class="site-nav" aria-label="Main">
-      <ul>
-        {%- for item in site.nav %}
-        <li><a href="{{ item.href | sitePath }}"{% if item.external %} rel="noopener"{% endif %}{% if item.href == page.url %} aria-current="page"{% endif %}>{{ item.label }}{% if item.external %}<span class="ext" aria-hidden="true">{% icon "external" %}</span><span class="sr-only"> (opens in a new tab)</span>{% endif %}</a></li>
-        {%- endfor %}
-      </ul>
-    </nav>
+    <p class="app-bar__title">{{ appBarTitle or "Music without an account" }}</p>
+    <div class="app-bar__actions">
+      <a class="icon-btn" href="{{ site.repo }}" rel="noopener" aria-label="Source on GitHub">{% icon "external" %}</a>
+      <a class="btn btn--primary" href="{{ '/app/' | sitePath }}">Open the app</a>
+    </div>
   </div>
 </header>
+{#- The app's navigation: DhunBottomNavigation on a phone, DhunNavigationRail
+    from 840px up (`website/css/shell.css`). One element, so there is exactly one
+    `aria-current` and one set of tab stops. -#}
+<nav class="site-nav" aria-label="Main">
+  <ul>
+    {%- for item in site.nav %}
+    <li><a href="{{ item.href | sitePath }}"{% if item.external %} rel="noopener"{% endif %}{% if item.href == page.url %} aria-current="page"{% endif %}>{% icon item.icon %}<span>{{ item.label }}</span>{% if item.external %}<span class="sr-only"> (opens in a new tab)</span>{% endif %}</a></li>
+    {%- endfor %}
+  </ul>
+</nav>
+{#- The docked bar, where the app keeps its mini-player: the one destination
+    this site exists to hand a visitor. -#}
+<a class="dock" href="{{ '/app/' | sitePath }}">
+  <span class="dock__art" aria-hidden="true">{% icon "play" %}</span>
+  <span class="dock__text">
+    <span class="dock__title">Try the live app</span>
+    <span class="dock__sub">{{ dockNote or "Runs in this browser — no sign-in, no install" }}</span>
+  </span>
+  <span class="dock__go" aria-hidden="true">{% icon "skipNext" %}</span>
+</a>
 <main id="main" tabindex="-1">
 {{ content | safe }}
 </main>
@@ -91,6 +115,52 @@
     </div>
     <p class="footer-note footer-independence">{{ site.footer.independence }}</p>
     <p class="footer-note">{{ site.footer.builtWith }}</p>
+
+    {#- The app's appearance settings, as the app's Settings screen offers them:
+        a theme (dark by default) and one of six accent ramps. Radio inputs +
+        `:has()` in css/tokens.css do the work — the site ships no JavaScript at
+        all, so this is the whole mechanism. -#}
+    <section class="appearance" aria-labelledby="appearance-title">
+      <h2 class="appearance__title" id="appearance-title">Appearance</h2>
+      <!--{{ site.appearanceSource }}-->
+      <p class="appearance__lead">
+        The same two choices the app's Settings screen offers, applied to this page with
+        CSS only: dark by default, light on request, and the six accent ramps the app
+        ships. Nothing is stored and nothing is sent — reload the page and it is back to
+        your system's preference.
+      </p>
+      <div class="appearance__groups">
+        <fieldset class="appearance__group">
+          <legend>Theme</legend>
+          <div class="appearance__choices">
+            <label class="appearance__choice">
+              <input type="radio" name="dhun-theme" value="system" checked>
+              <span>Match system</span>
+            </label>
+            <label class="appearance__choice">
+              <input type="radio" name="dhun-theme" value="dark" id="theme-dark">
+              <span>Dark</span>
+            </label>
+            <label class="appearance__choice">
+              <input type="radio" name="dhun-theme" value="light" id="theme-light">
+              <span>Light</span>
+            </label>
+          </div>
+        </fieldset>
+        <fieldset class="appearance__group">
+          <legend>Accent</legend>
+          <div class="appearance__choices">
+            {%- for ramp in site.accents %}
+            <label class="appearance__choice">
+              <input type="radio" name="dhun-accent" value="{{ ramp.id }}" id="accent-{{ ramp.id }}"{% if ramp.default %} checked{% endif %}>
+              <span class="appearance__chip appearance__chip--{{ ramp.id }}" aria-hidden="true"></span>
+              <span>{{ ramp.label }}</span>
+            </label>
+            {%- endfor %}
+          </div>
+        </fieldset>
+      </div>
+    </section>
   </div>
 </footer>
 </body>

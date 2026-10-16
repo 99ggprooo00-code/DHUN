@@ -70,10 +70,11 @@ const ICONS = {
 const SPRITE_SLOT = "<!--icon-sprite-->";
 const SPRITE_USE = /<use href="#i-([a-zA-Z0-9]+)"\/>/g;
 
-// Module order is meaningful: tokens first, then the shared layers, then the
+// Module order is meaningful: tokens first, then the shared layers (base, then
+// the app shell, then the components the pages are built from), then the
 // page-specific ones. `scripts/website_quality.py` reads the built pages, so
 // the order only has to be stable — and it is, because it is written here.
-const CSS_MODULES = ["tokens", "base", "components", "mockups", "ui"];
+const CSS_MODULES = ["tokens", "base", "shell", "components", "mockups", "ui"];
 
 function readModule(name) {
   if (!CSS_MODULES.includes(name)) {

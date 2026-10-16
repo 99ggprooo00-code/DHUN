@@ -186,15 +186,21 @@ Clearing your local history removes your local record only. It does not delete
 anything YouTube or Google may hold, and this app cannot ask them to.
 **[source] [legal]**
 
-## 8. The website and the browser preview
+## 8. The website and the web app
 
 The marketing site is static: its only `<script>` elements are JSON-LD data
 blocks, and it loads nothing from a third-party origin. GitHub, as the host,
 processes requests under its own policies. **[source]**
 
-The browser preview sets a strict Content-Security-Policy and makes no
-third-party request. It is an engineering preview, not a product surface, and
-audio playback from that origin is unproven. **[source]**
+The web app at `/app/` is the same client in a browser. It has no account and no
+service of its own: your library — playlists, likes and history — is stored in
+that browser's local storage, and clearing site data removes it. It sets a strict
+Content-Security-Policy whose `connect-src` allows only its own origin and the
+YouTube Music origin, and it sends no telemetry. When you play or search, it
+requests YouTube directly from your browser, which reveals your IP address to
+YouTube exactly as browsing there would; a browser may refuse that request and
+the app then says so instead of pretending otherwise. A service worker caches the
+app's own files so it opens offline; it caches no audio. **[source]**
 
 ## 9. Open questions
 
