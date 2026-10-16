@@ -135,6 +135,34 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
   reports the mistake too late to prevent it. Found by running
   `python3 scripts/website_smoke.py http://127.0.0.1:8080` against the assembled
   tree, which is the same tree the workflow tests.
+- **Fixed: `/features/` was still telling visitors there is no web app.** The
+  published page read *"No iOS, no web player, no browser client, no PWA"* — a
+  sentence from the pre-web-app build, still live at
+  `99ggprooo00-code.github.io/DHUN/features/` while the web app shipped at
+  `/app/`, and it passed every gate, including the served-site smoke check. The
+  reason it passed is the same reason it was written: the claim engine lets the
+  site say what it does *not* do, and every mention in that sentence sat in a
+  clause with its own "no", so the negation escape excused it. `website_claims`
+  now carries a second kind of rule — `FORBIDDEN_DENIALS`, claims that are
+  forbidden *because* they deny a surface that ships, scanned without the
+  negation escape, where the "no" is the evidence rather than the excuse. The
+  loop that applied these rules lived twice, in `website_claims` and in
+  `website_smoke`; both now call one `forbidden_claims_in()`, so the check that
+  reads the served bytes carries every rule the build-time check does. The item
+  is replaced with the truth (Android and Windows are the native targets; the
+  browser is served by the web app at `/app/`), and the fixture that had been
+  asserting the false sentence was allowed is gone with it.
+- **Fixed (docs): the plan documents stop putting the web app out of scope.**
+  The rebuilding work swept the documents that *describe* the web app; this
+  sweeps the ones that *plan* it. `MASTER_PROMPT.md`'s "Explicitly NOT in
+  S1–S6" list opened with "Production Web/PWA" and no longer names it;
+  `PROMPT_SEQUENCE.md` says web was "deferred to v2, not stubbed" and now says
+  so as history rather than as scope; `WEBSITE_PLAN.md` §1's D1 prohibition on a
+  web player carries the dated amendment it points to; `.ai/ROADMAP.md`'s §8
+  backlog entry — an evaluation whose leading outcome was "likely no" — is
+  marked resolved and built; `docs/decisions/README.md` states the ADR-008
+  amendment in its index line. `docs/verification/20-marketing-site.md` is a
+  historical build record and keeps its text, with a superseded note.
 - **Fixed (docs):** the web app is no longer described as a preview, a mirror or
   a demo in `README.md`, `app-web/README.md`, `docs/INSTALL.md`, `docs/TRD.md`,
   `docs/PRD.md`, `docs/app-flow.md`, `docs/implementation-plan.md`,

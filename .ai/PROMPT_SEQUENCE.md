@@ -13,6 +13,14 @@
 > like this) → ROADMAP.md (live status) → this file (what to build, phase by
 > phase).
 
+> **Superseded in part, 2026-10-16.** Everything below is the plan as written on
+> 2026-09-02 for the **native** work, and that part stands. What no longer
+> stands is the Web/PWA position: this file says web was "deferred to v2, not
+> stubbed", the web app now ships at `/app/`, and the repository has built it —
+> see the ADR-008 amendment of 2026-10-16 and the dated amendment at the foot of
+> [WEBSITE_PLAN.md](WEBSITE_PLAN.md). Read "no JS target, no PWA phase, no
+> Lighthouse phase" as history, not as scope.
+
 ---
 
 # Part A — Audit of the original 30-phase prompt

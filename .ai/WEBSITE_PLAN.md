@@ -1,7 +1,11 @@
 # DHUN website — build plan (Option A marketing site)
 
 > **Part A below is the plan of record for the `website/` workstream and
-> supersedes the Option-B framing of the material preserved as Part B.**
+> supersedes the Option-B framing of the material preserved as Part B.** It is
+> amended, not rewritten, by the dated section at the foot of the file:
+> **2026-10-16 — the site is the app's shell**, which supersedes §1's D1
+> prohibition ("no PWA, no browser playback") and the shell described in §3–§6.
+> Where Part A and the amendment disagree, the amendment is the plan.
 > Part B (the 2026-10-08 `arena/ae65f1a5-dhun` research) is retained because
 > its comparative research, licence snapshot and Pages evidence are still
 > accurate and are cited by this plan; it is *not* the current decision.
@@ -28,8 +32,11 @@ The deliverable is a **static marketing/download site** for the applications
 that already exist: a new top-level `website/` directory, its own workflow,
 and nothing else.
 
-**Forbidden by decision D1:** anything resembling a web player — no
-`app.`-style property, no PWA, no browser playback, no Kotlin/JS, no
+**Forbidden by decision D1 — superseded on 2026-10-16, and only in this
+respect:** a web *player* was forbidden to keep the site from becoming one by
+accident. The web app now ships at `/app/` by user decision and the site is its
+shell (see the dated amendment at the foot of this file). What still holds: no
+`app.`-style property, no Kotlin/JS, no
 TypeScript application code, no proxy/backend. `.ai/MASTER_PROMPT.md` line 46
 ("Web is deferred (v2 candidate, likely 'no')") and the "Explicitly NOT in
 S1–S6" list both keep production Web out of scope; accepted

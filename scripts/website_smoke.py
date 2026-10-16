@@ -97,13 +97,11 @@ def page_problems(route: str, status: int, markup: str) -> list[str]:
         problems.append(f"{route}: canonical URL is {canonical.group(1) if canonical else 'missing'}, expected {expected}")
 
     text = claims.html_to_text(markup)
-    for label, pattern in claims.FORBIDDEN_TERMS:
-        for match in pattern.finditer(text):
-            clauses = claims._clauses(text)
-            clause = clauses[claims._clause_index_of(clauses, match.start())]
-            if claims.NEGATION_CUES.search(clause):
-                continue
-            problems.append(f"{route}: served page carries forbidden claim ({label}): ‘{match.group(0)}’")
+    # The rules are `website_claims`'s, applied through its one entry point:
+    # a second copy of the loop here would be a second place for a rule to go
+    # missing, and this is the copy that reads the bytes a visitor gets.
+    for label, matched in claims.forbidden_claims_in(text):
+        problems.append(f"{route}: served page carries forbidden claim ({label}): ‘{matched}’")
     return problems
 
 

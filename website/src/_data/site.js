@@ -699,7 +699,10 @@ export default {
   notInDhun: [
     { text: "No accounts and no cross-device sync — there is no server to sync through.", source: "ADR-001" },
     { text: "No import from Spotify, YouTube Music or any other service's library export.", source: "not implemented anywhere in the tree" },
-    { text: "No iOS, no web player, no browser client, no PWA.", source: "MASTER_PROMPT §1 and §7 (Web/PWA explicitly out of S1–S6)" },
+    {
+      text: "No iOS build. Android and Windows are the native targets; the browser is served by the web app at /app/, which is the same interface rather than a second native client.",
+      source: "docs/decisions/ADR-008-browser-web-player-target.md (2026-10-16 amendment), app-web/README.md",
+    },
     { text: "No published audio-quality figure. DHUN makes no bitrate, lossless or FLAC claim of any kind.", source: "no verified number exists in the repository" },
     { text: "No casting, no Android Auto, no CarPlay.", source: "not implemented anywhere in the tree" },
     { text: "No recommendation engine of its own: related tracks and the radio come from the same anonymous endpoints as everything else.", source: "ADR-001, Phase 15 endless-radio" },

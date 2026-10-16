@@ -452,11 +452,18 @@ acceptance gates the next. File-level tasking lives in
   go-ahead. Then and only then: tag + publish.
 
 ### Explicitly NOT in S1–S6 (v2 backlog — see ROADMAP)
-Production Web/PWA (ADR-008 B1 ran and is BLOCKED; B2 is a user decision) · Android
-Auto · Cast · cross-device sync · optional cookie sign-in (#60) · EQ beyond S4
+Android Auto · Cast · cross-device sync · optional cookie sign-in (#60) · EQ beyond S4
 · widgets beyond Quick Play · security
 hardening program (#63) · store releases · v1.0 GA · any ADR-007
 implementation (contingency only).
+
+**Web/PWA left this list on 2026-10-16.** It used to be first: "Production
+Web/PWA (ADR-008 B1 ran and is BLOCKED; B2 is a user decision)". The user made
+that decision, the web app ships at `/app/`, and the site is its shell — see the
+ADR-008 amendment of 2026-10-16. The line is removed rather than annotated here
+because this section is the contract a session reads before deciding what to
+build, and a backlog entry that has shipped is an instruction to build it
+twice.
 
 ---
 
