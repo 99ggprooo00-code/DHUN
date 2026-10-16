@@ -55,13 +55,6 @@ sealed interface LyricsUiState {
 /** Which way the artwork slides on a track change (+1 next, -1 previous). */
 enum class SkipDirection { FORWARD, BACKWARD }
 
-private data class MuteSnapshot(
-    val volume: Float,
-    val enabled: Boolean,
-    val playback: PlaybackState,
-    val track: Track?,
-)
-
 /**
  * PlayerViewModel — the application-layer snapshot + actions behind
  * MiniPlayer and FullPlayer (Phase 08).
@@ -100,6 +93,7 @@ class PlayerViewModel(
     private val _pauseOnMute = MutableStateFlow(false)
     private var mutePausedTrackId: String? = null
     private var mutePauseConfirmed = false
+    private var resumeAfterMutePause = false
     private var lastVolumeWasZero = false
     private var lastMuteSettingEnabled = false
     private var lastMuteTrackId: String? = null
@@ -224,9 +218,8 @@ class PlayerViewModel(
         // Observe the player's actual volume, not just our own slider calls:
         // Android hardware keys and media-stream mute update this same flow.
         scope.launch {
-            combine(volume, _pauseOnMute, state, currentTrack) { level, enabled, playback, track ->
-                MuteSnapshot(level, enabled, playback, track)
-            }.collect(::handleMuteSnapshot)
+            combine(volume, _pauseOnMute, state, currentTrack) { _, _, _, _ -> Unit }
+                .collect { handleMuteSnapshot() }
         }
         settings?.let { repo ->
             scope.launch {
@@ -422,8 +415,7 @@ class PlayerViewModel(
 
     fun togglePlay() {
         // A deliberate transport press supersedes an automatic mute pause.
-        mutePausedTrackId = null
-        mutePauseConfirmed = false
+        clearMutePause()
         // After a failure the engine sits in error-idle where play() is a
         // no-op — route the press through recovery so the button never
         // appears dead on an error row.
@@ -505,40 +497,59 @@ class PlayerViewModel(
 
     fun setVolume(volume: Float) = player.setVolume(volume.coerceIn(0f, 1f))
 
-    private fun handleMuteSnapshot(snapshot: MuteSnapshot) {
-        val trackId = snapshot.track?.id
-        val zero = snapshot.volume <= 0f
-        if (!snapshot.enabled || (mutePausedTrackId != null && mutePausedTrackId != trackId) ||
-            snapshot.playback is PlaybackState.Idle || snapshot.playback is PlaybackState.Error
-        ) {
-            mutePausedTrackId = null
-            mutePauseConfirmed = false
-        }
-        if (mutePausedTrackId != null && snapshot.playback is PlaybackState.Paused) {
+    private fun clearMutePause() {
+        mutePausedTrackId = null
+        mutePauseConfirmed = false
+        resumeAfterMutePause = false
+    }
+
+    private fun handleMuteSnapshot() {
+        // combine can coalesce intermediate updates (and MediaController posts
+        // pause to the main looper). Read the latest state at decision time;
+        // an old Playing snapshot must not clear a newly acknowledged pause.
+        val trackId = currentTrack.value?.id
+        val playback = state.value
+        val enabled = _pauseOnMute.value
+        val zero = volume.value <= 0f
+        if (!enabled || (mutePausedTrackId != null && mutePausedTrackId != trackId) ||
+            playback is PlaybackState.Idle || playback is PlaybackState.Error
+        ) clearMutePause()
+
+        if (mutePausedTrackId != null && playback is PlaybackState.Paused) {
             mutePauseConfirmed = true
+            if (!zero && resumeAfterMutePause) {
+                clearMutePause()
+                player.playPause()
+            }
+        } else if (mutePauseConfirmed && playback is PlaybackState.Playing) {
+            // Another transport source resumed it before unmute.
+            clearMutePause()
         }
-        // Another transport source resumed the track before unmute: our mute
-        // pause no longer owns the state, so an eventual unmute cannot play it.
-        if (mutePauseConfirmed && snapshot.playback is PlaybackState.Playing) {
-            mutePausedTrackId = null
-            mutePauseConfirmed = false
-        }
+
         if (!zero) {
-            val shouldResume = lastVolumeWasZero && snapshot.enabled && mutePauseConfirmed &&
-                mutePausedTrackId == trackId && snapshot.playback is PlaybackState.Paused
-            mutePausedTrackId = null
-            mutePauseConfirmed = false
-            if (shouldResume) player.playPause()
-        } else if ((!lastVolumeWasZero || (!lastMuteSettingEnabled && snapshot.enabled) ||
-                lastMuteTrackId != trackId) && snapshot.enabled && trackId != null &&
-            snapshot.playback is PlaybackState.Playing
+            if (lastVolumeWasZero && enabled && mutePausedTrackId == trackId) {
+                if (playback is PlaybackState.Paused) {
+                    clearMutePause()
+                    player.playPause()
+                } else if (!mutePauseConfirmed) {
+                    // The system volume can rise before MediaController reports
+                    // Paused. Resume only after that pause is confirmed.
+                    resumeAfterMutePause = true
+                } else {
+                    clearMutePause()
+                }
+            }
+        } else if ((!lastVolumeWasZero || (!lastMuteSettingEnabled && enabled) ||
+                lastMuteTrackId != trackId) && enabled && trackId != null &&
+            playback is PlaybackState.Playing
         ) {
             mutePausedTrackId = trackId
             mutePauseConfirmed = false
+            resumeAfterMutePause = false
             player.playPause()
         }
         lastVolumeWasZero = zero
-        lastMuteSettingEnabled = snapshot.enabled
+        lastMuteSettingEnabled = enabled
         lastMuteTrackId = trackId
     }
 
