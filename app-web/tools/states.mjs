@@ -389,6 +389,71 @@ const SECTIONS = [
     render: () => views.libraryScreen({ tab: "playlists", playlists: [], liked: [], history: [], libraryKind: "indexeddb" }),
   },
   {
+    id: "entity-album",
+    title: "The album header, in the source's own numbers",
+    where: "views.albumScreen({ album }) — `AlbumScreen.kt`, `trackCountText` / `durationText`",
+    note:
+      "Two lines, not one: the artist and year, then the source's own count and run time on the quiet rung. The count is the source's string, because a row count taken from a partially-answered page is a claim about the network rather than about the album.",
+    render: () =>
+      views.albumScreen({
+        album: {
+          id: "MPREb_review",
+          title: "Lowland Echoes",
+          artist: "Bhanu & the Lowlands",
+          year: "2025",
+          trackCountText: "5 songs",
+          durationText: "18 minutes",
+        },
+        tracks: TRACKS,
+        currentId: "a",
+      }),
+  },
+  {
+    id: "entity-album-no-meta",
+    title: "The album header when the source sent no counts",
+    where: "views.albumScreen({ album }) with no `trackCountText` / `durationText`",
+    note: "The fallback is the row count, which is what this build can honestly say — and the line is absent entirely when there is not even that.",
+    render: () =>
+      views.albumScreen({
+        album: { id: "MPREb_bare", title: "No metadata", artist: "Someone", year: null },
+        tracks: TRACKS.slice(0, 1),
+      }),
+  },
+  {
+    id: "entity-artist",
+    title: "The artist hero, and the biography in its own section",
+    where: "views.artistScreen({ artist }) — `ArtistScreen.kt` 16:10 hero, `monthlyListeners`, `About` card",
+    note:
+      "The name is overlaid on the crop with the veil the app composites from the background colour, and the listener figure is only ever the source's string. The biography belongs in About at the end, eight lines maximum, not over the artwork.",
+    render: () =>
+      views.artistScreen({
+        artist: {
+          id: "UCreview",
+          name: "Bhanu & the Lowlands",
+          listeners: "1.2M monthly listeners",
+          description:
+            "A four-piece from the Koshi lowlands, recording field sounds and ragas in tea stalls, ferries and the long switchback roads. This biography is fixture text: it exists to give the About card something to clamp.",
+        },
+        tracks: TRACKS,
+        albums: [{ kind: "album", id: "MPREb_review", title: "Lowland Echoes" }],
+        currentId: "a",
+      }),
+  },
+  {
+    id: "entity-playlist-local",
+    title: "A playlist you made",
+    where: "views.playlistScreen({ playlist, isOwn: true }) — `PlaylistScreen.kt` local variant",
+    note:
+      "The app's own label for this case is “Local playlist”, and Rename / Delete appear here and nowhere else. A remote playlist shows the curator and the source's track count instead.",
+    render: () =>
+      views.playlistScreen({
+        playlist: { id: "pl-review", name: "Evening Drive", trackCountText: "3 songs" },
+        tracks: TRACKS,
+        currentId: "a",
+        isOwn: true,
+      }),
+  },
+  {
     frame: FRAME.phone,
     id: "player-gesture",
     title: "The browser is waiting for a gesture",

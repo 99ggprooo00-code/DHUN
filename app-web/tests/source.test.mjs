@@ -759,3 +759,128 @@ test("the greeting keeps the app's clock, boundaries and all", () => {
   assert.equal(greetingForHour(24), "Good night", "hour 24 wraps to midnight");
   assert.equal(greetingForHour(-1), "Good night", "and so does an hour before midnight");
 });
+
+/**
+ * The header's second subtitle line is the source's, not ours to recompute.
+ *
+ * `BrowseParsers.kt` reads `AlbumDetail.trackCountText` / `durationText` out of
+ * `secondSubtitle` and hands them straight to the header, and it keeps an
+ * artist's `monthlyListeners` only when that same line says "monthly listeners".
+ * The web mapper has to read the same line the same way: a header that counted
+ * its own rows would under-report an album the source sent partially, and one
+ * that printed any second-subtitle string as a listener count would put a
+ * statistic in the source's mouth.
+ */
+test("an album header keeps the source's own count and run time", () => {
+  const mapped = mapBrowse(
+    {
+      header: {
+        musicDetailHeaderRenderer: {
+          title: { runs: [{ text: "Lowland Echoes" }] },
+          subtitle: { runs: [{ text: "Bhanu & the Lowlands" }, { text: " • " }, { text: "2025" }] },
+          secondSubtitle: { runs: [{ text: "4 songs" }, { text: " • " }, { text: "17 minutes" }] },
+        },
+      },
+      contents: response([item({ title: "Lowland Echo", subtitle: ["Bhanu & the Lowlands", "Lowland Echoes", "4:34"], videoId: "v1" })]),
+    },
+    { kind: "album", browseId: "MPREb_x" },
+  );
+  assert.equal(mapped.album.trackCountText, "4 songs");
+  assert.equal(mapped.album.durationText, "17 minutes");
+  // The row count is still mapped — it is the fallback for a source that sent no
+  // such line, and it is a different fact from the source's own claim.
+  assert.equal(mapped.album.trackCount, 1);
+});
+
+test("an album without a second subtitle reports no count rather than inventing one", () => {
+  const mapped = mapBrowse(
+    {
+      header: {
+        musicDetailHeaderRenderer: {
+          title: { runs: [{ text: "Bare" }] },
+          subtitle: { runs: [{ text: "Someone" }, { text: " • " }, { text: "2020" }] },
+        },
+      },
+      contents: response([item({ title: "T", subtitle: ["Someone", "Bare", "3:00"], videoId: "v1" })]),
+    },
+    { kind: "album", browseId: "MPREb_y" },
+  );
+  assert.equal(mapped.album.trackCountText, null);
+  assert.equal(mapped.album.durationText, null);
+});
+
+test("an artist's listeners come from the source, and only when it said listeners", () => {
+  const listeners = mapBrowse(
+    {
+      header: {
+        musicImmersiveHeaderRenderer: {
+          title: { runs: [{ text: "Naya Koirala" }] },
+          secondSubtitle: { runs: [{ text: "1.2M monthly listeners" }] },
+        },
+      },
+      shelves: [response([item({ title: "Bijeuli", subtitle: ["Naya Koirala", "Dharan Nights", "3:14"], videoId: "v1" })]),
+      ],
+    },
+    { kind: "artist", browseId: "UCabc" },
+  );
+  assert.equal(listeners.artist.listeners, "1.2M monthly listeners");
+
+  const other = mapBrowse(
+    {
+      header: {
+        musicImmersiveHeaderRenderer: {
+          title: { runs: [{ text: "Someone" }] },
+          secondSubtitle: { runs: [{ text: "3.4K subscribers" }] },
+        },
+      },
+      shelves: [response([item({ title: "T", subtitle: ["Someone", "Album", "3:00"], videoId: "v1" })]),
+      ],
+    },
+    { kind: "artist", browseId: "UCdef" },
+  );
+  assert.equal(other.artist.listeners, null, "a subscriber count is not a listener count");
+});
+
+test("the demo source composes its own counts, and they match the rows it ships", async () => {
+  const demo = createDemoSource();
+  const album = await demo.browse("al-01");
+  const tracks = album.tracks;
+  // Not `pluralise(...)` in the screen's own wording: a source describes its own
+  // rows, so the demo source does too — and the strings are computed from the
+  // catalogue, so they cannot drift away from it.
+  assert.equal(album.album.trackCountText, `${tracks.length} songs`);
+  const minutes = Math.round(tracks.reduce((sum, track) => sum + track.durationMs, 0) / 60_000);
+  assert.equal(album.album.durationText, `${minutes} minutes`);
+  const playlist = await demo.browse("pl-02");
+  assert.equal(playlist.playlist.trackCountText, `${playlist.tracks.length} songs`);
+});
+
+/**
+ * A source labels its own entries, and the interface relies on it.
+ *
+ * `card()` has to guess when an entry carries no `kind` — it guesses *artist*
+ * for anything with a `name` — so a demo playlist with no kind became an artist
+ * card: searching and tapping a playlist opened `#/artist/pl-02`. Every mapper
+ * (`mapTwoRowItem`) sets the kind, so the bundled source has to as well, for
+ * every collection and every browse page.
+ */
+test("the demo source's search results carry the kind of the thing they are", async () => {
+  const results = await createDemoSource().search("e");
+  for (const [collection, kind] of [["tracks", "track"], ["albums", "album"], ["artists", "artist"], ["playlists", "playlist"]]) {
+    assert.ok(results[collection].length > 0, `the demo search returned no ${collection} for “e”`);
+    for (const entry of results[collection]) {
+      assert.equal(entry.kind, kind, `${entry.id} came back from ${collection} labelled ${entry.kind}`);
+    }
+  }
+});
+
+test("every collection the demo source browses hands out labelled entries", async () => {
+  const demo = createDemoSource();
+  const album = await demo.browse("al-01");
+  assert.ok(album.tracks.every((entry) => entry.kind === "track"), "an album's rows are songs");
+  const artist = await demo.browse("ar-01");
+  assert.ok(artist.tracks.every((entry) => entry.kind === "track"), "an artist's rows are songs");
+  assert.ok(artist.albums.every((entry) => entry.kind === "album"), "an artist's albums are albums");
+  const playlist = await demo.browse("pl-02");
+  assert.ok(playlist.tracks.every((entry) => entry.kind === "track"), "a playlist's rows are songs");
+});

@@ -104,3 +104,27 @@ here, so a visual bug is caught by reading or not at all.
 | the full player's artwork was an `<img>` painted over its own gradient | it is a `<span>`, like every other piece of artwork in the app | boot test renders the full player |
 
 Each is also recorded in `.ai/DEBUG_LOG.md`.
+
+## Fixes found by looking at the built screens, again (2026-10-17, session `arena/10c6882d-dhun`)
+
+Five more, found by holding the built album / artist / playlist screens next to
+the Kotlin that draws them and by pressing the appearance chip. All measurements
+are from this session's probes against the assembled tree; the captures are in
+the session's shot directory, not committed.
+
+| What was wrong | What the app does | Verified by |
+|---|---|---|
+| The album header merged `artist • year • count` into one line and counted its own rows; the action pair was Play + Queue | `AlbumScreen.kt` separates them: `bodyMedium` `artist • year`, then `labelSmall` `trackCountText • durationText` — both strings the source sent — and Play + **Shuffle** | rendered markup: `dhun-entity__meta">Naya Koirala · 2024<` and `dhun-entity__submeta">5 songs · 18 minutes<` on separate elements; the demo source's own computed strings match its rows |
+| The artist page was a round avatar, a kicker and a paragraph | `ArtistScreen.kt` draws a 16:10 crop with the name over the app's veil, `monthlyListeners` only when the source's string says it, and the biography in an About card at the end | measured 390×244 on a 390px phone and 720×450 in the desktop pane (both exactly 16:10); listener line absent for an artist whose source sent none |
+| An album screen printed its name twice (app bar and cover) and carried two `h1`s | `AlbumScreen.kt` / `ArtistScreen.kt` keep the name in the content and no title in the chrome | the browser job counts `h1`s on `/app/#/album/al-01`: one, the entity's own. Run against the duplicate first — it reported *2 h1(s) … ("Dharan Nights", "Dharan Nights")* |
+| The full player showed **"Album ·"** whatever was playing | the label names the kind and the entity | live: pressing Play on an album gives `Album · Dharan Nights`; `entityLabel`'s four cases are unit-tested |
+| Choosing **Light** painted the shell pale and left the page dark; the light-theme meta lines and the Shuffle button were invisible | the palettes are keyed on the root element | `browser.mjs` presses the chip and asserts the attribute, `body`'s background (`rgb(246,244,241)`) and `--dhun-background` (`#f6f4f1`) agree. Run against the old behaviour first: 6 failures, including *"the theme attribute is on #app (dark)"* |
+| Home's album shelf was four pressable songs, and search's playlists were drawn as artists | a source labels its entries; the screens classify by `kind` | live cards read `open-entity:album:al-01` … and `open-entity:playlist:pl-01`; pressing a playlist card opens `#/playlist/pl-01` with the source's `6 songs` |
+
+The route sweep has also been repaired rather than believed. It had been asking
+for an entity header on an id nothing knows (the app's answer — *"That album
+could not be loaded"* — is the correct one) and its discovery selectors named
+per-kind actions the app no longer emits, so the three entity routes were never
+visited at all. It now discovers ids from Home and Search, expects the honest
+error state for an unknown id, and reports **no findings** across 22 routes plus
+the entity pass.

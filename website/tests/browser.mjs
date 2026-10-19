@@ -493,12 +493,22 @@ function webAppReport() {
       visible: rect.width > 0 && rect.height > 0,
     };
   }
+  const rootStyle = getComputedStyle(document.documentElement);
   return {
     mounted: (document.querySelector("#app") || { children: [] }).children.length > 0,
     navItems: document.querySelectorAll(".dhun-nav-item").length,
     title: document.title,
     source,
     demoNotice: state('[data-notice="demo"]'),
+    // What the document says it is, and what the page is actually painted with.
+    // The two have to agree: `applyTheme` writing the attribute to `#app`
+    // instead of the root themed the chrome and left `body` dark, so choosing
+    // Light produced pale bars over a black page and light-theme ink that
+    // disappeared into it.
+    theme: document.documentElement.dataset.dhunTheme || "",
+    themeOnApp: (document.querySelector("#app") || { dataset: {} }).dataset.dhunTheme || "",
+    bodyBackground: (getComputedStyle(document.body).backgroundColor || "").replace(/\s+/g, ""),
+    backgroundToken: rootStyle.getPropertyValue("--dhun-background").trim(),
   };
 }
 
@@ -1602,6 +1612,15 @@ async function checkWebApp(browser) {
           `mounted, ${report.navItems} nav item(s), ${report.title ? report.title : "no title"}, ${source}`,
         );
       }
+      if (report.themeOnApp) {
+        fail(
+          `web app ${label}`,
+          `the theme attribute is on #app (${report.themeOnApp}) — the palettes are keyed on the root, so only the chrome would be themed`,
+        );
+      }
+      if (!report.theme) {
+        fail(`web app ${label}`, "the document does not name a resolved theme (data-dhun-theme)");
+      }
       if (!report.source || !report.source.visible || !report.source.kind) {
         fail(`web app ${label}`, "the app does not name the data source behind what is on screen — the source badge is absent or unlabelled");
       } else if (report.source.kind === "demo" && !report.demoNotice) {
@@ -1642,6 +1661,132 @@ async function checkWebApp(browser) {
       await page.close();
       await context.close();
     }
+  }
+}
+
+/**
+ * The detail screens have one heading, and it is the page's own.
+ *
+ * `AlbumScreen.kt`, `ArtistScreen.kt` and `PlaylistScreen.kt` draw the entity's
+ * name in the content — under the cover, or over the hero — and carry no title
+ * in the chrome. The web wrote the name into the app bar as well, so those
+ * routes had two `h1`s and printed the same name twice, 313px apart on a
+ * desktop. This reads the rendered document rather than the source, because a
+ * regression here is invisible to every other check in the file.
+ */
+function entityOutlineReport() {
+  const bar = document.querySelector(".dhun-topbar");
+  return {
+    h1s: [...document.querySelectorAll("h1")].map((el) => (el.textContent || "").replace(/\s+/g, " ").trim()),
+    barH1s: bar ? bar.querySelectorAll("h1").length : -1,
+    entityTitle: (document.querySelector(".dhun-entity__title")?.textContent || "").trim(),
+  };
+}
+
+async function checkWebAppEntity(browser) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: SCHEMES[0] });
+  const page = await context.newPage();
+  const label = "/app/ album heading";
+  await page.goto(url("/app/#/album/al-01"), { waitUntil: "load" });
+  await page
+    .waitForSelector(".dhun-entity__title", { timeout: 15000 })
+    .catch(() => {});
+  const report = await page.evaluate(entityOutlineReport);
+  if (!report.entityTitle) {
+    fail(label, "the album screen rendered no entity title");
+  } else if (report.h1s.length !== 1 || report.h1s[0] !== report.entityTitle) {
+    fail(
+      label,
+      `${report.h1s.length} h1(s) on the album screen (${report.h1s.map((t) => `“${t}”`).join(", ") || "none"}), expected one, the entity's own “${report.entityTitle}”`,
+    );
+  } else if (report.barH1s !== 0) {
+    fail(label, `the app bar still draws ${report.barH1s} heading(s) on a screen that has its own`);
+  } else {
+    record(label, `one h1, the page's own: “${report.entityTitle}”`);
+  }
+  await page.close();
+  await context.close();
+}
+
+/**
+ * The appearance control, exercised.
+ *
+ * The bug this exists for is invisible to every other check in this file: the
+ * app mounted, named its source, overflowed nothing and logged nothing — it just
+ * painted a light app bar over a dark page when asked for Light, because the
+ * theme attribute was written to `#app` while `body`'s background came from the
+ * root. So this presses the real control and then reads the *document*: the
+ * attribute, the computed background of `body`, and the palette token, all three
+ * of which have to agree with each other.
+ */
+const LIGHT_BACKGROUND = "rgb(246,244,241)";
+const DARK_BACKGROUND = "rgb(22,22,22)";
+const TOKEN_FOR_BACKGROUND = {
+  [LIGHT_BACKGROUND]: "#f6f4f1",
+  [DARK_BACKGROUND]: "#161616",
+};
+
+async function checkWebAppAppearance(browser) {
+  for (const scheme of SCHEMES) {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      colorScheme: scheme,
+    });
+    const page = await context.newPage();
+    const label = `/app/ appearance (${scheme})`;
+
+    await page.goto(url("/app/#/settings"), { waitUntil: "load" });
+    const before = await page.evaluate(webAppReport);
+    const expected = TOKEN_FOR_BACKGROUND[before.bodyBackground];
+    if (!expected) {
+      fail(label, `body is painted ${before.bodyBackground}, which is neither the dark nor the light background token`);
+      await context.close();
+      continue;
+    }
+    if (before.backgroundToken.toLowerCase() !== expected) {
+      // The document must agree with itself before anything is pressed: this is
+      // the state the app boots into, and it is what a visitor sees first.
+      fail(label, `body is painted ${before.bodyBackground} while --dhun-background is ${before.backgroundToken || "(unset)"}`);
+    }
+
+    // The real control, pressed: the theme chip in Settings.
+    const toggle = page.locator('[data-action="set-theme"][data-value="light"]');
+    await toggle.waitFor({ state: "visible", timeout: 15000 });
+    await toggle.click();
+    await page
+      .waitForFunction(() => document.documentElement.dataset.dhunTheme === "light", null, { timeout: 5000 })
+      .catch(() => {});
+    const after = await page.evaluate(webAppReport);
+
+    if (after.theme !== "light") {
+      fail(label, `choosing Light left the document on "${after.theme || "no theme"}"`);
+    } else if (after.bodyBackground !== LIGHT_BACKGROUND) {
+      // The bug this check exists for: the setting was stored and the chrome
+      // went pale while `body` stayed dark, so the meta lines vanished.
+      fail(
+        label,
+        `the document switched to light (${after.theme}) but body is still painted ${after.bodyBackground}; --dhun-background is ${after.backgroundToken || "(unset)"}`,
+      );
+    } else {
+      record(label, `Light switches the document: ${after.bodyBackground} with --dhun-background ${after.backgroundToken}`);
+    }
+
+    // And back: Dark has to work too, and the choice is the app's own default.
+    const restore = page.locator('[data-action="set-theme"][data-value="dark"]');
+    if (await restore.count()) {
+      await restore.click();
+      await page
+        .waitForFunction(() => document.documentElement.dataset.dhunTheme === "dark", null, { timeout: 5000 })
+        .catch(() => {});
+      const back = await page.evaluate(webAppReport);
+      if (back.theme !== "dark" || back.bodyBackground !== DARK_BACKGROUND) {
+        fail(label, `choosing Dark gave theme "${back.theme || "none"}" over ${back.bodyBackground}`);
+      }
+    } else {
+      fail(label, "the Settings screen offers Light but no way back to Dark");
+    }
+    await page.close();
+    await context.close();
   }
 }
 
@@ -1735,12 +1880,20 @@ const CHECKS = [
   ["print", () => checkPrint(browser)],
   ["axe", () => checkAxe(browser)],
   ["web app", () => checkWebApp(browser)],
+  ["appearance", () => checkWebAppAppearance(browser)],
+  ["entity outline", () => checkWebAppEntity(browser)],
   ["screenshots", () => captureScreenshots(browser)],
 ];
 
 let browser;
 try {
-  browser = await chromium.launch();
+  // CI installs Playwright's own Chromium and sets nothing here. A machine that
+  // already has a browser can point at it instead (`DHUN_CHROMIUM=/path/to/chrome`),
+  // which is how this job was run against a local preview while the appearance
+  // check below was being written.
+  browser = await chromium.launch(
+    process.env.DHUN_CHROMIUM ? { executablePath: process.env.DHUN_CHROMIUM } : {},
+  );
   summaryLine(`\n## Browser measurements — progress\n`);
   for (const [name, run] of CHECKS) {
     summaryLine(`- check started: **${name}**`);

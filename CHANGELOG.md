@@ -22,6 +22,88 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The detail screens become the app's, and the appearance control starts working (2026-10-17, session `arena/10c6882d-dhun`)
+
+Found by opening the built album, artist and playlist screens and holding them
+next to `AlbumScreen.kt`, `ArtistScreen.kt` and `PlaylistScreen.kt` — and by
+pressing **Light** in Settings while watching what happened to the page.
+
+- **Fixed: the appearance control themed the shell and not the document.** The
+  theme attribute was written to `#app`, but `tokens.css` keys its palettes on
+  the root and `body { background: var(--dhun-background) }` is painted by an
+  element *above* `#app`. Choosing Light therefore turned the app bar and the
+  bottom navigation pale over a black page, and the light-theme ink on that page
+  disappeared: the artist meta line, the album's track count and the Shuffle
+  button were all invisible. `applyTheme()` writes to `document.documentElement`
+  now — where `index.html` already carried its pre-JavaScript default — and the
+  browser job presses the control and reads the result.
+- **Fixed: the player's context line named the wrong thing.** It was built as
+  `"Album · "` with the entity's title ignored, so pressing Play on an album
+  showed the full player the string **"Album ·"**, and a playlist or an artist
+  both claimed to be an album. One `entityLabel(routeName, name)` in `router.js`
+  now answers for all three kinds, and a name that never arrived yields no label
+  rather than a dangling separator.
+- **The album and playlist headers are the app's headers.** The album header is
+  cover → title → `artist • year` → a *separate* quieter line of the source's own
+  `trackCountText • durationText` (`AlbumDetail`, read out of the response's
+  `secondSubtitle` exactly as `BrowseParsers.kt` reads it), with **Play** and
+  **Shuffle** as the actions; the web had merged all of it into one line, counted
+  its own rows, and offered Queue. The playlist header is the same shape with
+  `subtitle • meta`, and a playlist you made says **Local playlist**, which is
+  the app's own label for it. Titles are `headlineSmall` at two lines, the cover
+  is 220dp for an album and 200dp for a playlist (`DhunSpacing.artworkAlbum` /
+  `artworkPlaylist`), and both headers are centred at every width, because that is
+  what both screens do.
+- **The artist page got its hero.** `ArtistScreen.kt` draws a 16:10 full-bleed
+  crop with the name overlaid under a veil composited from the *theme's*
+  background at `.15 / .05 / LyricsMaterialPolicy.LYRICS_VEIL_BOTTOM`, and prints
+  a listener figure only when the source's own string says "monthly listeners".
+  The biography belongs in an **About** card at the end (eight lines maximum) —
+  the web had been printing it under the name, and now a page that has one keeps
+  it where the app keeps it. Radio, the app's second action there, has no
+  counterpart in this build and is not faked; Play and Shuffle act on the same
+  top songs.
+- **Fixed: Home's album shelf was a list of songs.** The home screen classifies a
+  shelf's entries by `kind`, and the demo catalogue's album rows had none — so
+  "Albums for you" rendered four `play-track` rows whose ids (`al-01` … `al-04`)
+  are not videos, and the album pages were reachable only by typing a URL.
+- **Fixed: a playlist search result was drawn as an artist.** Same cause: without
+  a `kind`, `card()` infers *artist* from a `name`, so searching and tapping
+  "Evening Drive" opened `#/artist/pl-02` — a page that cannot exist. Every
+  collection the bundled source hands out now labels its entries, which is what
+  every mapper (`mapTwoRowItem`) already did for a real response.
+- **Fixed: an album, artist or playlist screen had two headings saying the same
+  thing.** The page draws the entity's name in its content — under the cover, or
+  over the hero, exactly as `AlbumScreen.kt` and `ArtistScreen.kt` do — and the
+  app bar drew it again as its own `<h1>`. On a 1280px window that printed the
+  name twice, 313px apart, and gave a screen reader two identical headings. The
+  three entity routes now leave the title to the page; every other route keeps
+  the app bar's.
+- **Four new review states** in `app-web/tools/states.mjs` (27 now) so the entity
+  headers can be looked at without an upstream: album with the source's numbers,
+  album without them, the artist hero with a biography, and a local playlist.
+- Radio is the one deliberate omission, recorded here rather than papered over:
+  `/next`-seeded stations do not exist in this build, and a button that cannot do
+  what it says is worse than no button.
+
+**Tests:** `app-web` node suite **217 pass / 0 fail**. New coverage: the album
+header's two meta lines and its fallback to the row count when the source sent
+none; the entity action pair and the absence of Queue; the local/remote playlist
+labels; the hero's veil, its listeners rule and the About card; the mapper's
+`secondSubtitle` reading (including a subscriber count *not* becoming a listener
+count) and the demo source's own computed counts; `entityLabel`'s four cases; the
+appearance attributes landing on the document element, and the rule that an
+entity screen owns its one heading. Seven of them were mutation-checked against
+the code they describe, plus the browser checks —
+which was run against the *old* behaviour first and reported six failures
+(`the theme attribute is on #app (dark)` and `choosing Light left the document on
+"dark"`), and the heading check reported
+`2 h1(s) on the album screen ("Dharan Nights", "Dharan Nights")` against the
+repeated title before it passed. The route sweep (16 fixed routes across two
+viewports, 10 discovered entity ids, 10 entity pages — every card opened the page
+it names — `0` findings) and `website/tests/browser.mjs` (99 measurements, 0
+failures) were both re-run against the built tree.
+
 ### The badge stops lying, and Home gets its greeting and moods (2026-10-16, session `arena/85bacb28-dhun`)
 
 Found by opening the captures of the built `/app/` that the previous round
@@ -85,7 +167,7 @@ produce). `views.test.mjs` pins the mood states' copy and the strip's presence.
 The provenance tests were mutation-checked: turning the rows record back into a
 plain list of request stages makes them fail.
 
-### The interface gets its first real layout review, and loses seven defects (2026-10-16, session `arena/126d4a83-dhun`), and loses seven defects (2026-10-16, session `arena/126d4a83-dhun`)
+### The interface gets its first real layout review, and loses seven defects (2026-10-16, session `arena/126d4a83-dhun`)
 
 The web build has been measured by CI since Phase 6 — overflow, contrast, tab
 order, axe, print — but geometry and contrast are not taste, and **nobody had

@@ -9,7 +9,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parseRoute, formatRoute, sameRoute, DEFAULT_ROUTE, LIBRARY_TABS, needsData, createRouter } from "../src/js/router.js";
+import { parseRoute, formatRoute, sameRoute, DEFAULT_ROUTE, LIBRARY_TABS, needsData, createRouter, entityLabel } from "../src/js/router.js";
 
 test("the empty hash is the home route, not an error", () => {
   assert.equal(parseRoute("").name, "home");
@@ -147,4 +147,26 @@ test("sameRoute compares what the view renders, and nothing else", () => {
   assert.ok(!sameRoute(base, { ...base, name: "search", query: "" }));
   assert.ok(!sameRoute(base, { ...base, player: "open" }));
   assert.ok(!sameRoute(base, { ...base, player: "open", playerTab: "lyrics" }));
+});
+
+/**
+ * The player's context line names the thing that is playing.
+ *
+ * This is a small string with a real failure behind it: the label was built
+ * inline in `main.js` as `"Album · " + nothing`, so the full player showed
+ * "Album ·" over a playlist and over an artist, and an entity whose title never
+ * arrived showed a separator with nothing after it. The label is a function of
+ * the route, and these are its four cases.
+ */
+test("an entity's label names its kind, and a nameless one says nothing at all", () => {
+  assert.equal(entityLabel("album", "Dharan Nights"), "Album · Dharan Nights");
+  assert.equal(entityLabel("artist", "Naya Koirala"), "Artist · Naya Koirala");
+  assert.equal(entityLabel("playlist", "Evening Drive"), "Playlist · Evening Drive");
+  // No dangling "Album ·": the player falls back to its own "Playing".
+  assert.equal(entityLabel("album", ""), "");
+  assert.equal(entityLabel("artist", undefined), "");
+  // And a route that is not an entity never claims to be one.
+  for (const name of ["home", "search", "library", "settings", "about-legal", undefined]) {
+    assert.equal(entityLabel(name, "Something"), "", `${name} is not an entity`);
+  }
 });

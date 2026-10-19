@@ -163,6 +163,23 @@ function finalise(route, params, defaultTab) {
   return route;
 }
 
+/**
+ * What the player says it is playing, for a detail route.
+ *
+ * This lives here because it is a fact about the route, not about the player:
+ * `main.js` used to build it inline with `"Album · "` hardcoded, so a playlist
+ * and an artist both told the listener they were an album, and an entity with no
+ * title left a dangling separator — the full player showed the string
+ * "Album ·" on its own. A name this function does not recognise is not an
+ * entity, and an entity with no name has nothing to say, so both return the
+ * empty string and the player falls back to its own "Playing".
+ */
+export function entityLabel(routeName, name) {
+  const kind = { album: "Album", artist: "Artist", playlist: "Playlist" }[routeName];
+  if (!kind || !name) return "";
+  return `${kind} · ${name}`;
+}
+
 /** Route object → hash. Round-trips: `parseRoute(formatRoute(r))` deep-equals
  *  `r` for every route the app produces, which is asserted by tests. */
 export function formatRoute(route) {

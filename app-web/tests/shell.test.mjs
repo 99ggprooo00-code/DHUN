@@ -307,3 +307,54 @@ test("the manifest describes an installable app with real icons", () => {
     assert.ok(existsSync(path.join(srcRoot, relative)), `${icon.src} does not exist`);
   }
 });
+
+/**
+ * The appearance settings theme the *document*, not just the app shell.
+ *
+ * The regression: `applyTheme()` wrote `data-dhun-theme` onto `#app`, but
+ * `tokens.css` keys its palettes on the root element and `body`'s background —
+ * the one behind the shell — is painted by an element *above* `#app`. Choosing
+ * Light therefore turned the app bar and the nav pale while the backdrop stayed
+ * dark, and light-theme ink on it disappeared: the artist meta line and the
+ * Shuffle button were literally invisible. The attribute belongs where
+ * `index.html` already carries its pre-JavaScript default.
+ */
+test("the appearance attributes are written to the document element", () => {
+  const main = readFileSync(path.join(jsRoot, "main.js"), "utf8");
+  assert.match(main, /const themeRoot = doc\.documentElement \?\? root;/, "applyTheme no longer writes to the document element");
+  assert.match(main, /themeRoot\.dataset\.dhunTheme = resolved;/, "the resolved theme is not written to the document element");
+  assert.match(main, /themeRoot\.dataset\.dhunAccent = settings\.get\("accent"\);/, "the accent is not written to the document element");
+  assert.ok(!/root\.dataset\.dhunTheme|root\.dataset\.dhunAccent/.test(main), "an appearance attribute still lands on #app");
+});
+
+/**
+ * One heading per screen, and it is the screen's own.
+ *
+ * `AlbumScreen.kt` / `ArtistScreen.kt` / `PlaylistScreen.kt` draw the entity's
+ * name in the content. The web wrote the same name into the app bar as an
+ * `<h1>` too, so an album page had two `h1`s with identical text, 313px apart
+ * on a 1280px window — a duplicate heading for a screen reader and a visibly
+ * repeated name for everyone else.
+ */
+test("the detail screens own their heading and the app bar does not repeat it", () => {
+  const main = readFileSync(path.join(jsRoot, "main.js"), "utf8");
+  assert.match(
+    main,
+    /const ENTITY_ROUTES = Object\.freeze\(\["playlist", "artist", "album"\]\);/,
+    "the routes that draw their own title are not named",
+  );
+  assert.match(
+    main,
+    /const pageOwnsTitle = ENTITY_ROUTES\.includes\(route\.name\);/,
+    "nothing decides whether the screen owns its title",
+  );
+  assert.match(
+    main,
+    /\$\{pageOwnsTitle \? html`` : html`<h1 class="dhun-topbar__title">\$\{title\}<\/h1>`\}/,
+    "the app bar draws its own `<h1>` on a screen that already has one",
+  );
+  for (const view of ["albumHeader", "artistHeader", "playlistHeader"]) {
+    const views = readFileSync(path.join(jsRoot, "views.js"), "utf8");
+    assert.match(views, /dhun-entity__title/, `${view} exists but no entity title element does`);
+  }
+});

@@ -4485,3 +4485,105 @@ _(Follow-up the same day, in session `arena/85bacb28-dhun`: two more, both about
 **9. A mood borrowed the feed's copy, and an empty screen lost its provenance.** The demo strip was appended *after* the shelves, so it vanished whenever a screen was empty or failed — precisely when a visitor most needs to know who answered. And `homeScreen`'s empty state is the feed's ("Search for something, or point DHUN at your own data source"), which an empty **mood** rendered at someone who had just pressed Chill. Fixed both: the strip is drawn in every state, and a mood's states name the mood and the query that came back empty. The mood rail itself is mirrored from `HomeMood.kt` and asserted against that file, so its labels and its queries cannot drift; the greeting keeps the *local* hour, because this repository already shipped the UTC version of that bug once on Android.
 
 **Lesson.** A cap is only as good as the token it names. `--dhun-player-controls-max` was the right number for the player's transport column and the wrong one for a page of rows, and because both are "the app's design system" the mistake looked like fidelity. When a rule is copied from another context, check what the app calls that measure before reusing the token — and look at the thing, not just its geometry.
+
+## 2026-10-17 — the detail screens, and an appearance control that painted half the page (`arena/10c6882d-dhun`)
+
+_(Continues the numbering from 2026-10-16, which ended at incident 9.)_
+
+**Context.** The register review above had already found the shell's geometry and
+the provenance of every row. This round read the three detail screens against the
+Kotlin that draws them — `AlbumScreen.kt`, `ArtistScreen.kt`, `PlaylistScreen.kt`
+— and pressed the appearance chip. Six defects, five of them visible to anyone
+who used the app for a minute.
+
+**10. The album header was a different component.** The web drew cover → title →
+`Naya Koirala · 2024 · 5 tracks` on one `bodyMedium` line, with Play and **Queue**.
+`AlbumScreen.kt` draws cover → title (`headlineSmall`, two lines) → `artistName •
+year` (`bodyMedium`) → a **separate** `labelSmall` `trackCountText • durationText`
+line, then a filled **Play** and an outlined **Shuffle**. The two lines are two
+lines at two sizes; merging them is what made the header read as a different
+component, and the counts were the web counting its own rows — which is a fact
+about the network, not about the album. `BrowseParsers.kt` reads both strings out
+of the response's `secondSubtitle` (`trackCount = secondParts.firstOrNull {
+it.contains("song") }`, `durationText = secondParts.lastOrNull()`) and the web
+mapper was dropping the line on the floor. Fixed in the mapper and the screen.
+The playlist header got the same treatment (title, `subtitle • meta`, the
+description on its own quiet line, three lines), including the app's own label
+for the case that has one: **Local playlist**.
+
+**11. The artist page was not the app's artist page.** `ArtistScreen.kt` opens
+with a **16:10 full-bleed crop**, the name overlaid `headlineMedium` bold under a
+veil the screen composites from `DhunColors.background` at `.15 / .05 /
+LyricsMaterialPolicy.LYRICS_VEIL_BOTTOM (.62)`; it prints `monthlyListeners` only
+when the source's own second-subtitle string contains "monthly listeners"
+(`BrowseParsers.kt:289-291`); and the biography is an **About** card at the end
+of the page, `maxLines = 8`. The web had a round avatar, an `Artist` kicker and
+the biography as a paragraph under the name. Now: the hero, the veil, the
+listeners rule, About. Radio — the app's other action there — has no counterpart
+in this build, so the pair is Play and Shuffle over the same top songs rather
+than a button that cannot do what it says.
+
+**12. The player's context line said "Album ·".** `main.js` built the label
+inline as `"Album · "` and never appended the entity's title, so the full player
+showed a separator with nothing after it, and a playlist and an artist both
+claimed to be an album. Now `entityLabel(routeName, name)` lives in `router.js`,
+where the names of routes already live, and returns the empty string for a route
+that is not an entity or a name that never arrived. The empty string matters: the
+player falls back to its own "Playing" instead of drawing a dangling `·`.
+
+**13. The appearance control themed the shell and not the document.** Pressing
+**Light** turned the app bar and the bottom navigation pale and left the page
+black; the artist meta line, the album's track count and the Shuffle button were
+invisible against it. `applyTheme()` wrote `data-dhun-theme` to `#app` — but
+`tokens.css` declares its palettes for `:root, [data-dhun-theme=…]` and
+`body { background: var(--dhun-background) }` is painted by an element *above*
+`#app`, so `body` kept the dark tokens while every descendant of `#app` read the
+light ones. It was invisible to every gate: the app mounted, named its source,
+overflowed nothing and logged nothing. `browser.mjs` now presses the chip and
+reads the document — the attribute, `body`'s computed background and
+`--dhun-background` — and the check was run against the old code first, where it
+reported six failures including *"the theme attribute is on #app (dark)"*.
+
+**14. The demo catalogue's entries had no `kind`, so two screens drew them as the
+wrong thing.** `homeScreen` splits a shelf's entries by `kind` and treats anything
+without one as a **song**, which is right for a real browse response — every
+mapper sets the kind (`mapTwoRowItem`) — and wrong for the bundled catalogue,
+whose raw rows carry none. So "Albums for you" was four `play-track` rows whose
+ids (`al-01` …) are not videos and whose pages had to be reached by typing a URL;
+and `card()` infers *artist* from a `name`, so **search's playlist results became
+artist cards** and tapping "Evening Drive" opened `#/artist/pl-02`, a page that
+cannot exist. The bundled source now labels every collection it hands out, with
+tests that read its own responses — and a rendered-markup test that a shelf of
+albums produces album cards and never a playable row.
+
+**15. The sweep was asking the wrong question and looking in the wrong place.**
+Two harness defects, kept here because both made the app look better than it
+was: the sweep demanded an entity header from an id nothing knows (the app's
+answer — *"That album could not be loaded"* — is correct, and had been reported
+as a finding for two sessions), and its discovery selectors named per-kind
+actions (`open-album`, `open-artist`) that the app no longer emits, so the three
+entity routes were silently never visited. Repaired: ids are discovered from Home
+and Search, an unknown id expects the honest error state, and the run now covers
+22 routes plus a real album and artist page with **no findings**. The album
+discovery is also what exposed incident 14 — the sweep could not find an album
+link because Home did not have one.
+
+**16. An entity screen had two headings saying the same thing.** The album, artist and playlist
+screens draw the entity's name in the content — under the cover for an album,
+over the hero for an artist — exactly as `AlbumScreen.kt` and `ArtistScreen.kt`
+do; the app bar also drew it as its own `<h1>`. On a 1280px window the same name
+appeared at y=88 and y=401, and the document had two `h1`s with identical text,
+which a screen reader announces twice. Found by *looking at the capture*, not by
+any gate: the markup was valid, the outline had no skipped level (the website
+checker only counts levels, not duplicates), and axe does not flag it. The three
+entity routes now leave the heading to the page. `browser.mjs` counts the `h1`s
+on a real album screen, and the check was run against the duplicate first — it
+reported `2 h1(s) … ("Dharan Nights", "Dharan Nights")`.
+
+**Lesson.** Two of these were invisible to every automated gate for the same
+reason: the check asked about the *mechanism* rather than the *outcome*. The
+appearance chip stored `theme: "light"` correctly, so a test of the setting would
+have passed; the sweep queried for the app's links, and the app had none because
+a different layer had mislabelled its data. Ask what a person sees — the painted
+background, the cards on the shelf — and the failure appears immediately.
+

@@ -105,6 +105,16 @@
   --dhun-space-huge: 48px;
   /* Semantic aliases */
   --dhun-space-screen-padding: 20px;
+
+  /* The artist hero's veil. `ArtistScreen.kt` composites `DhunColors.background`
+     over the 16:10 crop at .15, .05, and LyricsMaterialPolicy.LYRICS_VEIL_BOTTOM
+     (.62) where it meets the page, so the veil darkens the artwork in dark mode
+     and lightens it in light mode. Expressed as mixes of the mirrored
+     `--dhun-background` token rather than as three more colour literals: the
+     alpha ladder is the app's, the colour stays the theme's. */
+  --dhun-hero-veil-top: color-mix(in srgb, var(--dhun-background) 15%, transparent);
+  --dhun-hero-veil-mid: color-mix(in srgb, var(--dhun-background) 5%, transparent);
+  --dhun-hero-veil-bottom: color-mix(in srgb, var(--dhun-background) 62%, transparent);
   --dhun-space-card-padding: 12px;
   --dhun-space-section-spacing: 32px;
   --dhun-space-item-spacing: 8px;

@@ -2117,3 +2117,53 @@ The build now drops every CSS rule a route cannot match
   measurements vanishing from a green CI run — can only be observed in CI.
 - **`app-web/` is not deployed.** It is `noindex` and unlinked; it is served only
   by `node tools/serve.mjs` inside this environment.
+
+## 2026-10-17 — session `arena/10c6882d-dhun`: the detail screens, and what is still not proven
+
+Three of the bullets in the 2026-10-09 section above are now out of date rather
+than wrong-then; the record keeps its sentences and this section supersedes them:
+
+- ~~"No browser exists in this environment and no browser binary can be
+  fetched."~~ **Superseded 2026-10-16/17.** A headless Chromium was assembled in
+  the sandbox from a static build plus its system libraries, and every claim in
+  this session's work was measured in it — geometry, computed backgrounds, the
+  rendered markup of the entity screens. It is a review instrument, not a
+  supported platform: it is not part of the build, and it lives outside the
+  repository.
+- ~~"`app-web/` is not deployed. It is `noindex` and unlinked; it is served only
+  by `node tools/serve.mjs` inside this environment."~~ **Superseded
+  2026-10-16.** `/app/` is published by the Pages workflow alongside the project
+  site and is linked from it; it is still `noindex, nofollow`, and it is still
+  not a store channel.
+- ~~"Downloads … the Downloads tab renders the app's two sections empty with the
+  reason on screen."~~ **Superseded 2026-10-16.** A browser cannot honour that
+  promise, so the tab is gone, along with the cache-budget setting and the
+  device-install-only affordances around it.
+
+What this round did **not** prove:
+
+- **No audio plays, and nothing in this round changed that.** Phase 2 — a real
+  stream resolved from a browser origin — remains the open gate. Not one capture,
+  probe or gate in this session heard a sound, and the app says so on screen.
+- **The device is still emulated.** Every measurement is a Chromium viewport at
+  320 / 360 / 390 / 844 / 1280 px. No phone, no tablet, no real touch input, and
+  no screen reader has run against `/app/`; the accessibility evidence is axe,
+  tab order, focus rings and contrast, which is not the same thing.
+- **The mirror is checked against the Kotlin sources, never against a rendered
+  Android screen.** That is the standing rule and it remains true for the entity
+  headers: `AlbumScreen.kt`, `ArtistScreen.kt` and `PlaylistScreen.kt` were read,
+  and the web was made to match them on paper. A side-by-side of two rendered
+  screens has still never been done.
+- **Radio has no web counterpart.** The app's artist header pairs Shuffle with a
+  `/next`-seeded station; no such station exists in this build, so the web pairs
+  Shuffle with Play over the same top songs. That is a deliberate gap, not an
+  unfinished feature, and it is the reason the artist header is not a pixel
+  mirror of the app's.
+- **The hero's veil is a `color-mix()` of the mirrored background token.** The
+  alphas are the app's (`.15 / .05 / .62`) and the colour is the theme's, but the
+  composition is CSS's, not Compose's, and the two will not be bit-identical.
+- **One app-shell detail is unverified: a 1000×900 window is portrait by
+  orientation and wide by the app's own rule (width > height).** The wide player
+  is selected by `(min-width: 480px) and (min-aspect-ratio: 1/1)` and the case has
+  not been captured.
+
