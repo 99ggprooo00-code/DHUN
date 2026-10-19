@@ -88,6 +88,15 @@ pressing **Light** in Settings while watching what happened to the page.
   the player that was asked for. Derived from the route, so the notice goes away
   by itself; placed above the first-run strip, which otherwise renders in its
   place and would have hidden it.
+- **The project site now says what changed.** A "What changed" band carries the
+  last four merged rounds with the pull request that carried each one (PR #185,
+  #184, #183, #182), each sourced in an HTML comment to this file and
+  `.ai/DEBUG_LOG.md`. It also stopped promising things the web build does not do:
+  the showcase's player, lyrics and queue links point at the routes the app
+  actually answers and say the player opens once a track plays; the Library card
+  no longer lists Downloads; and the Android Downloads capture keeps its caption,
+  gains a sentence saying the screen is Android/Windows only, and loses its deep
+  link rather than linking into `/app/` under a caption the web cannot honour.
 - **Four new review states** in `app-web/tools/states.mjs` (27 now) so the entity
   headers can be looked at without an upstream: album with the source's numbers,
   album without them, the artist hero with a biography, and a local playlist.
