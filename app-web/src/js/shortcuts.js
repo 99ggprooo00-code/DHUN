@@ -122,6 +122,20 @@ export function matchShortcut(event, { capabilities = {}, buffer = null, platfor
   const altKey = Boolean(event.altKey);
   const shiftKey = Boolean(event.shiftKey);
   if (event.ctrlKey && event.metaKey) return { action: null, pending: null, swallowed: false };
+  // Escape first, and regardless of where the caret is.
+  //
+  // Rule 1 says a text field owns its keys, and that is right for Space, for `/`
+  // and for every letter. It is wrong for Escape: a dialog that focuses its own
+  // field — which is what a dialog should do — would then be unclosable from the
+  // keyboard. The playlist-name sheet opens with the caret in it, so Escape
+  // stopped working exactly where it was most needed, while the help sheet went
+  // on advertising "Close the player or dialog". Escape is also not a key a
+  // text field uses for anything.
+  if (event.key === "Escape") {
+    const close = SHORTCUTS.find((shortcut) => shortcut.id === "close");
+    const action = close ? allowed(close, capabilities) : null;
+    return { action, pending: null, swallowed: Boolean(action) };
+  }
   // A text field owns its keys. Releasing the buffer here keeps a half-typed
   // chord from firing after the user clicks into the search box.
   if (isTextEntryTarget(event.target)) return { action: null, pending: null, swallowed: false };

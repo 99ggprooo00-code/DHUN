@@ -109,7 +109,7 @@ file. It is also the finding that makes the open-licensed candidate in
 
 | Test | Result |
 |---|---|
-| `cd app-web && npm test` (state machine, engine, source contract) | 165 pass |
+| `cd app-web && npm test` (state machine, engine, source contract) | 221 pass (2026-10-19) |
 | `browser` job on `/app/` (mount, source badge, no unhandled error, no overflow) | Pass |
 | Audible playback from the deployed site | **Not tested** |
 

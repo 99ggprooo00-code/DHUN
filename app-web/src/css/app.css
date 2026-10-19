@@ -258,7 +258,10 @@ a {
   min-width: var(--dhun-space-compact-target);
   padding: var(--dhun-space-sm) var(--dhun-space-md);
   border-radius: var(--dhun-shape-nav-indicator);
-  color: var(--dhun-text-tertiary);
+  /* Secondary, not tertiary: the tab labels are 11px, and the app's tertiary
+     (55% ink) measures 3.95:1 on the light background — under AA for text this
+     size. Measured across seven routes; the number is in the browser job. */
+  color: var(--dhun-text-secondary);
   font: var(--dhun-text-label-small);
   letter-spacing: var(--dhun-tracking-label-small);
   transition: color var(--dhun-motion-fast) var(--dhun-motion-easing);
@@ -858,7 +861,8 @@ a {
   margin: var(--dhun-space-xs) 0 0;
   font: var(--dhun-text-body-small);
   letter-spacing: var(--dhun-tracking-body-small);
-  color: var(--dhun-text-tertiary);
+  /* 12px body copy: 3.87:1 in tertiary on the light background. */
+  color: var(--dhun-text-secondary);
 }
 
 .dhun-section__action {
@@ -1041,7 +1045,9 @@ a {
   padding: 0 var(--dhun-space-sm);
   font: var(--dhun-text-label-small);
   font-variant-numeric: tabular-nums;
-  color: var(--dhun-text-tertiary);
+  /* 11px. The app draws durations in tertiary, which is a 3:1 "large text / UI
+     label" role there; at this size on the web it measured 3.87:1 in light. */
+  color: var(--dhun-text-secondary);
 }
 
 .dhun-track__flag {
@@ -1366,13 +1372,20 @@ a {
 }
 
 /* The quiet third line: the album's source-supplied `count • run time`, or a
-   playlist's description. `labelSmall` on `textTertiary`, which is what both
-   screens set. */
+   playlist's description. `labelSmall`, as both screens set — but on
+   `textSecondary` rather than the app's `textTertiary`, which measured 3.87:1
+   for 11px text in light. A description also gets the app's three-line clamp
+   (`PlaylistScreen.kt`: `maxLines = 3`). */
 .dhun-entity__submeta {
   margin: 0;
   font: var(--dhun-text-label-small);
   letter-spacing: var(--dhun-tracking-label-small);
-  color: var(--dhun-text-tertiary);
+  color: var(--dhun-text-secondary);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
 }
 
 .dhun-about {
@@ -1427,11 +1440,30 @@ a {
 .dhun-entity__veil {
   position: absolute;
   inset: 0;
+  /* `ArtistScreen.kt`'s three alphas, at the web's own stop positions.
+
+     The app spreads them 0 / 45 / 100% of the hero, which leaves the block the
+     name occupies (65–95% of the crop) at roughly a third of the final alpha.
+     Measured on the built app at 390px: the light-theme title read **2.64:1**
+     over the veil — below the 3:1 large-text floor, let alone 4.5:1 — because
+     dark ink was sitting on artwork the veil had only partly lightened. In dark
+     the same geometry measured 13.10:1, which is why nothing had noticed.
+
+     Reaching the bottom stop at 62% puts the whole title block on the full
+     veil. Every alpha is still `ArtistScreen.kt`'s (`LYRICS_VEIL_BOTTOM` is
+     .62); only the positions are the web's. At .62 the veil is an opaque-enough
+     wash that the title clears AA over *any* artwork: over pure black the light
+     theme's own ink composites to 5.8:1 (over pure white in dark, 5.1:1), which
+     is why this is a bound and not a tuning.
+
+     The mid stop is early (22%, not the app's 45%) so the ramp from .05 to .62
+     takes 40% of the hero instead of 17%: at 17% the point where the veil
+     reaches full strength read as a 41px fog band across a 244px hero. */
   background: linear-gradient(
     180deg,
     var(--dhun-hero-veil-top),
-    var(--dhun-hero-veil-mid) 45%,
-    var(--dhun-hero-veil-bottom)
+    var(--dhun-hero-veil-mid) 22%,
+    var(--dhun-hero-veil-bottom) 62%
   );
 }
 
@@ -1740,7 +1772,9 @@ input[type="range"]:disabled {
 }
 
 .dhun-contract__body {
-  color: var(--dhun-text-tertiary);
+  /* The request/response examples on Settings: 12px monospace, 3.92:1 in
+     tertiary. Secondary keeps them quiet without making them unreadable. */
+  color: var(--dhun-text-secondary);
 }
 
 .dhun-diagnostics {
@@ -2099,8 +2133,15 @@ input[type="range"]:disabled {
    beside the hero instead of collapsing the cover into the few pixels left
    above a tall bottom stack.
 
-   `orientation: landscape` is the closest media feature to `width > height`;
-   it is deliberately paired with the width floor, exactly as the Kotlin does.
+   The height test is `orientation: landscape` because that is exactly the
+   Kotlin's `width > height`: Media Queries Level 4 defines landscape as width
+   greater than height and portrait as height greater than *or equal to* width,
+   so the two agree including the square case, where both stay stacked. Measured
+   before trusting it: a 900x1000 window stacks (stacked is what the Kotlin
+   asks for) and its transport sits at y=915..963 inside the window; 1000x900
+   and 1280x900 go wide with the transport at y=514..586 and y=532..604. A
+   `min-aspect-ratio: 1/1` substitution was tried and reverted: it differs only
+   at exactly square, where it would go wide and the app would not.
 
    The split is the Kotlin's own arithmetic, not an eyeballed pair of halves:
    the controls column is clamp(0.34 · width, 240dp, 400dp)

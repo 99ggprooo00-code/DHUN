@@ -110,6 +110,22 @@ test("chords work in two steps and expire", () => {
   assert.ok(CHORD_TIMEOUT_MS > 500 && CHORD_TIMEOUT_MS < 3000);
 });
 
+test("Escape closes a dialog even when its own field has the caret", () => {
+  // Every other key in a field belongs to the field. Escape does not: a sheet
+  // that focuses its input — the playlist-name sheet does — would otherwise be
+  // unclosable from the keyboard, and the help sheet's "Close the player or
+  // dialog" would be a promise the app could not keep.
+  const inField = { tagName: "INPUT", type: "text" };
+  const escape = matchShortcut({ key: "Escape", target: inField }, { capabilities: { hasTrack: false } });
+  assert.equal(escape.action?.id, "close");
+  assert.equal(escape.swallowed, true);
+  // The rest of the field's keys stay the field's.
+  assert.equal(matchShortcut({ key: " ", target: inField }, { capabilities: { hasTrack: true } }).action, null);
+  assert.equal(matchShortcut({ key: "s", target: inField }, { capabilities: { hasTrack: true } }).action, null);
+  // A pending chord does not survive an Escape.
+  assert.equal(matchShortcut({ key: "Escape", target: inField }, { capabilities: {}, buffer: "g" }).pending, null);
+});
+
 test("a chord is abandoned when focus lands in a field", () => {
   const result = matchShortcut({ key: "h", target: { tagName: "INPUT", type: "text" } }, { capabilities: {}, buffer: "g" });
   assert.equal(result.action, null);

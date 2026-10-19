@@ -282,3 +282,88 @@ export function radioGroupProblem({ name, members, before, after, checkedCount, 
   }
   return null;
 }
+
+/**
+ * WCAG contrast, as arithmetic rather than as a browser feature.
+ *
+ * These live here because the *measurement* is a browser's job but the
+ * *decision* is not: the site's own contrast check scans the marketing pages in
+ * Chromium, and for two years `/app/` was exempt on the argument that its
+ * colours are mirrored from the Android app. Mirroring proves provenance, not
+ * legibility — the artist hero's title measured 2.64:1 in Light, and five 11px
+ * labels sat at 3.87:1 — so `/app/` is measured now too.
+ *
+ * Everything is in sRGB 8-bit channels, which is what `getComputedStyle`
+ * returns. `a` is 0..1. Compositing happens in sRGB space, not linear light,
+ * because that is what the browser does with a translucent `color`.
+ */
+export function parseCssColor(value) {
+  const match = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\s*\)$/i.exec(
+    String(value ?? "").trim(),
+  );
+  if (!match) return null;
+  const [r, g, b] = match.slice(1, 4).map(Number);
+  const a = match[4] === undefined ? 1 : Number(match[4]);
+  if (![r, g, b, a].every(Number.isFinite)) return null;
+  return { r, g, b, a };
+}
+
+/** `top` over `bottom`. Both opaque-safe: the result is opaque. */
+export function compositeOver(top, bottom) {
+  const a = top.a ?? 1;
+  return {
+    r: top.r * a + bottom.r * (1 - a),
+    g: top.g * a + bottom.g * (1 - a),
+    b: top.b * a + bottom.b * (1 - a),
+    a: 1,
+  };
+}
+
+/** WCAG relative luminance of an opaque colour. */
+export function relativeLuminance({ r, g, b }) {
+  const channel = (value) => {
+    const s = value / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+/** WCAG contrast ratio, 1..21. Order-independent. */
+export function contrastRatio(a, b) {
+  const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * The floor for text of this size, per WCAG 1.4.3: 3:1 counts as AA for large
+ * text — 24px, or 18.66px when it is bold — and 4.5:1 for everything else.
+ */
+export function contrastFloor(fontSizePx, fontWeight = 400) {
+  const size = Number(fontSizePx) || 0;
+  const weight = Number(fontWeight) || 400;
+  return size >= 24 || (size >= 18.66 && weight >= 700) ? 3 : 4.5;
+}
+
+/**
+ * One measured text node. `ink` may be translucent (the app writes its type ramp
+ * as alpha over the background); `backdrop` must be opaque and already
+ * composited, because only the browser knows what is painted behind it.
+ *
+ * Returns null when the text passes, or a one-line finding when it does not.
+ * A backdrop of `null` means "behind a gradient or an image" — those cannot be
+ * decided from computed styles at all, are reported by the caller as unmeasured
+ * rather than as failures, and are covered by the pixel probe for the one screen
+ * where it matters (the artist hero).
+ */
+export function contrastProblem({ ink, backdrop, fontSizePx, fontWeight, selector, text }) {
+  const foreground = typeof ink === "string" ? parseCssColor(ink) : ink;
+  const background = typeof backdrop === "string" ? parseCssColor(backdrop) : backdrop;
+  if (!foreground || !background) return null;
+  const floor = contrastFloor(fontSizePx, fontWeight);
+  const composited = foreground.a < 1 ? compositeOver(foreground, background) : foreground;
+  const ratio = contrastRatio(composited, background);
+  if (ratio + 1e-6 >= floor) return null;
+  const where = selector || "element";
+  const what = (text || "").trim().slice(0, 40);
+  return `${ratio.toFixed(2)}:1 (floor ${floor}:1) ${fontSizePx}px/${fontWeight || 400} on ${where}${what ? ` — “${what}”` : ""}`;
+}

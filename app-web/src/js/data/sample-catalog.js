@@ -69,11 +69,21 @@ const PLAYLISTS = [
     id: "pl-02",
     name: "Evening Drive",
     trackIds: ["tr-03", "tr-11", "tr-14", "tr-18"],
+    /*
+     * A description, because `PlaylistScreen.kt` draws one under the meta line
+     * and clamps it to three lines. The demo catalogue had none on any playlist,
+     * so the web's header could not show — and no test could have caught — that
+     * its description never clamped at all. Fictional, like every other word in
+     * this file.
+     */
+    description:
+      "For the hour when the ring road empties out. Songs with headlights in them, roughly oldest to newest, ending somewhere north of the city. Every title here is invented, and no audio exists for any of them.",
   },
   {
     id: "pl-03",
     name: "Monsoon Focus",
     trackIds: ["tr-06", "tr-07", "tr-15", "tr-20", "tr-02"],
+    description: "Rain, room tone and slow tempos. Instrumental where possible; nothing with a chorus that asks to be sung along to.",
   },
 ];
 

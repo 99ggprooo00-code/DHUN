@@ -33,15 +33,15 @@ gate covers which claim.
 
 | Gate | Command | Covers | Result |
 |---|---|---|---|
-| App suite | `cd app-web && npm test` | The state machine, the engine, storage, the router, the source seam, the screens, the shell, the tokens, the icons | 165 pass |
+| App suite | `cd app-web && npm test` | The state machine, the engine, storage, the router, the source seam, the screens, the shell, the tokens, the icons | 221 pass |
 | Repository contract suite | `python3 -m unittest discover -s scripts -p 'test_*.py'` | The web app's source-level rules, the site's honesty and quality rules, and the repository's own hygiene (links, secrets, debris) — no Node, no network | OK |
-| Site quality | `python3 scripts/website_quality.py website/dist` | Design-system mirror, contrast in both schemes, touch targets, budgets, metadata, crawlability | 31 checks |
+| Site quality | `python3 scripts/website_quality.py website/dist` | Design-system mirror, contrast in both schemes, touch targets, budgets, metadata, crawlability | 32 checks |
 | Site honesty | `python3 scripts/website_claims.py website/dist` | Forbidden claims, required caveats, no baked digests, no telemetry SDK | 4 pages, 9 rules |
 | Web documents | `python3 scripts/web_player_docs.py docs/web-player` | These documents: required sections, evidence beside every completion, no claim the repository cannot back | OK |
 | Failure copy | `app-web/tests/source.test.mjs`, `app-web/tests/views.test.mjs` | A failure never leads with a browser's or a server's own string; every kind and stage has a sentence; a help sentence stands without the summary above it; every state keeps its raw string as a labelled diagnostic | Pass |
 | The app's own copy | `app-web/tests/actions.test.mjs` | No string the app renders — a screen, the chrome, the document's title and description, the install manifest — promises playback or names an audio quality. Deliberately narrower than the site's lexicon, because Python cannot render these screens | Pass |
 | One surface per failure | `app-web/tests/actions.test.mjs` | A playback failure is reported once, not twice: the toast stays for the screens that have no status strip of their own, and the expanded player — which draws the same failure from the same `playerState.error` — starts clean instead of inheriting a toast over its own notice. Both checks were mutation-tested (the guard removed, the test fails) | Pass |
-| Browser job (CI) | `.github/workflows/website.yml` | Rendering, overflow, contrast, tab order, keyboard, motion, print, axe — every route, both schemes | Pass |
+| Browser job (CI) | `.github/workflows/website.yml` | Rendering, overflow, contrast (the site *and* `/app/`, in both themes), tab order, keyboard, motion, print, axe — every route | 108 measurements |
 | Served-site check (CI, after a publish) | `scripts/website_smoke.py` | The bytes a visitor actually receives, re-read on the live site | Pass |
 | Minification proof | `cd website && node tools/verify-minify.mjs` | The committed build matches a fresh build | Pass |
 | Markup validity | `npx html-validate "dist/**/*.html"` | Valid HTML on every built page | Pass |
