@@ -22,6 +22,93 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### A playlist you make opens, five labels stopped failing AA, and `/app/` gets a contrast gate (2026-10-19, session `arena/84c7280a-dhun`)
+
+Found by walking **every text node** of the built `/app/` in both themes and
+comparing its ink with the colour actually painted behind it — a measurement
+this repository had never made on the app. `tokens.test.mjs` proves the web's
+palette is a byte-identical mirror of `DhunAppearance.kt`, and that was taken as
+proof of legibility. It is proof of provenance: the mirror was correct, and the
+token it mirrored is too quiet for the sizes it is used at.
+
+- **Fixed: the light theme's tertiary ink failed WCAG AA on five roles.**
+  `textTertiary = 0x8C1A1714` (55% ink) measured **3.87–3.95:1** on the light
+  background for a track row's duration (11px/600), the bottom-nav labels, the
+  entity sub-meta line, section hints (12px/400) and the Settings
+  request/response block (12px monospace) — 15 failing styles across seven
+  routes. The app's own contrast table documents that token at 3.0:1 as *"AA
+  large text / UI labels"*, and the app uses it for 11px labels; the web now
+  draws those five roles on `--dhun-text-secondary` (7.53:1). The dark theme was
+  already clean at every one of the same nodes (0 failures on seven routes) and
+  is unchanged. `tokens.css` still mirrors `DhunAppearance.kt` byte for byte.
+- **Fixed: the artist hero's title read 2.64:1 in Light.** The hero's veil is the
+  app's own gradient of the theme's background at `.15 / .05 / .62`; at 45% and
+  100% stops the block the name occupies sat at roughly a third of the final
+  alpha, which is invisible with white ink (dark measured 13.10:1) and failed
+  with dark ink. The veil now reaches its bottom stop at **62%** and its mid stop
+  at 22% — same three alphas, the web's own stop positions — measured worst
+  **7.15:1**, median 7.51 (dark: 15.76 worst). Alternatives at 5.57, 3.35 and
+  3.18 were measured and rejected; a 17%-wide ramp was rejected for reading as a
+  fog seam across the artwork.
+- **Fixed: a playlist made in the browser opened as "That playlist could not be
+  loaded".** The app asked the *network* for every playlist, and a playlist made
+  on this device is not there — after creating one successfully and listing it in
+  the library, opening it failed. Local playlists now resolve from the library,
+  their rows come from a bounded local track table (the app keeps the same table
+  in SQLite), the route survives a reload, and the table travels with an export.
+  Also fixed the boot race that made a direct load of that route resolve before
+  the library had been read.
+- **Fixed: "New playlist" in the library header did nothing.** The button carried
+  the *form's* action id; the handler looked for an input inside the button's own
+  subtree, found none, and returned. It now opens a naming sheet — input, Create,
+  Enter to submit, cursor already in the field.
+- **Fixed: Rename called `window.prompt`.** Same sheet as New, prefilled, with
+  its own Save. Nothing in the app could style, translate or announce a browser
+  dialog.
+- **Fixed: Escape did not close a dialog whose field had focus.** The keyboard
+  matcher's "never steal a keystroke from a text field" rule swallowed it — and
+  the new naming sheet focuses its own field, so Escape stopped working exactly
+  where it was most needed while the help sheet still advertised *"Close the
+  player or dialog"*. Escape is now matched before the text-entry guard; every
+  other key in a field still belongs to the field.
+- **Playlist descriptions clamp to three lines**, which is what
+  `PlaylistScreen.kt` does (`maxLines = 3`). The web had no clamp at all, and the
+  demo catalogue had no description on any playlist, so nothing could show it.
+- **New gate: `/app/` is measured for contrast, in both themes.** The site's
+  contrast check only ever scanned the marketing pages. It now walks the app's
+  rendered text on seven routes per theme (386 nodes each), composites the
+  translucent backdrops in sRGB, and applies WCAG's floors — 4.5:1, or 3:1 for
+  large text. The decision is a pure function in `website/tests/rules.mjs`
+  (unit-tested, including 21:1 black/white and the 4.54:1 `#767676` boundary), so
+  it is provable without a browser. Mutation-proven: putting 55% ink back into a
+  served copy made the check report the same class of failure it was written for
+  — 3.77–3.92:1 on 14px chips and 12px subtitles — before the run was restored.
+- **Investigated and *not* a defect, recorded so it is not "fixed" again:** the
+  full player's wide layout is keyed on `(min-width: 480px) and (orientation:
+  landscape)`, which is exactly `PlayerLayout.isWide`'s `width > height` (Media
+  Queries defines landscape as width greater than height, portrait as height
+  greater than *or equal to* width, so the square case agrees too). A
+  `min-aspect-ratio: 1/1` substitution was written, measured and reverted: it
+  differs only at exactly square, where the app stays stacked. At 900×1000 the
+  player stacks and its transport sits at y=915..963 inside a 1000px window;
+  `#/album/al-01` with shuffle on plays a shuffled queue, not the album order —
+  also correct, and also recorded.
+- Stale numbers refreshed in `docs/web-player/` (221 tests, 32 quality checks,
+  108 browser measurements, 32 source files / 587,244 B); the Phase 0 audit keeps
+  its own dated snapshot with a line saying so.
+
+**Tests:** `app-web` node suite **221 pass / 0 fail** (+3: Escape from a text
+field, the naming sheet's two modes and its escaping, the local track table's
+normalisation and its round trip through export/import). `website/
+tests/rules.test.mjs` **52 pass** (+4 contrast). The Python contract suite **459
+OK**; site quality **32 checks**; honesty contract unchanged (4 pages, 9 rules).
+The browser job is **108 measurements, 0 failures**, five of them new: the naming
+sheet and its focus, Enter creating a playlist, that playlist opening on its own
+header with an honest empty state, Rename plus Escape, and the playlist surviving
+a reload. The `/app/` contrast check reads **386 text nodes per theme on seven
+routes**, both themes clean. Route sweep (16 routes, 10 entity ids) 0 findings.
+Build: 23 reachable modules, 32 shell entries, 587,244 B.
+
 ### The detail screens become the app's, and the appearance control starts working (2026-10-17, session `arena/10c6882d-dhun`)
 
 Found by opening the built album, artist and playlist screens and holding them

@@ -10,18 +10,23 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  INLINE_TARGET_FLOOR,
-  TARGET_FLOOR,
   anchorLandingProblem,
   caveatsHiddenInPrint,
+  compositeOver,
+  contrastFloor,
+  contrastProblem,
+  contrastRatio,
   currentPageProblem,
   duplicateLinkTargets,
   focusChanged,
   focusSignature,
   forcedColorsBoundaryMissing,
   headingOrderProblem,
+  INLINE_TARGET_FLOOR,
   markerPerceivable,
+  parseCssColor,
   radioGroupProblem,
+  TARGET_FLOOR,
   targetProblem,
 } from "./rules.mjs";
 
@@ -366,4 +371,58 @@ test("radio group: a single-radio group is not a choice", () => {
     tabLeftGroup: true,
   });
   assert.match(problem, /a group of one is not a choice/);
+});
+
+test("contrast: the arithmetic matches WCAG's own worked examples", () => {
+  const black = { r: 0, g: 0, b: 0, a: 1 };
+  const white = { r: 255, g: 255, b: 255, a: 1 };
+  assert.equal(contrastRatio(black, white).toFixed(1), "21.0", "black on white is 21:1");
+  assert.equal(contrastRatio(white, black).toFixed(1), "21.0", "and the ratio is order-independent");
+  assert.equal(contrastRatio(white, white).toFixed(1), "1.0");
+  // #767676 on white is the classic 4.54:1 boundary case.
+  assert.equal(contrastRatio({ r: 0x76, g: 0x76, b: 0x76, a: 1 }, white).toFixed(2), "4.54");
+  assert.deepEqual(parseCssColor("rgba(26, 23, 20, 0.55)"), { r: 26, g: 23, b: 20, a: 0.55 });
+  assert.deepEqual(parseCssColor("rgb(246, 244, 241)"), { r: 246, g: 244, b: 241, a: 1 });
+  assert.equal(parseCssColor("color(srgb 1 0 0 / 0.5)"), null, "a colour space we do not measure must not be guessed at");
+});
+
+test("contrast: translucent ink is composited before it is judged", () => {
+  // This is the defect the app shipped: 55% ink on the light background is
+  // 3.84:1, not the 14.41:1 that the same ink at 100% would score.
+  const background = parseCssColor("rgb(246, 244, 241)");
+  const tertiary = parseCssColor("rgba(26, 23, 20, 0.55)");
+  const composited = compositeOver(tertiary, background);
+  assert.ok(contrastRatio(composited, background) < 4.5, "55% ink fails body text");
+  const secondary = compositeOver(parseCssColor("rgba(26, 23, 20, 0.75)"), background);
+  assert.ok(contrastRatio(secondary, background) > 4.5, "75% ink passes");
+});
+
+test("contrast: the floor follows the size and weight", () => {
+  assert.equal(contrastFloor(11, 600), 4.5, "an 11px label is body text");
+  assert.equal(contrastFloor(16, 400), 4.5);
+  assert.equal(contrastFloor(24, 400), 3, "24px is large");
+  assert.equal(contrastFloor(18.66, 700), 3, "bold 18.66px is large");
+  assert.equal(contrastFloor(18.66, 600), 4.5, "and semibold is not");
+});
+
+test("contrast: a finding names the ratio, the floor and the element", () => {
+  const bad = contrastProblem({
+    ink: "rgba(26, 23, 20, 0.55)",
+    backdrop: "rgb(246, 244, 241)",
+    fontSizePx: 11,
+    fontWeight: 600,
+    selector: ".dhun-track__time",
+    text: "4:48",
+  });
+  assert.match(bad, /3\.8\d:1 \(floor 4\.5:1\) 11px\/600 on \.dhun-track__time — “4:48”/);
+  assert.equal(
+    contrastProblem({ ink: "rgb(26, 23, 20)", backdrop: "rgb(246, 244, 241)", fontSizePx: 16 }),
+    null,
+    "opaque primary ink passes",
+  );
+  assert.equal(
+    contrastProblem({ ink: null, backdrop: "rgb(246, 244, 241)", fontSizePx: 16 }),
+    null,
+    "an unreadable colour is not a finding",
+  );
 });

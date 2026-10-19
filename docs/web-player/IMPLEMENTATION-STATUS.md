@@ -17,7 +17,7 @@ cannot be asserted from this repository, and it is Phase 2.
 | 2 | Real playback proof of concept | ❌ Blocked | [PHASE-02-PLAYBACK-POC.md](PHASE-02-PLAYBACK-POC.md) — B1's result: metadata readable, the player request refused by the origin in the one available browser; the app surfaces that refusal (`app-web/src/js/source.js`, `player-ui.js`) | A real browser, on a real network, playing a real track from the deployed `/app/` and reporting what happened — sound or an error with a reason |
 | 3 | Source-neutral architecture | ✅ Complete | [PHASE-03-ARCHITECTURE.md](PHASE-03-ARCHITECTURE.md) — `app-web/src/js/source.js`: `SOURCE_KIND`, one `describeActive()`, a failure taxonomy, a documented endpoint contract | Nothing; a new provider is added behind the same interface |
 | 4 | Real search and catalogue | ⚠️ Complete with exceptions | [PHASE-04-SEARCH-AND-CATALOGUE.md](PHASE-04-SEARCH-AND-CATALOGUE.md) — `source.js` InnerTube adapter, unit-tested against the recorded contract; the demo catalogue is labelled and last | Live search from the deployed origin is unverified (it shares Phase 2's blocker) |
-| 5 | Complete playback engine | ✅ Complete | [PHASE-05-PLAYBACK-ENGINE.md](PHASE-05-PLAYBACK-ENGINE.md) — `player.js`, `audio.js`, `tabsync.js`; 165 `app-web` tests | Audible output depends on Phase 2 |
+| 5 | Complete playback engine | ✅ Complete | [PHASE-05-PLAYBACK-ENGINE.md](PHASE-05-PLAYBACK-ENGINE.md) — `player.js`, `audio.js`, `tabsync.js`; 221 `app-web` tests | Audible output depends on Phase 2 |
 | 6 | Interface and full-screen player | ✅ Complete | [PHASE-06-INTERFACE.md](PHASE-06-INTERFACE.md) — `player-ui.js`, `views.js`, generated tokens; the `browser` job measures viewports, contrast, tab stops and axe on every route | A human's eyes; no capture from the web app has been looked at by a person |
 | 7 | Library, playlists, persistence | ✅ Complete | [PHASE-07-LIBRARY-AND-PERSISTENCE.md](PHASE-07-LIBRARY-AND-PERSISTENCE.md) — `storage.js` (settings in `localStorage`, library in IndexedDB, export/import, private-mode degradation) | No cross-device story, by design and by budget |
 | 8 | Reliability, accessibility, privacy, security | ⚠️ Complete with exceptions | [PHASE-08-TEST-PLAN.md](PHASE-08-TEST-PLAN.md) — the four gates, the CSP, the no-telemetry assertions | A manual browser and screen-reader pass; real network-failure testing |
@@ -43,7 +43,7 @@ the evidence is named; an unticked box means it was not.
 - [x] **The interface ships and is reachable** — the site and `/app/` are live at
   `https://99ggprooo00-code.github.io/DHUN/` and re-checked after every publish
   by the `served` job (`scripts/website_smoke.py`).
-- [x] **The code is unit-tested** — `cd app-web && npm test` → 165 pass;
+- [x] **The code is unit-tested** — `cd app-web && npm test` → 221 pass;
   `python3 -m unittest discover -s scripts` → the repository's Python contract
   suite, which includes the web app's source-level rules.
 - [x] **The rendered pages are measured in a real browser** — the `browser` job

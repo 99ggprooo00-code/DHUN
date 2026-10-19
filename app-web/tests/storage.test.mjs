@@ -147,6 +147,40 @@ test("an empty library is a complete document, not an absent one", () => {
   assert.deepEqual(empty.playlists, []);
   assert.deepEqual(empty.history, []);
   assert.deepEqual(empty.plays, {});
+  assert.deepEqual(empty.tracks, {}, "the local track table exists from the start");
+});
+
+test("a local playlist keeps the rows it points at, and junk rows are dropped", () => {
+  // The defect this pins: a playlist made in the browser opened as "That
+  // playlist could not be loaded", because a playlist's rows were looked up in
+  // the network and a playlist made here is not there. The rows it points at are
+  // remembered locally instead, keyed by id, exactly like the app's own metadata
+  // table.
+  const library = normaliseLibrary({
+    playlists: [{ id: "pl-1", name: "Rain tape", trackIds: ["tr-1", "tr-2"] }],
+    tracks: {
+      "tr-1": { id: "tr-1", title: "Seven Bridges", artist: "A", artwork: "a.jpg", durationMs: 1000 },
+      "tr-2": { id: "tr-2", title: "  ", artist: "B" },
+      "tr-3": "not a row",
+      "": { id: "", title: "no id" },
+      // Parsed from a file the visitor chose: an id that is an object key must
+      // not become a prototype. An object *literal* would set the prototype, so
+      // this is exactly what `JSON.parse` gives `normaliseLibrary`.
+      ...JSON.parse('{"__proto__": {"title": "polluted"}}'),
+    },
+    plays: JSON.parse('{"__proto__": 9, "constructor": 4}'),
+  });
+  assert.deepEqual(Object.keys(library.tracks), ["tr-1"], "a row with no title is not a row");
+  assert.equal(library.tracks.polluted, undefined, "an id of __proto__ polluted the track table");
+  assert.deepEqual(Object.keys(library.plays), [], "or the play counts");
+  assert.equal(library.tracks["tr-1"].title, "Seven Bridges");
+
+  // And it travels with an export, so a restored playlist still opens.
+  const document = exportLibrary(library);
+  assert.equal(document.library.tracks["tr-1"].title, "Seven Bridges");
+  const imported = importLibrary(JSON.stringify(document));
+  assert.equal(imported.ok, true);
+  assert.equal(imported.library.tracks["tr-1"].title, "Seven Bridges");
 });
 
 test("the export is versioned, self-describing and carries the library", () => {

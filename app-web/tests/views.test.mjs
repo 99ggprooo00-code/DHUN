@@ -720,6 +720,28 @@ test("a local playlist is labelled local, and a remote one is not", () => {
   assert.ok(!/Local playlist/.test(theirs), "a remote playlist is not local");
 });
 
+test("a playlist is named in a sheet, not in a browser dialog", () => {
+  // "New playlist" in the library header used to call the picker's *form*
+  // handler from a button with no form under it: it found no input, returned,
+  // and did nothing. Rename called `window.prompt`. Both now open this sheet.
+  const create = text(views.playlistNameSheet({ mode: "create" }));
+  assert.match(create, /role="dialog"/);
+  assert.match(create, /data-action="new-playlist"/);
+  assert.match(create, /name="name"/);
+  assert.match(create, /Create/);
+  assert.ok(!/data-id=/.test(create), "a new playlist has no id yet");
+
+  const rename = text(views.playlistNameSheet({ mode: "rename", playlist: { id: "pl-1", name: "Rain tape" } }));
+  assert.match(rename, /aria-label="Rename playlist"/);
+  assert.match(rename, /data-action="rename-playlist"/);
+  assert.match(rename, /data-id="pl-1"/, "rename names the playlist it is renaming");
+  assert.match(rename, /value="Rain tape"/, "and starts from the current name");
+  assert.match(rename, /Save/);
+  // Escaping is still the view's job, even prefilled from stored data.
+  const hostile = text(views.playlistNameSheet({ mode: "rename", playlist: { id: "pl-2", name: '"><img src=x>' } }));
+  assert.ok(!/<img/.test(hostile), "the current name was not escaped");
+});
+
 test("the artist hero is the app's: a 16:10 veil, and only the listeners the source sent", () => {
   const withListeners = text(views.artistScreen({
     artist: { id: "UC1", name: "Naya Koirala", listeners: "1.2M monthly listeners" },

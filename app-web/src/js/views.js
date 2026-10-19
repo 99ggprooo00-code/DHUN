@@ -1265,6 +1265,37 @@ export function playlistPickerSheet({ track, playlists }) {
   </div>`;
 }
 
+/**
+ * The one place a playlist is named.
+ *
+ * Both ways in land here: "New playlist" in the library header and "Rename" on a
+ * playlist. The library button used to call the *form's* action from a button
+ * with no form under it, so it read no input and returned — a button that did
+ * nothing. Rename called `window.prompt`, which is a browser dialog, not this
+ * app's, and cannot be styled, translated or reached by a screen reader the way
+ * the rest of the shell is.
+ */
+export function playlistNameSheet({ mode = "create", playlist = null }) {
+  const renaming = mode === "rename";
+  const title = renaming ? "Rename playlist" : "New playlist";
+  const action = renaming ? "rename-playlist" : "new-playlist";
+  return html`<div class="dhun-sheet" role="dialog" aria-modal="true" aria-label="${title}">
+    <div class="dhun-menu-header">
+      <span class="dhun-menu-header__text">
+        <span class="dhun-menu-header__title">${title}</span>
+        <span class="dhun-menu-header__sub">${renaming
+          ? "The new name is saved on this device."
+          : "It is kept in this browser, and nowhere else."}</span>
+      </span>
+      <button type="button" class="dhun-icon-button" data-action="close-sheet" aria-label="Close">${icon("Close", { size: 20 })}</button>
+    </div>
+    <form class="dhun-newplaylist" data-action="${action}"${renaming ? html` data-id="${playlist?.id ?? ""}"` : html``}>
+      <input class="dhun-input" type="text" name="name" value="${renaming ? playlist?.name ?? "" : ""}" placeholder="Playlist name" aria-label="Playlist name" maxlength="120" autocomplete="off" enterkeyhint="done" />
+      <button type="submit" class="dhun-button dhun-button--tonal">${renaming ? "Save" : "Create"}</button>
+    </form>
+  </div>`;
+}
+
 export function confirmSheet({ title, body, confirmLabel, action, cancelLabel = "Cancel" }) {
   return html`<div class="dhun-sheet" role="dialog" aria-modal="true" aria-label="${title}">
     <div class="dhun-menu-header">

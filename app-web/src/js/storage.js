@@ -239,6 +239,17 @@ export function emptyLibrary() {
     likes: [],
     playlists: [],
     history: [],
+    /**
+     * Track metadata, keyed by id: title, artist, artwork, duration.
+     *
+     * The app keeps the same table in its local SQLite database ("Track metadata
+     * you have browsed", privacy doc §3). Without it a playlist entry is an id
+     * with no title: a locally-made playlist opened from its own card said
+     * "That playlist could not be loaded", because the only place the app looked
+     * for a playlist was the network, and a playlist made in this browser does
+     * not exist there. Written when a row is played, liked or added to a list.
+     */
+    tracks: {},
     /** Play counts, keyed by track id — what "Listen again" and sorting use. */
     plays: {},
     updatedAt: null,
@@ -255,6 +266,10 @@ export function normaliseLibrary(raw) {
   if (!raw || typeof raw !== "object") return library;
 
   const trackIdOk = (value) => typeof value === "string" && value.length > 0 && value.length <= 64;
+  // Ids become keys of two plain objects (`tracks`, `plays`). An imported file
+  // is the visitor's own, but it is still parsed data: an id of `__proto__`
+  // would set a prototype instead of storing a row.
+  const keySafe = (id) => id !== "__proto__" && id !== "constructor" && id !== "prototype";
 
   if (Array.isArray(raw.likes)) {
     const seen = new Set();
@@ -300,9 +315,24 @@ export function normaliseLibrary(raw) {
       }));
   }
 
+  if (raw.tracks && typeof raw.tracks === "object" && !Array.isArray(raw.tracks)) {
+    for (const [id, entry] of Object.entries(raw.tracks).slice(0, 2000)) {
+      if (!trackIdOk(id) || !keySafe(id) || !entry || typeof entry !== "object") continue;
+      const title = typeof entry.title === "string" ? entry.title.trim().slice(0, 200) : "";
+      if (!title) continue;
+      library.tracks[id] = {
+        id,
+        title,
+        artist: typeof entry.artist === "string" ? entry.artist.slice(0, 200) : "",
+        artwork: typeof entry.artwork === "string" ? entry.artwork.slice(0, 600) : "",
+        durationMs: typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) ? entry.durationMs : 0,
+      };
+    }
+  }
+
   if (raw.plays && typeof raw.plays === "object") {
     for (const [id, count] of Object.entries(raw.plays)) {
-      if (!trackIdOk(id)) continue;
+      if (!trackIdOk(id) || !keySafe(id)) continue;
       if (typeof count !== "number" || !Number.isFinite(count) || count <= 0) continue;
       library.plays[id] = Math.min(Math.floor(count), 100000);
     }

@@ -53,6 +53,9 @@ import AxeBuilder from "@axe-core/playwright";
 import {
   anchorLandingProblem,
   caveatsHiddenInPrint,
+  compositeOver,
+  contrastProblem,
+  parseCssColor,
   currentPageProblem,
   markerPerceivable,
   duplicateLinkTargets,
@@ -1754,6 +1757,225 @@ async function checkWebAppDeepLink(browser) {
 }
 
 /**
+ * Every line of text in `/app/`, measured against the colour painted behind it,
+ * in both themes.
+ *
+ * The site has had a contrast gate since Phase 6, but it only ever scanned the
+ * marketing pages. `/app/` was exempt on the argument that its colours are
+ * mirrored from `DhunAppearance.kt` — and mirroring proves provenance, not
+ * legibility. Measured, the light theme's 55%-ink tertiary token was 3.87:1 on
+ * every track row's duration, the bottom-nav labels, the entity sub-meta, the
+ * section hints and the Settings contract body. Nothing in the repository could
+ * have seen that: `tokens.test.mjs` proves the mirror is byte-identical, and it
+ * was.
+ *
+ * The browser supplies only the raw inputs — the ink, the composited backdrop,
+ * the size, the weight — and `contrastProblem` in `rules.mjs` decides, so the
+ * arithmetic is unit-tested without a browser. A node over a gradient or an
+ * image is skipped and counted, not failed: computed styles cannot see through
+ * one. The artist hero — the screen with a gradient — is measured by the pixel
+ * probe in `dhun-tools/probe-hero-contrast.mjs`, whose numbers (2.64:1 before,
+ * 7.15:1 after) are what put the veil's bottom stop at 62%.
+ */
+function textContrastScript() {
+  const paintedBackdrop = (node) => {
+    const layers = [];
+    for (let element = node; element; element = element.parentElement) {
+      const style = getComputedStyle(element);
+      if (style.backgroundImage && style.backgroundImage !== "none") return null;
+      const colour = style.backgroundColor;
+      const parsed = /rgba?\([^)]+\)/.exec(colour);
+      if (!parsed) break;
+      const parts = parsed[0].slice(colour.indexOf("(") + 1, -1).split(",").map((part) => Number(part.trim()));
+      const layer = { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
+      if (layer.a > 0) {
+        layers.push(layer);
+        if (layer.a === 1) break;
+      }
+      if (element === document.body) break;
+    }
+    // Whatever is left is painted on the root, which the page always sets.
+    return layers.length ? layers.reverse() : null;
+  };
+
+  const nodes = [];
+  const walker = document.createTreeWalker(document.querySelector("#app") || document.body, NodeFilter.SHOW_TEXT);
+  const seen = new Set();
+  while (walker.nextNode()) {
+    const text = (walker.currentNode.textContent || "").trim();
+    const element = walker.currentNode.parentElement;
+    if (!text || !element || seen.has(element)) continue;
+    seen.add(element);
+    if (element.closest("[hidden],[aria-hidden='true']")) continue;
+    const style = getComputedStyle(element);
+    if (style.visibility === "hidden" || style.display === "none") continue;
+    const rect = element.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) continue;
+    const layers = paintedBackdrop(element);
+    if (!layers) continue; // gradient or image behind it: not decidable here
+    nodes.push({
+      ink: style.color,
+      layers,
+      fontSizePx: parseFloat(style.fontSize),
+      fontWeight: Number(style.fontWeight) || 400,
+      selector: element.className && typeof element.className === "string" ? `.${element.className.trim().split(/\s+/)[0]}` : element.tagName.toLowerCase(),
+      text: text.slice(0, 40),
+    });
+  }
+  return {
+    nodes,
+    theme: document.documentElement.dataset.dhunTheme || "",
+    skips: document.querySelectorAll(".dhun-full, .dhun-sheet").length,
+  };
+}
+
+async function checkWebAppContrast(browser) {
+  const routes = ["#/home", "#/search?q=e", "#/library/playlists", "#/album/al-03", "#/artist/ar-03", "#/playlist/pl-02", "#/settings"];
+  for (const scheme of SCHEMES) {
+    // The app is dark-first and does not follow the OS, so the theme is chosen
+    // through its own control — never by seeding storage, which would test the
+    // seed instead of the control (and is how the old appearance test was wrong).
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    const label = `/app/ contrast (${scheme})`;
+    const failuresBefore = failures.length;
+    let measured = 0;
+    await page.goto(url("/app/#/settings"), { waitUntil: "load" });
+    await page.waitForSelector(`[data-action="set-theme"][data-value="${scheme}"]`, { timeout: 15000 });
+    await page.locator(`[data-action="set-theme"][data-value="${scheme}"]`).click();
+    await page.waitForFunction((wanted) => document.documentElement.dataset.dhunTheme === wanted, scheme);
+    for (const route of routes) {
+      await page.goto(url(`/app/${route}`), { waitUntil: "load" });
+      await page.waitForTimeout(route.includes("search") ? 700 : 500);
+      const { nodes, theme } = await page.evaluate(textContrastScript);
+      if (theme !== scheme) {
+        fail(label, `${route} rendered the ${theme || "unset"} theme in a ${scheme} browser`);
+        continue;
+      }
+      measured += nodes.length;
+      for (const node of nodes) {
+        // Composite the stack once, bottom-up, then judge ink against it.
+        const backdrop = node.layers.reduce((base, layer) => compositeOver(layer, base));
+        const problem = contrastProblem({ ...node, backdrop });
+        if (problem) fail(label, `${route} ${problem}`);
+      }
+    }
+    if (failures.length === failuresBefore) {
+      record(label, `${measured} text node(s) across ${routes.length} routes meet 4.5:1 / 3:1 for large text`);
+    }
+    await page.close();
+    await context.close();
+  }
+}
+
+/**
+ * A playlist made in the browser.
+ *
+ * Three defects lived in this path, and none of them was visible to a structural
+ * check. "New playlist" in the library header called the picker's form handler
+ * from a button with no form under it, so it did nothing at all. Creating one
+ * from a track's menu worked, and then opening it said "That playlist could not
+ * be loaded" — the app asked the *network* for a playlist that only exists in
+ * this browser. And Rename called `window.prompt`, which kept Escape from ever
+ * closing a sheet that had focused its own field.
+ *
+ * The check drives the real controls and then reloads: a playlist that only
+ * survives until the next page load is not a playlist.
+ */
+async function checkWebAppLibrary(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const page = await context.newPage();
+  const label = "/app/ local playlist";
+
+  await page.goto(url("/app/#/library/playlists"), { waitUntil: "load" });
+  await page.waitForSelector('[data-action="new-playlist"]', { timeout: 15000 });
+  await page.locator('[data-action="new-playlist"]').click();
+  const sheet = await page.evaluate(() => ({
+    label: document.querySelector(".dhun-sheet")?.getAttribute("aria-label") || "",
+    focused: document.activeElement?.getAttribute("aria-label") || "",
+  }));
+  if (sheet.label !== "New playlist") {
+    fail(label, `"New playlist" opened no naming sheet (dialog label: “${sheet.label || "none"}”)`);
+  } else if (sheet.focused !== "Playlist name") {
+    fail(label, `the naming sheet did not put the cursor in its field (focus: “${sheet.focused || "none"}”)`);
+  } else {
+    record(label, "the header button opens a naming sheet, with the cursor in the field");
+  }
+
+  await page.keyboard.type("Browser check");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(500);
+  const created = await page.evaluate(() => ({
+    toast: (document.querySelector(".dhun-toast")?.textContent || "").trim(),
+    cards: [...document.querySelectorAll('[data-action="open-playlist"]')].map((el) => el.querySelector(".dhun-grid__title")?.textContent?.trim()),
+    id: document.querySelector('[data-action="open-playlist"]')?.dataset.id || null,
+  }));
+  if (!created.cards.includes("Browser check")) {
+    fail(label, `Enter in the naming field created nothing (cards: ${created.cards.join(", ") || "none"})`);
+  } else {
+    record(label, `Enter creates it: ${created.toast || `${created.cards.length} card(s)`}`);
+  }
+
+  if (created.id) {
+    await page.locator(`[data-action="open-playlist"][data-id="${created.id}"]`).click();
+    await page.waitForTimeout(600);
+    const opened = await page.evaluate(() => ({
+      hash: location.hash,
+      title: (document.querySelector(".dhun-entity__title")?.textContent || "").trim(),
+      body: (document.querySelector(".dhun-state__title")?.textContent || "").trim(),
+      error: Boolean(document.querySelector(".dhun-state--error")),
+    }));
+    if (opened.error || opened.title !== "Browser check") {
+      fail(label, `opening the playlist it just made gave “${opened.title || opened.body}” at ${opened.hash}`);
+    } else if (opened.body !== "This playlist is empty") {
+      fail(label, `an empty playlist said “${opened.body}” instead of saying it is empty`);
+    } else {
+      record(label, "it opens on its own header and an honest empty state");
+    }
+
+    // Rename through the sheet, then Escape: the caret is in the field, which is
+    // exactly where the old guard used to swallow the key.
+    await page.locator('[data-action="rename-playlist"]').click();
+    await page.waitForTimeout(350);
+    const renameSheet = await page.evaluate(() => ({
+      label: document.querySelector(".dhun-sheet")?.getAttribute("aria-label") || "",
+      value: document.querySelector(".dhun-sheet input[name='name']")?.value ?? null,
+    }));
+    if (renameSheet.label !== "Rename playlist" || renameSheet.value !== "Browser check") {
+      fail(label, `Rename opened “${renameSheet.label || "no sheet"}” with “${renameSheet.value}”`);
+    } else {
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(300);
+      const closed = await page.evaluate(() => !document.querySelector(".dhun-sheet"));
+      if (!closed) fail(label, "Escape did not close the naming sheet while its field had the caret");
+      else record(label, "Rename is the same sheet, prefilled, and Escape closes it from the field");
+
+      await page.locator('[data-action="rename-playlist"]').click();
+      await page.waitForTimeout(300);
+      await page.keyboard.press("Control+A");
+      await page.keyboard.type("Browser check 2");
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(500);
+    }
+
+    await page.reload({ waitUntil: "load" });
+    await page.waitForTimeout(900);
+    const afterReload = await page.evaluate(() => ({
+      hash: location.hash,
+      title: (document.querySelector(".dhun-entity__title")?.textContent || "").trim(),
+      error: Boolean(document.querySelector(".dhun-state--error")),
+    }));
+    if (afterReload.error || afterReload.title !== "Browser check 2") {
+      fail(label, `after a reload ${afterReload.hash} read “${afterReload.title || "nothing"}”, not the renamed playlist`);
+    } else {
+      record(label, "the renamed playlist and its route survive a reload");
+    }
+  }
+  await page.close();
+  await context.close();
+}
+
+/**
  * The appearance control, exercised.
  *
  * The bug this exists for is invisible to every other check in this file: the
@@ -1928,6 +2150,8 @@ const CHECKS = [
   ["appearance", () => checkWebAppAppearance(browser)],
   ["entity outline", () => checkWebAppEntity(browser)],
   ["player deep link", () => checkWebAppDeepLink(browser)],
+  ["local playlist", () => checkWebAppLibrary(browser)],
+  ["/app/ contrast", () => checkWebAppContrast(browser)],
   ["screenshots", () => captureScreenshots(browser)],
 ];
 

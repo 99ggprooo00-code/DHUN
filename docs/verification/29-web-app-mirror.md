@@ -129,3 +129,30 @@ per-kind actions the app no longer emits, so the three entity routes were never
 visited at all. It now discovers ids from Home and Search, expects the honest
 error state for an unknown id, and reports **no findings** across 22 routes plus
 the entity pass.
+
+## Appendix — 2026-10-19, the first contrast audit of `/app/` itself (session `arena/84c7280a-dhun`)
+
+The record above is from 2026-10-09, and it says the colour tokens *trace to the
+app* — which was true and was never the same claim as *readable*. This appendix
+adds the second measurement: every text node of the built app, in both themes,
+seven routes, with the translucent backdrop composited in sRGB before WCAG's
+floors were applied.
+
+| Measured | Result | How |
+|---|---|---|
+| `/app/` contrast, light | **15 failing styles on 7 routes**, all `textTertiary` (55% ink): 3.87–3.95:1 on 11–12px text | `dhun-tools/probe-contrast-audit.mjs`, then the browser job's new `/app/ contrast` check (386 nodes × 7 routes × 2 themes) |
+| `/app/` contrast, dark | **0 failures** on the same nodes | same |
+| Artist hero title, light | **2.64:1 worst / 4.46 median** before; **7.15 / 7.51** after the veil's stops moved to 22%/62% | pixel probe under the title box, 6,475 samples per theme |
+| Artist hero title, dark | 13.10 / 15.56 before; 15.76 / 16.54 after | same |
+| A playlist made in the browser | opened as *"That playlist could not be loaded"*; now opens on its own header, keeps its rows across a reload, exports with them | browser job, five new measurements |
+| The naming sheet | existed nowhere; "New playlist" did nothing and Rename used `window.prompt`; now one sheet, Enter submits, Escape closes it from its own field | browser job + `shortcuts.test.mjs` |
+| Playlist description | no clamp; now three lines at 48px of 64px, both themes | measured through `getComputedStyle` |
+
+Rejected alternatives, kept so they are not retried: veil at 45%/100% (2.64:1),
+at 45%/62% with the app's mid stop (5.57:1 — too close to the floor to survive
+another artwork), at 45%/55% (3.35:1) and 30%/62% (3.18:1); a `min-aspect-ratio:
+1/1` wide-player substitution (equal to `orientation: landscape` except at
+exactly square, where the app stays stacked).
+
+Not claimed: audible playback, a device, a screen reader, or any browser other
+than the Chromium the job runs.

@@ -254,7 +254,7 @@ export default {
     ],
   },
 
-  // What changed recently — the PR is the evidence, and the three entries are
+  // What changed recently — the PR is the evidence, and the four entries are
   // the rounds that changed what a visitor of /app/ actually sees. Deliberately
   // short: the real changelog is CHANGELOG.md, and a second one here would rot.
   whatsNew: {
@@ -264,6 +264,13 @@ export default {
       "The site and the web app are built from the same repository, so the interface at /app/ moves when the app does. These are the last four rounds that changed something a visitor can see — every line is a merged change, not a roadmap, and the pull request next to it is the evidence.",
     source: "CHANGELOG.md [Unreleased]; .ai/DEBUG_LOG.md; docs/verification/29-web-app-mirror.md",
     entries: [
+      {
+        pr: "PR #187",
+        href: `${REPO}/pull/187`,
+        title: "A playlist you make now opens, and the whole web app meets AA in both themes.",
+        detail:
+          "A playlist created at /app/ used to open on “That playlist could not be loaded” — the app asked the network for a list that only exists in your browser. It now resolves from your own library, keeps its rows across a reload, and exports with them. “New playlist” in the library header did nothing at all and Rename used a browser prompt; both are one sheet now, with Enter to submit and Escape to close. Light theme text was measured for the first time: five small roles sat at 3.87–3.95:1 and the artist hero's title at 2.64:1 — all now above 4.5:1, and the browser job measures every visible line in both themes so it cannot slide back.",
+      },
       {
         pr: "PR #185",
         href: `${REPO}/pull/185`,
@@ -284,13 +291,6 @@ export default {
         title: "The source badge stopped lying, and Home got its greeting and moods.",
         detail:
           "When the live source could not be reached and the sample rows answered, every screen still said “YouTube Music”. The badge now names the source that produced the rows on screen. Home also opens the way the app's Home does — a greeting from the device's own clock and the app's five mood chips — and a mood is a real search, not a filter over rows that were already loaded.",
-      },
-      {
-        pr: "PR #182",
-        href: `${REPO}/pull/182`,
-        title: "The interface got its first real layout review, and lost seven defects.",
-        detail:
-          "Found by opening real captures of the built app: the shell let the document scroll instead of owning the viewport, a 260px cover sat in a 260px tile, the phone hero had no gutter, a failure notice wrapped to one word per line, a toast covered the mini player, and pressing a player tab threw the visitor back to the cover. Each is fixed and measured.",
       },
     ],
   },

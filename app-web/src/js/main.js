@@ -52,6 +52,7 @@ import {
   moodById,
   greetingForNow,
 } from "./source.js";
+import { pluralise } from "./format.js";
 import { createAudioEngine, AUDIO_STATUS } from "./audio.js";
 import { createPlayer, REPEAT } from "./player.js";
 import { createMediaSession } from "./mediasession.js";
@@ -239,6 +240,38 @@ export function boot({
     libraryStore.write(library);
   }
 
+  /**
+   * Remember a row's metadata, keyed by id.
+   *
+   * The local counterpart of the app's "Track metadata you have browsed" table.
+   * A played, liked or newly-listed row is remembered so a playlist made in this
+   * browser can draw its rows after a reload — the network is never asked for a
+   * playlist it does not have. Deliberately bounded: this is a cache of what was
+   * *seen*, not a catalogue.
+   */
+  function rememberTrack(track) {
+    const id = track?.id ?? track?.videoId;
+    const title = typeof track?.title === "string" ? track.title.trim() : "";
+    if (!id || !title) return;
+    library.tracks[id] = {
+      id,
+      title,
+      artist: typeof track.artist === "string" ? track.artist : "",
+      artwork: typeof track.artwork === "string" ? track.artwork : "",
+      durationMs: typeof track.durationMs === "number" ? track.durationMs : 0,
+    };
+    const ids = Object.keys(library.tracks);
+    if (ids.length > 2000) for (const stale of ids.slice(0, ids.length - 2000)) delete library.tracks[stale];
+  }
+
+  /** A row the library can draw, or null if nothing was ever seen under that id. */
+  function libraryTrack(trackId) {
+    const known = library.tracks[trackId];
+    if (known) return known;
+    const played = library.history.find((entry) => entry.id === trackId);
+    return played ? { ...played } : null;
+  }
+
   /* --------------------------------------------------------------- library */
 
   let libraryStore = {
@@ -254,6 +287,15 @@ export function boot({
     library = normaliseLibrary(await store.read());
     renderView();
     renderChrome();
+    // `router.start()` runs before this promise settles, so the first pass at a
+    // route resolved against an empty library and cached "That playlist could
+    // not be loaded" for a playlist sitting in storage. Now that the library is
+    // in hand, resolve the entity again — only when the entity is still the one
+    // that was asked for.
+    const route = state.route;
+    if (route.name === "playlist" && route.id && state.entity.id === route.id && library.playlists.some((entry) => entry.id === route.id)) {
+      loadEntity("playlist", route.id);
+    }
   });
 
   /* ------------------------------------------------------- data + rendering */
@@ -314,7 +356,42 @@ export function boot({
     renderView();
   }
 
+  /**
+   * A playlist made in this browser, as the view expects it.
+   *
+   * Rows come from the local track table (see `rememberTrack`). An id that was
+   * never seen with a title is counted, not printed: `playlistScreen` says how
+   * many could not be matched rather than showing a row with no name.
+   */
+  function ownPlaylistEntity(playlist) {
+    const tracks = playlist.trackIds.map(libraryTrack).filter(Boolean);
+    return {
+      kind: "playlist",
+      playlist: {
+        id: playlist.id,
+        name: playlist.name,
+        description: playlist.description ?? "",
+        trackCountText: pluralise(playlist.trackIds.length, "track"),
+      },
+      tracks,
+      missing: playlist.trackIds.length - tracks.length,
+    };
+  }
+
   async function loadEntity(kind, id) {
+    // A playlist made in this browser exists only here. Asking the source for it
+    // was the whole of the old behaviour, and the answer — "That playlist could
+    // not be loaded" — was shown for a playlist the app had just created and was
+    // listing two screens away. `/app` has no server to have it in.
+    if (kind === "playlist") {
+      const own = library.playlists.find((entry) => entry.id === id);
+      if (own) {
+        state.entity = { status: "ready", kind: "playlist", id, data: ownPlaylistEntity(own), error: null };
+        renderView();
+        renderChrome();
+        return;
+      }
+    }
     state.entity = { status: "loading", kind, id, data: null, error: null };
     renderView();
     const result = await sources.browse(id);
@@ -447,6 +524,7 @@ export function boot({
     media.update(track);
     media.setPlaybackState("playing");
     const id = track.id ?? track.videoId;
+    rememberTrack(track);
     if (id) {
       library.history = [
         {
@@ -672,15 +750,20 @@ export function boot({
           libraryKind,
         });
         break;
-      case "playlist":
+      case "playlist": {
+        // Read a playlist made here from the library at render time: a rename
+        // changes the header on the next frame rather than on the next load.
+        const own = library.playlists.find((entry) => entry.id === route.id) ?? null;
+        const data = own ? ownPlaylistEntity(own) : state.entity.data;
         markup = views.playlistScreen({
-          playlist: state.entity.data?.playlist ?? null,
-          tracks: state.entity.data?.tracks ?? [],
+          playlist: data?.playlist ?? null,
+          tracks: data?.tracks ?? [],
           currentId,
-          isOwn: library.playlists.some((entry) => entry.id === route.id),
-          missing: Number(state.entity.data?.missing ?? 0),
+          isOwn: Boolean(own),
+          missing: Number(data?.missing ?? 0),
         });
         break;
+      }
       case "artist":
         markup = views.artistScreen({
           artist: state.entity.data?.artist ?? null,
@@ -963,6 +1046,14 @@ export function boot({
     }
   }
 
+  /** Put the cursor in the sheet's one field: the sheet exists to fill it in. */
+  function focusSheetField() {
+    const field = doc.querySelector(".dhun-sheet input[name='name']");
+    if (!field) return;
+    focusWithoutScroll(field);
+    field.select?.();
+  }
+
   function renderSheet() {
     const sheet = state.sheet;
     let markup = html``;
@@ -975,6 +1066,8 @@ export function boot({
       });
     } else if (sheet?.kind === "playlist-picker") {
       markup = views.playlistPickerSheet({ track: sheet.track, playlists: library.playlists });
+    } else if (sheet?.kind === "playlist-name") {
+      markup = views.playlistNameSheet({ mode: sheet.mode, playlist: sheet.playlist });
     } else if (sheet?.kind === "confirm") {
       markup = views.confirmSheet(sheet.options);
     } else if (sheet?.kind === "shortcuts") {
@@ -1268,14 +1361,25 @@ export function boot({
       showToast("History cleared.");
       renderView();
     },
+    // Two entry points, one form:
+    //   the library's "New playlist" button (no input in its subtree) opens the
+    //   sheet; the sheet's own form is what creates anything.
     "new-playlist": (target, event) => {
       event.preventDefault();
-      const input = target.querySelector("input[name='name']");
-      const name = (input?.value ?? "").trim();
-      if (!name) return;
+      if (target.tagName !== "FORM") {
+        state.sheet = { kind: "playlist-name", mode: "create" };
+        renderSheet();
+        focusSheetField();
+        return;
+      }
+      const name = (target.querySelector("input[name='name']")?.value ?? "").trim();
+      if (!name) {
+        focusSheetField();
+        return;
+      }
       const playlist = {
         id: `pl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-        name,
+        name: name.slice(0, 120),
         description: "",
         trackIds: [],
         createdAt: Date.now(),
@@ -1284,19 +1388,34 @@ export function boot({
       library.playlists = [playlist, ...library.playlists];
       persistLibrary();
       state.sheet = null;
-      showToast(`Created “${name}”.`);
+      showToast(`Created “${playlist.name}”.`);
       renderView();
       renderChrome();
     },
-    "rename-playlist": () => {
+    // Rename is the same sheet, prefilled. It used to be `window.prompt`, which
+    // no part of this app can style, announce or translate.
+    "rename-playlist": (target, event) => {
+      event.preventDefault?.();
       const playlist = currentPlaylist();
       if (!playlist) return;
-      const name = win.prompt?.("Rename playlist", playlist.name);
-      if (!name) return;
-      playlist.name = name.trim().slice(0, 120) || playlist.name;
+      if (target.tagName !== "FORM") {
+        state.sheet = { kind: "playlist-name", mode: "rename", playlist: { ...playlist } };
+        renderSheet();
+        focusSheetField();
+        return;
+      }
+      const name = (target.querySelector("input[name='name']")?.value ?? "").trim();
+      if (!name) {
+        focusSheetField();
+        return;
+      }
+      playlist.name = name.slice(0, 120);
       playlist.updatedAt = Date.now();
       persistLibrary();
+      state.sheet = null;
+      showToast("Playlist renamed.");
       renderView();
+      renderChrome();
     },
     "delete-playlist": () => {
       const playlist = currentPlaylist();
@@ -1443,6 +1562,7 @@ export function boot({
       const id = track?.id ?? track?.videoId;
       if (!playlist || !id) return;
       if (!playlist.trackIds.includes(id)) playlist.trackIds.push(id);
+      rememberTrack(track);
       playlist.updatedAt = Date.now();
       persistLibrary();
       state.sheet = null;
@@ -1728,6 +1848,7 @@ export function boot({
       showToast("Removed from liked.");
     } else {
       library.likes = [{ id, at: Date.now() }, ...library.likes];
+      rememberTrack(track);
       if (!library.history.some((entry) => entry.id === id)) {
         library.history = [
           {
