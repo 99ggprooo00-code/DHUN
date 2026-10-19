@@ -12,6 +12,6 @@
   <figcaption class="mock-caption">
     <span class="mock-badge">{{ shot.badge }}</span>
     <span class="mock-caption-body">{{ shot.caption }}</span>
-    <a class="mock-app-link" href="{{ shot.appHref | sitePath }}">{{ shot.appLabel }} <span aria-hidden="true">→</span></a>
+    {% if shot.appHref and shot.appLabel %}<a class="mock-app-link" href="{{ shot.appHref | sitePath }}">{{ shot.appLabel }} <span aria-hidden="true">→</span></a>{% endif %}
   </figcaption>
 </figure>

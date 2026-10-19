@@ -358,3 +358,26 @@ test("the detail screens own their heading and the app bar does not repeat it", 
     assert.match(views, /dhun-entity__title/, `${view} exists but no entity title element does`);
   }
 });
+
+/**
+ * A player link with nothing to play is answered, not swallowed.
+ *
+ * `#/?player=open` is what the project site's "Launch /app/ Player" link and
+ * any bookmark of an expanded player produce. The overlay only draws once a
+ * track is loaded, so before this the request vanished: the visitor landed on
+ * Home with no player and no explanation. The notice is derived from the route,
+ * so it disappears by itself the moment something plays — and it is placed above
+ * the first-run strip, because a strip that always renders would shadow it.
+ */
+test("an empty player request gets an answer in the dock", () => {
+  const main = readFileSync(path.join(jsRoot, "main.js"), "utf8");
+  const banner = main.slice(main.indexOf("function renderBanner(vm)"), main.indexOf("/* The overlay's scroller is a child"));
+  assert.match(banner, /state\.route\.player === "open" && !vm\.track/, "nothing notices a player link with no track");
+  assert.match(banner, /title: "Nothing is playing yet"/, "the empty state has no title");
+  assert.match(banner, /The player opens on a track/, "the empty state does not say what it is waiting for");
+  // Order matters: the first-run strip renders whenever nothing else does, so a
+  // rule placed after it can never fire.
+  const emptyAt = banner.indexOf('state.route.player === "open" && !vm.track');
+  const welcomeAt = banner.indexOf('state.banner?.kind === "info"');
+  assert.ok(emptyAt > 0 && welcomeAt > 0 && emptyAt < welcomeAt, "the empty-player notice is shadowed by the first-run strip");
+});

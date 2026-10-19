@@ -815,7 +815,7 @@ export function boot({
 
   function renderDock() {
     const vm = playerViewModel();
-    const banner = renderBanner();
+    const banner = renderBanner(vm);
     setRegion(
       "dhun-dock",
       html`${banner}
@@ -823,7 +823,7 @@ export function boot({
     );
   }
 
-  function renderBanner() {
+  function renderBanner(vm) {
     if (!pwa.state.online) {
       return views.notice({
         tone: "warn",
@@ -864,6 +864,24 @@ export function boot({
           { id: "install", label: "Install" },
           { id: "dismiss-install", label: "Not now" },
         ],
+      });
+    }
+    /*
+     * A player link with nothing to play it.
+     *
+     * `#/home?player=open` — what the site's "Launch /app/ Player" link and any
+     * bookmark of an expanded player produce — asks for a screen that is only
+     * drawn once a track is loaded, and the app used to drop the request in
+     * silence: the visitor landed on Home with no player and no reason. The
+     * request is kept, so the player does open as soon as a track starts; until
+     * then the app says what it is waiting for. Derived from the route rather
+     * than stored, so it goes away by itself the moment something plays.
+     */
+    if (state.route.player === "open" && !vm.track) {
+      return views.notice({
+        tone: "info",
+        title: "Nothing is playing yet",
+        body: "The player opens on a track. Choose one and it opens here, holding the screen you asked for.",
       });
     }
     if (state.banner?.kind === "info") {

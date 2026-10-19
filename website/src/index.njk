@@ -118,6 +118,25 @@ cssModules: ["tokens", "base", "shell", "components", "mockups"]
     </ul>
   </section>
 
+  <section aria-labelledby="whats-new-title">
+    <div class="section-head">
+      <span class="kicker">{{ site.whatsNew.kicker }}</span>
+      <h2 id="whats-new-title">{{ site.whatsNew.title }}</h2>
+      <p class="lede">{{ site.whatsNew.lede }}</p>
+      <!--{{ site.whatsNew.source }}-->
+    </div>
+    <ul class="status-list">
+      {%- for entry in site.whatsNew.entries %}
+      <li class="card">
+        <span class="card-label">{{ entry.pr }}</span>
+        <h3>{{ entry.title }}</h3>
+        <p>{{ entry.detail }}</p>
+        <p style="margin: 0;"><a class="mock-app-link" href="{{ entry.href }}" rel="noopener">Read {{ entry.pr }} on GitHub <span aria-hidden="true">→</span></a></p>
+      </li>
+      {%- endfor %}
+    </ul>
+  </section>
+
   <!-- REQUIRED CAVEAT 1: extraction is borrowed time (MASTER_PROMPT §2). -->
   <section class="risk" aria-labelledby="risk-title" data-caveat="borrowed-time">
     <span class="kicker risk-flag">THE HONEST PART</span>
