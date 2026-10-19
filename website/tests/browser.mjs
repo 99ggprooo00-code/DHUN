@@ -1709,6 +1709,51 @@ async function checkWebAppEntity(browser) {
 }
 
 /**
+ * A player deep link from this site, with nothing playing.
+ *
+ * Every "Launch /app/ Player" and "Launch /app/ Lyrics" link on the project
+ * site is a request for a screen that only exists once a track is loaded. The
+ * app used to answer such a link by silently showing Home: no player, no
+ * reason. It now says what it is waiting for, in the dock, and opens the player
+ * as soon as a track starts.
+ */
+async function checkWebAppDeepLink(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const page = await context.newPage();
+  const label = "/app/ player deep link";
+  await page.goto(url("/app/#/?player=open"), { waitUntil: "load" });
+  await page.waitForTimeout(600);
+  const waiting = await page.evaluate(() => ({
+    hash: location.hash,
+    overlay: Boolean(document.querySelector(".dhun-full")),
+    notice: (document.querySelector("#dhun-dock .dhun-notice__title")?.textContent || "").trim(),
+    body: (document.querySelector("#dhun-dock .dhun-notice__body")?.textContent || "").trim(),
+  }));
+  if (waiting.overlay) {
+    fail(label, "the empty-player link drew an overlay over nothing");
+  } else if (!waiting.notice) {
+    fail(label, `the link was swallowed: the app landed on ${waiting.hash} with no explanation`);
+  } else {
+    record(label, `nothing playing: “${waiting.notice}”`);
+  }
+
+  // Choosing a track must honour the request that was already made.
+  await page.locator('[data-action="play-track"]').first().click();
+  await page.waitForFunction(() => Boolean(document.querySelector(".dhun-full")), null, { timeout: 10000 }).catch(() => {});
+  const opened = await page.evaluate(() => ({
+    overlay: Boolean(document.querySelector(".dhun-full")),
+    title: (document.querySelector(".dhun-full__title")?.textContent || "").trim(),
+  }));
+  if (!opened.overlay) {
+    fail(label, "choosing a track did not open the player the link asked for");
+  } else {
+    record(label, `choosing a track opens it: “${opened.title}”`);
+  }
+  await page.close();
+  await context.close();
+}
+
+/**
  * The appearance control, exercised.
  *
  * The bug this exists for is invisible to every other check in this file: the
@@ -1882,6 +1927,7 @@ const CHECKS = [
   ["web app", () => checkWebApp(browser)],
   ["appearance", () => checkWebAppAppearance(browser)],
   ["entity outline", () => checkWebAppEntity(browser)],
+  ["player deep link", () => checkWebAppDeepLink(browser)],
   ["screenshots", () => captureScreenshots(browser)],
 ];
 

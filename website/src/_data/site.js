@@ -183,9 +183,10 @@ export default {
       alt: "DHUN Android Library Downloads tab showing storage usage bar, Clear all action, and a downloaded track row with delete button",
       badge: "Captured on Android phone · DHUN v1.00.001",
       caption:
-        "Library Downloads tab showing device storage usage bar, Clear all control, and offline track management.",
-      appHref: "/app/#/library/downloads",
-      appLabel: "Open Downloads in the app",
+        "Library Downloads tab showing device storage usage bar, Clear all control, and offline track management. This screen exists on Android and Windows only: a browser has no equivalent of ADR-006's device-side store, so the web build at /app/ has no Downloads tab.",
+      // No appHref: the web build has no Downloads screen to open. A link here
+      // would land on Playlists under a caption that promises Downloads, which
+      // is the sort of mismatch this site exists not to make.
     },
     "history-phone": {
       id: "mock-history-phone",
@@ -239,17 +240,51 @@ export default {
     kicker: "THE WEB APP ITSELF",
     title: "Click through the real interface at /app/ before installing anything.",
     lede:
-      "Alongside the Android and Windows captures on this site, the shipped interface runs at /app/ with the same design tokens, navigation state machine, 10-band equaliser curves, synced lyrics parser, and About & Legal pages. Pick any destination below to jump straight into that screen.",
+      "Alongside the Android and Windows captures on this site, the shipped interface runs at /app/ with the same design tokens, navigation state machine, 10-band equaliser curves, synced lyrics parser, and About & Legal pages. Pick any destination below to jump straight into that screen. The player, lyrics and queue are only reachable once something is playing — a first visit has nothing to open there yet, and the app says so rather than showing an empty sheet.",
     source: "app-web/src/js/main.js; docs/verification/29-web-app-mirror.md; ADR-008 amendment 2026-10-09 (2)",
     routes: [
       { label: "Home feed & quick picks", detail: "Three-section feed, mood chips, and docked mini-player", href: "/app/", cta: "Launch /app/ Home" },
       { label: "Search & filter chips", detail: "Query bar, Songs, Artists, Albums, Playlists, and Videos filters, and recent searches", href: "/app/#/search", cta: "Launch /app/ Search" },
-      { label: "Expanded Full Player", detail: "Blurred artwork sheet, transport controls, seek scrubber", href: "/app/#/player", cta: "Launch /app/ Player" },
-      { label: "Synced lyrics (LRC)", detail: "Timestamped Devanagari & English lines with active-line highlight", href: "/app/#/player/lyrics", cta: "Launch /app/ Lyrics" },
-      { label: "Up Next Queue", detail: "Queue tab, track counter, and related tracks", href: "/app/#/player/queue", cta: "Launch /app/ Queue" },
-      { label: "Library — Playlists, Downloads & History", detail: "Liked Songs folder, offline state, and local play history", href: "/app/#/library/playlists", cta: "Launch /app/ Library" },
+      { label: "Expanded Full Player", detail: "Blurred artwork sheet, transport controls, seek scrubber — opens once a track is playing", href: "/app/#/?player=open", cta: "Launch /app/ Player" },
+      { label: "Synced lyrics (LRC)", detail: "Timestamped Devanagari & English lines with active-line highlight — opens once a track is playing", href: "/app/#/?player=open&ptab=lyrics", cta: "Launch /app/ Lyrics" },
+      { label: "Up Next Queue", detail: "Queue tab, track counter, and related tracks — opens once a track is playing", href: "/app/#/?player=open&ptab=queue", cta: "Launch /app/ Queue" },
+      { label: "Library — Playlists, Liked Songs & History", detail: "Your playlists, Liked Songs and what you have played — kept in this browser, with no account", href: "/app/#/library/playlists", cta: "Launch /app/ Library" },
       { label: "Settings & 10-band Equalizer", detail: "Dark and Light themes, 6 accents, 18 VLC presets, ±20 dB bands", href: "/app/#/settings", cta: "Launch /app/ Settings" },
       { label: "About, Privacy & Legal", detail: "Bundled Privacy Policy, Terms, GPL-3.0 & Apache-2.0 licences, Support", href: "/app/#/about-legal", cta: "Launch /app/ About & Legal" },
+    ],
+  },
+
+  // What changed recently — the PR is the evidence, and the three entries are
+  // the rounds that changed what a visitor of /app/ actually sees. Deliberately
+  // short: the real changelog is CHANGELOG.md, and a second one here would rot.
+  whatsNew: {
+    kicker: "WHAT CHANGED",
+    title: "Three rounds that changed what /app/ does, with the pull request that carried each one.",
+    lede:
+      "The site and the web app are built from the same repository, so the interface at /app/ moves when the app does. These are the last three rounds that changed something a visitor can see — every line is a merged change, not a roadmap, and the pull request next to it is the evidence.",
+    source: "CHANGELOG.md [Unreleased]; .ai/DEBUG_LOG.md; docs/verification/29-web-app-mirror.md",
+    entries: [
+      {
+        pr: "PR #184",
+        href: `${REPO}/pull/184`,
+        title: "The detail screens became the app's, and Light started working.",
+        detail:
+          "Albums, artists and playlists now draw the headers the application draws: the artist hero with its 16:10 crop and the theme's veil, the album's two meta lines taken from the source's own response, and Play with Shuffle instead of Queue. Choosing Light used to paint the bar pale over a dark page — the appearance settings theme the whole document now. The bundled demo catalogue also stopped calling its albums songs and its playlists artists.",
+      },
+      {
+        pr: "PR #183",
+        href: `${REPO}/pull/183`,
+        title: "The source badge stopped lying, and Home got its greeting and moods.",
+        detail:
+          "When the live source could not be reached and the sample rows answered, every screen still said “YouTube Music”. The badge now names the source that produced the rows on screen. Home also opens the way the app's Home does — a greeting from the device's own clock and the app's five mood chips — and a mood is a real search, not a filter over rows that were already loaded.",
+      },
+      {
+        pr: "PR #182",
+        href: `${REPO}/pull/182`,
+        title: "The interface got its first real layout review, and lost seven defects.",
+        detail:
+          "Found by opening real captures of the built app: the shell let the document scroll instead of owning the viewport, a 260px cover sat in a 260px tile, the phone hero had no gutter, a failure notice wrapped to one word per line, a toast covered the mini player, and pressing a player tab threw the visitor back to the cover. Each is fixed and measured.",
+      },
     ],
   },
 

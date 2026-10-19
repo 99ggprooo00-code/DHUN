@@ -4493,7 +4493,7 @@ _(Continues the numbering from 2026-10-16, which ended at incident 9.)_
 **Context.** The register review above had already found the shell's geometry and
 the provenance of every row. This round read the three detail screens against the
 Kotlin that draws them — `AlbumScreen.kt`, `ArtistScreen.kt`, `PlaylistScreen.kt`
-— and pressed the appearance chip. Six defects, five of them visible to anyone
+— and pressed the appearance chip. Seven defects, six of them visible to anyone
 who used the app for a minute.
 
 **10. The album header was a different component.** The web drew cover → title →
@@ -4579,6 +4579,21 @@ checker only counts levels, not duplicates), and axe does not flag it. The three
 entity routes now leave the heading to the page. `browser.mjs` counts the `h1`s
 on a real album screen, and the check was run against the duplicate first — it
 reported `2 h1(s) … ("Dharan Nights", "Dharan Nights")`.
+
+**17. The site's own player links were answered with silence.** The showcase section on
+the project site links "Launch /app/ Player", "Launch /app/ Lyrics" and
+"Launch /app/ Queue" at `#/player`, `#/player/lyrics` and `#/player/queue`. The
+app redirects those to `#/?player=open&ptab=…` — and then, because the overlay
+renders only when `vm.track` exists and a first visit has no track, draws Home.
+Measured: `#/?player=open` → hash `#/home?player=open`, `.dhun-full` absent, no
+notice anywhere. A visitor following the site's own call to action was told
+nothing at all. The dock now answers (*"Nothing is playing yet — the player opens
+on a track"*), the request survives so choosing a track opens it, and the notice
+is derived from the route rather than stored, so it cannot outlive the condition.
+It also had to sit *above* the first-run strip in `renderBanner`: that strip
+returns a notice whenever nothing else does, so a rule written below it would
+have been unreachable — the first version of the fix was, and the browser showed
+the welcome text instead.
 
 **Lesson.** Two of these were invisible to every automated gate for the same
 reason: the check asked about the *mechanism* rather than the *outcome*. The

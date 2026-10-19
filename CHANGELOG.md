@@ -79,6 +79,15 @@ pressing **Light** in Settings while watching what happened to the page.
   name twice, 313px apart, and gave a screen reader two identical headings. The
   three entity routes now leave the title to the page; every other route keeps
   the app bar's.
+- **Fixed: a player link answered with silence.** Every "Launch /app/ Player" and
+  "Launch /app/ Lyrics" link on the project site is a deep link to a screen that
+  only exists once a track is loaded (`#/?player=open`). The app dropped the
+  request: the visitor landed on Home with no player and no reason to think
+  anything had been asked for. The dock now says *"Nothing is playing yet — the
+  player opens on a track"*, and the request is kept, so choosing a track opens
+  the player that was asked for. Derived from the route, so the notice goes away
+  by itself; placed above the first-run strip, which otherwise renders in its
+  place and would have hidden it.
 - **Four new review states** in `app-web/tools/states.mjs` (27 now) so the entity
   headers can be looked at without an upstream: album with the source's numbers,
   album without them, the artist hero with a biography, and a local playlist.
@@ -86,23 +95,26 @@ pressing **Light** in Settings while watching what happened to the page.
   `/next`-seeded stations do not exist in this build, and a button that cannot do
   what it says is worse than no button.
 
-**Tests:** `app-web` node suite **217 pass / 0 fail**. New coverage: the album
+**Tests:** `app-web` node suite **218 pass / 0 fail**. New coverage: the album
 header's two meta lines and its fallback to the row count when the source sent
 none; the entity action pair and the absence of Queue; the local/remote playlist
 labels; the hero's veil, its listeners rule and the About card; the mapper's
 `secondSubtitle` reading (including a subscriber count *not* becoming a listener
 count) and the demo source's own computed counts; `entityLabel`'s four cases; the
 appearance attributes landing on the document element, and the rule that an
-entity screen owns its one heading. Seven of them were mutation-checked against
-the code they describe, plus the browser checks —
+entity screen owns its one heading, and the dock's answer to a player link with
+nothing playing. Eight of them were mutation-checked against the code they
+describe, plus the browser checks —
 which was run against the *old* behaviour first and reported six failures
 (`the theme attribute is on #app (dark)` and `choosing Light left the document on
 "dark"`), and the heading check reported
 `2 h1(s) on the album screen ("Dharan Nights", "Dharan Nights")` against the
-repeated title before it passed. The route sweep (16 fixed routes across two
-viewports, 10 discovered entity ids, 10 entity pages — every card opened the page
-it names — `0` findings) and `website/tests/browser.mjs` (99 measurements, 0
-failures) were both re-run against the built tree.
+repeated title before it passed. A player deep link is now exercised end to end:
+the empty state names what it is waiting for, and choosing a track opens it. The
+route sweep (16 fixed routes across two viewports, 10 discovered entity ids, 10
+entity pages — every card opened the page it names — `0` findings) and
+`website/tests/browser.mjs` (101 measurements, 0 failures) were both re-run
+against the built tree.
 
 ### The badge stops lying, and Home gets its greeting and moods (2026-10-16, session `arena/85bacb28-dhun`)
 
