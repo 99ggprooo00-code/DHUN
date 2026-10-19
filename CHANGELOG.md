@@ -91,7 +91,10 @@ pressing **Light** in Settings while watching what happened to the page.
 - **The project site now says what changed.** A "What changed" band carries the
   last four merged rounds with the pull request that carried each one (PR #185,
   #184, #183, #182), each sourced in an HTML comment to this file and
-  `.ai/DEBUG_LOG.md`. It also stopped promising things the web build does not do:
+  `.ai/DEBUG_LOG.md`. A new quality gate keeps the band honest: on the built page
+  every `PR #N` label must link to `/pull/N`, a pull-request link with no label is
+  a violation, and the entries must be newest-first — the failure that matters is
+  a card whose label and evidence disagree, and nothing else read that link. It also stopped promising things the web build does not do:
   the showcase's player, lyrics and queue links point at the routes the app
   actually answers and say the player opens once a track plays; the Library card
   no longer lists Downloads; and the Android Downloads capture keeps its caption,

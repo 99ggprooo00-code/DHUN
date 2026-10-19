@@ -582,6 +582,71 @@ def distribution_boundary_violations(dist: pathlib.Path) -> list[str]:
     return violations
 
 
+def release_round_violations(dist: pathlib.Path) -> list[str]:
+    """The "what changed" band names a pull request and links to the same one.
+
+    The front page lists recent merged rounds, each labelled `PR #N` and linking
+    to `/pull/N`, newest first. Three ways that can go wrong without anything
+    noticing, all of them a claim the page cannot back:
+
+      - a card labelled `PR #184` that links to `/pull/183` (the worst one: the
+        evidence is one click away and contradicts the label);
+      - a pull-request link with no label, so the reader cannot tell which round
+        it is;
+      - entries out of order, which makes "the last four rounds" untrue.
+
+    Checked against the built HTML rather than the data file, so it also covers
+    the renderers: a template that drops the label fails here.
+    """
+    violations: list[str] = []
+    for route, path in page_paths(dist).items():
+        markup = path.read_text(encoding="utf-8")
+        for card in re.findall(r"<li\b[^>]*>(.*?)</li>", markup, re.S):
+            links = PULL_REQUEST_LINK.findall(card)
+            if not links:
+                continue
+            label = re.search(r'<span class="card-label">\s*(PR\s*#(\d+))\s*</span>', card)
+            numbers = [int(number) for number in links]
+            if not label:
+                violations.append(
+                    f"{route}: a card links to pull request(s) {', '.join(f'#{n}' for n in numbers)} "
+                    f"with no `PR #N` label — the reader cannot tell which round it is"
+                )
+                continue
+            named = int(label.group(2))
+            if named not in numbers:
+                violations.append(
+                    f"{route}: the card labelled {label.group(1)} links to "
+                    f"{', '.join(f'/pull/{n}' for n in numbers)} — the label and the evidence disagree"
+                )
+            if any(len(set(numbers)) > 1 for _ in [0]) and len(numbers) > 1:
+                violations.append(
+                    f"{route}: {label.group(1)} links to more than one pull request "
+                    f"({', '.join(f'#{n}' for n in numbers)}) — one round, one link"
+                )
+
+        # Newest first, as the heading promises ("the last N rounds").
+        order = [
+            int(number)
+            for number in re.findall(
+                r'<span class="card-label">\s*PR\s*#(\d+)\s*</span>',
+                markup,
+            )
+        ]
+        if order and order != sorted(order, reverse=True):
+            violations.append(
+                f"{route}: the rounds are listed {', '.join(f'#{n}' for n in order)} — "
+                f"newest first is what 'the last rounds' means"
+            )
+    return violations
+
+
+PULL_REQUEST_LINK = re.compile(
+    r'<a\b[^>]*href="https://github\.com/[^"/]+/[^"/]+/pull/(\d+)"[^>]*>',
+    re.I,
+)
+
+
 def claim_traceability_violations(dist: pathlib.Path) -> list[str]:
     """Every claim block cites the source it came from, in the built HTML.
 
@@ -2574,6 +2639,7 @@ CHECKS = (
     ("icon sprite integrity", sprite_violations),
     ("page-weight ratchet", budget_ratchet_violations),
     ("claim traceability", claim_traceability_violations),
+    ("recent-round labels", release_round_violations),
     ("backlog ↔ site drift", backlog_drift_violations),
     ("no stale facts", stale_fact_violations),
     ("copy hygiene", copy_hygiene_violations),
