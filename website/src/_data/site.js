@@ -259,11 +259,18 @@ export default {
   // short: the real changelog is CHANGELOG.md, and a second one here would rot.
   whatsNew: {
     kicker: "WHAT CHANGED",
-    title: "Three rounds that changed what /app/ does, with the pull request that carried each one.",
+    title: "Four rounds that changed what /app/ does, with the pull request that carried each one.",
     lede:
-      "The site and the web app are built from the same repository, so the interface at /app/ moves when the app does. These are the last three rounds that changed something a visitor can see — every line is a merged change, not a roadmap, and the pull request next to it is the evidence.",
+      "The site and the web app are built from the same repository, so the interface at /app/ moves when the app does. These are the last four rounds that changed something a visitor can see — every line is a merged change, not a roadmap, and the pull request next to it is the evidence.",
     source: "CHANGELOG.md [Unreleased]; .ai/DEBUG_LOG.md; docs/verification/29-web-app-mirror.md",
     entries: [
+      {
+        pr: "PR #185",
+        href: `${REPO}/pull/185`,
+        title: "The player links on this page stopped landing on Home in silence.",
+        detail:
+          "“Launch /app/ Player”, Lyrics and Queue are links to a screen that only exists once a track is loaded. The app used to answer them by showing Home and saying nothing; it now says what it is waiting for, keeps the request, and opens the player as soon as a track starts. The same round stopped this page promising a Downloads screen the web build does not have: the Android capture keeps its caption and a sentence saying so, and no longer links into /app/ under it.",
+      },
       {
         pr: "PR #184",
         href: `${REPO}/pull/184`,

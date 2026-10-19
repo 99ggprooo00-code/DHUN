@@ -1209,6 +1209,54 @@ class StructuredData(DistCopyMixin):
         self.assertTrue(any("exactly one JSON-LD block" in v for v in violations), violations)
 
 
+class RecentRoundLabels(unittest.TestCase):
+    """The "what changed" band: the label, the link and the order must agree.
+
+    Added with the band itself (2026-10-17). The failure it exists for is the one
+    that matters most on a page whose whole point is traceability: a card that
+    says PR #184 while its evidence — the link — points at #183. Nothing else in
+    this file reads that link, and `website_claims.py` only cares whether the
+    words are forbidden.
+    """
+
+    def card(self, label, number, extra=""):
+        return (
+            f'<li class="card"><span class="card-label">{label}</span>'
+            f'<h3>A round</h3><p>What changed.</p>'
+            f'<a href="https://github.com/o/r/pull/{number}">Read</a>{extra}</li>'
+        )
+
+    def render(self, cards):
+        return f'<html><body><ul class="status-list">{"".join(cards)}</ul></body></html>'
+
+    def test_a_label_that_matches_its_link_passes(self):
+        root = write_tree(Path(tmpdir()), {"index.html": self.render([self.card("PR #184", 184), self.card("PR #183", 183)])})
+        self.assertEqual(quality.release_round_violations(root), [])
+
+    def test_a_label_and_a_link_that_disagree_fail(self):
+        root = write_tree(Path(tmpdir()), {"index.html": self.render([self.card("PR #184", 183)])})
+        problems = quality.release_round_violations(root)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("label and the evidence disagree", problems[0])
+
+    def test_a_pull_request_link_with_no_label_fails(self):
+        card = '<li class="card"><h3>Round</h3><a href="https://github.com/o/r/pull/183">Read</a></li>'
+        root = write_tree(Path(tmpdir()), {"index.html": self.render([card])})
+        problems = quality.release_round_violations(root)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("no `PR #N` label", problems[0])
+
+    def test_out_of_order_entries_fail(self):
+        root = write_tree(Path(tmpdir()), {"index.html": self.render([self.card("PR #182", 182), self.card("PR #184", 184)])})
+        problems = quality.release_round_violations(root)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("newest first", problems[0])
+
+    def test_a_band_with_no_pull_requests_is_not_this_rules_business(self):
+        root = write_tree(Path(tmpdir()), {"index.html": self.render(['<li class="card"><h3>x</h3></li>'])})
+        self.assertEqual(quality.release_round_violations(root), [])
+
+
 class NoJavaScriptStillHolds(unittest.TestCase):
     """The JSON-LD exception must not become a hole in the no-JS rule."""
 
