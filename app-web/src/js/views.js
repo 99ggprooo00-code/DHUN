@@ -637,15 +637,24 @@ export function playlistScreen({ playlist, tracks, currentId, isOwn = false, mis
       actions: [{ id: "go-home", label: "Go home" }],
     });
   }
+  // `PlaylistScreen.kt`: cover, title, then `subtitle • meta` on one quiet line
+  // and the description under it at the smallest size — the description is the
+  // *third* line there, not something appended to the meta line. A remote
+  // playlist gets Play / Shuffle; a local one adds Rename and Delete, which is
+  // the split the app's own docstring describes ("Remote: header + ordered
+  // tracks + play/shuffle. Local: all of that + rename, delete, …").
+  const metaLine = [isOwn ? "Local playlist" : playlist.artist, playlist.trackCountText ?? pluralise(tracks.length, "track")]
+    .filter(Boolean)
+    .join(" · ");
   return html`<header class="dhun-entity">
       <span class="dhun-entity__art">${artwork(playlist, { size: "hero" })}</span>
       <div class="dhun-entity__text">
-        <p class="dhun-entity__kind">Playlist</p>
         <h1 class="dhun-entity__title">${playlist.name}</h1>
-        <p class="dhun-entity__meta">${pluralise(tracks.length, "track")}${playlist.description ? html` · ${playlist.description}` : html``}</p>
+        ${metaLine ? html`<p class="dhun-entity__meta">${metaLine}</p>` : html``}
+        ${playlist.description ? html`<p class="dhun-entity__submeta">${playlist.description}</p>` : html``}
         <div class="dhun-entity__actions">
           <button type="button" class="dhun-button" data-action="play-entity">${icon("Play", { size: 20 })}<span>Play</span></button>
-          <button type="button" class="dhun-button dhun-button--tonal" data-action="queue-entity">${icon("QueueMusic", { size: 20 })}<span>Queue</span></button>
+          <button type="button" class="dhun-button dhun-button--outlined" data-action="shuffle-entity">${icon("Shuffle", { size: 20 })}<span>Shuffle</span></button>
           ${isOwn
             ? html`<button type="button" class="dhun-button dhun-button--ghost" data-action="rename-playlist">Rename</button>
                 <button type="button" class="dhun-button dhun-button--ghost" data-action="delete-playlist">Delete</button>`
@@ -676,22 +685,35 @@ export function artistScreen({ artist, tracks = [], albums = [], currentId }) {
       actions: [{ id: "go-home", label: "Go home" }],
     });
   }
-  return html`<header class="dhun-entity">
-      <span class="dhun-entity__art dhun-entity__art--round">${artwork(artist, { size: "hero" })}</span>
-      <div class="dhun-entity__text">
-        <p class="dhun-entity__kind">Artist</p>
-        <h1 class="dhun-entity__title">${artist.name}</h1>
-        ${artist.description ? html`<p class="dhun-entity__meta">${artist.description}</p>` : html``}
-        <div class="dhun-entity__actions">
-          <button type="button" class="dhun-button" data-action="play-entity">${icon("Play", { size: 20 })}<span>Play</span></button>
-          <button type="button" class="dhun-button dhun-button--tonal" data-action="queue-entity">${icon("QueueMusic", { size: 20 })}<span>Queue</span></button>
+  // `ArtistScreen.kt`: a 16:10 full-bleed crop with the name overlaid and the
+  // source's "N monthly listeners" under it when the source sent that line.
+  // The app's two buttons there are Shuffle and Radio; Radio has no counterpart
+  // in this build (no `/next`-seeded station), and a button that cannot do the
+  // thing it names is worse than no button, so the web pairs Shuffle with Play
+  // over the same top songs instead of pretending to be a radio.
+  return html`<header class="dhun-entity dhun-entity--hero">
+      <span class="dhun-entity__art dhun-entity__art--hero">
+        ${artwork(artist, { size: "hero" })}
+        <span class="dhun-entity__veil" aria-hidden="true"></span>
+        <div class="dhun-entity__text">
+          <h1 class="dhun-entity__title">${artist.name}</h1>
+          ${artist.listeners ? html`<p class="dhun-entity__meta">${artist.listeners}</p>` : html``}
         </div>
+      </span>
+      <div class="dhun-entity__actions">
+        <button type="button" class="dhun-button" data-action="play-entity">${icon("Play", { size: 20 })}<span>Play</span></button>
+        <button type="button" class="dhun-button dhun-button--outlined" data-action="shuffle-entity">${icon("Shuffle", { size: 20 })}<span>Shuffle</span></button>
       </div>
     </header>
     ${tracks.length
-      ? html`<section class="dhun-section">${sectionHeader("Songs")}${trackList(tracks, { currentId })}</section>`
+      ? html`<section class="dhun-section">${sectionHeader("Top songs")}${trackList(tracks, { currentId })}</section>`
       : html``}
-    ${albums.length ? html`<section class="dhun-section">${sectionHeader("Albums")}${cardGrid(albums)}</section>` : html``}`;
+    ${albums.length ? html`<section class="dhun-section">${sectionHeader("Albums")}${cardGrid(albums)}</section>` : html``}
+    ${artist.description
+      ? html`<section class="dhun-section">${sectionHeader("About")}
+          <div class="dhun-about"><p class="dhun-about__body">${artist.description}</p></div>
+        </section>`
+      : html``}`;
 }
 
 export function albumScreen({ album, tracks = [], currentId }) {
@@ -702,15 +724,24 @@ export function albumScreen({ album, tracks = [], currentId }) {
       actions: [{ id: "go-home", label: "Go home" }],
     });
   }
+  // `AlbumScreen.kt` exactly: cover, title, `artistName • year`, then a quieter
+  // `trackCount • duration` line — and the two are separate lines at two
+  // different type sizes, which is why the web's single merged line read as a
+  // different component. The count and the duration are the *source's* own text
+  // when it sent them (`AlbumDetail.trackCountText` / `durationText`); the row
+  // count is the fallback for a source that sent neither.
+  const metaLine = [album.trackCountText ?? pluralise(tracks.length, "track"), album.durationText]
+    .filter(Boolean)
+    .join(" · ");
   return html`<header class="dhun-entity">
-      <span class="dhun-entity__art">${artwork(album, { size: "hero" })}</span>
+      <span class="dhun-entity__art dhun-entity__art--album">${artwork(album, { size: "hero" })}</span>
       <div class="dhun-entity__text">
-        <p class="dhun-entity__kind">Album</p>
         <h1 class="dhun-entity__title">${album.title}</h1>
-        <p class="dhun-entity__meta">${[album.artist, album.year].filter(Boolean).join(" · ")}${tracks.length ? html` · ${pluralise(tracks.length, "track")}` : html``}</p>
+        <p class="dhun-entity__meta">${[album.artist, album.year].filter(Boolean).join(" · ") || "Album"}</p>
+        ${metaLine ? html`<p class="dhun-entity__submeta">${metaLine}</p>` : html``}
         <div class="dhun-entity__actions">
           <button type="button" class="dhun-button" data-action="play-entity">${icon("Play", { size: 20 })}<span>Play</span></button>
-          <button type="button" class="dhun-button dhun-button--tonal" data-action="queue-entity">${icon("QueueMusic", { size: 20 })}<span>Queue</span></button>
+          <button type="button" class="dhun-button dhun-button--outlined" data-action="shuffle-entity">${icon("Shuffle", { size: 20 })}<span>Shuffle</span></button>
         </div>
       </div>
     </header>

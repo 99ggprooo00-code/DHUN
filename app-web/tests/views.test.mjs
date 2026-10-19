@@ -655,3 +655,134 @@ test("the header carries the app's brand and greeting, and the rail is the app's
   assert.match(body, /data-mood="focus"[^>]*aria-selected="true"/);
   assert.match(body, /role="tablist"/);
 });
+
+/**
+ * The entity headers are the app's headers.
+ *
+ * `AlbumScreen.kt` prints the cover, the title, a `artistName • year` line and
+ * then a *separate* quieter line of `trackCountText • durationText` — the
+ * strings the source sent, not the number of rows this build happened to get.
+ * The web used to merge all of it into one line and count its own rows, which is
+ * a different promise: "5 tracks" that came from a truncated response is a claim
+ * about the internet, while "18 minutes" from the source is a fact about the
+ * album. The actions are the app's too, and the artist hero is a 16:10 crop with
+ * the name over it rather than a round avatar and a paragraph.
+ */
+test("the album header keeps the source's own count and run time on their own line", () => {
+  const body = text(views.albumScreen({
+    album: { id: "MPREb_1", title: "Dharan Nights", artist: "Naya Koirala", year: "2024", trackCountText: "5 songs", durationText: "18 minutes" },
+    tracks: [track("a"), track("b")],
+  }));
+  assert.match(body, /dhun-entity__title">Dharan Nights/);
+  assert.match(body, /dhun-entity__meta">Naya Koirala · 2024</);
+  assert.match(body, /dhun-entity__submeta">5 songs · 18 minutes</);
+  // The two lines are separate elements: the app separates them by type size,
+  // and one merged line is what made the web header read as another component.
+  assert.ok(!/Naya Koirala · 2024 · 5 songs/.test(body), "the meta lines must not be merged");
+});
+
+test("an album whose source sent no counts falls back to its rows, and says so plainly", () => {
+  const body = text(views.albumScreen({
+    album: { id: "MPREb_2", title: "No metadata", artist: "A", year: null },
+    tracks: [track("a"), track("b"), track("c")],
+  }));
+  assert.match(body, /dhun-entity__submeta">3 tracks</);
+  // A source that sent no artist and no year still gets a truthful first line
+  // rather than an empty paragraph.
+  const bare = text(views.albumScreen({ album: { id: "MPREb_3", title: "Naked" }, tracks: [] }));
+  assert.match(bare, /dhun-entity__meta">Album</);
+});
+
+test("the entity actions are Play and Shuffle — the app's pair, and no fake ones", () => {
+  for (const [name, body] of [
+    ["album", views.albumScreen({ album: { id: "x", title: "T", artist: "A" }, tracks: [track("a")] })],
+    ["artist", views.artistScreen({ artist: { id: "UC1", name: "A" }, tracks: [track("a")] })],
+    ["playlist", views.playlistScreen({ playlist: { id: "pl-1", name: "P" }, tracks: [track("a")] })],
+  ]) {
+    const rendered = text(body);
+    assert.match(rendered, /data-action="play-entity"/, `${name}: no Play`);
+    assert.match(rendered, /data-action="shuffle-entity"/, `${name}: no Shuffle`);
+    // Queue left the entity header with the app's own header: queueing a whole
+    // album is the row menu's job, and the header button promised the same thing
+    // twice.
+    assert.ok(!/data-action="queue-entity"/.test(rendered), `${name}: a Queue action survived`);
+  }
+});
+
+test("a local playlist is labelled local, and a remote one is not", () => {
+  const mine = text(views.playlistScreen({ playlist: { id: "pl-1", name: "My mix" }, tracks: [track("a")], isOwn: true }));
+  assert.match(mine, /dhun-entity__meta">Local playlist · 1 track</);
+  const theirs = text(views.playlistScreen({
+    playlist: { id: "VL1", name: "Someone's mix", artist: "A curator", trackCountText: "12 songs" },
+    tracks: [track("a")],
+  }));
+  assert.match(theirs, /dhun-entity__meta">A curator · 12 songs</);
+  assert.ok(!/Local playlist/.test(theirs), "a remote playlist is not local");
+});
+
+test("the artist hero is the app's: a 16:10 veil, and only the listeners the source sent", () => {
+  const withListeners = text(views.artistScreen({
+    artist: { id: "UC1", name: "Naya Koirala", listeners: "1.2M monthly listeners" },
+    tracks: [track("a")],
+  }));
+  assert.match(withListeners, /dhun-entity--hero/);
+  assert.match(withListeners, /dhun-entity__art--hero/);
+  assert.match(withListeners, /dhun-entity__veil/);
+  assert.match(withListeners, /dhun-entity__title">Naya Koirala/);
+  assert.match(withListeners, /dhun-entity__meta">1\.2M monthly listeners</);
+
+  // A listener count is only ever the source's string. When the source sent a
+  // description instead, the hero shows no statistic at all — an artist hero
+  // with an invented number would be the exact lie the app refuses to tell.
+  const described = text(views.artistScreen({
+    artist: { id: "UC2", name: "Someone", description: "A long biography that belongs on the page, not in the hero." },
+    tracks: [track("a")],
+  }));
+  assert.ok(!/monthly listeners/.test(described), "no listener figure was invented");
+  // The biography still reaches the page, in the app's own place for it: the
+  // "About" card at the end (`ArtistScreen.kt` — `GlassCard`, `maxLines = 8`),
+  // not over the hero artwork.
+  assert.match(described, /About/);
+  assert.match(described, /dhun-about__body">A long biography/);
+  const hero = described.slice(0, described.indexOf("dhun-entity__actions"));
+  assert.ok(!/long biography/.test(hero), "the hero must not print the biography over the artwork");
+});
+
+/**
+ * A shelf of albums is not a list of songs.
+ *
+ * The home screen classifies a shelf's entries by `kind`: entries without one
+ * are drawn as playable rows. The demo catalogue's albums had no kind, so
+ * "Albums for you" rendered four `play-track` rows whose ids are `al-01` … `al-04`
+ * — pressing one asked the player for an album as if it were a video, and the
+ * album pages were reachable only by typing a URL. The kind is what makes a
+ * shelf honest about what its entries are.
+ */
+test("an album shelf renders album cards with their own action, never playable rows", () => {
+  const body = text(views.homeScreen({
+    shelves: [
+      { title: "Quick picks", entries: [track("t1")] },
+      { title: "Albums for you", entries: [{ id: "al-01", title: "Dharan Nights", artist: "Naya Koirala", kind: "album", artwork: null }] },
+    ],
+  }));
+  assert.match(body, /dhun-card"[^>]*data-action="open-entity"[^>]*data-kind="album"[^>]*data-id="al-01"/);
+  assert.ok(!/data-action="play-track"[^>]*data-id="al-01"/.test(body), "an album is not a playable row");
+  // And the two shelves render as the two different things they are.
+  assert.match(body, /dhun-quickrow/);
+  assert.match(body, /dhun-shelf--cards/);
+});
+
+test("the demo catalogue's own home feed labels its albums", async () => {
+  const { createDemoSource } = await import("../src/js/source.js");
+  const home = await createDemoSource().home();
+  const albumShelf = home.shelves.find((shelfEntry) => /album/i.test(shelfEntry.title));
+  assert.ok(albumShelf, "the demo home has no album shelf");
+  for (const entry of albumShelf.entries) {
+    assert.equal(entry.kind, "album", `${entry.id} would be drawn as a song`);
+  }
+  for (const shelfEntry of home.shelves.filter((s) => !/album/i.test(s.title))) {
+    for (const entry of shelfEntry.entries) {
+      assert.ok(!entry.kind || entry.kind === "track", `${entry.id} in “${shelfEntry.title}” is neither a song nor a card`);
+    }
+  }
+});

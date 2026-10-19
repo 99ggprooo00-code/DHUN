@@ -247,3 +247,15 @@ test("the mood rail's control is wired to a real request", () => {
   // And a mood carries its own state, so its failure cannot empty the feed.
   assert.match(main, /moodFeed: \{ status: "idle"/, "the mood borrows the feed's state");
 });
+
+test("the player's context is built from the route, not hardcoded to Album", () => {
+  // The regression this guards: `main.js` carried the literal `"Album · "` in
+  // two places, so every entity told the listener it was an album. One label,
+  // from the router, for all three routes.
+  assert.ok(!/"Album · "/.test(main), "main.js still holds a hardcoded Album label");
+  assert.match(main, /entityLabel\(/, "main.js no longer uses the router's entityLabel");
+  assert.match(main, /context: entityContext\(\)/, "play-entity passes no context");
+  // Shuffle is the app's, and it plays the entity's list: `player.setShuffle(true)`
+  // after the queue is prepared, which is `AlbumViewModel.playShuffled`.
+  assert.match(main, /"shuffle-entity": \(\) => \{[\s\S]*?player\.setShuffle\(true\)/, "shuffle-entity does not turn shuffle on");
+});

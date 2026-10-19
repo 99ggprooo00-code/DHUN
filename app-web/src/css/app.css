@@ -471,6 +471,12 @@ a {
   filter: brightness(1.08);
 }
 
+.dhun-button--outlined {
+  background: transparent;
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  color: var(--dhun-text);
+}
+
 .dhun-button--tonal {
   background: var(--dhun-accent-container);
   color: var(--dhun-on-accent-container);
@@ -1298,39 +1304,51 @@ a {
 
 /* ======================================================== entity headers == */
 
+/* `AlbumScreen.kt` and `PlaylistScreen.kt` centre their whole header — cover,
+   title and the two buttons on one axis — and they do it at every width: the
+   desktop two-pane shell puts this page in the detail pane, it does not turn the
+   header into a row. The web used to left-align the cover and the text on a
+   phone and lay them out as a row above 480px, which was neither of the app's
+   two layouts. */
 .dhun-entity {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: var(--dhun-space-lg);
   padding: var(--dhun-space-md) var(--dhun-space-screen-padding) 0;
 }
 
 .dhun-entity__art {
   display: block;
+  width: 100%;
   max-width: var(--dhun-space-artwork-playlist);
 }
 
-.dhun-entity__art--round .dhun-art {
-  border-radius: var(--dhun-shape-full);
+/* DhunSpacing.artworkAlbum (220dp) — the album's cover is a size up from the
+   playlist's 200dp, exactly as the two screens ask for. */
+.dhun-entity__art--album {
+  max-width: var(--dhun-space-artwork-album);
 }
 
 .dhun-entity__text {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--dhun-space-xs);
 }
 
-.dhun-entity__kind {
-  margin: 0;
-  font: var(--dhun-text-label-small);
-  letter-spacing: var(--dhun-tracking-label-small);
-  text-transform: uppercase;
-  color: var(--dhun-text-tertiary);
-}
-
+/* `headlineSmall`, two lines maximum — the album and playlist headers in
+   `AlbumScreen.kt` / `PlaylistScreen.kt` both use it. The artist hero overrides
+   this with `headlineMedium`, which is the size that screen uses. */
 .dhun-entity__title {
   margin: 0;
-  font: var(--dhun-text-headline-large);
+  font: var(--dhun-text-headline-small);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
 }
 
 .dhun-entity__meta {
@@ -1342,19 +1360,105 @@ a {
 .dhun-entity__actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: var(--dhun-space-sm);
   margin-top: var(--dhun-space-xs);
 }
 
-@media (min-width: 480px) {
-  .dhun-entity {
-    flex-direction: row;
-    align-items: flex-end;
-  }
+/* The quiet third line: the album's source-supplied `count • run time`, or a
+   playlist's description. `labelSmall` on `textTertiary`, which is what both
+   screens set. */
+.dhun-entity__submeta {
+  margin: 0;
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  color: var(--dhun-text-tertiary);
+}
 
-  .dhun-entity__art {
-    width: var(--dhun-space-artwork-playlist);
-  }
+.dhun-about {
+  margin: 0 var(--dhun-space-screen-padding) var(--dhun-space-xxxl);
+  padding: var(--dhun-space-md);
+  border-radius: var(--dhun-shape-extra-large);
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+}
+
+.dhun-about__body {
+  margin: 0;
+  font: var(--dhun-text-body-medium);
+  color: var(--dhun-text-secondary);
+  /* `ArtistScreen.kt`'s About card: `maxLines = 8`, ellipsised. */
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  line-clamp: 8;
+  -webkit-line-clamp: 8;
+}
+
+/* The artist hero, after ArtistScreen.kt: a 16:10 full-bleed crop with the name
+   overlaid at the bottom, then the actions on their own row. The base
+   `.dhun-entity` rule below 480px is a column and above it a row, so this block
+   comes after both and re-states its own layout instead of relying on which
+   media query won — a hero is not a row at any width. */
+.dhun-entity--hero {
+  display: block;
+  padding: 0;
+  /* The hero is the one entity header that is not centred: `ArtistScreen.kt`
+     overlays the name at the bottom-left of the crop and starts its actions row
+     at the screen padding. */
+  text-align: left;
+}
+
+.dhun-entity__art--hero {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: none;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+}
+
+.dhun-entity__art--hero .dhun-art {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.dhun-entity__veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    var(--dhun-hero-veil-top),
+    var(--dhun-hero-veil-mid) 45%,
+    var(--dhun-hero-veil-bottom)
+  );
+}
+
+.dhun-entity--hero .dhun-entity__text {
+  position: absolute;
+  inset: auto 0 0 0;
+  align-items: flex-start;
+  text-align: left;
+  padding: var(--dhun-space-md) var(--dhun-space-screen-padding);
+  /* The veil is the theme's *background* colour at three alphas out of
+     `ArtistScreen.kt`, so it darkens the crop in dark mode and lightens it in
+     light mode — which is exactly what lets the ordinary text tokens stay
+     readable over borrowed artwork, and what the app relies on. */
+  color: var(--dhun-text);
+}
+
+.dhun-entity--hero .dhun-entity__title {
+  font: var(--dhun-text-headline-medium);
+}
+
+.dhun-entity--hero .dhun-entity__meta {
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-entity--hero .dhun-entity__actions {
+  justify-content: flex-start;
+  padding: 0 var(--dhun-space-screen-padding);
 }
 
 /* ================================================================ search == */

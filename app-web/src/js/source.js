@@ -761,6 +761,17 @@ export function mapBrowse(data, { kind = "unknown", browseId = null } = {}) {
     textOfRuns(headerRenderer?.secondSubtitle?.runs) ||
     "";
   const parts = subtitleText.split("•").map((part) => part.trim()).filter(Boolean);
+  /*
+   * The header's *second* subtitle line — "5 songs • 18 minutes" for an album,
+   * "1.2M monthly listeners" for an artist — split the way `BrowseParsers.kt`
+   * splits it. The app reads meta out of this line rather than counting the
+   * rows it happens to hold, because the source knows the album's real duration
+   * even when it sent only part of the tracklist, and `AlbumDetail.trackCountText`
+   * / `durationText` / `ArtistPage.monthlyListeners` are all this string. The web
+   * used to drop it on the floor and print its own row count instead.
+   */
+  const secondSubtitleText = textOfRuns(headerRenderer?.secondSubtitle?.runs) || "";
+  const secondParts = secondSubtitleText.split("•").map((part) => part.trim()).filter(Boolean);
   const artwork =
     thumbnails(headerRenderer) ??
     thumbnails(findRenderer(data, "musicThumbnailRenderer")) ??
@@ -786,6 +797,10 @@ export function mapBrowse(data, { kind = "unknown", browseId = null } = {}) {
         artist: parts.find((part) => !/^\d{4}$/.test(part) && !/songs?$/i.test(part)) ?? "",
         year: parts.find((part) => /^\d{4}$/.test(part)) ?? null,
         trackCount: items.length,
+        // `trackCount = secondParts?.firstOrNull { it.contains("song") }` and
+        // `durationText = secondParts?.lastOrNull()?.takeIf { secondParts.size > 1 }`.
+        trackCountText: secondParts.find((part) => /song/i.test(part)) ?? null,
+        durationText: secondParts.length > 1 ? secondParts[secondParts.length - 1] : null,
         artwork,
       },
       tracks: items,
@@ -807,6 +822,13 @@ export function mapBrowse(data, { kind = "unknown", browseId = null } = {}) {
         id: browseId,
         name: title,
         description: textOfRuns(headerRenderer?.description?.runs) || "",
+        /*
+         * The app takes the whole second subtitle and keeps it only when it
+         * actually says "monthly listeners": anything else on that line is a
+         * different fact, and a header that printed it would be putting words in
+         * the source's mouth.
+         */
+        listeners: /monthly listeners/i.test(secondSubtitleText) ? secondSubtitleText : null,
         artwork,
       },
       tracks: items,
@@ -822,6 +844,11 @@ export function mapBrowse(data, { kind = "unknown", browseId = null } = {}) {
       name: title,
       description: textOfRuns(headerRenderer?.description?.runs) || "",
       artist: parts[0] ?? "",
+      // `countText = parts.firstOrNull { it.contains("song") || it.contains("track") }`.
+      trackCountText:
+        parts.find((part) => /song|track/i.test(part)) ??
+        secondParts.find((part) => /song|track/i.test(part)) ??
+        null,
       trackCount: items.length,
       artwork,
     },
@@ -1062,15 +1089,46 @@ export function createDemoSource({ catalog = SAMPLE_CATALOG } = {}) {
   const byId = (list, id) => list.find((entry) => entry.id === id) ?? null;
   const trackById = (id) => catalog.tracks.find((track) => track.id === id || track.videoId === id) ?? null;
 
+  /**
+   * The two strings a browse header carries for a collection.
+   *
+   * A real source composes these itself ("5 songs", "18 minutes") and the mapper
+   * passes them through untouched, so the demo source composes its own too —
+   * from its own rows, so they cannot drift away from what the album holds. A
+   * demo that printed the web app's row count under a "sample data" notice would
+   * be describing the interface rather than the album.
+   */
+  /**
+   * Every entry a source hands to the interface carries its `kind`.
+   *
+   * `mapTwoRowItem` sets one on every card it maps, and the screens classify by
+   * it: no kind means "a song". The demo catalogue's raw rows had none, so its
+   * playlists were drawn as *artists* (`card()` infers artist from a `name`) —
+   * searching "e" and tapping "Evening Drive" opened `#/artist/pl-02`, a page
+   * that cannot exist, and the album shelf was drawn as four playable songs.
+   * Labeling the entries is what keeps the demo's own shelf the same shape as a
+   * real response.
+   */
+  const asKind = (kind, entries) => entries.map((entry) => ({ ...entry, kind }));
+
+  function collectionMeta(tracks) {
+    const totalMs = tracks.reduce((sum, track) => sum + (Number(track.durationMs) || 0), 0);
+    const minutes = Math.round(totalMs / 60_000);
+    return {
+      trackCountText: `${tracks.length} song${tracks.length === 1 ? "" : "s"}`,
+      durationText: minutes > 0 ? `${minutes} minute${minutes === 1 ? "" : "s"}` : null,
+    };
+  }
+
   function matches(query) {
     const needle = query.trim().toLowerCase();
     if (!needle) return { tracks: [], albums: [], artists: [], playlists: [] };
     const has = (value) => String(value ?? "").toLowerCase().includes(needle);
     return {
-      tracks: catalog.tracks.filter((track) => has(track.title) || has(track.artist) || has(track.album)),
-      albums: catalog.albums.filter((album) => has(album.title) || has(album.artist)),
-      artists: catalog.artists.filter((artist) => has(artist.name)),
-      playlists: catalog.playlists.filter((playlist) => has(playlist.name)),
+      tracks: asKind("track", catalog.tracks.filter((track) => has(track.title) || has(track.artist) || has(track.album))),
+      albums: asKind("album", catalog.albums.filter((album) => has(album.title) || has(album.artist))),
+      artists: asKind("artist", catalog.artists.filter((artist) => has(artist.name))),
+      playlists: asKind("playlist", catalog.playlists.filter((playlist) => has(playlist.name))),
     };
   }
 
@@ -1092,22 +1150,32 @@ export function createDemoSource({ catalog = SAMPLE_CATALOG } = {}) {
         ok: true,
         demo: true,
         shelves: [
-          { title: "Quick picks", entries: catalog.tracks.slice(0, 6) },
-          { title: "Recommended songs", entries: catalog.tracks.slice(6, 12) },
-          { title: "Listen again", entries: [...catalog.tracks].slice(2, 8) },
-          { title: "Albums for you", entries: catalog.albums },
+          { title: "Quick picks", entries: asKind("track", catalog.tracks.slice(0, 6)) },
+          { title: "Recommended songs", entries: asKind("track", catalog.tracks.slice(6, 12)) },
+          { title: "Listen again", entries: asKind("track", [...catalog.tracks].slice(2, 8)) },
+          /*
+           * `kind` is not decoration. The home screen classifies a shelf's
+           * entries by it — no kind means a song — so an album shelf without one
+           * was drawn as four playable rows whose ids (`al-01` …) are not
+           * videos: pressing one asked the player to play an album, and the
+           * album pages were reachable only by typing a URL. A real browse
+           * response carries the kind on every entry (`mapTwoRowItem`), and so
+           * does this one.
+           */
+          { title: "Albums for you", entries: asKind("album", catalog.albums) },
         ],
       };
     },
     async browse(id) {
       const album = byId(catalog.albums, id);
       if (album) {
+        const tracks = catalog.tracks.filter((track) => track.albumId === album.id);
         return {
           ok: true,
           demo: true,
           kind: "album",
-          album: { ...album, trackCount: catalog.tracks.filter((track) => track.albumId === album.id).length },
-          tracks: catalog.tracks.filter((track) => track.albumId === album.id),
+          album: { ...album, trackCount: tracks.length, ...collectionMeta(tracks) },
+          tracks: asKind("track", tracks),
         };
       }
       const artist = byId(catalog.artists, id);
@@ -1117,14 +1185,20 @@ export function createDemoSource({ catalog = SAMPLE_CATALOG } = {}) {
           demo: true,
           kind: "artist",
           artist,
-          tracks: catalog.tracks.filter((track) => track.artist === artist.name),
-          albums: catalog.albums.filter((entry) => entry.artist === artist.name),
+          tracks: asKind("track", catalog.tracks.filter((track) => track.artist === artist.name)),
+          albums: asKind("album", catalog.albums.filter((entry) => entry.artist === artist.name)),
         };
       }
       const playlist = byId(catalog.playlists, id);
       if (playlist) {
         const tracks = playlist.trackIds.map((trackId) => byId(catalog.tracks, trackId)).filter(Boolean);
-        return { ok: true, demo: true, kind: "playlist", playlist: { ...playlist, trackCount: tracks.length }, tracks };
+        return {
+          ok: true,
+          demo: true,
+          kind: "playlist",
+          playlist: { ...playlist, trackCount: tracks.length, ...collectionMeta(tracks) },
+          tracks: asKind("track", tracks),
+        };
       }
       return failure("notfound", new Error(`nothing in the demo catalogue has the id ${id}`), {
         kind: "notfound",

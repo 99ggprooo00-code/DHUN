@@ -2,7 +2,7 @@
 
 > Status: ✅ Complete — measured by CI on every route, never seen by a person
 > Branch: `arena/59c43e0a-dhun`
-> Last updated: 2026-10-16
+> Last updated: 2026-10-17
 
 ## Objective
 
@@ -118,7 +118,23 @@ asserted directly, along with both sides of every boundary.
 web's labels or queries drift from it: the same mirror rule the token sheet lives
 under, applied to the one thing on Home a visitor presses.
 
-## What has been measured, and what has not
+### The detail screens, and the appearance control (2026-10-17)
+
+A review pass over the three entity screens against the Kotlin that draws them,
+and one press of the **Light** theme chip with a screenshot taken either side.
+
+| What it said | What was true | What changed |
+|---|---|---|
+| An album header of `Naya Koirala · 2024 · 5 tracks` on one line, a 200px cover, Play and **Queue** | `AlbumScreen.kt`: cover → title → `artistName • year` → a *separate* `labelSmall` line of `trackCountText • durationText`, then a filled **Play** and an outlined **Shuffle**. Both strings are the **source's**, read out of the response's `secondSubtitle` by `BrowseParsers.kt` — the web counted its own rows instead, which is a claim about the network, not about the album | The app's two lines, the source's own strings, Play + Shuffle. Where a source sent no such line, the row count is the fallback and is named as a count of rows |
+| The artist page: a round avatar, "Artist" in small caps, a paragraph of biography under it, Play and Queue | `ArtistScreen.kt`: a **16:10 full-bleed crop**, the name overlaid `headlineMedium` under a veil composited from the theme background at `.15 / .05 / LYRICS_VEIL_BOTTOM (.62)`, `monthlyListeners` under it when the source's own string says so, a tonal Shuffle and Radio above the top songs, and the biography in an **About** card at the end, eight lines maximum | The hero, the veil, the listeners rule and the About card. Radio has no counterpart here (`/next` stations do not exist in this build) and is not faked; Play and Shuffle act on the same top songs |
+| A playlist's `meta` line carried the description; the kicker said "Playlist" | `PlaylistScreen.kt` remote: title, `subtitle • meta`, then the description on the quietest rung, three lines, plus Play / Shuffle. Local: the same with **Local playlist** as the subtitle and Rename / Delete added | Both variants, with the app's own label for each and the description in its own place |
+| Full player label: **"Album ·"** — a separator with nothing after it — over a playlist, an artist or an album alike | The label was built inline as `"Album · "` and ignored the entity's title | `entityLabel(routeName, name)` in `router.js`; a missing name yields no label and the player says "Playing" |
+| An album screen printed **"Dharan Nights"** twice — once in the app bar, once under the cover — and carried two `h1`s saying the same words | `AlbumScreen.kt` and `ArtistScreen.kt` draw the entity's name in the content and keep no title in the chrome | The three entity routes leave the heading to the page; `browser.mjs` counts `h1`s on a real album screen and was run against the duplicate first (2 found) before it passed |
+| The theme chip: **Light** left a dark page with a pale app bar, and the meta lines vanished into it | `applyTheme()` wrote `data-dhun-theme` to `#app`, but the palettes are keyed on the root and `body { background: var(--dhun-background) }` is painted *above* `#app` — so only the chrome was themed | The attributes go to `document.documentElement`. `browser.mjs` now presses the control and reads the document: the attribute, `body`'s computed background and `--dhun-background` all have to agree, and the check was run against the old behaviour first (six failures) before it passed |
+| The demo Home's "Albums for you" shelf: four rows you could press to play | The shelf's entries carried no `kind`, and the home screen treats an entry without one as a **song**: the rows were `play-track` with album ids, and the album pages were reachable only by typing a URL | The bundled source labels its own entries, as every mapper does |
+| Search's playlist results were drawn as **artists** | Same cause: `card()` infers *artist* from a `name`, so a playlist without a `kind` opened `#/artist/pl-…`, a page that cannot exist | Measured after the fix: the cards read `open-entity:playlist:pl-01`, and pressing one opens `#/playlist/pl-01` |
+
+### What the interface claimed, and did not know (2026-10-16, later the same day)
 
 Measured, by the `browser` job on every route and both colour schemes:
 
@@ -162,9 +178,10 @@ Those three are the Phase 8 work, listed in
 |---|---|
 | `app-web/tests/views.test.mjs` (screens, states, escaping, no `undefined` in copy) | Pass |
 | `app-web/tests/shell.test.mjs`, `actions.test.mjs`, `tokens.test.mjs`, `dom.test.mjs` | Pass |
-| `browser` job (the table above) | Pass |
+| `browser` job (the table above) | Pass — 99 measurements, 0 failures |
 | `python3 scripts/website_quality.py website/dist` | 31 checks pass |
 | A human looking at the built app's captures (34, four widths, both themes) | Looked at on 2026-10-16 — seven drawing defects and four claims the interface could not back, all fixed and listed above. Still not a phone and still not a screen reader |
+| A second look, at the entity screens and at the appearance chip (2026-10-17) | Six more defects, all fixed and listed in the section above. The Light chip was pressed in a real browser, and the check is in the browser job; the phone is still an emulated viewport and no screen reader has run |
 
 ## Completion decision
 

@@ -57,7 +57,7 @@ import { createPlayer, REPEAT } from "./player.js";
 import { createMediaSession } from "./mediasession.js";
 import { createTabSync, openTabChannel } from "./tabsync.js";
 import { createPwa } from "./pwa.js";
-import { createRouter, parseRoute, formatRoute, needsData, LIBRARY_TABS } from "./router.js";
+import { createRouter, parseRoute, formatRoute, needsData, entityLabel, LIBRARY_TABS } from "./router.js";
 import { BANDS_HZ, PRESETS, CUSTOM_ID, clampGains, matchingPreset } from "./equalizer.js";
 import { createNavState, backAction, ShellBackAction, RAIL_BREAKPOINT_PX } from "./nav.js";
 import { parseLrc, activeLineIndex } from "./lyrics.js";
@@ -137,6 +137,8 @@ export function boot({
   /** Routes that are one level down: the top bar offers a way back out of them,
    *  because a hash URL is not a visible affordance on a desktop window. */
   const DETAIL_ROUTES = Object.freeze(["playlist", "artist", "album", "settings", "about-legal"]);
+  /** The three that draw the entity's own name as the screen's `<h1>`. */
+  const ENTITY_ROUTES = Object.freeze(["playlist", "artist", "album"]);
   const tabSync = createTabSync({
     channel: openTabChannel(),
     onOtherTabPlaying: () => {
@@ -766,13 +768,20 @@ export function boot({
         ${tabs}`,
     );
     setRegion("dhun-tabs", html`${tabs}`);
+    // The detail screens draw their own `<h1>` — the album, artist or playlist
+    // name, under its cover or over its hero — and `AlbumScreen.kt` /
+    // `ArtistScreen.kt` carry no title in the chrome at all. Repeating the name
+    // up here put the same heading twice on one screen (313px apart on a
+    // desktop) and left the page with two `h1`s. The bar keeps what the app's
+    // chrome does not have to offer: the way back, the source badge, actions.
+    const pageOwnsTitle = ENTITY_ROUTES.includes(route.name);
     setRegion(
       "dhun-topbar",
       html`<div class="dhun-topbar__lead">
           ${DETAIL_ROUTES.includes(route.name) || route.player === "open"
             ? html`<button type="button" class="dhun-icon-button" data-action="back" aria-label="Back">${views.icon("ArrowBack", { size: 22 })}</button>`
             : html``}
-          <h1 class="dhun-topbar__title">${title}</h1>
+          ${pageOwnsTitle ? html`` : html`<h1 class="dhun-topbar__title">${title}</h1>`}
           ${views.sourceBadge(sources.describeRows())}
         </div>
         <div class="dhun-topbar__actions">
@@ -1120,6 +1129,13 @@ export function boot({
     renderChrome();
   }
 
+  /** The label for whatever entity screen is open, right now. */
+  function entityContext() {
+    const data = state.entity.data ?? {};
+    const name = data.playlist?.name ?? data.artist?.name ?? data.album?.title ?? "";
+    return name ? entityLabel(state.route.name, name) : "";
+  }
+
   /** The list a row belongs to, so "play this" queues its neighbours. */
   function listContext() {
     const route = state.route;
@@ -1139,7 +1155,7 @@ export function boot({
     if (["playlist", "artist", "album"].includes(route.name)) {
       const data = state.entity.data ?? {};
       const name = data.playlist?.name ?? data.artist?.name ?? data.album?.title ?? "";
-      return { list: data.tracks ?? [], context: name ? `Album · ${name}` : "" };
+      return { list: data.tracks ?? [], context: name ? entityLabel(route.name, name) : "" };
     }
     return { list: [], context: "" };
   }
@@ -1286,16 +1302,25 @@ export function boot({
       showToast("Playlist deleted.");
       go({ name: "library", libTab: "playlists" });
     },
+    // The album's own two buttons, after `AlbumViewModel.play` / `playShuffled`:
+    // Play starts at the top of the list, Shuffle prepares the same queue at
+    // index 0 and then turns shuffle on, so the first track stays in front the
+    // way the app's `setShuffle` does. Whether a *previously* chosen shuffle
+    // survives into this new queue is the app's `PERSIST_SHUFFLE_REPEAT`
+    // setting, and it defaults to keeping it — so Play does not silently undo a
+    // mode the listener chose.
     "play-entity": () => {
       const data = state.entity.data;
-      if (data?.tracks?.length) playFromList(data.tracks[0], { list: data.tracks, context: "Album · " });
+      if (!data?.tracks?.length) return;
+      playFromList(data.tracks[0], { list: data.tracks, context: entityContext() });
     },
-    "queue-entity": () => {
+    "shuffle-entity": () => {
       const data = state.entity.data;
-      if (data?.tracks?.length) {
-        player.enqueueMany(data.tracks);
-        showToast(`Added ${data.tracks.length} track(s) to the queue.`);
-      }
+      if (!data?.tracks?.length) return;
+      playFromList(data.tracks[0], { list: data.tracks, context: entityContext() });
+      player.setShuffle(true);
+      showToast("Shuffle on — every track plays once.");
+      renderOverlay();
     },
     "open-playlist": (target) => go({ name: "playlist", id: target.dataset.id, player: state.route.player, playerTab: state.route.playerTab }),
     "open-entity": (target) => {
@@ -1709,6 +1734,19 @@ export function boot({
 
   /* ----------------------------------------------------------- theme/EQ -- */
 
+  /**
+   * The appearance settings are written to the **document element**, not to
+   * `#app`.
+   *
+   * `tokens.css` keys its palettes on the root (`:root, [data-dhun-theme=…]`),
+   * and `body { background: var(--dhun-background) }` is painted by an element
+   * *above* `#app`. Putting the attribute on `#app` therefore themed the chrome
+   * and left the page: choosing Light turned the app bar and the nav pale while
+   * the backdrop stayed dark, and the light-theme ink on it was unreadable —
+   * the meta line and the Shuffle button simply vanished. The root is also where
+   * `index.html` carries its pre-JavaScript default, so there is one place the
+   * attribute lives.
+   */
   function applyTheme() {
     const choice = settings.get("theme");
     const resolved =
@@ -1717,9 +1755,10 @@ export function boot({
           ? "light"
           : "dark"
         : choice;
-    root.dataset.dhunTheme = resolved;
-    root.dataset.dhunAccent = settings.get("accent");
-    root.dataset.dhunThemeChoice = choice;
+    const themeRoot = doc.documentElement ?? root;
+    themeRoot.dataset.dhunTheme = resolved;
+    themeRoot.dataset.dhunAccent = settings.get("accent");
+    themeRoot.dataset.dhunThemeChoice = choice;
   }
 
   function applyEqualizer() {
@@ -1738,7 +1777,7 @@ export function boot({
   /* --------------------------------------------------------- subscriptions */
 
   settings.subscribe?.((next) => {
-    root.dataset.dhunAccent = next.accent;
+    (doc.documentElement ?? root).dataset.dhunAccent = next.accent;
   });
 
   player.subscribe(() => {
