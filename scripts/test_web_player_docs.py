@@ -240,5 +240,31 @@ class RetiredNames(DocsCopyMixin, unittest.TestCase):
         self.assertTrue(any("PHASE-02" in problem for problem in problems), problems)
 
 
+class TheIndexListsEveryDocument(DocsCopyMixin, unittest.TestCase):
+    def test_a_document_missing_from_the_index_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        self.drop_every_line_with(root, "README.md", "](PLAYBACK.md)")
+        problems = docs.check(root)
+        self.assertTrue(any("does not index PLAYBACK.md" in problem for problem in problems), problems)
+
+    def test_a_link_to_a_renamed_document_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        self.edit(root, "README.md", "](USER-GUIDE.md)", "](GUIDE-FOR-VISITORS.md)")
+        problems = docs.check(root)
+        self.assertTrue(any("GUIDE-FOR-VISITORS.md" in problem for problem in problems), problems)
+
+    def test_a_new_document_nothing_checks_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        (root / "SCRATCH-NOTES.md").write_text("# Notes\n", encoding="utf-8")
+        problems = docs.check(root)
+        self.assertTrue(any("SCRATCH-NOTES.md" in problem for problem in problems), problems)
+
+    def test_a_deleted_new_document_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        (root / "RUNBOOK.md").unlink()
+        problems = docs.check(root)
+        self.assertTrue(any("missing document: docs/web-player/RUNBOOK.md" in problem for problem in problems), problems)
+
+
 if __name__ == "__main__":
     unittest.main()

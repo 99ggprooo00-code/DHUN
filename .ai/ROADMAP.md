@@ -1,5 +1,32 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/488bcaa0-dhun` — master-prompt foundation: baseline, source research, proposed provider ADR (2026-10-20)
+
+**Uploaded input:** `DHUN MASTER AGENT PROMPT.md` (1,320 lines). Its initial context was verified, not
+trusted; the differences are in `docs/research/02-baseline-audit-2026-10-20.md` §2.
+
+| # | Step | State |
+|---|---|---|
+| 1 | Baseline: `app-web` tests (155 pass), build (29 files), `scripts` unittest (459 OK), `check:docs` (OK), open PRs (#54), recent CI on `main` (green) | Done — run here |
+| 2 | Web documentation: the repo already has `docs/web-player/` (five CI-checked documents). Decision: extend it, do not create a parallel `.ai/web/` | Done — decision recorded in 02 §4 |
+| 3 | Source research: YouTube (`03`), Spotify (`04`), matrix, cost/privacy, cross-platform, risks (`05`) | Done — primary pages read, evidence-labelled |
+| 4 | ADR-010 multi-source direction | Owner decisions recorded (D1, D2, D4, D6 accepted; D3 deferred; D5 design only). **D2 wording is open — the owner's reply can be read two ways; asked for confirmation.** |
+| 5 | Implementation phases A–H | **Not started.** The policy blockers are now recorded decisions; no implementation phase is scheduled |
+| 6 | Web documentation parity with the native set: 15 new files in `docs/web-player/` (PRD, TRD, app flow, implementation plan, UI/UX, data schema, provider integration, playback, security/privacy, testing, release, runbook, research register, decisions, user guide); README parity table | Done — written from the code; the claims found on re-read were corrected |
+| 7 | Docs gate extended: `REQUIRED_FILES` lists all 20 documents; the README index must list each one and every local link must resolve; claims rule exempts only the app's own file round trip (named third-party imports stay forbidden) | Done — tests added (`test_web_player_docs.py`, `test_website_claims.py`) |
+| 8 | Defects found while documenting, not fixed in this session: `LIBRARY_LIMITS.snapshots` never enforced; `pwa.applyUpdate` not wired to a control; import ignores the export `version` field | Open — listed in `docs/web-player/IMPLEMENTATION-PLAN.md` §2 |
+
+**Highest-priority finding:** the YouTube API Services Developer Policies §III.I.14 and §III.I.07
+read literally prohibit the native audio path (ADR-001). No repository document previously
+cited these policies. This needs a written legal review before new YouTube audio work.
+
+**Spotify:** developer policy §III.5 prohibits integrating Spotify streams with other services'
+content, which conflicts with the multi-source goal. Development Mode needs a paid Premium owner.
+Research only; nothing built.
+
+**Not verified in this session:** live provider responses, the deployed `/app/` (no browser run),
+website Playwright suite, Android and Windows builds.
+
 ## Session `arena/38ac4712-dhun` — the web app's honesty gates, closed out (2026-10-16)
 
 Continues `arena/dda0fee4-dhun`, whose PR **#172** merged the rebuilt site and

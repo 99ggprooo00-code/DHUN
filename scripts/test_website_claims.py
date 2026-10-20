@@ -304,6 +304,29 @@ class BuiltOutput(unittest.TestCase):
         self.assertGreaterEqual(len(cited), 8, comments)
 
 
+class OwnFileRoundTripIsNotAnImport(unittest.TestCase):
+    """The rule against importing a library exists for third-party services.
+
+    The app's own export and import of a JSON file is a real feature and must
+    not be flagged; a named third-party import must still be.
+    """
+
+    def labels(self, text: str) -> list[str]:
+        return [label for label, _ in claims.forbidden_claims_in(text)]
+
+    def test_the_settings_import_of_an_exported_file_passes(self) -> None:
+        self.assertNotIn(
+            "library import",
+            self.labels("Settings → This browser → Import library accepts a file you exported."),
+        )
+
+    def test_a_named_third_party_import_is_still_a_finding(self) -> None:
+        self.assertIn("library import", self.labels("Import from Spotify is available."))
+
+    def test_an_unqualified_library_import_with_no_file_is_still_a_finding(self) -> None:
+        self.assertIn("library import", self.labels("You can import your library instantly."))
+
+
 if __name__ == "__main__":
     unittest.main()
 
