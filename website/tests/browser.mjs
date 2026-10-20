@@ -1694,6 +1694,53 @@ async function checkWebApp(browser) {
 }
 
 /**
+ * The app is installable and opens offline — measured, not claimed.
+ *
+ * `sw.js` and a manifest have shipped in this repository for months, and the
+ * app never registered the worker: `main.js` called `pwa.register?.()`, a
+ * method `createPwa` does not have. The file was in the build, the shell list
+ * named every entry, and the offline promise was a file with nothing pointing
+ * at it. This check is what makes that class of defect visible: it loads the
+ * app, waits for a registration, cuts the network, reloads, and reads what a
+ * visitor would see.
+ */
+async function checkWebAppOffline(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const page = await context.newPage();
+  const label = "/app/ offline";
+  await page.goto(url("/app/#/home"), { waitUntil: "load" });
+  const registered = await page
+    .evaluate(async () => {
+      if (!navigator.serviceWorker) return 0;
+      await Promise.race([navigator.serviceWorker.ready, new Promise((resolve) => setTimeout(resolve, 15000))]);
+      return (await navigator.serviceWorker.getRegistrations()).length;
+    })
+    .catch(() => 0);
+  if (!registered) {
+    fail(label, "the page registered no service worker, so the app cannot open without a network");
+    await page.close();
+    await context.close();
+    return;
+  }
+  await context.setOffline(true);
+  await page.reload({ waitUntil: "load" });
+  await page.waitForTimeout(1500);
+  const report = await page.evaluate(webAppReport);
+  if (!report.mounted) {
+    fail(label, "with the network off, the app did not render at all");
+  } else if (!report.source || !report.source.kind) {
+    fail(label, "with the network off, the app rendered but did not name what answered");
+  } else if (report.source.kind === "sample" && !report.sampleNotice?.visible) {
+    fail(label, "offline, the sample catalogue answered without saying it is a sample");
+  } else {
+    record(label, `${registered} registration(s); with the network off the app renders and says “${report.source.label}”`);
+  }
+  await context.setOffline(false);
+  await page.close();
+  await context.close();
+}
+
+/**
  * The detail screens have one heading, and it is the page's own.
  *
  * The Android screens draw the entity's name in the content — under the cover,
@@ -2387,6 +2434,7 @@ const CHECKS = [
   ["appearance", () => checkWebAppAppearance(browser)],
   ["entity outline", () => checkWebAppEntity(browser)],
   ["player deep link", () => checkWebAppDeepLink(browser)],
+  ["offline", () => checkWebAppOffline(browser)],
   ["local playlist", () => checkWebAppLibrary(browser)],
   ["/app/ contrast", () => checkWebAppContrast(browser)],
   ["/app/ axe", () => checkWebAppAxe(browser)],

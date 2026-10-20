@@ -820,10 +820,10 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
 
   function startPlayback(songs, index, context) {
     if (!songs.length) return;
+    // A sample row still reaches the player, because the player is where a
+    // refusal is explained in full (`missingStreamError`). It is not announced
+    // twice: the dock and the player already carry the reason.
     player.play(songs, Math.max(0, Math.min(index, songs.length - 1)), context);
-    if (songs[index]?.demo) {
-      showToast("Sample rows carry no audio — the catalogue is unreachable.", "warn");
-    }
   }
 
   const actions = {

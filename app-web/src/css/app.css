@@ -548,10 +548,21 @@ a {
   z-index: 2;
   display: flex;
   gap: var(--dhun-space-lg);
-  align-items: flex-end;
+  /* Centred, not bottom-aligned: with the cover taller than the text the text
+     used to hang at the card's bottom edge, leaving the top-right empty. */
+  align-items: center;
   padding: var(--dhun-space-lg);
 }
 
+/*
+ * On a phone the hero stacks.
+ *
+ * Side by side, a 140px cover left the title a column about 170px wide: an
+ * album name broke over three lines, "5 songs" over two, and the two actions
+ * sat one above the other in a corner. Stacked, the cover keeps a square
+ * above the title and everything else has the card's full width. The row
+ * returns at 600px, where there is room for it.
+ */
 /* The feature hero sits at the top of Home on a phone, where a 200px cover
    beside the title leaves the title 130px wide. The cover steps down and the
    text keeps the room; the full size returns as soon as there is width for it. */
@@ -597,6 +608,29 @@ a {
     height: var(--dhun-space-artwork-large);
   }
 }
+
+@media (max-width: 599px) {
+  .dhun-hero__inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--dhun-space-md);
+  }
+
+  /* The art keeps a square above the text. It has to come after the base
+     sizes above: a media query adds no specificity, and an earlier rule would
+     simply lose to the later `.dhun-hero--feature .dhun-hero__art`. */
+  .dhun-hero__art,
+  .dhun-hero--feature .dhun-hero__art {
+    width: min(52%, var(--dhun-space-artwork-playlist));
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  .dhun-hero--feature .dhun-hero__title {
+    font: var(--dhun-text-headline-small);
+  }
+}
+
 
 .dhun-hero__art {
   flex: none;
@@ -1663,22 +1697,10 @@ a {
   flex-direction: column;
   gap: var(--dhun-space-xs);
   width: var(--dhun-space-navigation-rail-width);
-  padding: var(--dhun-space-lg) var(--dhun-space-sm);
-}
-
-/* An item is as wide as the rail. Sizing it by its longest label would move the
-   content column when a translation changes, or push a scrollbar onto the page;
-   the label wraps instead. Measured 2026-10-16 in the browser job, when a 90px
-   item sat inside a 79px rail. */
-.dhun-rail-nav__item {
-  width: 100%;
-  min-width: 0;
-}
-
-.dhun-rail-nav__label {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  text-align: start;
+  /* The item is a column inside an 88px rail; every horizontal pixel the nav
+     and the item spend on padding is a pixel the label cannot use, and at 11px
+     "Settings" needs about 52 of them. */
+  padding: var(--dhun-space-lg) var(--dhun-space-xs);
 }
 
 /*
@@ -1699,20 +1721,45 @@ a {
   color: var(--dhun-accent);
   font: var(--dhun-text-label-small);
   letter-spacing: var(--dhun-tracking-brand);
+  text-transform: uppercase;
 }
 
+/*
+ * A rail item is a column, not a row.
+ *
+ * Side by side, the 22px icon left about 30px for the label inside an 88px
+ * rail, and `overflow-wrap: anywhere` then broke every word into two- and
+ * three-letter fragments — measured on the desktop shell as "Ho me",
+ * "Se arc h", "Lib rar y", "Set tin gs". Stacked, and with the label allowed to
+ * sit on one line, each destination reads as one word.
+ *
+ * The item is as wide as the rail: sizing it by its longest label would move
+ * the content column when a translation changes, or push a scrollbar onto the
+ * page.
+ */
 .dhun-rail-nav__item {
   display: flex;
-  align-items: center;
-  gap: var(--dhun-space-md);
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--dhun-space-xs);
+  width: 100%;
+  min-width: 0;
   min-height: var(--dhun-space-touch-target);
-  padding: 0 var(--dhun-space-md);
+  padding: var(--dhun-space-sm) var(--dhun-space-xs);
   border: 0;
-  border-radius: var(--dhun-shape-full);
+  border-radius: var(--dhun-shape-card);
   background: none;
   color: var(--dhun-text-secondary);
-  font: var(--dhun-text-label-large);
+  font: var(--dhun-text-label-small);
+  text-align: center;
   text-decoration: none;
+}
+
+.dhun-rail-nav__label {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dhun-rail-nav__item:hover {
@@ -2233,7 +2280,8 @@ a {
     bottom: var(--dhun-space-xxl);
   }
 
-  .dhun-hero__art {
+  .dhun-hero__art,
+  .dhun-hero--feature .dhun-hero__art {
     width: var(--dhun-space-artwork-album);
     height: var(--dhun-space-artwork-album);
   }
