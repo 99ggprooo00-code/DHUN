@@ -23,7 +23,7 @@ Run from the repository root unless noted.
 The counts printed by these commands are the source of truth. The docs gate
 reads the number of `test(` declarations in `app-web/tests/*.test.mjs` and fails
 if a document states a different number for the browser suite. At the time of
-writing that number is **155** (`app-web/tests/`, fifteen files including the
+writing that number is **160** (`app-web/tests/`, fifteen files including the
 helpers folder).
 
 ## 2. The browser-app suite
@@ -90,9 +90,8 @@ scripts start it. A change to the Android or desktop code does not.
 - **The community catalogue.** The tests use fixtures. The live service is not
   called by the suite. A live check is a manual step, recorded in
   [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) when done.
-- **Long-running storage.** The suite does not fill the browser's storage quota or
-  reach the snapshot cap, which is not enforced (see
-  [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) WD-1).
+- **Storage at scale.** The suite does not fill the browser's storage quota. Snapshot
+  pruning is tested on small libraries (`library.test.mjs`).
 - **Legal text.** The tests check that tokens are substituted. They do not check
   the law, and no legal review has been done.
 

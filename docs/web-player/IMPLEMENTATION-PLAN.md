@@ -23,38 +23,37 @@ product changes, and a test before it is called done.
 | Legal texts | `app-web/src/js/data/web-legal.js`, `legal.js` | About, privacy, terms, licences, support. |
 | Build and checks | `app-web/tools/build.mjs`, `scripts/web_player_docs.py` | See [TESTING.md](TESTING.md). |
 
-## 2. Known defects (found while writing these documents)
+## 2. Defects found while documenting, and what was done
 
-Each defect below was confirmed by reading the code. None has a test yet that
-would have caught it.
+Each was confirmed in the code and reproduced by a test before the fix.
 
-| ID | Defect | Effect on a visitor | Evidence |
-|---|---|---|---|
-| WD-1 | `LIBRARY_LIMITS.snapshots` (2,500) is declared and **never enforced**. | Snapshots grow with every like, history entry and playlist addition. Storage can fill, and then saves stop (see DATA-SCHEMA §1). | `app-web/src/js/library.js`: the constant is defined at line 30 and not read anywhere else. |
-| WD-2 | `applyUpdate()` in `pwa.js` is exported but **no control calls it**. | A new version is announced, but the only way to use it is to close every DHUN tab. | `app-web/src/js/pwa.js` (definition and export); `main.js` (the notice). |
-| WD-3 | Import does **not check the `version` field**. | A future format would be read as if it were version 3. | `app-web/src/js/transfer.js` checks `app` only. |
+| ID | Defect | Resolution |
+|---|---|---|
+| WD-1 | `LIBRARY_LIMITS.snapshots` (2,500) was declared and never enforced; snapshots of unliked tracks and aged-out history stayed in storage for good. | **Fixed.** `pruneSnapshots` keeps only rows that a like, history entry or playlist refers to, on save and on read. The unenforced constant was removed. Tests: `library.test.mjs`. |
+| WD-2 | `pwa.applyUpdate()` existed with no control calling it; the notice tells the visitor to close and reopen. | **Decided, not wired.** A reload-now control would stop playback, and the queue is in memory. The dead functions (`applyUpdate`, `checkForUpdate`) and the waiting-worker field were removed. The update still applies when every DHUN tab is closed. |
+| WD-3 | Import did not check the export `version` field. | **Fixed.** Only format version 3 is read; others are refused with the version named. Tests: `transfer.test.mjs`. |
+
+Still open, found while checking the above:
+
+- The worst case for the library is still larger than the browser's storage quota
+  (200 playlists of 1,000 tracks each, plus likes and history). When a save fails,
+  the Library screen says nothing is being saved; the library is not split or shrunk. Recorded, not
+  scheduled.
 
 ## 3. Proposed next (not scheduled)
 
 Ordered by what each depends on.
 
-1. **WD-1: enforce the snapshot cap.** Prune snapshots that no list refers to,
-   then the oldest ones. Add a test that fills a library past the cap. Depends on
-   nothing.
-2. **WD-3: check the export version on import.** Refuse a version the build does
-   not know, with the reason. Add a test. Depends on nothing.
-3. **WD-2: decide the update experience.** Either wire `applyUpdate` to a visible
-   "Reload to update" action, or remove the dead function and keep the notice.
-   This changes what the visitor sees, so it needs the owner's decision.
-4. **A human audio check on the deployed origin**, written into
+1. **A human audio check on the deployed origin**, written into
    IMPLEMENTATION-STATUS.md with a date and the browser used. This cannot be done
    by the repository alone.
-5. **Browser coverage beyond Chromium.** The CI browser job uses one engine. Adding
+2. **Browser coverage beyond Chromium.** The CI browser job uses one engine. Adding
    Firefox or WebKit runs needs the browser binaries that the pinned tooling
    installs; cost is zero, but the run time and flake risk need measuring first.
-6. **A web UX audit document** (the web counterpart of `docs/ux-audit.md`). It
+3. **A web UX audit document** (the web counterpart of `docs/ux-audit.md`). It
    should be written from a recorded browser run, not from memory.
 
+## 4. Not planned in the browser build
 ## 4. Not planned in the browser build
 
 - YouTube or YouTube Music playback in the browser (owner decision D2,

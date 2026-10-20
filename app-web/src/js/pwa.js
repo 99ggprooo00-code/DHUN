@@ -12,8 +12,9 @@
  *      button, not fired automatically: an install prompt that appears unbidden
  *      is the reason people distrust install prompts.
  *   3. **It updates without losing your music.** A new service worker waits
- *      until the visitor says so; "Reload to update" appears as a bar, and the
- *      click that accepts it is a click the visitor chose.
+ *      and takes over when every DHUN tab is closed. The page shows a toast
+ *      asking the visitor to close and reopen; nothing reloads the page, because
+ *      a reload would stop playback.
  *
  * When any of this is unavailable the module reports which part failed in
  * `state`; `main.js` turns that into one sentence on screen rather than a
@@ -36,7 +37,6 @@ export function createPwa({
   scope = "./",
 } = {}) {
   let registration = null;
-  let waitingWorker = null;
   let deferredPrompt = null;
   let state = {
     sw: navigator?.serviceWorker ? SW_STATE.REGISTERING : SW_STATE.UNSUPPORTED,
@@ -61,7 +61,6 @@ export function createPwa({
     try {
       registration = await navigator.serviceWorker.register(swUrl, { scope });
       if (registration.waiting) {
-        waitingWorker = registration.waiting;
         emit({ sw: SW_STATE.UPDATE_READY, updateReady: true });
       } else {
         emit({ sw: SW_STATE.READY, offlineReady: true });
@@ -71,9 +70,8 @@ export function createPwa({
         if (!installing) return;
         installing.addEventListener("statechange", () => {
           // `installed` with a controller already present means an update, not a
-          // first install: offer the reload instead of swapping under the user.
+          // first install: show the notice instead of swapping under the user.
           if (installing.state === "installed" && navigator.serviceWorker.controller) {
-            waitingWorker = installing;
             emit({ sw: SW_STATE.UPDATE_READY, updateReady: true });
           }
         });
@@ -82,21 +80,6 @@ export function createPwa({
     } catch (error) {
       emit({ sw: SW_STATE.FAILED, error: error?.message ?? "the service worker could not be registered" });
       return null;
-    }
-  }
-
-  /** Apply a waiting service worker: the page reloads once, on purpose. */
-  function applyUpdate() {
-    if (!waitingWorker) return false;
-    try {
-      waitingWorker.postMessage({ type: "skip-waiting" });
-      waitingWorker = null;
-      emit({ updateReady: false, sw: SW_STATE.READY });
-      win.location?.reload?.();
-      return true;
-    } catch (error) {
-      emit({ error: error?.message ?? "the update could not be applied" });
-      return false;
     }
   }
 
@@ -140,16 +123,6 @@ export function createPwa({
         deferredPrompt = null;
         emit({ installable: false });
         return choice?.outcome === "accepted";
-      } catch {
-        return false;
-      }
-    },
-    applyUpdate,
-    /** Force the worker to check for a new version — the Settings row. */
-    checkForUpdate() {
-      try {
-        registration?.update?.();
-        return true;
       } catch {
         return false;
       }

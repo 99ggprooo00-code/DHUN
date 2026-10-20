@@ -1,3 +1,5 @@
+import { FORMAT_VERSION } from "./library.js";
+
 /**
  * Importing a library file.
  *
@@ -17,5 +19,12 @@ export async function handleFileImport(file, storage) {
     throw new Error("the file is not JSON");
   }
   if (parsed?.app !== "DHUN web") throw new Error("the file was not exported by this app");
+  // Only the format this build writes is read. A file from another format is
+  // refused rather than guessed at: the shape could have changed underneath it.
+  if (parsed?.version !== FORMAT_VERSION) {
+    throw new Error(
+      `the file is format version ${parsed?.version ?? "unknown"}; this app reads version ${FORMAT_VERSION}`,
+    );
+  }
   return storage.importAll(text);
 }

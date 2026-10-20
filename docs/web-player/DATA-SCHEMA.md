@@ -44,7 +44,9 @@ browser reports a full store in the same way is not verified.
 - `snapshots` holds one **copy of each track's display fields** (title, artwork
   reference, artists, album, duration and similar), keyed by song id. Playlists,
   likes and history draw their rows from snapshots, so they still show when the
-  catalogue cannot be reached. A snapshot is written when a track is liked, added
+  catalogue cannot be reached. A snapshot is kept only while a like, a history entry
+  or a playlist refers to its track; it is removed on save and on read otherwise.
+  A snapshot is written when a track is liked, added
   to a playlist, or played.
 - Playlists store track ids and look the rows up in `snapshots`.
 - `settings` holds only the values the interface can honour. Unknown values fall
@@ -80,7 +82,7 @@ These are enforced when a list is written. Each limit is in
 | Playlists | 200 | The oldest playlist (last in the list) is dropped. |
 | Tracks per playlist | 1,000 | The newest added track is not kept. |
 | Recent searches | 10 | The oldest search is dropped. |
-| Snapshots | 2,500 (declared as `LIBRARY_LIMITS.snapshots`) | **Not enforced.** No code reads this constant. Snapshots grow with every like, history entry and playlist addition. Recorded as a defect in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md). |
+| Snapshots | None of their own | Snapshots exist only for ids the likes, history or playlists refer to, so the total is bounded by the limits above. Unreferenced snapshots are removed (`pruneSnapshots`). |
 
 Dropping is silent: nothing tells the visitor that the oldest entry went.
 [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md) lists it as a limit a visitor can
@@ -121,9 +123,9 @@ uploaded.
 4. The document is normalised (§5) and **replaces** the library on this device,
    then is saved.
 
-The `version` field is written but not checked on import. A future format change
-would need a version check added here before it ships. This is recorded in
-[IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+The file's `version` must be `3` (`FORMAT_VERSION`). Any other version, or none, is
+refused with the version named, and the library is not touched. A future format
+needs its own reader before its files can be imported.
 
 ## 7. What is not stored
 

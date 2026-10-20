@@ -188,8 +188,9 @@ and expires, and a stale home feed presented as current is worse than an honest
 
 The shell list is explicit and `tools/build.mjs` checks it against the real build
 output, so a module that is not listed fails the build rather than making a
-half-working offline app. A new worker installs and waits; the page offers
-"Reload to update" and the `skip-waiting` message applies it. The cache name
+half-working offline app. A new worker installs and waits; the page shows a
+notice to close and reopen DHUN, and the worker takes over when no DHUN tab is
+open. There is no reload-now control (see IMPLEMENTATION-PLAN §2). The cache name
 carries the app version, so an old cache is deleted rather than accumulated.
 
 ## Styling

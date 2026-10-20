@@ -19,8 +19,10 @@
  *   - shell requests: cache-first, with a background revalidate on navigation;
  *   - everything else: the network, untouched.
  *
- * Updates never swap under the visitor. A new worker installs, waits, and the
- * page offers "Reload to update"; the `skip-waiting` message is what applies it.
+ * Updates never swap under the visitor. A new worker installs and waits; the
+ * page asks the visitor to close and reopen DHUN, and the worker takes over when
+ * no DHUN tab is open. The `skip-waiting` message can still force it; the app
+ * does not send it, because a reload would stop playback.
  * The cache name carries the app version, and `version` messages move it, so an
  * old cache is deleted rather than accumulating.
  */

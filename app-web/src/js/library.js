@@ -21,14 +21,22 @@
  */
 
 export const STORAGE_KEY = "dhun.web.v3";
+/** The export file's format. An import reads only this version (see transfer.js). */
+export const FORMAT_VERSION = 3;
 export const LIBRARY_LIMITS = Object.freeze({
   likes: 2000,
   history: 200,
   playlists: 200,
   playlistTracks: 1000,
   recentSearches: 10,
-  snapshots: 2500,
 });
+
+/*
+ * There is no limit on track snapshots because none is needed: a snapshot exists
+ * only while a like, a history entry or a playlist refers to its id, and
+ * `pruneSnapshots` removes the rest on every save and every read. The total is
+ * therefore bounded by the limits above.
+ */
 
 /**
  * The settings this build can honour.
@@ -94,6 +102,24 @@ export function snapshot(song) {
     explicit: Boolean(song.explicit),
     kind: "song",
   };
+}
+
+/**
+ * Keep only the track snapshots that a like, a history entry or a playlist still
+ * refers to. Without this, unliking a track or letting it age out of history left
+ * its row in storage for good.
+ */
+export function pruneSnapshots(library) {
+  const referenced = new Set([
+    ...library.likes,
+    ...library.history.map((entry) => entry.id),
+    ...library.playlists.flatMap((playlist) => playlist.trackIds),
+  ]);
+  const snapshots = {};
+  for (const [id, song] of Object.entries(library.snapshots ?? {})) {
+    if (referenced.has(id)) snapshots[id] = song;
+  }
+  return { ...library, snapshots };
 }
 
 /**
@@ -170,7 +196,7 @@ export function normaliseLibrary(raw) {
     .filter(Boolean)
     .slice(0, LIBRARY_LIMITS.recentSearches);
 
-  return { likes, playlists, history, snapshots, recentSearches, settings };
+  return pruneSnapshots({ likes, playlists, history, snapshots, recentSearches, settings });
 }
 
 /* ------------------------------------------------------------- operations -- */
@@ -318,10 +344,11 @@ export function createStorage(backing = globalThis.localStorage, key = STORAGE_K
       return memory;
     },
     save(library) {
-      memory = library;
+      const kept = pruneSnapshots(library);
+      memory = kept;
       if (!persistent) return false;
       try {
-        backing.setItem(key, JSON.stringify(library));
+        backing.setItem(key, JSON.stringify(kept));
         return true;
       } catch {
         // Quota: keep working in memory and stop claiming persistence.
@@ -331,7 +358,7 @@ export function createStorage(backing = globalThis.localStorage, key = STORAGE_K
     },
     /** A file the visitor can keep; the app never uploads it. */
     exportAll(library) {
-      return JSON.stringify({ app: "DHUN web", version: 3, exportedAt: new Date().toISOString(), ...library }, null, 2);
+      return JSON.stringify({ app: "DHUN web", version: FORMAT_VERSION, exportedAt: new Date().toISOString(), ...library }, null, 2);
     },
     importAll(text) {
       const parsed = JSON.parse(text);

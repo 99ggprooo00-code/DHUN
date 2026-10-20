@@ -155,16 +155,16 @@ class SuiteSize(DocsCopyMixin, unittest.TestCase):
 
     def test_a_stale_suite_size_is_a_finding(self) -> None:
         root = self.copy_docs()
-        self.edit(root, "IMPLEMENTATION-STATUS.md", "155 assertions", "9 assertions")
+        self.edit(root, "IMPLEMENTATION-STATUS.md", "160 assertions", "9 assertions")
         problems = docs.check(root)
         self.assertTrue(
-            any("9 assertions" in problem and "155 test(s)" in problem for problem in problems),
+            any("9 assertions" in problem and "160 test(s)" in problem for problem in problems),
             problems,
         )
 
     def test_the_python_suite_count_is_not_judged_as_javascript(self) -> None:
         root = self.copy_docs()
-        self.edit(root, "IMPLEMENTATION-STATUS.md", "459 tests OK", "1 tests OK")
+        self.edit(root, "IMPLEMENTATION-STATUS.md", "466 tests OK", "1 tests OK")
         self.assertEqual(docs.check(root), [], "the Python suite has its own count")
 
 

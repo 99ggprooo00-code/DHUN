@@ -30,6 +30,9 @@ improve the product.
 |---|---|
 | 2026-10-20 | Added the web product requirements, technical requirements, app flow, implementation plan, UI/UX design, data schema, provider integration, playback, security and privacy, testing, release and deployment, runbook, research register, this decision and change record, a user guide, and the README parity table. |
 | 2026-10-20 | Extended `scripts/web_player_docs.py` so that every new file must exist, and so that the README index lists every document. Tests for both rules are in `scripts/test_web_player_docs.py`. |
+| 2026-10-21 | **WD-2 decision:** no reload-now control. A reload stops playback, and the queue lives in memory. The waiting worker takes over when every DHUN tab is closed; the notice says so. Dead update functions (`applyUpdate`, `checkForUpdate`) and the waiting-worker field were removed. | Accepted (engineering). | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) §2 |
+| 2026-10-21 | **WD-1 fixed:** unreferenced track snapshots are pruned on save and read; the never-enforced `snapshots` limit was removed. | Done. | `library.js` (`pruneSnapshots`) |
+| 2026-10-21 | **WD-3 fixed:** an import is refused unless its format version is 3. | Done. | `transfer.js` (`FORMAT_VERSION`) |
 | 2026-10-20 | Recorded four defects found while writing the documents, in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) §2 (WD-1 to WD-3). No code was changed for them. |
 
 ## 3. What is not recorded here
