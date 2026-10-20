@@ -22,6 +22,33 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The catalogue answered, and the browser refused its pictures (2026-10-20, session `arena/a9390ecb-dhun`)
+
+The three-instance build deployed, the CI runner reached a catalogue — real rows,
+real covers — and the browser job went **red for a real reason**: every artist
+row carried JioSaavn's own generic art, `www.jiosaavn.com/_i/3.0/artist-default-*.png`,
+which `img-src 'self' data: https://*.saavncdn.com` refuses. That is one blocked
+request per artist row and a console full of CSP violations, invisible to a build
+whose sandbox cannot reach the API.
+
+- **A cover is only a cover if the page may fetch it.** `cdnImage()` in `api.js`
+  drops any image URL outside `*.saavncdn.com` at normalisation, so the drawn
+  initial renders instead: no third-party request, no console noise, and the
+  policy is not widened for a placeholder. `scripts/test_app_web.py` now reads
+  the `img-src` allowlist and fails if the policy and the filter disagree.
+- **The per-host state on Settings was 3.72:1 in the light theme** at 12px/600
+  (floor 4.5:1). It uses secondary ink now — roughly 7:1 on the same backdrop —
+  and the rerun passes contrast in both themes.
+- **The web documents said 153 tests for two rounds**, while the suite held 154
+  and then 155. `web_player_docs.py` now counts `test(` in `app-web/tests/*.test.mjs`
+  and fails any line about `npm test` whose number disagrees; the two documents
+  were corrected to **155**, and the Python suite's stated count to **459**.
+
+Verified: `npm test` **155 pass / 0 fail**, the Python suite **459 OK**,
+`scripts/web_player_docs.py` OK, `scripts/website_claims.py` OK on 4 pages,
+and the CI browser run green on the rerun — including the contrast, axe,
+keyboard and viewport measurements that caught the first two problems.
+
 ### The catalogue has three instances, so one host going down is no longer the whole app (2026-10-20, session `arena/a9390ecb-dhun`)
 
 The deployed page said **“The JioSaavn API could not be reached from this

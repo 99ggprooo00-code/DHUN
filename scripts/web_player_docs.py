@@ -46,6 +46,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_DIR = REPO_ROOT / "docs" / "web-player"
 
 MODULE_DIR = REPO_ROOT / "app-web" / "src" / "js"
+TEST_DIR = REPO_ROOT / "app-web" / "tests"
 
 REQUIRED_FILES = (
     "README.md",
@@ -93,6 +94,12 @@ NEGATIONS = (
 # A path cited as evidence: a backticked token that looks like a repository path.
 _PATH_SPAN = re.compile(r"`([^`\s]+)`")
 _TABLE_ROW = re.compile(r"^\|(?!\s*-)[^|]+\|.+\|\s*$", re.M)
+
+# A sentence about the JavaScript suite: the number it states has to be the
+# number of tests that exist. The Python suite is described in the same pages
+# with its own count, so only lines that name the browser suite are judged.
+_SUITE_MARKERS = ("npm test", "app-web/tests", "pure modules")
+_COUNT_CLAIM = re.compile(r"\b(\d+)\s+(assertions?|tests?|pass)\b")
 
 
 def _read(root: pathlib.Path, name: str) -> str:
@@ -219,6 +226,44 @@ def retired_name_problems(root: pathlib.Path) -> list[str]:
     return problems
 
 
+def declared_test_count() -> int:
+    """Top-level `test(` declarations in the browser suite.
+
+    Every test in `app-web/tests/` is a literal `test(...)` call, so this is the
+    same number `node --test` prints. It is read from the files rather than
+    remembered in prose: the documents said 153 for two rounds after the suite
+    had grown, and nothing failed.
+    """
+    return sum(
+        len(re.findall(r"(?m)^test\(", path.read_text(encoding="utf-8")))
+        for path in sorted(TEST_DIR.glob("*.test.mjs"))
+    )
+
+
+def count_problems(root: pathlib.Path) -> list[str]:
+    """Every stated size of the browser suite is the size of the suite."""
+    count = declared_test_count()
+    if not count:
+        return [f"no tests found under {TEST_DIR.relative_to(REPO_ROOT)}"]
+    documents = [(name, _read(root, name)) for name in REQUIRED_FILES]
+    readme = REPO_ROOT / "app-web" / "README.md"
+    if readme.is_file():
+        documents.append(("app-web/README.md", readme.read_text(encoding="utf-8")))
+    problems: list[str] = []
+    for name, text in documents:
+        for number, line in enumerate(text.splitlines(), start=1):
+            if not any(marker in line for marker in _SUITE_MARKERS):
+                continue
+            for match in _COUNT_CLAIM.finditer(line):
+                claimed = int(match.group(1))
+                if claimed != count:
+                    problems.append(
+                        f"{name}:{number}: says {match.group(0)!r}, but "
+                        f"{TEST_DIR.relative_to(REPO_ROOT)} holds {count} test(s)"
+                    )
+    return problems
+
+
 def claim_problems(root: pathlib.Path) -> list[str]:
     problems: list[str] = []
     for name in REQUIRED_FILES:
@@ -236,6 +281,7 @@ def check(root: pathlib.Path = DEFAULT_DIR) -> list[str]:
         presence_problems(root)
         + module_problems(root)
         + evidence_problems(root)
+        + count_problems(root)
         + retired_name_problems(root)
         + claim_problems(root)
     )
@@ -254,7 +300,8 @@ def main(argv: list[str]) -> int:
     print(
         f"OK: {len(REQUIRED_FILES)} web-player document(s) describe the build that "
         "exists: the module map matches app-web/src/js, every evidence path "
-        "resolves, no retired name survives, and no claim outruns the repository."
+        f"resolves, every stated suite size is the {declared_test_count()} tests "
+        "that exist, no retired name survives, and no claim outruns the repository."
     )
     return 0
 

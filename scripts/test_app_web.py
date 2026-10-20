@@ -261,6 +261,43 @@ class IsARealWebAppNotAPreview(unittest.TestCase):
             "frame-ancestors cannot be delivered from a meta tag — enforce it in the app",
         )
 
+    def test_every_cover_comes_from_a_host_img_src_allows(self) -> None:
+        """The page must not ask for an image the policy will refuse.
+
+        The catalogue answers with JioSaavn's own generic artist art
+        (`https://www.jiosaavn.com/_i/3.0/artist-default-music.png`), which is
+        not a cover and is not on `*.saavncdn.com`. Putting it in an `<img>`
+        produced one blocked request per artist row and a console full of CSP
+        violations, which the browser job reported on the first deploy of this
+        build (website run 39376581609, 2026-10-20). `cdnImage()` drops it in
+        normalisation, so the drawn initial renders instead. This test keeps
+        the two halves — the policy and the allowlist — from drifting apart:
+        widening `img-src` without teaching `cdnImage`, or the reverse, fails.
+        """
+        policy = re.search(r"img-src ([^;]*)", self.index_html)
+        self.assertIsNotNone(policy, "index.html declares no img-src")
+        allowed = re.findall(r"https://([a-z0-9*.-]+)", policy.group(1))
+        self.assertIn("*.saavncdn.com", allowed, "the CDN the catalogue serves covers from is not allowed")
+
+        api = _read(JS_DIR / "api.js")
+        self.assertIn("export function cdnImage(", api, "api.js has no image allowlist")
+        pattern = re.search(r"const IMAGE_URL = /(.+)/i;", api)
+        self.assertIsNotNone(pattern, "the image allowlist is not a single, testable pattern")
+        for host in allowed:
+            suffix = re.escape(host.removeprefix("*."))
+            self.assertIn(
+                suffix,
+                pattern.group(1),
+                f"{host} is in img-src but cdnImage would drop or admit it differently",
+            )
+        # Every cover the normalisers emit goes through the gate. A raw
+        # `pickImage()` would put the URL in the page unfiltered.
+        self.assertNotIn(
+            "image: pickImage(",
+            api,
+            "a normaliser bypasses cdnImage — the browser would refuse that request",
+        )
+
     def test_framing_is_refused_in_javascript(self) -> None:
         """`frame-ancestors` cannot be sent here, so the app enforces the rule.
 

@@ -145,6 +145,29 @@ class EvidenceResolves(DocsCopyMixin, unittest.TestCase):
         self.assertTrue(any("fewer than five rows" in problem for problem in problems), problems)
 
 
+class SuiteSize(DocsCopyMixin, unittest.TestCase):
+    """The documents said 153 for two rounds after the suite had grown to 155.
+
+    Nothing failed, because every rule read the prose as prose. The number is
+    now counted from `app-web/tests/*.test.mjs`, so a document that lags the
+    suite is a red build rather than a sentence nobody re-reads.
+    """
+
+    def test_a_stale_suite_size_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        self.edit(root, "IMPLEMENTATION-STATUS.md", "155 assertions", "9 assertions")
+        problems = docs.check(root)
+        self.assertTrue(
+            any("9 assertions" in problem and "155 test(s)" in problem for problem in problems),
+            problems,
+        )
+
+    def test_the_python_suite_count_is_not_judged_as_javascript(self) -> None:
+        root = self.copy_docs()
+        self.edit(root, "IMPLEMENTATION-STATUS.md", "459 tests OK", "1 tests OK")
+        self.assertEqual(docs.check(root), [], "the Python suite has its own count")
+
+
 class Honesty(DocsCopyMixin, unittest.TestCase):
     def test_removing_the_unverified_section_is_a_finding(self) -> None:
         root = self.copy_docs()

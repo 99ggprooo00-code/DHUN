@@ -345,6 +345,27 @@ export function pickImage(image, preferred = 500) {
 }
 
 /**
+ * A cover the page is allowed to fetch.
+ *
+ * `img-src` is `'self' data: https://*.saavncdn.com`, and the catalogue also
+ * hands back JioSaavn's own generic artist art from
+ * `www.jiosaavn.com/_i/3.0/artist-default-*.png`. Those are not covers:
+ * they are the platform's placeholder, and putting them in an `<img>` cost one
+ * blocked request per artist row and filled the console with CSP violations
+ * (browser job of website run 39376581609, 2026-10-20). A dropped URL renders
+ * the drawn initial instead — on brand, no third-party request, and the policy
+ * stays as narrow as it was written.
+ *
+ * Keeping the test here rather than widening the policy also means a future
+ * image host has to be admitted deliberately, in both places, with the
+ * `scripts/test_app_web.py` gate noticing if only one of them changes.
+ */
+const IMAGE_URL = /^https:\/\/(?:[a-z0-9-]+\.)*saavncdn\.com\//i;
+export function cdnImage(url) {
+  return IMAGE_URL.test(url) ? url : "";
+}
+
+/**
  * The stream, preferring 320 kbps and falling back down the ladder.
  *
  * `downloadUrl` is the API's name for "the audio files". A row with no entry is
@@ -402,7 +423,7 @@ export function normaliseSong(raw) {
     ? raw.artists
     : (raw.artists?.all ?? raw.artists?.primary ?? []);
   const artistList = creditSource
-    .map((artist) => ({ id: plainText(artist?.id), name: plainText(artist?.name), image: pickImage(artist?.image, 150) }))
+    .map((artist) => ({ id: plainText(artist?.id), name: plainText(artist?.name), image: cdnImage(pickImage(artist?.image, 150)) }))
     .filter((artist) => artist.name);
   return {
     kind: "song",
@@ -418,8 +439,8 @@ export function normaliseSong(raw) {
     year: plainText(raw.year ?? ""),
     language: plainText(raw.language ?? ""),
     duration: Number(raw.duration ?? 0) || 0,
-    image: pickImage(raw.image, 500),
-    imageSmall: pickImage(raw.image, 150),
+    image: cdnImage(pickImage(raw.image, 500)),
+    imageSmall: cdnImage(pickImage(raw.image, 150)),
     stream: stream.url,
     streamQuality: stream.quality,
     hasLyrics: Boolean(raw.hasLyrics),
@@ -440,13 +461,13 @@ export function normaliseAlbum(raw) {
     artists: (raw.artists?.all ?? raw.artists?.primary ?? []).map((artist) => ({
       id: plainText(artist?.id),
       name: plainText(artist?.name),
-      image: pickImage(artist?.image, 150),
+      image: cdnImage(pickImage(artist?.image, 150)),
     })).filter((artist) => artist.name),
     year: plainText(raw.year ?? ""),
     language: plainText(raw.language ?? ""),
     songCount: Number(raw.songCount ?? songs.length) || songs.length,
     duration: songs.reduce((total, song) => total + (song.duration || 0), 0),
-    image: pickImage(raw.image, 500),
+    image: cdnImage(pickImage(raw.image, 500)),
     songs,
     url: plainText(raw.url ?? ""),
   };
@@ -458,8 +479,8 @@ export function normaliseArtist(raw) {
     kind: "artist",
     id: String(raw.id),
     title: plainText(raw.name ?? "Unknown artist"),
-    image: pickImage(raw.image, 500),
-    imageSmall: pickImage(raw.image, 150),
+    image: cdnImage(pickImage(raw.image, 500)),
+    imageSmall: cdnImage(pickImage(raw.image, 150)),
     description: plainText(raw.description ?? ""),
     followerCount: Number(raw.followerCount ?? raw.fanCount ?? 0) || 0,
     verified: Boolean(raw.isVerified),
@@ -482,7 +503,7 @@ export function normalisePlaylist(raw) {
     language: plainText(raw.language ?? ""),
     songCount: Number(raw.songCount ?? songs.length) || songs.length,
     duration: songs.reduce((total, song) => total + (song.duration || 0), 0),
-    image: pickImage(raw.image, 500),
+    image: cdnImage(pickImage(raw.image, 500)),
     songs,
     url: plainText(raw.url ?? ""),
   };

@@ -19,6 +19,7 @@ import {
   FAILURE_KIND,
   SourceError,
   artistNames,
+  cdnImage,
   createSource,
   describeAttempts,
   describeFailure,
@@ -129,6 +130,27 @@ test("images pick the closest quality to what the layout needs", () => {
   assert.equal(urlOf("https://x/y.jpg"), "https://x/y.jpg");
   assert.equal(urlOf({ link: "https://x/z.jpg" }), "https://x/z.jpg", "the older field name is still read");
   assert.equal(urlOf(undefined), "");
+});
+
+test("a cover the policy would block never reaches the page", () => {
+  // `img-src` is `'self' data: https://*.saavncdn.com`. JioSaavn also serves its
+  // own generic artist art from www.jiosaavn.com, which the browser refused one
+  // request at a time (website run 39376581609). The rule lives here so no
+  // screen has to remember the policy.
+  assert.equal(cdnImage("https://c1.saavncdn.com/123/cover-500x500.jpg"), "https://c1.saavncdn.com/123/cover-500x500.jpg");
+  assert.equal(cdnImage("https://a.b.saavncdn.com/x.jpg"), "https://a.b.saavncdn.com/x.jpg", "subdomains of the CDN are the same host family");
+  assert.equal(cdnImage("https://www.jiosaavn.com/_i/3.0/artist-default-music.png"), "",
+    "the platform's placeholder art is not a cover");
+  assert.equal(cdnImage("data:image/png;base64,AAA"), "", "the allowlist is the CDN, not any inline image");
+  assert.equal(cdnImage(""), "");
+
+  const artist = normaliseArtist({
+    id: "ar1",
+    name: "Naya Koirala",
+    image: [{ quality: "150x150", url: "https://www.jiosaavn.com/_i/3.0/artist-default-music.png" }],
+  });
+  assert.equal(artist.image, "", "normalisation applies the rule, so a new screen cannot forget it");
+  assert.equal(normaliseSong({ ...songJson }).image, "https://a.saavncdn.com/x-500.jpg");
 });
 
 test("albums, artists and playlists come back with their rows", () => {

@@ -19,7 +19,7 @@ to a pretend result, a simulated queue or invented progress.
 
 ```bash
 node tools/serve.mjs 4173     # http://0.0.0.0:4173/ (serves src/)
-npm test                      # 153 tests; no install, no network
+npm test                      # 155 tests; no install, no network
 node tools/build.mjs          # src/ → dist/, then checks every shell entry
 npm run gen:icons             # regenerate js/icons.js from DhunIcons.kt
 ```
@@ -92,7 +92,7 @@ that a browser tab cannot honour.
 
 ## Gates
 
-- `npm test` — 153 assertions over the pure modules: routing round trips,
+- `npm test` — 155 assertions over the pure modules: routing round trips,
   escaping, the queue and repeat/shuffle rules, stream resolution, the library's
   return shapes, API normalisation, transfer files, every screen's rendered
   output, CSS class coverage, and the keyboard map against the dispatcher.
