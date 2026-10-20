@@ -1757,9 +1757,12 @@ a {
 
 .dhun-rail-nav__label {
   max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Wrapping, not clipping: at 11px every current label fits on one line in
+     this rail, and a longer one (a translation, a worse font) wraps to a second
+     line instead of losing letters to an ellipsis. `overflow-wrap: anywhere`
+     is what must not come back — it broke "Search" into "Searc h". */
+  white-space: normal;
+  text-align: center;
 }
 
 .dhun-rail-nav__item:hover {
@@ -1831,7 +1834,24 @@ a {
   gap: var(--dhun-space-lg);
   height: 100%;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The player is rebuilt on every tick; scroll anchoring would move the port
+     under the visitor's finger when the tab panel changes height. */
+  overflow-anchor: none;
   padding: var(--dhun-space-sm) var(--dhun-space-xl) calc(var(--dhun-space-xxl) + var(--dhun-safe-bottom));
+}
+
+/*
+ * The player scrolls; its blocks do not shrink.
+ *
+ * As flex children they had the default `flex-shrink: 1`, so a 390×844 window
+ * squeezed the queue/lyrics tab row to y=826 and collapsed the panel to nothing.
+ * The tabs were in the document and unreachable: `overflow: hidden` above, and
+ * no overflow inside to scroll. Measured in Chromium: `scrollHeight` equalled
+ * `clientHeight` at 844 with the panel entirely below the fold.
+ */
+.dhun-full__inner > * {
+  flex: none;
 }
 
 .dhun-full__bar {

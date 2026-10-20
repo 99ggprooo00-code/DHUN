@@ -543,8 +543,28 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   function renderOverlay() {
     const open = state.route.player === "open";
     const vm = playerVm();
+    // The overlay is rebuilt on every player tick, so its scroll position has
+    // to survive the rebuild: a queue scrolled to the fifth row used to jump
+    // back to the top four times a second.
+    const previous = doc.querySelector(".dhun-full__inner");
+    const scroll = previous?.scrollTop ?? 0;
+    const previousTab = root.dataset.playerTab ?? "";
     setRegion("dhun-overlay", open && vm.track ? fullPlayer(vm) : html``);
     root.dataset.player = open ? "open" : "closed";
+    root.dataset.playerTab = open ? state.route.playerTab ?? "queue" : "";
+    const inner = doc.querySelector(".dhun-full__inner");
+    if (inner) {
+      inner.scrollTop = scroll;
+      // A tab press asks for its panel. On a 390×844 window the panel sits just
+      // below the fold — 856px down — so without this the press looked like it
+      // did nothing. The assignment clamps to the scroll port's own maximum.
+      if (open && previousTab && previousTab !== state.route.playerTab) {
+        const panel = doc.getElementById("player-panel");
+        if (panel) {
+          inner.scrollTop = panel.getBoundingClientRect().top - inner.getBoundingClientRect().top + inner.scrollTop - 8;
+        }
+      }
+    }
   }
 
   function renderSheet() {
