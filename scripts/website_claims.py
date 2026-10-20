@@ -188,6 +188,15 @@ def _clause_index_of(clauses: list[str], offset: int) -> int:
     return len(clauses) - 1
 
 
+# The app's own file round trip is a real feature: "Export library" writes a JSON
+# file and "Import library" reads that file back. The "library import" rule exists
+# to stop a claim that DHUN imports a library from a third-party service, so a
+# generic library-import mention is exempt when its clause is about a file. A
+# named third-party import is never exempt.
+OWN_FILE_CUES = re.compile(r"\b(file|JSON|exported|export)\b", re.I)
+NAMED_THIRD_PARTY_IMPORT = re.compile(r"\bfrom (Spotify|Apple Music|YouTube Music)\b", re.I)
+
+
 def forbidden_claims_in(text: str) -> list[tuple[str, str]]:
     """Every forbidden claim in `text`, as (label, matched text) pairs.
 
@@ -207,6 +216,12 @@ def forbidden_claims_in(text: str) -> list[tuple[str, str]]:
             # about sync, and the earlier "no" does not excuse it.
             clause = clauses[_clause_index_of(clauses, match.start())]
             if NEGATION_CUES.search(clause):
+                continue
+            if (
+                label == "library import"
+                and OWN_FILE_CUES.search(clause)
+                and not NAMED_THIRD_PARTY_IMPORT.search(match.group(0))
+            ):
                 continue
             found.append((label, match.group(0)))
     for label, pattern in FORBIDDEN_DENIALS:

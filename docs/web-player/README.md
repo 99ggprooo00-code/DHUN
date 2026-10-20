@@ -65,11 +65,52 @@ A rule that nothing checks is a rule that lasts until the next busy session.
 
 | File | What it is |
 |---|---|
-| [README.md](README.md) | This page: what the build is, and the rules that hold it |
+| [README.md](README.md) | This page: what the build is, the rules that hold it, and the parity table below |
+| [PRD.md](PRD.md) | Product requirements: purpose, users, goals, functional requirements, non-goals, open questions |
+| [TRD.md](TRD.md) | Technical requirements: platform, Content Security Policy, network, storage, service worker, accessibility |
+| [APP-FLOW.md](APP-FLOW.md) | Routes, boot, the flows a visitor follows, failure paths, screen states |
+| [UI-UX-DESIGN.md](UI-UX-DESIGN.md) | The interface that exists: layout, tokens, components, motion, contrast, what the browser checks measure |
+| [DATA-SCHEMA.md](DATA-SCHEMA.md) | The one `localStorage` document, its limits, how it is read back, and the export file |
+| [PROVIDER-INTEGRATION.md](PROVIDER-INTEGRATION.md) | The catalogue origins, endpoints, failover, failure kinds, the sample catalogue, sources not in the build |
+| [PLAYBACK.md](PLAYBACK.md) | Player statuses, stream choice, queue and repeat and shuffle rules, failures, Media Session |
+| [SECURITY-PRIVACY.md](SECURITY-PRIVACY.md) | What leaves the browser, what is stored, framing, CSP, input handling, open policy questions |
+| [TESTING.md](TESTING.md) | Commands, the browser suite, the Python checks that cover the web build, the site workflow, what is not tested |
+| [RELEASE-DEPLOYMENT.md](RELEASE-DEPLOYMENT.md) | Version identifiers, the path to publication, rollback, hosting |
+| [RUNBOOK.md](RUNBOOK.md) | What to do when the catalogue, playback, storage, cache or a publish misbehaves |
+| [RESEARCH-REGISTER.md](RESEARCH-REGISTER.md) | Research that bears on the browser, verification records, and open research questions |
+| [DECISIONS-AND-CHANGES.md](DECISIONS-AND-CHANGES.md) | Decisions that shape the browser build, and dated changes to this set |
+| [USER-GUIDE.md](USER-GUIDE.md) | For a visitor: opening, the library, installing, keyboard, troubleshooting |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the modules fit together: boot, routing, the catalogue seam, the player, storage, the service worker |
 | [DEVELOPMENT-GUIDE.md](DEVELOPMENT-GUIDE.md) | How to run, build and test it; the conventions a change has to follow |
 | [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) | What is verified, by what, and what is still unproven |
+| [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) | What is built, the known defects, and the proposed next steps in dependency order (not a schedule) |
 | [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md) | The limits a visitor can meet, in plain language |
+
+### Parity with the native document set
+
+The native app's documents live in [`docs/`](../README.md). Each one below is
+either mirrored here for the browser build or stated as not applicable. The docs
+gate checks that every file in the table above exists.
+
+| Native document | Browser counterpart | Note |
+|---|---|---|
+| `docs/PRD.md` | [PRD.md](PRD.md) | |
+| `docs/TRD.md` | [TRD.md](TRD.md) | |
+| `docs/app-flow.md` | [APP-FLOW.md](APP-FLOW.md) | |
+| `docs/implementation-plan.md` | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) | Not a schedule. |
+| `docs/ui-ux-design.md` | [UI-UX-DESIGN.md](UI-UX-DESIGN.md) | |
+| `docs/backend-schema.md` | [DATA-SCHEMA.md](DATA-SCHEMA.md) | The browser has no backend; its schema is the local document. |
+| `docs/INSTALL.md` | [USER-GUIDE.md](USER-GUIDE.md) | Opening the web app instead of installing a package. |
+| `docs/development/` | [DEVELOPMENT-GUIDE.md](DEVELOPMENT-GUIDE.md) | |
+| `docs/decisions/` | [DECISIONS-AND-CHANGES.md](DECISIONS-AND-CHANGES.md), and the shared ADRs in `docs/decisions/` | ADR-008 and ADR-010 apply to the browser build. |
+| `docs/research/` | [RESEARCH-REGISTER.md](RESEARCH-REGISTER.md) | |
+| `docs/verification/` | [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) and the web records listed in the research register | The browser's evidence is the status table and the browser run. |
+| `docs/runbooks/` | [RUNBOOK.md](RUNBOOK.md) | The site's publishing runbook stays in `docs/runbooks/`. |
+| `docs/releases/` | [RELEASE-DEPLOYMENT.md](RELEASE-DEPLOYMENT.md) | The native release policy does not apply to the browser build. |
+| `docs/legal/` | [SECURITY-PRIVACY.md](SECURITY-PRIVACY.md) (engineering description only) | The in-app privacy and terms texts are in `app-web/src/js/data/web-legal.js`. No legal review exists. |
+| `docs/ux-audit.md` | Not mirrored yet | Needs a recorded browser run; listed in the implementation plan. |
+| `docs/METROLIST_PARITY.md` | Not applicable | Covers the native lyrics parity audit, not the browser. |
+| `docs/history/` | Not applicable | Historical records stay where they are. |
 
 The site that publishes it is described in `.ai/WEBSITE_PLAN.md`; the record of
 what was measured under `/app/` is `docs/verification/` and the browser run's own

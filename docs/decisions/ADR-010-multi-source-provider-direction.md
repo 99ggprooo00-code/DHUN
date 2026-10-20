@@ -119,6 +119,13 @@ This decision needs the maintainer and counsel. It is not an engineering choice.
 | **D5** | Accept the capability vocabulary (A2) as design? | **Accepted as design only.** No implementation is scheduled. | Implementing it would add abstraction for one source per platform, which the prompt warns against. It becomes worth building when a second source is actually approved, which is not now. |
 | **D6** | Who owns any future YouTube or Spotify developer account? | **The owner (the user), when Spotify work starts.** No developer account is created now. | Credentials are never requested in chat or stored in the repository. |
 
+**Open point on D2 (raised 2026-10-20, not yet answered).** The owner's reply to the
+D2 question was "It was primarily meant to be yt music client so do accordingly", with
+"do not compromise web app features". The reading recorded above (no IFrame player,
+features kept) follows the second half. The first half can be read as asking for a
+YouTube Music client on the web. The owner should confirm which is intended; until
+then the recorded decision stands.
+
 **Decision rule the owner delegated:** where a choice is engineering, make it and record it;
 where it is a legal or paid question the owner cannot answer, default to the choice that keeps
 working features and costs nothing, and say so plainly in the report.

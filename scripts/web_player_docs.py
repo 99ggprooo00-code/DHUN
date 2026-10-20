@@ -48,13 +48,33 @@ DEFAULT_DIR = REPO_ROOT / "docs" / "web-player"
 MODULE_DIR = REPO_ROOT / "app-web" / "src" / "js"
 TEST_DIR = REPO_ROOT / "app-web" / "tests"
 
+# The browser build's document set. Each one has a counterpart in the native
+# document set (the parity table in README.md); the list is the contract, and the
+# index rule below keeps README.md in step with it.
 REQUIRED_FILES = (
     "README.md",
+    "PRD.md",
+    "TRD.md",
+    "APP-FLOW.md",
+    "UI-UX-DESIGN.md",
+    "DATA-SCHEMA.md",
+    "PROVIDER-INTEGRATION.md",
+    "PLAYBACK.md",
+    "SECURITY-PRIVACY.md",
+    "TESTING.md",
+    "RELEASE-DEPLOYMENT.md",
+    "RUNBOOK.md",
+    "RESEARCH-REGISTER.md",
+    "DECISIONS-AND-CHANGES.md",
+    "USER-GUIDE.md",
     "ARCHITECTURE.md",
     "DEVELOPMENT-GUIDE.md",
     "IMPLEMENTATION-STATUS.md",
+    "IMPLEMENTATION-PLAN.md",
     "KNOWN-LIMITATIONS.md",
 )
+
+_LINK = re.compile(r"\]\(([^)#\s]+\.md)(?:#[^)]*)?\)")
 
 STATUS_HEADING = "## What is verified, and by what"
 UNVERIFIED_HEADING = "## Not verified"
@@ -119,6 +139,35 @@ def presence_problems(root: pathlib.Path) -> list[str]:
         for name in REQUIRED_FILES
         if not (root / name).is_file()
     ]
+
+
+def index_problems(root: pathlib.Path) -> list[str]:
+    """README.md indexes every document, and every link it makes resolves.
+
+    A document that no index lists is a document nobody is pointed at; a link to a
+    document that was renamed is a dead end. Both are findings.
+    """
+    text = _read(root, "README.md")
+    if not text:
+        return []  # presence_problems already reported it
+    problems: list[str] = []
+    # Only links within this directory are the index's business. A link that
+    # leaves it (to ../README.md, ../decisions/...) is checked by the repository's
+    # link test, which knows the whole tree.
+    linked = {target for target in _LINK.findall(text) if "/" not in target}
+    for name in REQUIRED_FILES:
+        if name != "README.md" and name not in linked:
+            problems.append(f"README.md: does not index {name}")
+    for target in sorted(linked):
+        if not (root / target).is_file():
+            problems.append(f"README.md: links {target}, which does not exist")
+    for path in sorted(root.glob("*.md")):
+        if path.name not in REQUIRED_FILES:
+            problems.append(
+                f"docs/web-player/{path.name}: not in REQUIRED_FILES, so no rule checks it — "
+                "add it to the list and to the README index"
+            )
+    return problems
 
 
 def module_problems(root: pathlib.Path) -> list[str]:
@@ -279,6 +328,7 @@ def check(root: pathlib.Path = DEFAULT_DIR) -> list[str]:
         return [f"no such directory: {root}"]
     return (
         presence_problems(root)
+        + index_problems(root)
         + module_problems(root)
         + evidence_problems(root)
         + count_problems(root)
