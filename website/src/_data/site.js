@@ -265,6 +265,13 @@ export default {
     source: "CHANGELOG.md [Unreleased]; .ai/DEBUG_LOG.md; docs/verification/29-web-app-mirror.md",
     entries: [
       {
+        pr: "PR #188",
+        href: `${REPO}/pull/188`,
+        title: "The web app now says which screen you are on — and keeps the caret where you left it.",
+        detail:
+          "The first axe scan of /app/ found 18 of the 19 equaliser presets rendering blank, and the player's tabs with no tablist — both critical. The sheets said aria-modal and then let Tab walk into the page behind them; focus now enters, wraps and returns to the button that opened the sheet. Every screen names itself in the document title, album and artist screens say “Loading the…” instead of claiming they could not be loaded, and submitting a search no longer drops the caret out of the box.",
+      },
+      {
         pr: "PR #187",
         href: `${REPO}/pull/187`,
         title: "A playlist you make now opens, and the whole web app meets AA in both themes.",
@@ -284,13 +291,6 @@ export default {
         title: "The detail screens became the app's, and Light started working.",
         detail:
           "Albums, artists and playlists now draw the headers the application draws: the artist hero with its 16:10 crop and the theme's veil, the album's two meta lines taken from the source's own response, and Play with Shuffle instead of Queue. Choosing Light used to paint the bar pale over a dark page — the appearance settings theme the whole document now. The bundled demo catalogue also stopped calling its albums songs and its playlists artists.",
-      },
-      {
-        pr: "PR #183",
-        href: `${REPO}/pull/183`,
-        title: "The source badge stopped lying, and Home got its greeting and moods.",
-        detail:
-          "When the live source could not be reached and the sample rows answered, every screen still said “YouTube Music”. The badge now names the source that produced the rows on screen. Home also opens the way the app's Home does — a greeting from the device's own clock and the app's five mood chips — and a mood is a real search, not a filter over rows that were already loaded.",
       },
     ],
   },
