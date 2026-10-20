@@ -14,7 +14,9 @@ trusted; the differences are in `docs/research/02-baseline-audit-2026-10-20.md` 
 | 5 | Implementation phases A–H | **Not started.** The policy blockers are now recorded decisions; no implementation phase is scheduled |
 | 6 | Web documentation parity with the native set: 15 new files in `docs/web-player/` (PRD, TRD, app flow, implementation plan, UI/UX, data schema, provider integration, playback, security/privacy, testing, release, runbook, research register, decisions, user guide); README parity table | Done — written from the code; the claims found on re-read were corrected |
 | 7 | Docs gate extended: `REQUIRED_FILES` lists all 20 documents; the README index must list each one and every local link must resolve; claims rule exempts only the app's own file round trip (named third-party imports stay forbidden) | Done — tests added (`test_web_player_docs.py`, `test_website_claims.py`) |
-| 8 | Defects found while documenting, not fixed in this session: `LIBRARY_LIMITS.snapshots` never enforced; `pwa.applyUpdate` not wired to a control; import ignores the export `version` field | Open — listed in `docs/web-player/IMPLEMENTATION-PLAN.md` §2 |
+| 8 | Defects found while documenting: unenforced snapshot limit (WD-1); unwired `pwa.applyUpdate` (WD-2); import ignoring the export `version` (WD-3) | WD-1 and WD-3 fixed with tests; WD-2 decided (no reload-now control, since a reload stops playback) and the dead code removed. See `docs/web-player/IMPLEMENTATION-PLAN.md` §2 |
+| 9 | Jamendo considered as a free source | Not added: independent Creative Commons and royalty-free music, not popular (ADR-010 follow-up, 2026-10-21) |
+| 10 | **Next session:** visible YouTube "Watch" mode (no audio separation; must stay displayed, pauses when hidden) | Planned, not built. Start with the referrer spike; owner approval needed before the third-party script (ADR-010 follow-up) |
 
 **Highest-priority finding:** the YouTube API Services Developer Policies §III.I.14 and §III.I.07
 read literally prohibit the native audio path (ADR-001). No repository document previously

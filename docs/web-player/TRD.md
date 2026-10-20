@@ -79,8 +79,8 @@ Endpoint paths are listed in [PROVIDER-INTEGRATION.md](PROVIDER-INTEGRATION.md).
 - Everything else (audio, artwork, catalogue) goes straight to the network and is
   not intercepted.
 - A new version is announced with a notice to close the tab and reopen DHUN. It
-  takes over when no DHUN tab is open. An "apply now" function exists in
-  `pwa.js` but no control calls it (see [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)).
+  takes over when no DHUN tab is open. There is deliberately no reload-now control:
+  a reload would stop playback (see [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) §2).
 - Old caches named `dhun-web-*` are removed on activation.
 
 The shell list is checked against the real build by `app-web/tools/build.mjs`.

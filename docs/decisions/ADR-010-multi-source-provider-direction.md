@@ -119,7 +119,26 @@ This decision needs the maintainer and counsel. It is not an engineering choice.
 | **D5** | Accept the capability vocabulary (A2) as design? | **Accepted as design only.** No implementation is scheduled. | Implementing it would add abstraction for one source per platform, which the prompt warns against. It becomes worth building when a second source is actually approved, which is not now. |
 | **D6** | Who owns any future YouTube or Spotify developer account? | **The owner (the user), when Spotify work starts.** No developer account is created now. | Credentials are never requested in chat or stored in the repository. |
 
-**Open point on D2 (raised 2026-10-20, not yet answered).** The owner's reply to the
+**D2 follow-up (2026-10-21): research answer.** The owner asked whether YouTube Music can be the web app's main source, and to fall back to other platforms only if it cannot. Findings from the official policy text [P]:
+
+- Developer Policies §I.9 prohibits features that play audio or video from "a background player, meaning a player that is not displayed in the page, tab, or screen". §I.8 (the guide) prohibits separating or offering audio apart from video. The Required Minimum Functionality rules forbid overlays on an embedded player and require it to be visible before autoplay.
+- So a YouTube-first web client built on the official IFrame Player API cannot offer the web app's core behaviour: audio that keeps playing with the tab hidden, a queue with its own player, and a minimised player. Making YouTube the main source would also drop web features, which the owner ruled out.
+- The unofficial route (InnerTube from the browser) was the web build's earlier source. `app-web/src/js/api.js` records that it was unreliable from a browser, and it is the route §I.14 prohibits. It is not an option.
+
+**Answer: not possible compliantly. JioSaavn stays the web app's main source.** Alternatives checked, all as of 2026-10-21:
+
+| Option | Cost | Terms and fit |
+|---|---|---|
+| Jamendo API | Free for non-commercial apps; up to 35,000 requests a month; `client_id` from the developer portal | Creative Commons catalogue (about half a million tracks), not mainstream. Must credit the artist and Jamendo, link each track, and not design the app around caching or offline access. Each track's licence is per track. Fits the non-commercial project. [1][2] |
+| SoundCloud API | New registration needs a paid Artist Pro subscription, per a 2026 guide | Excluded by D4 ($0 budget). [3] |
+| Apple MusicKit (web) | Apple Developer Program, $99 a year, required for the developer token | Excluded by D4. [4] |
+| Spotify | Premium for the developer account; Web Playback SDK for playback | Already deferred (D3, D4); §III.5 open. |
+
+Sources: [1] https://developer.jamendo.com/v3.0 ; [2] https://devportal.jamendo.com/api_terms_of_use (§3.3) ; [3] https://developers.soundcloud.com/docs ; [4] https://developer.apple.com/programs/ . Primary policy text: https://developers.google.com/youtube/terms/developer-policies (§I.8, §I.9) and https://developers.google.com/youtube/terms/required-minimum-functionality .
+
+Not decided here: whether to add Jamendo as a second web source. That needs `api.jamendo.com` and the audio host in the CSP (a change to D2's "current CSP" wording), a per-track licence display, and attribution. The owner decides.
+
+**Open point on D2 (raised 2026-10-20; answered 2026-10-21 above, D2 stands).** The owner's reply to the
 D2 question was "It was primarily meant to be yt music client so do accordingly", with
 "do not compromise web app features". The reading recorded above (no IFrame player,
 features kept) follows the second half. The first half can be read as asking for a
@@ -129,6 +148,51 @@ then the recorded decision stands.
 **Decision rule the owner delegated:** where a choice is engineering, make it and record it;
 where it is a legal or paid question the owner cannot answer, default to the choice that keeps
 working features and costs nothing, and say so plainly in the report.
+
+## Follow-up 2026-10-21 (owner): visible YouTube player and Jamendo
+
+**Question 1: can YouTube play without separating audio from video?** Yes, as a matter of the
+published text. The official IFrame Player API plays the video together with its own audio, so no
+audio track is separated, extracted or offered alone. The limits are what make it a different
+product from the web app's audio player:
+
+- The player must be **displayed** on the page. Policy §I.9 bans features that play audio or video
+  "from a background player, meaning a player that is not displayed in the page, tab, or screen".
+  So playback must stop when the tab is hidden or the player is minimised.
+- The player must not be covered or obscured by overlays (Required Minimum Functionality).
+- Autoplay only starts when more than half of the player is visible.
+- It cannot be an audio-only player, and the web app's `<audio>` queue, seek and media-session
+  behaviour do not apply to it. The web app's audio path cannot be moved onto it without losing
+  those features, which the owner ruled out.
+
+[P] Developer Policies §I.9 and Required Minimum Functionality, as quoted in the search results
+of 2026-10-21. Not legal review. The owner cannot fund counsel.
+
+**Question 2: Jamendo.** Not added. Jamendo describes itself as a platform for independent
+artists under Creative Commons licences, with royalty-free licensing for businesses, and one
+review states that "nothing here is a chart hit". Under the owner's rule (add it only if it has
+popular music), it stays out. Reopen if the owner wants a free Creative Commons source anyway.
+
+**Plan for the next session: a visible YouTube "Watch" mode (not built now).**
+
+1. **Spike, no product change.** On the deployed origin, load the stock IFrame player at its
+   minimum supported size and check that it plays. Confirm that the browser sends a Referer that
+   YouTube accepts (the app sets no referrer policy; the default is origin-only). Record the
+   date, browser and result in `docs/web-player/IMPLEMENTATION-STATUS.md`. If it fails, stop
+   here and record the failure.
+2. **Owner approval before any build.** The player adds `www.youtube.com` to `script-src` and
+   `frame-src`. That is a third-party runtime, which the privacy promise forbids today (D2).
+   Without explicit approval, the build does not start.
+3. **Build as a separate mode, not a replacement.** The JioSaavn audio path stays the default and
+   unchanged. Watch mode is a visible player with the YouTube controls, driven through the IFrame
+   API (`loadVideoById`, play, pause, state events). It pauses when hidden, covered or scrolled
+   out of view. It has no audio-only option, no separation and no download. Its queue is its own.
+   Background audio stops in this mode, and the UI must say so.
+4. **Tests.** `scripts/test_app_web.py` for the CSP change (only the named YouTube hosts). A browser
+   check in `website/tests/browser.mjs` that the player is at least the minimum size, pauses on
+   hide, and is not overlaid. Docs updated with the evidence.
+5. **Still open.** Whether the deployed origin's Referer is accepted (step 1), and the policy
+   reading, which has no legal review. Not a compliance claim.
 
 ## Consequences
 

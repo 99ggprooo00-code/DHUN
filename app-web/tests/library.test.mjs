@@ -247,3 +247,41 @@ test("export says what wrote the file, and import reads it back", () => {
   const imported = other.importAll(text);
   assert.deepEqual(imported.likes, ["a"]);
 });
+
+// ---- snapshot pruning (WD-1): a row is kept only while a list refers to it ----
+
+function memoryBacking() {
+  const map = new Map();
+  return {
+    setItem: (k, v) => map.set(k, String(v)),
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    removeItem: (k) => map.delete(k),
+    raw: (k) => map.get(k),
+  };
+}
+
+test("a row no list refers to is dropped when the library is saved", () => {
+  let library = toggleLike(emptyLibrary(), song("s1")).library;
+  library = toggleLike(library, song("s1")).library; // unliked: nothing refers to s1 now
+  assert.deepEqual(library.likes, []);
+  const backing = memoryBacking();
+  createStorage(backing).save(library);
+  assert.deepEqual(JSON.parse(backing.raw(STORAGE_KEY)).snapshots, {}, "the stored document must not keep the unliked row");
+});
+
+test("a row a playlist or the history still refers to is kept on save", () => {
+  let library = createPlaylist(emptyLibrary(), "Mix", 1).library;
+  library = addToPlaylist(library, library.playlists[0].id, song("p1"), 2).library;
+  library = rememberPlay(library, song("h1"), 3);
+  const backing = memoryBacking();
+  createStorage(backing).save(library);
+  const stored = JSON.parse(backing.raw(STORAGE_KEY));
+  assert.deepEqual(Object.keys(stored.snapshots).sort(), ["h1", "p1"]);
+});
+
+test("a stored document that carries unreferenced rows is pruned when it is read back", () => {
+  const backing = memoryBacking();
+  backing.setItem(STORAGE_KEY, JSON.stringify({ ...emptyLibrary(), snapshots: { orphan: song("orphan") } }));
+  const loaded = createStorage(backing).load();
+  assert.deepEqual(loaded.snapshots, {});
+});

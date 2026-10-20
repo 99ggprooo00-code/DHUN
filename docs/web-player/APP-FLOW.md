@@ -107,9 +107,9 @@ Home or Search  →  track row  →  Play
   installed, the app reports so.
 - When a new version has been downloaded, the app shows a notice: close this tab
   and open DHUN again to use it. The new version takes over when no DHUN tab is
-  open. The app does not reload the page on its own. The function that could
-  apply the update immediately exists in `pwa.js` but no control calls it; this
-  is recorded in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md).
+  open. The app does not reload the page on its own, and there is no control that
+  reloads it: a reload would stop the music. This is a decision, recorded in
+  [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) §2.
 
 ## 4. Screen states
 

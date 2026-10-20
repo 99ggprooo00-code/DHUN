@@ -75,3 +75,21 @@ test("a real export imports, and the library comes back", async () => {
   assert.deepEqual(imported.likes, ["s1"]);
   assert.equal(storage.library.likes[0], "s1", "the import reached storage, not only the return value");
 });
+
+// ---- format version (WD-3): only the version this build writes is read ----
+
+test("a file written by a different format version is refused, and the version is named", async () => {
+  const storage = fakeStorage();
+  await assert.rejects(
+    () => handleFileImport(fakeFile(JSON.stringify({ app: "DHUN web", version: 4, likes: [] })), storage),
+    /format version 4/,
+  );
+  assert.deepEqual(storage.library, emptyLibrary(), "a refused file must not touch the library");
+});
+
+test("a file with no format version is refused", async () => {
+  await assert.rejects(
+    () => handleFileImport(fakeFile(JSON.stringify({ app: "DHUN web", likes: [] })), fakeStorage()),
+    /format version/,
+  );
+});

@@ -18,7 +18,7 @@ table cannot quietly describe a build that has moved on.
 | Claim | Evidence |
 |---|---|
 | The build assembles from the sources, and every module is reachable from `main.js` | `app-web/tools/build.mjs` — it fails on an unreachable module or a shell entry that is not in the build |
-| 155 assertions over the pure modules pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
+| 160 assertions over the pure modules pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
 | The web build is a real app, not a preview: regions before the module runs, a strict CSP, `noindex`, no third-party asset, no downloads surface, a labelled sample catalogue | `scripts/test_app_web.py` |
 | Every screen renders one `h1`, resets focus to it after navigation, and titles the document | `website/tests/browser.mjs` (`entity outline`, `/app/ dialog focus`) |
 | Rendered contrast meets 4.5:1 / 3:1 on every visible line, in both themes | `website/tests/browser.mjs` (`/app/ contrast`) |
@@ -66,8 +66,8 @@ verified and this file names the evidence; an unticked box means it was not.
 - [x] **The interface ships and is reachable** — the site and `/app/` are live at
   `https://99ggprooo00-code.github.io/DHUN/`, and `scripts/website_smoke.py`
   re-reads the served bytes after every publish.
-- [x] **The code is unit-tested** — `cd app-web && npm test` → 155 pass;
-  `python3 -m unittest discover -s scripts -p 'test_*.py'` → 459 tests OK, the
+- [x] **The code is unit-tested** — `cd app-web && npm test` → 160 pass;
+  `python3 -m unittest discover -s scripts -p 'test_*.py'` → 466 tests OK, the
   web app's source-level rules included.
 - [x] **The rendered pages are measured in a real browser** — `website/tests/browser.mjs`
   runs on every pull request and prints its numbers as check annotations.
