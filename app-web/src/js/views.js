@@ -74,7 +74,17 @@ export function homeScreen(vm) {
       </div>
       ${sourceBadge(vm.source)}
     </header>
-    ${vm.status === "sample" ? notice({ kind: "sample", tone: "warn", title: "Sample catalogue.", body: "The JioSaavn API could not be reached from this network, so these are example rows — nothing in this list has audio. The live catalogue returns as soon as it answers." }) : html``}
+    ${vm.status === "sample"
+      ? notice({
+          kind: "sample",
+          tone: "warn",
+          title: "Sample catalogue.",
+          body:
+            vm.sampleNote ??
+            "No catalogue instance answered, so these are example rows — nothing in this list has audio. The live catalogue returns as soon as one answers.",
+          action: { id: "retry", label: "Try the catalogue again" },
+        })
+      : html``}
     ${body}
   </div>`;
 }
@@ -436,6 +446,39 @@ export function libraryScreen(vm) {
   </div>`;
 }
 
+/**
+ * The instances behind the catalogue, and what each answered last.
+ *
+ * The list is the app's own record, not a claim: `answered` is only printed for
+ * the host that actually returned the rows on screen. A visitor debugging "why
+ * is this the sample catalogue" can see which host refused and how.
+ */
+function chainRows(chain) {
+  if (!chain || !Array.isArray(chain.origins) || !chain.origins.length) return html``;
+  const seen = new Map((chain.attempts ?? []).map((entry) => [entry.id, entry]));
+  const activeId = chain.origin?.id ?? "";
+  return html`<ul class="dhun-source-list">
+    ${chain.origins.map((origin) => {
+      const attempt = seen.get(origin.id);
+      const outcome = !attempt
+        ? activeId === origin.id
+          ? "in use"
+          : "not asked yet"
+        : attempt.kind === "ok"
+          ? "answered"
+          : attempt.kind === "http"
+            ? `HTTP ${attempt.status}`
+            : attempt.kind === "timeout"
+              ? "no answer in time"
+              : "could not be reached";
+      return html`<li class="dhun-source-list__row">
+        <span class="dhun-source-list__host">${origin.label}</span>
+        <span class="dhun-source-list__state">${outcome}</span>
+      </li>`;
+    })}
+  </ul>`;
+}
+
 /* --------------------------------------------------------------- settings -- */
 
 const ACCENT_LABELS = { brand: "Violet", azure: "Azure", jade: "Jade", amber: "Amber", rose: "Rose", cyan: "Cyan" };
@@ -492,6 +535,7 @@ export function settingsScreen(vm) {
         <span class="dhun-setting__label">Source</span>
         <p class="dhun-setting__note">${vm.source.note}</p>
         <p class="dhun-setting__note dhun-setting__note--mono">${vm.source.endpoint}</p>
+        ${chainRows(vm.source.chain)}
         <p class="dhun-setting__note">${vm.source.disclosure}</p>
       </div>
     </section>

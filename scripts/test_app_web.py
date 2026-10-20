@@ -560,17 +560,29 @@ class HonestyIsInTheRenderedCopy(unittest.TestCase):
         sources = "\n".join(_js_sources().values())
         origins = set(re.findall(r"https://([a-z0-9*.-]+)", sources + self.index_html))
         self.assertNotIn("dhun", " ".join(origins).lower(), "a DHUN-operated origin would be a backend")
+        # The catalogue instances the build ships, read out of `api.js` rather
+        # than repeated here: a new instance is a change to one list, and the
+        # allowlist below says which kinds of community deployment are allowed.
+        declared = set(re.findall(r'origin: "https://([a-z0-9*.-]+)"', self.api))
+        self.assertGreaterEqual(len(declared), 2, "the catalogue has no failover — one host is a single point of failure")
         for origin in origins:
+            if origin in declared:
+                continue
             self.assertTrue(
-                origin.endswith(("saavn.dev", "saavncdn.com", "github.com")),
-                f"{origin} is not a service the bundled pages disclose",
+                origin.endswith(("saavncdn.com", "github.com")),
+                f"{origin} is neither a declared catalogue instance nor a disclosed service",
             )
         # github.com appears only as a link in the support copy, never as a
         # fetch target; `connect-src` is the enforceable half.
         policy = re.search(r"connect-src ([^;]*)", self.index_html)
         self.assertIsNotNone(policy, "the policy declares no connect-src")
         connect = policy.group(1)
-        self.assertIn("https://saavn.dev", connect)
+        for origin in sorted(declared):
+            self.assertIn(
+                f"https://{origin}",
+                connect,
+                f"{origin} is requested by api.js but the CSP would block it — the first host would always 'fail'",
+            )
         self.assertIn("https://*.saavncdn.com", connect)
         self.assertNotIn("github", connect)
 

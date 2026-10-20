@@ -38,10 +38,13 @@
       the app writes an inline `background-image` on a hero's blurred backdrop;
       there is no user-controlled CSS path.
 
-      `connect-src` and `media-src` name exactly two origins: the catalogue API
-      (`saavn.dev`) and the CDN it streams from (`saavncdn.com`). Images come from
-      that CDN too. Nothing else is reachable from this page — no analytics, no
-      fonts, no telemetry endpoint, because there are none to reach.
+      `connect-src` names the three catalogue instances this build will try
+      (`api.js` → `API_SOURCES`) and the CDN the audio streams from; `media-src`
+      names that CDN. Images come from it too. Nothing else is reachable from
+      this page — no analytics, no fonts, no telemetry endpoint, because there
+      are none to reach. Adding a fourth instance is a CSP change as well as a
+      code change, which is the point: a request to a host nobody wrote down is
+      a request a visitor was not told about.
 
       `frame-ancestors` is absent, and its absence is honest rather than a
       choice: it is a response-header directive, the specification requires a
@@ -51,7 +54,7 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.saavncdn.com; media-src https://*.saavncdn.com blob:; connect-src https://saavn.dev https://*.saavncdn.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none';"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.saavncdn.com; media-src https://*.saavncdn.com blob:; connect-src https://saavn.dev https://saavn.sumit.co https://saavnx.vercel.app https://*.saavncdn.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none';"
     />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />

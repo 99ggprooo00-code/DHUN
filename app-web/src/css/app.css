@@ -1168,6 +1168,37 @@ h3:focus-visible {
   margin-top: var(--dhun-space-lg);
 }
 
+/* The catalogue's instances, listed on Settings: host on the left, what it
+   answered on the right. A plain list, because the point is the record. */
+.dhun-source-list {
+  list-style: none;
+  margin: var(--dhun-space-sm) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-source-list__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-xs) var(--dhun-space-sm);
+  border-radius: var(--dhun-shape-small);
+  background: var(--dhun-overlay-pressed);
+  font: var(--dhun-text-label-medium);
+}
+
+.dhun-source-list__host {
+  font-family: var(--dhun-font-mono, var(--dhun-font-sans));
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-source-list__state {
+  color: var(--dhun-text-tertiary);
+  text-align: right;
+}
+
 /* -------------------------------------------------------------- settings -- */
 
 .dhun-settings {
@@ -2470,6 +2501,14 @@ h3:focus-visible {
   flex-direction: column;
   gap: var(--dhun-space-xs);
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* The notice's own control, when it has one — "Try the catalogue again" beside
+   the sentence that says why the catalogue is not there. */
+.dhun-notice__action {
+  flex: 0 0 auto;
+  align-self: center;
 }
 
 .dhun-page-head__actions {

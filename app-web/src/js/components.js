@@ -298,10 +298,13 @@ export function sourceBadge({ label, tone = "live", detail = "" }) {
   </p>`;
 }
 
-export function notice({ tone = "info", kind = "", title, body = "" }) {
+export function notice({ tone = "info", kind = "", title, body = "", action = null }) {
   return html`<div class="dhun-notice dhun-notice--${tone}"${kind ? html` data-notice="${kind}"` : html``}>
     <span class="dhun-notice__icon" aria-hidden="true">${icon(tone === "warn" ? "Offline" : "Link", { size: 18 })}</span>
     <span class="dhun-notice__text"><strong>${title}</strong>${body ? html` ${body}` : html``}</span>
+    ${action
+      ? html`<button type="button" class="dhun-button dhun-button--outlined dhun-notice__action" data-action="${action.id}">${action.label}</button>`
+      : html``}
   </div>`;
 }
 

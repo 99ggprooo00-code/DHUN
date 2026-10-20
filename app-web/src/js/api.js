@@ -29,11 +29,50 @@
  * is what makes the limit visible instead of mysterious when it bites.
  */
 
-export const API_ORIGIN = "https://saavn.dev";
+/**
+ * The instances this build will talk to, in the order it tries them.
+ *
+ * WHY A LIST. Until this round the build had one origin — `saavn.dev` — and the
+ * deployed page showed the sample catalogue whenever that instance was down,
+ * rate-limiting or refusing a cross-origin request. That is not a rare event:
+ * every instance in this family is a community deployment of the same MIT
+ * project (sumitkolhe/jiosaavn-api), run on free hosting, with no support
+ * contract (ADR-008 boundary 1). One hostname is a single point of failure for
+ * the whole web app.
+ *
+ * Each entry below speaks the *same* contract — the paths in `ENDPOINTS` and the
+ * `{success, data}` envelope `unwrap()` reads — so the seam does not need three
+ * adapters. The first is the documented instance; the second is the reference
+ * project's own deployment; the third is another recent deployment that
+ * documents itself as CORS-open. All three are named in the Content-Security-
+ * Policy (`src/index.html`), in Settings, and in the privacy page, because a
+ * request to an origin a visitor was not told about would be a different kind of
+ * dishonesty.
+ *
+ * Adding a fourth is a deliberate act: it needs the same contract, a line in the
+ * CSP, and a sentence in `scripts/test_app_web.py`'s allowlist.
+ */
+export const API_SOURCES = Object.freeze([
+  { id: "saavn", origin: "https://saavn.dev", label: "saavn.dev" },
+  { id: "sumit", origin: "https://saavn.sumit.co", label: "saavn.sumit.co" },
+  { id: "saavnx", origin: "https://saavnx.vercel.app", label: "saavnx.vercel.app" },
+]);
+
+/** The first instance, kept as the default for callers that name one origin. */
+export const API_ORIGIN = API_SOURCES[0].origin;
 export const API_BASE = `${API_ORIGIN}/api`;
 
 /** How long a request may take before the interface gives up and says so. */
 export const REQUEST_TIMEOUT_MS = 15000;
+
+/**
+ * How long one attempt may take while the app is still choosing an instance.
+ *
+ * The full timeout applies once an instance is known to answer. While it is
+ * racing, a longer wait per host would mean a visitor staring at a skeleton for
+ * three times as long as the situation deserves.
+ */
+export const PROBE_TIMEOUT_MS = 8000;
 
 /** One page of rows. The searches are paginated; 20 keeps a phone screen full. */
 export const PAGE_SIZE = 20;
@@ -74,13 +113,16 @@ export const ENDPOINTS = Object.freeze({
  * contract promises says so instead of being treated as an empty catalogue.
  */
 export class SourceError extends Error {
-  constructor(kind, message, { status = null, url = "", cause = null } = {}) {
+  constructor(kind, message, { status = null, url = "", cause = null, attempts = null } = {}) {
     super(message);
     this.name = "SourceError";
     this.kind = kind;
     this.status = status;
     this.url = url;
     this.cause = cause;
+    // What each configured instance answered, when the failure is the whole
+    // chain rather than one request. `null` for a failure that never raced.
+    this.attempts = attempts;
   }
 }
 
@@ -99,6 +141,26 @@ export const FAILURE_KIND = Object.freeze({
  * "Could not reach the catalogue" is true; "Something went wrong" is not a
  * description. Each branch names the thing that failed and the next action.
  */
+/** One line per instance that was tried: "saavn.dev — HTTP 429". */
+export function describeAttempts(attempts) {
+  if (!Array.isArray(attempts) || !attempts.length) return "";
+  return attempts
+    .map((entry) => {
+      const what =
+        entry.kind === "ok"
+          ? "answered"
+          : entry.kind === FAILURE_KIND.http
+            ? `HTTP ${entry.status}`
+            : entry.kind === FAILURE_KIND.timeout
+              ? "no answer in time"
+              : entry.kind === FAILURE_KIND.shape
+                ? "answered in an unexpected shape"
+                : "could not be reached";
+      return `${entry.label} — ${what}`;
+    })
+    .join(" · ");
+}
+
 export function describeFailure(error) {
   if (!(error instanceof SourceError)) {
     return {
@@ -142,20 +204,24 @@ export function describeFailure(error) {
         technical: `${error.message} — ${error.url}`,
         kind: error.kind,
       };
-    default:
+    default: {
+      const record = describeAttempts(error.attempts);
       return {
         title: "The catalogue could not be reached",
-        body: "The request never completed. An extension, a proxy or the network may be blocking it.",
-        technical: `${error.message}${error.url ? ` — ${error.url}` : ""}`,
+        body: record
+          ? `Every instance this build knows was tried and none answered: ${record}. An extension, a proxy or the network may be blocking them.`
+          : "The request never completed. An extension, a proxy or the network may be blocking it.",
+        technical: `${error.message}${error.url ? ` — ${error.url}` : ""}${record ? ` — tried: ${record}` : ""}`,
         kind: error.kind,
       };
+    }
   }
 }
 
 /* --------------------------------------------------------------- requests -- */
 
-function absolute(path) {
-  return path.startsWith("http") ? path : `${API_BASE}${path}`;
+function absolute(path, origin = API_ORIGIN) {
+  return path.startsWith("http") ? path : `${origin}/api${path}`;
 }
 
 /**
@@ -165,8 +231,8 @@ function absolute(path) {
  * controller is explicit. A request that outlives its timeout is aborted rather
  * than left to land on a screen that has already moved on.
  */
-export async function requestJson(path, { fetchImpl = globalThis.fetch, timeoutMs = REQUEST_TIMEOUT_MS, signal } = {}) {
-  const url = absolute(path);
+export async function requestJson(path, { fetchImpl = globalThis.fetch, timeoutMs = REQUEST_TIMEOUT_MS, signal, origin = API_ORIGIN } = {}) {
+  const url = absolute(path, origin);
   if (typeof fetchImpl !== "function") {
     throw new SourceError(FAILURE_KIND.network, "This browser has no fetch()", { url });
   }
@@ -429,8 +495,227 @@ function songsFrom(data, url) {
   return resultRows(data, url).map(normaliseSong).filter(Boolean);
 }
 
-export function createSource({ fetchImpl = globalThis.fetch, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
-  const get = (path, options = {}) => requestJson(path, { fetchImpl, timeoutMs, ...options });
+/**
+ * One request, against whichever instance will answer it.
+ *
+ * THE ORDER OF EVENTS. The instance that last answered is tried first, alone and
+ * with the full timeout — the common case costs one request to one host. If it
+ * fails, the remaining instances are raced against each other: the first success
+ * wins, and the winner becomes the remembered instance. Only when every instance
+ * has refused does the request fail, and then it fails with *all* of their
+ * answers attached, so the interface can print which host said what instead of
+ * "the catalogue could not be reached".
+ *
+ * CANCELLATION. A race leaves losers in flight. Each attempt gets its own
+ * AbortController chained to the caller's signal, and the losers are aborted as
+ * soon as a winner is known — a request nobody is waiting for should not keep a
+ * community server busy.
+ */
+function createRacer({ fetchImpl, timeoutMs, sources, preferredId, onOriginChange }) {
+  const list = sources.slice();
+  let activeId = list.some((source) => source.id === preferredId) ? preferredId : (list[0]?.id ?? "");
+  let attempts = [];
+  // While a failover is running, every other request waits for it rather than
+  // starting a race of its own: Home asks for seven shelves at once, and seven
+  // simultaneous races would mean twenty-one requests to community servers that
+  // are already struggling.
+  let switching = null;
+
+  const byId = (id) => list.find((source) => source.id === id) ?? null;
+
+  function attempt(source, path, options, controller, budget) {
+    return requestJson(path, {
+      ...options,
+      fetchImpl,
+      timeoutMs: budget,
+      origin: source.origin,
+      signal: controller.signal,
+    }).then(
+      (data) => ({ ok: true, source, data }),
+      (error) => ({
+        ok: false,
+        source,
+        error,
+        entry: {
+          id: source.id,
+          label: source.label,
+          origin: source.origin,
+          kind: error?.kind ?? FAILURE_KIND.network,
+          status: error?.status ?? null,
+          message: String(error?.message ?? error ?? ""),
+        },
+      }),
+    );
+  }
+
+  function adopt(source) {
+    if (source.id === activeId) return;
+    activeId = source.id;
+    onOriginChange?.(source);
+  }
+
+  const okEntry = (source) => ({ id: source.id, label: source.label, origin: source.origin, kind: "ok", status: 200, message: "" });
+
+  /**
+   * Race the other instances, once, for everyone who is waiting.
+   *
+   * Resolves with `{source, path, data}` — the winner's answer to the path this
+   * caller asked for. A caller whose own path was not the one raced re-requests
+   * it from the winner and reuses the result if it was.
+   */
+  function switchTo(path, options, failedId) {
+    if (switching) return switching;
+    switching = (async () => {
+      const rest = list.filter((source) => source.id !== failedId);
+      const controllers = rest.map(() => new AbortController());
+      const abortAll = () => controllers.forEach((controller) => controller.abort());
+      options.signal?.addEventListener?.("abort", abortAll, { once: true });
+      try {
+        const winner = await new Promise((resolve, reject) => {
+          const failures = [];
+          if (!rest.length) {
+            reject(failures);
+            return;
+          }
+          let left = rest.length;
+          rest.forEach((source, index) => {
+            attempt(source, path, options, controllers[index], PROBE_TIMEOUT_MS).then((result) => {
+              if (result.ok) {
+                resolve(result);
+                return;
+              }
+              failures.push(result.entry);
+              left -= 1;
+              if (left === 0) reject(failures);
+            });
+          });
+        });
+        adopt(winner.source);
+        return { source: winner.source, path, data: winner.data };
+      } catch (failures) {
+        if (!Array.isArray(failures)) throw failures;
+        const worst = failures[0] ?? null;
+        throw new SourceError(worst?.kind ?? FAILURE_KIND.network, worst?.message ?? "every instance failed", {
+          status: worst?.status ?? null,
+          url: `${failedId}/api${path}`,
+          attempts: failures,
+        });
+      } finally {
+        options.signal?.removeEventListener?.("abort", abortAll);
+        abortAll();
+      }
+    })().finally(() => {
+      switching = null;
+    });
+    return switching;
+  }
+
+  return {
+    get origin() {
+      return byId(activeId) ?? list[0] ?? null;
+    },
+    get origins() {
+      return list.slice();
+    },
+    get attempts() {
+      return attempts.slice();
+    },
+
+    async get(path, options = {}) {
+      if (!list.length) {
+        throw new SourceError(FAILURE_KIND.network, "no catalogue instance is configured", { url: path });
+      }
+      const tried = [];
+      let source = byId(activeId) ?? list[0];
+
+      for (let round = 0; round < 3; round += 1) {
+        const controller = new AbortController();
+        const linkOuter = () => controller.abort();
+        options.signal?.addEventListener?.("abort", linkOuter, { once: true });
+        let result;
+        try {
+          result = await attempt(source, path, options, controller, timeoutMs);
+        } finally {
+          options.signal?.removeEventListener?.("abort", linkOuter);
+        }
+
+        if (result.ok) {
+          attempts = [...tried, okEntry(source)];
+          return result.data;
+        }
+        // Offline is not a per-host problem: racing the others would repeat the
+        // same refusal three times, more slowly.
+        if (result.error?.kind === FAILURE_KIND.offline) {
+          attempts = [result.entry];
+          throw result.error;
+        }
+        tried.push(result.entry);
+
+        // Another request may already have moved the chain to a live instance —
+        // seven Home shelves fail together, and only one of them should pay for
+        // the switch.
+        if (switching) {
+          try {
+            await switching;
+          } catch {
+            /* this caller retries below and reports its own result */
+          }
+        }
+        const moved = byId(activeId);
+        if (moved && moved.id !== source.id) {
+          source = moved;
+          continue;
+        }
+
+        let switched = null;
+        try {
+          switched = await switchTo(path, options, source.id);
+        } catch (error) {
+          attempts = [...tried, ...(error?.attempts ?? [])];
+          throw new SourceError(error?.kind ?? result.entry.kind, error?.message ?? result.entry.message, {
+            status: error?.status ?? result.entry.status,
+            url: error?.url ?? `${source.origin}/api${path}`,
+            attempts: attempts.slice(),
+          });
+        }
+        if (switched.path === path) {
+          attempts = [...tried, okEntry(switched.source)];
+          return switched.data;
+        }
+        source = switched.source;
+      }
+
+      // Every instance was tried and none answered this path.
+      const last = tried[tried.length - 1] ?? { kind: FAILURE_KIND.network, status: null, message: "" };
+      throw new SourceError(last.kind, last.message, {
+        status: last.status,
+        url: `${source.origin}/api${path}`,
+        attempts: tried.slice(),
+      });
+    },
+  };
+}
+
+export function createSource({
+  fetchImpl = globalThis.fetch,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+  sources = API_SOURCES,
+  preferred = "",
+  onOriginChange = null,
+} = {}) {
+  const racer = createRacer({ fetchImpl, timeoutMs, sources, preferredId: preferred, onOriginChange });
+  const get = (path, options = {}) => racer.get(path, options);
+
+  /**
+   * Which instance is answering, and what the last request saw on each host.
+   * `main.js` draws this on Settings and inside a failure, so a visitor can tell
+   * a dead instance from a dead network.
+   */
+  const status = () => ({
+    origin: racer.origin,
+    origins: racer.origins,
+    attempts: racer.attempts,
+  });
 
   return {
     /** Search rows of one kind. `kind` is a view concern, not an API one. */
@@ -503,6 +788,9 @@ export function createSource({ fetchImpl = globalThis.fetch, timeoutMs = REQUEST
       const byId = new Map(songsFrom(data, ENDPOINTS.songsById(wanted)).map((song) => [song.id, song]));
       return wanted.map((id) => byId.get(String(id))).filter(Boolean);
     },
+
+    /** Which instance is answering, and what the last request saw on each host. */
+    status,
   };
 }
 

@@ -24,7 +24,7 @@ import * as views from "./views.js";
 import * as components from "./components.js";
 import { appBar, bottomNav, miniError, miniPlayer, navRail } from "./shell.js";
 import { fullPlayer } from "./player-ui.js";
-import { API_ORIGIN, HOME_RAILS, createSource, describeFailure, SourceError, FAILURE_KIND } from "./api.js";
+import { API_ORIGIN, HOME_RAILS, createSource, describeAttempts, describeFailure, SourceError, FAILURE_KIND } from "./api.js";
 import { demoEntity, demoHome, searchDemo } from "./demo.js";
 import {
   addToPlaylist,
@@ -79,7 +79,16 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
   const audio = doc.querySelector("#dhun-audio");
   const storage = createStorage();
-  const source = createSource();
+  // Which of the catalogue's instances answered last time is remembered, so a
+  // returning visitor's first request goes to the host that worked for them
+  // instead of re-learning that the first one is down.
+  const source = createSource({
+    preferred: storage.load().settings.sourceId ?? "",
+    onOriginChange: (origin) => {
+      state.library = { ...state.library, settings: { ...state.library.settings, sourceId: origin.id } };
+      save();
+    },
+  });
 
   const state = {
     route: parseRoute(win.location.hash),
@@ -168,6 +177,34 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   function noteFailure(error) {
     state.source.error = error;
     state.source.mode = "sample";
+    state.source.attempts = Array.isArray(error?.attempts) ? error.attempts : [];
+  }
+
+  /**
+   * The sentence under "Sample catalogue".
+   *
+   * It names the instances that were tried and what each said, because the old
+   * wording ("the JioSaavn API could not be reached from this network") was
+   * true of one hostname and useless to anyone trying to work out whether the
+   * fault was theirs. Nothing here is guessed: each clause is an attempt the
+   * app made.
+   */
+  function sampleNote() {
+    const record = describeAttempts(state.source.attempts);
+    if (!record) {
+      return "No catalogue instance answered, so these are example rows — nothing in this list has audio. The live catalogue returns as soon as one answers.";
+    }
+    return `No catalogue instance answered, so these are example rows — nothing in this list has audio. Tried: ${record}.`;
+  }
+
+  /** What each instance answered on the last request — for Settings and errors. */
+  function sourceStatus() {
+    const status = source.status?.() ?? { origin: null, origins: [], attempts: [] };
+    return {
+      origin: status.origin,
+      origins: status.origins,
+      attempts: state.source.attempts?.length ? state.source.attempts : status.attempts,
+    };
   }
 
   /** Tracks for the queue from whatever list the press came from. */
@@ -219,6 +256,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       const value = await run();
       state.source.mode = "live";
       state.source.error = null;
+      state.source.attempts = [];
       return value;
     } catch (error) {
       if (error instanceof SourceError && NETWORK_KINDS.has(error.kind)) {
@@ -502,9 +540,10 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
           settings: settings(),
           source: {
             note: "This build reads JioSaavn's public catalogue — search, albums, artists, playlists and audio streams.",
-            endpoint: `${API_ORIGIN}/api`,
+            endpoint: `${sourceStatus().origin?.origin ?? API_ORIGIN}/api`,
             disclosure:
-              "saavn.dev is an unofficial, community-run wrapper around JioSaavn. It has no support contract with this project and may rate-limit, change or disappear. When it cannot be reached the app says so and falls back to a labelled sample catalogue.",
+              "Every instance listed here is an unofficial, community-run deployment of the same open-source wrapper around JioSaavn. None has a support contract with this project, and any of them may rate-limit, change or disappear. The app tries them in turn, remembers the one that answered, and says which host said what when none does.",
+            chain: sourceStatus(),
           },
           storage: storageInfo(),
           version: `DHUN web ${WEB_VERSION} · no account · no DHUN server`,
@@ -529,6 +568,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
           rails: state.home.rails,
           hero: state.home.rails.find((rail) => rail.kind === "songs")?.items[0] ?? state.home.rails[0]?.items[0] ?? null,
           source: sourceBadge(),
+          sampleNote: sampleNote(),
           hrefFor,
         });
       }
@@ -1094,7 +1134,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       else loadEntity();
     },
     refresh: () => {
-      state.source = { mode: "unknown", error: null };
+      state.source = { mode: "unknown", error: null, attempts: [] };
       if (state.route.name === "home") loadHome();
       else loadEntity();
     },
