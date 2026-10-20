@@ -2,15 +2,22 @@
 
 ## Status
 
-**PROPOSED — NOT ACCEPTED.** 2026-10-20. Written by the research session that produced
+**ACCEPTED for the owner's delegated decisions D1, D2, D4, D6 (2026-10-20). D3 accepted as
+"Spotify stays planned, deferred". D5 accepted as design only.** The owner is a student without a legal budget. They asked for these calls to be made
+from the repository evidence, and said: *"do the way you think it is the best and working way
+without compromising any features on the webapp"*, *"you can review yourself and continue
+development"*, *"it was primarily meant to be yt music client"*, and *"I am student, I am not
+able to pay."*
+
+These decisions are an engineering reading of the evidence. **They are not legal advice.**
+Nothing here establishes that any YouTube or Spotify use complies with the developer policies.
+The residual risk is recorded in D1 and in [05 §4](../research/05-source-capability-matrix.md#4-risk-register-provider-specific).
+
+Written 2026-10-20 by the research session that produced
 [02](../research/02-baseline-audit-2026-10-20.md),
 [03](../research/03-youtube-youtube-music.md),
 [04](../research/04-spotify.md) and
-[05](../research/05-source-capability-matrix.md).
-
-Nothing in this ADR changes code. Acceptance of the *capability model* (D5) would
-authorise design work only. Every other item needs the maintainer's decision first.
-ADR-007 is still reserved by PR #54 and is not used here.
+[05](../research/05-source-capability-matrix.md). ADR-007 is still reserved by PR #54 and is not used.
 
 ## Context
 
@@ -41,6 +48,10 @@ operating budget; no third-party runtime on the web ([ADR-008](ADR-008-browser-w
 boundaries 1–3; [ADR-009](ADR-009-marketing-site.md)).
 
 ## Options considered
+
+> The recommendations in this section are the **pre-decision analysis**. The owner's decisions
+> are recorded in the Decisions section below and take precedence where they differ.
+
 
 ### Question A — How should providers be modelled?
 
@@ -93,36 +104,36 @@ This decision needs the maintainer and counsel. It is not an engineering choice.
 
 ### Question D — Spotify as a planned source
 
-- **Recommendation:** document only. Do not implement. The Spotify work that could proceed
+- **Recommendation (pre-decision):** document only. Do not implement yet; the owner's decision keeps Spotify planned and deferred until a Premium account exists. The Spotify work that could proceed
   without the open decisions is the research already done (04) and a capability-only
   placeholder in the vocabulary (A2). No adapter, no OAuth flow, no client ID.
 
-## Decision requested from the maintainer
+## Decisions
 
-| ID | Question | Why it is not an engineering decision | Options |
+| ID | Question | Decision (2026-10-20) | Reason and residual risk |
 |---|---|---|---|
-| **D1** | Does the YouTube developer policy bind the native InnerTube and yt-dlp audio path (§III.I.07, §III.I.14, §III.I.09, §III.E.4)? If yes, what happens to the native audio and offline features? | A legal interpretation, and a product trade-off if the answer is unfavourable | (a) accept risk in writing; (b) counsel review first (recommended); (c) migrate to IFrame (B3); (d) remove (B4) |
-| **D2** | May the web app add the YouTube IFrame player, which widens the CSP and adds a third-party script? | Changes the product's stated privacy and "no third-party runtime" promise | Yes / no / later |
-| **D3** | Is a Spotify source wanted, given §III.5 (no product integrated with other services' streams) and §IV.1 (Premium-only streaming)? | Under the literal policy, a multi-source Dhun is prohibited. Either a legal answer or Spotify's written approval is needed | Drop Spotify; metadata-only (C3) after legal review; pursue approval |
-| **D4** | Will the project carry the recurring cost of a Premium subscription for the Spotify developer account, and is there any commercial intent? | The $0.00 budget is the maintainer's stated constraint; commercial use needs approval | Accept cost; decline; confirm non-commercial |
-| **D5** | May the project accept the capability vocabulary (A2) as design, with no behaviour change? | Low risk; needs a sign-off to start | Accept / revise |
-| **D6** | Who owns any future YouTube or Spotify developer account and its credentials? | Credentials must be provided by the owner; they are never requested in chat or stored in the repository | Owner named / not yet |
+| **D1** | Does the YouTube developer policy bind the native InnerTube and yt-dlp audio path (§III.I.07, §III.I.14, §III.I.09, §III.E.4)? | **Keep the native YouTube Music path as it is. Do not expand it. Do not add new YouTube audio features that depend on the extraction path.** Record the risk plainly. No legal review will be obtained (the owner cannot fund one). | The owner asked for the working product to be kept, and the native app is the YouTube Music client. Removing or migrating the audio path would remove working features, which the owner ruled out. **Residual risk, unresolved:** the literal reading of §III.I.14 prohibits this path. If YouTube enforces it, the native audio and offline features are at risk. Revisit if a rights holder, YouTube, or counsel raises it. |
+| **D2** | May the web app add the YouTube IFrame player (wider CSP, third-party script)? | **No.** The web app keeps its JioSaavn source and the current CSP. | The IFrame player displays video and cannot provide the web app's `<audio>` queue, seek and media-session behaviour. Adopting it would remove web features and break the no-third-party-runtime promise. The owner also asked that web features not be compromised. |
+| **D3** | Should Spotify be pursued? | **Spotify stays a planned second source, deferred.** Nothing is removed. No code, no OAuth, no client ID now. The owner will add it later, when they hold a Premium account and the open policy question below is answered. | The owner cannot pay for Premium today (D4), so there is nothing to build yet. Developer policy §III.5 still conflicts with the multi-source goal; that question stays open as a residual risk and must be resolved before any Spotify work starts. |
+| **D4** | Is the Premium cost acceptable, and is there commercial intent? | **No paid services now.** The $0.00 budget holds for current work. The owner will obtain a Spotify Premium account later, when they can pay for it. Dhun is non-commercial. | Owner's stated constraint today. Spotify Development Mode needs the owner's Premium account, so Spotify work is blocked until then. |
+| **D5** | Accept the capability vocabulary (A2) as design? | **Accepted as design only.** No implementation is scheduled. | Implementing it would add abstraction for one source per platform, which the prompt warns against. It becomes worth building when a second source is actually approved, which is not now. |
+| **D6** | Who owns any future YouTube or Spotify developer account? | **The owner (the user), when Spotify work starts.** No developer account is created now. | Credentials are never requested in chat or stored in the repository. |
 
-No credential, key or account is requested here.
+**Decision rule the owner delegated:** where a choice is engineering, make it and record it;
+where it is a legal or paid question the owner cannot answer, default to the choice that keeps
+working features and costs nothing, and say so plainly in the report.
 
 ## Consequences
 
-**If the maintainer accepts D5 and rejects nothing else:**
+- No code changes result from this ADR. Current behaviour of the native apps and the web app
+  is unchanged.
+- The capability vocabulary (D5) is available as a design if a second approved source appears.
 
-- A later session can implement the capability vocabulary in `MusicProvider` and in the
-  web app without changing behaviour. Tests would cover capability declarations and error
-  categories only.
+**The main open risk (D1):**
 
-**If D1 is answered unfavourably:**
-
-- Native audio and offline features would be reviewed for removal or migration. This is
-  the largest user-visible consequence in this ADR. It would be a product decision, and it
-  would be recorded in a new ADR.
+- If YouTube enforces §III.I.14 against the native audio path, native audio and offline
+  features would be affected. The decision to keep them is recorded here, so a future
+  change can be made deliberately in a new ADR.
 
 **Regardless of the answers:**
 

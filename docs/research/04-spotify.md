@@ -27,7 +27,8 @@ The website already states that Dhun does not import from Spotify (`website/src/
 - Extended quota (the route beyond Development Mode) is, per Spotify's stated criteria,
   limited to organisations with an active launched service and a large user base. Dhun
   is not eligible on those criteria. [S]
-- **Recommendation for Dhun:** do not implement Spotify playback. Treat Spotify as a
+- **Owner decision (2026-10-20, ADR-010 D3):** Spotify stays a planned source. It is deferred, not removed, until the owner holds a Premium account and the §III.5 question is answered.
+- **Recommendation for Dhun:** do not implement Spotify playback yet. Treat Spotify as a
   possible metadata-only source, and only after the policy questions in ADR-010 D3 are
   answered. Playback would also cost a Premium subscription, which conflicts with the
   $0.00 budget (ADR-010 D4).
