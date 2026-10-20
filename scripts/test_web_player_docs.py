@@ -1,20 +1,19 @@
-"""Mutation tests for the web workstream's document gate.
+"""Mutation tests for the web build's document gate.
 
-Each rule in `website/web_player_docs` is fed a document that *must* fail and the
-real directory, which must pass. The pattern is the same one
-`scripts/test_website_claims.py` uses, and for the same reason: a rule that
-silently stops matching is worse than no rule, because the green run is believed.
+Each rule in `web_player_docs` is fed a document that *must* fail, and the real
+directory, which must pass. The pattern is the same one
+`test_website_claims.py` uses, and for the same reason: a rule that silently stops
+matching is worse than no rule, because the green run is believed.
 
-Every mutation below is one a busy session could actually make — deleting a phase
-file because it looked empty, ticking a box because the work felt done, copying a
-sentence from a forum that promises playback, renumbering the tracker so phase 2
-looks closed.
+Every mutation below is one a busy session could actually make: deleting a
+module from the table because it was renamed, leaving the old name in a sentence,
+citing a test file that moved, trimming the "not verified" list to the one item
+that felt important, or copying a sentence from a forum that promises playback.
 """
 
 from __future__ import annotations
 
 import pathlib
-import re
 import shutil
 import sys
 import tempfile
@@ -37,194 +36,183 @@ class DocsCopyMixin:
         shutil.copytree(REAL, target)
         return target
 
-    def set_cell(
-        self, root: pathlib.Path, name: str, phase: str, column: str, value: str
-    ) -> pathlib.Path:
-        """Set one cell of the tracker's phase table, by column name.
-
-        Mutation tests written as whole-line string replacements fail when a
-        word in the row changes; addressing the cell keeps each test aimed at
-        the *rule* under test rather than at today's wording of the table.
-        """
-        path = root / name
-        lines = path.read_text(encoding="utf-8").splitlines()
-        header: list[str] | None = None
-        for index, line in enumerate(lines):
-            if not line.startswith("|"):
-                continue
-            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-            if header is None:
-                header = cells
-                continue
-            if len(cells) != len(header) or cells[0] != phase:
-                continue
-            cells[header.index(column)] = value
-            lines[index] = "| " + " | ".join(cells) + " |"
-            break
-        else:
-            self.fail(f"no '{phase}' row in {name}")
-        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        return path
-
-    def drop_row(self, root: pathlib.Path, name: str, phase: str) -> pathlib.Path:
-        path = root / name
-        lines = path.read_text(encoding="utf-8").splitlines()
-        kept = [line for line in lines if not line.startswith(f"| {phase} |")]
-        self.assertEqual(len(kept), len(lines) - 1, f"no '| {phase} |' row in {name}")
-        path.write_text("\n".join(kept) + "\n", encoding="utf-8")
-        return path
-
-    def mutate(self, root: pathlib.Path, name: str, change) -> pathlib.Path:
+    def edit(self, root: pathlib.Path, name: str, old: str, new: str) -> pathlib.Path:
         path = root / name
         text = path.read_text(encoding="utf-8")
-        path.write_text(change(text), encoding="utf-8")
+        self.assertIn(old, text, f"the fixture no longer contains {old!r} — update the test")
+        path.write_text(text.replace(old, new, 1), encoding="utf-8")
         return path
 
-    def assert_reports(self, root: pathlib.Path, needle: str) -> None:
+    def drop_line(self, root: pathlib.Path, name: str, needle: str) -> pathlib.Path:
+        path = root / name
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        kept = [line for line in lines if needle not in line]
+        self.assertLess(len(kept), len(lines), f"no line contained {needle!r}")
+        path.write_text("".join(kept), encoding="utf-8")
+        return path
+
+    def drop_every_line_with(self, root: pathlib.Path, name: str, needle: str) -> pathlib.Path:
+        """Remove a module's every mention: the table row and the prose."""
+        path = root / name
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        kept = [line for line in lines if needle not in line]
+        self.assertLess(len(kept), len(lines), f"no line contained {needle!r}")
+        path.write_text("".join(kept), encoding="utf-8")
+        return path
+
+
+class TheRealDirectoryPasses(unittest.TestCase):
+    def test_the_checked_in_documents_pass_every_rule(self) -> None:
+        self.assertEqual(docs.check(REAL), [])
+
+    def test_a_missing_directory_is_a_finding(self) -> None:
+        problems = docs.check(pathlib.Path(tempfile.gettempdir()) / "no-such-docs-here")
+        self.assertTrue(problems)
+        self.assertIn("no such directory", problems[0])
+
+
+class Presence(DocsCopyMixin, unittest.TestCase):
+    def test_a_deleted_document_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        (root / "KNOWN-LIMITATIONS.md").unlink()
+        problems = docs.check(root)
+        self.assertTrue(any("KNOWN-LIMITATIONS.md" in problem for problem in problems))
+
+
+class TheModuleMapMatchesTheDirectory(DocsCopyMixin, unittest.TestCase):
+    def test_a_module_missing_from_the_table_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        self.drop_every_line_with(root, "ARCHITECTURE.md", "`js/player.js`")
         problems = docs.check(root)
         self.assertTrue(
-            any(needle in problem for problem in problems),
-            f"expected a problem mentioning {needle!r}; got {problems}",
+            any("js/player.js exists but the module table does not name it" in p for p in problems),
+            problems,
         )
 
-
-class StructureRules(DocsCopyMixin, unittest.TestCase):
-    def test_the_real_documents_pass(self):
-        self.assertEqual([], docs.check(REAL))
-
-    def test_a_missing_phase_file_fails(self):
+    def test_a_module_the_table_invents_is_a_finding(self) -> None:
         root = self.copy_docs()
-        (root / "PHASE-04-SEARCH-AND-CATALOGUE.md").unlink()
-        self.assert_reports(root, "missing document")
-
-    def test_a_phase_file_without_its_sections_fails(self):
-        root = self.copy_docs()
-        self.mutate(
+        self.edit(
             root,
-            "PHASE-05-PLAYBACK-ENGINE.md",
-            lambda text: text.replace("## Acceptance criteria", "## Notes"),
+            "ARCHITECTURE.md",
+            "| `js/version.js` |",
+            "| `js/ghost.js` | A module that was deleted |\n| `js/version.js` |",
         )
-        self.assert_reports(root, "missing section '## Acceptance criteria'")
+        problems = docs.check(root)
+        self.assertTrue(
+            any("js/ghost.js, which does not exist" in p for p in problems),
+            problems,
+        )
 
-    def test_a_phase_file_without_a_status_line_fails(self):
+    def test_a_new_module_must_be_added_to_the_table(self) -> None:
+        """The rule bites in the direction that matters: the build moved on."""
         root = self.copy_docs()
-        self.mutate(root, "PHASE-03-ARCHITECTURE.md", lambda text: text.replace("> Status: ✅ Complete", ""))
-        self.assert_reports(root, "no '> Status:")
+        self.drop_line(root, "ARCHITECTURE.md", "`js/shortcuts.js` |")
+        problems = docs.check(root)
+        self.assertTrue(any("js/shortcuts.js exists" in p for p in problems), problems)
 
-    def test_a_phase_file_without_a_decision_fails(self):
+
+class EvidenceResolves(DocsCopyMixin, unittest.TestCase):
+    def test_a_row_citing_a_path_that_does_not_exist_is_a_finding(self) -> None:
         root = self.copy_docs()
-        self.mutate(root, "PHASE-06-INTERFACE.md", lambda text: text.replace("**Go / No-Go:", "**Verdict:"))
-        self.assert_reports(root, "no explicit Go/No-Go decision")
+        self.edit(root, "IMPLEMENTATION-STATUS.md", "`app-web/tests/`", "`app-web/tests-gone/`")
+        problems = docs.check(root)
+        self.assertTrue(any("does not exist" in problem for problem in problems), problems)
 
-
-class TrackerRules(DocsCopyMixin, unittest.TestCase):
-    def test_a_completed_phase_with_no_evidence_fails(self):
+    def test_a_row_citing_nothing_is_a_finding(self) -> None:
         root = self.copy_docs()
-        self.set_cell(root, "IMPLEMENTATION-STATUS.md", "3", "Evidence", "—")
-        self.assert_reports(root, "with no evidence beside it")
-
-    def test_evidence_that_does_not_point_at_its_phase_file_fails(self):
-        root = self.copy_docs()
-        self.set_cell(
+        self.edit(
             root,
             "IMPLEMENTATION-STATUS.md",
-            "5",
-            "Evidence",
-            "the code in `app-web/src/js/player.js`, which is unit-tested",
+            "| 147 assertions over the pure modules pass with no install and no network | `app-web/tests/`",
+            "| 147 assertions over the pure modules pass | the tests, obviously",
         )
-        self.assert_reports(root, "does not point at its phase file")
+        problems = docs.check(root)
+        self.assertTrue(any("cites no path" in problem for problem in problems), problems)
 
-    def test_exceptions_must_be_written_down(self):
+    def test_a_thin_table_is_a_finding(self) -> None:
         root = self.copy_docs()
-        self.set_cell(root, "IMPLEMENTATION-STATUS.md", "4", "Remaining work", "—")
-        self.assert_reports(root, "does not say what the exception is")
+        path = root / "IMPLEMENTATION-STATUS.md"
+        text = path.read_text(encoding="utf-8")
+        start = text.find(docs.STATUS_HEADING)
+        end = text.find("\n## ", start + 1)
+        table = text[start:end]
+        rows = [line for line in table.splitlines() if line.startswith("|")]
+        kept = "\n".join(rows[:4])  # header, separator, two rows
+        path.write_text(text[:start] + docs.STATUS_HEADING + "\n\n" + kept + "\n" + text[end:], encoding="utf-8")
+        problems = docs.check(root)
+        self.assertTrue(any("fewer than five rows" in problem for problem in problems), problems)
 
-    def test_a_ticked_box_with_no_evidence_fails(self):
+
+class Honesty(DocsCopyMixin, unittest.TestCase):
+    def test_removing_the_unverified_section_is_a_finding(self) -> None:
         root = self.copy_docs()
-        self.mutate(
-            root,
-            "IMPLEMENTATION-STATUS.md",
-            lambda text: re.sub(r"^- \[x\] \*\*No tracking\*\*.*?(?=\n- |\n\n)", "- [x] **No tracking**", text, flags=re.S | re.M),
+        path = root / "IMPLEMENTATION-STATUS.md"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace(docs.UNVERIFIED_HEADING, "## Everything else", 1), encoding="utf-8")
+        problems = docs.check(root)
+        self.assertTrue(any("Not verified" in problem for problem in problems), problems)
+
+    def test_shrinking_the_unverified_list_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        path = root / "IMPLEMENTATION-STATUS.md"
+        text = path.read_text(encoding="utf-8")
+        start = text.find(docs.UNVERIFIED_HEADING)
+        end = text.find("\n## ", start + 1)
+        block = text[start:end]
+        items = [line for line in block.splitlines() if line.startswith("- ")]
+        self.assertGreater(len(items), 1)
+        kept_cuts = set(items[1:])
+        trimmed = "".join(
+            line + "\n" for line in block.splitlines() if line not in kept_cuts
         )
-        self.assert_reports(root, "ticked box with no evidence")
+        path.write_text(text[:start] + trimmed + text[end:], encoding="utf-8")
+        problems = docs.check(root)
+        self.assertTrue(any("Not verified" in problem and "item(s)" in problem for problem in problems), problems)
 
-    def test_a_ticked_box_with_an_empty_evidence_note_fails(self):
+    def test_a_forbidden_claim_is_a_finding(self) -> None:
         root = self.copy_docs()
-        self.mutate(
-            root,
-            "IMPLEMENTATION-STATUS.md",
-            lambda text: text.replace(
-                "- [x] **Licensing and attribution are recorded** — `LICENSE` (GPL-3.0-or-later),",
-                "- [x] **Licensing and attribution are recorded** — ok",
-            ),
-        )
-        self.assert_reports(root, "empty evidence note")
-
-    def test_a_status_mark_outside_the_legend_fails(self):
-        root = self.copy_docs()
-        self.set_cell(root, "IMPLEMENTATION-STATUS.md", "5", "Status", "🎉 Done")
-        self.assert_reports(root, "legend marks")
-
-    def test_the_release_line_must_match_the_gate(self):
-        root = self.copy_docs()
-        self.mutate(
-            root,
-            "IMPLEMENTATION-STATUS.md",
-            lambda text: text.replace("NOT VERIFIED FOR RELEASE", "READY FOR RELEASE"),
-        )
-        self.assert_reports(root, "NOT VERIFIED FOR RELEASE")
-
-    def test_a_phase_row_that_disappears_fails(self):
-        root = self.copy_docs()
-        self.drop_row(root, "IMPLEMENTATION-STATUS.md", "7")
-        self.assert_reports(root, "no row for phase(s) 7")
-
-
-class ClaimRules(DocsCopyMixin, unittest.TestCase):
-    def test_a_promise_of_browser_playback_in_a_document_fails(self):
-        root = self.copy_docs()
-        self.mutate(
-            root,
-            "PHASE-02-PLAYBACK-POC.md",
-            lambda text: text + "\n\nIt plays in every browser, so this phase is done.\n",
-        )
-        self.assert_reports(root, "forbidden claim")
-
-    def test_a_denial_of_a_shipped_surface_fails(self):
-        root = self.copy_docs()
-        self.mutate(
-            root,
-            "KNOWN-LIMITATIONS.md",
-            lambda text: text + "\n\nThere is no web app in this repository.\n",
-        )
-        self.assert_reports(root, "denies the browser client")
-
-    def test_a_quality_figure_fails(self):
-        root = self.copy_docs()
-        self.mutate(root, "README.md", lambda text: text + "\n\nStreams at 320 kbps.\n")
-        self.assert_reports(root, "forbidden claim")
-
-    def test_an_acceptable_sentence_passes(self):
-        """The gate must not be a ban on the subject — only on unsupportable claims."""
-        root = self.copy_docs()
-        self.mutate(
-            root,
-            "PHASE-02-PLAYBACK-POC.md",
-            lambda text: text
-            + "\n\nPlayback is not proven, no audio has been heard, and the native builds "
-            "remain the supported players.\n",
-        )
-        self.assertEqual([], docs.check(root))
-
-    def test_code_blocks_are_not_scanned(self):
-        """A quoted rule is documentation, not a claim."""
-        root = self.copy_docs()
-        self.mutate(
+        self.edit(
             root,
             "README.md",
-            lambda text: text + "\n\n```text\nIt plays in every browser.\n```\n",
+            "## The priority order",
+            "The web build offers offline playback of everything you save.\n\n## The priority order",
         )
-        self.assertEqual([], docs.check(root))
+        problems = docs.check(root)
+        self.assertTrue(any("forbidden claim" in problem for problem in problems), problems)
+
+
+class RetiredNames(DocsCopyMixin, unittest.TestCase):
+    def test_a_bare_mention_of_a_deleted_module_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        self.edit(
+            root,
+            "DEVELOPMENT-GUIDE.md",
+            "## Adding a screen",
+            "The player lives in `js/source.js`.\n\n## Adding a screen",
+        )
+        problems = docs.check(root)
+        self.assertTrue(any("js/source.js" in problem for problem in problems), problems)
+
+    def test_a_mention_that_says_it_is_gone_passes(self) -> None:
+        root = self.copy_docs()
+        self.edit(
+            root,
+            "DEVELOPMENT-GUIDE.md",
+            "## Adding a screen",
+            "The old adapter, `js/source.js`, no longer exists.\n\n## Adding a screen",
+        )
+        self.assertEqual(docs.check(root), [])
+
+    def test_a_retired_phase_document_is_a_finding(self) -> None:
+        root = self.copy_docs()
+        self.edit(
+            root,
+            "README.md",
+            "## The priority order",
+            "See PHASE-02-PLAYBACK-POC.md for the plan.\n\n## The priority order",
+        )
+        problems = docs.check(root)
+        self.assertTrue(any("PHASE-02" in problem for problem in problems), problems)
 
 
 if __name__ == "__main__":

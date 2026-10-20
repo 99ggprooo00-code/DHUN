@@ -393,3 +393,75 @@ and the two surfaces must read as one product.
   (`scripts/website_quality.py`, `scripts/website_claims.py`) run on the built
   bytes, and `website/tests/browser.mjs` measures the rendered shell in a browser
   in the site workflow.
+
+## Amendment 2026-10-20 — the source is JioSaavn, and the build is its own
+
+Appended, not rewritten. This supersedes the *source* named in the 2026-10-16
+amendment (B3 row 13) and the documents that described it. ADR-008's boundaries
+are unchanged, and boundary 1 is now satisfied more cheaply than before.
+
+### User directive (2026-10-20)
+
+> "Go with jii first as youtube ones is not properly integrated … better to work
+> from scratch … easier to solve it rather than hit and trial improving later."
+
+And, for the documents: only the web-facing ones may change; nothing that
+describes the Android or Windows builds is touched.
+
+### What changed
+
+- **The source.** `app-web/` reads JioSaavn through the public
+  [`saavn.dev`](https://saavn.dev) wrapper, with ordinary `fetch` from the
+  visitor's tab. The InnerTube player request, and the user-configured endpoint
+  that existed to work around it, are gone: the endpoint table in
+  `app-web/src/js/api.js` is the whole contract, and the CSP names exactly
+  `https://saavn.dev` and `https://*.saavncdn.com`. Nothing this project
+  operates sits in that path.
+- **The build.** `app-web/` was rewritten as the web build rather than a mirror
+  of the Compose code: twenty dependency-free ES modules, the app's glass shell
+  and tokens, a hash router with deep links, a library in `localStorage`
+  (`dhun.web.v3`), and a service worker that caches the shell and no audio.
+- **What is absent, not stubbed.** The equaliser (a platform audio binding), the
+  lyric service and parser, the Downloads surface and the cache-budget setting
+  do not exist in this build; each surface that used to offer one now says so.
+  B3 rows 6 and 12 stay as the 2026-10-16 amendment decided.
+- **The sample catalogue.** `app-web/src/js/demo.js` is the last resort: fixed
+  rows, `demo: true`, an empty stream, announced by a badge and a notice. It is
+  never mixed with live results, and pressing play on a row explains that it has
+  no audio.
+- **Boundary 1, strengthened.** No DHUN-operated backend, proxy or function — and
+  no user-supplied endpoint either. The only widening in the CSP is the
+  catalogue and its CDN, named in `app-web/src/index.html`.
+- **Boundary 4, unchanged.** There is still no playback claim. The deployed
+  origin has not been heard to produce audio by any author of this repository,
+  and `docs/web-player/IMPLEMENTATION-STATUS.md` names that as the release gate
+  rather than implying it away.
+- **The documents.** The eleven-phase plan and its tracker described the build
+  that was replaced — a plan whose "✅ Complete" rows pointed at `js/source.js`,
+  a file that no longer exists. They are replaced by a description of the build
+  that does: `README.md`, `ARCHITECTURE.md`, `DEVELOPMENT-GUIDE.md`,
+  `IMPLEMENTATION-STATUS.md` and `KNOWN-LIMITATIONS.md`.
+  `scripts/web_player_docs.py` now checks that description against the
+  filesystem — every module named exists, every evidence path resolves, no
+  retired name survives — instead of requiring phase headings.
+
+### Cost, and how to reverse it
+
+The source is community-run and has no agreement with this project. It can
+rate-limit, change shape or disappear, and it is not an official API. The cost of
+being wrong is bounded by the seam: one module (`api.js`), one CSP line, and a
+labelled sample catalogue as the floor. No money is spent in any outcome, and no
+visitor is asked for an account.
+
+### Verification (this amendment)
+
+- `cd app-web && npm test` → 147 pass, 0 fail.
+- `python3 -m unittest discover -s scripts -p 'test_*.py'` → 456 tests OK,
+  including `scripts/test_app_web.py` and the fifteen mutation tests behind the
+  document gate.
+- `python3 scripts/web_player_docs.py` → five documents describe the build that
+  exists.
+- `node website/tests/browser.mjs` against a locally assembled site: the
+  `/app/` checks measure boot, one `h1` per screen, both themes, axe at zero
+  violations, dialog focus, the local-playlist round trip, the player deep link,
+  and the offline reload.

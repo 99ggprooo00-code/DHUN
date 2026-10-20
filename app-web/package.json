@@ -2,7 +2,7 @@
   "name": "dhun-web",
   "version": "3.0.0",
   "private": true,
-  "description": "DHUN in the browser: a working music player for the web \u2014 YouTube Music search and playback, no account, no DHUN server, library stored on the device. Ships no runtime dependency.",
+  "description": "DHUN in the browser: a working music player for the web \u2014 JioSaavn search and playback through the public saavn.dev API, no account, no DHUN server, library stored on the device. Ships no runtime dependency.",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
@@ -11,7 +11,6 @@
     "start": "node tools/build.mjs && node tools/serve.mjs",
     "gen:icons": "node tools/gen-icons.mjs && node tools/gen-icons-png.mjs",
     "check:icons": "node tools/gen-icons.mjs --check && node tools/gen-icons-png.mjs --check",
-    "states": "node tools/states.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
     "test:only": "node --test --test-only \"tests/*.test.mjs\""
   },

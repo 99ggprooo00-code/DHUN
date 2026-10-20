@@ -15,7 +15,6 @@
     "test": "npm --prefix app-web test",
     "gen:icons": "npm --prefix app-web run gen:icons",
     "check:icons": "npm --prefix app-web run check:icons",
-    "states": "npm --prefix app-web run states",
     "check:docs": "python3 scripts/web_player_docs.py docs/web-player",
     "check:repo": "python3 -m unittest discover -s scripts -p 'test_*.py'",
     "check": "npm run check:icons && npm run build && npm test && npm run check:docs"

@@ -75,9 +75,9 @@ export default {
   ctaPrimary: { href: "/app/", label: "Open the web app" },
   ctaSecondary: { href: REPO, label: "Source on GitHub", external: true },
   ctaNote:
-    "DHUN's web app runs at /app/ — the same shell, navigation, keyboard shortcuts, equaliser, synced lyrics and legal pages as the Android and Windows builds, installed from this page by your browser and usable offline once it has loaded. It talks to YouTube Music directly from your browser, so a refusal by that origin is shown on screen rather than hidden.",
+    "DHUN's web app runs at /app/ — the same glass shell, navigation and keyboard shortcuts as the Android and Windows builds, installable from this page and usable offline once it has loaded, with your likes, playlists and history kept in this browser. It reads JioSaavn through the public saavn.dev API; when that service refuses, rate-limits or cannot be reached, the app says so on screen and falls back to a labelled sample catalogue whose rows carry no audio.",
   ctaNoteSource:
-    "ADR-008 amendment 2026-10-09 (2) (deployment); app-web/src (service worker, keyboard shortcuts, endpoint setting)",
+    "ADR-008 amendment 2026-10-09 (2) (deployment); app-web/src (service worker, keyboard shortcuts, api.js)",
 
   // Verified real device captures (`website/src/assets/screenshots/*.webp`),
   // mapped 1-to-1 to `.ai/WEBSITE_PLAN.md` Part A §9 and deep-linked into `/app/`.
@@ -109,7 +109,7 @@ export default {
       badge: "Captured on Android phone · DHUN v1.00.001",
       caption:
         "Full-screen player sheet with blurred artwork backdrop, seek scrubber, shuffle, previous, play, next, and repeat transport, and queue and lyrics actions.",
-      appHref: "/app/#/player",
+      appHref: "/app/#/?player=open",
       appLabel: "Open Full player in the app",
     },
     "lyrics-phone": {
@@ -123,9 +123,9 @@ export default {
       alt: "DHUN Android Full Player screen with synced lyrics in Devanagari overlay active over the blurred artwork card",
       badge: "Captured on Android phone · DHUN v1.00.001",
       caption:
-        "Synced lyrics overlay inside the full player with active CC toggle and timestamped Devanagari lines.",
-      appHref: "/app/#/player/lyrics",
-      appLabel: "Open Synced lyrics in the app",
+        "Synced lyrics overlay inside the full player with active CC toggle and timestamped Devanagari lines. This screen exists on Android and Windows only: the web build has no lyric service, and its Lyrics tab says the words are not available there rather than showing an empty pane.",
+      // No appHref: the web build's Lyrics tab carries no words. A link here
+      // would promise the screen in the caption and land on a refusal.
     },
     "queue-phone": {
       id: "mock-queue-phone",
@@ -139,7 +139,7 @@ export default {
       badge: "Captured on Android phone · DHUN v1.00.001",
       caption:
         "Up next queue and Related sheet inside the full player with drag-to-reorder handles and active track indicator.",
-      appHref: "/app/#/player/queue",
+      appHref: "/app/#/?player=open&ptab=queue",
       appLabel: "Open Up next queue in the app",
     },
     "search-phone": {
@@ -240,17 +240,16 @@ export default {
     kicker: "THE WEB APP ITSELF",
     title: "Click through the real interface at /app/ before installing anything.",
     lede:
-      "Alongside the Android and Windows captures on this site, the shipped interface runs at /app/ with the same design tokens, navigation state machine, 10-band equaliser curves, synced lyrics parser, and About & Legal pages. Pick any destination below to jump straight into that screen. The player, lyrics and queue are only reachable once something is playing — a first visit has nothing to open there yet, and the app says so rather than showing an empty sheet.",
-    source: "app-web/src/js/main.js; docs/verification/29-web-app-mirror.md; ADR-008 amendment 2026-10-09 (2)",
+      "Alongside the Android and Windows captures on this site, the shipped interface runs at /app/ with the same design tokens, navigation and glass components, built for the browser rather than mirrored from the app. Pick any destination below to jump straight into that screen. The player and its queue are only reachable once something is playing — a first visit has nothing to open there yet, and the app says so rather than showing an empty sheet.",
+    source: "app-web/src/js/main.js; app-web/README.md; ADR-008 amendment 2026-10-09 (2)",
     routes: [
-      { label: "Home feed & quick picks", detail: "Three-section feed, mood chips, and docked mini-player", href: "/app/", cta: "Launch /app/ Home" },
-      { label: "Search & filter chips", detail: "Query bar, Songs, Artists, Albums, Playlists, and Videos filters, and recent searches", href: "/app/#/search", cta: "Launch /app/ Search" },
+      { label: "Home", detail: "A hero, seven shelves read from the catalogue, and the docked mini-player", href: "/app/", cta: "Launch /app/ Home" },
+      { label: "Search & filter chips", detail: "Query bar, Songs / Albums / Artists / Playlists filters, and recent searches", href: "/app/#/search", cta: "Launch /app/ Search" },
       { label: "Expanded Full Player", detail: "Blurred artwork sheet, transport controls, seek scrubber — opens once a track is playing", href: "/app/#/?player=open", cta: "Launch /app/ Player" },
-      { label: "Synced lyrics (LRC)", detail: "Timestamped Devanagari & English lines with active-line highlight — opens once a track is playing", href: "/app/#/?player=open&ptab=lyrics", cta: "Launch /app/ Lyrics" },
-      { label: "Up Next Queue", detail: "Queue tab, track counter, and related tracks — opens once a track is playing", href: "/app/#/?player=open&ptab=queue", cta: "Launch /app/ Queue" },
+      { label: "Up Next Queue", detail: "Queue tab with a track counter — opens once a track is playing", href: "/app/#/?player=open&ptab=queue", cta: "Launch /app/ Queue" },
       { label: "Library — Playlists, Liked Songs & History", detail: "Your playlists, Liked Songs and what you have played — kept in this browser, with no account", href: "/app/#/library/playlists", cta: "Launch /app/ Library" },
-      { label: "Settings & 10-band Equalizer", detail: "Dark and Light themes, 6 accents, 18 VLC presets, ±20 dB bands", href: "/app/#/settings", cta: "Launch /app/ Settings" },
-      { label: "About, Privacy & Legal", detail: "Bundled Privacy Policy, Terms, GPL-3.0 & Apache-2.0 licences, Support", href: "/app/#/about-legal", cta: "Launch /app/ About & Legal" },
+      { label: "Settings", detail: "Dark, Light and System themes, six accents, volume, repeat and shuffle, plus export, import and erase", href: "/app/#/settings", cta: "Launch /app/ Settings" },
+      { label: "About, Privacy & Legal", detail: "This build's own privacy policy, terms and licences — bundled, with no request leaving the page", href: "/app/#/about/privacy", cta: "Launch /app/ About & Legal" },
     ],
   },
 
@@ -259,17 +258,24 @@ export default {
   // short: the real changelog is CHANGELOG.md, and a second one here would rot.
   whatsNew: {
     kicker: "WHAT CHANGED",
-    title: "Four rounds that changed what /app/ does, with the pull request that carried each one.",
+    title: "Four rounds that changed what /app/ is, with the pull request that carried each one.",
     lede:
       "The site and the web app are built from the same repository, so the interface at /app/ moves when the app does. These are the last four rounds that changed something a visitor can see — every line is a merged change, not a roadmap, and the pull request next to it is the evidence.",
-    source: "CHANGELOG.md [Unreleased]; .ai/DEBUG_LOG.md; docs/verification/29-web-app-mirror.md",
+    source: "CHANGELOG.md [Unreleased]; app-web/README.md; docs/web-player/IMPLEMENTATION-STATUS.md",
     entries: [
+      {
+        pr: "PR #189",
+        href: `${REPO}/pull/189`,
+        title: "The web app was rebuilt from scratch, and it reads JioSaavn instead of failing on YouTube.",
+        detail:
+          "The browser build had been a mirror of the Android code, and its source was YouTube Music — an origin that refuses a browser's player request often enough that the app spent most of its life showing an error it could not act on. It is now its own build: twenty dependency-free modules, the DHUN glass shell, a catalogue seam over the public saavn.dev API, a library in this browser and a service worker that caches the shell and no audio. The equaliser, the lyric service and the Downloads screen are gone rather than stubbed — each says so where a visitor would look for it. Nothing promises audio that has been heard: the status page still names that as the release gate.",
+      },
       {
         pr: "PR #188",
         href: `${REPO}/pull/188`,
         title: "The web app now says which screen you are on — and keeps the caret where you left it.",
         detail:
-          "The first axe scan of /app/ found 18 of the 19 equaliser presets rendering blank, and the player's tabs with no tablist — both critical. The sheets said aria-modal and then let Tab walk into the page behind them; focus now enters, wraps and returns to the button that opened the sheet. Every screen names itself in the document title, album and artist screens say “Loading the…” instead of claiming they could not be loaded, and submitting a search no longer drops the caret out of the box.",
+          "The first axe scan of /app/ found the player's tabs with no tablist, and a settings screen whose preset chips rendered blank — both critical. The sheets said aria-modal and then let Tab walk into the page behind them; focus now enters, wraps and returns to the button that opened the sheet. Every screen names itself in the document title, album and artist screens say “Loading the…” instead of claiming they could not be loaded, and submitting a search no longer drops the caret out of the box.",
       },
       {
         pr: "PR #187",

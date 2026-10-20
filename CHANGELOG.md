@@ -22,6 +22,50 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The web documents describe the build that exists, and the site stops promising what it does not (2026-10-20, session `arena/3e7baa1c-dhun`)
+
+The rebuild left the web workstream's own documents describing the app it
+replaced. Four were accurate in October and wrong by the afternoon: the plan
+named `js/source.js` (deleted), the status page counted 224 tests (there are
+147), and both promised a playback proof from a build that no longer existed.
+
+- **The phase plan is gone.** `docs/web-player/` carried eleven `PHASE-*.md`
+  reports plus a tracker whose rows said "✅ Complete" for code that had been
+  rewritten. A ledger of phases is the wrong shape for a build that changes in a
+  round; it is replaced by `ARCHITECTURE.md` (the module map and how the layers
+  fit), `IMPLEMENTATION-STATUS.md` (what is verified, by what, and what is not)
+  and `KNOWN-LIMITATIONS.md`, alongside the README and the development guide.
+- **The gate checks the filesystem, not the prose.** `scripts/web_player_docs.py`
+  used to demand eleven phase files with fixed headings and evidence cells
+  pointing at them — a format that stays green while the content rots. It now
+  fails when `ARCHITECTURE.md` misses a module that exists, names one that does
+  not, when an evidence row in the status table cites a path that no longer
+  resolves, when "Not verified" shrinks below three items, when a retired name
+  (`js/source.js`, `PHASE-02`, …) appears without saying it is gone, or when the
+  site's own honesty rules reject a sentence. Fifteen mutation tests feed it the
+  mistakes a busy session makes.
+- **The site's copy matches the app it links to.** The front page described
+  "YouTube Music, read directly from your browser" and promised an equaliser,
+  synced lyrics and an `#/about-legal` route; the Lyrics capture linked into a
+  build that has no lyric service. It now names JioSaavn and the labelled sample
+  catalogue, deep-links the player and queue through `?player=open`, points at
+  `#/about/privacy`, and the Lyrics capture says the screen is Android/Windows
+  only and no longer links under it. The "What changed" entries were rewritten
+  around the rebuild (PR #189).
+- **Deleted: `app-web/tools/states.mjs`.** It imported `js/source.js`, which no
+  longer exists — `npm run states` had been failing with `ERR_MODULE_NOT_FOUND`
+  since the rebuild and nothing noticed. The `states` script is gone from both
+  manifests rather than left as a command that cannot run.
+- **Corrected stale self-descriptions.** `app-web/package.json` and
+  `manifest.webmanifest` still described YouTube Music search; they now describe
+  the JioSaavn catalogue and the source that can refuse.
+
+Verified after the change: `node tools/build.mjs` clean (20 reachable modules, 29
+shell entries), `npm test` **147 pass / 0 fail**, the Python suite **459 OK**
+(`scripts/test_app_web.py` and the new document tests included), the site's
+honesty contract **OK on 4 pages**, and the browser run's app checks **42
+measurements, 0 failures**.
+
 ### The web app is rebuilt from scratch, and four defects it shipped with are fixed (2026-10-20, session `arena/3e7baa1c-dhun`)
 
 `app-web/` is not a mirror of the installed app any more; it is the web build,
