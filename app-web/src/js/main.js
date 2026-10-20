@@ -372,8 +372,12 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
             : html`<button type="button" class="dhun-icon-button" data-action="open-settings" aria-label="Settings">${icon("Settings", { size: 22 })}</button>`,
       }),
     );
-    setRegion("dhun-rail-region", navRail({ active: state.tab }));
-    setRegion("dhun-nav-region", bottomNav({ active: state.tab }));
+    // The highlighted destination is a property of the screen you are on, not of
+    // the last tab you pressed: Settings and About belong to no destination, and
+    // leaving Library lit under them claimed otherwise.
+    const activeTab = tabFor(route) ?? "";
+    setRegion("dhun-rail-region", navRail({ active: activeTab }));
+    setRegion("dhun-nav-region", bottomNav({ active: activeTab }));
     // The dock carries the failure as well as the track. A playback error that
     // is only visible after opening the full player is a failure most visitors
     // never see: they pressed play, nothing happened, and the row went quiet.

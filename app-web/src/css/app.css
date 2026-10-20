@@ -84,6 +84,20 @@ a {
   background: color-mix(in srgb, var(--dhun-accent) 35%, transparent);
 }
 
+/*
+ * A heading is focused on every screen change so a screen reader announces the
+ * new screen — and it is not a control. The global `:focus-visible` ring drew a
+ * purple box around "Make it yours" on load, which reads as a text field left in
+ * edit mode. The focus stays; the ring does not. Headings are not in the tab
+ * order (`tabindex="-1"` only), so no keyboard-operable target loses its
+ * indicator.
+ */
+h1:focus-visible,
+h2:focus-visible,
+h3:focus-visible {
+  outline: none;
+}
+
 .dhun-visually-hidden {
   position: absolute;
   width: var(--dhun-stroke-hairline);
@@ -1118,13 +1132,18 @@ a {
   align-items: center;
   gap: var(--dhun-space-xs);
   min-height: var(--dhun-space-compact-target);
-  padding: 0 var(--dhun-space-lg);
+  /* `nowrap` here re-broke the rule above: "Recently played" cannot fit a third
+     of a 390px strip, so the label ran past the right edge and the strip's end
+     was clipped by the screen. Labels wrap; the strip stays inside the page. */
+  padding: 0 var(--dhun-space-sm);
   border: 0;
   border-radius: var(--dhun-shape-full);
   background: none;
   color: var(--dhun-text-secondary);
   font: var(--dhun-text-label-large);
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .dhun-tab.is-active {

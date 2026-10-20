@@ -22,10 +22,10 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
-### Two things a visitor would have seen in the player (2026-10-20, session `arena/3e7baa1c-dhun`)
+### Four things a visitor would have seen (2026-10-20, session `arena/3e7baa1c-dhun`)
 
-Both were found by looking at the app rather than measuring it, and both are now
-pinned by the browser run.
+All four were found by looking at the app rather than measuring it, and each is
+now pinned by the browser run.
 
 - **The player's header printed its queue key.** Starting a track from an album
   opens the full player with the context `album:demo-al-1` — the key
@@ -40,6 +40,18 @@ pinned by the browser run.
   size for it (176px below 900px tall, 144px plus tighter stage gaps below
   820px). Measured after the change: 390×844 → tabs 782–826, 360×800 →
   742–786. The two-column desktop player is unaffected.
+- **The library's three section tabs ran off the right edge.** The strip is
+  `flex: 1` per tab, but a later rule set `white-space: nowrap`, so "Recently
+  played" could not wrap and the strip ran past the right edge — the label was
+  visibly cut and the strip's rounded end was off-window. Labels wrap again;
+  measured at 390, 360 and 320 px, every tab now sits inside the strip and each
+  is 44px tall. The page-level overflow check
+  never saw it, because the strip is its own scroll container — the local
+  playlist check now measures the strip directly.
+- **Settings and About lit the Library tab in the rail.** The highlight came
+  from `state.tab`, which remembers the last destination pressed; those screens
+  belong to none. It is now derived from the route, so nothing is lit under a
+  screen that is not one of the three destinations.
 
 ### The web documents describe the build that exists, and the site stops promising what it does not (2026-10-20, session `arena/3e7baa1c-dhun`)
 
