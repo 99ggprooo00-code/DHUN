@@ -1822,11 +1822,44 @@ async function checkWebAppDeepLink(browser) {
   const opened = await page.evaluate(() => ({
     overlay: Boolean(document.querySelector(".dhun-full")),
     title: (document.querySelector(".dhun-full__title")?.textContent || "").trim(),
+    context: (document.querySelector(".dhun-full__label")?.textContent || "").trim(),
   }));
   if (!opened.overlay) {
     fail(label, "choosing a track did not open the player the link asked for");
+  } else if (/:/.test(opened.context)) {
+    // The context the player was started with is a queue key (`album:<id>`).
+    // Printed as-is it told a visitor the album's internal id and hid the name
+    // the same screen had just loaded.
+    fail(label, `the player's header shows the queue key, not a name: “${opened.context}”`);
   } else {
-    record(label, `choosing a track opens it: “${opened.title}”`);
+    record(label, `choosing a track opens it: “${opened.title}” over “${opened.context}”`);
+  }
+
+  // The overlay is drawn as soon as a track exists; the row's position settles
+  // once the state it carries (here, the sample-row refusal) has rendered.
+  await page.waitForTimeout(600);
+
+  // The tab row is the only way to the queue and the lyrics, and at 390×844 it
+  // used to land at 826px — 18 pixels of two buttons above the fold. The sheet
+  // scrolls, so it was reachable, but a control that is half a button on the
+  // screen a visitor lands on reads as broken. Short phone windows now trade
+  // artwork size for it; this measures the result.
+  const tabs = await page.evaluate(() => {
+    const row = document.querySelector(".dhun-full__tabs");
+    if (!row) return null;
+    const rect = row.getBoundingClientRect();
+    return { bottom: Math.round(rect.bottom), viewport: window.innerHeight };
+  });
+  if (!tabs) {
+    fail(label, "the player has no Queue/Lyrics tab row");
+  } else if (tabs.bottom > tabs.viewport) {
+    fail(
+      label,
+      `the Queue/Lyrics tab row ends ${tabs.bottom - tabs.viewport}px below the fold ` +
+        `(${tabs.bottom} > ${tabs.viewport}) — the only route to the queue is half-drawn`,
+    );
+  } else {
+    record(label, `the Queue/Lyrics tab row is fully above the fold (${tabs.bottom} of ${tabs.viewport})`);
   }
   await page.close();
   await context.close();
@@ -1971,6 +2004,7 @@ async function checkWebAppDialogs(browser) {
   // The sheet's own claim, then a keyboard inside it, then the way out.
   await page.goto(url("/app/#/library/playlists"), { waitUntil: "load" });
   await page.waitForSelector('[data-action="new-playlist"]', { timeout: 25000 });
+
   await page.locator('[data-action="new-playlist"]').first().click();
   await page.waitForTimeout(350);
   const opened = await active();
@@ -2169,6 +2203,36 @@ async function checkWebAppLibrary(browser) {
 
   await page.goto(url("/app/#/library/playlists"), { waitUntil: "load" });
   await page.waitForSelector('[data-action="new-playlist"]', { timeout: 25000 });
+
+  // The three library tabs share one strip. With `white-space: nowrap` on the
+  // tab the third label ("Recently played") ran past the right edge and the
+  // strip's rounded end was off-screen — invisible to the page-level overflow
+  // check, because the strip is its own scroll container.
+  const strip = await page.evaluate(() => {
+    const row = document.querySelector(".dhun-tabs");
+    if (!row) return null;
+    const rect = row.getBoundingClientRect();
+    const tabs = [...row.querySelectorAll(".dhun-tab")].map((tab) => {
+      const box = tab.getBoundingClientRect();
+      return { label: (tab.textContent || "").trim(), right: Math.round(box.right), height: Math.round(box.height) };
+    });
+    return { left: Math.round(rect.left), right: Math.round(rect.right), viewport: window.innerWidth, tabs };
+  });
+  if (!strip) {
+    fail(label, "the library screen has no section tabs");
+  } else {
+    const spilled = strip.tabs.filter((tab) => tab.right > strip.viewport);
+    if (strip.right > strip.viewport || spilled.length) {
+      fail(
+        label,
+        `the library tab strip runs past the window: strip ×${strip.left}–${strip.right} in ${strip.viewport}px` +
+          (spilled.length ? `, ${spilled.map((tab) => `“${tab.label}” ends at ${tab.right}`).join(", ")}` : ""),
+      );
+    } else {
+      record(label, `${strip.tabs.length} section tabs fit the ${strip.viewport}px window (${strip.right}px)`);
+    }
+  }
+
   await page.locator('[data-action="new-playlist"]').first().click();
   const sheet = await page.evaluate(() => ({
     label: (document.querySelector("#sheet-title")?.textContent || "").trim(),
@@ -2179,7 +2243,7 @@ async function checkWebAppLibrary(browser) {
   } else if (sheet.focused !== "Playlist name") {
     fail(label, `the naming sheet did not put the cursor in its field (focus: “${sheet.focused || "none"}”)`);
   } else {
-    record(label, "the header button opens a naming sheet, with the cursor in the field");
+    record(label, "the New playlist control opens a naming sheet, with the cursor in the field");
   }
 
   await page.keyboard.type("Browser check");

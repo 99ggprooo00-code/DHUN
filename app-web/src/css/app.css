@@ -84,6 +84,20 @@ a {
   background: color-mix(in srgb, var(--dhun-accent) 35%, transparent);
 }
 
+/*
+ * A heading is focused on every screen change so a screen reader announces the
+ * new screen — and it is not a control. The global `:focus-visible` ring drew a
+ * purple box around "Make it yours" on load, which reads as a text field left in
+ * edit mode. The focus stays; the ring does not. Headings are not in the tab
+ * order (`tabindex="-1"` only), so no keyboard-operable target loses its
+ * indicator.
+ */
+h1:focus-visible,
+h2:focus-visible,
+h3:focus-visible {
+  outline: none;
+}
+
 .dhun-visually-hidden {
   position: absolute;
   width: var(--dhun-stroke-hairline);
@@ -1118,13 +1132,18 @@ a {
   align-items: center;
   gap: var(--dhun-space-xs);
   min-height: var(--dhun-space-compact-target);
-  padding: 0 var(--dhun-space-lg);
+  /* `nowrap` here re-broke the rule above: "Recently played" cannot fit a third
+     of a 390px strip, so the label ran past the right edge and the strip's end
+     was clipped by the screen. Labels wrap; the strip stays inside the page. */
+  padding: 0 var(--dhun-space-sm);
   border: 0;
   border-radius: var(--dhun-shape-full);
   background: none;
   color: var(--dhun-text-secondary);
   font: var(--dhun-text-label-large);
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .dhun-tab.is-active {
@@ -2366,6 +2385,42 @@ a {
 
   .dhun-full__tabs-wrap {
     margin-top: 0;
+  }
+}
+
+/* ------------------------------------------------------- short windows ---- */
+
+/*
+ * The full player is one column on a phone, and at 390×844 its Queue/Lyrics tab
+ * row landed at 826px — 18 pixels of two buttons above the fold, below a 220px
+ * artwork. The artwork is the only element there that can give up space without
+ * losing information, so on a short phone window it gives some up and the tabs
+ * sit fully above the fold (measured at 390×844: tabs 782–826, art 176).
+ *
+ * Scoped to the one-column layout: a desktop window shorter than 900px draws
+ * the player in two columns, where the art has its own column and nothing is
+ * competing for the tab row's space.
+ */
+@media (max-width: 839px) and (max-height: 900px) {
+  .dhun-full__art {
+    width: calc(var(--dhun-space-artwork-card) + var(--dhun-space-lg));
+  }
+}
+
+/* The same trade one step further down: 360×800 is a 2022-era Android phone and
+   needs another ~60px before its tab row clears the fold. */
+@media (max-width: 839px) and (max-height: 820px) {
+  .dhun-full__art {
+    width: calc(var(--dhun-space-artwork-card) - var(--dhun-space-lg));
+  }
+
+  .dhun-full__stage {
+    gap: var(--dhun-space-md);
+    margin-top: var(--dhun-space-sm);
+  }
+
+  .dhun-full__tabs-wrap {
+    padding-top: var(--dhun-space-sm);
   }
 }
 

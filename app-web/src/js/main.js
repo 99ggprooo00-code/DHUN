@@ -198,7 +198,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       shuffle: player.state.shuffle,
       repeat: player.state.repeat,
       tab: state.route.playerTab ?? "queue",
-      context: player.state.context,
+      context: contextForDisplay(player.state.context),
       sourceLabel: track ? sourceLabel() : "",
       liked: track ? state.library.likes.includes(track.id) : false,
       playing: player.state.status === STATUS.playing,
@@ -372,8 +372,12 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
             : html`<button type="button" class="dhun-icon-button" data-action="open-settings" aria-label="Settings">${icon("Settings", { size: 22 })}</button>`,
       }),
     );
-    setRegion("dhun-rail-region", navRail({ active: state.tab }));
-    setRegion("dhun-nav-region", bottomNav({ active: state.tab }));
+    // The highlighted destination is a property of the screen you are on, not of
+    // the last tab you pressed: Settings and About belong to no destination, and
+    // leaving Library lit under them claimed otherwise.
+    const activeTab = tabFor(route) ?? "";
+    setRegion("dhun-rail-region", navRail({ active: activeTab }));
+    setRegion("dhun-nav-region", bottomNav({ active: activeTab }));
     // The dock carries the failure as well as the track. A playback error that
     // is only visible after opening the full player is a failure most visitors
     // never see: they pressed play, nothing happened, and the row went quiet.
@@ -1285,6 +1289,47 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     }
     const data = state.entity.data;
     return data?.album?.songs ?? data?.playlist?.songs ?? data?.songs ?? [];
+  }
+
+  /**
+   * What the full player calls what it is playing.
+   *
+   * The player's queue is started with a context string (`album:demo-al-1`,
+   * `collection:pl-…`) because that is what `listContext()` needs to find the
+   * rows again. It is not something to show a person: the bar used to print the
+   * raw value, so the header read "ALBUM:DEMO-AL-1" over a record whose name it
+   * knew all along. A known collection gets its name; everything else gets the
+   * kind in words.
+   */
+  const CONTEXT_WORDS = Object.freeze({
+    album: "Album",
+    playlist: "Playlist",
+    artist: "Artist",
+    collection: "Your playlist",
+    search: "Search results",
+    liked: "Liked songs",
+    history: "Recently played",
+    home: "Home",
+    hero: "Trending now",
+    list: "Playing",
+  });
+
+  function contextForDisplay(context) {
+    if (!context) return "Playing";
+    // A context with no colon was written as words when playback started
+    // ("Trending now", "Liked songs") and needs no translation.
+    if (!String(context).includes(":")) return String(context);
+    const [kind, id] = String(context).split(":");
+    if ((kind === "album" || kind === "playlist" || kind === "artist") && state.entity.data) {
+      const data = state.entity.data[kind];
+      if (data && (!id || data.id === id)) return data.title;
+    }
+    if (kind === "collection") {
+      const playlist = state.library.playlists.find((entry) => entry.id === id);
+      if (playlist) return playlist.name;
+      return CONTEXT_WORDS.collection;
+    }
+    return CONTEXT_WORDS[kind] ?? "Playing";
   }
 
   function contextLabel() {

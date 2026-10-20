@@ -384,9 +384,13 @@ export function libraryScreen(vm) {
   ];
   const body = (() => {
     if (vm.tab === "playlists") {
-      return html`<div class="dhun-library-tools">
-          <button type="button" class="dhun-button dhun-button--filled" data-action="new-playlist">${icon("Add", { size: 18 })}<span>New playlist</span></button>
-        </div>
+      // The empty state already offers "New playlist"; drawing the header button
+      // over it too put two identical controls on an otherwise empty screen.
+      return html`${vm.playlists.length
+          ? html`<div class="dhun-library-tools">
+              <button type="button" class="dhun-button dhun-button--filled" data-action="new-playlist">${icon("Add", { size: 18 })}<span>New playlist</span></button>
+            </div>`
+          : html``}
         ${vm.playlists.length
           ? html`<div class="dhun-grid dhun-grid--playlists">
               ${vm.playlists.map((playlist) =>

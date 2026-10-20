@@ -22,6 +22,37 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Four things a visitor would have seen (2026-10-20, session `arena/3e7baa1c-dhun`)
+
+All four were found by looking at the app rather than measuring it, and each is
+now pinned by the browser run.
+
+- **The player's header printed its queue key.** Starting a track from an album
+  opens the full player with the context `album:demo-al-1` — the key
+  `listContext()` needs to find the rows again — and the bar rendered it as-is:
+  `ALBUM:DEMO-AL-1` over a record whose name the same screen had loaded. A known
+  album, playlist, artist or playlist-you-made now shows its name; anything else
+  shows the kind in words ("Search results", "Liked songs", "Trending now"), and
+  the check fails if a colon reaches that label again.
+- **The Queue/Lyrics tab row sat half below the fold on a phone.** At 390×844 the
+  row began at 826px under a 220px artwork: eighteen pixels of two buttons, and
+  the only route to the queue. On phone-shaped windows the artwork now gives up
+  size for it (176px below 900px tall, 144px plus tighter stage gaps below
+  820px). Measured after the change: 390×844 → tabs 782–826, 360×800 →
+  742–786. The two-column desktop player is unaffected.
+- **The library's three section tabs ran off the right edge.** The strip is
+  `flex: 1` per tab, but a later rule set `white-space: nowrap`, so "Recently
+  played" could not wrap and the strip ran past the right edge — the label was
+  visibly cut and the strip's rounded end was off-window. Labels wrap again;
+  measured at 390, 360 and 320 px, every tab now sits inside the strip and each
+  is 44px tall. The page-level overflow check
+  never saw it, because the strip is its own scroll container — the local
+  playlist check now measures the strip directly.
+- **Settings and About lit the Library tab in the rail.** The highlight came
+  from `state.tab`, which remembers the last destination pressed; those screens
+  belong to none. It is now derived from the route, so nothing is lit under a
+  screen that is not one of the three destinations.
+
 ### The web documents describe the build that exists, and the site stops promising what it does not (2026-10-20, session `arena/3e7baa1c-dhun`)
 
 The rebuild left the web workstream's own documents describing the app it
@@ -63,7 +94,7 @@ named `js/source.js` (deleted), the status page counted 224 tests (there are
 Verified after the change: `node tools/build.mjs` clean (20 reachable modules, 29
 shell entries), `npm test` **147 pass / 0 fail**, the Python suite **459 OK**
 (`scripts/test_app_web.py` and the new document tests included), the site's
-honesty contract **OK on 4 pages**, and the browser run's app checks **42
+honesty contract **OK on 4 pages**, and the browser run's app checks **43
 measurements, 0 failures**.
 
 ### The web app is rebuilt from scratch, and four defects it shipped with are fixed (2026-10-20, session `arena/3e7baa1c-dhun`)
