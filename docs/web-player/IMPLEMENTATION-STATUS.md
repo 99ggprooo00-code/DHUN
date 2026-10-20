@@ -1,90 +1,99 @@
-# DHUN Web — implementation status
+# DHUN Web — status and evidence
 
-> **Overall status: IN DEVELOPMENT — NOT VERIFIED FOR RELEASE**
-> Last updated: 2026-10-16 (session `arena/59c43e0a-dhun`)
+> **Status: the build ships and works; it is NOT VERIFIED FOR RELEASE.**
+> Last updated: 2026-10-20.
 
-The one fact that sets the overall status: **no one has yet heard audio come out
-of the deployed site.** Everything else in the phase table below is either
-implemented and unit-tested, or CI-measured, or both — playback is the item that
-cannot be asserted from this repository, and it is Phase 2.
+Two facts set that status, and both are named in "Not verified" below: nobody has
+heard audio come out of the **deployed** origin, and the catalogue this build
+reads is a community-run wrapper with no support contract. Everything else is
+either implemented and unit-tested, or measured in a real browser on every pull
+request, or both.
 
-## Phase tracker
+## What is verified, and by what
 
-| Phase | Name | Status | Evidence | Remaining work |
-|---|---|---|---|---|
-| 0 | Repository audit and baseline | ✅ Complete | [PHASE-00-AUDIT.md](PHASE-00-AUDIT.md) — audit of the existing `app-web/`, the gates, and what is reused rather than rebuilt | Keep the tracker current; that is Phase 10's job |
-| 1 | Research and feasibility | ⚠️ Complete with exceptions | [PHASE-01-SOURCE-RESEARCH.md](PHASE-01-SOURCE-RESEARCH.md) — `docs/decisions/ADR-001`, `ADR-008` (including the B1 result), `docs/research/`, `web-spike/` | An open-licensed source (Internet Archive) has been identified and **not** evaluated against the app's provider contract — see the phase file |
-| 2 | Real playback proof of concept | ❌ Blocked | [PHASE-02-PLAYBACK-POC.md](PHASE-02-PLAYBACK-POC.md) — B1's result: metadata readable, the player request refused by the origin in the one available browser; the app surfaces that refusal (`app-web/src/js/source.js`, `player-ui.js`) | A real browser, on a real network, playing a real track from the deployed `/app/` and reporting what happened — sound or an error with a reason |
-| 3 | Source-neutral architecture | ✅ Complete | [PHASE-03-ARCHITECTURE.md](PHASE-03-ARCHITECTURE.md) — `app-web/src/js/source.js`: `SOURCE_KIND`, one `describeActive()`, a failure taxonomy, a documented endpoint contract | Nothing; a new provider is added behind the same interface |
-| 4 | Real search and catalogue | ⚠️ Complete with exceptions | [PHASE-04-SEARCH-AND-CATALOGUE.md](PHASE-04-SEARCH-AND-CATALOGUE.md) — `source.js` InnerTube adapter, unit-tested against the recorded contract; the demo catalogue is labelled and last | Live search from the deployed origin is unverified (it shares Phase 2's blocker) |
-| 5 | Complete playback engine | ✅ Complete | [PHASE-05-PLAYBACK-ENGINE.md](PHASE-05-PLAYBACK-ENGINE.md) — `player.js`, `audio.js`, `tabsync.js`; 224 `app-web` tests | Audible output depends on Phase 2 |
-| 6 | Interface and full-screen player | ✅ Complete | [PHASE-06-INTERFACE.md](PHASE-06-INTERFACE.md) — `player-ui.js`, `views.js`, generated tokens; the `browser` job measures viewports, contrast, tab stops and axe on every route | A human's eyes; no capture from the web app has been looked at by a person |
-| 7 | Library, playlists, persistence | ✅ Complete | [PHASE-07-LIBRARY-AND-PERSISTENCE.md](PHASE-07-LIBRARY-AND-PERSISTENCE.md) — `storage.js` (settings in `localStorage`, library in IndexedDB, export/import, private-mode degradation) | No cross-device story, by design and by budget |
-| 8 | Reliability, accessibility, privacy, security | ⚠️ Complete with exceptions | [PHASE-08-TEST-PLAN.md](PHASE-08-TEST-PLAN.md) — the four gates, the CSP, the no-telemetry assertions | A manual browser and screen-reader pass; real network-failure testing |
-| 9 | Deployment and release | ⚠️ Complete with exceptions | [PHASE-09-DEPLOYMENT.md](PHASE-09-DEPLOYMENT.md) — the site and `/app/` are live on GitHub Pages; the served-bytes check re-reads them after every publish | The release gate itself is Phase 2, and no release of the web app is claimed |
-| 10 | Maintenance and roadmap | ✅ Complete | [PHASE-10-MAINTENANCE-ROADMAP.md](PHASE-10-MAINTENANCE-ROADMAP.md) — the daily extraction drill, the maintenance contract in `README.md`, `docs/decisions/ADR-001` | Living document: reviewed whenever extraction breaks |
+Every row names a file in this repository that exists and does the work. The gate
+`scripts/web_player_docs.py` fails when a row's evidence stops resolving, so this
+table cannot quietly describe a build that has moved on.
 
-## Status legend
-
-| Mark | Meaning |
+| Claim | Evidence |
 |---|---|
-| ✅ Complete | Implemented, tested, and the evidence is named in the row |
-| ⚠️ Complete with exceptions | The work is done and the exception is written down — read the phase file before relying on it |
-| 🔄 In progress | Started, not finished |
-| 🔲 Not started | Not begun |
-| ❌ Blocked | Cannot proceed for a reason outside this repository's control |
-| 🚫 Skipped | Deliberately not done, with the reason recorded |
+| The build assembles from the sources, and every module is reachable from `main.js` | `app-web/tools/build.mjs` — it fails on an unreachable module or a shell entry that is not in the build |
+| 147 assertions over the pure modules pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
+| The web build is a real app, not a preview: regions before the module runs, a strict CSP, `noindex`, no third-party asset, no downloads surface, a labelled sample catalogue | `scripts/test_app_web.py` |
+| Every screen renders one `h1`, resets focus to it after navigation, and titles the document | `website/tests/browser.mjs` (`entity outline`, `/app/ dialog focus`) |
+| Rendered contrast meets 4.5:1 / 3:1 on every visible line, in both themes | `website/tests/browser.mjs` (`/app/ contrast`) |
+| axe reports no serious or critical violation on any route, in both themes, with the player and the sheets open | `website/tests/browser.mjs` (`/app/ axe`) |
+| Sheets are dialogs: focus enters, Tab wraps, Escape closes, focus returns to the button that opened it | `website/tests/browser.mjs` (`/app/ dialog focus`) |
+| A playlist made in the browser opens, keeps its rows across a reload, and renames through the same sheet | `website/tests/browser.mjs` (`local playlist`), `app-web/src/js/library.js` |
+| The shell opens with the network off, and says which catalogue answered | `website/tests/browser.mjs` (`offline`), `app-web/src/sw.js` |
+| The player deep link says what it is waiting for, then opens the player when a track starts | `website/tests/browser.mjs` (`player deep link`) |
+| The appearance control themes the document, not just the chrome | `website/tests/browser.mjs` (`appearance`), `app-web/src/css/tokens.css` |
+| The catalogue seam turns a timeout, an offline browser and an HTTP error into distinct sentences, with the technical detail labelled | `app-web/src/js/api.js`, `app-web/tests/api.test.mjs` |
+| A row with no stream is refused in words rather than played silently | `app-web/src/js/player.js`, `app-web/src/js/player-ui.js` |
+| The site and `/app/` deploy together from one workflow, and the served bytes are re-read after each publish | `.github/workflows/website.yml`, `scripts/website_smoke.py` |
+| These documents describe the build that exists | `scripts/web_player_docs.py` |
 
-## Release readiness checklist
+## Not verified
 
-This is the definition of done. A ticked box means the claim was verified and
-the evidence is named; an unticked box means it was not.
+- **Nobody has heard audio from the deployed `/app/`.** The code path is real —
+  a URL from the catalogue's `downloadUrl` list goes into an `<audio>` element —
+  but no author of this repository can state from evidence that the deployed page
+  produced sound. A browser check on a runner cannot hear it either. Treat this as
+  the release gate until a person records what happened.
+- **The live catalogue from the deployed origin.** `saavn.dev` is reachable from
+  CI in principle, but the browser run records the source badge it finds; it has
+  never recorded a live response from the deployed page. A CORS refusal, a 429 or
+  an empty shelf is a finding to record, not a success to assume.
+- **Browsers other than the one CI launches.** The measurements come from one
+  Chromium build on Linux. Safari, Firefox and an Android browser on a phone are
+  untested.
+- **A screen-reader pass.** axe checks what a DOM can be checked for; nobody has
+  listened to the app with a screen reader.
+- **A person's judgement of the look.** CI measures geometry, contrast and
+  semantics. It does not see whether the result is pleasant to use.
+- **The service's terms.** This build reads a community wrapper around JioSaavn.
+  Whether that is permitted, and what must be disclosed, is an open question for
+  the project and for a lawyer — not something the code can settle. The app says
+  what it calls and where, and makes no claim of authorisation.
+
+## What "done" would mean
+
+The checklist below is the definition of done. A ticked box means the claim was
+verified and this file names the evidence; an unticked box means it was not.
 
 - [x] **The interface ships and is reachable** — the site and `/app/` are live at
-  `https://99ggprooo00-code.github.io/DHUN/` and re-checked after every publish
-  by the `served` job (`scripts/website_smoke.py`).
-- [x] **The code is unit-tested** — `cd app-web && npm test` → 224 pass;
-  `python3 -m unittest discover -s scripts` → the repository's Python contract
-  suite, which includes the web app's source-level rules.
-- [x] **The rendered pages are measured in a real browser** — the `browser` job
-  (viewports, contrast in both schemes, tab stops, radio groups, keyboard, axe)
-  passes on every route, `/app/` included.
-- [x] **No paid infrastructure, and none hidden** — no backend, no proxy, no
-  serverless function, no database service, no paid API, no paid domain: the
-  deployment is a static GitHub Pages site and a static app, and
-  `scripts/test_app_web.py` fails if the app grows a DHUN-operated endpoint.
-- [x] **No tracking** — no analytics, telemetry or crash-reporting SDK; asserted
-  against the shipped dependency graph by `scripts/website_claims.py`.
-- [x] **Licensing and attribution are recorded** — `LICENSE` (GPL-3.0-or-later),
-  `THIRD_PARTY.md`, and the legal bundle generated into the app.
-- [x] **The limitations are visible** — [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md)
-  and [`.ai/KNOWN_LIMITATIONS.md`](../../.ai/KNOWN_LIMITATIONS.md).
-- [ ] **A real source provides genuine results, from the deployed site** — the
-  adapter is real and unit-tested, but a live query from the deployed origin has
-  not been performed and recorded. Blocked by the same thing as the next line.
-- [ ] **At least one supported source plays audible audio** — **not proven.**
-  This is the release gate. See [PHASE-02](PHASE-02-PLAYBACK-POC.md).
-- [ ] **Track changes and errors are handled honestly in practice** — the states
-  exist and are unit-tested; that they behave as designed on a real network is
-  part of the same unperformed test.
-- [ ] **Desktop and Android browser tests pass** — CI renders the app in one
-  Chromium build on a Linux runner. A desktop browser other than that, and an
-  Android browser on a phone, are untested.
-- [ ] **A human has looked at the result** — nobody has watched a page render,
-  on the site or in `/app/`. CI measures geometry and semantics, not taste, and
-  it does not see what a person sees.
+  `https://99ggprooo00-code.github.io/DHUN/`, and `scripts/website_smoke.py`
+  re-reads the served bytes after every publish.
+- [x] **The code is unit-tested** — `cd app-web && npm test` → 147 pass;
+  `python3 -m unittest discover -s scripts -p 'test_*.py'` → 459 tests OK, the
+  web app's source-level rules included.
+- [x] **The rendered pages are measured in a real browser** — `website/tests/browser.mjs`
+  runs on every pull request and prints its numbers as check annotations.
+- [x] **No paid infrastructure and no DHUN server** — static GitHub Pages, one
+  third-party API called from the tab, no function, no database, no proxy.
+- [x] **No tracking** — no analytics, telemetry or crash reporting; the CSP names
+  two origins and both are the catalogue's.
+- [x] **The limits are visible in the product** — the source badge, the sample
+  catalogue notice, the failure states, `Settings → Catalogue`, and
+  [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md).
+- [x] **Licensing and attribution** — `LICENSE` (GPL-3.0-or-later),
+  `THIRD_PARTY.md`, and the licences page rendered from the bundle.
+- [ ] **A real catalogue answers the deployed page** — unverified; see above.
+- [ ] **At least one track is heard to play** — unverified; this is the gate.
+- [ ] **A second browser, and an Android phone, are measured** — not done.
+- [ ] **A screen-reader pass** — not done.
+- [ ] **A person has listened and looked** — not done.
 
-## How to move the status forward
+## How to move it forward
 
-In order, and nothing below the first line matters until it is done:
+In order; nothing below the first line matters until it is done.
 
-1. Open the deployed `/app/` in a real browser on a real network, search for
-   something, press play, and write down exactly what happened — sound, or the
-   error the app showed. Record it in [PHASE-02](PHASE-02-PLAYBACK-POC.md).
-2. If it refused: read the refusal. A CORS or origin refusal is the expected
-   outcome on some networks and is a finding to record, not a failure to hide.
-   The honest alternatives are in [PHASE-01](PHASE-01-SOURCE-RESEARCH.md) —
-   notably an open-licensed catalogue, which needs no account and no service the
-   project operates.
-3. Only then: the manual browser and screen-reader pass (Phase 8), and the
+1. Open the deployed `/app/` in a real browser on a real network. Search, play a
+   track, and write down exactly what happened — sound, or the sentence the app
+   showed.
+2. If it refused, keep the refusal verbatim. A CORS, 429 or "no stream" answer is
+   evidence about the source, not a bug to hide; it belongs in
+   [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md) and in the source's own words on
+   screen.
+3. Only then: the second browser and the phone, the screen-reader pass, and the
    release decision.

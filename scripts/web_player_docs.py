@@ -1,24 +1,29 @@
-"""The web workstream's documents, checked rather than trusted.
+"""The web build's documents, checked rather than trusted.
 
 Why this exists: this repository has, at different times, described the browser
 build as an "engineering preview", published a features page saying the browser
 client does not exist, and carried a README promising playback that no one had
-ever heard. Every one of those was a document nobody was checking, and each was
-found by a person reading the deployed page — the most expensive way to find it.
+heard. Every one of those was a document nobody was checking, and each was found
+by a person reading the deployed page — the most expensive way to find it.
 
-So the documents in `docs/web-player/` are gated the way the site's copy is:
+The web build was then rewritten from scratch, and the plan that described the
+old one was wrong for the new one the same afternoon. So the documents here are
+not a phase ledger to keep in step: they are a *description of the build that
+exists*, and the gate asks the filesystem whether that is still true.
 
-* **Structure** — every phase file exists and carries the sections a phase file
-  is supposed to have, so a "phase report" cannot be an empty promise.
-* **Evidence** — a phase marked complete, or a box ticked in the definition of
-  done, must name what proved it. A tick with nothing behind it is the exact
-  failure mode this file is written against.
-* **Consistency** — while Phase 2 (real playback) is not complete, the tracker
-  must still say the project is not verified for release. The two facts cannot be
-  allowed to drift apart, because the optimistic half is the one people read.
-* **Claims** — the site's own honesty rules (`website_claims`) are applied to
-  these documents too: no promise of browser playback, no quality figure, no
-  store channel, no denial of the surfaces that do ship.
+Four kinds of check, each of which has failed in this repository before:
+
+* **Presence** — every document exists, so a directory cannot quietly lose the
+  page that says what the project does not do.
+* **The module map** — `ARCHITECTURE.md` names every `app-web/src/js/*.js` and
+  names no module that has been deleted. This is the rule that would have caught
+  the rebuild itself: the old documents named `js/source.js` for a day after it
+  stopped existing.
+* **Evidence** — every row of the status table must cite a path that resolves.
+  A claim whose proof has been moved or deleted is a claim with no proof.
+* **Claims and retired names** — the site's own honesty rules (`website_claims`)
+  are applied to this prose, and the names of the deleted build may appear only
+  in a sentence that says they are gone.
 
 Usage:
     python3 scripts/web_player_docs.py [docs/web-player]
@@ -40,189 +45,186 @@ import website_claims as claims  # noqa: E402
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_DIR = REPO_ROOT / "docs" / "web-player"
 
-PHASE_FILES = tuple(f"PHASE-{index:02d}-{slug}.md" for index, slug in (
-    (0, "AUDIT"),
-    (1, "SOURCE-RESEARCH"),
-    (2, "PLAYBACK-POC"),
-    (3, "ARCHITECTURE"),
-    (4, "SEARCH-AND-CATALOGUE"),
-    (5, "PLAYBACK-ENGINE"),
-    (6, "INTERFACE"),
-    (7, "LIBRARY-AND-PERSISTENCE"),
-    (8, "TEST-PLAN"),
-    (9, "DEPLOYMENT"),
-    (10, "MAINTENANCE-ROADMAP"),
-))
+MODULE_DIR = REPO_ROOT / "app-web" / "src" / "js"
 
-SUPPORT_FILES = (
+REQUIRED_FILES = (
     "README.md",
+    "ARCHITECTURE.md",
+    "DEVELOPMENT-GUIDE.md",
     "IMPLEMENTATION-STATUS.md",
     "KNOWN-LIMITATIONS.md",
-    "DEVELOPMENT-GUIDE.md",
 )
 
-REQUIRED_FILES = SUPPORT_FILES + PHASE_FILES
+STATUS_HEADING = "## What is verified, and by what"
+UNVERIFIED_HEADING = "## Not verified"
+MIN_UNVERIFIED_ITEMS = 3
 
-PHASE_SECTIONS = ("## Objective", "## Acceptance criteria", "## Completion decision")
+# Files and documents of the build that was replaced. A document may mention one
+# only while saying that it is gone; a bare mention is how an old plan survives a
+# rewrite and then misleads the next person.
+RETIRED_NAMES = (
+    "js/source.js",
+    "js/audio.js",
+    "js/storage.js",
+    "js/equalizer.js",
+    "js/nav.js",
+    "js/tabsync.js",
+    "js/platform.js",
+    "js/downloads.js",
+    "js/offline.js",
+    "js/video.js",
+    "PHASE-00",
+    "PHASE-02",
+    "PHASE-10",
+)
 
-TRACKER_HEADING = "## Phase tracker"
-STATUS_MARKS = ("✅", "⚠️", "🔄", "🔲", "❌", "🚫")
+NEGATIONS = (
+    "no longer",
+    "removed",
+    "deleted",
+    "absent",
+    "does not exist",
+    "do not exist",
+    "did not exist",
+    "replaced",
+    "gone",
+)
 
-# A phase may only be marked with one of these two when its evidence cell names
-# the phase file that carries the evidence.
-COMPLETE_MARKS = ("✅", "⚠️")
-
-RELEASE_LINE = "NOT VERIFIED FOR RELEASE"
-PHASE_TWO_ROW = re.compile(r"^\|\s*2\s*\|", re.M)
-
-# Evidence on a ticked box has to be more than a word.
-MIN_EVIDENCE_CHARS = 8
-
-
-def _table_rows(text: str) -> list[dict[str, str]]:
-    """The phase table's body rows, keyed by the table's own column names."""
-    start = text.find(TRACKER_HEADING)
-    if start < 0:
-        return []
-    header: list[str] = []
-    rows: list[dict[str, str]] = []
-    for line in text[start:].splitlines():
-        if not line.startswith("|"):
-            if rows:
-                break
-            continue
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if not header:
-            header = cells
-            continue
-        if set("".join(cells)) <= set("-: "):
-            continue
-        if len(cells) == len(header):
-            rows.append(dict(zip(header, cells)))
-    return rows
+# A path cited as evidence: a backticked token that looks like a repository path.
+_PATH_SPAN = re.compile(r"`([^`\s]+)`")
+_TABLE_ROW = re.compile(r"^\|(?!\s*-)[^|]+\|.+\|\s*$", re.M)
 
 
-def structure_problems(root: pathlib.Path) -> list[str]:
-    """Every required document exists, and every phase file has its sections."""
+def _read(root: pathlib.Path, name: str) -> str:
+    path = root / name
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+
+def _strip_code(text: str) -> str:
+    """Fenced code and HTML comments are documentation, not claims."""
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    return re.sub(r"<!--.*?-->", " ", text, flags=re.S)
+
+
+def presence_problems(root: pathlib.Path) -> list[str]:
+    return [
+        f"missing document: docs/web-player/{name}"
+        for name in REQUIRED_FILES
+        if not (root / name).is_file()
+    ]
+
+
+def module_problems(root: pathlib.Path) -> list[str]:
+    """The architecture document and the module directory agree."""
+    text = _read(root, "ARCHITECTURE.md")
+    if not text:
+        return []  # presence_problems already reported it
+    if not MODULE_DIR.is_dir():
+        return [f"no module directory at {MODULE_DIR.relative_to(REPO_ROOT)}"]
+    existing = sorted(path.stem for path in MODULE_DIR.glob("*.js"))
+    named = set(re.findall(r"`js/([a-z0-9-]+)\.js`", text))
     problems: list[str] = []
-    for name in REQUIRED_FILES:
-        path = root / name
-        if not path.is_file():
-            problems.append(f"missing document: docs/web-player/{name}")
-            continue
-        if name not in PHASE_FILES:
-            continue
-        text = path.read_text(encoding="utf-8")
-        if not re.search(r"^> Status: ", text, re.M):
-            problems.append(f"{name}: no '> Status: …' line — a phase report has to state its status")
-        for section in PHASE_SECTIONS:
-            if section not in text:
-                problems.append(f"{name}: missing section '{section}'")
-        if "**Go / No-Go:" not in text:
-            problems.append(f"{name}: no explicit Go/No-Go decision")
+    for module in existing:
+        if module not in named:
+            problems.append(
+                f"ARCHITECTURE.md: js/{module}.js exists but the module table does not name it"
+            )
+    for module in sorted(named - set(existing)):
+        problems.append(
+            f"ARCHITECTURE.md: names js/{module}.js, which does not exist"
+        )
     return problems
 
 
-def tracker_problems(root: pathlib.Path) -> list[str]:
-    """The tracker's table and checklist carry evidence, and stay consistent."""
-    path = root / "IMPLEMENTATION-STATUS.md"
-    if not path.is_file():
-        return ["missing document: docs/web-player/IMPLEMENTATION-STATUS.md"]
-    text = path.read_text(encoding="utf-8")
+def evidence_problems(root: pathlib.Path) -> list[str]:
+    """Every row of the status table cites a path that resolves."""
+    text = _read(root, "IMPLEMENTATION-STATUS.md")
+    if not text:
+        return []
+    start = text.find(STATUS_HEADING)
+    if start < 0:
+        return [f"IMPLEMENTATION-STATUS.md: missing section '{STATUS_HEADING}'"]
+    section = text[start:]
+    next_heading = section.find("\n## ", 1)
+    if next_heading > 0:
+        section = section[:next_heading]
     problems: list[str] = []
-
-    rows = _table_rows(text)
-    if len(rows) < 11:
+    rows = [row for row in _TABLE_ROW.findall(section)]
+    if len(rows) < 5:
         problems.append(
-            "IMPLEMENTATION-STATUS.md: the phase tracker does not list all eleven phases "
-            f"(found {len(rows)} rows)"
+            "IMPLEMENTATION-STATUS.md: the verified table has fewer than five rows "
+            f"(found {len(rows)}) — the evidence would be a paragraph, not a ledger"
         )
-    wanted = ("Phase", "Status", "Evidence", "Remaining work")
-    if rows and not all(key in rows[0] for key in wanted):
-        return problems + [
-            "IMPLEMENTATION-STATUS.md: the phase tracker is missing a column "
-            f"(needs {', '.join(wanted)})"
-        ]
-    seen: set[str] = set()
     for row in rows:
-        number, status = row["Phase"], row["Status"]
-        evidence, remaining = row["Evidence"], row["Remaining work"]
-        seen.add(number)
-        marks = [mark for mark in STATUS_MARKS if mark in status]
-        if len(marks) != 1:
+        cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
+        if len(cells) != 2:
+            continue
+        claim, evidence = cells
+        if claim == "Claim" or set(claim.replace(" ", "")) <= set("-:"):
+            continue
+        paths = [
+            span.strip("./")
+            for span in _PATH_SPAN.findall(evidence)
+            if "/" in span and " " not in span
+        ]
+        if not paths:
             problems.append(
-                f"IMPLEMENTATION-STATUS.md: phase {number}'s status {status!r} carries "
-                f"{len(marks)} legend marks — exactly one is required"
+                f"IMPLEMENTATION-STATUS.md: the row {claim[:48]!r} cites no path — "
+                "a claim needs a file that proves it"
             )
             continue
-        if marks[0] in COMPLETE_MARKS:
-            if len(evidence) < MIN_EVIDENCE_CHARS or evidence.startswith("—"):
-                problems.append(
-                    f"IMPLEMENTATION-STATUS.md: phase {number} is marked {marks[0]} with no "
-                    "evidence beside it — a completed phase has to name what proved it"
-                )
-            elif not re.search(r"PHASE-\d\d", evidence):
-                problems.append(
-                    f"IMPLEMENTATION-STATUS.md: phase {number}'s evidence does not point at its "
-                    "phase file — the row is a claim, the file is the evidence"
-                )
-            if marks[0] == "⚠️" and (len(remaining) < MIN_EVIDENCE_CHARS or remaining.startswith("—")):
-                problems.append(
-                    f"IMPLEMENTATION-STATUS.md: phase {number} is 'complete with exceptions' and "
-                    "does not say what the exception is"
-                )
-    missing = [str(index) for index in range(11) if str(index) not in seen]
-    if missing:
-        problems.append(f"IMPLEMENTATION-STATUS.md: the phase tracker has no row for phase(s) {', '.join(missing)}")
-
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped.startswith("- [x]"):
-            continue
-        body = stripped[len("- [x]"):].strip()
-        if " — " not in body:
+        resolved = [path for path in paths if (REPO_ROOT / path).exists()]
+        if not resolved:
             problems.append(
-                f"IMPLEMENTATION-STATUS.md: ticked box with no evidence: {body[:70]!r} — "
-                "write what proved it, or untick it"
-            )
-            continue
-        evidence = body.split(" — ", 1)[1].strip()
-        if len(evidence) < MIN_EVIDENCE_CHARS:
-            problems.append(
-                f"IMPLEMENTATION-STATUS.md: ticked box with an empty evidence note: {body[:70]!r}"
+                f"IMPLEMENTATION-STATUS.md: the row {claim[:48]!r} cites {paths[0]!r}, "
+                "which does not exist"
             )
 
-    # Consistency: the optimistic claim may not outrun the release gate.
-    phase_two = [row for row in rows if row["Phase"] == "2"]
-    if phase_two:
-        gate_open = not any(mark in phase_two[0]["Status"] for mark in COMPLETE_MARKS)
-        if gate_open and RELEASE_LINE not in text:
+    unverified = text.find(UNVERIFIED_HEADING)
+    if unverified < 0:
+        problems.append(
+            f"IMPLEMENTATION-STATUS.md: missing section '{UNVERIFIED_HEADING}' — a "
+            "status page that lists only what works is the optimistic half of the truth"
+        )
+    else:
+        block = text[unverified:]
+        end = block.find("\n## ", 1)
+        if end > 0:
+            block = block[:end]
+        items = [line for line in block.splitlines() if line.startswith("- ")]
+        if len(items) < MIN_UNVERIFIED_ITEMS:
             problems.append(
-                "IMPLEMENTATION-STATUS.md: phase 2 is not complete, so the file must still say "
-                f"'{RELEASE_LINE}' — the status line and the gate have drifted apart"
+                "IMPLEMENTATION-STATUS.md: 'Not verified' lists "
+                f"{len(items)} item(s); at least {MIN_UNVERIFIED_ITEMS} are required — "
+                "the release gate is one of them"
             )
-        if not gate_open and "Playback proof" not in text:
-            problems.append(
-                "IMPLEMENTATION-STATUS.md: phase 2 is marked complete with no mention of what "
-                "the playback proof was"
-            )
+    return problems
+
+
+def retired_name_problems(root: pathlib.Path) -> list[str]:
+    """A name from the replaced build may appear only with a note that it is gone."""
+    problems: list[str] = []
+    for name in REQUIRED_FILES:
+        for number, line in enumerate(_read(root, name).splitlines(), start=1):
+            haystack = line.lower()
+            for retired in RETIRED_NAMES:
+                if retired.lower() not in haystack:
+                    continue
+                if any(negation in haystack for negation in NEGATIONS):
+                    continue
+                problems.append(
+                    f"{name}:{number}: mentions {retired!r}, which the current build "
+                    "does not have — say that it is gone, or remove the line"
+                )
     return problems
 
 
 def claim_problems(root: pathlib.Path) -> list[str]:
-    """No document here may carry a claim the repository cannot back.
-
-    The site's rules, applied to prose. Code blocks and HTML comments are
-    stripped first: a rule engine quoted in a document is documentation, not a
-    claim, and comments are notes to a future editor.
-    """
     problems: list[str] = []
-    for path in sorted(root.glob("*.md")):
-        text = path.read_text(encoding="utf-8")
-        text = re.sub(r"```.*?```", " ", text, flags=re.S)
-        text = re.sub(r"<!--.*?-->", " ", text, flags=re.S)
+    for name in REQUIRED_FILES:
+        text = _strip_code(_read(root, name))
         for label, matched in claims.forbidden_claims_in(text):
-            problems.append(f"{path.name}: forbidden claim ({label}): {matched!r}")
+            problems.append(f"{name}: forbidden claim ({label}): {matched!r}")
     return problems
 
 
@@ -230,7 +232,13 @@ def check(root: pathlib.Path = DEFAULT_DIR) -> list[str]:
     """Every rule, in the order a reader would meet them."""
     if not root.is_dir():
         return [f"no such directory: {root}"]
-    return structure_problems(root) + tracker_problems(root) + claim_problems(root)
+    return (
+        presence_problems(root)
+        + module_problems(root)
+        + evidence_problems(root)
+        + retired_name_problems(root)
+        + claim_problems(root)
+    )
 
 
 def main(argv: list[str]) -> int:
@@ -244,8 +252,9 @@ def main(argv: list[str]) -> int:
             print(f"  - {problem}")
         return 1
     print(
-        f"OK: {len(REQUIRED_FILES)} web-player document(s) hold their structure, "
-        f"their evidence and the site's honesty rules."
+        f"OK: {len(REQUIRED_FILES)} web-player document(s) describe the build that "
+        "exists: the module map matches app-web/src/js, every evidence path "
+        "resolves, no retired name survives, and no claim outruns the repository."
     )
     return 0
 

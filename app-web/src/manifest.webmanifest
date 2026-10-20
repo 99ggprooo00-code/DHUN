@@ -1,7 +1,7 @@
 {
   "name": "DHUN — music player",
   "short_name": "DHUN",
-  "description": "A free, open-source music player. Search YouTube Music anonymously in the browser; your library stays on your device, and the app says when a source will not answer.",
+  "description": "A free, open-source music player. Search JioSaavn's public catalogue in the browser; your library stays on your device, and the app says when the source will not answer.",
   "id": "/",
   "start_url": "./",
   "scope": "./",

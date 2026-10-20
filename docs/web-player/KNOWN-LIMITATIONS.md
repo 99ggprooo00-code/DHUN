@@ -1,108 +1,90 @@
 # DHUN Web — known limitations
 
-> Last updated: 2026-10-16 (session `arena/59c43e0a-dhun`)
+What a visitor can actually meet at `/app/`, and what the build deliberately does
+not do. Every item is either enforced by a gate or visible in the interface; none
+is an aspiration.
 
-This is the web build's view of what is unproven, unsupported or awkward. It is
-written for someone deciding whether to rely on the browser build today.
+## The catalogue
 
-**The canonical record is [`../../.ai/KNOWN_LIMITATIONS.md`](../../.ai/KNOWN_LIMITATIONS.md)**,
-which covers the whole project in date order, session by session. This file is
-the summary a reader of the web workstream needs, kept deliberately short: where
-the two disagree, the canonical file wins, and that file is the one the project
-updates after every session.
+- **It is a community wrapper, not an official API.** The app reads JioSaavn
+  through `https://saavn.dev/api`, which this project does not operate and has no
+  agreement with. It can rate-limit, change shape, or disappear. When it does,
+  the app shows what happened (a status, a timeout, a refused request) in the
+  service's own words, labelled as technical detail, and offers a retry.
+- **Some networks cannot reach it.** A blocked origin, a corporate proxy or an
+  ad-blocker produces a failure the browser reports as a generic fetch error. The
+  sentence the app writes names the request it made, because the browser's own
+  message names nothing.
+- **A search can come back empty.** An empty shelf is drawn as an empty state
+  naming the query, never as a spinner that never ends.
+- **The API is unofficial and so is the licence situation.** The app states what
+  it calls; it does not claim the service's content is licensed for it. See
+  `#/about/terms`.
 
-An unticked box is not a to-do list — several of these are permanent properties
-of a static site in a browser, and are listed so that nobody promises otherwise.
+## The sample catalogue
 
-## Playback
+- With no reachable catalogue, Home draws a **sample catalogue**: fixed rows,
+  chosen so the interface can be seen and judged. Every one is labelled
+  (`demo: true`), the screen carries a notice saying the rows are examples, and
+  the source badge says "Sample catalogue".
+- **Sample rows have no audio.** Pressing play on one says so. Nothing is
+  simulated: no fake progress, no invented queue, no pretend buffering.
 
-- [ ] **No audio has been verified as playing from the deployed site.** This is
-  the release gate. The app attempts real resolution, and the attempt has never
-  been completed by a person on a real network. Nothing in this repository can
-  close this line; a browser and a network can.
-- [ ] **Browsers may refuse the stream request.** A page cannot make YouTube's
-  origin answer a cross-origin request. When it refuses, the app shows the
-  refusal on the row instead of pretending — that behaviour is implemented and
-  unit-tested, but it is not a substitute for playback.
-- [ ] **Autoplay policy.** A browser will not start audio before the visitor has
-  gestured. The app surfaces this as a prompt with a Play action rather than an
-  error; the first press on a fresh page may therefore be a prompt, not sound.
-- [ ] **Format support varies.** What the browser can decode is the browser's
-  decision. An unsupported format becomes an error state, not a silent failure.
-- [ ] **The equaliser's effect has not been heard either.** The web build carries
-  the app's ten bands, its preamp and the eighteen stock presets, bound to the
-  browser's own audio graph, and it says on screen when a source's bytes cannot
-  be routed through it (a cross-origin stream that the browser will not let the
-  graph touch). That the sliders move ten real filters is asserted by tests
-  against the graph, not by an ear — the same gap as playback itself.
+## What this build does not have
 
-## Sources
+These exist in the Android and Windows applications and **not** here. Each is
+absent rather than stubbed:
 
-- [ ] **The YouTube Music path is attempted, not proven.** Metadata retrieval
-  does not prove playback, and this project treats the two as separate claims.
-- [ ] **An open-licensed catalogue has not been evaluated.** Internet Archive
-  hosts recordings whose licences vary per item, and some are freely reusable.
-  It is the most promising source that needs no account and no service the
-  project operates, and it is not implemented. See
-  [PHASE-01](PHASE-01-SOURCE-RESEARCH.md).
-- [ ] **A user-configured endpoint is the escape hatch, not a product.** It
-  exists for someone whose network blocks the default path; the project does not
-  operate it, and the contract it must speak is small and documented in
-  `app-web/src/js/source.js`.
-- [ ] **A source badge is an honesty device, not a guarantee.** It names who
-  answered the last request — "YouTube Music", "Your endpoint" or "Demo data".
-  A real source answering does not mean every row in it can play.
+- **No lyrics.** The player's Lyrics tab says the words are not available in this
+  build. There is no lyric service, no parser, and no invented line.
+- **No equaliser.** Its bands are a platform audio binding. Routing
+  cross-origin audio through a browser Web Audio graph can fail silently and mute
+  the product, so the control does not exist.
+- **No downloads and no offline audio.** ADR-006's device-side store has no
+  browser equivalent. The service worker caches the app's own files so the shell
+  opens without a network; it caches no audio and no API response, and there is no
+  "download" control to find.
+- **No cache-budget setting.** There is no audio cache to budget.
+- **No account, no sync, no server copy.** The library is this browser's
+  `localStorage`, under one key. Another device, another browser or a cleared
+  profile is an empty library. Export and import are the only way to move it.
+- **No catalog browser.** The Android build has a browsable catalogue; the web
+  build has Home, Search, and the pages a row or a card links to.
 
-## Hosting
+## Playback in a browser
 
-- [ ] **GitHub Pages is static.** No server-side logic, no proxy, no database,
-  no response headers the project can set. This is the constraint that shaped
-  everything else in this file.
-- [ ] **CORS is decided by the other end.** Some requests the app would like to
-  make are refused before they leave the browser, and no amount of client code
-  changes that.
-- [ ] **A browser extension or proxy can change behaviour** in ways this project
-  cannot reproduce or support.
+- **Stream URLs are signed and expire.** A track paused for hours may refuse to
+  resume; the app then says the stream could not be played rather than silently
+  stopping.
+- **The browser owns the audio element.** A codec, a headphone change, a revoked
+  autoplay permission or an OS audio interruption produces an error the browser
+  reports. The app labels that text as technical detail; it does not invent a
+  cause.
+- **Autoplay is not guaranteed.** Browsers may refuse to start audio without a
+  gesture; every start in this build comes from a press.
+- **Background playback is the platform's decision.** On a phone, locking the
+  screen or switching tabs may pause audio. Media Session metadata is attached
+  where the browser supports it; nothing is promised beyond that.
+- **No gapless playback, no crossfade, no volume normalisation.** The build plays
+  one stream at a time and draws its real clock.
 
-## Data
+## This browser, not that one
 
-- [ ] **Everything stays in one browser, on one device.** Settings live in
-  `localStorage`, the library in IndexedDB. There is no account and no service to
-  move data through, so there is nothing to move it with.
-- [ ] **Clearing site data erases the library.** It is the documented way to
-  remove it; there is no undo and no copy elsewhere.
-- [ ] **A private window degrades the library.** When IndexedDB is unavailable,
-  the app says so on screen and keeps the library in memory for the tab's life.
-- [ ] **No data export beyond the app's own.** The app can write a library file
-  and read one back; that is the whole story.
+- **Storage is per browser and per origin.** A private window may throw on write
+  or forget what it wrote; the app detects that, keeps the library in memory, and
+  says so on Settings instead of promising a save.
+- **The keyboard map is global to the page.** It is not taken from text fields
+  and not from combinations the browser owns, but a browser extension can take
+  those keys first.
+- **The app is one tab.** It refuses to boot inside another page's frame and says
+  why; `frame-ancestors` cannot be sent from a static host.
 
-## Interface and accessibility
+## Not verified
 
-- [ ] **No human has looked at the rendered interface.** CI measures viewports,
-  contrast, tab order, radio-group behaviour and axe rules on every route; it
-  cannot see what a person sees.
-- [ ] **No screen reader has been used.** The markup follows the conventions the
-  CI checks can assert (labels, landmarks, roles, focus behaviour); a real
-  screen-reader pass has not happened.
-- [ ] **Blur and transparency cost rendering.** Frosted glass is layered on
-  purpose; on a slow device, or with the preference set to reduce transparency,
-  the surfaces fall back to opaque panels.
-- [ ] **The motion preference is respected, not merely detected.** Reduced-motion
-  turns animation off rather than shortening it; a couple of transitions then
-  happen instantly, which is intentional.
-
-## Features that do not exist
-
-Listed so that nobody goes looking: audio downloads, a visualiser, an account,
-and any form of cross-device library movement.
-The Android and Windows builds have some of these; the browser build does not,
-because each of them needs a service, a signed stream that stays valid, or a
-device-side store that a web page does not have.
-
-## Browser support
-
-- [ ] **The tested browser is the one CI runs** (Chromium on a Linux runner, at
-  four viewport/scheme combinations). Any other browser — including any browser
-  on an Android phone — is untested by this project.
-- [ ] **Install-to-home-screen behaviour differs between browsers**, and so does
-  the amount of storage available. The app does not require installation.
+- **Audio from the deployed origin.** The path is real; nobody has heard it. See
+  [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md).
+- **Browsers other than the Chromium build CI launches.** Safari, Firefox and a
+  phone browser are untested.
+- **Screen readers.** axe passes; nobody has listened.
+- **Slow networks.** The request timeout is 15 seconds; what a 2G connection does
+  to the interface has not been measured.
