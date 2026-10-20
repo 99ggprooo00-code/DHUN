@@ -63,7 +63,7 @@ project starts lying to its own users.
 | `app-web/tests/player.test.mjs` | Pass — transport, queue, shuffle/repeat, failures, expiry |
 | `app-web/tests/audio.test.mjs` | Pass — status reporting, gesture handling, equaliser wiring |
 | `app-web/tests/equalizer.test.mjs`, `shortcuts.test.mjs`, `mediasession` paths in `views.test.mjs` | Pass |
-| `cd app-web && npm test` | 221 pass, 0 fail (2026-10-19) |
+| `cd app-web && npm test` | 224 pass, 0 fail (2026-10-20) |
 | Audible output | **Not tested** — Phase 2 |
 
 ## Completion decision

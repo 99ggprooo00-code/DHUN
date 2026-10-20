@@ -59,7 +59,7 @@ import { createMediaSession } from "./mediasession.js";
 import { createTabSync, openTabChannel } from "./tabsync.js";
 import { createPwa } from "./pwa.js";
 import { createRouter, parseRoute, formatRoute, needsData, entityLabel, LIBRARY_TABS } from "./router.js";
-import { BANDS_HZ, PRESETS, CUSTOM_ID, clampGains, matchingPreset } from "./equalizer.js";
+import { BANDS_HZ, PRESETS, CUSTOM_ID, clampGains, matchingPreset, presetChoices } from "./equalizer.js";
 import { createNavState, backAction, ShellBackAction, RAIL_BREAKPOINT_PX } from "./nav.js";
 import { parseLrc, activeLineIndex } from "./lyrics.js";
 import * as views from "./views.js";
@@ -700,6 +700,45 @@ export function boot({
     if (scroller) scroller.scrollTop = top;
   }
 
+  /* --------------------------------------------------- focus on navigation --
+   *
+   * A card press replaces the screen, so the button that had focus no longer
+   * exists and the browser drops focus onto `<body>`. Measured on the built app:
+   * open an album from Home and `document.activeElement` is `body` — the next
+   * Tab starts at the skip link, and a screen-reader user is told nothing about
+   * the screen they just asked for. The clock had the screen's name in the
+   * document title and no way to announce it until now.
+   *
+   * The rule is deliberately narrow: only when focus was actually lost, and the
+   * callers decide which screens are worth announcing. A tab press re-renders
+   * the nav itself, so the button that was pressed is gone and focus lands on
+   * `<body>`; there the new screen's `<h1>` ("Your library") is the useful
+   * target, which is what a nav press does now. A search submit keeps the caret
+   * in the field instead (see `restoreFieldFocus`): the person is still typing.
+   */
+  let pendingHeadingFocus = null;
+
+  function focusScreenHeadingIfLost() {
+    if (!pendingHeadingFocus) return;
+    const wanted = pendingHeadingFocus;
+    if (
+      state.route.name !== wanted.name ||
+      (state.route.id ?? null) !== (wanted.id ?? null) ||
+      (state.route.libTab ?? null) !== (wanted.libTab ?? null) ||
+      (state.route.doc ?? null) !== (wanted.doc ?? null)
+    ) {
+      pendingHeadingFocus = null;
+      return;
+    }
+    // An entity screen draws its heading only once the entity has arrived; the
+    // flag survives the loading render and is spent by the one that has it.
+    const heading = doc.querySelector("#dhun-view h1") ?? doc.querySelector("#dhun-topbar h1");
+    if (!heading) return;
+    pendingHeadingFocus = null;
+    heading.setAttribute("tabindex", "-1");
+    focusWithoutScroll(heading);
+  }
+
   function viewTitle(route) {
     switch (route.name) {
       case "search":
@@ -720,6 +759,20 @@ export function boot({
       default:
         return "Home";
     }
+  }
+
+  /**
+   * The document's own title, which was one static string for every screen.
+   *
+   * `viewTitle` already knew the name of the album, artist, playlist, tab and
+   * settings screen — it is what the app bar's `h1` reads — and none of it
+   * reached `document.title`. So a browser tab, a bookmark and the history
+   * entry all said "DHUN — the web build" whatever was open, and a screen
+   * reader that announces the document title on navigation announced nothing.
+   */
+  function updateDocumentTitle() {
+    const title = viewTitle(state.route);
+    doc.title = title && title !== "Home" ? `${title} — DHUN` : "DHUN — the web build";
   }
 
   function renderView() {
@@ -751,9 +804,15 @@ export function boot({
         });
         break;
       case "playlist": {
-        // Read a playlist made here from the library at render time: a rename
-        // changes the header on the next frame rather than on the next load.
+        // A screen whose entity is still in flight says so. It used to render
+        // its *error* state for that frame — "That playlist could not be
+        // loaded" — and replace it when the data arrived, which on a slow source
+        // is a visible lie for as long as the request takes.
         const own = library.playlists.find((entry) => entry.id === route.id) ?? null;
+        if (!own && state.entity.status === "loading") {
+          markup = views.loadingState(["Loading the playlist"]);
+          break;
+        }
         const data = own ? ownPlaylistEntity(own) : state.entity.data;
         markup = views.playlistScreen({
           playlist: data?.playlist ?? null,
@@ -765,6 +824,10 @@ export function boot({
         break;
       }
       case "artist":
+        if (state.entity.status === "loading") {
+          markup = views.loadingState(["Loading the artist"]);
+          break;
+        }
         markup = views.artistScreen({
           artist: state.entity.data?.artist ?? null,
           tracks: state.entity.data?.tracks ?? [],
@@ -773,6 +836,10 @@ export function boot({
         });
         break;
       case "album":
+        if (state.entity.status === "loading") {
+          markup = views.loadingState(["Loading the album"]);
+          break;
+        }
         markup = views.albumScreen({
           album: state.entity.data?.album ?? null,
           tracks: state.entity.data?.tracks ?? [],
@@ -824,8 +891,58 @@ export function boot({
         break;
       }
     }
+    // A render replaces the screen's nodes, so a field that had the caret is
+    // gone by the time the new markup is in: pressing Enter in Search rebuilt
+    // the view and left focus on `<body>`, which meant the second half of a
+    // query could not be typed until the first request came back. Capture the
+    // field by identity, not by node, and put the caret back in its successor.
+    const focusedField = captureFieldFocus();
     setRegion("dhun-view", markup);
+    updateDocumentTitle();
     renderChrome();
+    if (!restoreFieldFocus(focusedField)) focusScreenHeadingIfLost();
+  }
+
+  /**
+   * Which text field had the caret, as something a re-render can find again.
+   * Returns null for anything that is not a field: a button whose screen is
+   * being replaced should not be re-focused — its screen is gone.
+   */
+  function captureFieldFocus() {
+    const active = doc.activeElement;
+    if (!active || !["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)) return null;
+    // The caret and selection are worth keeping when the field is the same
+    // field: a search box that scrolls back to character zero is a box that
+    // ate what you typed.
+    const caret = { start: active.selectionStart ?? null, end: active.selectionEnd ?? null };
+    if (active.id) return { id: active.id, ...caret };
+    const action = active.dataset?.action;
+    if (!action) return null;
+    return {
+      action,
+      index: active.dataset.index ?? null,
+      value: active.dataset.value ?? null,
+      ...caret,
+    };
+  }
+
+  function restoreFieldFocus(captured) {
+    if (!captured) return false;
+    const field = captured.id
+      ? doc.getElementById(captured.id)
+      : doc.querySelector(
+          `[data-action="${captured.action}"]${captured.index ? `[data-index="${captured.index}"]` : ""}${captured.value ? `[data-value="${captured.value}"]` : ""}`,
+        );
+    if (!field || field === doc.activeElement) return Boolean(field && field === doc.activeElement);
+    focusWithoutScroll(field);
+    if (typeof field.setSelectionRange === "function" && captured.start !== null) {
+      try {
+        field.setSelectionRange(captured.start, captured.end ?? captured.start);
+      } catch {
+        /* a field type that has no selection, e.g. number */
+      }
+    }
+    return true;
   }
 
   function renderChrome() {
@@ -994,6 +1111,7 @@ export function boot({
     const next = root?.querySelector?.("#dhun-overlay .dhun-full__inner");
     if (next && trackKey && trackKey === playerScroll.trackKey) next.scrollTop = playerScroll.top;
     playerScroll.trackKey = trackKey;
+    settleModalFocus();
     drawVisualiser();
   }
 
@@ -1075,8 +1193,120 @@ export function boot({
     }
     // `markup` is a Markup fragment, and every fragment is truthy — including an
     // empty one, because it is an object. Ask for its text.
-    setRegion("dhun-sheet", String(markup).length ? html`<div class="dhun-scrim">${markup}</div>` : html``);
+    const open = String(markup).length > 0;
+    setRegion("dhun-sheet", open ? html`<div class="dhun-scrim">${markup}</div>` : html``);
     setRegion("dhun-toast", state.toast ? views.toast(state.toast) : html``);
+    settleModalFocus();
+  }
+
+  /* ------------------------------------------------------------ dialog focus --
+   *
+   * A sheet carries `role="dialog" aria-modal="true"`, and for a long time that
+   * was a claim rather than a behaviour: the caret started in the sheet (the
+   * naming sheet focuses its field) but the second Tab left it, walked into the
+   * page behind the scrim, and the page was never marked unavailable. Measured
+   * on the built app: open "New playlist", press Tab twice, and focus is on the
+   * skip link behind the dialog. A screen reader is told the rest of the page is
+   * hidden; the keyboard found otherwise.
+   *
+   * The full player makes the same claim (`role="dialog" aria-modal="true"`) and
+   * goes through the same helper, so the one surface that is always reachable —
+   * the sheet — is not the only one that behaves like the dialog it says it is.
+   * (The player only renders once audio is actually playing from a source the
+   * visitor configured, so that path has no gate yet; the sheet's does.)
+   *
+   * So: focus moves into a dialog when it opens, Tab and Shift+Tab wrap inside
+   * the dialog on top, and closing it puts focus back on whatever opened it.
+   * `aria-modal` stays because it is now true. The return target is remembered
+   * as a selector as well as a node: the click that opens the sheet or player is
+   * followed by a re-render that replaces the button, so the node is often
+   * detached by the time the dialog closes.
+   */
+  let modalKey = null;
+  let modalReturn = null;
+
+  function modalRoot() {
+    // The sheet renders above the player, and Escape closes it first.
+    return doc.querySelector(".dhun-sheet") ?? doc.querySelector('#dhun-overlay [role="dialog"]');
+  }
+
+  function focusablesIn(root) {
+    return [...root.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )].filter((element) => element.getClientRects().length > 0 && element.getAttribute("aria-hidden") !== "true");
+  }
+
+  function focusInsideAnyModal() {
+    const sheet = doc.querySelector(".dhun-sheet");
+    const playerDialog = doc.querySelector('#dhun-overlay [role="dialog"]');
+    const active = doc.activeElement;
+    return Boolean((sheet && sheet.contains(active)) || (playerDialog && playerDialog.contains(active)));
+  }
+
+  function settleModalFocus() {
+    const root = modalRoot();
+    const key = root ? (root.classList.contains("dhun-sheet") ? "sheet" : "player") : null;
+    if (key && !modalKey) {
+      // A dialog opened. Remember what had focus so closing can hand it back.
+      const active = doc.activeElement;
+      modalReturn = active && active !== doc.body && active.getAttribute
+        ? { node: active, action: active.dataset?.action ?? null, id: active.dataset?.id ?? null, value: active.dataset?.value ?? null }
+        : null;
+      modalKey = key;
+      if (!root.contains(doc.activeElement)) {
+        // The sheet's own field, when it has one, has already claimed the caret.
+        focusWithoutScroll(key === "player" ? root : focusablesIn(root)[0] ?? root);
+      }
+      return;
+    }
+    if (key) {
+      // A sheet opening over an open player (or the reverse) must not overwrite
+      // the remembered trigger, and must not yank a caret that is still valid.
+      modalKey = key;
+      if (!focusInsideAnyModal()) focusWithoutScroll(key === "player" ? root : focusablesIn(root)[0] ?? root);
+      return;
+    }
+    if (modalKey) {
+      modalKey = null;
+      const wanted = modalReturn;
+      modalReturn = null;
+      if (!wanted) return;
+      let target = wanted.node && doc.contains(wanted.node) ? wanted.node : null;
+      if (!target && wanted.action) {
+        // The original node was re-rendered away; find the same control again.
+        const selector = `[data-action="${wanted.action}"]${wanted.id ? `[data-id="${wanted.id}"]` : ""}${wanted.value ? `[data-value="${wanted.value}"]` : ""}`;
+        target = doc.querySelector(selector);
+      }
+      if (target?.focus) focusWithoutScroll(target);
+    }
+  }
+
+  /** Keep Tab inside the dialog on top. Called before the shortcut matcher,
+   *  which owns Escape but must not own Tab. */
+  function trapModalTab(event) {
+    const root = modalRoot();
+    if (!root) return false;
+    const items = focusablesIn(root);
+    if (!items.length) return false;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = doc.activeElement;
+    if (!root.contains(active)) {
+      event.preventDefault();
+      focusWithoutScroll(event.shiftKey ? last : first);
+      return true;
+    }
+    if (event.shiftKey && (active === first || active === root)) {
+      event.preventDefault();
+      focusWithoutScroll(last);
+      return true;
+    }
+    if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      focusWithoutScroll(first);
+      return true;
+    }
+    return false;
   }
 
   function equalizerViewModel() {
@@ -1085,7 +1315,7 @@ export function boot({
     const processed = engine.state.processed;
     const enabled = settings.get("equalizerEnabled");
     return {
-      presets: [{ id: CUSTOM_ID, name: "Custom" }, ...PRESETS.map((preset) => ({ id: preset.id, name: preset.name }))],
+      presets: presetChoices(),
       activePresetId,
       bands: BANDS_HZ.map((hz, index) => ({ index, label: hz >= 1000 ? `${hz / 1000}k` : String(hz) })),
       status: !enabled
@@ -1193,7 +1423,19 @@ export function boot({
       // Retry / Data source / Why?. The player is a full-screen surface with its
       // own status strip; it starts clean.
       if (route.player === "open" && previous.player !== "open") clearToast();
+      const screenChanged =
+        route.name !== previous.name ||
+        (route.id ?? null) !== (previous.id ?? null) ||
+        (route.libTab ?? null) !== (previous.libTab ?? null) ||
+        (route.doc ?? null) !== (previous.doc ?? null);
       renderView();
+      // After the render, not before it: the trigger is destroyed by this very
+      // render, so before it `activeElement` is still the card that was pressed.
+      const lost = !doc.activeElement || doc.activeElement === doc.body;
+      if (!meta.initial && screenChanged && lost) {
+        pendingHeadingFocus = { name: route.name, id: route.id ?? null, libTab: route.libTab ?? null, doc: route.doc ?? null };
+        focusScreenHeadingIfLost();
+      }
     },
   });
 
@@ -1953,6 +2195,7 @@ export function boot({
   let chordTimer = null;
 
   function onKeydown(event) {
+    if (event.key === "Tab" && trapModalTab(event)) return;
     const { action, pending, swallowed } = matchShortcut(event, {
       capabilities: { hasTrack: Boolean(player.current) },
       buffer: chordBuffer,

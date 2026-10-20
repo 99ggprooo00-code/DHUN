@@ -244,6 +244,42 @@ test("the player's two surfaces render in every state a browser can put them in"
   assert.match(text(statusLine({ error: { kind: "autoplay-blocked" } })), /Press play/);
 });
 
+test("a state that is the whole page carries the page's only heading", () => {
+  // `#/album/unknown-id` was the one screen in the app with no h1 at all: the
+  // error state rendered its title as a paragraph. A screen-reader user who
+  // navigates by heading had nothing to land on. The state stays a paragraph
+  // everywhere it sits under a screen's own heading, so there is never a second
+  // h1 — the browser job's axe check would say so.
+  for (const [name, body] of [
+    ["album", views.albumScreen({ album: null, tracks: [] })],
+    ["artist", views.artistScreen({ artist: null, tracks: [] })],
+    ["playlist", views.playlistScreen({ playlist: null, tracks: [] })],
+  ]) {
+    const rendered = text(body);
+    const headings = rendered.match(/<h1\b/g) ?? [];
+    assert.equal(headings.length, 1, `${name}: expected the error to be the page's one h1`);
+    assert.match(rendered, /<h1 class="dhun-state__title">/, `${name}: the h1 is not the state's title`);
+  }
+  // Everywhere else it is a paragraph, because the screen already has an h1.
+  const inline = text(views.playlistScreen({ playlist: { id: "pl-1", name: "Mix" }, tracks: [track("a")], missing: 2 }));
+  assert.ok(!/<h1 class="dhun-state__title"/.test(inline), "a notice under a header claimed the page's h1");
+  assert.equal((text(views.errorState({ title: "Nope" })).match(/<h1\b/g) ?? []).length, 0);
+});
+
+test("the player's tabs are a tablist, and each one names the panel it owns", () => {
+  // `role="tab"` with no `role="tablist"` parent is an axe `aria-required-parent`
+  // violation (critical): the group's relationship to its panel is unannounced.
+  const queue = text(fullPlayer(playerVm({ tab: "queue" })));
+  assert.match(queue, /class="dhun-full__tabs" role="tablist" aria-label="Player panel"/);
+  assert.match(queue, /id="player-tab-queue"[^>]*aria-selected="true"[^>]*aria-controls="player-panel"/);
+  assert.match(queue, /id="player-tab-lyrics"[^>]*aria-selected="false"[^>]*aria-controls="player-panel"/);
+  assert.match(queue, /id="player-panel" role="tabpanel" aria-labelledby="player-tab-queue"/);
+
+  const lyrics = text(fullPlayer(playerVm({ tab: "lyrics" })));
+  assert.match(lyrics, /id="player-tab-lyrics"[^>]*aria-selected="true"/);
+  assert.match(lyrics, /aria-labelledby="player-tab-lyrics"/);
+});
+
 test("user data is escaped, and a hostile title stays text", () => {
   const hostile = track("evil", {
     title: '<img src=x onerror="alert(1)"> & "quotes"',

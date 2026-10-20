@@ -8,6 +8,7 @@ import {
   MAX_GAIN_DB,
   CUSTOM_ID,
   PRESETS,
+  presetChoices,
   clampGain,
   clampGains,
   frequencyLabel,
@@ -25,6 +26,20 @@ test("the band geometry is libVLC's 10 bands, ±20 dB", () => {
   assert.equal(BAND_COUNT, 10);
   assert.equal(MIN_GAIN_DB, -20);
   assert.equal(MAX_GAIN_DB, 20);
+});
+
+test("every preset choice has a name a person — and a screen reader — can read", () => {
+  // The defect this pins: the view read `preset.name` while the data carries
+  // `displayName`, so all 18 preset chips rendered as empty pills. `Custom` was
+  // spelled out at the call site, which is why exactly one of 19 ever worked.
+  const choices = presetChoices();
+  assert.equal(choices.length, PRESETS.length + 1);
+  assert.deepEqual(choices.map((choice) => choice.id), [CUSTOM_ID, ...PRESETS.map((preset) => preset.id)]);
+  for (const choice of choices) {
+    assert.equal(typeof choice.name, "string");
+    assert.ok(choice.name.trim().length >= 2, `${choice.id} has no name`);
+  }
+  assert.deepEqual(choices.slice(1, 3).map((choice) => choice.name), ["Flat", "Classical"]);
 });
 
 test("every preset carries ten gains and a preamp", () => {

@@ -54,6 +54,24 @@ export const PRESETS = Object.freeze([
   preset("techno", "Techno", 5, [8, 5.6, 0, -5.6, -4.8, 0, 8, 9.6, 9.6, 8.8]),
 ]);
 
+/**
+ * The preset row's options: `EqualizerPresets.ALL` plus the Custom entry.
+ *
+ * A function rather than a `map` at the call site because the call site's map
+ * was wrong for a year: it read `preset.name`, the data carries
+ * `preset.displayName`, and every chip but Custom rendered as an empty pill —
+ * no visible label, no accessible name. A screen reader had nothing to read and
+ * axe called all 18 critical. The name used here is the app's own
+ * (`EqualizerPresets.ALL`), and `equalizer.test.mjs` asserts none of them is
+ * empty.
+ */
+export function presetChoices() {
+  return [
+    { id: CUSTOM_ID, name: "Custom" },
+    ...PRESETS.map((item) => ({ id: item.id, name: item.displayName })),
+  ];
+}
+
 /** EqualizerBands.clampGain — NaN/Infinity collapse to 0 dB, then clamp. */
 export function clampGain(gainDb) {
   if (!Number.isFinite(gainDb)) return 0;
