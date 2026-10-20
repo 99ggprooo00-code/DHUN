@@ -1,12 +1,12 @@
 # Phase 0 — Repository audit and baseline
 
 > Status: ✅ Complete — audited 2026-10-16 (session `arena/59c43e0a-dhun`)
-> Measured again 2026-10-19: the same commands now read **221 passing tests**,
-> 32 source files / 587,244 B, 32 quality checks and 108 browser measurements.
+> Measured again 2026-10-20: the same commands now read **224 passing tests**,
+> 32 source files / 600,565 B, 32 quality checks and 135 browser measurements.
 > The rows below are this audit's own snapshot and stay as that; the living
 > numbers are in [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md).
 > Branch: `arena/59c43e0a-dhun` (this repository works on session branches; see [DEVELOPMENT-GUIDE.md](DEVELOPMENT-GUIDE.md))
-> Last updated: 2026-10-19
+> Last updated: 2026-10-20
 
 ## Objective
 

@@ -83,10 +83,16 @@ export function emptyState({ title, body = "", iconName = "Album" }) {
  * it reads as evidence rather than as the message. A person who does not want it
  * can ignore it; a person reporting a playback failure can copy it.
  */
-export function errorState({ title = "That did not work", body = "", technical = "", actions = [] } = {}) {
+export function errorState({ title = "That did not work", body = "", technical = "", actions = [], heading = false } = {}) {
+  // `heading` is for the screens where this state *is* the page — an album,
+  // artist or playlist id that did not resolve. Every other screen renders the
+  // state under its own h1, so promoting it there would make two. Measured:
+  // `#/album/unknown-id` was the one screen in the app with no heading at all
+  // (axe `page-has-heading-one`), which leaves a screen-reader user who
+  // navigates by heading with no anchor on the error itself.
   return html`<div class="dhun-state dhun-state--error" role="alert">
     <span class="dhun-state__icon">${icon("Error", { size: 32 })}</span>
-    <p class="dhun-state__title">${title}</p>
+    ${heading ? html`<h1 class="dhun-state__title">${title}</h1>` : html`<p class="dhun-state__title">${title}</p>`}
     ${body ? html`<p class="dhun-state__body">${body}</p>` : html``}
     ${technical
       ? html`<p class="dhun-state__detail"><span class="dhun-state__detail-label">Technical detail</span> ${technical}</p>`
@@ -634,6 +640,7 @@ export function playlistScreen({ playlist, tracks, currentId, isOwn = false, mis
     return errorState({
       title: "That playlist could not be loaded",
       body: "It may have been removed, or the link may be stale.",
+      heading: true,
       actions: [{ id: "go-home", label: "Go home" }],
     });
   }
@@ -682,6 +689,7 @@ export function artistScreen({ artist, tracks = [], albums = [], currentId }) {
     return errorState({
       title: "That artist could not be loaded",
       body: "The link may be stale, or the source did not answer.",
+      heading: true,
       actions: [{ id: "go-home", label: "Go home" }],
     });
   }
@@ -721,6 +729,7 @@ export function albumScreen({ album, tracks = [], currentId }) {
     return errorState({
       title: "That album could not be loaded",
       body: "The link may be stale, or the source did not answer.",
+      heading: true,
       actions: [{ id: "go-home", label: "Go home" }],
     });
   }

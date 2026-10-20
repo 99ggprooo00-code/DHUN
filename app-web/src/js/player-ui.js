@@ -226,10 +226,22 @@ function playerNotice(state) {
   return html``;
 }
 
+/*
+ * The tabs are a `tablist`, and both stay in the tab order.
+ *
+ * `role="tab"` without a `role="tablist"` parent is what they used to be: axe
+ * calls it `aria-required-parent` (critical), and nothing announced the group's
+ * relationship to the panel it switches. The usual companion — roving tabindex
+ * plus ArrowLeft/ArrowRight — is deliberately *not* used here: inside this
+ * player the arrow keys are the seek shortcut (five seconds a press), so owning
+ * them in the tabs would break either the shortcut or the tabs. Both tabs
+ * therefore remain reachable with Tab, and Enter/Space activates them, which is
+ * what a keyboard user needs.
+ */
 export function fullPlayer(state) {
   const track = state.track;
   const context = state.context ?? "";
-  return html`<section class="dhun-full" role="dialog" aria-modal="true" aria-label="Now playing">
+  return html`<section class="dhun-full" role="dialog" aria-modal="true" aria-label="Now playing" tabindex="-1">
     <div class="dhun-full__backdrop" aria-hidden="true">
       ${track ? artwork(track, { size: "backdrop" }) : html``}
       <span class="dhun-full__scrim"></span>
@@ -273,18 +285,20 @@ export function fullPlayer(state) {
           <button type="button" class="dhun-icon-button ${state.eqActive ? "dhun-icon-button--active" : ""}" data-action="open-equalizer"
             aria-label="Equaliser" title="${state.eqLabel}">${icon("GraphicEq", { size: 22 })}</button>
           <button type="button" class="dhun-icon-button" data-action="track-menu" aria-label="Add to playlist">${icon("Add", { size: 22 })}</button>
-          <span class="dhun-full__tabs">
-            <button type="button" class="dhun-chip" data-action="player-tab" data-tab="queue" aria-selected="${state.tab === "queue" ? "true" : "false"}" role="tab">
+          <span class="dhun-full__tabs" role="tablist" aria-label="Player panel">
+            <button type="button" class="dhun-chip" id="player-tab-queue" data-action="player-tab" data-tab="queue"
+              aria-selected="${state.tab === "queue" ? "true" : "false"}" aria-controls="player-panel" role="tab">
               Queue${state.queue.length ? html` <span class="dhun-chip__count">${state.queue.length}</span>` : html``}
             </button>
-            <button type="button" class="dhun-chip" data-action="player-tab" data-tab="lyrics" aria-selected="${state.tab === "lyrics" ? "true" : "false"}" role="tab">
+            <button type="button" class="dhun-chip" id="player-tab-lyrics" data-action="player-tab" data-tab="lyrics"
+              aria-selected="${state.tab === "lyrics" ? "true" : "false"}" aria-controls="player-panel" role="tab">
               Lyrics
             </button>
           </span>
         </div>
       </div>
 
-      <div class="dhun-full__panel" role="tabpanel">
+      <div class="dhun-full__panel" id="player-panel" role="tabpanel" aria-labelledby="player-tab-${state.tab === "lyrics" ? "lyrics" : "queue"}">
         ${state.tab === "lyrics" ? lyricsPanel(state) : queuePanel(state)}
       </div>
     </div>

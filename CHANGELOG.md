@@ -22,6 +22,65 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The app says which screen you are on, and where the caret is (2026-10-20, session `arena/86be93f9-dhun`)
+
+Found by scanning `/app/` with axe (never before run on the app), then by
+driving its keyboard the way a person would. Every defect here is a place where
+the markup made a claim the interface did not keep: a `role="tab"` with no
+`tablist`, an `aria-modal` dialog that leaked Tab into the page behind it, a
+`document.title` that named no screen, an error message shown while the screen
+was still loading, and a caret that left the search box the moment a query was
+submitted.
+
+- **Fixed: 18 of the 19 equaliser presets rendered blank.** The data carries
+  `displayName`; the renderer read `name`. The chips had no text and no
+  accessible name — axe rated it critical, and it was visible: the preset row
+  was nineteen pills, one labelled. `presetChoices()` in `equalizer.js` maps the
+  field the data actually has; all 19 now render between 63 and 192 px wide.
+- **Fixed: the player's tabs had `role="tab"` and no `role="tablist"`.** axe
+  `aria-required-parent`, critical, two nodes. The panel the tabs control also
+  had no relationship to them. `.dhun-full__tabs` is now a `tablist` labelled
+  "Player panel", each tab carries an id and `aria-controls="player-panel"`, and
+  the panel is a `tabpanel` labelled by the tab that is selected. Arrow keys
+  still seek ±5 s (a deliberate shell shortcut), so both tabs are tabbable
+  rather than roving.
+- **Fixed: an unknown album, artist or playlist route had no `<h1>`.** The
+  error screen drew its message as a `<p>`, so the one screen a lost visitor
+  lands on was the only one with no heading — axe `page-has-heading-one`,
+  moderate. `errorState` takes `heading: true` for page-level states.
+- **Fixed: every sheet claimed `aria-modal="true"` and did not behave like a
+  modal.** Open "New playlist", press Tab twice, and focus was on the skip link
+  behind the scrim — the page the screen reader is told is unavailable was one
+  Tab away. Tab and Shift+Tab now wrap inside the open dialog, opening moves
+  focus in, and closing returns it to the control that opened it (remembered by
+  selector as well as node, because the trigger is re-rendered). The full player
+  makes the same claim and goes through the same helper.
+- **Fixed: `document.title` was one string on every screen.** It is now the
+  screen's name — "Dharan Nights — DHUN", "Search — DHUN", "Your library —
+  DHUN" — with Home keeping the build's own title.
+- **Fixed: album, artist and playlist screens showed their error state while
+  loading.** Opening an album from Home rendered "That album could not be
+  loaded" for the duration of the fetch, then the album. Measured text sequence
+  now: home → **"Loading the album"** (a shimmer with a visually-hidden label) →
+  the album. This also made the new heading focus land on a node that survives.
+- **Fixed: submitting a search dropped the caret out of the field.** The submit
+  re-rendered the screen, focus fell to `<body>`, and typing the rest of the
+  query went nowhere until the request returned. The field is now captured by
+  id (with its selection) before the render and restored after it; measured
+  "rain" + Enter + "y" → **"rainy"**, caret at 5.
+- **Measured: a nav-tab press announces the new screen.** A tab press replaces
+  the nav buttons, so the pressed button is gone; focus now lands on the new
+  screen's `<h1>` ("Your library") and the title follows. Both are asserted.
+
+**Gates:** two new measurements in `website/tests/browser.mjs` — axe over every
+`/app/` route in both themes, and a keyboard/dialog check (sheet trap and
+restore, track menu, nav-tab announcement, search caret).
+
+**Tests:** `app-web` node suite **224 pass / 0 fail** (+3); `browser` job
+**135 measurements, 0 failures**; Python contract suite **459 OK**.
+
+Build: 23 reachable modules, 32 shell entries, 32 files / 600,565 B (586.5 kB).
+
 ### A playlist you make opens, five labels stopped failing AA, and `/app/` gets a contrast gate (2026-10-19, session `arena/84c7280a-dhun`)
 
 Found by walking **every text node** of the built `/app/` in both themes and

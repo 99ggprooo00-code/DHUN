@@ -16,12 +16,12 @@ that runs only on `main` had been asserting a rule the PR never ran.
 
 ### Verification for this session
 
-- `python3 -m unittest discover -s scripts -p 'test_*.py'` → **434 OK**
-- `python3 scripts/website_quality.py website/dist` → **OK: 31 quality checks**
+- `python3 -m unittest discover -s scripts -p 'test_*.py'` → **459 OK**
+- `python3 scripts/website_quality.py website/dist` → **OK: 32 quality checks**
 - `python3 scripts/website_claims.py website/dist` → **OK: 4 built pages** (**9** forbidden-claim rules, 3 required caveats, 5 digest rules, 12 telemetry rules)
 - `python3 scripts/website_smoke.py http://127.0.0.1:8080` on the assembled tree (site at `/`, `app-web/dist` at `/app/`) → the three marketing routes carry the three caveats and trip no rule, every internal link resolves, `/app/` serves the shell with its CSP
-- `cd website && npm run build && npm run test:rules && node tools/verify-minify.mjs && npx html-validate "dist/**/*.html"` → byte-accurate `dist/`, **48/48**, `86623 bytes saved`, no findings
-- `cd app-web && npm test && node tools/build.mjs` → **165 pass**, 32 files / 518017 B
+- `cd website && npm run build && npm run test:rules && node tools/verify-minify.mjs && npx html-validate "dist/**/*.html"` → byte-accurate `dist/`, **48/48**, `86878 bytes saved`, no findings
+- `cd app-web && npm test && node tools/build.mjs` → **224 pass**, 32 files / 600565 B
 - The denial rule was proven against the *old* build first: `test_no_forbidden_claims` reported `/features/` before the rebuild, and the fixture that had been asserting the false sentence was allowed (`test_allows_a_negated_mention`) was cut down.
 
 **Still open, and the only thing that can close it: a person looking at the
@@ -64,7 +64,7 @@ things that is no need for the webapp."
 ### Verification for this task
 
 - `python3 -m unittest discover -s scripts -p 'test_*.py'` → **410 OK**
-- `python3 scripts/website_quality.py website/dist` → **OK: 31 quality checks**
+- `python3 scripts/website_quality.py website/dist` → **OK: 32 quality checks**
 - `python3 scripts/website_claims.py website/dist` → **OK: 4 built pages** (8 forbidden-claim rules, 3 required caveats, 5 digest rules, 12 telemetry rules)
 - `cd website && npm run build && node tools/verify-minify.mjs` → byte-accurate `dist/`, `75040 bytes saved`
 - `npm run test:rules` → **41/41**; `npx html-validate "dist/**/*.html"` → no findings

@@ -1869,6 +1869,216 @@ async function checkWebAppContrast(browser) {
 }
 
 /**
+ * The dialogs a keyboard has to live in.
+ *
+ * A sheet says `role="dialog" aria-modal="true"`. For a year that was a claim:
+ * Tab left the sheet on the second press and walked the page behind the scrim,
+ * and closing it dropped focus on `<body>` so the person had to start again from
+ * the top. axe cannot see either — both need a real Tab key and a real
+ * `document.activeElement` — which is why this check presses the keys.
+ */
+async function checkWebAppDialogs(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const page = await context.newPage();
+  const label = "/app/ dialog focus";
+  const active = () =>
+    page.evaluate(() => ({
+      action: document.activeElement?.dataset?.action || "",
+      insideSheet: Boolean(document.activeElement?.closest?.(".dhun-sheet")),
+      sheet: Boolean(document.querySelector(".dhun-sheet")),
+      role: document.querySelector(".dhun-sheet")?.getAttribute("role") || "",
+      modal: document.querySelector(".dhun-sheet")?.getAttribute("aria-modal") || "",
+      name: document.querySelector(".dhun-sheet")?.getAttribute("aria-label") || "",
+    }));
+
+  // The sheet's own claim, then a keyboard inside it, then the way out.
+  await page.goto(url("/app/#/library/playlists"), { waitUntil: "load" });
+  await page.waitForSelector('[data-action="new-playlist"]', { timeout: 15000 });
+  await page.locator('[data-action="new-playlist"]').click();
+  await page.waitForTimeout(350);
+  const opened = await active();
+  if (opened.role !== "dialog" || opened.modal !== "true") {
+    fail(label, `the naming sheet is not a modal dialog (role=${opened.role || "none"}, aria-modal=${opened.modal || "none"})`);
+  } else if (!opened.insideSheet) {
+    fail(label, "opening the sheet left focus outside it");
+  } else {
+    let escaped = false;
+    for (let press = 0; press < 8; press += 1) {
+      await page.keyboard.press("Tab");
+      await page.waitForTimeout(50);
+      const state = await active();
+      if (!state.insideSheet) {
+        escaped = true;
+        fail(label, `Tab ${press + 1} left the open sheet for “${state.action || "the page behind it"}”`);
+        break;
+      }
+    }
+    if (!escaped) record(label, "focus starts inside the sheet and 8 Tab presses stay there");
+  }
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  const closed = await active();
+  if (closed.sheet) fail(label, "Escape did not close the naming sheet");
+  else if (closed.action !== "new-playlist") fail(label, `closing the sheet left focus on “${closed.action || "body"}” instead of “New playlist”`);
+  else record(label, "Escape closes it and returns focus to the control that opened it");
+
+  // The same behaviour on a different sheet, whose trigger is a row button.
+  await page.goto(url("/app/#/home"), { waitUntil: "load" });
+  await page.waitForTimeout(800);
+  await page.locator('[data-action="track-menu"]').first().click();
+  await page.waitForTimeout(350);
+  let escaped = false;
+  for (let press = 0; press < 8; press += 1) {
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(50);
+    const state = await active();
+    if (!state.insideSheet) {
+      escaped = true;
+      fail(label, `track menu: Tab ${press + 1} left the sheet`);
+      break;
+    }
+  }
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  const back = await active();
+  if (!escaped && back.action === "track-menu") record(label, "the track menu traps Tab and returns focus to its row button");
+
+  // A screen change must announce itself. Pressing a nav tab replaces the nav
+  // buttons, so the pressed button is gone; the screen's `<h1>` — and the
+  // document title — are what tell the visitor where they now are.
+  await page.goto(url("/app/#/home"), { waitUntil: "load" });
+  await page.waitForTimeout(800);
+  await page.locator('#dhun-tabs [data-action="nav-tab"][data-tab="LIBRARY"]').click();
+  await page.waitForTimeout(500);
+  const screened = await page.evaluate(() => ({
+    hash: location.hash,
+    tag: document.activeElement?.tagName?.toLowerCase() || "",
+    text: (document.activeElement?.textContent || "").trim(),
+    title: document.title,
+  }));
+  if (screened.tag !== "h1" || !/library/i.test(screened.text)) {
+    fail(label, `a nav tab left focus on <${screened.tag || "body"}> “${screened.text.slice(0, 30)}” instead of the new screen's heading`);
+  } else if (!/library/i.test(screened.title)) {
+    fail(label, `a nav tab reached “${screened.hash}” but the document title is “${screened.title}”`);
+  } else {
+    record(label, `a nav tab lands focus on the new screen's heading (“${screened.text}”) and titles the page`);
+  }
+
+  // Submitting a search re-renders the screen around the field. The caret has
+  // to survive that: losing it meant the second half of a query could not be
+  // typed until the first request came back.
+  await page.locator('#dhun-tabs [data-action="nav-tab"][data-tab="SEARCH"]').click();
+  await page.waitForSelector("#search-input", { timeout: 15000 });
+  await page.locator("#search-input").click();
+  await page.keyboard.type("rain");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(1200);
+  const afterSubmit = await page.evaluate(() => ({
+    id: document.activeElement?.id || "",
+    tag: document.activeElement?.tagName?.toLowerCase() || "",
+    hash: location.hash,
+  }));
+  if (afterSubmit.id !== "search-input") {
+    fail(label, `submitting a search left focus on <${afterSubmit.tag || "body"}> instead of the field (${afterSubmit.hash})`);
+  } else {
+    await page.keyboard.type("y");
+    await page.waitForTimeout(400);
+    const typed = await page.locator("#search-input").inputValue();
+    if (typed !== "rainy") fail(label, `typing after a search submit produced “${typed}” instead of “rainy”`);
+    else record(label, "submitting a search keeps the caret in the field, and typing continues from its end");
+  }
+
+  await page.close();
+  await context.close();
+}
+
+/**
+ * axe over `/app/`, in both of its themes, plus the surfaces that only exist
+ * after a gesture.
+ *
+ * The site's axe check has scanned the marketing pages since Phase 6 and the
+ * app was never scanned at all — the same blind spot the contrast gate had. It
+ * mattered: the first run found the equaliser's 18 preset chips rendering with
+ * no text at all (a mapping read `preset.name` where the data says
+ * `displayName`), so the whole preset row was unlabelled for a screen reader and
+ * blank on screen, and the player's two `role="tab"` buttons had no
+ * `role="tablist"` parent. Both were critical.
+ *
+ * The app currently runs at **zero** violations, so this fails on any of them
+ * rather than only on serious/critical: a gate that tolerates the moderate
+ * ones is a gate that lets the next empty heading through. The marketing pages
+ * keep their own policy (fail serious/critical, warn the rest) because they
+ * carry third-party-shaped content the app does not.
+ */
+async function checkWebAppAxe(browser) {
+  const routes = [
+    "#/home",
+    "#/search?q=rain",
+    "#/library/playlists",
+    "#/album/al-01",
+    "#/artist/ar-03",
+    "#/playlist/pl-02",
+    "#/settings",
+    "#/about-legal",
+    "#/album/unknown-id",
+  ];
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const page = await context.newPage();
+
+  const scan = async (label) => {
+    const results = await new AxeBuilder({ page }).analyze();
+    const list = results.violations
+      .map((violation) => `${violation.id} (${violation.impact}, ${violation.nodes.length} node(s))`)
+      .join(", ");
+    if (results.violations.length) fail(label, `${results.violations.length} violation(s): ${list}`);
+    else record(label, `0 violations, ${results.passes.length} passes`);
+  };
+
+  for (const theme of SCHEMES) {
+    // Through the app's own control, never by seeding storage: the theme the
+    // app renders is part of what is being scanned.
+    await page.goto(url("/app/#/settings"), { waitUntil: "load" });
+    await page.waitForSelector(`[data-action="set-theme"][data-value="${theme}"]`, { timeout: 15000 });
+    await page.locator(`[data-action="set-theme"][data-value="${theme}"]`).click();
+    await page.waitForFunction((wanted) => document.documentElement.dataset.dhunTheme === wanted, theme);
+    for (const route of routes) {
+      await page.goto(url(`/app/${route}`), { waitUntil: "load" });
+      await page.waitForTimeout(route.includes("search") ? 700 : 500);
+      await scan(`axe /app/ ${route} (${theme})`);
+    }
+  }
+
+  // The overlays. Each is a dialog or a panel that does not exist until a
+  // gesture creates it, and each is where a role mistake reaches the user.
+  await page.goto(url("/app/#/album/al-01?player=open"), { waitUntil: "load" });
+  await page.waitForTimeout(700);
+  await page.evaluate(() => document.querySelector('[data-action="play-track"]')?.click());
+  await page.waitForFunction(() => Boolean(document.querySelector(".dhun-full")), null, { timeout: 10000 }).catch(() => {});
+  await scan("axe /app/ player, queue tab");
+  await page.evaluate(() => document.querySelector('[data-action="player-tab"][data-tab="lyrics"]')?.click());
+  await page.waitForTimeout(400);
+  await scan("axe /app/ player, lyrics tab");
+
+  await page.goto(url("/app/#/home"), { waitUntil: "load" });
+  await page.waitForTimeout(700);
+  await page.locator('[data-action="track-menu"]').first().click();
+  await page.waitForTimeout(400);
+  await scan("axe /app/ track menu");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  await page.goto(url("/app/#/library/playlists"), { waitUntil: "load" });
+  await page.waitForTimeout(700);
+  await page.locator('[data-action="new-playlist"]').click();
+  await page.waitForTimeout(400);
+  await scan("axe /app/ naming sheet");
+  await page.keyboard.press("Escape");
+
+  await page.close();
+  await context.close();
+}
+
+/**
  * A playlist made in the browser.
  *
  * Three defects lived in this path, and none of them was visible to a structural
@@ -2152,6 +2362,8 @@ const CHECKS = [
   ["player deep link", () => checkWebAppDeepLink(browser)],
   ["local playlist", () => checkWebAppLibrary(browser)],
   ["/app/ contrast", () => checkWebAppContrast(browser)],
+  ["/app/ axe", () => checkWebAppAxe(browser)],
+  ["/app/ dialog focus", () => checkWebAppDialogs(browser)],
   ["screenshots", () => captureScreenshots(browser)],
 ];
 

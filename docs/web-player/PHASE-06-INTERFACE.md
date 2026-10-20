@@ -179,7 +179,7 @@ Those three are the Phase 8 work, listed in
 |---|---|
 | `app-web/tests/views.test.mjs` (screens, states, escaping, no `undefined` in copy) | Pass |
 | `app-web/tests/shell.test.mjs`, `actions.test.mjs`, `tokens.test.mjs`, `dom.test.mjs` | Pass |
-| `browser` job (the table above) | Pass — 108 measurements, 0 failures (2026-10-19) |
+| `browser` job (the table above) | Pass — 135 measurements, 0 failures (2026-10-20) |
 | `python3 scripts/website_quality.py website/dist` | 31 checks pass |
 | A human looking at the built app's captures (34, four widths, both themes) | Looked at on 2026-10-16 — seven drawing defects and four claims the interface could not back, all fixed and listed above. Still not a phone and still not a screen reader |
 | A second look, at the entity screens, the appearance chip and a player deep link (2026-10-17) | Seven more defects, all fixed and listed in the section above. The Light chip was pressed in a real browser, and the check is in the browser job; the phone is still an emulated viewport and no screen reader has run |
