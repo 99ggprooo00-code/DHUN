@@ -119,7 +119,26 @@ This decision needs the maintainer and counsel. It is not an engineering choice.
 | **D5** | Accept the capability vocabulary (A2) as design? | **Accepted as design only.** No implementation is scheduled. | Implementing it would add abstraction for one source per platform, which the prompt warns against. It becomes worth building when a second source is actually approved, which is not now. |
 | **D6** | Who owns any future YouTube or Spotify developer account? | **The owner (the user), when Spotify work starts.** No developer account is created now. | Credentials are never requested in chat or stored in the repository. |
 
-**Open point on D2 (raised 2026-10-20, not yet answered).** The owner's reply to the
+**D2 follow-up (2026-10-21): research answer.** The owner asked whether YouTube Music can be the web app's main source, and to fall back to other platforms only if it cannot. Findings from the official policy text [P]:
+
+- Developer Policies §I.9 prohibits features that play audio or video from "a background player, meaning a player that is not displayed in the page, tab, or screen". §I.8 (the guide) prohibits separating or offering audio apart from video. The Required Minimum Functionality rules forbid overlays on an embedded player and require it to be visible before autoplay.
+- So a YouTube-first web client built on the official IFrame Player API cannot offer the web app's core behaviour: audio that keeps playing with the tab hidden, a queue with its own player, and a minimised player. Making YouTube the main source would also drop web features, which the owner ruled out.
+- The unofficial route (InnerTube from the browser) was the web build's earlier source. `app-web/src/js/api.js` records that it was unreliable from a browser, and it is the route §I.14 prohibits. It is not an option.
+
+**Answer: not possible compliantly. JioSaavn stays the web app's main source.** Alternatives checked, all as of 2026-10-21:
+
+| Option | Cost | Terms and fit |
+|---|---|---|
+| Jamendo API | Free for non-commercial apps; up to 35,000 requests a month; `client_id` from the developer portal | Creative Commons catalogue (about half a million tracks), not mainstream. Must credit the artist and Jamendo, link each track, and not design the app around caching or offline access. Each track's licence is per track. Fits the non-commercial project. [1][2] |
+| SoundCloud API | New registration needs a paid Artist Pro subscription, per a 2026 guide | Excluded by D4 ($0 budget). [3] |
+| Apple MusicKit (web) | Apple Developer Program, $99 a year, required for the developer token | Excluded by D4. [4] |
+| Spotify | Premium for the developer account; Web Playback SDK for playback | Already deferred (D3, D4); §III.5 open. |
+
+Sources: [1] https://developer.jamendo.com/v3.0 ; [2] https://devportal.jamendo.com/api_terms_of_use (§3.3) ; [3] https://developers.soundcloud.com/docs ; [4] https://developer.apple.com/programs/ . Primary policy text: https://developers.google.com/youtube/terms/developer-policies (§I.8, §I.9) and https://developers.google.com/youtube/terms/required-minimum-functionality .
+
+Not decided here: whether to add Jamendo as a second web source. That needs `api.jamendo.com` and the audio host in the CSP (a change to D2's "current CSP" wording), a per-track licence display, and attribution. The owner decides.
+
+**Open point on D2 (raised 2026-10-20; answered 2026-10-21 above, D2 stands).** The owner's reply to the
 D2 question was "It was primarily meant to be yt music client so do accordingly", with
 "do not compromise web app features". The reading recorded above (no IFrame player,
 features kept) follows the second half. The first half can be read as asking for a
