@@ -1,5 +1,29 @@
 # CURRENT ACTIVE TASK
 
+## Session `arena/488bcaa0-dhun` — master-prompt foundation: baseline, source research, proposed provider ADR (2026-10-20)
+
+**Uploaded input:** `DHUN MASTER AGENT PROMPT.md` (1,320 lines). Its initial context was verified, not
+trusted; the differences are in `docs/research/02-baseline-audit-2026-10-20.md` §2.
+
+| # | Step | State |
+|---|---|---|
+| 1 | Baseline: `app-web` tests (155 pass), build (29 files), `scripts` unittest (459 OK), `check:docs` (OK), open PRs (#54), recent CI on `main` (green) | Done — run here |
+| 2 | Web documentation: the repo already has `docs/web-player/` (five CI-checked documents). Decision: extend it, do not create a parallel `.ai/web/` | Done — decision recorded in 02 §4 |
+| 3 | Source research: YouTube (`03`), Spotify (`04`), matrix, cost/privacy, cross-platform, risks (`05`) | Done — primary pages read, evidence-labelled |
+| 4 | ADR-010 multi-source direction | **PROPOSED — not accepted.** Waits for maintainer decisions D1–D6 |
+| 5 | Implementation phases A–H | **Not started.** Blocked on D1 (YouTube policy §III.I.14 vs. the native audio path) and D2–D4 |
+
+**Highest-priority finding:** the YouTube API Services Developer Policies §III.I.14 and §III.I.07
+read literally prohibit the native audio path (ADR-001). No repository document previously
+cited these policies. This needs a written legal review before new YouTube audio work.
+
+**Spotify:** developer policy §III.5 prohibits integrating Spotify streams with other services'
+content, which conflicts with the multi-source goal. Development Mode needs a paid Premium owner.
+Research only; nothing built.
+
+**Not verified in this session:** live provider responses, the deployed `/app/` (no browser run),
+website Playwright suite, Android and Windows builds.
+
 ## Session `arena/38ac4712-dhun` — the web app's honesty gates, closed out (2026-10-16)
 
 Continues `arena/dda0fee4-dhun`, whose PR **#172** merged the rebuilt site and
