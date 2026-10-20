@@ -44,13 +44,17 @@ Still open, found while checking the above:
 
 Ordered by what each depends on.
 
-1. **A human audio check on the deployed origin**, written into
+1. **YouTube "Watch" mode, as a spike first.** A visible IFrame player beside the JioSaavn
+   audio path. It needs a referrer check on the deployed origin, then owner approval for the
+   third-party script, then a separate mode. Plan in [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md)
+   (2026-10-21 follow-up). Not built.
+2. **A human audio check on the deployed origin**, written into
    IMPLEMENTATION-STATUS.md with a date and the browser used. This cannot be done
    by the repository alone.
-2. **Browser coverage beyond Chromium.** The CI browser job uses one engine. Adding
+3. **Browser coverage beyond Chromium.** The CI browser job uses one engine. Adding
    Firefox or WebKit runs needs the browser binaries that the pinned tooling
    installs; cost is zero, but the run time and flake risk need measuring first.
-3. **A web UX audit document** (the web counterpart of `docs/ux-audit.md`). It
+4. **A web UX audit document** (the web counterpart of `docs/ux-audit.md`). It
    should be written from a recorded browser run, not from memory.
 
 ## 4. Not planned in the browser build

@@ -149,6 +149,51 @@ then the recorded decision stands.
 where it is a legal or paid question the owner cannot answer, default to the choice that keeps
 working features and costs nothing, and say so plainly in the report.
 
+## Follow-up 2026-10-21 (owner): visible YouTube player and Jamendo
+
+**Question 1: can YouTube play without separating audio from video?** Yes, as a matter of the
+published text. The official IFrame Player API plays the video together with its own audio, so no
+audio track is separated, extracted or offered alone. The limits are what make it a different
+product from the web app's audio player:
+
+- The player must be **displayed** on the page. Policy §I.9 bans features that play audio or video
+  "from a background player, meaning a player that is not displayed in the page, tab, or screen".
+  So playback must stop when the tab is hidden or the player is minimised.
+- The player must not be covered or obscured by overlays (Required Minimum Functionality).
+- Autoplay only starts when more than half of the player is visible.
+- It cannot be an audio-only player, and the web app's `<audio>` queue, seek and media-session
+  behaviour do not apply to it. The web app's audio path cannot be moved onto it without losing
+  those features, which the owner ruled out.
+
+[P] Developer Policies §I.9 and Required Minimum Functionality, as quoted in the search results
+of 2026-10-21. Not legal review. The owner cannot fund counsel.
+
+**Question 2: Jamendo.** Not added. Jamendo describes itself as a platform for independent
+artists under Creative Commons licences, with royalty-free licensing for businesses, and one
+review states that "nothing here is a chart hit". Under the owner's rule (add it only if it has
+popular music), it stays out. Reopen if the owner wants a free Creative Commons source anyway.
+
+**Plan for the next session: a visible YouTube "Watch" mode (not built now).**
+
+1. **Spike, no product change.** On the deployed origin, load the stock IFrame player at its
+   minimum supported size and check that it plays. Confirm that the browser sends a Referer that
+   YouTube accepts (the app sets no referrer policy; the default is origin-only). Record the
+   date, browser and result in `docs/web-player/IMPLEMENTATION-STATUS.md`. If it fails, stop
+   here and record the failure.
+2. **Owner approval before any build.** The player adds `www.youtube.com` to `script-src` and
+   `frame-src`. That is a third-party runtime, which the privacy promise forbids today (D2).
+   Without explicit approval, the build does not start.
+3. **Build as a separate mode, not a replacement.** The JioSaavn audio path stays the default and
+   unchanged. Watch mode is a visible player with the YouTube controls, driven through the IFrame
+   API (`loadVideoById`, play, pause, state events). It pauses when hidden, covered or scrolled
+   out of view. It has no audio-only option, no separation and no download. Its queue is its own.
+   Background audio stops in this mode, and the UI must say so.
+4. **Tests.** `scripts/test_app_web.py` for the CSP change (only the named YouTube hosts). A browser
+   check in `website/tests/browser.mjs` that the player is at least the minimum size, pauses on
+   hide, and is not overlaid. Docs updated with the evidence.
+5. **Still open.** Whether the deployed origin's Referer is accepted (step 1), and the policy
+   reading, which has no legal review. Not a compliance claim.
+
 ## Consequences
 
 - No code changes result from this ADR. Current behaviour of the native apps and the web app

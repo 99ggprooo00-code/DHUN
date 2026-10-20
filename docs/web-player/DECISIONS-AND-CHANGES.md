@@ -34,6 +34,8 @@ improve the product.
 | 2026-10-21 | **WD-1 fixed:** unreferenced track snapshots are pruned on save and read; the never-enforced `snapshots` limit was removed. | Done. | `library.js` (`pruneSnapshots`) |
 | 2026-10-21 | **WD-3 fixed:** an import is refused unless its format version is 3. | Done. | `transfer.js` (`FORMAT_VERSION`) |
 | 2026-10-20 | Recorded four defects found while writing the documents, in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) §2 (WD-1 to WD-3). No code was changed for them. |
+| 2026-10-21 | **Jamendo not added.** Its catalogue is independent Creative Commons and royalty-free music, not popular music, so under the owner's rule it stays out. | Accepted. | [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md) (2026-10-21 follow-up) |
+| 2026-10-21 | **Visible YouTube player is planned, not built.** It plays video with its own audio (no separation), must stay displayed, and pauses when hidden. Next session: a spike first, then owner approval for the third-party script, then a separate mode beside JioSaavn. | Planned. | [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md) (2026-10-21 follow-up) |
 
 ## 3. What is not recorded here
 
