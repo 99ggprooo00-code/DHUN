@@ -20,15 +20,18 @@ export const main = readFileSync(path.join(jsRoot, "main.js"), "utf8");
 export const shellHtml = readFileSync(path.join(srcRoot, "index.html"), "utf8");
 
 /** Every module, as [filename, source]. */
-export const modules = readdirSync(jsRoot)
-  .filter((file) => file.endsWith(".js"))
-  .map((file) => [file, readFileSync(path.join(jsRoot, file), "utf8")]);
+export const modules = readdirSync(jsRoot, { recursive: true })
+  .filter((file) => String(file).endsWith(".js"))
+  .map((file) => [String(file), readFileSync(path.join(jsRoot, String(file)), "utf8")])
+  // The Android/desktop legal corpus is generated into this tree for the app's
+  // gate; it is not part of this build.
+  .filter(([file]) => file !== path.join("data", "legal-content.js"));
 
 /** The action names `main.js` answers, from its handler map. Keys are quoted
  *  except where an identifier is legal, and a handler may be `async`. */
 export function handledActions() {
-  const start = main.indexOf("const handlers = {");
-  if (start < 0) throw new Error("main.js has no handler map");
+  const start = main.indexOf("const actions = {");
+  if (start < 0) throw new Error("main.js has no action map");
   const body = main.slice(start, main.indexOf("\n  };", start));
   const pattern = /\n\s{4}(?:"([a-z][a-z0-9-]*)"|'([a-z][a-z0-9-]*)'|([a-z][a-z0-9-]*))\s*:\s*(?:async\s*)?\(/g;
   return new Set([...body.matchAll(pattern)].map((match) => match[1] ?? match[2] ?? match[3]));
@@ -57,12 +60,12 @@ export function declaredIds() {
   return found;
 }
 
-/** Action names a keypress can reach, from the shortcut map in `main.js`. */
+/** Action names a keypress can reach: the `case` labels of the shortcut switch. */
 export function keyboardActions() {
-  const start = main.indexOf("const map = {");
-  if (start < 0) throw new Error("main.js has no shortcut map");
-  const body = main.slice(start, main.indexOf("\n    };", start));
-  return new Set([...body.matchAll(/:\s*"([a-z][a-z0-9-]*)"/g)].map((match) => match[1]));
+  const start = main.indexOf("switch (action) {");
+  if (start < 0) throw new Error("main.js has no shortcut dispatcher");
+  const body = main.slice(start, main.indexOf("\n    }\n", start));
+  return new Set([...body.matchAll(/case\s+"([a-z][a-z0-9-]*)":/g)].map((match) => match[1]));
 }
 
 /** Actions written by hand into chrome markup — the parts of the interface that

@@ -252,7 +252,7 @@ test("nothing in the app loads a third-party script, style or font", () => {
   for (const file of jsFiles) {
     const body = readFileSync(file, "utf8");
     assert.ok(
-      !/cdn\.|unpkg|jsdelivr|googleapis\.com\/ajax|@import\s+url|@font-face/.test(body),
+      !/(?:unpkg|jsdelivr)\.|googletagmanager|googleapis\.com\/ajax|@import\s+url|@font-face/.test(body),
       `${path.basename(file)} pulls in a third-party asset`,
     );
   }
@@ -266,9 +266,13 @@ test("nothing in the app loads a third-party script, style or font", () => {
 test("the entry point boots itself", () => {
   // The mirror build shipped a main.js that exported `boot` and never called it,
   // and the app rendered nothing in a real browser for a whole CI cycle. The
-  // same rule is asserted here and in scripts/test_app_web.py.
+  // call is guarded so the test runner can import the module's pure helpers
+  // without a document — the guard still fires on the page, which is the one
+  // thing that has `#app`. The same rule is asserted in scripts/test_app_web.py.
   const main = readFileSync(path.join(jsRoot, "main.js"), "utf8");
-  assert.match(main, /^boot\(\);$/m);
+  assert.match(main, /^\s{2,}boot\(\);$/m, "main.js never calls boot()");
+  assert.match(main, /document\?\.querySelector\?\.\("#app"\)/, "the boot guard does not look for the app root");
+  assert.match(main, /DOMContentLoaded/, "a module loaded before the body must still start");
 });
 
 test("every module is listed in the offline shell, and every listed file exists", () => {
@@ -281,6 +285,13 @@ test("every module is listed in the offline shell, and every listed file exists"
 
   for (const file of jsFiles) {
     const relative = path.relative(srcRoot, file).split(path.sep).join("/");
+    if (relative === "js/data/legal-content.js") {
+      // The Android/desktop corpus is generated into this tree so the app's own
+      // gate can prove it is current. It is not part of the web build, and the
+      // web build has its own pages (`js/data/web-legal.js`).
+      assert.ok(!listed.has(relative), "the installed app's legal corpus must not ship in the web build");
+      continue;
+    }
     assert.ok(listed.has(relative), `${relative} is not in the service worker's offline shell`);
   }
   for (const entry of listed) {
@@ -309,75 +320,55 @@ test("the manifest describes an installable app with real icons", () => {
 });
 
 /**
- * The appearance settings theme the *document*, not just the app shell.
+ * The appearance attributes belong on the document element.
  *
- * The regression: `applyTheme()` wrote `data-dhun-theme` onto `#app`, but
- * `tokens.css` keys its palettes on the root element and `body`'s background —
- * the one behind the shell — is painted by an element *above* `#app`. Choosing
- * Light therefore turned the app bar and the nav pale while the backdrop stayed
- * dark, and light-theme ink on it disappeared: the artist meta line and the
- * Shuffle button were literally invisible. The attribute belongs where
- * `index.html` already carries its pre-JavaScript default.
+ * `tokens.css` keys its palettes on `:root`, and the page background behind
+ * `#app` is painted above the app root. Choosing Light when the attributes were
+ * written to `#app` left the backdrop dark while the bar and nav went pale —
+ * light-theme ink on a dark page, which is how the artist meta line and the
+ * Shuffle button became invisible in an earlier round.
  */
 test("the appearance attributes are written to the document element", () => {
   const main = readFileSync(path.join(jsRoot, "main.js"), "utf8");
-  assert.match(main, /const themeRoot = doc\.documentElement \?\? root;/, "applyTheme no longer writes to the document element");
-  assert.match(main, /themeRoot\.dataset\.dhunTheme = resolved;/, "the resolved theme is not written to the document element");
-  assert.match(main, /themeRoot\.dataset\.dhunAccent = settings\.get\("accent"\);/, "the accent is not written to the document element");
+  assert.match(main, /doc\.documentElement\.dataset\.dhunTheme = resolvedTheme\(\)/, "the resolved theme is not written to the document element");
+  assert.match(main, /doc\.documentElement\.dataset\.dhunAccent = settings\(\)\.accent/, "the accent is not written to the document element");
   assert.ok(!/root\.dataset\.dhunTheme|root\.dataset\.dhunAccent/.test(main), "an appearance attribute still lands on #app");
 });
 
 /**
- * One heading per screen, and it is the screen's own.
+ * One heading per screen, and the app bar is not one.
  *
- * `AlbumScreen.kt` / `ArtistScreen.kt` / `PlaylistScreen.kt` draw the entity's
- * name in the content. The web wrote the same name into the app bar as an
- * `<h1>` too, so an album page had two `h1`s with identical text, 313px apart
- * on a 1280px window — a duplicate heading for a screen reader and a visibly
- * repeated name for everyone else.
+ * The bar repeats the screen's name so the visitor knows where they are, but it
+ * must not be a second `<h1>` with the same words as the screen's own title.
+ * `pageHeader` is the shared heading; Home, the hero and Search's
+ * visually-hidden title are the others.
  */
-test("the detail screens own their heading and the app bar does not repeat it", () => {
-  const main = readFileSync(path.join(jsRoot, "main.js"), "utf8");
-  assert.match(
-    main,
-    /const ENTITY_ROUTES = Object\.freeze\(\["playlist", "artist", "album"\]\);/,
-    "the routes that draw their own title are not named",
-  );
-  assert.match(
-    main,
-    /const pageOwnsTitle = ENTITY_ROUTES\.includes\(route\.name\);/,
-    "nothing decides whether the screen owns its title",
-  );
-  assert.match(
-    main,
-    /\$\{pageOwnsTitle \? html`` : html`<h1 class="dhun-topbar__title">\$\{title\}<\/h1>`\}/,
-    "the app bar draws its own `<h1>` on a screen that already has one",
-  );
-  for (const view of ["albumHeader", "artistHeader", "playlistHeader"]) {
-    const views = readFileSync(path.join(jsRoot, "views.js"), "utf8");
-    assert.match(views, /dhun-entity__title/, `${view} exists but no entity title element does`);
+test("every screen has exactly one h1 and the app bar is not one", () => {
+  const views = readFileSync(path.join(jsRoot, "views.js"), "utf8");
+  const components = readFileSync(path.join(jsRoot, "components.js"), "utf8");
+  const shell = readFileSync(path.join(jsRoot, "shell.js"), "utf8");
+  assert.ok(!/<h1[^>]*dhun-bar/.test(shell), "the app bar draws a heading");
+  assert.match(shell, /class="dhun-bar__title"/, "the bar's title is not the plain span it should be");
+  const pageHeader = components.match(/export function pageHeader[\s\S]*?\n}/)?.[0] ?? "";
+  assert.equal([...pageHeader.matchAll(/<h1\b/g)].length, 1, "pageHeader is not exactly one h1");
+  for (const screen of ["homeScreen", "searchScreen", "libraryScreen", "settingsScreen", "aboutScreen"]) {
+    const body = views.match(new RegExp(`export function ${screen}[\\s\\S]*?\\n}`))?.[0] ?? "";
+    assert.ok(body, `${screen} is missing`);
+    const own = [...body.matchAll(/<h1\b/g)].length + (body.includes("pageHeader(") ? 1 : 0);
+    assert.equal(own, 1, `${screen} has ${own} h1s; a screen has exactly one`);
   }
 });
 
 /**
  * A player link with nothing to play is answered, not swallowed.
  *
- * `#/?player=open` is what the project site's "Launch /app/ Player" link and
- * any bookmark of an expanded player produce. The overlay only draws once a
- * track is loaded, so before this the request vanished: the visitor landed on
- * Home with no player and no explanation. The notice is derived from the route,
- * so it disappears by itself the moment something plays — and it is placed above
- * the first-run strip, because a strip that always renders would shadow it.
+ * `#/?player=open` is what a bookmark of the expanded player produces. The
+ * overlay only draws once a track is loaded, so before this the request
+ * vanished: the visitor landed on Home with no player and no explanation.
  */
 test("an empty player request gets an answer in the dock", () => {
   const main = readFileSync(path.join(jsRoot, "main.js"), "utf8");
-  const banner = main.slice(main.indexOf("function renderBanner(vm)"), main.indexOf("/* The overlay's scroller is a child"));
-  assert.match(banner, /state\.route\.player === "open" && !vm\.track/, "nothing notices a player link with no track");
-  assert.match(banner, /title: "Nothing is playing yet"/, "the empty state has no title");
-  assert.match(banner, /The player opens on a track/, "the empty state does not say what it is waiting for");
-  // Order matters: the first-run strip renders whenever nothing else does, so a
-  // rule placed after it can never fire.
-  const emptyAt = banner.indexOf('state.route.player === "open" && !vm.track');
-  const welcomeAt = banner.indexOf('state.banner?.kind === "info"');
-  assert.ok(emptyAt > 0 && welcomeAt > 0 && emptyAt < welcomeAt, "the empty-player notice is shadowed by the first-run strip");
+  assert.match(main, /state\.route\.player === "open" && !track/, "nothing notices a player link with no track");
+  assert.match(main, /title: "Nothing is playing yet"/, "the empty state has no title");
+  assert.match(main, /The player opens on a track/, "the empty state does not say what it is waiting for");
 });

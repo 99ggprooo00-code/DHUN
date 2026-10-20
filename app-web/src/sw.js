@@ -25,7 +25,7 @@
  * old cache is deleted rather than accumulating.
  */
 
-const DEFAULT_CACHE = "dhun-web-v2.0.0";
+const DEFAULT_CACHE = "dhun-web-v3.0.0";
 
 /** Everything the interface needs to open offline. Kept as an explicit list so
  *  a forgotten module is a missing-file error in development rather than a
@@ -38,28 +38,25 @@ const SHELL = [
   "./css/tokens.css",
   "./css/app.css",
   "./js/main.js",
-  "./js/platform.js",
-  "./js/storage.js",
-  "./js/router.js",
-  "./js/source.js",
-  "./js/audio.js",
-  "./js/player.js",
-  "./js/player-ui.js",
-  "./js/mediasession.js",
-  "./js/tabsync.js",
-  "./js/pwa.js",
-  "./js/shortcuts.js",
-  "./js/equalizer.js",
-  "./js/lyrics.js",
-  "./js/markdown.js",
-  "./js/views.js",
   "./js/dom.js",
   "./js/format.js",
   "./js/icons.js",
-  "./js/nav.js",
+  "./js/api.js",
+  "./js/library.js",
+  "./js/player.js",
+  "./js/router.js",
+  "./js/components.js",
+  "./js/views.js",
+  "./js/shell.js",
+  "./js/player-ui.js",
+  "./js/legal.js",
+  "./js/markdown.js",
+  "./js/shortcuts.js",
+  "./js/transfer.js",
+  "./js/demo.js",
   "./js/version.js",
-  "./js/data/sample-catalog.js",
-  "./js/data/legal-content.js",
+  "./js/pwa.js",
+  "./js/data/web-legal.js",
   "./assets/icon.svg",
   "./assets/icon-192.png",
   "./assets/icon-512.png",

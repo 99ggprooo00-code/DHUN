@@ -1,21 +1,18 @@
 /**
- * DHUN web — the application's chrome, components and screens.
+ * DHUN web — the interface.
  *
- * Rules that hold for this whole file, and are enforced rather than trusted:
+ * The look is the application's, rebuilt for a browser: dark-first, artwork-led,
+ * translucent glass over the page, one accent ramp per theme, and the type scale
+ * mirrored in `tokens.css`. Nothing here invents a colour or a spacing value —
+ * every measurement is a token, and the only literals in this file are rem/em
+ * sizes, percentages and two breakpoints that CSS cannot read from a variable.
  *
- *   - **No raw colour and no raw pixel value.** Everything comes from
- *     `tokens.css`, which is a mirror of the app's Compose design system
- *     (`shared/.../design/DhunAppearance.kt` and friends). `scripts/test_app_web.py`
- *     fails the build on a hex literal or a `px` in any stylesheet except the
- *     token file, and on an inline `px` in any module.
- *   - **Every selector maps to something real.** Where a rule encodes a decision
- *     the app makes — the two-pane breakpoint, the docked mini-player height, the
- *     48/44dp target floors — the comment names the Kotlin file it mirrors.
- *   - **Layout is one column of blocks.** The shell is a flex column: top bar,
- *     scrolling content, dock. Nothing is absolutely positioned except the
- *     overlays (player, sheets, toasts), which is what keeps a phone and a
- *     desktop window from needing different structure.
+ * The file is ordered the way a screen is drawn: page, shell, screens, parts,
+ * overlays, states, then the two media queries (wide layout, motion) and the
+ * accessibility overrides at the end.
  */
+
+/* ------------------------------------------------------------------ page -- */
 
 *,
 *::before,
@@ -23,229 +20,1608 @@
   box-sizing: border-box;
 }
 
-html,
-body {
+html {
   height: 100%;
-  margin: 0;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--dhun-background);
+  margin: 0;
+  min-height: 100%;
   color: var(--dhun-text);
-  font: var(--dhun-text-body-large);
+  background-color: var(--dhun-background);
+  font: var(--dhun-text-body-medium);
+  font-family: var(--dhun-font-sans);
+  letter-spacing: var(--dhun-tracking-body-medium);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
 
-button {
+/* The ambient wash: the accent's container tinted into the page's corners, so
+   the glass has something to be translucent *over*. It is a gradient, not an
+   image, and it costs one paint. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 45% at 12% -10%, var(--dhun-accent-container), transparent 70%),
+    radial-gradient(45% 40% at 100% 0%, color-mix(in srgb, var(--dhun-accent) 22%, transparent), transparent 72%),
+    radial-gradient(70% 60% at 50% 110%, color-mix(in srgb, var(--dhun-accent) 10%, transparent), transparent 70%);
+  opacity: 0.55;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button,
+input,
+select,
+textarea {
   font: inherit;
   color: inherit;
-  background: none;
-  border: 0;
-  padding: 0;
+}
+
+button {
   cursor: pointer;
 }
 
-input,
-textarea,
-select {
-  font: inherit;
+a {
   color: inherit;
 }
 
-a {
-  color: var(--dhun-accent);
-}
-
-:focus-visible {
-  outline: var(--dhun-space-icon-stroke) solid var(--dhun-accent);
-  outline-offset: var(--dhun-space-xs);
+:where(a, button, input, select, [tabindex]):focus-visible {
+  outline: var(--dhun-focus-ring-width) solid var(--dhun-accent);
+  outline-offset: var(--dhun-focus-ring-offset);
   border-radius: var(--dhun-shape-small);
 }
 
-/* Windows High Contrast drops every author background, so a control that is
-   only a filled shape disappears. Every control boundary is restated here. */
-@media (forced-colors: active) {
-  .dhun-button,
-  .dhun-chip,
-  .dhun-card,
-  .dhun-mini,
-  .dhun-notice,
-  .dhun-state,
-  .dhun-sheet,
-  .dhun-settings-row,
-  .dhun-eq__band,
-  .dhun-switch,
-  .dhun-input {
-    border-color: CanvasText;
-  }
-
-  .dhun-source__dot,
-  .dhun-mini__progress > i {
-    background: Highlight;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
+::selection {
+  background: color-mix(in srgb, var(--dhun-accent) 35%, transparent);
 }
 
 .dhun-visually-hidden {
   position: absolute;
-  width: var(--dhun-space-border);
-  height: var(--dhun-space-border);
+  width: var(--dhun-stroke-hairline);
+  height: var(--dhun-stroke-hairline);
   padding: 0;
-  margin: calc(-1 * var(--dhun-space-border));
+  margin: calc(var(--dhun-stroke-hairline) * -1);
   overflow: hidden;
-  clip-path: inset(50%);
+  clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
 }
 
 .dhun-skip-link {
-  position: absolute;
-  left: var(--dhun-space-md);
-  top: var(--dhun-space-md);
-  transform: translateY(-200%);
+  position: fixed;
+  top: var(--dhun-space-sm);
+  left: var(--dhun-space-sm);
   z-index: 60;
-  padding: var(--dhun-space-md) var(--dhun-space-lg);
-  border-radius: var(--dhun-shape-button);
-  background: var(--dhun-accent-container);
-  color: var(--dhun-on-accent-container);
+  transform: translateY(-200%);
+  padding: var(--dhun-space-sm) var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
   font: var(--dhun-text-label-large);
-  letter-spacing: var(--dhun-tracking-label-large);
+  text-decoration: none;
 }
 
-.dhun-skip-link:focus-visible {
-  transform: translateY(0);
+.dhun-skip-link:focus {
+  transform: none;
 }
 
-.dhun-noscript {
-  max-width: var(--dhun-space-legal-content-max);
-  margin: 0 auto;
-  padding: var(--dhun-space-huge) var(--dhun-space-screen-padding);
-  font: var(--dhun-text-body-medium);
+/* ----------------------------------------------------------------- shell -- */
+
+.dhun-app {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  /* `minmax(0, …)`, not `1fr`: a grid item's automatic minimum is its content,
+     and a horizontally scrolling rail's content is wider than a phone. With
+     `1fr` the whole app grew to the rail's width and the page scrolled
+     sideways — measured at 720 CSS px in a 390 px window. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "bar"
+    "main";
+  padding-bottom: var(--dhun-space-content-bottom-inset);
 }
 
-/* =========================================================== app shell ====
- * One column: top bar, scrolling content, docked player + tabs. The rail and
- * the two-pane split arrive at DhunSpacing.navigationRailBreakpoint, exactly as
- * `ui/shell/DhunShellLayout.kt` decides it.
- * ========================================================================= */
+.dhun-topbar {
+  grid-area: bar;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
 
-/* The shell owns the viewport and the scroll region inside it owns the
-   scrolling — that is the whole point of `.dhun-scroll`. `min-height` alone
-   does not do it: the app grew to the height of its content instead (measured
-   2026-10-16: 2210px tall in a 900px window), so the *document* scrolled, the
-   app bar and the navigation rail slid out of view, and a `position: fixed`
-   toast drifted over whatever row happened to be under it. `height` bounds the
-   column, which is what lets `.dhun-scroll`'s own `overflow-y: auto` ever
-   engage. `dvh` follows the mobile URL bar; `vh` is the fallback for the
-   browsers that do not know `dvh` yet. */
-#app {
+.dhun-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dhun-space-md);
+  min-height: var(--dhun-space-navigation-bar-content);
+  padding: var(--dhun-space-sm) var(--dhun-space-screen-padding);
+  background: var(--dhun-glass-bar-top);
+  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+}
+
+.dhun-bar__left {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  min-width: 0;
+}
+
+.dhun-bar__mark {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-icon-size-lg);
+  height: var(--dhun-space-icon-size-lg);
+  color: var(--dhun-accent);
+}
+
+.dhun-bar__titles {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
-  height: 100vh;
-  height: 100dvh;
+  min-width: 0;
+}
+
+/*
+ * Secondary ink, not tertiary.
+ *
+ * Both of these are 11px/600 on a translucent glass surface, and the light
+ * palette's 55%-ink tertiary measures 3.95:1 there — under the 4.5:1 floor for
+ * text this small. The palette mirrors the Android build's tokens and should
+ * keep doing so; what changes is which rung of the ladder this chrome uses.
+ */
+.dhun-bar__overline {
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  text-transform: uppercase;
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-bar__title {
+  font: var(--dhun-text-title-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-main {
+  grid-area: main;
+  width: 100%;
+  min-width: 0;
+  max-width: var(--dhun-pane-master-max);
+  margin-inline: auto;
+  padding: var(--dhun-space-xl) var(--dhun-space-screen-padding) var(--dhun-space-xxxl);
+}
+
+.dhun-view,
+.dhun-screen {
+  display: block;
+  min-width: 0;
+}
+
+.dhun-rail-region {
+  display: none;
+}
+
+.dhun-nav-region {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 32;
+}
+
+.dhun-dock {
+  position: fixed;
+  inset-inline: var(--dhun-space-sm);
+  bottom: calc(var(--dhun-space-bottom-nav-height) - var(--dhun-space-sm));
+  z-index: 31;
+}
+
+/* ----------------------------------------------------------- glass layer --
+
+   The blur lives on a pseudo-element, not on the element.
+
+   `backdrop-filter` on a container that holds text applies to that container's
+   own content in some renderers — measured here in a software-rendered
+   Chromium, where every sentence inside a glass card came out blurred while the
+   headings beside it stayed sharp. The fix is the technique the effect was
+   always meant to be: a positioned layer that paints the blur, with the content
+   composited above it. A card's readability must not depend on a GPU path.
+   ------------------------------------------------------------------------- */
+
+.dhun-bar,
+.dhun-card,
+.dhun-notice,
+.dhun-settings,
+.dhun-search,
+.dhun-sheet,
+.dhun-mini,
+.dhun-tabs-nav {
+  position: relative;
+  isolation: isolate;
+}
+
+.dhun-bar::before,
+.dhun-card::before,
+.dhun-notice::before,
+.dhun-settings::before,
+.dhun-search::before,
+.dhun-sheet::before,
+.dhun-mini::before,
+.dhun-tabs-nav::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--dhun-glass-sheen);
+  backdrop-filter: blur(var(--dhun-blur-glass)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--dhun-blur-glass)) saturate(150%);
+  pointer-events: none;
+}
+
+.dhun-sheet::before {
+  backdrop-filter: blur(var(--dhun-blur-sheet)) saturate(170%);
+  -webkit-backdrop-filter: blur(var(--dhun-blur-sheet)) saturate(170%);
+}
+
+.dhun-mini::before {
+  backdrop-filter: blur(var(--dhun-blur-mini)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--dhun-blur-mini)) saturate(160%);
+}
+
+@media (forced-colors: active) {
+  .dhun-bar::before,
+  .dhun-card::before,
+  .dhun-notice::before,
+  .dhun-settings::before,
+  .dhun-search::before,
+  .dhun-sheet::before,
+  .dhun-mini::before,
+  .dhun-tabs-nav::before {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------- artwork -- */
+
+.dhun-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--dhun-surface-variant);
+  border-radius: inherit;
+}
+
+.dhun-art--blank {
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(140deg, color-mix(in srgb, var(--dhun-accent) 40%, var(--dhun-surface-elevated)), var(--dhun-surface-variant) 60%),
+    var(--dhun-surface-variant);
+}
+
+.dhun-art__initial {
+  font: var(--dhun-text-headline-large);
+  color: color-mix(in srgb, var(--dhun-text) 70%, transparent);
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- texture -- */
+
+.dhun-card,
+.dhun-row,
+.dhun-hero,
+.dhun-settings,
+.dhun-rail,
+.dhun-search,
+.dhun-sheet,
+.dhun-mini,
+.dhun-tabs-nav,
+.dhun-rail-nav {
+  --dhun-glass-edge-current: var(--dhun-border);
+}
+
+/* ----------------------------------------------------------------- cards -- */
+
+.dhun-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-md);
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  border-radius: var(--dhun-shape-card-large);
+  text-decoration: none;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing),
+    transform var(--dhun-motion-fast) var(--dhun-motion-easing),
+    border-color var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-card:hover {
+  background: var(--dhun-glass-strong);
+  border-color: var(--dhun-border-strong);
+  transform: translateY(var(--dhun-lift-hover));
+}
+
+.dhun-card:active {
+  transform: translateY(0) scale(0.995);
+}
+
+/* An artist has no square sleeve. The card carries its kind in `data-kind`, so
+   the shape is chosen from data rather than from a class the app has to build
+   and the stylesheet has to guess. */
+.dhun-card[data-kind="artist"] .dhun-card__art {
+  border-radius: var(--dhun-shape-full);
+}
+
+.dhun-card__art {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  border-radius: var(--dhun-shape-artwork);
+  overflow: hidden;
+  box-shadow: 0 var(--dhun-space-sm) var(--dhun-space-xxl) color-mix(in srgb, var(--dhun-scrim) 60%, transparent);
+}
+
+.dhun-card__play {
+  position: absolute;
+  right: var(--dhun-space-sm);
+  bottom: var(--dhun-space-sm);
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-compact-target);
+  height: var(--dhun-space-compact-target);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+  box-shadow: 0 var(--dhun-space-xs) var(--dhun-space-lg) color-mix(in srgb, var(--dhun-scrim-strong) 70%, transparent);
+  opacity: 0;
+  transform: translateY(var(--dhun-space-xs));
+  transition: opacity var(--dhun-motion-fast) var(--dhun-motion-easing),
+    transform var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-card:hover .dhun-card__play,
+.dhun-card:focus-visible .dhun-card__play {
+  opacity: 1;
+  transform: none;
+}
+
+.dhun-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  min-width: 0;
+}
+
+.dhun-card__title {
+  font: var(--dhun-text-title-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-card__sub {
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--dhun-grid-card-min), 1fr));
+  gap: var(--dhun-space-md);
+}
+
+/* ----------------------------------------------------------------- rails -- */
+
+.dhun-rail {
+  margin-top: var(--dhun-space-section-spacing);
+}
+
+.dhun-rail__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dhun-space-md);
+  margin-bottom: var(--dhun-space-md);
+}
+
+.dhun-rail__title {
+  margin: 0;
+  font: var(--dhun-text-title-large);
+}
+
+.dhun-rail__more {
+  font: var(--dhun-text-label-medium);
+  color: var(--dhun-text-secondary);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.dhun-rail__more:hover {
+  color: var(--dhun-accent);
+}
+
+.dhun-rail__track {
+  display: grid;
+  min-width: 0;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(var(--dhun-space-artwork-card), 42%);
+  gap: var(--dhun-space-md);
+  overflow-x: auto;
+  padding-bottom: var(--dhun-space-sm);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.dhun-rail__item {
+  scroll-snap-align: start;
+}
+
+.dhun-rail__empty {
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-body-small);
+}
+
+/* ------------------------------------------------------------------ home -- */
+
+.dhun-home-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--dhun-space-sm) var(--dhun-space-md);
+  margin-bottom: var(--dhun-space-xl);
+}
+
+.dhun-home-head > div {
+  min-width: 0;
+}
+
+.dhun-home-head__kicker {
+  margin: 0 0 var(--dhun-space-xs);
+  font: var(--dhun-text-label-large);
+  letter-spacing: var(--dhun-tracking-label-large);
+  text-transform: uppercase;
+  color: var(--dhun-accent);
+}
+
+.dhun-home-head__title {
+  margin: 0;
+  font: var(--dhun-text-headline-medium);
+  letter-spacing: var(--dhun-tracking-display-large);
+  text-wrap: balance;
+}
+
+/* ------------------------------------------------------------------ hero -- */
+
+.dhun-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--dhun-shape-card-large);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass);
+  isolation: isolate;
+}
+
+.dhun-hero__backdrop {
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  filter: blur(var(--dhun-blur-ambient)) saturate(160%);
+  transform: scale(1.1);
+}
+
+.dhun-hero__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, var(--dhun-hero-veil-top) 0%, var(--dhun-hero-veil-mid) 22%, var(--dhun-hero-veil-bottom) 62%, var(--dhun-glass-strong) 100%);
+}
+
+.dhun-hero__inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: var(--dhun-space-lg);
+  align-items: flex-end;
+  padding: var(--dhun-space-lg);
+}
+
+/* The feature hero sits at the top of Home on a phone, where a 200px cover
+   beside the title leaves the title 130px wide. The cover steps down and the
+   text keeps the room; the full size returns as soon as there is width for it. */
+.dhun-hero--feature .dhun-hero__art {
+  width: var(--dhun-grid-card-min);
+  height: var(--dhun-grid-card-min);
+  border-radius: var(--dhun-shape-artwork);
+}
+
+.dhun-hero--feature .dhun-hero__title {
+  font: var(--dhun-text-title-medium);
+}
+
+/* The two hero actions stay on one line and share the column they have, rather
+   than each demanding its padding and running off the card. */
+.dhun-hero--feature .dhun-hero__actions {
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-hero--feature .dhun-button {
+  padding-inline: var(--dhun-space-lg);
+  min-height: var(--dhun-space-compact-target);
+}
+
+@media (max-width: 380px) {
+  .dhun-hero--feature .dhun-hero__inner {
+    gap: var(--dhun-space-md);
+    padding: var(--dhun-space-md);
+  }
+}
+
+@media (min-width: 600px) {
+  .dhun-hero__inner {
+    padding: var(--dhun-space-xl);
+  }
+
+  .dhun-hero__title {
+    font: var(--dhun-text-hero);
+  }
+
+  .dhun-hero--feature .dhun-hero__art {
+    width: var(--dhun-space-artwork-large);
+    height: var(--dhun-space-artwork-large);
+  }
+}
+
+.dhun-hero__art {
+  flex: none;
+  width: var(--dhun-space-artwork-playlist);
+  height: var(--dhun-space-artwork-playlist);
+  border-radius: var(--dhun-shape-artwork-hero);
+  box-shadow: 0 var(--dhun-space-lg) var(--dhun-space-huge) color-mix(in srgb, var(--dhun-scrim-strong) 55%, transparent);
+}
+
+.dhun-hero--round .dhun-hero__art {
+  border-radius: var(--dhun-shape-full);
+}
+
+.dhun-hero__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  min-width: 0;
+}
+
+.dhun-hero__kicker {
+  margin: 0;
+  font: var(--dhun-text-label-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: var(--dhun-tracking-label-medium);
+  text-transform: uppercase;
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-hero__title {
+  margin: 0;
+  font: var(--dhun-text-headline-small);
+  letter-spacing: var(--dhun-tracking-display-large);
+  text-wrap: balance;
+}
+
+.dhun-hero__meta {
+  margin: 0;
+  font: var(--dhun-text-body-medium);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-hero__description {
+  margin: 0;
+  max-width: 52ch;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.dhun-shell {
+.dhun-hero__actions {
   display: flex;
-  flex: 1;
-  min-height: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  margin-top: var(--dhun-space-sm);
 }
 
-.dhun-content {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
+/* --------------------------------------------------------------- buttons -- */
+
+.dhun-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dhun-space-sm);
+  min-height: var(--dhun-space-touch-target);
+  padding: 0 var(--dhun-space-xl);
+  border: var(--dhun-space-border) solid transparent;
+  border-radius: var(--dhun-shape-button);
+  background: none;
+  font: var(--dhun-text-label-large);
+  text-decoration: none;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing),
+    transform var(--dhun-motion-fast) var(--dhun-motion-easing);
 }
 
-.dhun-master {
-  flex: 1;
-  min-width: 0;
+.dhun-button:active {
+  transform: scale(0.97);
+}
+
+.dhun-button--filled {
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+}
+
+.dhun-button--filled:hover {
+  background: color-mix(in srgb, var(--dhun-accent) 88%, var(--dhun-text));
+}
+
+.dhun-button--tonal {
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
+}
+
+.dhun-button--outlined {
+  border-color: var(--dhun-border-strong);
+  color: var(--dhun-text);
+}
+
+.dhun-button--glass {
+  background: var(--dhun-glass-strong);
+  border-color: var(--dhun-border);
+  color: var(--dhun-text);
+  backdrop-filter: blur(var(--dhun-blur-control));
+  -webkit-backdrop-filter: blur(var(--dhun-blur-control));
+}
+
+.dhun-button--play {
+  padding-inline: var(--dhun-space-xxl) var(--dhun-space-xxl);
+}
+
+.dhun-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--dhun-space-touch-target);
+  height: var(--dhun-space-touch-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: none;
+  color: var(--dhun-text-secondary);
+  transition: color var(--dhun-motion-fast) var(--dhun-motion-easing),
+    background var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-icon-button:hover {
+  color: var(--dhun-text);
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-icon-button.is-active,
+.dhun-icon-button.is-liked {
+  color: var(--dhun-accent);
+}
+
+.dhun-text-button {
+  padding: var(--dhun-space-xs) 0;
+  border: 0;
+  background: none;
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-large);
+  text-decoration: underline;
+  text-underline-offset: var(--dhun-underline-offset);
+}
+
+.dhun-text-button:hover {
+  color: var(--dhun-text);
+}
+
+.dhun-text-button--danger {
+  color: var(--dhun-error);
+}
+
+/* ----------------------------------------------------------------- chips -- */
+
+.dhun-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+}
+
+.dhun-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dhun-space-xs-plus);
+  min-height: var(--dhun-space-compact-target);
+  padding: 0 var(--dhun-space-lg);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  border-radius: var(--dhun-shape-chip);
+  background: var(--dhun-glass);
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-medium);
+  letter-spacing: var(--dhun-tracking-label-medium);
+  text-decoration: none;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing),
+    color var(--dhun-motion-fast) var(--dhun-motion-easing),
+    border-color var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-chip:hover {
+  color: var(--dhun-text);
+  border-color: var(--dhun-border-strong);
+}
+
+.dhun-chip.is-active {
+  background: var(--dhun-accent);
+  border-color: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+}
+
+.dhun-chip__count {
+  font: var(--dhun-text-label-small);
+  opacity: 0.75;
+}
+
+/* ------------------------------------------------------------------ rows -- */
+
+.dhun-list {
+  list-style: none;
+  margin: var(--dhun-space-md) 0 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  gap: var(--dhun-space-xs);
 }
 
-.dhun-scroll {
+.dhun-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-large);
+  background: transparent;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-row:hover {
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-row.is-current {
+  background: color-mix(in srgb, var(--dhun-accent) 12%, transparent);
+}
+
+.dhun-row__main {
+  display: grid;
+  grid-template-columns: var(--dhun-space-artwork-thumb) 1fr auto;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  width: 100%;
+  min-height: var(--dhun-space-list-row-height);
+  padding: var(--dhun-space-sm);
+  border: 0;
+  border-radius: var(--dhun-shape-large);
+  background: none;
+  text-align: left;
+}
+
+.dhun-row__art {
+  position: relative;
+  width: var(--dhun-space-artwork-thumb);
+  height: var(--dhun-space-artwork-thumb);
+  border-radius: var(--dhun-shape-medium);
+  overflow: hidden;
+}
+
+.dhun-row__veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--dhun-scrim-strong) 55%, transparent);
+  color: var(--dhun-text);
+  opacity: 0;
+  transition: opacity var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-row:hover .dhun-row__veil,
+.dhun-row__main:focus-visible .dhun-row__veil {
+  opacity: 1;
+}
+
+.dhun-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-bars-gap);
+  min-width: 0;
+}
+
+.dhun-row__title {
+  font: var(--dhun-text-track-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-row.is-current .dhun-row__title {
+  color: var(--dhun-accent);
+}
+
+.dhun-row__sub {
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-row__duration {
+  font: var(--dhun-text-compact);
+  color: var(--dhun-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dhun-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-zero);
+}
+
+.dhun-row__actions .dhun-icon-button {
+  width: var(--dhun-space-compact-target);
+  height: var(--dhun-space-compact-target);
+}
+
+.dhun-row__bars,
+.dhun-mini__bars {
+  position: absolute;
+  inset-inline: 0;
+  bottom: var(--dhun-space-xs-plus);
+  display: flex;
+  justify-content: center;
+  gap: var(--dhun-bars-gap);
+}
+
+.dhun-row__bars i,
+.dhun-mini__bars i {
+  display: block;
+  width: var(--dhun-bars-width);
+  height: var(--dhun-space-md);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  box-shadow: 0 0 var(--dhun-bars-glow) var(--dhun-accent);
+  animation: dhun-bars 900ms infinite ease-in-out;
+}
+
+.dhun-row__bars i:nth-child(2),
+.dhun-mini__bars i:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.dhun-row__bars i:nth-child(3),
+.dhun-mini__bars i:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes dhun-bars {
+  0%, 100% { transform: scaleY(0.5); }
+  50% { transform: scaleY(1.15); }
+}
+
+.dhun-list__empty {
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-body-small);
+}
+
+/* ------------------------------------------------------------------ grid -- */
+
+.dhun-page-head {
+  margin-bottom: var(--dhun-space-xl);
+}
+
+.dhun-page-head__overline {
+  margin: 0 0 var(--dhun-space-xs);
+  font: var(--dhun-text-label-large);
+  letter-spacing: var(--dhun-tracking-label-large);
+  text-transform: uppercase;
+  color: var(--dhun-accent);
+}
+
+.dhun-page-head__title {
+  margin: 0;
+  font: var(--dhun-text-headline-medium);
+  letter-spacing: var(--dhun-tracking-display-large);
+}
+
+.dhun-page-head__meta {
+  margin: var(--dhun-space-xs) 0 0;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-section {
+  margin-top: var(--dhun-space-section-spacing);
+}
+
+.dhun-section__title {
+  margin: 0;
+  font: var(--dhun-text-title-large);
+}
+
+/* ---------------------------------------------------------------- search -- */
+
+.dhun-search {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  padding: var(--dhun-space-xs) var(--dhun-space-xs) var(--dhun-space-xs) var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-button);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass-strong);
+}
+
+.dhun-search__icon {
+  display: grid;
+  place-items: center;
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-search__input {
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-bottom: var(--dhun-space-content-bottom-inset);
-  scrollbar-width: thin;
-  scroll-behavior: smooth;
+  min-width: 0;
+  min-height: var(--dhun-space-compact-target);
+  border: 0;
+  background: none;
+  font: var(--dhun-text-body-large);
+  color: var(--dhun-text);
 }
 
-/* --------------------------------------------------------------- nav rail -- */
+.dhun-search__input::placeholder {
+  color: var(--dhun-text-tertiary);
+}
 
-.dhun-rail {
-  display: none;
-  flex: 0 0 auto;
-  width: var(--dhun-space-bottom-nav-height);
+.dhun-search__input:focus {
+  outline: none;
+}
+
+.dhun-search:focus-within {
+  border-color: var(--dhun-accent);
+}
+
+.dhun-search__go {
+  min-height: var(--dhun-space-compact-target);
+  padding: 0 var(--dhun-space-xl);
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+  font: var(--dhun-text-label-large);
+}
+
+.dhun-search + .dhun-chips {
+  margin-top: var(--dhun-space-md);
+}
+
+.dhun-recent {
+  margin-top: var(--dhun-space-section-spacing);
+}
+
+/* ------------------------------------------------------------------ tabs -- */
+
+.dhun-tabs {
+  display: flex;
+  gap: var(--dhun-space-xs);
+  padding: var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-button);
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  width: 100%;
+}
+
+/* Three tabs on a 360px phone: they share the width rather than scrolling one
+   label off the edge. `width: fit-content` + overflow turned "Recently played"
+   into a label nobody could read without a sideways drag. */
+.dhun-tab {
+  flex: 1;
+  justify-content: center;
+  padding-inline: var(--dhun-space-sm);
+  min-width: 0;
+  font: var(--dhun-text-label-medium);
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-tab__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--dhun-space-lg);
+  padding-inline: var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-overlay-pressed);
+  font: var(--dhun-text-label-small);
+}
+
+.dhun-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+  min-height: var(--dhun-space-compact-target);
+  padding: 0 var(--dhun-space-lg);
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: none;
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-large);
+  white-space: nowrap;
+}
+
+.dhun-tab.is-active {
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+}
+
+.dhun-panel {
+  margin-top: var(--dhun-space-lg);
+}
+
+.dhun-library-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--dhun-space-lg);
+}
+
+.dhun-collection-tools {
+  display: flex;
+  gap: var(--dhun-space-lg);
+  justify-content: flex-end;
+  margin-top: var(--dhun-space-lg);
+}
+
+/* -------------------------------------------------------------- settings -- */
+
+.dhun-settings {
+  margin-top: var(--dhun-space-xl);
+  padding: var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-card-large);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass);
+}
+
+.dhun-settings__title {
+  margin: 0 0 var(--dhun-space-md);
+  font: var(--dhun-text-title-medium);
+}
+
+.dhun-setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-sm);
+  padding-block: var(--dhun-space-sm);
+}
+
+.dhun-setting--stack {
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-setting__label {
+  font: var(--dhun-text-label-large);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-setting__note {
+  margin: 0;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  max-width: 60ch;
+}
+
+.dhun-setting__note--mono {
+  font-family: var(--dhun-font-mono);
+  font-size: 0.8em;
+  color: var(--dhun-text);
+}
+
+.dhun-setting__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  margin-block: var(--dhun-space-sm);
+}
+
+.dhun-setting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  width: 100%;
+  min-height: var(--dhun-space-touch-target);
+  padding: var(--dhun-space-xs) 0;
+  border: 0;
+  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+  background: none;
+  color: var(--dhun-text);
+  font: var(--dhun-text-body-medium);
+  text-align: left;
+  text-decoration: none;
+}
+
+.dhun-setting-row:last-of-type {
+  border-bottom: 0;
+}
+
+.dhun-settings__version {
+  margin: var(--dhun-space-md) 0 0;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-file {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.dhun-file input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dhun-range {
+  width: 100%;
+  accent-color: var(--dhun-accent);
+  min-height: var(--dhun-space-compact-target);
+  background: transparent;
+}
+
+.dhun-form {
+  display: flex;
+  gap: var(--dhun-space-sm);
+  margin-top: var(--dhun-space-md);
+}
+
+.dhun-input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--dhun-space-touch-target);
+  padding: 0 var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-medium);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  background: var(--dhun-surface-variant);
+  color: var(--dhun-text);
+  font: var(--dhun-text-body-large);
+}
+
+.dhun-input:focus {
+  border-color: var(--dhun-accent);
+}
+
+/* ----------------------------------------------------------------- about -- */
+
+.dhun-about-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  margin-bottom: var(--dhun-space-lg);
+}
+
+.dhun-prose {
+  max-width: var(--dhun-space-legal-content-max);
+  font: var(--dhun-text-body-relaxed);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-prose h2,
+.dhun-prose h3,
+.dhun-prose h4 {
+  color: var(--dhun-text);
+  margin: var(--dhun-space-xl) 0 var(--dhun-space-sm);
+  font: var(--dhun-text-title-medium);
+}
+
+.dhun-prose h2 {
+  font: var(--dhun-text-title-large);
+}
+
+.dhun-prose p {
+  margin: 0 0 var(--dhun-space-md);
+}
+
+.dhun-prose a {
+  color: var(--dhun-accent);
+}
+
+.dhun-prose .is-strong {
+  color: var(--dhun-text);
+  font-weight: 600;
+}
+
+.dhun-prose .is-code,
+.dhun-prose code {
+  font-family: var(--dhun-font-mono);
+  font-size: 0.88em;
+}
+
+.dhun-prose pre {
+  overflow-x: auto;
+  padding: var(--dhun-space-md);
+  border-radius: var(--dhun-shape-medium);
+  background: var(--dhun-surface-variant);
+}
+
+.dhun-prose blockquote {
+  margin: 0 0 var(--dhun-space-md);
+  padding-left: var(--dhun-space-md);
+  border-left: var(--dhun-stroke-thick) solid var(--dhun-accent);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-prose__list {
+  margin: 0 0 var(--dhun-space-md);
+  padding-left: var(--dhun-space-xl);
+}
+
+.dhun-prose__list li[data-indent="1"] {
+  margin-left: var(--dhun-space-lg);
+}
+
+.dhun-prose__record {
+  display: grid;
+  grid-template-columns: minmax(0, 12ch) 1fr;
+  gap: var(--dhun-space-xs) var(--dhun-space-md);
+  margin: 0 0 var(--dhun-space-md);
+  padding: var(--dhun-space-md);
+  border-radius: var(--dhun-shape-medium);
+  background: var(--dhun-surface-variant);
+}
+
+/* `textTertiary` in the light theme measures 3.84:1 — under AA for 11px text,
+   the same finding the earlier contrast round fixed on five other roles.
+   Small copy uses
+   `textSecondary` (7.53:1) in both themes instead of relying on a token that is
+   only adequate for large text. */
+.dhun-prose__record dt {
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-small);
+  text-transform: uppercase;
+  letter-spacing: var(--dhun-tracking-label-small);
+}
+
+.dhun-prose__record dd {
+  margin: 0;
+  color: var(--dhun-text);
+}
+
+/* ----------------------------------------------------------------- states -- */
+
+.dhun-state {
+  display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--dhun-space-sm);
-  padding-top: var(--dhun-space-md);
-  background: var(--dhun-glass-strong);
-  border-right: var(--dhun-space-border) solid var(--dhun-border);
-  backdrop-filter: blur(var(--dhun-space-lg));
-}
-
-/* The rail is 80px because the app's own NavigationRail is, so its items are
-   pinned to the rail's width instead of being sized by their longest label: a
-   rail that grows when a label does would push every page's content column
-   sideways, and it would do it on the visitor's machine rather than in review.
-
-   The label wraps here (see the override below) rather than truncating as it
-   does in the bottom bar. The bottom bar truncates because its height is what
-   keeps the thumb's targets still; a rail grows downward without moving
-   anything under a finger, and "Your library" cut to "Your librar…" is a
-   destination the visitor has to guess at.
-
-   Measured 2026-10-16, browser job of website run 38850405071: the item row was
-   90px wide inside a 79px rail at 1280x800 (`overflowReport` in
-   website/tests/browser.mjs reports that as spilling, with each child's
-   width). Nothing else about the rail changed. */
-.dhun-rail .dhun-nav-item {
-  width: 100%;
-  min-width: 0;
-  padding-inline: var(--dhun-space-xs);
-}
-
-.dhun-rail .dhun-nav-item__label {
-  white-space: normal;
-  overflow-wrap: anywhere;
+  margin-top: var(--dhun-space-xxxl);
+  padding: var(--dhun-space-xxl);
   text-align: center;
+  border-radius: var(--dhun-shape-card-large);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass);
 }
 
-.dhun-brand-block {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-bottom: var(--dhun-space-md);
+.dhun-state__icon {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-huge);
+  height: var(--dhun-space-huge);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
 }
 
-.dhun-wordmark {
-  font: var(--dhun-text-label-small);
-  font-weight: 700;
-  letter-spacing: var(--dhun-tracking-brand);
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+.dhun-state__title {
+  margin: 0;
+  font: var(--dhun-text-title-medium);
+}
+
+.dhun-state__body {
+  margin: 0;
+  max-width: 46ch;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-state__detail {
+  margin: 0;
+  max-width: 100%;
+  padding: var(--dhun-space-sm) var(--dhun-space-md);
+  border-radius: var(--dhun-shape-medium);
+  background: var(--dhun-surface-variant);
+  color: var(--dhun-text-secondary);
+  font-family: var(--dhun-font-mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.dhun-state__detail-label {
   color: var(--dhun-text-secondary);
   text-transform: uppercase;
+  letter-spacing: var(--dhun-tracking-label-small);
+}
+
+.dhun-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  justify-content: center;
+}
+
+.dhun-state--error .dhun-state__icon {
+  background: var(--dhun-error-container);
+  color: var(--dhun-error);
+}
+
+.dhun-state--loading {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.dhun-spinner {
+  width: var(--dhun-space-xxl);
+  height: var(--dhun-space-xxl);
+  border-radius: var(--dhun-shape-full);
+  border: var(--dhun-stroke-thin) solid var(--dhun-border-strong);
+  border-top-color: var(--dhun-accent);
+  animation: dhun-spin 800ms linear infinite;
+}
+
+@keyframes dhun-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dhun-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-sm);
+  width: 100%;
+  margin-top: var(--dhun-space-lg);
+}
+
+.dhun-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+}
+
+.dhun-skeleton {
+  display: block;
+  border-radius: var(--dhun-shape-medium);
+  background: linear-gradient(90deg, var(--dhun-shimmer-base), var(--dhun-shimmer-highlight), var(--dhun-shimmer-base));
+  background-size: 200% 100%;
+  animation: dhun-shimmer 1400ms infinite linear;
+}
+
+.dhun-skeleton--art {
+  width: var(--dhun-space-artwork-thumb);
+  height: var(--dhun-space-artwork-thumb);
+}
+
+.dhun-skeleton--text {
+  flex: 1;
+  height: var(--dhun-space-md);
+}
+
+@keyframes dhun-shimmer {
+  to { background-position: -200% 0; }
+}
+
+/* -------------------------------------------------------------- notices -- */
+
+.dhun-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dhun-space-md);
+  margin-top: var(--dhun-space-lg);
+  padding: var(--dhun-space-md) var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-large);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass-strong);
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-notice strong {
+  color: var(--dhun-text);
+}
+
+.dhun-notice--warn {
+  border-color: var(--dhun-warning);
+}
+
+.dhun-notice__icon {
+  color: var(--dhun-warning);
+  display: grid;
+  place-items: center;
+}
+
+.dhun-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dhun-space-xs-plus);
+  margin: 0;
+  padding: var(--dhun-space-xs) var(--dhun-space-md);
+  border-radius: var(--dhun-shape-full);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass-strong);
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  text-transform: uppercase;
+  color: var(--dhun-text-secondary);
+  white-space: nowrap;
+}
+
+.dhun-source-badge__dot {
+  width: var(--dhun-space-sm);
+  height: var(--dhun-space-sm);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-text-tertiary);
+}
+
+.dhun-source-badge--live .dhun-source-badge__dot {
+  background: var(--dhun-success);
+}
+
+.dhun-source-badge--sample .dhun-source-badge__dot {
+  background: var(--dhun-warning);
+}
+
+/* ------------------------------------------------------------------ dock -- */
+
+.dhun-mini {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  padding: var(--dhun-space-xs) var(--dhun-space-sm) var(--dhun-space-xs) var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-card-large);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  background: var(--dhun-glass-strong);
+  box-shadow: 0 var(--dhun-space-sm) var(--dhun-space-huge) color-mix(in srgb, var(--dhun-scrim-strong) 50%, transparent);
+  overflow: hidden;
+}
+
+.dhun-mini__progress {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: var(--dhun-space-xs);
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+}
+
+.dhun-progress {
+  display: block;
+  width: 100%;
+  height: var(--dhun-space-xs);
+  appearance: none;
+  border: 0;
+  background: transparent;
+}
+
+.dhun-progress::-webkit-progress-bar {
+  background: var(--dhun-border);
+}
+
+.dhun-progress::-webkit-progress-value {
+  background: var(--dhun-accent);
+}
+
+.dhun-progress::-moz-progress-bar {
+  background: var(--dhun-accent);
+}
+
+.dhun-mini__main {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  flex: 1;
+  min-width: 0;
+  padding: var(--dhun-space-xs);
+  border: 0;
+  border-radius: var(--dhun-shape-large);
+  background: none;
+  text-align: left;
+}
+
+.dhun-mini__art {
+  position: relative;
+  flex: none;
+  width: var(--dhun-space-artwork-mini);
+  height: var(--dhun-space-artwork-mini);
+  border-radius: var(--dhun-shape-medium);
+  overflow: hidden;
+}
+
+.dhun-mini__bars {
+  bottom: var(--dhun-space-zero);
+  align-items: flex-end;
+}
+
+.dhun-mini__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dhun-mini__title {
+  font: var(--dhun-text-track-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-mini__sub {
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-mini__controls {
+  display: flex;
+  align-items: center;
+}
+
+/* ------------------------------------------------------------------- nav -- */
+
+.dhun-tabs-nav {
+  display: flex;
+  justify-content: space-around;
+  gap: var(--dhun-space-xs);
+  padding: var(--dhun-space-xs) var(--dhun-space-sm) calc(var(--dhun-space-sm) + var(--dhun-safe-bottom));
+  min-height: var(--dhun-space-bottom-nav-height);
+  background: var(--dhun-glass-bar-top);
+  border-top: var(--dhun-space-border) solid var(--dhun-border);
 }
 
 .dhun-nav-item {
@@ -254,1644 +1630,112 @@ a {
   align-items: center;
   justify-content: center;
   gap: var(--dhun-space-xs);
-  min-height: var(--dhun-space-navigation-bar-content);
-  min-width: var(--dhun-space-compact-target);
-  padding: var(--dhun-space-sm) var(--dhun-space-md);
-  border-radius: var(--dhun-shape-nav-indicator);
-  /* Secondary, not tertiary: the tab labels are 11px, and the app's tertiary
-     (55% ink) measures 3.95:1 on the light background — under AA for text this
-     size. Measured across seven routes; the number is in the browser job. */
+  flex: 1;
+  min-height: var(--dhun-space-touch-target);
+  border: 0;
+  background: none;
+  /* Secondary: the label is 11px, and tertiary ink on the light glass nav
+     measures 3.95:1. See `.dhun-bar__overline`. */
   color: var(--dhun-text-secondary);
   font: var(--dhun-text-label-small);
   letter-spacing: var(--dhun-tracking-label-small);
-  transition: color var(--dhun-motion-fast) var(--dhun-motion-easing);
 }
 
-.dhun-nav-item:hover {
-  background: var(--dhun-overlay-hover);
+.dhun-nav-item__icon {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-huge);
+  height: var(--dhun-space-medium-large);
+  border-radius: var(--dhun-shape-nav-indicator);
 }
 
-.dhun-nav-item[aria-current="page"] {
-  background: var(--dhun-accent-container);
-  color: var(--dhun-on-accent-container);
-}
-
-/* The label under a tab icon. Truncated rather than wrapped: a bottom bar whose
-   height depends on the longest translation is a bar that moves under the thumb
-   mid-tap. */
-.dhun-nav-item__label {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ------------------------------------------------------------- top bar ---- */
-
-.dhun-topbar {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-md);
-  padding: var(--dhun-space-xl) var(--dhun-space-screen-padding) var(--dhun-space-md);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: linear-gradient(180deg, var(--dhun-background) 65%, transparent);
-}
-
-.dhun-topbar__lead {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-xs);
-}
-
-.dhun-topbar__title {
-  margin: 0;
-  font: var(--dhun-text-headline-medium);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dhun-topbar__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-xs);
-}
-
-/* ------------------------------------------------------------------ dock -- */
-
-/* The dock is in normal flow rather than fixed: a fixed bar over a scrolling
-   list is the classic way a web app hides its own last row, and `dvh` already
-   keeps the column exactly viewport-tall. */
-.dhun-dock-wrap {
-  flex: 0 0 auto;
-  z-index: 20;
-}
-
-.dhun-dock {
-  display: flex;
-  flex-direction: column;
-}
-
-.dhun-bottom-nav {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-around;
-  gap: var(--dhun-space-sm);
-  min-height: var(--dhun-space-bottom-nav-height);
-  padding: var(--dhun-space-sm) var(--dhun-space-md);
-  padding-bottom: max(var(--dhun-space-sm), env(safe-area-inset-bottom));
-  background: var(--dhun-glass-strong);
-  border-top: var(--dhun-space-border) solid var(--dhun-glass-bar-top);
-  backdrop-filter: blur(var(--dhun-space-lg));
-}
-
-/* ------------------------------------------------------------- overlays --- */
-
-.dhun-overlay-mount,
-.dhun-sheet-mount,
-.dhun-toast-mount {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 40;
-}
-
-.dhun-sheet-mount {
-  z-index: 50;
-}
-
-/* The toast floats over everything, so it has to float *clear of the dock* —
-   and the dock is not one height. The scroll region ends at the dock's top
-   edge, but a fixed overlay is measured against the viewport, and this one
-   used the content inset (112px) as its offset. Measured 2026-10-16 at
-   390x844: the dock is a 85px mini player over an 81px navigation bar — 166px
-   — so the toast sat squarely across the mini player and a tap on its expand
-   control landed on the toast instead (the player could not be opened on a
-   phone at all). The offset is now made of the dock it actually has. */
-.dhun-toast-mount {
-  z-index: 55;
-  top: auto;
-  bottom: var(--dhun-space-bottom-nav-height);
-}
-
-#app:has(.dhun-mini) .dhun-toast-mount {
-  bottom: calc(
-    var(--dhun-space-mini-player-height) + var(--dhun-space-bottom-nav-height) +
-      var(--dhun-space-sm)
-  );
-}
-
-.dhun-overlay-mount > *,
-.dhun-sheet-mount > *,
-.dhun-toast-mount > * {
-  pointer-events: auto;
-}
-
-.dhun-scrim {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: var(--dhun-scrim-strong);
-  padding: var(--dhun-space-md);
-}
-
-@media (min-width: 480px) {
-  .dhun-scrim {
-    align-items: center;
-  }
-}
-
-/* ========================================================== primitives ==== */
-
-.dhun-icon {
-  display: block;
-  flex: none;
-  fill: currentColor;
-  /* The SVG carries its own width and height: the app asks for 16, 18, 20, 22,
-     24 or 32 depending on where the icon sits, and a single size here would
-     flatten all six. This rule is about behaviour, not measurement. */
-}
-
-.dhun-icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--dhun-space-touch-target);
-  height: var(--dhun-space-touch-target);
-  border-radius: var(--dhun-shape-full);
-  color: var(--dhun-text-secondary);
-  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
-}
-
-.dhun-icon-button:hover {
-  background: var(--dhun-overlay-hover);
-}
-
-.dhun-icon-button:active {
-  background: var(--dhun-overlay-pressed);
-}
-
-.dhun-icon-button--small {
-  width: var(--dhun-space-compact-target);
-  height: var(--dhun-space-compact-target);
-}
-
-.dhun-icon-button--active {
+.dhun-nav-item.is-active {
   color: var(--dhun-accent);
 }
 
-/* One chevron glyph, two directions: rotating a vector is cheaper than a second
-   asset and keeps the icon set generated from the app's own enum. */
-.dhun-icon-button--up .dhun-icon {
-  transform: rotate(180deg);
-}
-
-.dhun-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--dhun-space-sm);
-  min-height: var(--dhun-space-touch-target);
-  padding: 0 var(--dhun-space-xxl);
-  border-radius: var(--dhun-shape-button);
-  border: var(--dhun-space-border) solid transparent;
-  background: var(--dhun-accent);
-  color: var(--dhun-on-accent);
-  font: var(--dhun-text-label-large);
-  letter-spacing: var(--dhun-tracking-label-large);
-  text-decoration: none;
-  transition: filter var(--dhun-motion-fast) var(--dhun-motion-easing);
-}
-
-.dhun-button:hover {
-  filter: brightness(1.08);
-}
-
-.dhun-button--outlined {
-  background: transparent;
-  border: var(--dhun-space-border) solid var(--dhun-border-strong);
-  color: var(--dhun-text);
-}
-
-.dhun-button--tonal {
+.dhun-nav-item.is-active .dhun-nav-item__icon {
   background: var(--dhun-accent-container);
   color: var(--dhun-on-accent-container);
 }
 
-.dhun-button--ghost {
-  background: transparent;
-  color: var(--dhun-text-secondary);
-  border-color: var(--dhun-border-strong);
-  padding: 0 var(--dhun-space-lg);
-}
-
-.dhun-button--ghost:hover {
-  background: var(--dhun-overlay-hover);
-  filter: none;
-}
-
-.dhun-button--danger {
-  background: var(--dhun-error);
-  color: var(--dhun-on-error);
-}
-
-.dhun-button--file {
-  position: relative;
-  overflow: hidden;
-}
-
-.dhun-button--file input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.dhun-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--dhun-space-xs);
-  min-height: var(--dhun-space-compact-target);
-  padding: 0 var(--dhun-space-lg);
-  border-radius: var(--dhun-shape-chip);
-  border: var(--dhun-space-border) solid var(--dhun-border);
-  background: var(--dhun-glass);
-  color: var(--dhun-text-secondary);
-  font: var(--dhun-text-label-large);
-  letter-spacing: var(--dhun-tracking-label-large);
-  white-space: nowrap;
-  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
-}
-
-.dhun-chip:hover {
-  background: var(--dhun-overlay-hover);
-}
-
-.dhun-chip[aria-selected="true"],
-.dhun-chip[aria-checked="true"],
-.dhun-chip[aria-pressed="true"] {
-  background: var(--dhun-accent-container);
-  border-color: transparent;
-  color: var(--dhun-on-accent-container);
-}
-
-.dhun-chip:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.dhun-chip__count {
-  font: var(--dhun-text-label-small);
-  color: var(--dhun-text-tertiary);
-}
-
-.dhun-chip[aria-selected="true"] .dhun-chip__count,
-.dhun-chip[aria-checked="true"] .dhun-chip__count {
-  color: inherit;
-}
-
-.dhun-chip-row {
-  display: flex;
-  gap: var(--dhun-space-sm);
-  padding: var(--dhun-space-md) var(--dhun-space-screen-padding);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.dhun-chip-row::-webkit-scrollbar {
+.dhun-rail-nav {
   display: none;
-}
-
-.dhun-chip-row--wrap {
-  flex-wrap: wrap;
-  padding: 0;
-  overflow: visible;
-}
-
-.dhun-recent {
-  display: inline-flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--dhun-space-xs);
-  list-style: none;
+  width: var(--dhun-space-navigation-rail-width);
+  padding: var(--dhun-space-lg) var(--dhun-space-sm);
 }
 
-/* ============================================================ feedback ==== */
-
-.dhun-notice {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--dhun-space-md);
-  margin: var(--dhun-space-sm) var(--dhun-space-screen-padding);
-  padding: var(--dhun-space-md) var(--dhun-space-lg);
-  border-radius: var(--dhun-shape-card);
-  border: var(--dhun-space-border) solid var(--dhun-border);
-  background: var(--dhun-glass);
-  backdrop-filter: blur(var(--dhun-space-md));
-}
-
-.dhun-notice--warn {
-  border-color: var(--dhun-warning);
-}
-
-.dhun-notice--error {
-  border-color: var(--dhun-error);
-}
-
-.dhun-notice__text {
-  flex: 1;
+/* An item is as wide as the rail. Sizing it by its longest label would move the
+   content column when a translation changes, or push a scrollbar onto the page;
+   the label wraps instead. Measured 2026-10-16 in the browser job, when a 90px
+   item sat inside a 79px rail. */
+.dhun-rail-nav__item {
+  width: 100%;
   min-width: 0;
 }
 
-/* A notice's message *is* the notice, so it must never be squeezed into a
-   column of single words to make room for its own buttons. `flex-wrap` alone
-   does not save it: the text's flex basis is 0 and `min-width: 0` lets it
-   shrink past its longest word, so the buttons keep their width and the
-   message collapses. Measured 2026-10-16 at 1280x900: inside the player's
-   343px control column, "This track could not be played" rendered one word per
-   line beside Retry / Data source / Why?. The message now takes its own line
-   and the actions sit under it, which is also how the app's
-   PlayerControlCluster arranges the same notice in the same narrow column. */
-.dhun-full__controls .dhun-notice {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.dhun-notice__title {
-  margin: 0;
-  font: var(--dhun-text-title-small);
-}
-
-.dhun-notice__body {
-  margin: 0;
-  font: var(--dhun-text-body-small);
-  letter-spacing: var(--dhun-tracking-body-small);
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-notice__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--dhun-space-xs);
-}
-
-/* A phone is narrower than the player's control column, so a notice in a list
-   gets the same treatment there: message first, actions underneath. */
-@media (max-width: 479px) {
-  .dhun-notice {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-.dhun-notice__actions .dhun-button {
-  min-height: var(--dhun-space-compact-target);
-  padding: 0 var(--dhun-space-md);
-}
-
-.dhun-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--dhun-space-sm);
-  padding: var(--dhun-space-xxxl) var(--dhun-space-screen-padding);
-  text-align: center;
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-state__icon {
-  color: var(--dhun-text-tertiary);
-}
-
-.dhun-state--error .dhun-state__icon {
-  color: var(--dhun-error);
-}
-
-.dhun-state__title {
-  margin: 0;
-  font: var(--dhun-text-title-large);
-  color: var(--dhun-text);
-}
-
-.dhun-state__body,
-.dhun-state__detail {
-  margin: 0;
-  max-width: 52ch;
-  font: var(--dhun-text-body-medium);
-  color: var(--dhun-text-secondary);
+.dhun-rail-nav__label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
 }
 
 /*
- * The technical detail line, and the label that introduces it.
+ * The rail's brand: the mark above the wordmark, not beside it.
  *
- * A failure says what happened in the app's own words (`failureHelp`), and the
- * browser's or the server's string sits underneath, quiet, named, monospaced.
- * The rung matters: it is the lowest contrast step in the palette, so it cannot
- * be mistaken for the message — and because it is *legible*, a person reporting
- * a playback failure can read the string off the screen instead of opening
- * developer tools, which is what the bug template asks them for.
+ * Side by side, the icon and a 3px-tracked "DHUN" measured 81px inside a 72px
+ * content box and spilled out of the rail — the browser suite caught it as a
+ * 9px overflow on the desktop shell. Stacked, the wordmark can keep its
+ * tracking and still fit the narrow rail, and the mark reads as a logo rather
+ * than as a fourth destination.
  */
-.dhun-state__detail,
-.dhun-notice__detail {
-  margin: 0;
-  max-width: 52ch;
-  font: var(--dhun-text-body-small);
-  /* Secondary, not tertiary. The app's tertiary rung is a 0.549 alpha ink in the
-     light scheme, which measures below the 4.5:1 floor on every one of the app's
-     light surfaces — the site's own gate fails that rung for exactly this reason
-     (`scripts/website_quality.py`). A line that carries the one string worth
-     copying out of the app has to be readable, and secondary is still a step
-     quieter than the message above it. */
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-notice__detail {
-  margin-top: var(--dhun-space-xs);
-}
-
-.dhun-state__detail-label,
-.dhun-lyrics__detail {
-  display: block;
-  margin-top: var(--dhun-space-xs);
-  font: var(--dhun-text-body-small);
-  color: var(--dhun-text-secondary);
-  overflow-wrap: anywhere;
-}
-
-.dhun-row__failure-detail {
-  font-family: var(--dhun-font-mono);
-  font-size: 0.75rem;
-  letter-spacing: var(--dhun-tracking-label-small);
-  text-transform: uppercase;
-}
-
-.dhun-state__detail-label {
-  margin-inline-end: var(--dhun-space-xs);
-}
-
-.dhun-state__actions {
+.dhun-rail-nav__brand {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--dhun-space-sm);
-  margin-top: var(--dhun-space-sm);
-}
-
-.dhun-state--loading {
-  align-items: stretch;
-}
-
-.dhun-shimmer {
-  height: var(--dhun-space-list-row-height);
-  border-radius: var(--dhun-shape-card);
-  background: linear-gradient(
-    90deg,
-    var(--dhun-shimmer-base) 0%,
-    var(--dhun-shimmer-highlight) 50%,
-    var(--dhun-shimmer-base) 100%
-  );
-  background-size: 200% 100%;
-  animation: dhun-shimmer 1400ms linear infinite;
-}
-
-@keyframes dhun-shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-/* A spinner carries no information about *why* something is slow, so it only
-   ever appears inside a control whose label already said what is happening. */
-.dhun-spinner {
-  display: block;
-  width: var(--dhun-space-icon-size);
-  height: var(--dhun-space-icon-size);
-  border-radius: var(--dhun-shape-full);
-  border: var(--dhun-space-icon-stroke) solid var(--dhun-text-tertiary);
-  border-top-color: var(--dhun-accent);
-  animation: dhun-spin 800ms linear infinite;
-}
-
-.dhun-spinner--lg {
-  width: var(--dhun-space-icon-size-lg);
-  height: var(--dhun-space-icon-size-lg);
-}
-
-@keyframes dhun-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.dhun-toast {
-  margin: 0 auto var(--dhun-space-md);
-  max-width: 60ch;
-  padding: var(--dhun-space-md) var(--dhun-space-lg);
-  border-radius: var(--dhun-shape-card);
-  background: var(--dhun-surface-elevated);
-  border: var(--dhun-space-border) solid var(--dhun-border-strong);
-  font: var(--dhun-text-body-medium);
-}
-
-/* The source badge is always on screen: a music app that does not say where its
-   rows came from is asking to be trusted blindly. */
-.dhun-source {
-  display: inline-flex;
+  flex-direction: column;
   align-items: center;
   gap: var(--dhun-space-xs);
-  font: var(--dhun-text-label-small);
-  letter-spacing: var(--dhun-tracking-label-small);
-  color: var(--dhun-text-tertiary);
-  text-transform: uppercase;
-}
-
-.dhun-source__dot {
-  width: var(--dhun-space-xs-plus);
-  height: var(--dhun-space-xs-plus);
-  border-radius: var(--dhun-shape-full);
-  background: var(--dhun-success);
-}
-
-/* The badge shares the top bar with the screen title, which is the element that
-   must stay readable: the label gives up its width first. */
-.dhun-source__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dhun-source[data-kind="demo"] .dhun-source__dot {
-  background: var(--dhun-warning);
-}
-
-.dhun-source[data-kind="endpoint"] .dhun-source__dot {
-  background: var(--dhun-tertiary);
-}
-
-/* ============================================================== sections == */
-
-.dhun-section {
-  margin-top: var(--dhun-space-section-spacing);
-}
-
-.dhun-section__head {
-  padding: 0 var(--dhun-space-screen-padding) var(--dhun-space-sm);
-}
-
-.dhun-section__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--dhun-space-md);
-  margin: 0;
-  font: var(--dhun-text-title-large);
-}
-
-.dhun-section__hint {
-  margin: var(--dhun-space-xs) 0 0;
-  font: var(--dhun-text-body-small);
-  letter-spacing: var(--dhun-tracking-body-small);
-  /* 12px body copy: 3.87:1 in tertiary on the light background. */
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-section__action {
-  font: var(--dhun-text-label-large);
+  padding: var(--dhun-space-sm);
   color: var(--dhun-accent);
-  min-height: var(--dhun-space-compact-target);
-  padding: 0 var(--dhun-space-sm);
-}
-
-/* ============================================================== home head == */
-
-/* DHUN's wordmark and the time-of-day greeting, exactly where `HomeScreen.kt`
-   draws them: above the state, above the mood rail. The wordmark is the one
-   "brand moment" in the product (`DhunTypographyTokens.brand` — same sans, wide
-   tracking), and the greeting is `headlineMedium`. */
-.dhun-home__head {
-  padding: var(--dhun-space-md) var(--dhun-space-screen-padding) 0;
-}
-
-.dhun-home__brand {
-  margin: 0;
   font: var(--dhun-text-label-small);
-  font-weight: 700;
   letter-spacing: var(--dhun-tracking-brand);
-  color: var(--dhun-accent);
-  text-transform: uppercase;
 }
 
-.dhun-home__greeting {
-  margin: 0;
-  font: var(--dhun-text-headline-medium);
-  color: var(--dhun-text);
-}
-
-/* =============================================================== artwork == */
-
-.dhun-art {
-  display: block;
-  border-radius: var(--dhun-shape-artwork);
-  background-color: var(--dhun-surface-variant);
-  background-size: cover;
-  flex: none;
-  object-fit: cover;
-}
-
-.dhun-art__mark {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  color: var(--dhun-text-hint);
-}
-
-.dhun-art--thumb {
-  width: var(--dhun-space-artwork-mini);
-  height: var(--dhun-space-artwork-mini);
-}
-
-.dhun-art--row {
-  width: var(--dhun-space-artwork-thumb);
-  height: var(--dhun-space-artwork-thumb);
-}
-
-.dhun-art--mini {
-  width: var(--dhun-space-artwork-mini);
-  height: var(--dhun-space-artwork-mini);
-  border-radius: var(--dhun-shape-small);
-}
-
-.dhun-art--card {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: var(--dhun-shape-card);
-}
-
-.dhun-art--quickrow {
-  width: var(--dhun-space-touch-target);
-  height: var(--dhun-space-touch-target);
-  border-radius: var(--dhun-shape-medium);
-}
-
-/* The hero fills the field it is given and stops at the app's own ceiling.
-   It used to stop at --dhun-space-artwork-large (280px) instead — the size the
-   app draws on a *playlist* header — which is why a 390px phone showed a 280px
-   cover with 55px of dead gutter either side. Entity headers are unaffected:
-   they sit inside .dhun-entity__art, which caps itself at the playlist
-   measure and leaves this to fill it. */
-.dhun-art--hero {
-  width: 100%;
-  max-width: var(--dhun-player-artwork-max);
-  aspect-ratio: 1;
-  border-radius: var(--dhun-shape-artwork-hero);
-}
-
-.dhun-art--backdrop {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 0;
-  filter: blur(var(--dhun-space-xxl)) saturate(140%);
-  transform: scale(1.1);
-}
-
-/* ============================================================ track rows == */
-
-.dhun-tracklist {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-item-spacing);
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--dhun-space-screen-padding);
-}
-
-.dhun-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-xs);
-}
-
-.dhun-row__main {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-xs);
-}
-
-.dhun-track {
+.dhun-rail-nav__item {
   display: flex;
   align-items: center;
   gap: var(--dhun-space-md);
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: var(--dhun-space-list-row-height);
-  padding: var(--dhun-space-xs) var(--dhun-space-sm);
-  border-radius: var(--dhun-shape-card);
-  text-align: left;
-  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
-}
-
-.dhun-track:hover {
-  background: var(--dhun-overlay-hover);
-}
-
-.dhun-track[aria-current="true"] {
-  background: var(--dhun-accent-container);
-}
-
-.dhun-track[aria-current="true"] .dhun-track__title,
-.dhun-track[aria-current="true"] .dhun-track__subtitle {
-  color: var(--dhun-on-accent-container);
-}
-
-.dhun-track__meta {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.dhun-track__title,
-.dhun-track__subtitle {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dhun-track__title {
-  font: var(--dhun-text-track-title);
-}
-
-.dhun-track__subtitle {
-  font: var(--dhun-text-body-small);
-  letter-spacing: var(--dhun-tracking-body-small);
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-track__time {
-  flex: 0 0 auto;
-  padding: 0 var(--dhun-space-sm);
-  font: var(--dhun-text-label-small);
-  font-variant-numeric: tabular-nums;
-  /* 11px. The app draws durations in tertiary, which is a 3:1 "large text / UI
-     label" role there; at this size on the web it measured 3.87:1 in light. */
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-track__flag {
-  color: var(--dhun-error);
-  flex: none;
-}
-
-.dhun-row__failure {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--dhun-space-xs);
-  margin: 0 0 0 var(--dhun-space-artwork-thumb);
-  font: var(--dhun-text-body-small);
-  color: var(--dhun-error);
-}
-
-/* The raw string, beside the sentence rather than replacing it. Muted on
-   purpose: on a row it is the small print, and the sentence is the message.
-   It wraps rather than truncating — a status code cut in half is worse than a
-   tall row — and the row is already the thing that grew to hold it. */
-.dhun-row__failure-detail {
-  color: var(--dhun-text-secondary);
-  opacity: 0.85;
-  overflow-wrap: anywhere;
-}
-
-.dhun-row__main > .dhun-icon-button {
-  flex: 0 0 auto;
-}
-
-/* A queue row highlights as a unit. The row is something you act on — move it,
-   remove it, play from it — so the accent covers the number and the reorder
-   controls too, not just the button in the middle. Browsers without `:has()`
-   fall back to the button-only highlight, which is the behaviour this builds
-   on rather than replaces. */
-.dhun-row__main--queue:has(.dhun-track[aria-current="true"]) {
-  background: var(--dhun-accent-container);
-  border-radius: var(--dhun-shape-card);
-}
-
-.dhun-row__main--queue .dhun-track[aria-current="true"] {
-  background: none;
-}
-
-.dhun-row__main--queue {
-  gap: var(--dhun-space-sm);
-}
-
-/* Queue rows add an index and three controls; the row text still has to win the
-   space, which is why the index is fixed-width and the controls never shrink. */
-.dhun-queue__index {
-  flex: 0 0 auto;
-  width: var(--dhun-space-xxl);
-  text-align: center;
-  font: var(--dhun-text-label-small);
-  font-variant-numeric: tabular-nums;
-  color: var(--dhun-text-tertiary);
-}
-
-.dhun-queue__controls {
-  display: flex;
-  flex: 0 0 auto;
-  gap: var(--dhun-space-xs);
-}
-
-.dhun-queue__controls .dhun-icon-button {
-  width: var(--dhun-space-compact-target);
-  height: var(--dhun-space-compact-target);
-}
-
-/* The queue lives inside the player's own panel, which already carries the
-   sheet's padding — so the list brings none of its own, and separates its rows
-   with a hairline. Forty rows of artwork need something to count them by. */
-.dhun-tracklist--queue {
-  padding: 0;
-}
-
-.dhun-tracklist--queue > .dhun-row + .dhun-row {
-  border-top: var(--dhun-space-border) solid var(--dhun-border);
-}
-
-/* ============================================================== shelves === */
-
-.dhun-shelf {
-  display: flex;
-  gap: var(--dhun-space-md);
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--dhun-space-screen-padding) var(--dhun-space-xs);
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scroll-snap-type: x proximity;
-}
-
-.dhun-shelf > * {
-  scroll-snap-align: start;
-}
-
-/* One scroller, two shapes. A card shelf is the same album card as the grid, so
-   it keeps the grid's column width — the two read as the same shelf whatever the
-   screen puts them in. */
-.dhun-shelf--cards .dhun-card-item {
-  min-width: var(--dhun-grid-card-min);
-}
-
-.dhun-shelf--cards .dhun-card {
-  height: 100%;
-}
-
-/* Quick picks are the app's `QuickPicksGrid`: its 12 tracks chunked two to a
-   column, each column as wide as `DhunSpacing.dialogMinWidth` and scrolled
-   sideways as one rail (`DhunHorizontalRail`). The web used to draw these as
-   260px artwork-first tiles instead, which was neither the app's component nor
-   even self-consistent — the 260px artwork sat inside a 260px tile that had
-   8px of padding and a 2px border, so every cover hung 18px out of its own
-   card. The rows below are the real component: a 48dp square
-   (`Modifier.size(DhunSpacing.touchTarget)`), title over artist, on the
-   content-row surface (`dhunContentRowSurface` = the content fill at
-   `DhunShapes.medium`). */
-.dhun-shelf--quick {
-  align-items: flex-start;
-  gap: var(--dhun-space-md);
-}
-
-.dhun-quickcol-item,
-.dhun-card-item {
-  flex: 0 0 auto;
-  list-style: none;
-}
-
-.dhun-quickcol {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-sm);
-  width: var(--dhun-space-dialog-min-width);
-}
-
-.dhun-quickrow {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-sm);
-  width: 100%;
-  padding: var(--dhun-space-sm);
-  border-radius: var(--dhun-shape-medium);
-  background: var(--dhun-glass);
-  text-align: left;
-  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
-}
-
-.dhun-quickrow:hover {
-  background: var(--dhun-overlay-hover);
-}
-
-.dhun-quickrow[aria-current="true"] {
-  background: var(--dhun-accent-container);
-}
-
-.dhun-quickrow[aria-current="true"] .dhun-quickrow__title,
-.dhun-quickrow[aria-current="true"] .dhun-quickrow__sub {
-  color: var(--dhun-on-accent-container);
-}
-
-.dhun-quickrow__art,
-.dhun-card__art {
-  display: block;
-  flex: none;
-}
-
-.dhun-quickrow__meta {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.dhun-quickrow__title,
-.dhun-quickrow__sub {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dhun-quickrow__title {
-  font: var(--dhun-text-track-title);
-}
-
-.dhun-quickrow__sub {
-  font: var(--dhun-text-body-small);
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-grid {
-  display: grid;
-  gap: var(--dhun-space-md);
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--dhun-space-screen-padding);
-}
-
-.dhun-grid--list {
-  grid-template-columns: repeat(auto-fill, minmax(var(--dhun-grid-card-min), 1fr));
-}
-
-.dhun-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-xs);
-  width: 100%;
-  padding: var(--dhun-space-sm);
-  border-radius: var(--dhun-shape-card-large);
-  background: var(--dhun-glass);
-  border: var(--dhun-space-border) solid var(--dhun-border);
-  text-align: left;
-  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
-}
-
-.dhun-card:hover {
-  background: var(--dhun-overlay-hover);
-}
-
-/* The Library card is the same component on a horizontal axis: artwork left,
-   name and track count stacked right. Library is a list of things you made, and
-   a name you can read at a glance beats a cover you can recognise. */
-.dhun-card--row {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--dhun-space-md);
-}
-
-.dhun-card--row .dhun-card__art {
-  flex: 0 0 auto;
-}
-
-.dhun-card__meta {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-xs);
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.dhun-grid__title,
-.dhun-grid__subtitle {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dhun-grid__title {
-  font: var(--dhun-text-track-title);
-}
-
-.dhun-grid__subtitle {
-  font: var(--dhun-text-body-small);
-  color: var(--dhun-text-secondary);
-}
-
-/* ======================================================== entity headers == */
-
-/* `AlbumScreen.kt` and `PlaylistScreen.kt` centre their whole header — cover,
-   title and the two buttons on one axis — and they do it at every width: the
-   desktop two-pane shell puts this page in the detail pane, it does not turn the
-   header into a row. The web used to left-align the cover and the text on a
-   phone and lay them out as a row above 480px, which was neither of the app's
-   two layouts. */
-.dhun-entity {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: var(--dhun-space-lg);
-  padding: var(--dhun-space-md) var(--dhun-space-screen-padding) 0;
-}
-
-.dhun-entity__art {
-  display: block;
-  width: 100%;
-  max-width: var(--dhun-space-artwork-playlist);
-}
-
-/* DhunSpacing.artworkAlbum (220dp) — the album's cover is a size up from the
-   playlist's 200dp, exactly as the two screens ask for. */
-.dhun-entity__art--album {
-  max-width: var(--dhun-space-artwork-album);
-}
-
-.dhun-entity__text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--dhun-space-xs);
-}
-
-/* `headlineSmall`, two lines maximum — the album and playlist headers in
-   `AlbumScreen.kt` / `PlaylistScreen.kt` both use it. The artist hero overrides
-   this with `headlineMedium`, which is the size that screen uses. */
-.dhun-entity__title {
-  margin: 0;
-  font: var(--dhun-text-headline-small);
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  line-clamp: 2;
-  -webkit-line-clamp: 2;
-}
-
-.dhun-entity__meta {
-  margin: 0;
-  font: var(--dhun-text-body-medium);
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-entity__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--dhun-space-sm);
-  margin-top: var(--dhun-space-xs);
-}
-
-/* The quiet third line: the album's source-supplied `count • run time`, or a
-   playlist's description. `labelSmall`, as both screens set — but on
-   `textSecondary` rather than the app's `textTertiary`, which measured 3.87:1
-   for 11px text in light. A description also gets the app's three-line clamp
-   (`PlaylistScreen.kt`: `maxLines = 3`). */
-.dhun-entity__submeta {
-  margin: 0;
-  font: var(--dhun-text-label-small);
-  letter-spacing: var(--dhun-tracking-label-small);
-  color: var(--dhun-text-secondary);
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  line-clamp: 3;
-  -webkit-line-clamp: 3;
-}
-
-.dhun-about {
-  margin: 0 var(--dhun-space-screen-padding) var(--dhun-space-xxxl);
-  padding: var(--dhun-space-md);
-  border-radius: var(--dhun-shape-extra-large);
-  background: var(--dhun-glass);
-  border: var(--dhun-space-border) solid var(--dhun-border);
-}
-
-.dhun-about__body {
-  margin: 0;
-  font: var(--dhun-text-body-medium);
-  color: var(--dhun-text-secondary);
-  /* `ArtistScreen.kt`'s About card: `maxLines = 8`, ellipsised. */
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  line-clamp: 8;
-  -webkit-line-clamp: 8;
-}
-
-/* The artist hero, after ArtistScreen.kt: a 16:10 full-bleed crop with the name
-   overlaid at the bottom, then the actions on their own row. The base
-   `.dhun-entity` rule below 480px is a column and above it a row, so this block
-   comes after both and re-states its own layout instead of relying on which
-   media query won — a hero is not a row at any width. */
-.dhun-entity--hero {
-  display: block;
-  padding: 0;
-  /* The hero is the one entity header that is not centred: `ArtistScreen.kt`
-     overlays the name at the bottom-left of the crop and starts its actions row
-     at the screen padding. */
-  text-align: left;
-}
-
-.dhun-entity__art--hero {
-  position: relative;
-  display: block;
-  width: 100%;
-  max-width: none;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-}
-
-.dhun-entity__art--hero .dhun-art {
-  width: 100%;
-  height: 100%;
-  border-radius: 0;
-}
-
-.dhun-entity__veil {
-  position: absolute;
-  inset: 0;
-  /* `ArtistScreen.kt`'s three alphas, at the web's own stop positions.
-
-     The app spreads them 0 / 45 / 100% of the hero, which leaves the block the
-     name occupies (65–95% of the crop) at roughly a third of the final alpha.
-     Measured on the built app at 390px: the light-theme title read **2.64:1**
-     over the veil — below the 3:1 large-text floor, let alone 4.5:1 — because
-     dark ink was sitting on artwork the veil had only partly lightened. In dark
-     the same geometry measured 13.10:1, which is why nothing had noticed.
-
-     Reaching the bottom stop at 62% puts the whole title block on the full
-     veil. Every alpha is still `ArtistScreen.kt`'s (`LYRICS_VEIL_BOTTOM` is
-     .62); only the positions are the web's. At .62 the veil is an opaque-enough
-     wash that the title clears AA over *any* artwork: over pure black the light
-     theme's own ink composites to 5.8:1 (over pure white in dark, 5.1:1), which
-     is why this is a bound and not a tuning.
-
-     The mid stop is early (22%, not the app's 45%) so the ramp from .05 to .62
-     takes 40% of the hero instead of 17%: at 17% the point where the veil
-     reaches full strength read as a 41px fog band across a 244px hero. */
-  background: linear-gradient(
-    180deg,
-    var(--dhun-hero-veil-top),
-    var(--dhun-hero-veil-mid) 22%,
-    var(--dhun-hero-veil-bottom) 62%
-  );
-}
-
-.dhun-entity--hero .dhun-entity__text {
-  position: absolute;
-  inset: auto 0 0 0;
-  align-items: flex-start;
-  text-align: left;
-  padding: var(--dhun-space-md) var(--dhun-space-screen-padding);
-  /* The veil is the theme's *background* colour at three alphas out of
-     `ArtistScreen.kt`, so it darkens the crop in dark mode and lightens it in
-     light mode — which is exactly what lets the ordinary text tokens stay
-     readable over borrowed artwork, and what the app relies on. */
-  color: var(--dhun-text);
-}
-
-.dhun-entity--hero .dhun-entity__title {
-  font: var(--dhun-text-headline-medium);
-}
-
-.dhun-entity--hero .dhun-entity__meta {
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-entity--hero .dhun-entity__actions {
-  justify-content: flex-start;
-  padding: 0 var(--dhun-space-screen-padding);
-}
-
-/* ================================================================ search == */
-
-.dhun-searchbar {
-  padding: var(--dhun-space-xs) var(--dhun-space-screen-padding) 0;
-}
-
-.dhun-search {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-sm);
-  padding: 0 var(--dhun-space-md);
   min-height: var(--dhun-space-touch-target);
-  border-radius: var(--dhun-shape-chip);
-  background: var(--dhun-surface-variant);
-  border: var(--dhun-space-border) solid var(--dhun-border);
-}
-
-.dhun-search:focus-within {
-  border-color: var(--dhun-accent);
-}
-
-.dhun-search__icon {
-  color: var(--dhun-text-tertiary);
-}
-
-.dhun-search input {
-  flex: 1;
-  min-width: 0;
-  background: none;
-  border: 0;
-  outline: none;
-  font: var(--dhun-text-body-large);
-}
-
-.dhun-search input::placeholder {
-  color: var(--dhun-text-hint);
-}
-
-.dhun-search input::-webkit-search-cancel-button {
-  display: none;
-}
-
-/* Search's demo line is the same notice the app's other screens carry
-   (`views.notice`, `data-notice="demo"`), so there is no search-only hint rule
-   any more: one surface per message, and the strip is the one with the way out. */
-
-/* ============================================================== settings == */
-
-.dhun-settings-row {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-md);
-  padding: var(--dhun-space-md) var(--dhun-space-screen-padding);
-  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
-}
-
-.dhun-settings-row__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.dhun-settings-row__title {
-  font: var(--dhun-text-title-small);
-}
-
-.dhun-settings-row__subtitle {
-  font: var(--dhun-text-body-small);
-  letter-spacing: var(--dhun-tracking-body-small);
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-settings-row__control {
-  flex: 0 1 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-sm);
-  min-width: 0;
-}
-
-/* At phone widths a control with a long label must be allowed to stack under
-   its own description rather than squeeze both into a column too narrow to read. */
-@media (max-width: 479px) {
-  .dhun-settings-row {
-    flex-wrap: wrap;
-  }
-
-  .dhun-settings-row__control {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-  }
-}
-
-.dhun-switch {
-  position: relative;
-  width: var(--dhun-space-transport-target);
-  height: var(--dhun-space-xxxl);
-  border-radius: var(--dhun-shape-full);
-  border: var(--dhun-space-border) solid var(--dhun-border-strong);
-  background: var(--dhun-surface-variant);
-  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
-  flex: none;
-}
-
-.dhun-switch__thumb {
-  position: absolute;
-  top: var(--dhun-space-xs);
-  left: var(--dhun-space-xs);
-  width: var(--dhun-space-xxl);
-  height: var(--dhun-space-xxl);
-  border-radius: var(--dhun-shape-full);
-  background: var(--dhun-text-tertiary);
-  transition: transform var(--dhun-motion-fast) var(--dhun-motion-easing);
-}
-
-.dhun-switch[aria-checked="true"] {
-  background: var(--dhun-accent-container);
-  border-color: var(--dhun-accent);
-}
-
-.dhun-switch[aria-checked="true"] .dhun-switch__thumb {
-  background: var(--dhun-accent);
-  transform: translateX(var(--dhun-space-xl));
-}
-
-.dhun-switch:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.dhun-input {
-  min-height: var(--dhun-space-compact-target);
   padding: 0 var(--dhun-space-md);
-  min-width: 0;
-  flex: 1 1 auto;
-  border-radius: var(--dhun-shape-small);
-  background: var(--dhun-surface-variant);
-  border: var(--dhun-space-border) solid var(--dhun-border);
-  font: var(--dhun-text-body-medium);
-}
-
-.dhun-input-pair {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-sm);
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.dhun-stat {
-  font: var(--dhun-text-body-small);
-  color: var(--dhun-text-secondary);
-  white-space: nowrap;
-}
-
-.dhun-slider-row {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-md);
-  padding: var(--dhun-space-sm) var(--dhun-space-screen-padding);
-  min-width: 0;
-}
-
-.dhun-slider-row__label {
-  flex: 0 0 auto;
-  min-width: var(--dhun-space-artwork-mini);
-  font: var(--dhun-text-label-medium);
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-slider-row__value {
-  flex: 0 0 auto;
-  min-width: var(--dhun-space-artwork-mini);
-  text-align: right;
-  font: var(--dhun-text-label-medium);
-  font-variant-numeric: tabular-nums;
-  color: var(--dhun-text-secondary);
-}
-
-input[type="range"] {
-  flex: 1 1 auto;
-  min-width: 0;
-  height: var(--dhun-space-xl);
-  appearance: none;
+  border: 0;
+  border-radius: var(--dhun-shape-full);
   background: none;
-  cursor: pointer;
-}
-
-input[type="range"]::-webkit-slider-runnable-track {
-  height: var(--dhun-space-progress-height);
-  border-radius: var(--dhun-shape-full);
-  background: var(--dhun-surface-highest);
-}
-
-input[type="range"]::-moz-range-track {
-  height: var(--dhun-space-progress-height);
-  border-radius: var(--dhun-shape-full);
-  background: var(--dhun-surface-highest);
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  width: var(--dhun-space-lg);
-  height: var(--dhun-space-lg);
-  margin-top: calc((var(--dhun-space-progress-height) - var(--dhun-space-lg)) / 2);
-  border-radius: var(--dhun-shape-full);
-  background: var(--dhun-accent);
-  border: none;
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: var(--dhun-space-lg);
-  height: var(--dhun-space-lg);
-  border: none;
-  border-radius: var(--dhun-shape-full);
-  background: var(--dhun-accent);
-}
-
-input[type="range"]:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* ---------------------------------------------------------- equaliser ----- */
-
-.dhun-eq {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-sm);
-  padding: var(--dhun-space-md) var(--dhun-space-screen-padding);
-}
-
-.dhun-eq__band {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-md);
-}
-
-.dhun-eq__gain,
-.dhun-eq__freq {
-  flex: 0 0 auto;
-  min-width: var(--dhun-space-artwork-thumb);
-  font: var(--dhun-text-label-small);
-  font-variant-numeric: tabular-nums;
   color: var(--dhun-text-secondary);
-}
-
-.dhun-eq__gain {
-  text-align: right;
-}
-
-.dhun-eq__actions {
-  display: flex;
-  gap: var(--dhun-space-sm);
-  padding: var(--dhun-space-sm) var(--dhun-space-screen-padding);
-}
-
-.dhun-details {
-  margin: var(--dhun-space-sm) var(--dhun-space-screen-padding);
-  padding: var(--dhun-space-md);
-  border-radius: var(--dhun-shape-card);
-  background: var(--dhun-glass);
-  border: var(--dhun-space-border) solid var(--dhun-border);
-  font: var(--dhun-text-body-small);
-}
-
-.dhun-details summary {
-  cursor: pointer;
   font: var(--dhun-text-label-large);
+  text-decoration: none;
 }
 
-.dhun-contract {
-  margin: var(--dhun-space-sm) 0 0;
-  padding-left: var(--dhun-space-lg);
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-contract__body {
-  /* The request/response examples on Settings: 12px monospace, 3.92:1 in
-     tertiary. Secondary keeps them quiet without making them unreadable. */
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-diagnostics {
-  margin: 0;
-  padding: 0 var(--dhun-space-screen-padding);
-}
-
-.dhun-diagnostics__row {
-  display: flex;
-  gap: var(--dhun-space-md);
-  justify-content: space-between;
-  padding: var(--dhun-space-sm) 0;
-  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
-  font: var(--dhun-text-body-small);
-}
-
-.dhun-diagnostics dt {
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-diagnostics dd {
-  margin: 0;
-  text-align: right;
+.dhun-rail-nav__item:hover {
+  background: var(--dhun-overlay-hover);
   color: var(--dhun-text);
-  overflow-wrap: anywhere;
 }
 
-.dhun-diagnostics dd[data-state="warn"] {
-  color: var(--dhun-warning);
+.dhun-rail-nav__item.is-active {
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
 }
 
-.dhun-caveats {
-  margin: var(--dhun-space-md) 0 0;
-  padding-left: var(--dhun-space-xl);
-  font: var(--dhun-text-body-small);
-  color: var(--dhun-text-secondary);
+/* --------------------------------------------------------------- overlay -- */
+
+.dhun-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
 }
 
-.dhun-caveats li {
-  margin-bottom: var(--dhun-space-xs);
-}
-
-/* ================================================================ player == */
-
-.dhun-mini {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: var(--dhun-space-sm);
-  padding: var(--dhun-space-sm) var(--dhun-space-md) var(--dhun-space-sm);
-  background: var(--dhun-glass-strong);
-  border-top: var(--dhun-space-border) solid var(--dhun-glass-bar-top);
-  backdrop-filter: blur(var(--dhun-space-lg));
-  position: relative;
-  min-height: var(--dhun-space-mini-player-height);
-}
-
-.dhun-mini__open {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-md);
-  min-width: 0;
-  min-height: var(--dhun-space-compact-target);
-  text-align: left;
-}
-
-.dhun-mini__meta {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.dhun-mini__title,
-.dhun-mini__subtitle {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dhun-mini__title {
-  font: var(--dhun-text-track-title);
-}
-
-.dhun-mini__subtitle {
-  font: var(--dhun-text-body-small);
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-mini__controls {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-xs);
-  flex: none;
-}
-
-/* The progress hairline is the player's own truth: two bars, one for what has
-   been buffered and one for where the listener is. A stalled stream stops here. */
-.dhun-mini__progress {
-  grid-column: 1 / -1;
-  position: relative;
-  height: var(--dhun-space-xs);
-  border-radius: var(--dhun-shape-full);
-  background: var(--dhun-surface-highest);
-  overflow: hidden;
-}
-
-.dhun-mini__progress > i {
-  display: block;
-  height: 100%;
-  background: var(--dhun-accent);
-}
-
-.dhun-mini__buffered {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: var(--dhun-text-disabled);
+.dhun-overlay > * {
+  pointer-events: auto;
 }
 
 .dhun-full {
@@ -1901,53 +1745,60 @@ input[type="range"]:disabled {
   flex-direction: column;
   overflow: hidden;
   background: var(--dhun-background);
+  animation: dhun-sheet-up var(--dhun-motion-medium) var(--dhun-motion-easing);
+}
+
+@keyframes dhun-sheet-up {
+  from { transform: translateY(4%); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
 }
 
 .dhun-full__backdrop {
   position: absolute;
   inset: 0;
+  z-index: 0;
   overflow: hidden;
+}
+
+.dhun-full__wash {
+  position: absolute;
+  inset: -25%;
+  background-position: center;
+  background-size: cover;
+  filter: blur(var(--dhun-blur-ambient-strong)) saturate(170%) brightness(0.7);
+  transform: scale(1.15);
 }
 
 .dhun-full__scrim {
   position: absolute;
   inset: 0;
-  background: var(--dhun-scrim-strong);
-  backdrop-filter: blur(var(--dhun-space-xxxl));
+  background:
+    linear-gradient(180deg, var(--dhun-hero-veil-top), transparent 30%, var(--dhun-hero-veil-bottom) 78%, var(--dhun-glass-strong));
 }
 
 .dhun-full__inner {
   position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--dhun-space-md);
-  padding: var(--dhun-space-md) var(--dhun-space-screen-padding)
-    calc(var(--dhun-space-xl) + env(safe-area-inset-bottom));
-  /* The stacked composition is a content column, so it keeps the app's
-     reading measure rather than the player's control measure. It was pinned to
-     --dhun-player-controls-max (400px) — the transport column — which squeezed
-     the whole player, hero included, into a 400px strip down the middle of a
-     desktop window. */
-  max-width: var(--dhun-pane-master-max);
-  margin-inline: auto;
-  width: 100%;
+  gap: var(--dhun-space-lg);
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--dhun-space-sm) var(--dhun-space-xl) calc(var(--dhun-space-xxl) + var(--dhun-safe-bottom));
 }
 
 .dhun-full__bar {
   display: flex;
   align-items: center;
-  gap: var(--dhun-space-sm);
+  gap: var(--dhun-space-md);
 }
 
 .dhun-full__context {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
 }
 
 .dhun-full__label {
@@ -1966,657 +1817,660 @@ input[type="range"]:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--dhun-space-lg);
+  gap: var(--dhun-space-xl);
+  margin-top: var(--dhun-space-lg);
 }
 
 .dhun-full__art {
-  width: 100%;
-  max-width: var(--dhun-player-artwork-max);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--dhun-space-md);
-}
-
-/* The control cluster is the app's PlayerControlCluster: notice, timeline,
-   transport, volume and the action row, as one column that can be given a
-   width without touching any of its rows. Stacked, that width is the
-   comfortable transport measure (DhunSpacing.playerTransportMaxWidth); the
-   wide layout below swaps it for the app's own clamp. */
-.dhun-full__controls {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-md);
-  width: 100%;
-  max-width: var(--dhun-player-controls-max);
-  margin-inline: auto;
-}
-
-.dhun-visualiser {
-  width: 100%;
-  max-width: var(--dhun-space-artwork-large);
-  height: var(--dhun-space-huge);
+  width: min(78vw, var(--dhun-space-artwork-album));
+  aspect-ratio: 1;
+  border-radius: var(--dhun-shape-artwork-hero);
+  overflow: hidden;
+  box-shadow: 0 var(--dhun-space-xxl) var(--dhun-space-huge) color-mix(in srgb, var(--dhun-scrim-strong) 70%, transparent);
 }
 
 .dhun-full__meta {
   text-align: center;
-  max-width: 46ch;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .dhun-full__title {
   margin: 0;
   font: var(--dhun-text-player-title);
+  letter-spacing: var(--dhun-tracking-display-large);
+  overflow-wrap: anywhere;
 }
 
 .dhun-full__artist {
-  margin: 0;
+  margin: var(--dhun-space-xs) 0 0;
   font: var(--dhun-text-body-medium);
   color: var(--dhun-text-secondary);
 }
 
-.dhun-seek {
+.dhun-full__quality {
+  margin: var(--dhun-space-xs) 0 0;
+  font: var(--dhun-text-label-small);
+  color: var(--dhun-text-tertiary);
+  letter-spacing: var(--dhun-tracking-label-small);
+  text-transform: uppercase;
+}
+
+.dhun-full__seek {
   display: flex;
   flex-direction: column;
   gap: var(--dhun-space-xs);
 }
 
-.dhun-seek__times {
+.dhun-range--seek {
+  --dhun-range-height: var(--dhun-space-progress-height-active);
+}
+
+.dhun-full__times {
   display: flex;
   justify-content: space-between;
   font: var(--dhun-text-label-small);
-  font-variant-numeric: tabular-nums;
   color: var(--dhun-text-tertiary);
+  font-variant-numeric: tabular-nums;
 }
 
-.dhun-transport {
+.dhun-full__controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: var(--dhun-space-player-transport-height);
+  gap: var(--dhun-space-sm);
 }
 
-.dhun-transport__play {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.dhun-full__transport {
   width: var(--dhun-space-transport-target);
   height: var(--dhun-space-transport-target);
+}
+
+.dhun-full__play {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-artwork-thumb);
+  height: var(--dhun-space-artwork-thumb);
+  border: 0;
   border-radius: var(--dhun-shape-full);
   background: var(--dhun-accent);
   color: var(--dhun-on-accent);
+  box-shadow: 0 var(--dhun-space-sm) var(--dhun-space-xxl) color-mix(in srgb, var(--dhun-accent) 35%, transparent);
 }
 
-.dhun-volume {
-  display: flex;
+.dhun-full__volume {
+  display: none;
   align-items: center;
-  gap: var(--dhun-space-md);
-}
-
-.dhun-volume input[type="range"] {
-  max-width: var(--dhun-player-controls-min);
-}
-
-.dhun-volume__value {
-  flex: none;
-  min-width: var(--dhun-space-xxxl);
-  text-align: right;
-  font: var(--dhun-text-label-small);
-  font-variant-numeric: tabular-nums;
+  gap: var(--dhun-space-sm);
   color: var(--dhun-text-secondary);
 }
 
-.dhun-full__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--dhun-space-sm);
-  flex-wrap: wrap;
+.dhun-full__tabs-wrap {
+  margin-top: auto;
+  padding-top: var(--dhun-space-lg);
 }
 
 .dhun-full__tabs {
   display: flex;
   gap: var(--dhun-space-xs);
-  margin-left: auto;
 }
 
 .dhun-full__panel {
-  flex: 1;
-  min-height: 0;
+  margin-top: var(--dhun-space-md);
 }
 
-/* The spectrum the full player draws from the analyser node. Its `color` is the
-   only thing the drawing code reads, which is how the accent ramp and the theme
-   reach a canvas without a colour written into JavaScript. */
-.dhun-visualiser {
-  display: block;
-  width: 100%;
-  max-width: var(--dhun-player-artwork-max);
-  height: auto;
-  color: var(--dhun-accent);
-}
-
-.dhun-lyrics {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-md);
-  padding: var(--dhun-space-md) 0 var(--dhun-space-xxxl);
-}
-
-.dhun-lyrics__line {
+.dhun-full__empty {
   margin: 0;
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-body-small);
+}
+
+.dhun-lyrics-state {
   display: flex;
   flex-direction: column;
-  gap: var(--dhun-space-xs);
-  font: var(--dhun-text-title-large);
-  color: var(--dhun-text-tertiary);
-  transition: color var(--dhun-motion-medium) var(--dhun-motion-easing);
+  gap: var(--dhun-space-sm);
+  padding: var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-large);
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-border);
 }
 
-.dhun-lyrics__line[data-active="true"] {
-  color: var(--dhun-text);
-}
-
-.dhun-lyrics__roman {
+.dhun-lyrics-state__note {
+  margin: 0;
   font: var(--dhun-text-body-small);
   color: var(--dhun-text-tertiary);
 }
 
-.dhun-lyrics__status {
+.dhun-queue {
+  list-style: none;
   margin: 0;
-  padding: var(--dhun-space-md) 0;
-  font: var(--dhun-text-body-medium);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-queue__row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-large);
+  background: var(--dhun-glass);
+}
+
+.dhun-queue__row.is-current {
+  background: color-mix(in srgb, var(--dhun-accent) 14%, transparent);
+}
+
+.dhun-queue__main {
+  display: grid;
+  grid-template-columns: var(--dhun-space-xxl) var(--dhun-space-menu-artwork) 1fr auto;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  flex: 1;
+  min-width: 0;
+  padding: var(--dhun-space-xs);
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.dhun-queue__main .dhun-art {
+  width: var(--dhun-space-menu-artwork);
+  height: var(--dhun-space-menu-artwork);
+  border-radius: var(--dhun-shape-small);
+}
+
+.dhun-queue__index {
+  display: grid;
+  place-items: center;
+  color: var(--dhun-text-tertiary);
+  font: var(--dhun-text-label-medium);
+}
+
+.dhun-queue__row.is-current .dhun-queue__index {
+  color: var(--dhun-accent);
+}
+
+.dhun-queue__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dhun-queue__title {
+  font: var(--dhun-text-track-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-queue__sub,
+.dhun-queue__duration {
+  font: var(--dhun-text-body-small);
   color: var(--dhun-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Wide layout — the app's FullPlayerLayoutMode.Wide: taken when the viewport is
-   at least DhunSpacing.playerWideLayoutMinWidth (480dp) *and* is wider than it
-   is tall, so a landscape phone or a desktop window puts the control cluster
-   beside the hero instead of collapsing the cover into the few pixels left
-   above a tall bottom stack.
+/* ---------------------------------------------------------------- sheets -- */
 
-   The height test is `orientation: landscape` because that is exactly the
-   Kotlin's `width > height`: Media Queries Level 4 defines landscape as width
-   greater than height and portrait as height greater than *or equal to* width,
-   so the two agree including the square case, where both stay stacked. Measured
-   before trusting it: a 900x1000 window stacks (stacked is what the Kotlin
-   asks for) and its transport sits at y=915..963 inside the window; 1000x900
-   and 1280x900 go wide with the transport at y=514..586 and y=532..604. A
-   `min-aspect-ratio: 1/1` substitution was tried and reverted: it differs only
-   at exactly square, where it would go wide and the app would not.
-
-   The split is the Kotlin's own arithmetic, not an eyeballed pair of halves:
-   the controls column is clamp(0.34 · width, 240dp, 400dp)
-   (PlayerLayout.playerWideControlsWidth) and *all* remaining width is the
-   artwork field, which then fits its cover to min(field width, field height,
-   640dp) (PlayerLayout.fittedPlayerArtworkSize). The old rule gave both
-   columns `1 1 45%` inside a 400px-tall column, so the "wide" player was a
-   400px strip split in two.
-
-   The controls cluster is bottom-aligned in its column because that is where
-   the app draws it — `contentAlignment = Alignment.BottomCenter`. */
-@media (min-width: 480px) and (orientation: landscape) {
-  .dhun-full__inner {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    max-width: calc(
-      var(--dhun-player-artwork-max) + var(--dhun-player-controls-max) + var(--dhun-space-sm)
-    );
-  }
-
-  .dhun-full__bar,
-  .dhun-full__panel {
-    flex: 1 1 100%;
-  }
-
-  .dhun-full__stage {
-    flex: 1 1 auto;
-    min-width: 0;
-    align-self: stretch;
-    justify-content: center;
-  }
-
-  .dhun-full__controls {
-    flex: none;
-    width: clamp(
-      var(--dhun-player-controls-min),
-      34%,
-      var(--dhun-player-controls-max)
-    );
-    max-width: none;
-    margin-inline: 0;
-    justify-content: flex-end;
-    align-self: stretch;
-  }
+.dhun-sheet-region {
+  position: relative;
+  z-index: 50;
 }
 
-/* A short viewport compacts the player's spacing so the hero and every control
-   still fit (PlayerLayout.usesCompactPlayerControls, at DhunSpacing's
-   playerCompactControlsHeight = 640dp). Spacing only — "all interactive
-   controls retain their existing target sizes", as that function's own comment
-   says, so nothing here touches a target. */
-@media (max-height: 640px) {
-  .dhun-full__inner {
-    gap: var(--dhun-space-sm);
-  }
-
-  .dhun-full__stage,
-  .dhun-full__art,
-  .dhun-full__controls {
-    gap: var(--dhun-space-sm);
-  }
+.dhun-scrim {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--dhun-scrim);
 }
-
-/* ================================================================= sheets == */
 
 .dhun-sheet {
-  width: min(100%, var(--dhun-space-dialog-max-width));
-  max-height: 80dvh;
+  width: min(100%, var(--dhun-pane-master-max));
+  max-height: 86dvh;
   overflow-y: auto;
-  background: var(--dhun-surface-elevated);
-  border: var(--dhun-space-border) solid var(--dhun-border);
+  padding: var(--dhun-space-sm) var(--dhun-space-lg) calc(var(--dhun-space-xl) + var(--dhun-safe-bottom));
   border-radius: var(--dhun-shape-bottom-sheet);
-  padding-bottom: var(--dhun-space-md);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  border-bottom: 0;
+  background: var(--dhun-glass-bar-top);
+  animation: dhun-sheet-rise var(--dhun-motion-medium) var(--dhun-motion-easing);
 }
 
-@media (min-width: 480px) {
-  .dhun-sheet {
-    border-radius: var(--dhun-shape-card-large);
-  }
+@keyframes dhun-sheet-rise {
+  from { transform: translateY(12%); }
+  to { transform: none; }
 }
 
-.dhun-sheet--help {
-  width: min(100%, var(--dhun-space-dialog-max-width));
+.dhun-sheet__grab {
+  width: var(--dhun-space-huge);
+  height: var(--dhun-space-xs);
+  margin: var(--dhun-space-xs) auto var(--dhun-space-sm);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-border-strong);
 }
 
-.dhun-menu-header {
+.dhun-sheet__head {
   display: flex;
   align-items: center;
   gap: var(--dhun-space-md);
-  padding: var(--dhun-space-md);
-  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+  padding-bottom: var(--dhun-space-sm);
 }
 
-.dhun-menu-header__text {
-  flex: 1;
-  min-width: 0;
+.dhun-sheet__titles {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
-.dhun-menu-header__title {
+.dhun-sheet__title {
   font: var(--dhun-text-title-medium);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dhun-menu-header__sub {
+.dhun-sheet__sub {
   font: var(--dhun-text-body-small);
   color: var(--dhun-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.dhun-sheet__body {
+  padding-top: var(--dhun-space-sm);
 }
 
 .dhun-menu {
   display: flex;
   flex-direction: column;
-  padding: var(--dhun-space-xs) 0;
 }
 
-.dhun-menu__row {
+.dhun-menu-row {
   display: flex;
   align-items: center;
   gap: var(--dhun-space-md);
+  width: 100%;
   min-height: var(--dhun-space-menu-row-height);
-  padding: 0 var(--dhun-space-md);
-  text-align: left;
-  font: var(--dhun-text-body-medium);
+  padding: var(--dhun-space-sm) var(--dhun-space-xs);
+  border: 0;
+  background: none;
   color: var(--dhun-text);
+  font: var(--dhun-text-body-medium);
+  text-align: left;
+  text-decoration: none;
+  border-radius: var(--dhun-shape-medium);
 }
 
-.dhun-menu__row:hover {
+.dhun-menu-row:hover {
   background: var(--dhun-overlay-hover);
 }
 
-.dhun-menu__row--danger {
+.dhun-menu-row--danger {
   color: var(--dhun-error);
 }
 
-.dhun-newplaylist {
-  display: flex;
-  gap: var(--dhun-space-sm);
-  padding: var(--dhun-space-sm) var(--dhun-space-md) 0;
-  border-top: var(--dhun-space-border) solid var(--dhun-border);
-}
-
-.dhun-help {
-  padding: var(--dhun-space-md);
-}
-
-.dhun-help__group + .dhun-help__group {
-  margin-top: var(--dhun-space-lg);
-}
-
-.dhun-help__title {
-  margin: 0 0 var(--dhun-space-sm);
-  font: var(--dhun-text-label-large);
-  letter-spacing: var(--dhun-tracking-label-large);
-  text-transform: uppercase;
-  color: var(--dhun-text-tertiary);
-}
-
-.dhun-help__list {
+.dhun-shortcuts {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
 }
 
-.dhun-help__row {
+.dhun-shortcuts__row {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--dhun-space-md);
-  align-items: baseline;
   padding: var(--dhun-space-xs) 0;
-  font: var(--dhun-text-body-small);
+  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
 }
 
-.dhun-help__row dd {
+.dhun-shortcuts dt,
+.dhun-shortcuts dd {
   margin: 0;
-  color: var(--dhun-text-secondary);
 }
 
-.dhun-kbd {
+.dhun-shortcuts kbd {
   display: inline-block;
   min-width: var(--dhun-space-xxl);
   padding: var(--dhun-space-xs) var(--dhun-space-sm);
   border-radius: var(--dhun-shape-small);
-  background: var(--dhun-surface-container-high);
   border: var(--dhun-space-border) solid var(--dhun-border-strong);
-  font: var(--dhun-text-label-small);
+  background: var(--dhun-surface-variant);
+  font-family: var(--dhun-font-mono);
+  font-size: 0.85em;
   text-align: center;
 }
 
-/* ================================================================== legal == */
-
-.dhun-legal__intro {
-  padding: 0 var(--dhun-space-screen-padding);
-  max-width: var(--dhun-space-legal-content-max);
+.dhun-shortcuts dd {
   color: var(--dhun-text-secondary);
-  font: var(--dhun-text-body-relaxed);
+  font: var(--dhun-text-body-small);
 }
 
-.dhun-legal__index {
+/* ----------------------------------------------------------------- toast -- */
+
+.dhun-toast-region {
+  position: fixed;
+  inset-inline: 0;
+  bottom: calc(var(--dhun-space-bottom-nav-height) + var(--dhun-space-mini-player-height) + var(--dhun-space-md));
+  z-index: 55;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--dhun-space-sm);
-  padding: var(--dhun-space-sm) var(--dhun-space-screen-padding);
+  justify-content: center;
+  pointer-events: none;
 }
 
-.dhun-legal__entry {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dhun-space-xs);
-  padding: var(--dhun-space-md);
-  min-width: var(--dhun-space-dialog-min-width);
-  border-radius: var(--dhun-shape-card);
-  border: var(--dhun-space-border) solid var(--dhun-border);
-  background: var(--dhun-glass);
-  text-align: left;
+.dhun-toast {
+  padding: var(--dhun-space-sm) var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-surface-elevated);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  box-shadow: 0 var(--dhun-space-sm) var(--dhun-space-xxl) var(--dhun-scrim);
+  font: var(--dhun-text-label-large);
+  animation: dhun-sheet-rise var(--dhun-motion-medium) var(--dhun-motion-easing);
 }
 
-.dhun-legal__entry[aria-current="true"] {
-  border-color: var(--dhun-accent);
+.dhun-toast--warn {
+  border-color: var(--dhun-warning);
 }
 
-.dhun-legal__entry-title {
-  font: var(--dhun-text-title-small);
-}
+/* ------------------------------------------------------------- no script -- */
 
-.dhun-legal__entry-meta {
-  font: var(--dhun-text-body-small);
-  color: var(--dhun-text-tertiary);
-}
-
-.dhun-legal__body {
-  padding: var(--dhun-space-md) var(--dhun-space-screen-padding);
+.dhun-noscript {
   max-width: var(--dhun-space-legal-content-max);
-  font: var(--dhun-text-body-relaxed);
-  color: var(--dhun-text-secondary);
+  margin: var(--dhun-space-huge) auto;
+  padding: var(--dhun-space-xxl);
+  font-family: var(--dhun-font-sans);
 }
 
-.dhun-legal__list {
-  padding-left: var(--dhun-space-xl);
-  margin: 0;
-}
+/* --------------------------------------------------------------- wide ---- */
 
-.dhun-legal__list li {
-  margin-bottom: var(--dhun-space-sm);
-}
-
-/* The bundled documents: the project's own pages, rendered by the HTML mirror of
-   the app's `Markdown.kt`. They are the one long-form text in the app, so they
-   carry the reading measure, the quiet colours and the code treatment the
-   licence texts need to stay legible. */
-.dhun-legal__document {
-  display: block;
-  padding: 0 var(--dhun-space-screen-padding) var(--dhun-space-xxl);
-  max-width: var(--dhun-space-legal-content-max);
-}
-
-.dhun-legal__heading {
-  margin: var(--dhun-space-xl) 0 var(--dhun-space-xs);
-  color: var(--dhun-text);
-}
-
-h2.dhun-legal__heading {
-  font: var(--dhun-text-title-large);
-}
-
-h3.dhun-legal__heading {
-  font: var(--dhun-text-title-medium);
-}
-
-h4.dhun-legal__heading {
-  font: var(--dhun-text-title-small);
-}
-
-.dhun-legal__para {
-  margin: 0 0 var(--dhun-space-md);
-}
-
-/* A policy page links out; the accent is the only affordance it needs, and the
-   offset keeps the underline off the descenders at this size. */
-.dhun-legal__link {
-  color: var(--dhun-accent);
-  text-decoration: underline;
-  text-underline-offset: var(--dhun-space-xs);
-}
-
-.dhun-legal__strong {
-  color: var(--dhun-text);
-}
-
-.dhun-legal__code,
-.dhun-legal__pre {
-  font-family: var(--dhun-font-mono, monospace);
-  font-size: var(--dhun-text-compact);
-}
-
-.dhun-legal__strike {
-  text-decoration: line-through;
-}
-
-/* Markdown's own quote, and the DRAFT banner the same parser produces: both are
-   the document telling the reader how to read it, so both get the accent. */
-.dhun-legal__quote {
-  margin: 0 0 var(--dhun-space-lg);
-  padding: var(--dhun-space-sm) var(--dhun-space-md);
-  border-left: var(--dhun-space-progress-stroke) solid var(--dhun-accent);
-  border-radius: var(--dhun-shape-small);
-  background: var(--dhun-glass);
-  color: var(--dhun-text-secondary);
-}
-
-.dhun-legal__li {
-  margin-bottom: var(--dhun-space-sm);
-}
-
-/* Indented list items keep their nesting as indentation rather than as a
-   second list level: the licence texts nest six deep and a stack of markers
-   would cost more width than the text has. */
-.dhun-legal__li[data-indent="1"] {
-  margin-left: var(--dhun-space-lg);
-}
-
-.dhun-legal__li[data-indent="2"] {
-  margin-left: var(--dhun-space-xl);
-}
-
-.dhun-legal__li[data-indent="3"] {
-  margin-left: var(--dhun-space-xxl);
-}
-
-.dhun-legal__pre {
-  overflow-x: auto;
-  padding: var(--dhun-space-md);
-  border-radius: var(--dhun-shape-small);
-  background: var(--dhun-surface-container-high);
-}
-
-.dhun-legal__rule {
-  height: var(--dhun-space-border);
-  margin: var(--dhun-space-xl) 0;
-  border: 0;
-  background: var(--dhun-border);
-}
-
-/* Tables become stacked records, so the label carries the weight and the value
-   carries the text. */
-.dhun-legal__record {
-  margin: 0 0 var(--dhun-space-lg);
-  padding: var(--dhun-space-md);
-  border-radius: var(--dhun-shape-card);
-  border: var(--dhun-space-border) solid var(--dhun-border);
-  background: var(--dhun-glass);
-}
-
-.dhun-legal__label {
-  font: var(--dhun-text-label-small);
-  text-transform: uppercase;
-  color: var(--dhun-text-tertiary);
-}
-
-.dhun-legal__value {
-  margin: var(--dhun-space-xs) 0 0;
-  color: var(--dhun-text);
-}
-
-.dhun-legal__warn {
-  margin: 0 var(--dhun-space-sm) var(--dhun-space-md);
-  padding: var(--dhun-space-sm) var(--dhun-space-md);
-  border-radius: var(--dhun-shape-small);
-  border: var(--dhun-space-border) solid var(--dhun-warning);
-  background: var(--dhun-glass);
-  color: var(--dhun-text-secondary);
-  font: var(--dhun-text-body-small);
-}
-
-.dhun-legal__banner {
-  display: block;
-  margin: 0 var(--dhun-space-sm) var(--dhun-space-md);
-  padding: var(--dhun-space-md);
-  border-radius: var(--dhun-shape-card);
-  border: var(--dhun-space-border) solid var(--dhun-accent);
-  background: var(--dhun-glass);
-}
-
-.dhun-legal__banner p {
-  margin: var(--dhun-space-xs) 0 0;
-  color: var(--dhun-text-secondary);
-  font: var(--dhun-text-body-small);
-}
-
-.dhun-legal__entry-meta--draft {
-  color: var(--dhun-accent);
-}
-
-.dhun-legal__body code,
-.dhun-details code {
-  font-family: var(--dhun-font-mono, monospace);
-  color: var(--dhun-text);
-  overflow-wrap: anywhere;
-}
-
-/* ====================================================== responsive shell == */
-
-/* DhunShellLayout.TwoPane at DhunSpacing.navigationRailBreakpoint (840dp): the
-   rail appears, the bottom tabs retire, and the content gets the wider measure
-   the extra space is actually for. */
+/*
+ * The app's rail breakpoint. Below it: the bottom navigation and the dock, the
+ * phone shell the application uses. At and above it: a rail beside the content,
+ * the dock sitting over the content's bottom-right corner, and the player's two
+ * columns — the same breakpoint the application's `TwoPane` uses.
+ */
 @media (min-width: 840px) {
-  .dhun-rail {
-    display: flex;
+  .dhun-app {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "bar bar"
+      "rail main";
+    padding-bottom: var(--dhun-space-xxxl);
   }
 
-  .dhun-bottom-nav {
+  .dhun-rail-region {
+    grid-area: rail;
+    display: block;
+    position: sticky;
+    top: var(--dhun-space-navigation-bar-content);
+    align-self: start;
+  }
+
+  .dhun-rail-nav {
+    display: flex;
+    width: var(--dhun-space-navigation-rail-width);
+  }
+
+  .dhun-nav-region {
     display: none;
   }
 
-  .dhun-mini {
-    margin: 0 var(--dhun-space-md) var(--dhun-space-md);
-    border-radius: var(--dhun-shape-glass);
-    border: var(--dhun-space-border) solid var(--dhun-border);
+  .dhun-dock {
+    inset-inline: auto var(--dhun-space-xxl);
+    bottom: var(--dhun-space-xxl);
+    width: min(28rem, 40vw);
   }
 
-  /* Wide screens hide the navigation bar and give the mini player its own
-     margins, so the content inset already clears the whole dock here. */
-  .dhun-toast-mount,
-  #app:has(.dhun-mini) .dhun-toast-mount {
-    bottom: var(--dhun-space-content-bottom-inset);
+  .dhun-main {
+    padding-inline: var(--dhun-space-xxxl);
   }
 
-  .dhun-scroll {
-    padding-bottom: var(--dhun-space-lg);
+  .dhun-toast-region {
+    bottom: var(--dhun-space-xxl);
   }
 
-  /* The large-screen reading measure is the app's *master pane* ceiling, not
-     the player's control column. DhunShellPolicy.masterPaneMaxWidth is
-     DhunSpacing.playerContentMaxWidth (720dp) precisely because "a list of
-     rows does not improve when it gets wider": rows and quick-picks were
-     designed at roughly phone width, so past 720dp the extra space belongs to
-     the detail pane, not to the list.
+  .dhun-hero__art {
+    width: var(--dhun-space-artwork-album);
+    height: var(--dhun-space-artwork-album);
+  }
 
-     This block used to cap the same regions at --dhun-player-controls-max
-     (400dp) — the Full Player's transport column — which at 1280x900 left a
-     400px column marooned in a 1200px area: 800px of dead glass. It is the
-     same ceiling the app has, now taken from the same token; the legal pages
-     keep their own narrower 680px measure because body copy is a different
-     problem from a list of rows. */
-  .dhun-section,
-  .dhun-entity,
-  .dhun-searchbar,
-  .dhun-chip-row,
-  .dhun-tracklist,
-  .dhun-grid,
-  .dhun-shelf,
-  .dhun-settings-row,
-  .dhun-slider-row,
-  .dhun-eq,
-  .dhun-eq__actions,
-  .dhun-diagnostics,
-  .dhun-details {
+  .dhun-rail__track {
+    grid-auto-columns: minmax(var(--dhun-space-artwork-card), 18%);
+  }
+
+  .dhun-full__inner {
     max-width: var(--dhun-pane-master-max);
     margin-inline: auto;
+    width: 100%;
   }
 
-  /* The legal pages keep their own reading measure at every width — their
-     base rules already set it, and this block is only what centres them. */
-  .dhun-legal__intro,
-  .dhun-legal__index,
-  .dhun-legal__body {
-    max-width: var(--dhun-space-legal-content-max);
-    margin-inline: auto;
+  .dhun-full__volume {
+    display: flex;
   }
 
+  .dhun-sheet {
+    margin-bottom: var(--dhun-space-xxl);
+    border-radius: var(--dhun-shape-card-large);
+    border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+  }
+
+  .dhun-scrim {
+    align-items: center;
+  }
+}
+
+/* Wide player: the application splits the cover and the controls into two
+   columns at 480px of height-orientation width. Here the same idea for a short
+   landscape window, where a stacked player would need scrolling to reach Play. */
+@media (min-width: 480px) and (orientation: landscape) and (max-height: 560px) {
+  .dhun-full__inner {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    column-gap: var(--dhun-space-xxl);
+    align-content: start;
+  }
+
+  .dhun-full__bar {
+    grid-column: 1 / -1;
+  }
+
+  .dhun-full__stage {
+    grid-row: 2 / 4;
+    flex-direction: column;
+    margin-top: 0;
+  }
+
+  .dhun-full__art {
+    width: var(--dhun-space-artwork-album);
+  }
+
+  .dhun-full__seek,
+  .dhun-full__controls,
+  .dhun-full__volume,
+  .dhun-full__tabs-wrap {
+    grid-column: 2;
+  }
+
+  .dhun-full__tabs-wrap {
+    margin-top: 0;
+  }
+}
+
+/* ------------------------------------------------------------- reduced ---- */
+
+/* --------------------------------------------------------- shell details --
+   The pieces the rebuild added and the stylesheet had not yet drawn: the row's
+   play veil, the dock's failure line, the search field's clear button, and the
+   settings screen's narrower reading column. Each is a real element the app
+   emits, and an element with no rule is an unstyled control.
+   ------------------------------------------------------------------------- */
+
+.dhun-bar__back {
+  margin-inline-start: calc(var(--dhun-space-xs) * -1);
+}
+
+.dhun-nav-item__label {
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+}
+
+.dhun-row__icon {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-artwork-thumb);
+  height: var(--dhun-space-artwork-thumb);
+  border-radius: var(--dhun-shape-full);
+  background: color-mix(in srgb, var(--dhun-scrim-strong) 55%, transparent);
+  color: var(--dhun-text);
+}
+
+.dhun-row__like.is-liked,
+.dhun-icon-button.is-liked {
+  color: var(--dhun-accent);
+}
+
+.dhun-sheet__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  justify-content: flex-end;
+  padding-top: var(--dhun-space-sm);
+}
+
+.dhun-notice__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  min-width: 0;
+}
+
+.dhun-page-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  align-items: center;
+}
+
+.dhun-prose__heading {
+  margin: var(--dhun-space-xl) 0 var(--dhun-space-sm);
+  color: var(--dhun-text);
+}
+
+.dhun-search__clear {
+  position: absolute;
+  inset-inline-end: var(--dhun-space-sm);
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  width: var(--dhun-space-compact-target);
+  height: var(--dhun-space-compact-target);
+}
+
+.dhun-hero--entity {
+  margin-bottom: var(--dhun-space-xl);
+}
+
+.dhun-grid--playlists {
+  grid-template-columns: repeat(auto-fill, minmax(var(--dhun-grid-card-min), 1fr));
+}
+
+/* The dock's own failure line: the reason a press produced no sound, in the
+   place the visitor is already looking. */
+.dhun-mini-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  margin-top: var(--dhun-space-xs);
+  padding: var(--dhun-space-sm) var(--dhun-space-md);
+  border: var(--dhun-space-border) solid var(--dhun-error);
+  border-radius: var(--dhun-shape-large);
+  background: var(--dhun-error-container);
+  color: var(--dhun-error);
+}
+
+.dhun-mini-error__title {
+  font: var(--dhun-text-label-large);
+}
+
+.dhun-mini-error__detail {
+  font-family: var(--dhun-font-mono);
+  font-size: 0.75rem;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+/* A settings or legal page is a column of text, not a feed. */
+.dhun-screen--settings,
+.dhun-screen--about {
+  max-width: var(--dhun-space-legal-content-max);
+}
+
+.dhun-screen--framed {
+  padding-block: var(--dhun-space-xxl);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows high contrast: the glass is decoration, the borders and text are the
+   interface. Drop the blur, keep the structure, keep every focus ring. */
+@media (forced-colors: active) {
+  .dhun-card,
+  .dhun-settings,
+  .dhun-mini,
+  .dhun-bar,
+  .dhun-tabs-nav,
+  .dhun-rail-nav,
+  .dhun-sheet,
+  .dhun-search,
+  .dhun-state,
   .dhun-notice {
-    max-width: var(--dhun-pane-master-max);
-    margin-inline: auto;
+    background: Canvas;
+    border: var(--dhun-stroke-hairline) solid CanvasText;
+  }
+
+  .dhun-button--filled,
+  .dhun-search__go,
+  .dhun-full__play,
+  .dhun-chip.is-active {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .dhun-source-badge__dot,
+  .dhun-row__bars i,
+  .dhun-mini__bars i {
+    background: CanvasText;
+    box-shadow: none;
+  }
+}
+
+@media print {
+  .dhun-bar,
+  .dhun-dock,
+  .dhun-nav-region,
+  .dhun-rail-region,
+  .dhun-overlay,
+  .dhun-sheet-region,
+  .dhun-toast-region,
+  .dhun-skip-link {
+    display: none !important;
+  }
+
+  body {
+    background: Canvas;
+    color: CanvasText;
   }
 }

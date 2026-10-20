@@ -6,7 +6,7 @@
  * sent to the service worker so its cache name moves with it, and printed in the
  * diagnostics panel so a bug report can name a build.
  */
-export const WEB_VERSION = "2.0.0";
+export const WEB_VERSION = "3.0.0";
 
 /** A human label for the same thing, including what the build targets. */
 export const BUILD_LABEL = "web (static, no backend)";

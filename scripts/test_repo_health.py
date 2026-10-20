@@ -27,12 +27,12 @@ SECRET_PATTERNS = {
 }
 
 # Documented, public values that are allowed. Maps (path, rule) -> exact count.
-# The InnerTube web client key is a public key embedded in the client, not a
-# project credential (see .ai/DEPENDENCY_AUDIT.md, 2026-10-10 entry). Its value
-# is deliberately not written here.
-ALLOWED_PUBLIC_VALUES = {
-    ("app-web/src/js/source.js", "Google API key"): 1,
-}
+# The web build used to ship YouTube's public InnerTube client key inside
+# `app-web/src/js/source.js` (not a project credential — see
+# .ai/DEPENDENCY_AUDIT.md, 2026-10-10). The rebuilt web app reads JioSaavn's
+# public API, which needs no key, so nothing in the repository is allowed to
+# match a secret pattern outside this (now empty) allowlist.
+ALLOWED_PUBLIC_VALUES = {}
 
 KEY_SUFFIXES = (".p12", ".pfx", ".jks", ".keystore", ".pem", ".key")
 ONLY_TRACKED_KEYSTORE = "app-android/keystores/dhun-test.p12"

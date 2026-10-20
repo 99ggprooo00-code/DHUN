@@ -1,460 +1,530 @@
 /**
- * The queue and the transport.
+ * The player: one `<audio>` element, a queue, and an honest status line.
  *
- * This is the layer between "a list of tracks the visitor chose" and "one
- * `<audio>` element that may or may not be allowed to play them". It owns the
- * queue, the repeat/shuffle rules, stream resolution, the resolution cache and
- * the retry policy, and it exposes exactly one state object for the UI to
- * render.
+ * THE STATE MACHINE IS SMALL ON PURPOSE. There are exactly seven statuses
+ * (`idle`, `loading`, `playing`, `paused`, `ended`, `error`, `blocked`) and one
+ * rule that matters: the interface draws the status it is given, so a status can
+ * never say "playing" before the element has actually produced sound. A rejected
+ * `play()` (autoplay policy, a dead URL, a codec the browser refuses) lands in
+ * `blocked` or `error` with the reason attached — it does not silently bounce
+ * back to `paused` and leave the button looking stuck.
  *
- * Three decisions worth naming:
- *
- *   **Stream URLs are resolved lazily and cached briefly.** Resolving a stream
- *   is a network round-trip; doing it for all 24 queue rows when the visitor
- *   presses play on one of them would be absurd, and doing it once and keeping
- *   it for ever fails when the signed URL expires. So: resolve on demand, cache
- *   for `STREAM_TTL_MS`, and re-resolve once when a cached URL fails to play.
- *
- *   **A failure never eats the queue.** A track that cannot be resolved marks
- *   itself failed in the queue and is skipped to the next one only when the
- *   visitor asked for continuous playback; the queue is the user's, and a
- *   player that clears it because a network call failed is a player nobody
- *   trusts with a long queue.
- *
- *   **Queue edits are pure.** `enqueue`, `removeAt`, `moveTo` return new
- *   arrays rather than mutating, so the player's state is testable and the UI's
- *   undo-last is a matter of holding the previous array.
+ * ROWS FROM THE LIBRARY HAVE NO STREAM. Audio URLs expire, so likes and history
+ * store the row and not the URL. Playing one asks the injected `resolve` for a
+ * fresh stream first, and a failure there is reported as the source's failure —
+ * the same taxonomy the rest of the app uses.
  */
 
-import { AUDIO_STATUS } from "./audio.js";
+import { FAILURE_KIND, SourceError, describeFailure } from "./api.js";
 
-/** Repeat modes, in the app's own words (QueueManager.RepeatMode). */
-export const REPEAT = Object.freeze({
-  OFF: "off",
-  ALL: "all",
-  ONE: "one",
+export const STATUS = Object.freeze({
+  idle: "idle",
+  loading: "loading",
+  playing: "playing",
+  paused: "paused",
+  ended: "ended",
+  error: "error",
+  blocked: "blocked",
 });
 
-/** How long a resolved stream URL is reused before it is re-resolved. */
-export const STREAM_TTL_MS = 20 * 60 * 1000;
+export const REPEAT = Object.freeze(["off", "all", "one"]);
 
-/** The queue is persisted; a thousand rows would blow the storage budget the
- *  settings store shares, and nobody scrolls past a thousand. */
-export const MAX_QUEUE = 500;
-
-/* --------------------------------------------------------- pure queue ops -- */
-
-export function enqueueTrack(queue, track, { next = false } = {}) {
-  const list = [...queue];
-  if (next) list.unshift(track);
-  else list.push(track);
-  return list.slice(0, MAX_QUEUE);
+/** A fresh player state. Pure: the tests build one without a browser. */
+export function emptyPlayerState() {
+  return {
+    queue: [],
+    index: -1,
+    status: STATUS.idle,
+    context: "",
+    position: 0,
+    duration: 0,
+    volume: 0.8,
+    muted: false,
+    repeat: "off",
+    shuffle: false,
+    order: [],
+    error: null,
+  };
 }
 
-export function removeAt(queue, index) {
-  const list = [...queue];
-  if (index < 0 || index >= list.length) return list;
-  list.splice(index, 1);
-  return list;
+/** The track on screen, or null. */
+export function currentTrack(state) {
+  if (state.index < 0) return null;
+  return state.queue[state.index] ?? null;
 }
 
-export function moveTo(queue, from, to) {
-  const list = [...queue];
-  if (from < 0 || from >= list.length) return list;
-  const target = Math.max(0, Math.min(to, list.length - 1));
-  const [item] = list.splice(from, 1);
-  list.splice(target, 0, item);
-  return list;
-}
-
-/** The shuffle order: every other row, randomised, current track kept in front. */
-export function shuffledOrder(length, currentIndex, random = Math.random) {
+/**
+ * A shuffle order that starts with the track that is playing.
+ *
+ * Shuffling must not cut the current song off, so the current index is placed
+ * first and everything else is a Fisher–Yates pass over the remainder.
+ */
+export function shuffledOrder(length, startIndex, random = Math.random) {
   const rest = [];
-  for (let index = 0; index < length; index += 1) {
-    if (index !== currentIndex) rest.push(index);
-  }
+  for (let index = 0; index < length; index += 1) if (index !== startIndex) rest.push(index);
   for (let index = rest.length - 1; index > 0; index -= 1) {
     const swap = Math.floor(random() * (index + 1));
     [rest[index], rest[swap]] = [rest[swap], rest[index]];
   }
-  return currentIndex >= 0 ? [currentIndex, ...rest] : rest;
+  return startIndex >= 0 && startIndex < length ? [startIndex, ...rest] : rest;
+}
+
+/** Where `next` goes, honouring repeat and shuffle. `-1` means "stop". */
+export function nextIndex(state) {
+  const length = state.queue.length;
+  if (!length) return -1;
+  if (state.repeat === "one" && state.index >= 0) return state.index;
+  if (state.shuffle && state.order.length) {
+    const at = state.order.indexOf(state.index);
+    if (at >= 0 && at + 1 < state.order.length) return state.order[at + 1];
+    if (state.repeat === "all") return state.order[0];
+    return -1;
+  }
+  if (state.index + 1 < length) return state.index + 1;
+  return state.repeat === "all" ? 0 : -1;
+}
+
+/** Where `previous` goes. A long press on most players means "restart". */
+export function previousIndex(state, { restartAfterSeconds = 3 } = {}) {
+  const length = state.queue.length;
+  if (!length) return -1;
+  if (state.position > restartAfterSeconds) return state.index;
+  if (state.shuffle && state.order.length) {
+    const at = state.order.indexOf(state.index);
+    if (at > 0) return state.order[at - 1];
+    return state.repeat === "all" ? state.order[state.order.length - 1] : state.index;
+  }
+  if (state.index - 1 >= 0) return state.index - 1;
+  return state.repeat === "all" ? length - 1 : 0;
 }
 
 /**
- * The next queue index under the current repeat/shuffle mode.
+ * What a failed `play()` means, in the browser's own terms.
  *
- * Mirrors the app's QueueManager rules, with one web-specific addition: a
- * shuffle plays every row once before repeating, because a browser tab is often
- * left running for hours and "shuffle" that replays the same three songs in a
- * sixty-track queue reads as broken.
+ * The three cases are not interchangeable: `NotAllowedError` means the browser
+ * wanted a gesture and nothing is wrong with the track; `NotSupportedError`
+ * means the file itself is unusable; everything else is the network. The player
+ * shows the difference so a visitor knows whether to press the button again.
  */
-export function nextIndex({ length, index, repeat, shuffle, order }) {
-  if (length === 0) return -1;
-  if (repeat === REPEAT.ONE) return index;
-  if (shuffle && Array.isArray(order) && order.length === length) {
-    const position = order.indexOf(index);
-    if (position >= 0 && position < order.length - 1) return order[position + 1];
-    return repeat === REPEAT.ALL ? order[0] : -1;
+export function playRejection(error) {
+  const name = error?.name ?? "";
+  if (name === "NotAllowedError") {
+    return { status: STATUS.blocked, title: "The browser blocked playback", body: "Press play once more — browsers require a gesture before audio starts." };
   }
-  if (index < length - 1) return index + 1;
-  return repeat === REPEAT.ALL ? 0 : -1;
+  if (name === "NotSupportedError") {
+    return { status: STATUS.error, title: "This browser cannot play that file", body: "The audio URL answered, but the format was refused by the browser." };
+  }
+  if (name === "AbortError") {
+    // A load interrupted by the next track is not an error the visitor needs.
+    return null;
+  }
+  return { status: STATUS.error, title: "Playback stopped", body: String(error?.message ?? "The audio element refused to play the track.") };
 }
 
-export function previousIndex({ length, index, positionMs, repeat, restartAfterMs = 3000 }) {
-  if (length === 0) return -1;
-  // The convention every player shares: previous restarts the track first.
-  if (positionMs > restartAfterMs) return index;
-  if (index > 0) return index - 1;
-  return repeat === REPEAT.ALL ? length - 1 : 0;
+/** "The track has no audio URL" is a real state, not an empty string src. */
+function missingStreamError(track) {
+  if (track?.demo) {
+    // A sample row is invented. It must say so at the moment someone presses
+    // play on it, not only in the banner above the list.
+    return {
+      status: STATUS.error,
+      title: "This is a sample row",
+      body: `“${track?.title ?? "This track"}” is an invented example drawn when the JioSaavn API could not be reached. It carries no audio. The live catalogue returns as soon as the API answers.`,
+    };
+  }
+  return {
+    status: STATUS.error,
+    title: "This row has no audio URL",
+    body: `“${track?.title ?? "The track"}” came from the saved library, and this build re-reads audio from the catalogue instead of storing it. Open the track from its album or search again.`,
+  };
 }
 
-/* ------------------------------------------------------------------ player -- */
-
+/**
+ * Create the player.
+ *
+ * `resolve` is injected so the player never imports the network itself: the
+ * audio path and the catalogue path stay separable, which is what lets the
+ * player be tested against a fake element.
+ */
 export function createPlayer({
-  engine,
-  source,
-  settings,
-  onEvent = () => {},
+  audio,
+  resolve = async (song) => song,
+  describe = describeFailure,
+  persist = () => {},
   now = () => Date.now(),
 } = {}) {
-  const listeners = new Set();
-  const streamCache = new Map();
+  let state = emptyPlayerState();
+  let listeners = new Set();
+  let loadToken = 0;
+  let playRequested = false;
 
-  let state = {
-    queue: [],
-    index: -1,
-    playing: false,
-    repeat: settings?.get?.("repeat") ?? REPEAT.OFF,
-    shuffle: settings?.get?.("shuffle") ?? false,
-    order: [],
-    /** Per-row resolution failures, keyed by queue index → failure object. */
-    failures: {},
-    /** The stream the engine is currently holding, if any. */
-    stream: null,
-    resolving: false,
-    /** The last thing that went wrong, for the notice strip. */
-    error: null,
-    /** Set when playback is waiting for a gesture (autoplay policy). */
-    needsGesture: false,
-    volume: settings?.get?.("volume") ?? 1,
-    muted: false,
-    positionMs: 0,
-    durationMs: 0,
-    bufferedMs: 0,
-    audioStatus: AUDIO_STATUS.IDLE,
-  };
-
-  function emit(patch) {
-    state = { ...state, ...patch };
+  function emit() {
     for (const listener of listeners) listener(state);
   }
 
-  engine?.subscribe?.((audioState) => {
-    emit({
-      audioStatus: audioState.status,
-      positionMs: audioState.positionMs,
-      durationMs: audioState.durationMs || state.durationMs,
-      bufferedMs: audioState.bufferedMs,
-      volume: audioState.volume,
-      muted: audioState.muted,
-      playing: audioState.status === AUDIO_STATUS.PLAYING || audioState.status === AUDIO_STATUS.BUFFERING,
-      error: audioState.status === AUDIO_STATUS.ERROR ? audioState.error : state.error,
-      needsGesture: audioState.status === AUDIO_STATUS.BLOCKED,
-    });
-  });
-
-  function current() {
-    return state.index >= 0 ? state.queue[state.index] ?? null : null;
+  function set(patch) {
+    state = { ...state, ...patch };
+    emit();
   }
 
-  function setQueue(queue, index = -1) {
-    emit({
-      queue: queue.slice(0, MAX_QUEUE),
-      index: queue.length ? Math.max(0, Math.min(index, queue.length - 1)) : -1,
-      failures: {},
-      order: state.shuffle ? shuffledOrder(queue.length, index) : [],
-    });
+  function resetError() {
+    if (state.error) set({ error: null });
   }
 
-  /** A cached stream URL is only as good as its signature; the TTL bounds it. */
-  function cachedStream(videoId) {
-    const entry = streamCache.get(videoId);
-    if (!entry) return null;
-    if (now() - entry.at > STREAM_TTL_MS) {
-      streamCache.delete(videoId);
-      return null;
-    }
-    return entry;
+  function fail(error) {
+    const described = describe(error);
+    playRequested = false;
+    set({ status: STATUS.error, error: { ...described, technical: described.technical, at: now() } });
   }
 
   /**
-   * Resolve and start one queue row.
+   * Load and start one queue position.
    *
-   * The retry rule is deliberately narrow: a *cached* URL that the browser
-   * refuses is re-resolved exactly once (signatures expire, and that is the
-   * whole reason a stream can stop working between two presses of play). A
-   * fresh URL that fails is reported, not retried in a loop — an infinite retry
-   * against a refusing origin is how a tab ends up hammering a server.
+   * `token` guards against a slow track landing after the visitor has already
+   * pressed next twice: the stale response is dropped instead of replacing the
+   * song they are now listening to.
    */
-  async function start(index, { autoplay = true, fromCache = true } = {}) {
-    const track = state.queue[index];
-    if (!track) return false;
-    emit({ index, error: null, needsGesture: false, positionMs: 0, durationMs: track.durationMs ?? 0 });
-
-    if (track.demo) {
-      const demoFailure = {
-        kind: "demo",
-        message: `"${track.title}" is a demo row with no audio. Configure a data source in Settings to play real tracks.`,
-      };
-      emit({
-        error: demoFailure,
-        failures: { ...state.failures, [index]: demoFailure },
-        playing: false,
-      });
-      onEvent({ type: "track-failed", track, failure: demoFailure });
-      return false;
+  async function startAt(index, { autoplay = true } = {}) {
+    if (index < 0 || index >= state.queue.length) {
+      playRequested = false;
+      set({ status: STATUS.idle, index: -1, position: 0, duration: 0 });
+      audio.pause?.();
+      audio.removeAttribute?.("src");
+      return;
     }
-
-    const videoId = track.videoId ?? track.id;
-    if (!videoId) {
-      const failure = { kind: "nostream", message: "This row has no playable id." };
-      emit({ error: failure, failures: { ...state.failures, [index]: failure } });
-      onEvent({ type: "track-failed", track, failure });
-      return false;
-    }
-
-    let resolved = fromCache ? cachedStream(videoId) : null;
-    if (!resolved) {
-      emit({ resolving: true });
-      const result = await source.resolveStream(videoId);
-      emit({ resolving: false });
-      if (!result?.ok) {
-        const failure = { kind: result?.kind ?? "resolve", message: result?.message ?? "The stream could not be resolved." };
-        emit({ error: failure, failures: { ...state.failures, [index]: failure }, playing: false });
-        onEvent({ type: "track-failed", track, failure });
-        return false;
-      }
-      resolved = { at: now(), stream: result.stream, meta: result.track ?? null };
-      streamCache.set(videoId, resolved);
-    }
-
-    // Merge anything the stream resolution learned that the row did not have —
-    // most usefully the real duration and artwork, which list rows often lack.
-    const merged = { ...track, ...(resolved.meta?.durationMs ? { durationMs: resolved.meta.durationMs } : {}) };
-    if (merged.durationMs !== track.durationMs) {
-      const queue = [...state.queue];
-      queue[index] = merged;
-      emit({ queue });
-    }
-
-    emit({ stream: resolved.stream, playing: autoplay });
-    onEvent({ type: "track-start", track: merged, index });
-
-    const started = await engine.load(resolved.stream.url, { autoplay });
-    if (!started && state.audioStatus === AUDIO_STATUS.ERROR) {
-      // The cached URL is the prime suspect; drop it and try once more with a
-      // fresh one — but only for the URL-freshness failure kinds.
-      const kind = state.error?.kind;
-      if (fromCache && (kind === "unsupported" || kind === "network" || kind === "decode")) {
-        streamCache.delete(videoId);
-        return start(index, { autoplay, fromCache: false });
-      }
-    }
-    return started;
-  }
-
-  /** A queue row the visitor asked for by name, not by index. */
-  async function playTrack(track, { queue = null, index = 0 } = {}) {
-    if (queue) setQueue(queue, index);
-    else setQueue([track], 0);
-    return start(index);
-  }
-
-  async function playTracks(tracks, index = 0) {
-    if (!tracks?.length) return false;
-    setQueue(tracks, index);
-    return start(index);
-  }
-
-  function advance(step) {
-    const next = nextIndex({
-      length: state.queue.length,
-      index: state.index,
-      repeat: state.repeat,
-      shuffle: state.shuffle,
-      order: state.order,
+    const token = (loadToken += 1);
+    const requested = state.queue[index];
+    playRequested = autoplay;
+    set({
+      index,
+      status: STATUS.loading,
+      position: 0,
+      duration: requested?.duration ?? 0,
+      error: null,
     });
-    if (step === -1) {
-      const back = previousIndex({
-        length: state.queue.length,
-        index: state.index,
-        positionMs: state.positionMs,
-        repeat: state.repeat,
-      });
-      if (back === state.index) {
-        engine.seek(0);
-        return true;
+
+    let track = requested;
+    if (!track?.stream) {
+      try {
+        const hydrated = await resolve(track);
+        if (token !== loadToken) return;
+        if (hydrated?.stream) {
+          track = hydrated;
+          const queue = state.queue.slice();
+          queue[index] = hydrated;
+          set({ queue });
+        }
+      } catch (error) {
+        if (token !== loadToken) return;
+        fail(error);
+        return;
       }
-      return start(back);
     }
-    if (next < 0) {
-      engine.pause();
-      emit({ playing: false, positionMs: 0 });
-      return false;
+    if (token !== loadToken) return;
+    if (!track?.stream) {
+      const described = missingStreamError(track);
+      playRequested = false;
+      set({ status: described.status, error: { ...described, at: now() } });
+      return;
     }
-    return start(next);
+
+    try {
+      audio.src = track.stream;
+      audio.load?.();
+    } catch (error) {
+      if (token !== loadToken) return;
+      fail(new SourceError(FAILURE_KIND.network, String(error?.message ?? "could not load the audio URL"), { url: track.stream }));
+      return;
+    }
+    persist({ track, index });
+
+    if (!autoplay) {
+      set({ status: STATUS.paused });
+      return;
+    }
+    try {
+      await audio.play();
+      if (token !== loadToken) return;
+      set({ status: STATUS.playing });
+    } catch (error) {
+      if (token !== loadToken) return;
+      const rejection = playRejection(error);
+      if (!rejection) return;
+      playRequested = false;
+      set({ status: rejection.status, error: { ...rejection, technical: String(error?.name ?? ""), at: now() } });
+    }
   }
 
-  return {
+  /* ------------------------------------------------------------- element -- */
+
+  const onTimeUpdate = () => {
+    if (!audio) return;
+    const duration = Number.isFinite(audio.duration) ? audio.duration : state.duration;
+    set({ position: audio.currentTime || 0, duration: duration || 0 });
+  };
+  const onPlay = () => {
+    if (state.status !== STATUS.playing) set({ status: STATUS.playing });
+  };
+  const onPause = () => {
+    // A pause caused by the track ending is not a user pause; `ended` owns that.
+    if (state.status === STATUS.playing) set({ status: STATUS.paused });
+  };
+  const onEnded = () => {
+    const next = nextIndex(state);
+    if (state.repeat === "one") {
+      startAt(state.index);
+      return;
+    }
+    if (next >= 0) startAt(next);
+    else {
+      playRequested = false;
+      set({ status: STATUS.ended, position: 0 });
+    }
+  };
+  const onError = () => {
+    const code = audio?.error?.code ?? 0;
+    const message = audio?.error?.message ?? "";
+    fail(new SourceError(FAILURE_KIND.network, message || `the audio element reported error ${code}`, { url: audio?.src ?? "" }));
+  };
+  const onVolumeChange = () => set({ volume: audio.volume ?? 0, muted: Boolean(audio.muted) });
+  const onLoadedMetadata = () => {
+    if (Number.isFinite(audio.duration)) set({ duration: audio.duration });
+  };
+
+  audio?.addEventListener?.("timeupdate", onTimeUpdate);
+  audio?.addEventListener?.("play", onPlay);
+  audio?.addEventListener?.("pause", onPause);
+  audio?.addEventListener?.("ended", onEnded);
+  audio?.addEventListener?.("error", onError);
+  audio?.addEventListener?.("volumechange", onVolumeChange);
+  audio?.addEventListener?.("loadedmetadata", onLoadedMetadata);
+
+  const api = {
     get state() {
       return state;
     },
-    get current() {
-      return current();
+    get track() {
+      return currentTrack(state);
     },
     subscribe(listener) {
       listeners.add(listener);
+      listener(state);
       return () => listeners.delete(listener);
     },
 
-    /* ------------------------------------------------------------ transport */
-    play: () => engine.play(),
-    pause: () => engine.pause(),
-    async toggle() {
-      if (state.playing) {
-        engine.pause();
-        return false;
-      }
-      if (state.index < 0 && state.queue.length > 0) return start(0);
-      return engine.play();
+    /** Replace the queue and start one position. */
+    play(songs, index = 0, context = "") {
+      const queue = (songs ?? []).filter(Boolean);
+      if (!queue.length) return;
+      const order = state.shuffle ? shuffledOrder(queue.length, index) : queue.map((_, position) => position);
+      set({ queue, order, context });
+      startAt(index);
     },
-    next: () => advance(1),
-    previous: () => advance(-1),
-    seekTo: (ms) => engine.seek(ms),
-    seekBy: (deltaMs) => engine.seek(Math.max(0, Math.min(state.positionMs + deltaMs, state.durationMs || state.positionMs + deltaMs))),
-    setVolume: (value) => {
-      engine.setVolume(value);
-      settings?.set?.({ volume: value });
-    },
-    setMuted: (value) => engine.setMuted(value),
 
-    /* ---------------------------------------------------------------- queue */
-    playTrack,
-    playTracks,
-    setQueue,
-    /** Play a queue row that is already there — used by every track row click. */
-    playAt(index) {
-      if (index < 0 || index >= state.queue.length) return false;
-      if (index === state.index && state.playing) return true;
-      return start(index);
+    /** Add to the end of the queue without interrupting what is playing. */
+    enqueue(song) {
+      if (!song?.id) return false;
+      if (state.queue.some((entry) => entry.id === song.id)) return false;
+      const queue = [...state.queue, song];
+      const order = state.shuffle ? [...state.order, queue.length - 1] : queue.map((_, position) => position);
+      set({ queue, order });
+      return true;
     },
-    enqueue(track, options) {
-      const queue = enqueueTrack(state.queue, track, options);
-      emit({ queue, order: state.shuffle ? shuffledOrder(queue.length, state.index) : state.order });
-      return queue.length;
+
+    /** Play next: insert after the current position, not at the end. */
+    playNext(song) {
+      if (!song?.id) return false;
+      if (state.queue.some((entry) => entry.id === song.id)) return false;
+      const at = Math.max(state.index, 0) + 1;
+      const queue = [...state.queue];
+      queue.splice(at, 0, song);
+      set({ queue, order: state.shuffle ? shuffledOrder(queue.length, state.index) : queue.map((_, position) => position) });
+      return true;
     },
-    enqueueMany(tracks, options) {
-      let queue = state.queue;
-      for (const track of tracks) queue = enqueueTrack(queue, track, options);
-      emit({ queue, order: state.shuffle ? shuffledOrder(queue.length, state.index) : state.order });
-      return queue.length;
-    },
+
     removeAt(index) {
-      const queue = removeAt(state.queue, index);
-      const wasPlaying = index === state.index;
-      let nextCurrent = state.index;
-      if (index < state.index) nextCurrent = state.index - 1;
-      if (index === state.index) nextCurrent = Math.min(index, queue.length - 1);
-      emit({ queue, index: queue.length ? nextCurrent : -1 });
-      if (queue.length === 0) {
-        engine.stop();
-        emit({ playing: false, stream: null });
-      } else if (wasPlaying) {
-        start(nextCurrent);
+      if (index < 0 || index >= state.queue.length) return;
+      const queue = state.queue.filter((_, position) => position !== index);
+      if (!queue.length) {
+        api.stop();
+        return;
       }
-      return queue.length;
-    },
-    move(from, to) {
-      const queue = moveTo(state.queue, from, to);
-      let index = state.index;
-      if (from === state.index) index = to;
-      else if (from < state.index && to >= state.index) index = state.index - 1;
-      else if (from > state.index && to <= state.index) index = state.index + 1;
-      emit({ queue, index });
-      return queue.length;
-    },
-    clearQueue() {
-      engine.stop();
-      emit({ queue: [], index: -1, playing: false, stream: null, failures: {}, order: [], error: null });
+      if (index < state.index) set({ queue, index: state.index - 1 });
+      else if (index === state.index) {
+        set({ queue });
+        startAt(Math.min(index, queue.length - 1));
+      } else set({ queue });
     },
 
-    /* -------------------------------------------------------------- modes */
-    setRepeat(repeat) {
-      emit({ repeat, order: state.shuffle ? shuffledOrder(state.queue.length, state.index) : state.order });
-      settings?.set?.({ repeat });
+    toggle() {
+      if (!state.queue.length) return;
+      if (state.status === STATUS.playing) {
+        audio.pause();
+        set({ status: STATUS.paused });
+        return;
+      }
+      if (state.status === STATUS.paused || state.status === STATUS.blocked || state.status === STATUS.ended) {
+        if (!audio.src && state.index >= 0) {
+          startAt(state.index);
+          return;
+        }
+        playRequested = true;
+        audio
+          .play()
+          .then(() => set({ status: STATUS.playing, error: null }))
+          .catch((error) => {
+            const rejection = playRejection(error);
+            if (rejection) set({ status: rejection.status, error: { ...rejection, technical: String(error?.name ?? ""), at: now() } });
+          });
+        return;
+      }
+      if (state.status === STATUS.idle && state.queue.length) startAt(Math.max(state.index, 0));
     },
+
+    next({ manual = true } = {}) {
+      const index = nextIndex(state);
+      if (index >= 0) startAt(index);
+      else if (manual) {
+        set({ status: STATUS.ended, position: 0 });
+      }
+    },
+
+    previous() {
+      const index = previousIndex(state);
+      if (index >= 0) startAt(index);
+    },
+
+    seek(seconds) {
+      const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : state.duration;
+      const target = Math.max(0, Math.min(seconds, duration || seconds));
+      try {
+        audio.currentTime = target;
+      } catch {
+        /* some browsers refuse a seek before metadata */
+      }
+      set({ position: target });
+    },
+
+    seekBy(delta) {
+      api.seek((audio.currentTime || state.position || 0) + delta);
+    },
+
+    setVolume(value) {
+      const volume = Math.max(0, Math.min(1, Number(value) || 0));
+      audio.volume = volume;
+      if (volume > 0 && audio.muted) audio.muted = false;
+      set({ volume, muted: Boolean(audio.muted) });
+      persist({ volume });
+    },
+
+    toggleMute() {
+      audio.muted = !audio.muted;
+      set({ muted: Boolean(audio.muted) });
+    },
+
     cycleRepeat() {
-      const order = [REPEAT.OFF, REPEAT.ALL, REPEAT.ONE];
-      const repeat = order[(order.indexOf(state.repeat) + 1) % order.length];
-      this.setRepeat(repeat);
+      const repeat = REPEAT[(REPEAT.indexOf(state.repeat) + 1) % REPEAT.length];
+      set({ repeat });
+      persist({ repeat });
       return repeat;
     },
-    setShuffle(shuffle) {
-      const enabled = Boolean(shuffle);
-      emit({
-        shuffle: enabled,
-        order: enabled ? shuffledOrder(state.queue.length, state.index) : [],
-      });
-      settings?.set?.({ shuffle: enabled });
-    },
+
     toggleShuffle() {
-      this.setShuffle(!state.shuffle);
-      return state.shuffle;
+      const shuffle = !state.shuffle;
+      set({
+        shuffle,
+        order: shuffle ? shuffledOrder(state.queue.length, state.index) : state.queue.map((_, position) => position),
+      });
+      persist({ shuffle });
+      return shuffle;
     },
 
-    /* ------------------------------------------------------------ streams */
-    /** Force a re-resolve of the current track — the "Retry" button's work. */
-    async retry() {
-      const track = current();
-      if (!track) return false;
-      streamCache.delete(track.videoId ?? track.id);
-      return start(state.index, { fromCache: false });
+    stop() {
+      loadToken += 1;
+      playRequested = false;
+      audio.pause?.();
+      audio.removeAttribute?.("src");
+      set({ queue: [], index: -1, status: STATUS.idle, position: 0, duration: 0, context: "", error: null });
     },
-    /** Warm the next row while the current one plays: the difference between a
-     *  gap and no gap when the listener is driving manually. */
-    async preResolve(index) {
-      const track = state.queue[index];
-      const videoId = track?.videoId ?? track?.id;
-      if (!videoId || track?.demo) return null;
-      if (cachedStream(videoId)) return null;
-      const result = await source.resolveStream(videoId);
-      if (result?.ok) streamCache.set(videoId, { at: now(), stream: result.stream, meta: result.track ?? null });
-      return result;
+
+    clearError() {
+      resetError();
+      if (state.status === STATUS.error || state.status === STATUS.blocked) set({ status: STATUS.paused });
     },
-    /** Restore a persisted session: queue, position, and whether it was playing. */
-    async restore({ queue, index, positionMs = 0, autoplay = false }) {
-      const rows = Array.isArray(queue) ? queue.filter((row) => row && (row.videoId || row.id)).slice(0, MAX_QUEUE) : [];
-      if (rows.length === 0) return false;
-      setQueue(rows, index >= 0 && index < rows.length ? index : 0);
-      if (positionMs > 0) emit({ positionMs });
-      const track = current();
-      const videoId = track?.videoId ?? track?.id;
-      const cached = videoId ? cachedStream(videoId) : null;
-      if (!cached) return false;
-      const started = await engine.load(cached.stream.url, { autoplay });
-      if (started && positionMs > 0) engine.seek(positionMs);
-      return started;
+
+    /** The queue as rows, with the playing one marked. */
+    queueView() {
+      return state.queue.map((track, index) => ({
+        ...track,
+        index,
+        current: index === state.index,
+        playing: index === state.index && state.status === STATUS.playing,
+      }));
     },
-    /** The stream cache size, for the Settings diagnostics row. */
-    get cacheSize() {
-      return streamCache.size;
+
+    get requested() {
+      return playRequested;
     },
-    clearStreamCache() {
-      streamCache.clear();
-    },
-    dispose() {
-      listeners.clear();
-      engine.dispose();
+
+    destroy() {
+      audio?.removeEventListener?.("timeupdate", onTimeUpdate);
+      audio?.removeEventListener?.("play", onPlay);
+      audio?.removeEventListener?.("pause", onPause);
+      audio?.removeEventListener?.("ended", onEnded);
+      audio?.removeEventListener?.("error", onError);
+      audio?.removeEventListener?.("volumechange", onVolumeChange);
+      audio?.removeEventListener?.("loadedmetadata", onLoadedMetadata);
+      listeners = new Set();
     },
   };
+
+  return api;
+}
+
+/* --------------------------------------------------------- media session -- */
+
+/**
+ * Hardware media keys and the OS "now playing" card.
+ *
+ * Features are asked for, never assumed: `mediaSession` is absent in Safari
+ * 14 and `setPositionState` throws on a duration of 0, and both must be
+ * harmless rather than a console full of errors.
+ */
+export function attachMediaSession({ track, status, position, duration, handlers, mediaSession = globalThis.navigator?.mediaSession } = {}) {
+  if (!mediaSession || !track) return;
+  try {
+    if (typeof MediaMetadata === "function") {
+      mediaSession.metadata = new MediaMetadata({
+        title: track.title ?? "",
+        artist: track.artist ?? "",
+        album: track.album?.name ?? "",
+        artwork: track.image ? [{ src: track.image, sizes: "500x500", type: "image/jpeg" }] : [],
+      });
+    }
+    mediaSession.playbackState = status === STATUS.playing ? "playing" : status === STATUS.paused ? "paused" : "none";
+    if (typeof mediaSession.setPositionState === "function" && Number.isFinite(duration) && duration > 0) {
+      mediaSession.setPositionState({
+        duration,
+        playbackRate: 1,
+        position: Math.min(Math.max(position ?? 0, 0), duration),
+      });
+    }
+    const action = (name, handler) => {
+      if (typeof handler !== "function" || typeof mediaSession.setActionHandler !== "function") return;
+      try {
+        mediaSession.setActionHandler(name, handler);
+      } catch {
+        /* the browser knows the action and refuses the handler */
+      }
+    };
+    action("play", handlers?.play);
+    action("pause", handlers?.pause);
+    action("previoustrack", handlers?.previous);
+    action("nexttrack", handlers?.next);
+    action("seekbackward", handlers?.seekBackward);
+    action("seekforward", handlers?.seekForward);
+    action("seekto", handlers?.seekTo);
+  } catch {
+    /* a media session is an enhancement; never a boot failure */
+  }
 }

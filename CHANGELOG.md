@@ -22,6 +22,58 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The web app is rebuilt from scratch, and four defects it shipped with are fixed (2026-10-20, session `arena/3e7baa1c-dhun`)
+
+`app-web/` is not a mirror of the installed app any more; it is the web build,
+written for a browser and modelled on the reference web player the user named.
+It calls JioSaavn through the public `saavn.dev` wrapper, keeps the library in
+browser storage, and renders this build's own legal pages. The equaliser, synced
+lyrics, the downloads tab and the YouTube endpoint are gone with the code that
+could not honour them — the player's Lyrics tab says the words are not
+available here, and Settings offers only what a tab can keep: theme, accent,
+volume, repeat, shuffle, export/import/erase.
+
+The rebuild is 20 modules and 147 Node assertions; `scripts/test_app_web.py`
+(41) and the Python repository suite (459) pass, and the browser suite drives
+the real app: boot, one `h1` per screen, contrast in both themes, axe at zero
+violations on nine screens and three overlays, the local-playlist round trip
+across a reload, the player deep link, and the theme control.
+
+Four defects the previous build shipped are fixed here. Each one is a claim the
+interface made and the code did not keep.
+
+- **Fixed: a full-viewport scrim covered every screen.** The sheet layer asked
+  `markup ? wrap(markup) : nothing`, and a rendered fragment is a `String`
+  subclass — always truthy. With no sheet open the app still drew the scrim over
+  itself, so no button anywhere in the interface could be pressed with a mouse
+  or a finger. `components.js#sheetLayer` now decides on *rendered* content, and
+  `tests/dom.test.mjs` pins the empty-fragment case.
+- **Fixed: Enter and Save never renamed a playlist.** A `<form data-action>`
+  names what its submit does, but the delegated *click* handler resolved the
+  form as the click target (a submit button sits inside it), ran the action,
+  re-rendered the sheet and disconnected the form before the browser could
+  submit it. Rename silently saved nothing; create could run twice. The click
+  handler now ignores forms.
+- **Fixed: every screen change dropped focus on `<body>`.** `focusWithoutScroll`
+  set `tabindex="-1"`, focused the element and removed the attribute again —
+  which blurs the element that has focus in Chromium. Focusing a heading now
+  keeps the attribute; natively focusable controls never get one.
+- **Fixed: the service worker was never registered.** `main.js` called
+  `pwa.register?.()`, a method `createPwa` does not have, so the app's offline
+  promise was a `sw.js` in the build with nothing pointing at it. It now calls
+  `start()`; a Chromium run confirms one registration, a 29-entry
+  `dhun-web-v3.0.0` cache, and the app opening from cache with the network off.
+- **Fixed: the sheet's `<header>` was a second banner landmark**, which axe
+  reported on every open sheet (`landmark-no-duplicate-banner`,
+  `landmark-unique`); the title bar is a div.
+- **Fixed: the navigation rail's brand spilled 9px out of an 88px rail.** The
+  mark and a 3px-tracked wordmark sat side by side (81px in a 72px box); they
+  are stacked now.
+- **Fixed: 11px chrome labels failed contrast in the light theme.** The bar's
+  overline and the navigation labels measured 3.95:1 on the glass surface at
+  11px/600. They use the secondary rung instead; the palette still mirrors
+  `DhunAppearance.kt`.
+
 ### The app says which screen you are on, and where the caret is (2026-10-20, session `arena/86be93f9-dhun`)
 
 Found by scanning `/app/` with axe (never before run on the app), then by

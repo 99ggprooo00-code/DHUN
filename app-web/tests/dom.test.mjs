@@ -78,3 +78,24 @@ test("no interpolation can produce a tag that was not in the template", () => {
     assert.ok(markup.includes("&lt;") || markup.includes("&quot;") || markup.includes("&amp;"), `${attack} was not escaped`);
   }
 });
+
+/**
+ * A sheet is drawn only when there is one.
+ *
+ * The empty fragment is the trap this pair exists for: `html``` is a `String`
+ * subclass, so it is *truthy*, and a renderer that asks `content ? wrap(content)
+ * : nothing` wraps nothing into a full-viewport scrim. That shipped: the app
+ * drew a scrim over itself on every screen, and no control in the interface
+ * could be pressed. "Empty" now has to mean empty in the rendered markup too.
+ */
+test("a sheet layer is drawn only around real content", async () => {
+  const { sheetLayer } = await import("../src/js/components.js");
+  assert.equal(String(sheetLayer(null)), "");
+  assert.equal(String(sheetLayer()), "");
+  assert.equal(String(sheetLayer(html``)), "", "an empty fragment is still empty");
+  assert.equal(String(sheetLayer(html`   `)), "");
+  const layer = String(sheetLayer(html`<div class="dhun-sheet">sheet</div>`));
+  assert.ok(layer.includes('class="dhun-scrim"'));
+  assert.ok(layer.includes('data-action="scrim-close"'));
+  assert.ok(layer.includes("dhun-sheet"));
+});

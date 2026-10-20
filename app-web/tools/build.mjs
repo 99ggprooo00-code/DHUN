@@ -35,6 +35,22 @@ const outRoot = path.join(moduleRoot, "dist");
 await rm(outRoot, { recursive: true, force: true });
 await cp(srcRoot, outRoot, { recursive: true });
 
+/**
+ * Files that live under `src/js` because another build generates them there.
+ *
+ * `data/legal-content.js` is the Android/desktop legal corpus, emitted by
+ * `scripts/gen_legal_content.py` into this tree so the app's own gate can prove
+ * it is current. The web build describes the web build instead
+ * (`data/web-legal.js`): rendering the installed app's policy pages in a
+ * browser tab would state downloads, SQLite and YouTube as facts. The file is
+ * therefore kept in the repository but removed from the output, and both gates
+ * that scan `src/js` know it is not part of this app.
+ */
+const NOT_PART_OF_THE_WEB_BUILD = new Set(["data/legal-content.js"]);
+for (const excluded of NOT_PART_OF_THE_WEB_BUILD) {
+  await rm(path.join(outRoot, "js", excluded), { force: true });
+}
+
 function fail(message) {
   console.error(`build: ${message}`);
   process.exit(1);
@@ -62,6 +78,10 @@ async function collect(dir, prefix = "") {
   }
 }
 await collect(jsRoot);
+for (const excluded of NOT_PART_OF_THE_WEB_BUILD) {
+  const index = modules.indexOf(excluded);
+  if (index >= 0) modules.splice(index, 1);
+}
 
 /**
  * Follow the import graph from the entry point.

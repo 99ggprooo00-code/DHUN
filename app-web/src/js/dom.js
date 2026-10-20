@@ -72,12 +72,20 @@ export function delegate(root, eventName, selector, handler) {
   });
 }
 
-/** Moves focus into `element` without scrolling the page out from under the
- *  user. Used when a detail page opens or the full player collapses. */
+/**
+ * Moves focus into `element` without scrolling the page out from under the
+ * user. Used when a screen opens or a dialog closes.
+ *
+ * Only the elements that cannot take focus on their own — a heading, a
+ * container — get `tabindex="-1"`, and it stays: removing the attribute from
+ * the element that currently has focus blurs it in Chromium, so the old
+ * add-focus-remove dance handed focus straight back to `<body>`. Every screen
+ * change ended with focus on the document instead of the new screen's heading.
+ */
 export function focusWithoutScroll(element) {
   if (!element) return;
-  const previous = element.getAttribute("tabindex");
-  if (previous === null) element.setAttribute("tabindex", "-1");
+  if (!element.matches("a[href], button, input, select, textarea, [tabindex]")) {
+    element.setAttribute("tabindex", "-1");
+  }
   element.focus({ preventScroll: true });
-  if (previous === null) element.removeAttribute("tabindex");
 }

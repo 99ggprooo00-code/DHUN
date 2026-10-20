@@ -1,70 +1,104 @@
 # `app-web/` — the DHUN web app
 
-DHUN as a web app: the same shell, design tokens, navigation, shortcuts,
-equaliser, synced-lyrics parser and legal pages as the Android and Windows
-builds, running in a browser with no server of its own. It installs from the
-page (manifest + service worker), opens offline once loaded, and keeps your
-library in browser storage.
+DHUN in a browser tab: the same shell as the Android and Windows builds — the
+glass app bar, the three destinations, the docked mini player, the full player,
+the sheets — running as a static site with **no DHUN server, no account and no
+build-time dependency**. Your likes, playlists, history and settings live in
+this browser's storage.
 
-**What a browser cannot be promised.** Playback depends on YouTube's origin
-answering a cross-origin request from a static page, which no author controls
-(ADR-008 boundary 4). The app tries, and when it is refused it says so on screen
-— with the labelled demo catalogue offered as a last resort rather than passed
-off as a real result.
+The catalogue is **JioSaavn**, read through the public
+[`saavn.dev`](https://saavn.dev) wrapper. That service is community-run, has no
+support contract with this project, and can rate-limit, change or disappear
+(ADR-008: DHUN operates no proxy and no backend for it). When it does not
+answer, the interface says so in the network's own words and falls back to a
+**labelled sample catalogue** whose rows carry no audio — never to a pretend
+result, a simulated queue or invented progress.
 
 ## Run it
 
 ```bash
-node tools/serve.mjs 4173     # http://0.0.0.0:4173/
-npm test                      # the whole suite, no install, no network
-node tools/build.mjs          # copies src/ → dist/ and checks the icons
+node tools/serve.mjs 4173     # http://0.0.0.0:4173/ (serves src/)
+npm test                      # 147 tests; no install, no network
+node tools/build.mjs          # src/ → dist/, then checks every shell entry
 npm run gen:icons             # regenerate js/icons.js from DhunIcons.kt
 ```
 
-There is nothing to install. The module has **no dependencies** — not even
-development ones: the server is `node:http`, the tests are `node --test`, and
-the build is a copy plus a generated-file check.
+The module has **no dependencies** — not even development ones. The server is
+`node:http`, the tests are `node --test`, and the build is a copy plus the
+checks that every module is reachable and every file the service worker names
+exists.
 
-## What it mirrors
+## The modules
 
-Every value and every behaviour traces to a file in `shared/`, and the trace is
-enforced by tests rather than by convention:
-
-| Web | Source |
+| File | What it is |
 |---|---|
-| `src/css/tokens.css` | `design/DhunAppearance.kt`, `DhunTypography.kt`, `DhunShapes.kt`, `DhunSpacing.kt`, `DhunAnimations.kt` |
-| `src/js/icons.js` | `design/DhunIcons.kt` — generated, `--check` in CI |
-| `src/js/nav.js` | `ui/shell/AppNavState.kt`, `DhunShellLayout.kt` |
-| `src/js/views.js` | `ui/home`, `ui/search`, `ui/library`, `ui/settings`, `ui/browse` |
-| `src/js/player-ui.js` | `ui/player/{MiniPlayer,FullPlayer,TransportControls,PlayerSeekBar}.kt` |
-| `src/js/player.js` | `player/QueueManager.kt`, `DhunPlayer` |
-| `src/js/equalizer.js` | `player/equalizer/{EqualizerBands,EqualizerPreset,EqualizerSession}.kt` |
-| `src/js/lyrics.js` | `lyrics/LrcParser.kt` |
+| `js/main.js` | Boot, state, the action table (one delegated listener), the render pass |
+| `js/router.js` | Hash routes as data: parse, format, tab, title, the detail set |
+| `js/api.js` | The JioSaavn seam: timeouts, failure kinds, normalisers, the shelves |
+| `js/demo.js` | The labelled sample catalogue — fictional, silent, clearly marked |
+| `js/library.js` | Likes, playlists, history, settings, storage (`dhun.web.v3`) |
+| `js/player.js` | Queue, repeat, shuffle, stream resolution, media session |
+| `js/player-ui.js` | The full player: transport, scrubber, queue and lyrics tabs |
+| `js/shell.js` | App bar, bottom navigation, navigation rail, mini player |
+| `js/views.js` | Home, Search, Library, album, artist, playlist, collection, Settings, About |
+| `js/components.js` | Cards, rows, rails, states, sheets, notices, the source badge |
+| `js/legal.js`, `js/markdown.js`, `js/data/web-legal.js` | This build's own legal pages |
+| `js/transfer.js` | Export and import of the library as a file |
+| `js/pwa.js` | Service-worker registration, install prompt, update state |
+| `js/shortcuts.js` | The keyboard map the dispatcher and the help sheet share |
+| `js/dom.js` | `html` (escaping template), markup marking, focus helpers |
 
-`scripts/test_app_web.py` (part of app CI step 1, which has no Node) asserts
-the same rules as `tests/tokens.test.mjs`: every colour traces to the Kotlin
-source, no raw hex or px outside `tokens.css`, no external asset, `noindex`,
-a strict CSP, and the honesty notices.
+`src/css/tokens.css` mirrors `design/DhunAppearance.kt`, `DhunTypography.kt`,
+`DhunShapes.kt`, `DhunSpacing.kt` and `DhunAnimations.kt`; `src/js/icons.js` is
+generated from `design/DhunIcons.kt` and checked against it, not hand-edited.
+`js/data/legal-content.js` is the shared legal corpus, generated from
+`legal/*.md`; the web build renders its *own* pages from `data/web-legal.js`,
+because the installed app's documents describe downloads and a SQLite store
+that a browser tab cannot honour.
 
 ## What it does, and what it does not
 
-- **Real streams, with the failures named.** Playback resolves through YouTube
-  Music's anonymous `player` endpoint, or through an endpoint you configure in
-  Settings; there is no DHUN proxy and no DHUN server (ADR-008). A refusal — CORS,
-  an HTTP error, a dead stream — becomes a state on screen, and the row that could
-  not resolve keeps its place with its reason.
-- **A labelled demo catalogue, last.** When nothing real resolves, the app says
-  so and offers labelled fictional rows so the interface can still be used. Demo
-  rows are never presented as search results, and they never produce audio.
-- **No downloads.** ADR-006's device-side store has no browser equivalent, so the
-  Downloads tab is gone rather than stubbed; the Library is playlists, likes and
-  history, all in browser storage.
-- **Offline is the shell, not the music.** The service worker caches the app's own
-  files (every module, in the shell list `tools/build.mjs` checks) so it opens
-  without a network. It does not cache audio.
-- **No pixels proof in CI.** No browser binary exists in the build environment, so
-  the suites drive the app against a DOM stub and assert rendered *output* as
-  strings; live layout checks are a human step.
+- **Real streams, or a named failure.** A track plays if JioSaavn returns a
+  stream URL. A blocked request, a timeout, an HTTP error or a row with no URL
+  becomes a state on screen — with the URL or status the failure carried — and
+  the row keeps its place. Nothing is retried behind the visitor's back, and
+  nothing pretends to buffer.
+- **A labelled sample catalogue, last.** With no upstream the app still draws a
+  usable interface, says which shelves are examples, and gives every sample row
+  `demo: true` with an empty stream. Pressing play on one says why it is silent.
+- **Lyrics are not invented.** The build has no lyric service and no parser. The
+  player's Lyrics tab states that the words are not available here rather than
+  showing an empty pane or a fake line.
+- **No equaliser.** Its bands are a platform audio binding; routing the
+  catalogue's cross-origin audio through a browser Web Audio graph can fail
+  silently and mute the product. The control is absent, not stubbed.
+- **No downloads.** ADR-006's device-side store has no browser equivalent. The
+  Library is playlists, liked songs and history, all in this browser.
+- **Offline is the shell, not the music.** The service worker caches the app's
+  own files (`tools/build.mjs` checks that the shell list is complete) so the app
+  and your library open without a network. Streams are cross-origin and signed;
+  they are neither cached nor offered as a download.
+- **This browser is the account.** Everything is local: no login, no sync, no
+  server copy. Settings can export the library to a file, import it back, and
+  erase it. A private window that cannot store anything is told exactly that.
+- **Nothing is framed.** `frame-ancestors` cannot be sent by a meta tag, so
+  `boot()` refuses to start inside a frame and says why.
+
+## Gates
+
+- `npm test` — 147 assertions over the pure modules: routing round trips,
+  escaping, the queue and repeat/shuffle rules, stream resolution, the library's
+  return shapes, API normalisation, transfer files, every screen's rendered
+  output, CSS class coverage, and the keyboard map against the dispatcher.
+- `scripts/test_app_web.py` — the no-Node half, run in app CI: regions exist in
+  the HTML before the module runs, no raw hex or px outside `tokens.css`, no
+  third-party asset or analytics, `noindex`, no invented lyrics, the sample
+  catalogue is labelled, the service-worker shell is complete.
+- `website/tests/browser.mjs` — the real Chromium run against the deployed
+  `/app/`: boot, source badge, one `h1` per screen, dialog focus and Tab traps,
+  rendered contrast in both themes, axe with zero violations, the local
+  playlist round trip across a reload, the player deep link, and the theme
+  control switching the *document*, not just the chrome.
 
 ## Where it is deployed
 
@@ -75,5 +109,7 @@ the single owner of the Pages artifact (ADR-008 amendment, 2026-10-09 (2);
 
 ## Keyboard
 
-`Space` play/pause · `Shift+→` next · `Shift+←` previous · `/` search ·
-`Esc` close the player, page or sheet, in that order.
+`Space` play/pause · `N` / `P` next / previous · `→` / `←` seek five seconds ·
+`↑` / `↓` volume · `M` mute · `S` shuffle · `R` repeat · `/` search · `?` this
+list · `Esc` closes a sheet, then the player. Keys are never taken from a text
+field and never from a combination the browser owns.
