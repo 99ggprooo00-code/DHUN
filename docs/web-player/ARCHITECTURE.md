@@ -110,8 +110,14 @@ rewrite rules: `#/album/123` is a URL that works on GitHub Pages, and `router.js
   sentence a visitor reads. The interface shows that sentence first and the
   underlying detail after it, labelled "Technical detail".
 
-The API is `https://saavn.dev/api`, a community wrapper around JioSaavn with no
-support contract with this project. That is why the failure taxonomy exists: the
+The API is JioSaavn, read through three community deployments of the same
+open-source wrapper (`API_SOURCES` in `api.js`: `saavn.dev`, `saavn.sumit.co`,
+`saavnx.vercel.app`), none with a support contract with this project.
+`createRacer()` tries the instance that answered last, alone; if it fails, the
+others are raced and the winner becomes the remembered instance. A total failure
+carries a per-host record (`describeAttempts`) into the sentence a visitor
+reads. Every instance must also appear in the CSP, which
+`scripts/test_app_web.py` asserts by reading `api.js`. That is why the failure taxonomy exists: the
 service can rate-limit, change shape or disappear, and the app has to survive
 each of those as a state rather than as a blank screen. The CSP names exactly
 that origin and `*.saavncdn.com`, so a stray request to anywhere else fails

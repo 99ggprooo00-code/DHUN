@@ -18,7 +18,7 @@ table cannot quietly describe a build that has moved on.
 | Claim | Evidence |
 |---|---|
 | The build assembles from the sources, and every module is reachable from `main.js` | `app-web/tools/build.mjs` — it fails on an unreachable module or a shell entry that is not in the build |
-| 147 assertions over the pure modules pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
+| 153 assertions over the pure modules pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
 | The web build is a real app, not a preview: regions before the module runs, a strict CSP, `noindex`, no third-party asset, no downloads surface, a labelled sample catalogue | `scripts/test_app_web.py` |
 | Every screen renders one `h1`, resets focus to it after navigation, and titles the document | `website/tests/browser.mjs` (`entity outline`, `/app/ dialog focus`) |
 | Rendered contrast meets 4.5:1 / 3:1 on every visible line, in both themes | `website/tests/browser.mjs` (`/app/ contrast`) |
@@ -29,6 +29,7 @@ table cannot quietly describe a build that has moved on.
 | The player deep link says what it is waiting for, then opens the player when a track starts | `website/tests/browser.mjs` (`player deep link`) |
 | The appearance control themes the document, not just the chrome | `website/tests/browser.mjs` (`appearance`), `app-web/src/css/tokens.css` |
 | The catalogue seam turns a timeout, an offline browser and an HTTP error into distinct sentences, with the technical detail labelled | `app-web/src/js/api.js`, `app-web/tests/api.test.mjs` |
+| A dead instance is skipped, the one that answered is remembered, and a total failure names every host | `app-web/src/js/api.js` (`createRacer`, `describeAttempts`), `app-web/tests/api.test.mjs` (six failover tests), `scripts/test_app_web.py` (the CSP must name every instance `api.js` requests) |
 | A row with no stream is refused in words rather than played silently | `app-web/src/js/player.js`, `app-web/src/js/player-ui.js` |
 | The site and `/app/` deploy together from one workflow, and the served bytes are re-read after each publish | `.github/workflows/website.yml`, `scripts/website_smoke.py` |
 | These documents describe the build that exists | `scripts/web_player_docs.py` |
@@ -40,10 +41,11 @@ table cannot quietly describe a build that has moved on.
   but no author of this repository can state from evidence that the deployed page
   produced sound. A browser check on a runner cannot hear it either. Treat this as
   the release gate until a person records what happened.
-- **The live catalogue from the deployed origin.** `saavn.dev` is reachable from
-  CI in principle, but the browser run records the source badge it finds; it has
-  never recorded a live response from the deployed page. A CORS refusal, a 429 or
-  an empty shelf is a finding to record, not a success to assume.
+- **The live catalogue from the deployed origin.** Three instances are configured
+  and the failover is unit-tested against a fake network, but the browser run
+  records the source badge it finds; it has never recorded a live response from
+  the deployed page. A CORS refusal, a 429 or an empty shelf is a finding to
+  record, not a success to assume.
 - **Browsers other than the one CI launches.** The measurements come from one
   Chromium build on Linux. Safari, Firefox and an Android browser on a phone are
   untested.
@@ -64,7 +66,7 @@ verified and this file names the evidence; an unticked box means it was not.
 - [x] **The interface ships and is reachable** — the site and `/app/` are live at
   `https://99ggprooo00-code.github.io/DHUN/`, and `scripts/website_smoke.py`
   re-reads the served bytes after every publish.
-- [x] **The code is unit-tested** — `cd app-web && npm test` → 147 pass;
+- [x] **The code is unit-tested** — `cd app-web && npm test` → 153 pass;
   `python3 -m unittest discover -s scripts -p 'test_*.py'` → 459 tests OK, the
   web app's source-level rules included.
 - [x] **The rendered pages are measured in a real browser** — `website/tests/browser.mjs`
@@ -72,7 +74,7 @@ verified and this file names the evidence; an unticked box means it was not.
 - [x] **No paid infrastructure and no DHUN server** — static GitHub Pages, one
   third-party API called from the tab, no function, no database, no proxy.
 - [x] **No tracking** — no analytics, telemetry or crash reporting; the CSP names
-  two origins and both are the catalogue's.
+  three catalogue deployments and its CDN, and nothing else.
 - [x] **The limits are visible in the product** — the source badge, the sample
   catalogue notice, the failure states, `Settings → Catalogue`, and
   [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md).

@@ -22,6 +22,42 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The catalogue has three instances, so one host going down is no longer the whole app (2026-10-20, session `arena/a9390ecb-dhun`)
+
+The deployed page said **“The JioSaavn API could not be reached from this
+network, so these are example rows — nothing in this list has audio.”** That
+sentence was true of one hostname, `saavn.dev`, and it was the entire catalogue:
+when that community deployment was down, rate-limiting or refusing the
+cross-origin request, the app had nothing and said so, usefully but finally. A
+free community API is down often; one hostname is a bet, not a source.
+
+- **Three deployments, one contract.** `api.js` now keeps an ordered list
+  (`API_SOURCES`): `saavn.dev`, `saavn.sumit.co` and `saavnx.vercel.app` — all
+  community deployments of the same MIT wrapper, all speaking the paths and
+  envelope the build already understood. The instance that answered last is
+  remembered in the library's settings and tried first, alone.
+- **Failover is shared, not per-request.** If it fails, the rest are raced once;
+  the seven Home shelves that fail together wait on that one switch instead of
+  starting seven races. The winner is adopted for everything after it, and a dead
+  host stops being asked.
+- **A failure names every host.** `describeAttempts()` turns the per-host record
+  into `saavn.dev — HTTP 429 · saavn.sumit.co — could not be reached`, which the
+  sample notice, the error body and the technical detail all use. The sample
+  notice also gained a **“Try the catalogue again”** action, so recovering does
+  not require a reload.
+- **Settings shows the chain**, host by host, with what each answered on the last
+  request — the record, not a claim.
+- **The CSP, the privacy page and the site name all three hosts.** The gate now
+  reads `API_SOURCES` out of `api.js` and fails if any instance is missing from
+  `connect-src`, which is how a fourth host could otherwise be added in code and
+  silently blocked by the browser.
+
+Verified locally: `npm test` **154 pass / 0 fail** (five failover tests,
+including the shared-switch one), the Python suite **456 OK**, the site's honesty
+contract **OK on 4 pages**, and `docs/web-player` gates green. The browser job
+runs in CI, which is the only place with a network and a Chromium in this
+environment.
+
 ### Four things a visitor would have seen (2026-10-20, session `arena/3e7baa1c-dhun`)
 
 All four were found by looking at the app rather than measuring it, and each is

@@ -7,10 +7,13 @@ is an aspiration.
 ## The catalogue
 
 - **It is a community wrapper, not an official API.** The app reads JioSaavn
-  through `https://saavn.dev/api`, which this project does not operate and has no
-  agreement with. It can rate-limit, change shape, or disappear. When it does,
-  the app shows what happened (a status, a timeout, a refused request) in the
-  service's own words, labelled as technical detail, and offers a retry.
+  through three deployments of the same open-source project — `saavn.dev`,
+  `saavn.sumit.co`, `saavnx.vercel.app` — none of which this project operates or
+  has an agreement with. Any of them can rate-limit, change shape, or disappear,
+  and all of them can be down at once because they share upstreams. The app
+  shows what each host answered, labelled as technical detail, and offers a
+  retry. Three hosts reduce the chance of a dead catalogue; they do not make it
+  impossible.
 - **Some networks cannot reach it.** A blocked origin, a corporate proxy or an
   ad-blocker produces a failure the browser reports as a generic fetch error. The
   sentence the app writes names the request it made, because the browser's own

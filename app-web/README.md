@@ -6,19 +6,20 @@ the sheets — running as a static site with **no DHUN server, no account and no
 build-time dependency**. Your likes, playlists, history and settings live in
 this browser's storage.
 
-The catalogue is **JioSaavn**, read through the public
-[`saavn.dev`](https://saavn.dev) wrapper. That service is community-run, has no
-support contract with this project, and can rate-limit, change or disappear
-(ADR-008: DHUN operates no proxy and no backend for it). When it does not
-answer, the interface says so in the network's own words and falls back to a
-**labelled sample catalogue** whose rows carry no audio — never to a pretend
-result, a simulated queue or invented progress.
+The catalogue is **JioSaavn**, read through community deployments of the same
+open-source wrapper: `saavn.dev`, `saavn.sumit.co` and `saavnx.vercel.app`, tried
+in that order (ADR-008: DHUN operates no proxy and no backend for any of them).
+Each is a free community deployment with no support contract, so one hostname is
+not a source — the app remembers the instance that answered and moves on when it
+stops. When none answers, the interface names every host and what each said, and
+falls back to a **labelled sample catalogue** whose rows carry no audio — never
+to a pretend result, a simulated queue or invented progress.
 
 ## Run it
 
 ```bash
 node tools/serve.mjs 4173     # http://0.0.0.0:4173/ (serves src/)
-npm test                      # 147 tests; no install, no network
+npm test                      # 153 tests; no install, no network
 node tools/build.mjs          # src/ → dist/, then checks every shell entry
 npm run gen:icons             # regenerate js/icons.js from DhunIcons.kt
 ```
@@ -58,6 +59,11 @@ that a browser tab cannot honour.
 
 ## What it does, and what it does not
 
+- **A catalogue that survives one host going down.** `api.js` keeps an ordered
+  list (`API_SOURCES`); the remembered instance is tried first and alone, the
+  rest are raced only if it fails, and the winner is remembered. A failure
+  carries every host's answer, so "the catalogue could not be reached" says which
+  host said what.
 - **Real streams, or a named failure.** A track plays if JioSaavn returns a
   stream URL. A blocked request, a timeout, an HTTP error or a row with no URL
   becomes a state on screen — with the URL or status the failure carried — and
@@ -86,7 +92,7 @@ that a browser tab cannot honour.
 
 ## Gates
 
-- `npm test` — 147 assertions over the pure modules: routing round trips,
+- `npm test` — 153 assertions over the pure modules: routing round trips,
   escaping, the queue and repeat/shuffle rules, stream resolution, the library's
   return shapes, API normalisation, transfer files, every screen's rendered
   output, CSS class coverage, and the keyboard map against the dispatcher.

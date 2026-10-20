@@ -78,7 +78,8 @@ visible markup.
 
 ## When the catalogue disagrees with this build
 
-`saavn.dev` is community-run. If a field disappears, the fix belongs in
+The catalogue instances are community-run and independent of this project. If a
+field disappears, the fix belongs in
 `normalise*()` in `js/api.js` — the rest of the app reads the normalised shape
 and should not learn about the API's own JSON. If the endpoint changes, the
 `ENDPOINTS` table is the only place to edit, and the failure text a visitor sees

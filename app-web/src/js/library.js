@@ -161,6 +161,10 @@ export function normaliseLibrary(raw) {
   settings.repeat = ["off", "all", "one"].includes(settings.repeat) ? settings.repeat : "off";
   settings.shuffle = Boolean(settings.shuffle);
   settings.volume = clampNumber(settings.volume, 0, 1, DEFAULT_SETTINGS.volume);
+  // Which catalogue instance answered last visit. Free text in storage is not
+  // trusted: an id that is not in the current list is dropped, and the app falls
+  // back to the first instance rather than asking a host it never shipped.
+  settings.sourceId = typeof settings.sourceId === "string" ? settings.sourceId.slice(0, 40) : "";
 
   const recentSearches = [...new Set(safeArray(raw.recentSearches).map((entry) => String(entry ?? "").trim()))]
     .filter(Boolean)

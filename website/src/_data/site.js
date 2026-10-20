@@ -75,7 +75,7 @@ export default {
   ctaPrimary: { href: "/app/", label: "Open the web app" },
   ctaSecondary: { href: REPO, label: "Source on GitHub", external: true },
   ctaNote:
-    "DHUN's web app runs at /app/ — the same glass shell, navigation and keyboard shortcuts as the Android and Windows builds, installable from this page and usable offline once it has loaded, with your likes, playlists and history kept in this browser. It reads JioSaavn through the public saavn.dev API; when that service refuses, rate-limits or cannot be reached, the app says so on screen and falls back to a labelled sample catalogue whose rows carry no audio.",
+    "DHUN's web app runs at /app/ — the same glass shell, navigation and keyboard shortcuts as the Android and Windows builds, installable from this page and usable offline once it has loaded, with your likes, playlists and history kept in this browser. It reads JioSaavn through three community deployments of the same open-source API and moves to the next when one refuses; when none answers it names what each host said and falls back to a labelled sample catalogue whose rows carry no audio.",
   ctaNoteSource:
     "ADR-008 amendment 2026-10-09 (2) (deployment); app-web/src (service worker, keyboard shortcuts, api.js)",
 
@@ -268,7 +268,7 @@ export default {
         href: `${REPO}/pull/189`,
         title: "The web app was rebuilt from scratch, and it reads JioSaavn instead of failing on YouTube.",
         detail:
-          "The browser build had been a mirror of the Android code, and its source was YouTube Music — an origin that refuses a browser's player request often enough that the app spent most of its life showing an error it could not act on. It is now its own build: twenty dependency-free modules, the DHUN glass shell, a catalogue seam over the public saavn.dev API, a library in this browser and a service worker that caches the shell and no audio. The equaliser, the lyric service and the Downloads screen are gone rather than stubbed — each says so where a visitor would look for it. Nothing promises audio that has been heard: the status page still names that as the release gate.",
+          "The browser build had been a mirror of the Android code, and its source was YouTube Music — an origin that refuses a browser's player request often enough that the app spent most of its life showing an error it could not act on. It is now its own build: twenty dependency-free modules, the DHUN glass shell, a catalogue seam over three community JioSaavn API deployments that fails over between them, a library in this browser and a service worker that caches the shell and no audio. The equaliser, the lyric service and the Downloads screen are gone rather than stubbed — each says so where a visitor would look for it. Nothing promises audio that has been heard: the status page still names that as the release gate.",
       },
       {
         pr: "PR #188",

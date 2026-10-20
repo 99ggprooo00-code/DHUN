@@ -11,7 +11,8 @@
  * Every factual sentence below is traceable to code in `src/js`:
  *
  *   localStorage, the storage key, export/import   → library.js, transfer.js
- *   saavn.dev, *.saavncdn.com, the API paths        → api.js, index.html (CSP)
+ *   saavn.dev, saavn.sumit.co, saavnx.vercel.app,
+ *   *.saavncdn.com, the API paths                  → api.js (API_SOURCES), index.html (CSP)
  *   shell-only service-worker cache                 → sw.js
  *   the absent lyrics                               → player-ui.js
  *   the sample catalogue's own label                → demo.js
@@ -52,11 +53,15 @@ every browser. There is no service-level promise and no support desk. **[source]
 
 ## Where the music comes from
 
-Search, albums, artists and playlists are answered by the public JioSaavn API at
-\`saavn.dev\`; audio and artwork are fetched from \`*.saavncdn.com\`. DHUN
-operates neither service and cannot control their availability, their catalogue
-or their policies. When the API cannot be reached, the app says so and shows a
-clearly labelled sample catalogue whose rows have no audio. **[source]**
+Search, albums, artists and playlists are answered by the public JioSaavn API,
+which this build reads through three community deployments of the same
+open-source wrapper — \`saavn.dev\`, \`saavn.sumit.co\` and
+\`saavnx.vercel.app\` — tried in that order, with the one that answered
+remembered for next time. Audio and artwork are fetched from
+\`*.saavncdn.com\`. DHUN operates none of these services and cannot control
+their availability, their catalogue or their policies. When none answers, the app
+says which host said what and shows a clearly labelled sample catalogue whose
+rows have no audio. **[source]**
 
 ## Independence
 
@@ -136,7 +141,7 @@ so and keeps working for the visit instead of pretending the library was saved.
 
 | Recipient | What the page sends | When |
 | --- | --- | --- |
-| \`saavn.dev\` (JioSaavn API) | Search terms; album, artist, playlist and song identifiers | Searching, browsing, resolving a stream |
+| \`saavn.dev\`, \`saavn.sumit.co\`, \`saavnx.vercel.app\` (JioSaavn API deployments) | Search terms; album, artist, playlist and song identifiers — sent only to the deployment being tried | Searching, browsing, resolving a stream |
 | \`*.saavncdn.com\` (JioSaavn CDN) | Media and artwork requests, which include your IP address | Showing artwork and playing a track |
 
 Every request also carries the ordinary headers a browser sends, including your
@@ -243,7 +248,7 @@ the same terms. **[source]**
 
 | Service | What it is used for | Terms |
 | --- | --- | --- |
-| JioSaavn public API (\`saavn.dev\`) | search, albums, artists, playlists, stream URLs | the API's operator's own terms apply; DHUN does not control the service |
+| JioSaavn public API deployments (\`saavn.dev\`, \`saavn.sumit.co\`, \`saavnx.vercel.app\`) | search, albums, artists, playlists, stream URLs | each deployment's operator's own terms apply; DHUN controls none of them |
 | JioSaavn CDN (\`*.saavncdn.com\`) | audio and artwork delivery | the CDN operator's own terms apply |
 
 This build makes no claim that either service permits every use; it asks them
