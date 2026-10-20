@@ -48,9 +48,17 @@ APPEARANCE_KT = (
 ICONS_KT = REPO_ROOT / "shared" / "src" / "commonMain" / "kotlin" / "dev" / "dhun" / "design" / "DhunIcons.kt"
 
 # Files that are generated rather than written: `icons.js` comes from the Kotlin
-# enum, `data/sample-catalog.js` from the demo fixture. They obey the same rules
-# as hand-written modules except where a rule is about authorship.
+# enum. They obey the same rules as hand-written modules except where a rule is
+# about authorship.
 GENERATED = {"icons.js"}
+
+# `data/legal-content.js` is the Android/desktop legal corpus, which
+# `scripts/gen_legal_content.py` emits into this tree so the app's own gate can
+# prove it is current. It is deliberately **not** part of the web build: the
+# browser has its own pages (`data/web-legal.js`) because the installed app's
+# documents describe downloads, a SQLite database and YouTube. Both gates that
+# scan `src/js` know it is not this app's code.
+NOT_PART_OF_THE_WEB_BUILD = {"data/legal-content.js"}
 
 
 def _read(path: Path) -> str:
@@ -59,9 +67,10 @@ def _read(path: Path) -> str:
 
 def _js_sources() -> dict[str, str]:
     return {
-        file.name: _read(file)
+        file.relative_to(JS_DIR).as_posix(): _read(file)
         for file in sorted(JS_DIR.rglob("*.js"))
         if file.name not in GENERATED
+        and file.relative_to(SRC / "js").as_posix() not in NOT_PART_OF_THE_WEB_BUILD
     }
 
 
@@ -98,7 +107,7 @@ def _tracked_under(*paths: str) -> list[str] | None:
 
 def _handled_actions(main_js: str) -> set[str]:
     """The action names `main.js` answers, from its handler map."""
-    start = main_js.index("const handlers = {")
+    start = main_js.index("const actions = {")
     body = main_js[start : main_js.index("\n  };", start)]
     pattern = re.compile(
         r"\n\s{4}(?:\"([a-z][a-z0-9-]*)\"|'([a-z][a-z0-9-]*)'|([a-z][a-z0-9-]*))\s*:\s*(?:async\s*)?\("
@@ -223,10 +232,15 @@ class IsARealWebAppNotAPreview(unittest.TestCase):
         """
         self.assertRegex(
             self.main_js,
-            r"(?m)^boot\(\);\s*$",
-            "main.js does not call boot() at top level — the browser loads the "
-            "module and then gets an empty #app",
+            r"(?m)^\s{2,}boot\(\);$",
+            "main.js does not call boot() at module scope — the browser loads "
+            "the module and then gets an empty #app",
         )
+        # The call is guarded so the test runner can import the module's pure
+        # helpers without a document. The guard must still fire on the real
+        # page, and the page is the one that has `#app`.
+        self.assertIn('document?.querySelector?.("#app")', self.main_js)
+        self.assertIn("DOMContentLoaded", self.main_js)
 
     def test_a_strict_content_security_policy_is_declared(self) -> None:
         policy = re.search(r'http-equiv="Content-Security-Policy"\s*\n?\s*content="([^"]*)"', self.index_html)
@@ -258,14 +272,13 @@ class IsARealWebAppNotAPreview(unittest.TestCase):
         or the removal is a downgrade. It holds in `boot()`, before the app
         builds anything at all.
         """
-        platform_js = _read(JS_DIR / "platform.js")
         views_js = _read(JS_DIR / "views.js")
-        self.assertIn("export function isFramed(", platform_js)
-        self.assertIn("isFramed", self.main_js, "main.js never asks whether it is framed")
+        self.assertIn("export function isFramed(", self.main_js)
+        self.assertIn("isFramed(win)", self.main_js, "main.js never asks whether it is framed")
         self.assertIn("views.framedRefusal()", self.main_js)
         self.assertIn("export function framedRefusal(", views_js)
         guard = self.main_js.index("isFramed(win)")
-        for later in ("createSettingsStore(", "createSourceManager(", "root.innerHTML = html"):
+        for later in ("createStorage(", "createSource(", "root.innerHTML = html`${views.framedRefusal()}"):
             self.assertLess(
                 guard,
                 self.main_js.index(later),
@@ -283,10 +296,15 @@ class IsARealWebAppNotAPreview(unittest.TestCase):
         it.
         """
         app_css = _read(CSS_DIR / "app.css")
-        block = re.search(r"\.dhun-rail \.dhun-nav-item \{([^}]*)\}", app_css)
+        tokens = _read(CSS_DIR / "tokens.css")
+        self.assertIn("--dhun-space-navigation-rail-width:", tokens, "the rail has no width of its own")
+        rail = re.search(r"\.dhun-rail-nav \{\s*display: none;([^}]*)\}", app_css)
+        self.assertIsNotNone(rail, "app.css has no rail-nav rule")
+        self.assertIn("width: var(--dhun-space-navigation-rail-width)", rail.group(1))
+        block = re.search(r"\.dhun-rail-nav__item \{([^}]*)\}", app_css)
         self.assertIsNotNone(block, "app.css has no rule pinning the rail's items to the rail")
         self.assertIn("width: 100%", block.group(1))
-        label = re.search(r"\.dhun-rail \.dhun-nav-item__label \{([^}]*)\}", app_css)
+        label = re.search(r"\.dhun-rail-nav__label \{([^}]*)\}", app_css)
         self.assertIsNotNone(label, "the rail's labels need a rule of their own")
         self.assertIn("white-space: normal", label.group(1), "a rail label wraps rather than clipping")
 
@@ -350,6 +368,13 @@ class IsARealWebAppNotAPreview(unittest.TestCase):
         listed = set(re.findall(r'"\./([^"]*)"', shell))
         for file in sorted(JS_DIR.rglob("*.js")):
             relative = file.relative_to(SRC).as_posix()
+            if relative.removeprefix("js/") in NOT_PART_OF_THE_WEB_BUILD:
+                self.assertNotIn(
+                    relative,
+                    listed,
+                    f"{relative} is the app's legal corpus and must not ship in the web build",
+                )
+                continue
             self.assertIn(relative, listed, f"{relative} is not cached by the service worker")
         for entry in listed:
             target = SRC / (entry if entry else "index.html")
@@ -413,10 +438,15 @@ class DoesNotSellWhatABrowserCannotDo(unittest.TestCase):
         self.assertIsNotNone(tabs, "LIBRARY_TABS is missing")
         self.assertNotIn("downloads", tabs.group(1), "Downloads cannot be a library tab in a browser")
         self.assertIn("playlists", tabs.group(1))
-        self.assertIn("liked", tabs.group(1))
+        self.assertIn("likes", tabs.group(1))
         self.assertIn("history", tabs.group(1))
-        # A bookmark to the screen that used to exist still lands somewhere real.
-        self.assertIn('#/library/downloads', router, "the old link must redirect, not 404")
+        # A bookmark to the screen that used to exist still lands somewhere real:
+        # an unknown library tab resolves to Playlists rather than to nothing.
+        self.assertRegex(
+            router,
+            r'LIBRARY_TABS\.includes\(tab\) \? tab : "playlists"',
+            "an unknown library tab must fall back to a real screen",
+        )
 
     def test_no_cache_budget_setting_survives(self) -> None:
         for name, body in _js_sources().items():
@@ -434,24 +464,38 @@ class DoesNotSellWhatABrowserCannotDo(unittest.TestCase):
             )
 
     def test_the_demo_catalogue_is_labelled_as_demo(self) -> None:
+        """Fictional rows are announced, and they never carry audio.
+
+        The sample catalogue exists so a blocked network shows the shape of the
+        app instead of an empty page. Both halves of that bargain are asserted:
+        its rows say what they are, and they are declared with an empty stream
+        so a press cannot produce a fake success.
+        """
+        demo = _read(JS_DIR / "demo.js")
+        self.assertIn("Sample catalogue", demo)
+        self.assertIn("carry no audio", demo)
+        self.assertRegex(demo, r'stream:\s*""', "a demo row must not invent a stream URL")
+        self.assertIn("demo: true", demo)
         views = _read(JS_DIR / "views.js")
-        self.assertIn("Demo catalogue", views)
-        self.assertIn("no audio", views)
-        source = _read(JS_DIR / "source.js")
-        # Stream resolution never falls back to demo rows: a fictional track
-        # must fail loudly, not play silently as a success.
-        self.assertRegex(
-            source,
-            r"resolveStream:\s*\(videoId\)\s*=>\s*run\([^;]*allowDemo:\s*false",
-            "stream resolution must not fall back to the demo catalogue",
-        )
+        self.assertIn("Sample catalogue", views, "the screen never repeats the warning the data carries")
+        # Pressing play on a demo row says so; it does not start a track.
+        player = _read(JS_DIR / "player.js")
+        self.assertIn("track?.demo", player, "pressing play on a sample row must say what it is")
 
     def test_a_failed_stream_says_why(self) -> None:
-        source = _read(JS_DIR / "source.js")
-        for kind in ("network-or-cors", "timeout", "http", "shape"):
+        source = _read(JS_DIR / "api.js")
+        for kind in ("offline", "timeout", "http", "shape", "network"):
             self.assertIn(kind, source, f"the failure classifier lost the {kind} case")
-        views = _read(JS_DIR / "views.js")
-        self.assertIn("dhun-row__failure", views, "a row that could not resolve keeps its place and its reason")
+        player = _read(JS_DIR / "player.js")
+        self.assertIn("error", player, "the player has no error state")
+        ui = _read(JS_DIR / "player-ui.js")
+        self.assertIn("errorState(", ui, "the full player draws no error state")
+        self.assertIn("vm.error", ui, "the player's own error never reaches the screen")
+        # A failure is never silent: the full player draws it, and so does the
+        # dock, so a visitor who pressed play and never opened the player still
+        # sees why nothing happened.
+        self.assertIn("miniError", _read(JS_DIR / "main.js"), "the dock never reports a playback failure")
+        self.assertIn("miniError", _read(JS_DIR / "shell.js"))
 
 
 @unittest.skipUnless(APP_WEB.is_dir(), "app-web/ does not exist")
@@ -461,53 +505,88 @@ class HonestyIsInTheRenderedCopy(unittest.TestCase):
     Every claim asserted here is asserted twice: once as copy the visitor can
     read, and once as the code that makes the copy true. A disclosure that
     outruns the implementation is the failure mode this class exists to catch.
+
+    The copy lives in `data/web-legal.js`, not in the Android corpus. The
+    installed app's pages describe downloads, SQLite and YouTube; rendering
+    them in a browser tab would state things this build cannot do. The shared
+    corpus is still generated and tested by `test_legal_content.py` for the
+    app; the web build ships these pages instead.
     """
 
     @classmethod
     def setUpClass(cls) -> None:
         cls.views = _read(JS_DIR / "views.js")
-        cls.legal = _read(JS_DIR / "data" / "legal-content.js")
+        cls.legal = _read(JS_DIR / "data" / "web-legal.js")
         cls.main = _read(JS_DIR / "main.js")
+        cls.player_ui = _read(JS_DIR / "player-ui.js")
+        cls.api = _read(JS_DIR / "api.js")
+        cls.index_html = _read(SRC / "index.html")
 
     def test_the_app_states_it_runs_no_server(self) -> None:
-        self.assertIn("no DHUN server", self.views)
+        self.assertIn("no DHUN server", self.legal)
         self.assertIn("no DHUN-operated server", self.legal)
+        # The pages are only truthful if they are the ones the screen renders.
+        self.assertIn("WEB_LEGAL_DOCUMENTS", self.main)
+        self.assertIn("webLegalById", self.main)
 
     def test_the_app_states_it_is_not_affiliated_with_google(self) -> None:
-        body = " ".join(self.views.split())
-        self.assertIn("not affiliated with Google", body)
+        """The catalogue's operator, YouTube and Google are all named."""
+        body = " ".join(self.legal.split())
+        self.assertIn("not affiliated with", body)
+        for name in ("JioSaavn", "YouTube", "Google"):
+            self.assertIn(name, body, f"the independence notice never names {name}")
 
-    def test_lyrics_traffic_is_disclosed_with_a_real_off_switch(self) -> None:
-        """LRCLIB is named, its endpoint is the one the code calls, and the
-        request sits behind the setting the page names."""
-        self.assertIn("LRCLIB", self.legal)
-        self.assertIn("lrclib.net", self.legal)
-        self.assertIn('const LYRICS_ENDPOINT = "https://lrclib.net/api"', self.main)
-        guard = self.main.index('if (!settings.get("lyricsEnabled"))')
-        request = self.main.index("fetchImpl(", guard)
-        self.assertLess(guard, request, "the lyrics request is not gated by the setting the page names")
-        self.assertIn('credentials: "omit"', self.main, "a lyrics request that sends credentials contradicts the page")
+    def test_lyrics_are_not_invented_and_no_lyric_service_is_called(self) -> None:
+        """There is no lyric endpoint in this build, and the panel says so.
+
+        The previous build fetched lyrics from LRCLIB behind a setting. This
+        one has no lyric source at all: the catalogue's API exposes a
+        `hasLyrics` flag but no text. The honest interface is therefore an
+        explanation, not an empty pane — and no request may quietly reappear.
+        """
+        body = " ".join(self.player_ui.split())
+        self.assertIn("Lyrics are not available in this build.", body)
+        self.assertIn("no lyric text", body)
+        self.assertNotIn("lrclib", (self.api + self.main).lower(), "no lyric service is called by this build")
+        self.assertNotRegex(self.api, r"/lyrics", "the API seam has no lyric path")
 
     def test_no_request_carries_the_visitor_anywhere_but_a_named_service(self) -> None:
-        """No DHUN-operated host. Every literal origin in the app source is one of
-        the services the bundled pages name."""
-        origins = set(re.findall(r"https://([a-z0-9.-]+)", self.main + _read(JS_DIR / "source.js")))
-        self.assertNotIn("dhun", " ".join(origins).lower())
+        """No DHUN-operated host. Every literal origin is a disclosed service.
+
+        This is asserted twice: in the source, and in the Content-Security-Policy
+        that the browser enforces. A source scan alone would pass a module that
+        builds its origin at run time.
+        """
+        sources = "\n".join(_js_sources().values())
+        origins = set(re.findall(r"https://([a-z0-9*.-]+)", sources + self.index_html))
+        self.assertNotIn("dhun", " ".join(origins).lower(), "a DHUN-operated origin would be a backend")
         for origin in origins:
             self.assertTrue(
-                origin.endswith(("youtube.com", "googlevideo.com", "googleapis.com", "ytimg.com", "lrclib.net", "picsum.photos")),
+                origin.endswith(("saavn.dev", "saavncdn.com", "github.com")),
                 f"{origin} is not a service the bundled pages disclose",
             )
+        # github.com appears only as a link in the support copy, never as a
+        # fetch target; `connect-src` is the enforceable half.
+        policy = re.search(r"connect-src ([^;]*)", self.index_html)
+        self.assertIsNotNone(policy, "the policy declares no connect-src")
+        connect = policy.group(1)
+        self.assertIn("https://saavn.dev", connect)
+        self.assertIn("https://*.saavncdn.com", connect)
+        self.assertNotIn("github", connect)
 
     def test_the_source_of_every_row_is_on_screen(self) -> None:
-        self.assertIn("dhun-source", self.views, "the source badge disappeared from the interface")
-        for kind, label in (("innertube", "YouTube Music"), ("endpoint", "Your endpoint"), ("demo", "Demo data")):
-            self.assertIn(kind, self.views)
-            self.assertIn(label, self.views)
+        """The badge exists, and it names the two possible catalogues."""
+        self.assertIn("dhun-source-badge", _read(JS_DIR / "components.js"))
+        self.assertIn("sourceBadge", self.views, "the source badge disappeared from the interface")
+        self.assertIn("JioSaavn", self.main)
+        self.assertIn("Sample catalogue", self.main)
+        self.assertIn("Sample catalogue", _read(JS_DIR / "demo.js"))
 
-    def test_a_browser_without_web_audio_is_told_so(self) -> None:
-        self.assertIn("no Web Audio API", self.views)
-        self.assertIn("not saving your library", self.views)
+    def test_a_browser_that_refuses_storage_is_told_so(self) -> None:
+        """A private window must not silently pretend the library was saved."""
+        self.assertIn("not saving data", self.main)
+        self.assertIn("storage.persistent", self.views)
+        self.assertIn("persistent", _read(JS_DIR / "library.js"))
 
     def test_nothing_claims_the_android_or_desktop_builds_ship_here(self) -> None:
         for phrase in ("Download the app", "Install the APK", "Get it on Google Play"):
@@ -539,13 +618,19 @@ class IconsMatchTheAppSource(unittest.TestCase):
         self.assertEqual([], missing, f"icons used but not in DhunIcons.kt: {missing}")
 
     def test_the_tab_icon_map_only_names_real_icons(self) -> None:
+        """Every navigation tab draws an icon that exists in DhunIcons.kt.
+
+        The map used to live in `main.js` as `TAB_ICON`; the rebuild made it
+        part of `NAV_TABS`, so the check follows the data rather than the old
+        variable name.
+        """
         generated = _read(JS_DIR / "icons.js")
         declared = set(re.findall(r"^\s{2}([A-Z][A-Za-z0-9_]*): \"", generated, re.M))
-        main_js = _read(JS_DIR / "main.js")
-        match = re.search(r"TAB_ICON\s*=\s*(?:Object\.freeze\()?\{(.*?)\}", main_js, re.S)
-        self.assertIsNotNone(match, "the tab→icon map is missing")
-        tab_icons = set(re.findall(r'"([A-Z][A-Za-z0-9_]*)"', match.group(1)))
-        self.assertTrue(tab_icons, "the tab→icon map is empty")
+        router = _read(JS_DIR / "router.js")
+        match = re.search(r"NAV_TABS = Object\.freeze\(\[(.*?)\]\)", router, re.S)
+        self.assertIsNotNone(match, "the navigation tab list is missing")
+        tab_icons = set(re.findall(r'icon: "([A-Z][A-Za-z0-9_]*)"', match.group(1)))
+        self.assertGreaterEqual(len(tab_icons), 3, "the navigation is missing tabs")
         self.assertEqual(set(), tab_icons - declared, f"tab icons not in DhunIcons.kt: {sorted(tab_icons - declared)}")
 
 

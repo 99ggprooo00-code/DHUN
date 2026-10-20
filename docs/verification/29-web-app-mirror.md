@@ -6,6 +6,16 @@
 > and surfaces refusals, removes the device-only surfaces, and is described in
 > the ADR-008 amendment of 2026-10-16 and `app-web/README.md`. The measurements
 > below remain true for the build they describe.
+>
+> **Superseded again, 2026-10-20.** `app-web/` was rebuilt from scratch as the
+> web build rather than a mirror of the Compose code: new modules
+> (`api.js`, `library.js`, `demo.js`, `transfer.js`, `legal.js`, `shell.js`),
+> JioSaavn through the public `saavn.dev` wrapper, this build's own legal pages.
+> `equalizer.js`, `lyrics.js`, `source.js`, `storage.js`, `platform.js` and the
+> old demo catalogue no longer exist. The row-by-row table below is therefore a
+> record of the 2026-10-09 build, not a description of the current one; the
+> current app is described in `app-web/README.md` and measured by
+> `app-web/tests/`, `scripts/test_app_web.py` and `website/tests/browser.mjs`.
 
 Session `arena/967513fd-dhun`, 2026-10-09. Branch point and GitHub `main` at
 boot `d82aa190b702cd0e3fe42dbff34c7a0c6e84e2cc` (PR #143).

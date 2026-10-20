@@ -123,6 +123,9 @@
   --dhun-space-transport-target: 52px;
   --dhun-space-artwork-mini: 56px;
   --dhun-space-navigation-bar-content: 64px;
+  /* DhunSpacing.navigationRailWidth: the rail is as wide as the app's, and its
+     labels wrap inside it rather than widening the page. */
+  --dhun-space-navigation-rail-width: 88px;
   --dhun-space-list-row-height: 72px;
   --dhun-space-mini-player-height: 72px;
   --dhun-space-bottom-nav-height: 80px;
@@ -374,3 +377,31 @@
 [data-dhun-theme="light"][data-dhun-accent="amber"] { --dhun-accent: var(--dhun-accent-amber-light); --dhun-on-accent: var(--dhun-on-accent-amber-light); --dhun-accent-container: var(--dhun-accent-container-amber-light); --dhun-on-accent-container: var(--dhun-on-accent-container-amber-light); }
 [data-dhun-theme="light"][data-dhun-accent="rose"] { --dhun-accent: var(--dhun-accent-rose-light); --dhun-on-accent: var(--dhun-on-accent-rose-light); --dhun-accent-container: var(--dhun-accent-container-rose-light); --dhun-on-accent-container: var(--dhun-on-accent-container-rose-light); }
 [data-dhun-theme="light"][data-dhun-accent="cyan"] { --dhun-accent: var(--dhun-accent-cyan-light); --dhun-on-accent: var(--dhun-on-accent-cyan-light); --dhun-accent-container: var(--dhun-accent-container-cyan-light); --dhun-on-accent-container: var(--dhun-on-accent-container-cyan-light); }
+
+/* ------------------------------------------------------------- geometry --
+
+   The web build's own measurements. Everything a stylesheet places, strokes or
+   blurs is named here for the same reason the palette is: the gate refuses raw
+   px outside this file, so a one-off `3px` cannot quietly become a second
+   design system. `--dhun-safe-bottom` wraps `env()` because its fallback is a
+   length literal and would otherwise have to be written in every rule that
+   clears an iPhone's home indicator. */
+:root {
+  --dhun-stroke-hairline: 1px;
+  --dhun-stroke-thin: 2px;
+  --dhun-stroke-thick: 3px;
+  --dhun-focus-ring-width: 2px;
+  --dhun-focus-ring-offset: 3px;
+  --dhun-underline-offset: 2px;
+  --dhun-bars-gap: 2px;
+  --dhun-bars-width: 3px;
+  --dhun-bars-glow: 6px;
+  --dhun-lift-hover: -2px;
+  --dhun-blur-glass: 22px;
+  --dhun-blur-sheet: 30px;
+  --dhun-blur-mini: 26px;
+  --dhun-blur-control: 14px;
+  --dhun-blur-ambient: 38px;
+  --dhun-blur-ambient-strong: 64px;
+  --dhun-safe-bottom: env(safe-area-inset-bottom, 0px);
+}

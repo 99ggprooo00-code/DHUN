@@ -473,48 +473,43 @@ function overflowReport() {
 // scripts/test_website_workflow.py). It gathers; Node decides.
 //
 // What it reads is the app's own honesty device rather than a test-only hook:
-// `views.js` renders one `.dhun-source[data-kind]` badge on every screen — "the
+// `components.js` renders one `.dhun-source-badge[data-kind]` per screen — "the
 // source that produced the rows on screen, always visible, never implied" — and
-// a strip the app marks `data-notice="demo"` when that source is the bundled
-// demo catalogue. Both are real interface elements with real jobs; the job of
-// this report is to notice whether they are there.
+// the sample fallback carries a strip marked `data-notice="sample"`. Both are
+// real interface elements with real jobs; this report only notices whether they
+// are there, and in which state.
 function webAppReport() {
-  const state = (selector) => {
-    const el = document.querySelector(selector);
+  const box = (el) => {
     if (!el) return null;
     const rect = el.getBoundingClientRect();
-    return { visible: rect.width > 0 && rect.height > 0, text: (el.textContent || "").trim().slice(0, 60) };
+    return { visible: rect.width > 0 && rect.height > 0, text: (el.textContent || "").trim().slice(0, 80) };
   };
-  const badge = document.querySelector(".dhun-source");
-  let source = null;
-  if (badge) {
-    const rect = badge.getBoundingClientRect();
-    const label = badge.querySelector(".dhun-source__label");
-    source = {
-      kind: String(badge.dataset.kind || ""),
-      label: ((label ? label.textContent : "") || "").trim().slice(0, 40),
-      visible: rect.width > 0 && rect.height > 0,
-    };
-  }
+  const badge = document.querySelector(".dhun-source-badge");
+  const source = badge
+    ? {
+        kind: String(badge.dataset.kind || ""),
+        label: (badge.textContent || "").trim().slice(0, 40),
+        visible: badge.getBoundingClientRect().width > 0 && badge.getBoundingClientRect().height > 0,
+      }
+    : null;
   const rootStyle = getComputedStyle(document.documentElement);
   return {
     mounted: (document.querySelector("#app") || { children: [] }).children.length > 0,
-    navItems: document.querySelectorAll(".dhun-nav-item").length,
+    navItems: document.querySelectorAll(".dhun-nav-item, .dhun-rail-nav__item").length,
     title: document.title,
     source,
-    demoNotice: state('[data-notice="demo"]'),
+    sampleNotice: box(document.querySelector('[data-notice="sample"]')),
+    dockNotice: box(document.querySelector("#dhun-dock .dhun-notice")),
     // What the document says it is, and what the page is actually painted with.
-    // The two have to agree: `applyTheme` writing the attribute to `#app`
-    // instead of the root themed the chrome and left `body` dark, so choosing
-    // Light produced pale bars over a black page and light-theme ink that
-    // disappeared into it.
+    // The two have to agree: writing the theme attribute to `#app` instead of
+    // the root themed the chrome and left `body` dark, so choosing Light
+    // produced pale bars over a black page and light-theme ink that vanished.
     theme: document.documentElement.dataset.dhunTheme || "",
     themeOnApp: (document.querySelector("#app") || { dataset: {} }).dataset.dhunTheme || "",
     bodyBackground: (getComputedStyle(document.body).backgroundColor || "").replace(/\s+/g, ""),
     backgroundToken: rootStyle.getPropertyValue("--dhun-background").trim(),
   };
 }
-
 function iconReport() {
   const icons = [...document.querySelectorAll("svg.i")];
   let smallest = Infinity;
@@ -1560,15 +1555,45 @@ async function checkPrint(browser) {
 // upstream, the app falls back and says so, and that fallback is the correct
 // behaviour.
 //
-// The check that stood here until 2026-10-16 looked for
-// `data-testid="preview-notice"` and failed with "the mirror may be claiming
-// more than it proves" when it was missing — an assertion about the
-// "engineering preview" badge of a build that no longer exists. The web app
-// stopped being a preview of the app and became the web app, so the check now
-// asserts the honesty the app actually carries: the source badge that names
-// who answered, and, when the demo catalogue answered, the strip that says
-// those rows are fictional and have no audio.
+// Every check below drives the app that is actually deployed: routes the shell
+// parses, controls the visitor presses, and markup the renderer emits. The
+// selectors are the product's own (`#dhun-view`, `.dhun-hero__title`,
+// `[data-action="play-row"]`, `#sheet-title`); a test-only hook would pass
+// while the screen was wrong.
 const NETWORK_NOISE = /Failed to load resource|net::ERR_|ERR_NAME_NOT_RESOLVED/i;
+
+/**
+ * Start a track from Home.
+ *
+ * Home is a hero plus shelves of cards, so the primary control is the hero's
+ * Play; if a catalogue change ever removes it, the fallback walks the path a
+ * visitor would take — the first card, then the first row of the screen it
+ * opens. Either route puts a real track through the real player, which is what
+ * these checks need; neither invents a track.
+ */
+async function startFromHome(page) {
+  await page.goto(url("/app/#/home"), { waitUntil: "load" });
+  const hero = page.locator('[data-action="play-hero"]').first();
+  await hero.waitFor({ timeout: 25000 });
+  await hero.click();
+  await page.waitForTimeout(800);
+  if (await page.locator('[data-action="open-player"]').count()) return;
+  await openFirstCard(page);
+  await page.locator('[data-action="play-row"]').first().click();
+  await page.waitForTimeout(800);
+}
+
+/** Open the first card on Home and wait for the detail screen it leads to. */
+async function openFirstCard(page) {
+  await page.goto(url("/app/#/home"), { waitUntil: "load" });
+  const card = page.locator(".dhun-card").first();
+  await card.waitFor({ timeout: 25000 });
+  const href = await card.getAttribute("href");
+  await card.click();
+  await page.waitForSelector(".dhun-hero--entity .dhun-hero__title", { timeout: 20000 }).catch(() => {});
+  return href;
+}
+
 async function checkWebApp(browser) {
   const viewports = [
     { name: "desktop", width: 1280, height: 800 },
@@ -1600,6 +1625,7 @@ async function checkWebApp(browser) {
       );
 
       await page.goto(url("/app/"), { waitUntil: "load" });
+      await page.waitForTimeout(700);
       const report = await page.evaluate(webAppReport);
       const overflow = await page.evaluate(overflowReport);
       const label = `/app/ (${scheme}, ${viewport.name})`;
@@ -1626,10 +1652,10 @@ async function checkWebApp(browser) {
       }
       if (!report.source || !report.source.visible || !report.source.kind) {
         fail(`web app ${label}`, "the app does not name the data source behind what is on screen — the source badge is absent or unlabelled");
-      } else if (report.source.kind === "demo" && !report.demoNotice) {
+      } else if (report.source.kind === "sample" && !report.sampleNotice?.visible) {
         fail(
           `web app ${label}`,
-          `the demo catalogue answered (${report.source.label || "unlabelled"}), so the page must say those rows are fictional and have no audio, and this one does not`,
+          `the sample catalogue answered (${report.source.label || "unlabelled"}), so the page must say those rows are fictional and have no audio, and this one does not`,
         );
       }
       if (report.navItems < 3) {
@@ -1668,21 +1694,73 @@ async function checkWebApp(browser) {
 }
 
 /**
+ * The app is installable and opens offline — measured, not claimed.
+ *
+ * `sw.js` and a manifest have shipped in this repository for months, and the
+ * app never registered the worker: `main.js` called `pwa.register?.()`, a
+ * method `createPwa` does not have. The file was in the build, the shell list
+ * named every entry, and the offline promise was a file with nothing pointing
+ * at it. This check is what makes that class of defect visible: it loads the
+ * app, waits for a registration, cuts the network, reloads, and reads what a
+ * visitor would see.
+ */
+async function checkWebAppOffline(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const page = await context.newPage();
+  const label = "/app/ offline";
+  await page.goto(url("/app/#/home"), { waitUntil: "load" });
+  const registered = await page
+    .evaluate(async () => {
+      if (!navigator.serviceWorker) return 0;
+      await Promise.race([navigator.serviceWorker.ready, new Promise((resolve) => setTimeout(resolve, 15000))]);
+      return (await navigator.serviceWorker.getRegistrations()).length;
+    })
+    .catch(() => 0);
+  if (!registered) {
+    fail(label, "the page registered no service worker, so the app cannot open without a network");
+    await page.close();
+    await context.close();
+    return;
+  }
+  await context.setOffline(true);
+  await page.reload({ waitUntil: "load" });
+  await page.waitForTimeout(1500);
+  const report = await page.evaluate(webAppReport);
+  if (!report.mounted) {
+    fail(label, "with the network off, the app did not render at all");
+  } else if (!report.source || !report.source.kind) {
+    fail(label, "with the network off, the app rendered but did not name what answered");
+  } else if (report.source.kind === "sample" && !report.sampleNotice?.visible) {
+    fail(label, "offline, the sample catalogue answered without saying it is a sample");
+  } else {
+    record(label, `${registered} registration(s); with the network off the app renders and says “${report.source.label}”`);
+  }
+  await context.setOffline(false);
+  await page.close();
+  await context.close();
+}
+
+/**
  * The detail screens have one heading, and it is the page's own.
  *
- * `AlbumScreen.kt`, `ArtistScreen.kt` and `PlaylistScreen.kt` draw the entity's
- * name in the content — under the cover, or over the hero — and carry no title
- * in the chrome. The web wrote the name into the app bar as well, so those
- * routes had two `h1`s and printed the same name twice, 313px apart on a
- * desktop. This reads the rendered document rather than the source, because a
- * regression here is invisible to every other check in the file.
+ * The Android screens draw the entity's name in the content — under the cover,
+ * or over the hero — and carry no title in the chrome. An earlier web build
+ * wrote the name into the app bar as well, so those routes had two `h1`s and
+ * printed the same name twice, 313px apart on a desktop. This reads the
+ * rendered document rather than the source, because a regression here is
+ * invisible to every other check in the file.
+ *
+ * The route is reached the way a visitor reaches it: by pressing the first card
+ * Home offers. Hard-coding an id would test whichever catalogue the runner
+ * happens to have; pressing the card tests the link the screen actually drew.
  */
 function entityOutlineReport() {
-  const bar = document.querySelector(".dhun-topbar");
+  const bar = document.querySelector("#dhun-topbar");
   return {
-    h1s: [...document.querySelectorAll("h1")].map((el) => (el.textContent || "").replace(/\s+/g, " ").trim()),
+    h1s: [...document.querySelectorAll("#dhun-view h1")].map((el) => (el.textContent || "").replace(/\s+/g, " ").trim()),
     barH1s: bar ? bar.querySelectorAll("h1").length : -1,
-    entityTitle: (document.querySelector(".dhun-entity__title")?.textContent || "").trim(),
+    entityTitle: (document.querySelector(".dhun-hero--entity .dhun-hero__title")?.textContent || "").trim(),
+    hash: location.hash,
   };
 }
 
@@ -1690,13 +1768,10 @@ async function checkWebAppEntity(browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: SCHEMES[0] });
   const page = await context.newPage();
   const label = "/app/ album heading";
-  await page.goto(url("/app/#/album/al-01"), { waitUntil: "load" });
-  await page
-    .waitForSelector(".dhun-entity__title", { timeout: 15000 })
-    .catch(() => {});
+  const href = await openFirstCard(page);
   const report = await page.evaluate(entityOutlineReport);
   if (!report.entityTitle) {
-    fail(label, "the album screen rendered no entity title");
+    fail(label, `the card at ${href} opened ${report.hash} with no entity title`);
   } else if (report.h1s.length !== 1 || report.h1s[0] !== report.entityTitle) {
     fail(
       label,
@@ -1705,7 +1780,7 @@ async function checkWebAppEntity(browser) {
   } else if (report.barH1s !== 0) {
     fail(label, `the app bar still draws ${report.barH1s} heading(s) on a screen that has its own`);
   } else {
-    record(label, `one h1, the page's own: “${report.entityTitle}”`);
+    record(label, `one h1, the page's own: “${report.entityTitle}” (${report.hash})`);
   }
   await page.close();
   await context.close();
@@ -1716,32 +1791,33 @@ async function checkWebAppEntity(browser) {
  *
  * Every "Launch /app/ Player" and "Launch /app/ Lyrics" link on the project
  * site is a request for a screen that only exists once a track is loaded. The
- * app used to answer such a link by silently showing Home: no player, no
- * reason. It now says what it is waiting for, in the dock, and opens the player
- * as soon as a track starts.
+ * app answers such a link by saying what it is waiting for, in the dock, and by
+ * opening the player as soon as a track starts.
  */
 async function checkWebAppDeepLink(browser) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
   const page = await context.newPage();
   const label = "/app/ player deep link";
   await page.goto(url("/app/#/?player=open"), { waitUntil: "load" });
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(900);
   const waiting = await page.evaluate(() => ({
     hash: location.hash,
     overlay: Boolean(document.querySelector(".dhun-full")),
-    notice: (document.querySelector("#dhun-dock .dhun-notice__title")?.textContent || "").trim(),
-    body: (document.querySelector("#dhun-dock .dhun-notice__body")?.textContent || "").trim(),
+    notice: (document.querySelector("#dhun-dock .dhun-notice")?.textContent || "").trim(),
   }));
   if (waiting.overlay) {
     fail(label, "the empty-player link drew an overlay over nothing");
   } else if (!waiting.notice) {
     fail(label, `the link was swallowed: the app landed on ${waiting.hash} with no explanation`);
   } else {
-    record(label, `nothing playing: “${waiting.notice}”`);
+    record(label, `nothing playing: “${waiting.notice.slice(0, 60)}”`);
   }
 
-  // Choosing a track must honour the request that was already made.
-  await page.locator('[data-action="play-track"]').first().click();
+  // Choosing a track must honour the request that was already made. The
+  // control is pressed, not called: playback goes through the player the
+  // visitor uses.
+  await page.locator('[data-action="play-hero"]').first().waitFor({ timeout: 25000 });
+  await page.locator('[data-action="play-hero"]').first().click();
   await page.waitForFunction(() => Boolean(document.querySelector(".dhun-full")), null, { timeout: 10000 }).catch(() => {});
   const opened = await page.evaluate(() => ({
     overlay: Boolean(document.querySelector(".dhun-full")),
@@ -1760,22 +1836,11 @@ async function checkWebAppDeepLink(browser) {
  * Every line of text in `/app/`, measured against the colour painted behind it,
  * in both themes.
  *
- * The site has had a contrast gate since Phase 6, but it only ever scanned the
- * marketing pages. `/app/` was exempt on the argument that its colours are
- * mirrored from `DhunAppearance.kt` — and mirroring proves provenance, not
- * legibility. Measured, the light theme's 55%-ink tertiary token was 3.87:1 on
- * every track row's duration, the bottom-nav labels, the entity sub-meta, the
- * section hints and the Settings contract body. Nothing in the repository could
- * have seen that: `tokens.test.mjs` proves the mirror is byte-identical, and it
- * was.
- *
  * The browser supplies only the raw inputs — the ink, the composited backdrop,
  * the size, the weight — and `contrastProblem` in `rules.mjs` decides, so the
  * arithmetic is unit-tested without a browser. A node over a gradient or an
  * image is skipped and counted, not failed: computed styles cannot see through
- * one. The artist hero — the screen with a gradient — is measured by the pixel
- * probe in `dhun-tools/probe-hero-contrast.mjs`, whose numbers (2.64:1 before,
- * 7.15:1 after) are what put the veil's bottom stop at 62%.
+ * one.
  */
 function textContrastScript() {
   const paintedBackdrop = (node) => {
@@ -1830,38 +1895,50 @@ function textContrastScript() {
 }
 
 async function checkWebAppContrast(browser) {
-  const routes = ["#/home", "#/search?q=e", "#/library/playlists", "#/album/al-03", "#/artist/ar-03", "#/playlist/pl-02", "#/settings"];
+  // The screens a visitor can always reach, whatever the network did: the three
+  // destinations, Settings, the legal pages, and a failing detail route (which
+  // is a screen too). The entity screens are measured below, once a real card
+  // has been pressed, so no remote id is baked into this list.
+  const routes = ["#/home", "#/search?q=e", "#/library/playlists", "#/settings", "#/about/privacy", "#/album/unknown-id"];
   for (const scheme of SCHEMES) {
     // The app is dark-first and does not follow the OS, so the theme is chosen
     // through its own control — never by seeding storage, which would test the
-    // seed instead of the control (and is how the old appearance test was wrong).
+    // seed instead of the control.
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     const label = `/app/ contrast (${scheme})`;
     const failuresBefore = failures.length;
     let measured = 0;
     await page.goto(url("/app/#/settings"), { waitUntil: "load" });
-    await page.waitForSelector(`[data-action="set-theme"][data-value="${scheme}"]`, { timeout: 15000 });
+    await page.waitForSelector(`[data-action="set-theme"][data-value="${scheme}"]`, { timeout: 25000 });
     await page.locator(`[data-action="set-theme"][data-value="${scheme}"]`).click();
     await page.waitForFunction((wanted) => document.documentElement.dataset.dhunTheme === wanted, scheme);
-    for (const route of routes) {
-      await page.goto(url(`/app/${route}`), { waitUntil: "load" });
-      await page.waitForTimeout(route.includes("search") ? 700 : 500);
+    const measure = async (where) => {
       const { nodes, theme } = await page.evaluate(textContrastScript);
       if (theme !== scheme) {
-        fail(label, `${route} rendered the ${theme || "unset"} theme in a ${scheme} browser`);
-        continue;
+        fail(label, `${where} rendered the ${theme || "unset"} theme in a ${scheme} browser`);
+        return;
       }
       measured += nodes.length;
       for (const node of nodes) {
         // Composite the stack once, bottom-up, then judge ink against it.
         const backdrop = node.layers.reduce((base, layer) => compositeOver(layer, base));
         const problem = contrastProblem({ ...node, backdrop });
-        if (problem) fail(label, `${route} ${problem}`);
+        if (problem) fail(label, `${where} ${problem}`);
       }
+    };
+    for (const route of routes) {
+      await page.goto(url(`/app/${route}`), { waitUntil: "load" });
+      await page.waitForTimeout(route.includes("search") ? 900 : 600);
+      await measure(route);
     }
+    // The detail screen, reached by pressing a card: its hero is the densest
+    // composition of secondary ink in the app.
+    const href = await openFirstCard(page);
+    await page.waitForTimeout(500);
+    if (href) await measure(`detail ${href}`);
     if (failures.length === failuresBefore) {
-      record(label, `${measured} text node(s) across ${routes.length} routes meet 4.5:1 / 3:1 for large text`);
+      record(label, `${measured} text node(s) across ${routes.length} routes and a detail screen meet 4.5:1 / 3:1 for large text`);
     }
     await page.close();
     await context.close();
@@ -1871,10 +1948,10 @@ async function checkWebAppContrast(browser) {
 /**
  * The dialogs a keyboard has to live in.
  *
- * A sheet says `role="dialog" aria-modal="true"`. For a year that was a claim:
- * Tab left the sheet on the second press and walked the page behind the scrim,
- * and closing it dropped focus on `<body>` so the person had to start again from
- * the top. axe cannot see either — both need a real Tab key and a real
+ * A sheet says `role="dialog" aria-modal="true"`. That claim is only true if
+ * the keyboard cannot leave it, so focus moves in when one opens, wraps inside
+ * while it is open, and returns to the control that opened it when it closes.
+ * axe cannot see any of that — it needs a real Tab key and a real
  * `document.activeElement` — which is why this check presses the keys.
  */
 async function checkWebAppDialogs(browser) {
@@ -1888,13 +1965,13 @@ async function checkWebAppDialogs(browser) {
       sheet: Boolean(document.querySelector(".dhun-sheet")),
       role: document.querySelector(".dhun-sheet")?.getAttribute("role") || "",
       modal: document.querySelector(".dhun-sheet")?.getAttribute("aria-modal") || "",
-      name: document.querySelector(".dhun-sheet")?.getAttribute("aria-label") || "",
+      name: (document.querySelector("#sheet-title")?.textContent || "").trim(),
     }));
 
   // The sheet's own claim, then a keyboard inside it, then the way out.
   await page.goto(url("/app/#/library/playlists"), { waitUntil: "load" });
-  await page.waitForSelector('[data-action="new-playlist"]', { timeout: 15000 });
-  await page.locator('[data-action="new-playlist"]').click();
+  await page.waitForSelector('[data-action="new-playlist"]', { timeout: 25000 });
+  await page.locator('[data-action="new-playlist"]').first().click();
   await page.waitForTimeout(350);
   const opened = await active();
   if (opened.role !== "dialog" || opened.modal !== "true") {
@@ -1923,9 +2000,11 @@ async function checkWebAppDialogs(browser) {
   else record(label, "Escape closes it and returns focus to the control that opened it");
 
   // The same behaviour on a different sheet, whose trigger is a row button.
-  await page.goto(url("/app/#/home"), { waitUntil: "load" });
-  await page.waitForTimeout(800);
-  await page.locator('[data-action="track-menu"]').first().click();
+  // Rows live on detail screens, so the card is pressed first — Home is a hero
+  // and shelves of cards, exactly as the app draws it.
+  await openFirstCard(page);
+  await page.locator('[data-action="row-menu"]').first().waitFor({ timeout: 25000 });
+  await page.locator('[data-action="row-menu"]').first().click();
   await page.waitForTimeout(350);
   let escaped = false;
   for (let press = 0; press < 8; press += 1) {
@@ -1941,22 +2020,26 @@ async function checkWebAppDialogs(browser) {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   const back = await active();
-  if (!escaped && back.action === "track-menu") record(label, "the track menu traps Tab and returns focus to its row button");
+  if (!escaped && back.action === "row-menu") record(label, "the track menu traps Tab and returns focus to its row button");
 
   // A screen change must announce itself. Pressing a nav tab replaces the nav
   // buttons, so the pressed button is gone; the screen's `<h1>` — and the
   // document title — are what tell the visitor where they now are.
   await page.goto(url("/app/#/home"), { waitUntil: "load" });
-  await page.waitForTimeout(800);
-  await page.locator('#dhun-tabs [data-action="nav-tab"][data-tab="LIBRARY"]').click();
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
+  await page.locator('#dhun-nav-region [data-action="nav"][data-tab="LIBRARY"]').click();
+  await page.waitForTimeout(600);
   const screened = await page.evaluate(() => ({
     hash: location.hash,
     tag: document.activeElement?.tagName?.toLowerCase() || "",
     text: (document.activeElement?.textContent || "").trim(),
+    inView: Boolean(document.activeElement?.closest?.("#dhun-view")),
     title: document.title,
   }));
-  if (screened.tag !== "h1" || !/library/i.test(screened.text)) {
+  // The screen's own wording is its business ("Made of what you saved here");
+  // what this asserts is that focus moved to the one heading of the screen that
+  // is now on display, and that the document says where that is.
+  if (screened.tag !== "h1" || !screened.inView) {
     fail(label, `a nav tab left focus on <${screened.tag || "body"}> “${screened.text.slice(0, 30)}” instead of the new screen's heading`);
   } else if (!/library/i.test(screened.title)) {
     fail(label, `a nav tab reached “${screened.hash}” but the document title is “${screened.title}”`);
@@ -1967,12 +2050,12 @@ async function checkWebAppDialogs(browser) {
   // Submitting a search re-renders the screen around the field. The caret has
   // to survive that: losing it meant the second half of a query could not be
   // typed until the first request came back.
-  await page.locator('#dhun-tabs [data-action="nav-tab"][data-tab="SEARCH"]').click();
-  await page.waitForSelector("#search-input", { timeout: 15000 });
+  await page.locator('#dhun-nav-region [data-action="nav"][data-tab="SEARCH"]').click();
+  await page.waitForSelector("#search-input", { timeout: 25000 });
   await page.locator("#search-input").click();
   await page.keyboard.type("rain");
   await page.keyboard.press("Enter");
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1500);
   const afterSubmit = await page.evaluate(() => ({
     id: document.activeElement?.id || "",
     tag: document.activeElement?.tagName?.toLowerCase() || "",
@@ -1996,30 +2079,20 @@ async function checkWebAppDialogs(browser) {
  * axe over `/app/`, in both of its themes, plus the surfaces that only exist
  * after a gesture.
  *
- * The site's axe check has scanned the marketing pages since Phase 6 and the
- * app was never scanned at all — the same blind spot the contrast gate had. It
- * mattered: the first run found the equaliser's 18 preset chips rendering with
- * no text at all (a mapping read `preset.name` where the data says
- * `displayName`), so the whole preset row was unlabelled for a screen reader and
- * blank on screen, and the player's two `role="tab"` buttons had no
- * `role="tablist"` parent. Both were critical.
- *
- * The app currently runs at **zero** violations, so this fails on any of them
- * rather than only on serious/critical: a gate that tolerates the moderate
- * ones is a gate that lets the next empty heading through. The marketing pages
- * keep their own policy (fail serious/critical, warn the rest) because they
- * carry third-party-shaped content the app does not.
+ * The app runs at **zero** violations, so this fails on any of them rather than
+ * only on serious/critical: a gate that tolerates the moderate ones is a gate
+ * that lets the next empty heading through. The marketing pages keep their own
+ * policy because they carry third-party-shaped content the app does not.
  */
 async function checkWebAppAxe(browser) {
   const routes = [
     "#/home",
     "#/search?q=rain",
     "#/library/playlists",
-    "#/album/al-01",
-    "#/artist/ar-03",
-    "#/playlist/pl-02",
+    "#/library/likes",
     "#/settings",
-    "#/about-legal",
+    "#/about/privacy",
+    "#/about/terms",
     "#/album/unknown-id",
   ];
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
@@ -2038,38 +2111,37 @@ async function checkWebAppAxe(browser) {
     // Through the app's own control, never by seeding storage: the theme the
     // app renders is part of what is being scanned.
     await page.goto(url("/app/#/settings"), { waitUntil: "load" });
-    await page.waitForSelector(`[data-action="set-theme"][data-value="${theme}"]`, { timeout: 15000 });
+    await page.waitForSelector(`[data-action="set-theme"][data-value="${theme}"]`, { timeout: 25000 });
     await page.locator(`[data-action="set-theme"][data-value="${theme}"]`).click();
     await page.waitForFunction((wanted) => document.documentElement.dataset.dhunTheme === wanted, theme);
     for (const route of routes) {
       await page.goto(url(`/app/${route}`), { waitUntil: "load" });
-      await page.waitForTimeout(route.includes("search") ? 700 : 500);
+      await page.waitForTimeout(route.includes("search") ? 900 : 600);
       await scan(`axe /app/ ${route} (${theme})`);
     }
   }
 
   // The overlays. Each is a dialog or a panel that does not exist until a
   // gesture creates it, and each is where a role mistake reaches the user.
-  await page.goto(url("/app/#/album/al-01?player=open"), { waitUntil: "load" });
-  await page.waitForTimeout(700);
-  await page.evaluate(() => document.querySelector('[data-action="play-track"]')?.click());
+  await startFromHome(page);
+  await page.evaluate(() => document.querySelector('[data-action="open-player"]')?.click());
   await page.waitForFunction(() => Boolean(document.querySelector(".dhun-full")), null, { timeout: 10000 }).catch(() => {});
   await scan("axe /app/ player, queue tab");
-  await page.evaluate(() => document.querySelector('[data-action="player-tab"][data-tab="lyrics"]')?.click());
+  await page.evaluate(() => document.querySelector('[data-action="player-tab"][data-value="lyrics"]')?.click());
   await page.waitForTimeout(400);
   await scan("axe /app/ player, lyrics tab");
 
-  await page.goto(url("/app/#/home"), { waitUntil: "load" });
-  await page.waitForTimeout(700);
-  await page.locator('[data-action="track-menu"]').first().click();
+  await openFirstCard(page);
+  await page.locator('[data-action="row-menu"]').first().waitFor({ timeout: 25000 });
+  await page.locator('[data-action="row-menu"]').first().click();
   await page.waitForTimeout(400);
   await scan("axe /app/ track menu");
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
   await page.goto(url("/app/#/library/playlists"), { waitUntil: "load" });
-  await page.waitForTimeout(700);
-  await page.locator('[data-action="new-playlist"]').click();
+  await page.waitForSelector('[data-action="new-playlist"]', { timeout: 25000 });
+  await page.locator('[data-action="new-playlist"]').first().click();
   await page.waitForTimeout(400);
   await scan("axe /app/ naming sheet");
   await page.keyboard.press("Escape");
@@ -2081,15 +2153,13 @@ async function checkWebAppAxe(browser) {
 /**
  * A playlist made in the browser.
  *
- * Three defects lived in this path, and none of them was visible to a structural
- * check. "New playlist" in the library header called the picker's form handler
- * from a button with no form under it, so it did nothing at all. Creating one
- * from a track's menu worked, and then opening it said "That playlist could not
- * be loaded" — the app asked the *network* for a playlist that only exists in
- * this browser. And Rename called `window.prompt`, which kept Escape from ever
- * closing a sheet that had focused its own field.
+ * Every defect this check was written for is invisible to a structural gate:
+ * "New playlist" calling a form handler from a button with no form, a playlist
+ * that opened as "could not be loaded" because the app asked the network for
+ * something that only exists in storage, and a Rename implemented with
+ * `window.prompt`, which Escape can never close.
  *
- * The check drives the real controls and then reloads: a playlist that only
+ * So this drives the real controls and then reloads: a playlist that only
  * survives until the next page load is not a playlist.
  */
 async function checkWebAppLibrary(browser) {
@@ -2098,14 +2168,14 @@ async function checkWebAppLibrary(browser) {
   const label = "/app/ local playlist";
 
   await page.goto(url("/app/#/library/playlists"), { waitUntil: "load" });
-  await page.waitForSelector('[data-action="new-playlist"]', { timeout: 15000 });
-  await page.locator('[data-action="new-playlist"]').click();
+  await page.waitForSelector('[data-action="new-playlist"]', { timeout: 25000 });
+  await page.locator('[data-action="new-playlist"]').first().click();
   const sheet = await page.evaluate(() => ({
-    label: document.querySelector(".dhun-sheet")?.getAttribute("aria-label") || "",
+    label: (document.querySelector("#sheet-title")?.textContent || "").trim(),
     focused: document.activeElement?.getAttribute("aria-label") || "",
   }));
   if (sheet.label !== "New playlist") {
-    fail(label, `"New playlist" opened no naming sheet (dialog label: “${sheet.label || "none"}”)`);
+    fail(label, `"New playlist" opened no naming sheet (dialog title: “${sheet.label || "none"}”)`);
   } else if (sheet.focused !== "Playlist name") {
     fail(label, `the naming sheet did not put the cursor in its field (focus: “${sheet.focused || "none"}”)`);
   } else {
@@ -2114,24 +2184,27 @@ async function checkWebAppLibrary(browser) {
 
   await page.keyboard.type("Browser check");
   await page.keyboard.press("Enter");
-  await page.waitForTimeout(500);
-  const created = await page.evaluate(() => ({
-    toast: (document.querySelector(".dhun-toast")?.textContent || "").trim(),
-    cards: [...document.querySelectorAll('[data-action="open-playlist"]')].map((el) => el.querySelector(".dhun-grid__title")?.textContent?.trim()),
-    id: document.querySelector('[data-action="open-playlist"]')?.dataset.id || null,
-  }));
-  if (!created.cards.includes("Browser check")) {
-    fail(label, `Enter in the naming field created nothing (cards: ${created.cards.join(", ") || "none"})`);
+  await page.waitForTimeout(700);
+  const cards = await page.evaluate(() =>
+    [...document.querySelectorAll('.dhun-card[data-kind="playlist"]')].map((el) => ({
+      title: (el.querySelector(".dhun-card__title")?.textContent || "").trim(),
+      href: el.getAttribute("href") || "",
+    })),
+  );
+  const created = cards.find((entry) => entry.title === "Browser check");
+  if (!created) {
+    fail(label, `Enter in the naming field created nothing (cards: ${cards.map((c) => c.title).join(", ") || "none"})`);
   } else {
-    record(label, `Enter creates it: ${created.toast || `${created.cards.length} card(s)`}`);
+    const toast = (await page.locator(".dhun-toast").textContent().catch(() => "")) || "";
+    record(label, `Enter creates it: ${toast.trim() || `${cards.length} card(s)`}`);
   }
 
-  if (created.id) {
-    await page.locator(`[data-action="open-playlist"][data-id="${created.id}"]`).click();
-    await page.waitForTimeout(600);
+  if (created) {
+    await page.locator(`.dhun-card[data-kind="playlist"][href="${created.href}"]`).click();
+    await page.waitForTimeout(700);
     const opened = await page.evaluate(() => ({
       hash: location.hash,
-      title: (document.querySelector(".dhun-entity__title")?.textContent || "").trim(),
+      title: (document.querySelector(".dhun-hero--entity .dhun-hero__title")?.textContent || "").trim(),
       body: (document.querySelector(".dhun-state__title")?.textContent || "").trim(),
       error: Boolean(document.querySelector(".dhun-state--error")),
     }));
@@ -2145,34 +2218,34 @@ async function checkWebAppLibrary(browser) {
 
     // Rename through the sheet, then Escape: the caret is in the field, which is
     // exactly where the old guard used to swallow the key.
-    await page.locator('[data-action="rename-playlist"]').click();
-    await page.waitForTimeout(350);
+    await page.locator('.dhun-collection-tools [data-action="rename-playlist"]').click();
+    await page.waitForTimeout(400);
     const renameSheet = await page.evaluate(() => ({
-      label: document.querySelector(".dhun-sheet")?.getAttribute("aria-label") || "",
+      label: (document.querySelector("#sheet-title")?.textContent || "").trim(),
       value: document.querySelector(".dhun-sheet input[name='name']")?.value ?? null,
     }));
     if (renameSheet.label !== "Rename playlist" || renameSheet.value !== "Browser check") {
       fail(label, `Rename opened “${renameSheet.label || "no sheet"}” with “${renameSheet.value}”`);
     } else {
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(400);
       const closed = await page.evaluate(() => !document.querySelector(".dhun-sheet"));
       if (!closed) fail(label, "Escape did not close the naming sheet while its field had the caret");
       else record(label, "Rename is the same sheet, prefilled, and Escape closes it from the field");
 
-      await page.locator('[data-action="rename-playlist"]').click();
-      await page.waitForTimeout(300);
+      await page.locator('.dhun-collection-tools [data-action="rename-playlist"]').click();
+      await page.waitForTimeout(350);
       await page.keyboard.press("Control+A");
       await page.keyboard.type("Browser check 2");
       await page.keyboard.press("Enter");
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(600);
     }
 
     await page.reload({ waitUntil: "load" });
-    await page.waitForTimeout(900);
+    await page.waitForTimeout(1000);
     const afterReload = await page.evaluate(() => ({
       hash: location.hash,
-      title: (document.querySelector(".dhun-entity__title")?.textContent || "").trim(),
+      title: (document.querySelector(".dhun-hero--entity .dhun-hero__title")?.textContent || "").trim(),
       error: Boolean(document.querySelector(".dhun-state--error")),
     }));
     if (afterReload.error || afterReload.title !== "Browser check 2") {
@@ -2213,6 +2286,7 @@ async function checkWebAppAppearance(browser) {
     const label = `/app/ appearance (${scheme})`;
 
     await page.goto(url("/app/#/settings"), { waitUntil: "load" });
+    await page.waitForTimeout(600);
     const before = await page.evaluate(webAppReport);
     const expected = TOKEN_FOR_BACKGROUND[before.bodyBackground];
     if (!expected) {
@@ -2228,7 +2302,7 @@ async function checkWebAppAppearance(browser) {
 
     // The real control, pressed: the theme chip in Settings.
     const toggle = page.locator('[data-action="set-theme"][data-value="light"]');
-    await toggle.waitFor({ state: "visible", timeout: 15000 });
+    await toggle.waitFor({ state: "visible", timeout: 25000 });
     await toggle.click();
     await page
       .waitForFunction(() => document.documentElement.dataset.dhunTheme === "light", null, { timeout: 5000 })
@@ -2360,6 +2434,7 @@ const CHECKS = [
   ["appearance", () => checkWebAppAppearance(browser)],
   ["entity outline", () => checkWebAppEntity(browser)],
   ["player deep link", () => checkWebAppDeepLink(browser)],
+  ["offline", () => checkWebAppOffline(browser)],
   ["local playlist", () => checkWebAppLibrary(browser)],
   ["/app/ contrast", () => checkWebAppContrast(browser)],
   ["/app/ axe", () => checkWebAppAxe(browser)],
@@ -2377,7 +2452,13 @@ try {
     process.env.DHUN_CHROMIUM ? { executablePath: process.env.DHUN_CHROMIUM } : {},
   );
   summaryLine(`\n## Browser measurements — progress\n`);
+  // CI runs every check. A machine iterating on one of them can narrow the run
+  // with DHUN_CHECKS (a case-insensitive fragment of the check's name); the
+  // filter is reported, so a narrowed run can never be mistaken for a full one.
+  const only = process.env.DHUN_CHECKS ? new RegExp(process.env.DHUN_CHECKS, "i") : null;
+  if (only) summaryLine(`\nNarrowed run: only checks matching \`${process.env.DHUN_CHECKS}\` execute.\n`);
   for (const [name, run] of CHECKS) {
+    if (only && !only.test(name)) continue;
     summaryLine(`- check started: **${name}**`);
     await guard(name, run);
     summaryLine(`- check finished: ${name}`);

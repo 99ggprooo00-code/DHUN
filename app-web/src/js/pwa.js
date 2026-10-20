@@ -15,8 +15,9 @@
  *      until the visitor says so; "Reload to update" appears as a bar, and the
  *      click that accepts it is a click the visitor chose.
  *
- * When any of this is unavailable the module says which part and why — see
- * `platform.js#unavailableCapabilities` for the sentences the UI prints.
+ * When any of this is unavailable the module reports which part failed in
+ * `state`; `main.js` turns that into one sentence on screen rather than a
+ * silent no-op.
  */
 
 export const SW_STATE = Object.freeze({
@@ -124,6 +125,7 @@ export function createPwa({
     get registration() {
       return registration;
     },
+    /** Wire the install prompt and connectivity, then register the worker. */
     start() {
       wireInstallPrompt();
       wireConnectivity();

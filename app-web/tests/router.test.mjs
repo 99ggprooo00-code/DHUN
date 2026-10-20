@@ -1,172 +1,85 @@
 /**
- * The URL surface, pinned.
+ * Routes are data, and every route survives a round trip.
  *
- * Every screen in a web app is a link, so a router bug is a screen that cannot
- * be reloaded, shared or reached with the Back button. These run in Node with no
- * window: `parseRoute` and `formatRoute` are pure functions, which is the whole
- * reason they live in their own module.
+ * A hash link that formats differently from how it parses is a link that
+ * quietly goes somewhere else, so the round trip is asserted for every screen
+ * rather than for one example.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parseRoute, formatRoute, sameRoute, DEFAULT_ROUTE, LIBRARY_TABS, needsData, createRouter, entityLabel } from "../src/js/router.js";
+import { DETAIL_ROUTES, LIBRARY_TABS, NAV_TABS, PLAYER_TABS, formatRoute, parseRoute, tabFor, titleFor } from "../src/js/router.js";
 
-test("the empty hash is the home route, not an error", () => {
+test("an empty hash is home, not an error", () => {
   assert.equal(parseRoute("").name, "home");
-  assert.equal(parseRoute("#").name, "home");
   assert.equal(parseRoute("#/").name, "home");
-  assert.equal(parseRoute("#/home").name, "home");
-  assert.equal(parseRoute("#/nonsense/deep/path").name, "home");
+  assert.equal(parseRoute("#/nonsense").name, "home", "an unknown route falls back to the app's front door");
 });
 
-test("every route survives a round trip through the URL", () => {
-  const routes = [
-    { name: "home", player: null, playerTab: "queue" },
-    { name: "search", query: "koshi sessions", player: null, playerTab: "queue" },
-    { name: "library", libTab: "liked", player: null, playerTab: "queue" },
-    { name: "library", libTab: "history", player: null, playerTab: "queue" },
-    { name: "playlist", id: "pl-42", player: null, playerTab: "queue" },
-    { name: "album", id: "MPREb_abc", player: "open", playerTab: "lyrics" },
-    { name: "artist", id: "UCabc", player: "open", playerTab: "queue" },
-    { name: "settings", player: null, playerTab: "queue" },
-    { name: "about-legal", doc: "privacy", player: null, playerTab: "queue" },
-  ];
-  for (const route of routes) {
-    const parsed = parseRoute(formatRoute(route));
-    assert.deepEqual(parsed, route, `${formatRoute(route)} did not round trip`);
-    assert.ok(sameRoute(parsed, route));
-  }
+test("a library tab is one of the three that exist; anything else is Playlists", () => {
+  assert.deepEqual([...LIBRARY_TABS], ["playlists", "likes", "history"]);
+  assert.equal(parseRoute("#/library/history").libTab, "history");
+  assert.equal(parseRoute("#/library/downloads").libTab, "playlists", "the old Downloads bookmark lands on a real screen");
 });
 
-test("ids with characters a URL cares about survive the round trip", () => {
-  const route = { name: "playlist", id: "VL/weird id+&?", player: null, playerTab: "queue" };
-  assert.equal(parseRoute(formatRoute(route)).id, route.id);
-});
-
-test("the previous build's links still land somewhere real", () => {
-  // These are the URLs the mirror build published. A returning visitor's
-  // bookmark must not 404, and the one screen that no longer exists says so.
-  assert.deepEqual(parseRoute("#/player"), { name: "home", player: "open", playerTab: "queue" });
-  assert.equal(parseRoute("#/player/lyrics").playerTab, "lyrics");
-  assert.equal(parseRoute("#/player/queue").playerTab, "queue");
-  assert.equal(parseRoute("#/settings").name, "settings");
-  assert.equal(parseRoute("#/about-legal").name, "about-legal");
-  assert.equal(parseRoute("#/about").name, "about-legal");
-});
-
-test("a link to the removed Downloads screen lands on Playlists and says why", () => {
-  const route = parseRoute("#/library/downloads");
-  assert.equal(route.name, "library");
-  assert.equal(route.libTab, "playlists");
-  assert.equal(route.redirectedFrom, "downloads");
-  // And it is a first-class library tab, never a tab the app renders.
-  assert.deepEqual([...LIBRARY_TABS], ["playlists", "liked", "history"]);
-});
-
-test("the player's open state and tab ride along with any route", () => {
-  const route = parseRoute("#/album/MPREb_x?player=open&ptab=lyrics");
+test("the player's open state and panel are query parameters, not routes", () => {
+  const route = parseRoute("#/album/abc?player=open&ptab=lyrics");
   assert.equal(route.name, "album");
-  assert.equal(route.id, "MPREb_x");
+  assert.equal(route.id, "abc");
   assert.equal(route.player, "open");
   assert.equal(route.playerTab, "lyrics");
+  assert.equal(parseRoute("#/album/abc?ptab=nope").playerTab, "queue");
+  assert.deepEqual([...PLAYER_TABS], ["queue", "lyrics"]);
 });
 
-test("a hostile or truncated hash cannot throw", () => {
-  for (const hash of ["#/album/%", "#/search?q=%E0%A4", "#/%ZZ", "#//", "#/library/"]) {
-    assert.doesNotThrow(() => parseRoute(hash));
-    assert.ok(parseRoute(hash).name);
+test("ids are decoded once and encoded once", () => {
+  const route = parseRoute("#/playlist/a%20b");
+  assert.equal(route.id, "a b");
+  assert.equal(formatRoute(route), "#/playlist/a%20b");
+});
+
+test("every route formats back to itself", () => {
+  const routes = [
+    { name: "home" },
+    { name: "search", query: "arijit singh" },
+    { name: "library", libTab: "likes" },
+    { name: "album", id: "al-1" },
+    { name: "artist", id: "ar-1" },
+    { name: "playlist", id: "pl-1" },
+    { name: "collection", id: "col-1" },
+    { name: "settings" },
+    { name: "about", doc: "privacy" },
+    { name: "album", id: "al-1", player: "open", playerTab: "queue" },
+  ];
+  for (const route of routes) {
+    const formatted = formatRoute(route);
+    const parsed = parseRoute(formatted);
+    assert.equal(parsed.name, route.name, `${formatted} lost its screen`);
+    if (route.id) assert.equal(parsed.id, route.id);
+    if (route.query) assert.equal(parsed.query, route.query);
+    if (route.libTab) assert.equal(parsed.libTab, route.libTab);
+    if (route.doc) assert.equal(parsed.doc, route.doc);
+    if (route.player) assert.equal(parsed.player, "open");
+    assert.equal(formatRoute(parsed), formatted, `${formatted} did not survive a second round trip`);
   }
 });
 
-/*
- * The bug these pin: `/app/` opened on an idle Home and never fetched anything.
- *
- * `main.js` seeds its state with `parseRoute(location.hash)`, so by the time the
- * router's first `onRoute` fired, the "previous" route was already the current
- * one — `sameRoute` returned true, and every load was skipped. The screenshot
- * was "Nothing to show yet" with no error, because nothing had been tried.
- */
-test("needsData fetches on the first route, whatever the URL is", () => {
-  for (const hash of ["", "#/home", "#/search?q=koshi", "#/album/MPREb_1", "#/library/history", "#/settings"]) {
-    const route = parseRoute(hash);
-    // What main.js does: seed the state from the URL before the router starts.
-    const seeded = parseRoute(hash);
-    assert.equal(
-      needsData(seeded, route, { initial: true }),
-      true,
-      `${hash || "(no hash)"} must fetch on the initial route`,
-    );
-  }
+test("the navigation is exactly three destinations", () => {
+  assert.equal(NAV_TABS.length, 3);
+  assert.deepEqual(NAV_TABS.map((tab) => tab.route), ["home", "search", "library"]);
+  for (const tab of NAV_TABS) assert.ok(tab.icon, `${tab.id} has no icon`);
 });
 
-test("needsData re-fetches when the route actually changes", () => {
-  const home = parseRoute("#/home");
-  assert.equal(needsData(home, parseRoute("#/search?q=a"), { initial: false }), true);
-  assert.equal(needsData(home, parseRoute("#/album/x"), { initial: false }), true);
-  assert.equal(needsData(null, home, { initial: false }), true, "a router with no previous route still fetches");
+test("a detail screen keeps the tab it was opened from", () => {
+  assert.equal(tabFor({ name: "home" }), "HOME");
+  assert.equal(tabFor({ name: "album", id: "x" }, "SEARCH"), "SEARCH");
+  assert.equal(tabFor({ name: "library" }), "LIBRARY");
+  assert.ok(DETAIL_ROUTES.includes("settings"));
 });
 
-test("needsData does not re-fetch the route already on screen", () => {
-  // `router.navigate()` to the current hash re-runs the handler so the view is
-  // correct (the layer stack is UI state, not URL state). That must not become a
-  // second network request for the same screen.
-  const home = parseRoute("#/home");
-  assert.equal(needsData(home, parseRoute("#/home"), { initial: false }), false);
-  const search = parseRoute("#/search?q=koshi");
-  assert.equal(needsData(search, parseRoute("#/search?q=koshi"), { initial: false }), false);
-  // Opening the player is a different URL, and it is a *presentation* change:
-  // it re-renders, and it must not re-query. (This failed when `needsData` used
-  // `sameRoute`, which compares the player's open state.)
-  assert.equal(needsData(search, parseRoute("#/search?q=koshi&player=open"), { initial: false }), false,
-    "opening the player is not a reason to re-query the source");
-  assert.equal(needsData(parseRoute("#/home?player=open"), parseRoute("#/home?ptab=lyrics"), { initial: false }), false);
-});
-
-test("the router tells the app which call is the first one", () => {
-  // The signal `needsData` depends on. A router that stopped passing it would
-  // silently reintroduce the idle-first-render bug.
-  const seen = [];
-  const fakeWin = {
-    location: { hash: "" },
-    history: { replaceState: () => {} },
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  };
-  const router = createRouter({ win: fakeWin, onRoute: (route, meta) => seen.push(meta) });
-  router.start();
-  // `replace` so the handler runs without a real hashchange event: the point
-  // here is the flag, not the event plumbing.
-  router.navigate({ ...parseRoute("#/search"), query: "koshi" }, { replace: true });
-  assert.equal(seen[0]?.initial, true, "the first call must be marked initial");
-  assert.equal(seen.at(-1)?.initial, false, "later calls must not be");
-});
-
-test("sameRoute compares what the view renders, and nothing else", () => {
-  const base = { ...DEFAULT_ROUTE };
-  assert.ok(sameRoute(base, { ...base }));
-  assert.ok(!sameRoute(base, { ...base, name: "search", query: "" }));
-  assert.ok(!sameRoute(base, { ...base, player: "open" }));
-  assert.ok(!sameRoute(base, { ...base, player: "open", playerTab: "lyrics" }));
-});
-
-/**
- * The player's context line names the thing that is playing.
- *
- * This is a small string with a real failure behind it: the label was built
- * inline in `main.js` as `"Album · " + nothing`, so the full player showed
- * "Album ·" over a playlist and over an artist, and an entity whose title never
- * arrived showed a separator with nothing after it. The label is a function of
- * the route, and these are its four cases.
- */
-test("an entity's label names its kind, and a nameless one says nothing at all", () => {
-  assert.equal(entityLabel("album", "Dharan Nights"), "Album · Dharan Nights");
-  assert.equal(entityLabel("artist", "Naya Koirala"), "Artist · Naya Koirala");
-  assert.equal(entityLabel("playlist", "Evening Drive"), "Playlist · Evening Drive");
-  // No dangling "Album ·": the player falls back to its own "Playing".
-  assert.equal(entityLabel("album", ""), "");
-  assert.equal(entityLabel("artist", undefined), "");
-  // And a route that is not an entity never claims to be one.
-  for (const name of ["home", "search", "library", "settings", "about-legal", undefined]) {
-    assert.equal(entityLabel(name, "Something"), "", `${name} is not an entity`);
-  }
+test("screen titles come from one place", () => {
+  assert.equal(titleFor({ name: "settings" }), "Settings");
+  assert.equal(titleFor({ name: "search", query: "lofi" }), "Search: lofi");
+  assert.equal(titleFor({ name: "album", id: "x" }, "Monsoon"), "Monsoon");
+  assert.equal(titleFor({ name: "album", id: "x" }), "Album", "a collection without a name still has a title");
 });

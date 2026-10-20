@@ -5,25 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>DHUN — the web build</title>
     <!--
-      The document's own copy is copy: it is the tab title, the install prompt
-      and the line a search engine or a share sheet shows. It used to read "play
-      YouTube Music in your browser", which is the one claim this build cannot
-      make from its own chrome — playback depends on an origin nobody here
-      controls. What the app actually does is search it, attempt it, and say
-      plainly when the answer is no. `tests/actions.test.mjs` checks these lines
-      along with every string the screens render.
+      The document's copy is copy: the tab title, the install name, the line a
+      share sheet shows. It says what this build is — a music player for the
+      browser that reads JioSaavn's public catalogue — and not what it cannot
+      promise: it is an unofficial wrapper, and the app says so on screen.
     -->
     <meta
       name="description"
-      content="DHUN's web build: search YouTube Music anonymously from your browser, keep your library on your device, and see plainly when a source will not answer."
+      content="DHUN in the browser: search JioSaavn's catalogue, play it, and keep likes, playlists and history on your own device. No account, no DHUN server, no telemetry."
     />
-    <!-- Out of the index, and not as a hedge: what a crawler gets here is an
-         empty `<div id="app">` and a module graph, because the interface is
-         built in the browser from the visitor's own library. There is no page
-         here to rank, and an app shell in search results would be a result
-         that cannot show anything until it runs. The site's own routes are what
-         belong in the index; `scripts/website_smoke.py` asserts this line on
-         the served bytes, and the site's sitemap lists no `/app/` route. -->
+    <!--
+      Out of the index on purpose. A crawler gets an empty `<div id="app">` and a
+      module graph, because the interface is assembled in the browser from the
+      visitor's own library and a live catalogue. There is no page here to rank,
+      and an app shell in search results would be a result that cannot show
+      anything until it runs. `scripts/website_smoke.py` asserts this line on the
+      served bytes.
+    -->
     <meta name="robots" content="noindex, nofollow" />
     <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#161616" media="(prefers-color-scheme: dark)" />
@@ -31,61 +29,68 @@
     <meta name="application-name" content="DHUN" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="DHUN" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!--
       Content-Security-Policy, and what each widening is for.
 
-      `script-src 'self'` is the whole point: no inline script, no eval, no CDN.
-      `style-src` needs 'unsafe-inline' because the app writes an inline
-      `background-image` gradient on artwork placeholders and the theme is
-      applied as a data attribute; there is no user-controlled CSS path.
+      `script-src 'self'` is the point: no inline script, no eval, no CDN, no
+      third-party runtime of any kind. `style-src` needs 'unsafe-inline' because
+      the app writes an inline `background-image` on a hero's blurred backdrop;
+      there is no user-controlled CSS path.
 
-      The network directives are wide on purpose and worth being explicit about.
-      A music client's whole job is to fetch media from somewhere the app does
-      not control: YouTube's own endpoints and its `googlevideo.com` CDN, LRCLIB
-      for lyrics, artwork from `googleusercontent.com`/`ytimg.com`, and — when a
-      visitor configures one — their own endpoint on any HTTPS host. Constraining
-      those to a hard-coded list would break the one escape hatch that exists for
-      a blocked network. What is *not* allowed is being widened: no
-      `script-src 'unsafe-eval'`, no `frame-src`, no `object-src`, no inline
-      event handlers, and `base-uri`/`form-action` stay locked to 'none'.
+      `connect-src` and `media-src` name exactly two origins: the catalogue API
+      (`saavn.dev`) and the CDN it streams from (`saavncdn.com`). Images come from
+      that CDN too. Nothing else is reachable from this page — no analytics, no
+      fonts, no telemetry endpoint, because there are none to reach.
 
-      `frame-ancestors 'none'` is deliberately absent, and its absence is a
-      limitation rather than a choice. It is a response-header directive: the
-      specification requires a `<meta>` CSP to ignore it, Chrome logs exactly
-      that on every load, and GitHub Pages serves a project site with no header
-      control — so the directive would have been dead configuration that looked
-      like protection. The rule itself is still enforced, in the one place this
-      build can enforce it: the app refuses to boot inside a frame
-      (`isFramed` in js/platform.js, the guard at the top of `boot()`), and the
-      visitor gets an explanation instead of a Play button wearing somebody
-      else's page as a costume.
+      `frame-ancestors` is absent, and its absence is honest rather than a
+      choice: it is a response-header directive, the specification requires a
+      `<meta>` CSP to ignore it, and GitHub Pages serves a project site with no
+      header control. The rule is enforced where this build can enforce it — the
+      app refuses to boot inside a frame and says why.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: blob:; connect-src 'self' https:; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.saavncdn.com; media-src https://*.saavncdn.com blob:; connect-src https://saavn.dev https://*.saavncdn.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none';"
     />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="stylesheet" href="./css/tokens.css" />
     <link rel="stylesheet" href="./css/app.css" />
+    <script type="module" src="./js/main.js"></script>
   </head>
   <body>
-    <div id="app"></div>
+    <!--
+      The app's regions. Every one of them is a real element in the document
+      before the module runs, so the first paint is the shell rather than a blank
+      page, and `scripts/test_app_web.py` asserts that each exists.
+    -->
+    <div id="app" class="dhun-app" data-player="closed" data-has-track="false">
+      <a class="dhun-skip-link" href="#main">Skip to content</a>
+      <div id="dhun-topbar" class="dhun-topbar"></div>
+      <div id="dhun-rail-region" class="dhun-rail-region"></div>
+      <main id="main" class="dhun-main" tabindex="-1">
+        <div id="dhun-view" class="dhun-view" aria-live="polite"></div>
+      </main>
+      <div id="dhun-dock" class="dhun-dock"></div>
+      <div id="dhun-nav-region" class="dhun-nav-region"></div>
+      <div id="dhun-overlay" class="dhun-overlay"></div>
+      <div id="dhun-sheet" class="dhun-sheet-region"></div>
+      <div id="dhun-toast" class="dhun-toast-region" aria-live="polite" aria-atomic="true"></div>
+    </div>
+    <audio id="dhun-audio" preload="metadata" crossorigin="anonymous"></audio>
     <noscript>
       <div class="dhun-noscript">
         <h1>DHUN needs JavaScript</h1>
         <p>
-          This is an application, not a document: every screen is built in the browser and the audio
-          engine is part of the page. With scripting disabled the interface cannot render at all.
+          The interface is assembled in your browser: the catalogue is fetched from
+          JioSaavn's public API, and your likes, playlists and history live in this
+          browser's storage. Nothing is pre-rendered, so with scripting disabled there
+          is no player to show. The Android and Windows builds do not need it.
         </p>
-        <p>
-          The Android and Windows builds do not need it. See
-          <a href="../">the DHUN project page</a> for downloads, or read the source at
-          <a href="https://github.com/99ggprooo00-code/DHUN">github.com/99ggprooo00-code/DHUN</a>.
-        </p>
+        <p><a href="../">Back to the DHUN site</a></p>
       </div>
     </noscript>
-    <script type="module" src="./js/main.js"></script>
   </body>
 </html>
