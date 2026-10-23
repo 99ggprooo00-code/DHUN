@@ -141,6 +141,7 @@ Procedure, run by a person in a real browser:
 | Date | Browser and OS | Console result (verbatim) | Player shown and played? | Owner's name |
 |---|---|---|---|---|
 | Owner-reported. Date and page address to be confirmed. | Chrome (to be confirmed) | Lines seen: `SPIKE state -1`, `3`, `1`, `2`. The `SPIKE onReady` line (which prints the origin and referrer) has not yet been copied. An ad-blocker message appeared for an unrelated Google conversion ping. | Yes: the player loaded with a play button, played, and sound came out. The box stays fixed in its corner when scrolling. | Owner (name to be added) |
+| Owner-reported, 2026-10-22. Page: `https://99ggprooo00-code.github.io/DHUN/app/#/home` | Firefox (version to be confirmed) | `Content-Security-Policy: ... script-src-elem at https://www.youtube.com/iframe_api ... violates the following directive: "script-src 'self'"`. The box appeared empty, with no player. | No. The policy blocked the script before YouTube was contacted. This is **not** a referrer result. | Owner (name to be added) |
 | _not yet run_ | | | | |
 
 Reading the result: `onReady` with no error means the embed was accepted from that origin. An
