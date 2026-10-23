@@ -50,7 +50,7 @@ A rule that nothing checks is a rule that lasts until the next busy session.
 
 | Rule | Enforced by |
 |---|---|
-| **No running cost, no DHUN backend.** The only origins the page may reach are the catalogue and its CDN. | `app-web/src/index.html`'s CSP (`connect-src https://saavn.dev https://*.saavncdn.com`); `scripts/test_app_web.py::ShipsNoThirdPartyRuntimeAsset`; `docs/decisions/ADR-008-browser-web-player-target.md` boundary 1 |
+| **No running cost, no DHUN backend.** The page may reach only the catalogue and its CDN. The policy also permits the script and frame hosts of three player services, none used yet (see SECURITY-PRIVACY). | `app-web/src/index.html`'s CSP (`connect-src https://saavn.dev https://*.saavncdn.com`); `scripts/test_app_web.py::ShipsNoThirdPartyRuntimeAsset`; `docs/decisions/ADR-008-browser-web-player-target.md` boundary 1 |
 | **No fake playback.** Progress is drawn from the media element's own clock; a "playing" state implies a media element that is actually playing. | `app-web/src/js/player.js` (queue and transport), `app-web/src/js/player-ui.js` (the clock), `app-web/tests/player.test.mjs` |
 | **No simulated catalogue.** Sample rows are labelled at the source *and* on screen, and carry no stream. | `app-web/src/js/demo.js`, `app-web/src/js/components.js` (`sourceBadge`, `notice`), `scripts/test_app_web.py::DoesNotSellWhatABrowserCannotDo` |
 | **Honest failures.** Timeout, offline, HTTP error and a row with no stream are distinct states that name what happened. | `app-web/src/js/api.js` (`SourceError`, `describeFailure`), `app-web/src/js/components.js` (`errorState`), `app-web/tests/api.test.mjs` |

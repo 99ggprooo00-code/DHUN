@@ -74,7 +74,8 @@ verified and this file names the evidence; an unticked box means it was not.
 - [x] **No paid infrastructure and no DHUN server** — static GitHub Pages, one
   third-party API called from the tab, no function, no database, no proxy.
 - [x] **No tracking** — no analytics, telemetry or crash reporting; the CSP names
-  three catalogue deployments and its CDN, and nothing else.
+  three catalogue deployments and its CDN, and the script and frame hosts of three
+  player services that no code uses yet (see SECURITY-PRIVACY.md).
 - [x] **The limits are visible in the product** — the source badge, the sample
   catalogue notice, the failure states, `Settings → Catalogue`, and
   [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md).
