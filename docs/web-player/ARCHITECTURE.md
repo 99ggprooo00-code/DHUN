@@ -121,7 +121,8 @@ reads. Every instance must also appear in the CSP, which
 service can rate-limit, change shape or disappear, and the app has to survive
 each of those as a state rather than as a blank screen. The CSP names exactly
 that origin and `*.saavncdn.com`, so a stray request to anywhere else fails
-closed.
+closed. The player services in SECURITY-PRIVACY.md may load scripts and frames;
+they cannot be reached by requests.
 
 `js/demo.js` is the labelled sample catalogue: fixed rows, `demo: true`, an empty
 stream. It is chosen only when the network fails, it is announced by a badge and

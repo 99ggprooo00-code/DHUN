@@ -602,12 +602,28 @@ class HonestyIsInTheRenderedCopy(unittest.TestCase):
         # allowlist below says which kinds of community deployment are allowed.
         declared = set(re.findall(r'origin: "https://([a-z0-9*.-]+)"', self.api))
         self.assertGreaterEqual(len(declared), 2, "the catalogue has no failover — one host is a single point of failure")
+        # Player services the policy permits (decision 2026-10-22, ADR-010). The
+        # policy allows them; no source file uses them yet. Each is listed here
+        # so an addition is a reviewed change, not a silent one.
+        # Only script and frame hosts are listed: the embedded players need them.
+        # Network (connect), image and media hosts are added with the integration
+        # that uses them, because a third-party script allowed to run could
+        # otherwise reach them.
+        player_services = {"www.youtube.com", "s.ytimg.com", "sdk.scdn.co", "js-cdn.music.apple.com"}
         for origin in origins:
             if origin in declared:
                 continue
             self.assertTrue(
-                origin.endswith(("saavncdn.com", "github.com")),
+                origin.endswith(("saavncdn.com", "github.com")) or origin in player_services,
                 f"{origin} is neither a declared catalogue instance nor a disclosed service",
+            )
+        for service in player_services:
+            self.assertIn(service, self.index_html, f"{service} is listed as disclosed but is not in the policy")
+        player_url = re.compile(r"https?://[^\s\"'`)]*(youtube|ytimg|spotify|scdn\.co|music\.apple|mzstatic|googlevideo)", re.I)
+        for name, source in _js_sources().items():
+            self.assertIsNone(
+                player_url.search(source),
+                f"{name} names a player service; the policy allows it but no code may use it yet",
             )
         # github.com appears only as a link in the support copy, never as a
         # fetch target; `connect-src` is the enforceable half.

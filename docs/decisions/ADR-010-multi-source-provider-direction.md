@@ -173,6 +173,14 @@ artists under Creative Commons licences, with royalty-free licensing for busines
 review states that "nothing here is a chart hit". Under the owner's rule (add it only if it has
 popular music), it stays out. Reopen if the owner wants a free Creative Commons source anyway.
 
+**Follow-up 2026-10-22 (owner): policy widened for player services.** The owner approved the
+policy change and asked for YouTube, Spotify, Apple Music and others. Only the script and frame
+hosts of YouTube, Spotify's Web Playback SDK and Apple MusicKit JS were added. No code uses them.
+Connect, image and media hosts were left out on purpose, so a third-party script cannot reach
+them. Other services were not added: SoundCloud needs a paid subscription, Jamendo was excluded
+as not popular, and no others were named. Permission is not use; the account requirements still
+apply.
+
 **Plan for the next session: a visible YouTube "Watch" mode (not built now).**
 
 1. **Spike, no product change.** On the deployed origin, load the stock IFrame player at its

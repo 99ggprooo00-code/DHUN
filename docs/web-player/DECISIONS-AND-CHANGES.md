@@ -36,6 +36,7 @@ improve the product.
 | 2026-10-20 | Recorded four defects found while writing the documents, in [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) §2 (WD-1 to WD-3). No code was changed for them. |
 | 2026-10-21 | **Jamendo not added.** Its catalogue is independent Creative Commons and royalty-free music, not popular music, so under the owner's rule it stays out. | Accepted. | [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md) (2026-10-21 follow-up) |
 | 2026-10-21 | **Visible YouTube player is planned, not built.** It plays video with its own audio (no separation), must stay displayed, and pauses when hidden. Next session: a spike first, then owner approval for the third-party script, then a separate mode beside JioSaavn. | Planned. | [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md) (2026-10-21 follow-up) |
+| 2026-10-22 | **Owner decision: the policy permits the script and frame hosts of three player services, none of them used.** This reverses the "no third-party runtime" line for those hosts only. Spotify's Web Playback SDK is permitted but not used. Apple's MusicKit JS is permitted but not used. Network, image and media hosts are not added until an integration needs them, and account requirements apply to any later integration. | Accepted by the owner. Permission only; no feature. | [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md) (2026-10-22 follow-up), `app-web/src/index.html`, `scripts/test_app_web.py`, [SECURITY-PRIVACY.md](SECURITY-PRIVACY.md) |
 
 ## 3. What is not recorded here
 

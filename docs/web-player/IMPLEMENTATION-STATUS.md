@@ -74,7 +74,8 @@ verified and this file names the evidence; an unticked box means it was not.
 - [x] **No paid infrastructure and no DHUN server** — static GitHub Pages, one
   third-party API called from the tab, no function, no database, no proxy.
 - [x] **No tracking** — no analytics, telemetry or crash reporting; the CSP names
-  three catalogue deployments and its CDN, and nothing else.
+  three catalogue deployments and its CDN, and the script and frame hosts of three
+  player services that no code uses yet (see SECURITY-PRIVACY.md).
 - [x] **The limits are visible in the product** — the source badge, the sample
   catalogue notice, the failure states, `Settings → Catalogue`, and
   [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md).
@@ -99,3 +100,51 @@ In order; nothing below the first line matters until it is done.
    screen.
 3. Only then: the second browser and the phone, the screen-reader pass, and the
    release decision.
+
+## Spike: YouTube player on the live origin (step 1 of the Watch-mode plan, not run)
+
+Purpose: find out whether YouTube's embedded player accepts the Referer the live site sends.
+This is evidence only. It changes no product code. The procedure is in
+[ADR-010](../decisions/ADR-010-multi-source-provider-direction.md) (2026-10-21 follow-up).
+
+Procedure, run by a person in a real browser:
+
+1. Open `https://99ggprooo00-code.github.io/DHUN/` (the homepage, which has no page-level
+   Content-Security-Policy in its source). Open the developer console.
+2. Paste the script below and press Enter. It loads the official IFrame API and creates a 320×180
+   player in the bottom-right corner, with a public video the owner chooses.
+3. Watch the console for lines starting `SPIKE`, and look at the player itself.
+4. Record the result in the table below. Keep the console text verbatim.
+
+```js
+(() => {
+  const VIDEO_ID = "jNQXAC9IVRw"; // replace with any public video you choose
+  const box = document.createElement("div");
+  box.style.cssText = "position:fixed;right:16px;bottom:16px;width:320px;height:180px;z-index:99999;background:#000";
+  document.body.appendChild(box);
+  window.onYouTubeIframeAPIReady = () => {
+    new YT.Player(box, {
+      width: 320, height: 180, videoId: VIDEO_ID,
+      playerVars: { autoplay: 0, playsinline: 1 },
+      events: {
+        onReady: () => console.log("SPIKE onReady", location.origin, "referrer:", document.referrer),
+        onStateChange: (e) => console.log("SPIKE state", e.data),
+        onError: (e) => console.log("SPIKE error", e.data),
+      },
+    });
+  };
+  const s = document.createElement("script");
+  s.src = "https://www.youtube.com/iframe_api";
+  document.head.appendChild(s);
+})();
+```
+
+| Date | Browser and OS | Console result (verbatim) | Player shown and played? | Owner's name |
+|---|---|---|---|---|
+| Owner-reported, 2026-10-22. Page: `https://99ggprooo00-code.github.io/DHUN/` (homepage). Chrome was **not** tested. | Brave and Firefox (versions to be confirmed) | Lines seen: `SPIKE state -1`, `3`, `1`, `2`. The `SPIKE onReady` line (which prints the origin and referrer) has not yet been copied. An ad-blocker message appeared for an unrelated Google conversion ping. | Yes: the player loaded with a play button, played, and sound came out. The box stays fixed in its corner when scrolling. | Owner (name to be added) |
+| Owner-reported, 2026-10-22. Page: `https://99ggprooo00-code.github.io/DHUN/app/#/home` | Firefox (version to be confirmed) | `Content-Security-Policy: ... script-src-elem at https://www.youtube.com/iframe_api ... violates the following directive: "script-src 'self'"`. The box appeared empty, with no player. | No. The policy blocked the script before YouTube was contacted. This is **not** a referrer result. | Owner (name to be added) |
+| _not yet run_ | | | | |
+
+Reading the result: `onReady` with no error means the embed was accepted from that origin. An
+`onError` code means the embed was refused. Look up the code in YouTube's IFrame API error
+reference before deciding anything. Do not treat one run as proof for every browser.

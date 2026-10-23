@@ -11,7 +11,7 @@ of the constraints themselves and where each one is enforced.
 |---|---|---|
 | Delivery | Static files only: one HTML document, two stylesheets, ES modules, a manifest and a service worker. | `app-web/tools/build.mjs` copies `app-web/src/` to `app-web/dist/`. |
 | Runtime dependencies | None. `app-web/package.json` declares no `dependencies`. | `app-web/package.json`; `scripts/test_app_web.py::ShipsNoThirdPartyRuntimeAsset`. |
-| Script loading | ES modules, loaded with `type="module"`. No inline script. | `script-src 'self'` in the CSP. |
+| Script loading | ES modules, loaded with `type="module"`. No inline script. | `script-src 'self'` in the CSP, plus the player scripts in SECURITY-PRIVACY.md. |
 | Browsers | Modern evergreen browsers are the target. | Only Chromium is measured in CI (see [TESTING.md](TESTING.md)). Firefox, Safari and Edge are not measured by this repository. |
 | Hosting | GitHub Pages at `/DHUN/app/`, and a local `/app/` for tests. | `.github/workflows/website.yml`. |
 | Build step | Node.js for the copy and checks; no install is needed for the build tool itself. | `app-web/tools/build.mjs`. |

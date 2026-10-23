@@ -14,8 +14,8 @@ privacy and terms texts are in `app-web/src/js/data/web-legal.js`.
 | `saavn.dev`, `saavn.sumit.co`, `saavnx.vercel.app` | Search text, song/album/artist/playlist ids, page numbers. Standard request headers, sent by the browser. No cookies (`credentials: omit`). | To read the catalogue. |
 | `*.saavncdn.com` | The audio and artwork request for a URL the catalogue returned. | To play and show a track. |
 
-Nothing else is requested. The page loads no fonts, scripts, analytics, tags,
-embeds or advertising from any other origin. This is enforced by the CSP (see
+Nothing else is requested. The page loads no fonts, analytics, tags, embeds or
+advertising from any other origin. Three player services have permitted script and frame hosts, and none is used. The page makes no requests to them, and no code loads them. YouTube's player hosts are `www.youtube.com` and `s.ytimg.com`. Spotify's Web Playback SDK is permitted but not used, and its script host is `sdk.scdn.co`. Apple's MusicKit JS is permitted but not used, and its script host is `js-cdn.music.apple.com`. Their network, image and media hosts are not allowed until a feature needs them. This is enforced by the CSP (see
 [TRD.md](TRD.md) §2) and checked by `scripts/test_app_web.py` and by the
 `website_claims.py` rules over the shipped dependency graph.
 
