@@ -1,6 +1,6 @@
 # Release and deployment — DHUN Web (`/app/`)
 
-> **2026-10-28 local revision:** browser shell/cache version `3.0.2` carries
+> **2026-10-29 browser cache revision:** browser shell/cache version `3.0.3` carries
 > transport, storage/erase, FullPlayer and shell-cache reliability corrections so clients can refresh them
 > when a future authorised deployment occurs. No schema/storage-key/native
 > release version or release channel changed; no publication is authorised here.
@@ -17,9 +17,9 @@ apply to the browser build except where it says so.
 
 | Identifier | Value | Where it lives |
 |---|---|---|
-| Web version | `3.0.2` | `app-web/src/js/version.js` (`WEB_VERSION`) |
+| Web version | `3.0.3` | `app-web/src/js/version.js` (`WEB_VERSION`) |
 | Build label | `web (static, no backend)` | `app-web/src/js/version.js` (`BUILD_LABEL`) |
-| Service worker cache | `dhun-web-v3.0.2` | `app-web/src/sw.js` (`DEFAULT_CACHE`), and `cacheName()` in `version.js` |
+| Service worker cache | `dhun-web-v3.0.3` | `app-web/src/sw.js` (`DEFAULT_CACHE`), and `cacheName()` in `version.js` |
 | Release channel shown in legal text | `web (static build)`, platform `browser` | `app-web/src/js/legal.js` (`WEB_APP_INFO`) |
 | Storage key | `dhun.web.v3` | `app-web/src/js/library.js` (`STORAGE_KEY`); a version change here is a data change |
 
@@ -85,3 +85,9 @@ the only publisher.
   recorded, not listening.
 - Whether every host that might serve the site sends the same headers. The
   project uses GitHub Pages only.
+
+Version 3.0.3 also carries connected-input Search result updates and composition
+protocol guards. It changes the worker script/cache namespace so existing clients
+can receive the fix after the normal close/reopen update cycle, without forced
+reload or keyboard dismissal. Native application versions and storage schema are
+unchanged; this is not native-device/IME or audible-provider acceptance.

@@ -122,6 +122,11 @@ boot/router coverage is `app-web/tests/navigation-requests.test.mjs`, not real
 browser or service acceptance. Aborting fetch cannot recall data already received
 or logged by an operator. No origin, CSP, retry budget or data schema changed.
 
+For the same intent, result/error markup updates without replacing the Search
+form/input, preserving its composition target. Composing partial text is not
+submitted; a new explicit query remains a new request owner. These are browser
+DOM rules, not evidence of Android keyboard behavior or a native provider change.
+
 ### Teardown versus independent work
 
 Screen cancellation does not destroy the app or its player. Full component

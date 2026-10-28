@@ -1,3 +1,19 @@
+## 2026-10-29 — browser result renders detached the composing Search target
+
+Controlled Node regressions: 7 failures / 19 cases before correction. Search
+rebuilt the whole input; restoring a string/caret cannot recreate native IME
+state, and Escape was matched before composition checks. Result-only updates,
+input ownership and composition/processing-key guards correct the browser path.
+Focused Search/view/cancellation/shortcut cases 78/78 and full app 269 pass.
+This is not a native-phone reproduction: no phone/SDK/ADB transport is available.
+No native KMP behavior, dismiss policy, provider/CSP or storage schema changed.
+Available local gates pass: 269 JS/20 docs, 497 Python, 63 site rules and
+static/HTTP website checks. Guard-removal mutations fail as expected without
+changing production source. Remaining gates: final-head CI and the externally
+blocked physical matrix. No native-IME or real-device success is asserted.
+
+---
+
 # DEBUG_LOG — incidents, root causes, environment traps
 
 ## 2026-10-28 — PR #197: stale native table test, live-CORS layout dependency, unlabelled fallback

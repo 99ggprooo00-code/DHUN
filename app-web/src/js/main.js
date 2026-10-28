@@ -293,8 +293,16 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   // Only screen-owned catalogue requests live here. Player resolution is
   // independent, so navigation never cancels its stream lookup.
   const catalogueRequests = { home: null, search: null, entity: null };
+  let searchComposition = null;
+
+  function isSearchComposing() {
+    return Boolean(searchComposition && state.route.name === "search"
+      && searchComposition.requestId === state.search.requestId
+      && doc.getElementById("search-input") === searchComposition.target);
+  }
 
   function beginCatalogueRequest(kind) {
+    if (kind === "search") searchComposition = null;
     catalogueRequests[kind]?.abort();
     const controller = new AbortController();
     catalogueRequests[kind] = controller;
@@ -308,6 +316,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
 
   function retireCatalogueRequest(kind) {
+    if (kind === "search") searchComposition = null;
     const controller = catalogueRequests[kind];
     catalogueRequests[kind] = null;
     controller?.abort();
@@ -561,7 +570,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
 
     switch (route.name) {
       case "search": {
-        markup = views.searchScreen({
+        const vm = {
           query: state.search.query,
           filter: state.search.filter,
           status: state.search.status,
@@ -572,7 +581,13 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
           currentId,
           playing,
           hrefFor,
-        });
+        };
+        const results = renderedSearchRequestId === state.search.requestId ? doc.getElementById("search-results") : null;
+        if (results) {
+          // Keep the actual form/input connected: strings cannot restore IME state.
+          results.innerHTML = views.searchResults(vm);
+          markup = null;
+        } else markup = views.searchScreen(vm);
         break;
       }
       case "library": {
@@ -679,7 +694,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       }
     }
     state.pendingFieldFocus = capturedCaret;
-    setRegion("dhun-view", markup);
+    if (markup !== null) setRegion("dhun-view", markup);
     renderedSearchRequestId = route.name === "search" ? state.search.requestId : null;
     updateDocumentTitle();
     renderChrome();
@@ -833,8 +848,10 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     if (!captured) return;
     const field = doc.getElementById(captured.id);
     if (!field) return;
+    // A composing field stays connected and under the IME's control.
+    if (isSearchComposing() && searchComposition.target === field) return;
     // Assign a value, never HTML; unsubmitted text must not be sent or persisted.
-    if (typeof captured.value === "string") field.value = captured.value;
+    if (typeof captured.value === "string" && field.value !== captured.value) field.value = captured.value;
     if (field === doc.activeElement) {
       if (field === doc.activeElement && captured.start !== null) setCaret(field, captured);
       return;
@@ -844,6 +861,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
 
   function setCaret(field, captured) {
+    if (field.selectionStart === captured.start && field.selectionEnd === (captured.end ?? captured.start)) return;
     try {
       field.setSelectionRange(captured.start, captured.end ?? captured.start);
     } catch {
@@ -1052,6 +1070,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     /* search */
     "search-submit": (target, event) => {
       event.preventDefault();
+      if (isSearchComposing()) return;
       const input = target.querySelector("input[name='q']") ?? doc.querySelector("#search-input");
       const query = (input?.value ?? "").trim();
       if (!query) return;
@@ -1323,6 +1342,15 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     handler(target, event);
   })));
 
+  own(listen(root, "compositionstart", whileActive((event) => {
+    if (state.route.name === "search" && event.target === doc.getElementById("search-input")) {
+      searchComposition = { target: event.target, requestId: state.search.requestId };
+    }
+  })));
+  own(listen(root, "compositionend", whileActive((event) => {
+    if (searchComposition?.target === event.target) searchComposition = null;
+  })));
+
   // The file input is change, not click.
   own(listen(root, "change", whileActive((event) => {
     const input = event.target.closest?.("[data-action='import-library']");
@@ -1351,6 +1379,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   })));
 
   own(listen(doc, "keydown", whileActive((event) => {
+    if (event.isComposing || event.keyCode === 229 || (isSearchComposing() && doc.activeElement === searchComposition.target)) return;
     if (event.key === "Tab" && trapDialogTab(event)) return;
     const match = matchShortcut(event, { inDialog: Boolean(dialogRoot()) });
     if (!match) return;
