@@ -284,7 +284,10 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       state.home = { status: "ready", rails, error: null };
     } else {
       const error = failures[0] ?? new SourceError(FAILURE_KIND.shape, "every shelf came back empty", { url: API_ORIGIN });
-      if (error instanceof SourceError && NETWORK_KINDS.has(error.kind)) noteFailure(error);
+      // Every row below is fictional, including after HTTP/shape failures.
+      // Always label that fallback; this does not turn an HTTP detail/search
+      // error into a successful response (withFallback keeps that distinction).
+      noteFailure(error);
       state.home = { status: "sample", rails: demoHome(), error };
     }
     if (state.route.name === "home") renderView();

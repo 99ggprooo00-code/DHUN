@@ -21,23 +21,32 @@ records discrepancies, corrections, all file changes, fresh primary research,
 validation and remaining gates. Existing native cache/history controls and
 browser data flows are reflected truthfully; no wholesale source/ID migration.
 
-**Publication follow-up / exact next step:** initial corrections/safeguards and
-local checks are complete; rerun current gates, commit the audited changes, push
-the assigned branch, create the PR, then inspect every applicable check (including
-step outcomes) and fix root causes before merge. No PR/new remote CI is claimed yet.
-GitHub confirms `main` and this starting HEAD are `12498ca`; its existing build/
-site checks passed. The separate scheduled extraction probe run `40483966781`
+**Publication follow-up / exact next step:** [PR #197](https://github.com/99ggprooo00-code/DHUN/pull/197)
+opened from assigned-branch commit `7ca24a0`. Its initial Build APK, website build
+and Lighthouse passed; shared JVM/Windows MSI failed on the obsolete 3-row
+Support-table test (the corrected page has nine real controls). Browser failed
+on three live-wrapper CORS console messages. Both causes are fixed locally:
+semantic native table assertions; controlled network/HTTP fixtures without gate
+relaxation; actual Home sample-label fix exposed by HTTP failure. New fixture
+unit tests pass (59 total site rules); full local browser has 146 measurements,
+zero notes/failures. **Next: push these fixes, inspect fresh native/site/package
+CI and only merge once all applicable final-head checks pass.** No all-green
+remote claim yet. Current files: native MarkdownParserTest, app-web main, browser
+harness/fixtures/tests, audit/inventory and state records.
+
+Starting main remains `12498ca`. Its separately scheduled probe `40483966781`
 reports `ENVIRONMENT_BLOCKED`, not healthy playback. Branch-protection inspection
-is denied to the integration (HTTP 403); do not bypass GitHub merge enforcement.
+is denied (HTTP 403); normal GitHub merge enforcement is not bypassed.
 
 **Independent follow-up gates:** provider permission/legal and resolved notices,
 current-device and real-origin audio evidence, then bounded deletion/logging and
 provider identity/capability/auth/player/migration design. These remain open;
 merging this alignment does not authorise a provider or public app release.
-Current files: audit 06, this roadmap and handoff; last new failure: none;
-next: commit/push → PR and new CI evidence. Fresh local rerun passes: 493 Python,
-165 JS, 52 site rules, 20 docs, 4-page HTML/claims/build, quality 32, legal
-7 pages / 2 targets, 51 fragment links and whitespace; no gate disabled.
+Last actual CI errors: stale native table assertion and live-CORS browser
+coupling, fixed locally; fresh remote confirmation pending. Original pre-push
+checks passed 493 Python/165 JS/52 site rules; added fixture/harness regressions
+are recorded in audit 06 §12, not misreported as part of that earlier run.
+
 
 ## Historical sessions and earlier active-task snapshots
 

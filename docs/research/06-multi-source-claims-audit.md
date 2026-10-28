@@ -104,7 +104,7 @@ Additional providers need evidence. Implementation/provider/capability differenc
   browser-provider checks, native legal hashes/includes/tokens and current control assertions, fixed exact CSP origin
   checks, real legal/erase browser tests and non-ignored-worktree hygiene. Existing CI discovers them; workflows unchanged.
 - **Small justified runtime/UI changes only:** legal draft/date labels; browser Erase wording; one notice wrapping rule;
-  browser local/cache patch `3.0.1`. No provider/API/player/queue/auth/storage migration, new backend/runtime dependency,
+  browser local/cache patch `3.0.1`; follow-up Home sample-badge disclosure fix (§12). No provider/API/player/queue/auth/storage migration, new backend/runtime dependency,
   paid service, Spotify implementation or native-stack rewrite. Cache patch is **not a published release**.
 
 ### Further discrepancies found during the final trace/rescan
@@ -315,21 +315,21 @@ No word-only ban, wholesale identifier rename, fabricated new test result, erase
 The multi-source direction, YouTube priority and Spotify plan are **resolved**, not questions to ask again.
 Future gated decisions are: the legal/controller/private-contact/adoption approach and permitted service scopes;
 whether any Spotify account/recurring-cost/access constraint may change (not assumed); whether a proposed visible Watch mode
-is wanted enough to authorise its runtime/privacy/CSP work; and when, if ever, publication is authorised after independent
-technical/legal gates. No technical workaround, separation of queues, Premium purchase or missing contact is invented here.
+is wanted enough to authorise its runtime/privacy/CSP work; and when, if ever, a public app release is authorised after
+independent technical/legal gates. Commit/push/conditional merge of this alignment is now explicitly authorised (§12). No technical workaround, separation of queues, Premium purchase or missing contact is invented here.
 
 ## 11. Every changed/created/deleted file and why
 
-**106 files: 102 modified, 4 created, 0 deleted**, relative to starting revision `12498caa02607edd74504161f388fc2e11d34a4c`. All work remains on `arena/5ced2dbe-dhun`. The original alignment snapshot was unstaged/uncommitted; §12 tracks the later authorised PR/CI follow-up. Canonical licence texts, dependency lockfiles, screenshot assets, `.github/workflows`, provider signatures/SQL schema and user data unchanged. Ignored browser builds/test screenshots and external tool/cache/log files are not Git additions.
+**110 files: 104 modified, 6 created, 0 deleted**, relative to starting revision `12498caa02607edd74504161f388fc2e11d34a4c`. All work remains on `arena/5ced2dbe-dhun`. The original alignment snapshot was unstaged/uncommitted; §12 tracks the later authorised PR/CI follow-up. Canonical licence texts, dependency lockfiles, screenshot assets, `.github/workflows`, provider signatures/SQL schema and user data unchanged. Ignored browser builds/test screenshots and external tool/cache/log files are not Git additions.
 
 | Action | Exact file | Reason |
 | --- | --- | --- |
 | Modified | `.ai/AUTONOMY_PROMPT.md` | Current authority/session permissions above preserved historical autonomy and extraction orders; no automatic publication. |
-| Modified | `.ai/DEBUG_LOG.md` | Dated cause/fix for provider/privacy/claims drift; prior incidents and test outcomes preserved. |
+| Modified | `.ai/DEBUG_LOG.md` | Dated causes/fixes for claims/privacy drift and actual PR native/CORS/sample-label failures; failed attempts, final evidence and old incidents retained. |
 | Modified | `.ai/DEPENDENCY_AUDIT.md` | Dated applicability note: old fallback/version/licence observations are historical, not current resolved review. |
 | Modified | `.ai/HANDOFF_NEXT_SESSION.md` | Current direction, evidence and remaining gates above intact archived B1/B2/branch snapshots. |
 | Modified | `.ai/KNOWN_LIMITATIONS.md` | Current provider permission, storage/deletion, architecture and verification gaps; old incidents dated. |
-| Modified | `.ai/MASTER_PROMPT.md` | Multi-source authority, real KMP/browser/provider/transport split, correct history and current no-publication scope. |
+| Modified | `.ai/MASTER_PROMPT.md` | Multi-source authority, KMP/browser/provider/transport split and history; record explicit follow-up PR/merge authority without permitting public app releases or new services/providers. |
 | Modified | `.ai/PROBLEMS_AND_FIXES.md` | Label 2026-09-01 plan audit/old extractor and browser impossibility orders historical; retain original analysis. |
 | Modified | `.ai/PROMPT_SEQUENCE.md` | Archive phase prompts; point to current PRD/instructions rather than re-executing historic build tasks. |
 | Modified | `.ai/README.md` | Instruction reading order and intent-vs-behaviour/permissions hierarchy. |
@@ -350,7 +350,7 @@ technical/legal gates. No technical workaround, separation of queues, Premium pu
 | Modified | `app-web/src/js/data/legal-content.js` | Regenerated native-corpus parity fixture from canonical legal inputs; still excluded from shipped browser app. |
 | Modified | `app-web/src/js/data/web-legal.js` | Rewrite independent five-page browser corpus with true providers/storage/erase/rights, draft status and build tokens. |
 | Modified | `app-web/src/js/legal.js` | Correct renderer/pipeline comment: native corpus is not browser policy; renderer behaviour unchanged. |
-| Modified | `app-web/src/js/main.js` | Erase confirmation accurately names library/snapshot deletion and settings/shell retention; handler unchanged. |
+| Modified | `app-web/src/js/main.js` | Truthful library-only Erase confirmation plus always label fictional Home fallback after HTTP/shape as well as network errors; detail/search HTTP-error semantics preserved. |
 | Modified | `app-web/src/js/version.js` | Local browser patch/cache identity 3.0.1 lets a future authorised deployment retire stale legal/copy assets; no publication. |
 | Modified | `app-web/src/js/views.js` | Erase library label replaces misleading erase-browser wording; actual scope unchanged. |
 | Modified | `app-web/src/manifest.webmanifest` | Browser install description scopes product/current JioSaavn client; no new platform feature. |
@@ -413,12 +413,14 @@ technical/legal gates. No technical workaround, separation of queues, Premium pu
 | Modified | `scripts/test_web_player_docs.py` | Read actual JS test count in mutation fixture rather than stale hard-coded 160. |
 | Modified | `scripts/test_website_claims.py` | Planning-vs-present support, negation, real browser provider and non-affiliation fixtures; legitimate provider names retained. |
 | Modified | `scripts/test_website_smoke.py` | Four-route/current-direction/404 stale-status mutations plus existing HTTP/canonical/link rules. |
+| Modified | `scripts/test_website_workflow.py` | Guard controlled catalogue fixtures for all app measurement contexts and retain exact unexpected-console/page-error failure predicates. |
 | Modified | `scripts/website_claims.py` | Allow legitimate explicit plans/research, reject current Spotify/additional-provider support and wrong browser-YouTube claims; call positive built-page contract. |
 | Modified | `scripts/website_smoke.py` | Apply shared positive product/status/legal-link/metadata contract to all four served public routes including 404. |
 | Modified | `shared/src/commonMain/kotlin/dev/dhun/legal/DhunAppInfo.kt` | KDoc only: remove stale hard-coded Android/MSI version comparison; runtime metadata and four-token substitution unchanged. |
 | Modified | `shared/src/commonMain/kotlin/dev/dhun/legal/LegalContent.kt` | Regenerated compiled native legal documents/includes/digests from authoritative Markdown; no hand-edit-only output fix. |
 | Modified | `shared/src/commonMain/kotlin/dev/dhun/provider/MusicProvider.kt` | KDoc only: acknowledge InnerTube filters/IDs and unfinished neutrality; signatures/functionality unchanged. |
 | Modified | `shared/src/commonMain/kotlin/dev/dhun/ui/legal/AboutLegalScreen.kt` | Display draft/not-in-force and Last updated labels, not legal effectiveness; existing navigation/schema preserved. |
+| Modified | `shared/src/jvmTest/kotlin/dev/dhun/legal/MarkdownParserTest.kt` | Replace obsolete three-row Support expectation with exact nine real controls, complete columns and failure/retention semantics; parser gate retained. |
 | Modified | `website/budget-baseline.json` | Deliberately record added product/provider/legal disclosures; 5% ratchet and 60 KiB absolute budget unchanged. |
 | Modified | `website/dist/404.html` | Fresh generated public recovery page with shared product/provider/draft footer and metadata. |
 | Modified | `website/dist/features/index.html` | Fresh generated scoped features/FAQ/rights/provider/privacy/evidence copy. |
@@ -429,7 +431,9 @@ technical/legal gates. No technical workaround, separation of queues, Premium pu
 | Modified | `website/src/features.njk` | Scoped native/browser current features, corrected FAQ/data/cache/account/cost risks and legal drafts. |
 | Modified | `website/src/index.njk` | Multi-source front matter/description and native-vs-browser/offline/evidence caveats. |
 | Modified | `website/src/ui.njk` | Historical native captures are not identical browser screens; scope metadata and comparison links. |
-| Modified | `website/tests/browser.mjs` | New local five-page legal/version/no-external-request and actual synthetic erase-scope checks, integrated into existing browser job. |
+| Modified | `website/tests/browser.mjs` | Five legal/version/erase contracts plus controlled catalogue UI contexts and real HTTP-outage Home/detail assertions; console/page-error and geometry gates unchanged. |
+| Created | `website/tests/catalogue-fixture.mjs` | Test-only interception of configured wrapper API paths for explicit network refusal/HTTP 503; no live-service success or security bypass. |
+| Created | `website/tests/catalogue-fixture.test.mjs` | Seven mutation/scope/failure/context/error-propagation tests for controlled outages; local assets, unrelated origins and service-worker behaviour remain real. |
 
 The generated bundles/pages above were rebuilt from their authoritative inputs. This manifest includes this audit, its inventory, every small code/comment/metadata change and every changed test/document; no omitted deleted file or unreported implementation is implied.
 
@@ -458,12 +462,64 @@ fragment links and `git diff --check` pass. Minification preserves fresh output
 (87,370 bytes saved). Updated scan: 753 paths / 727 text / 26 binary exclusions,
 269 matching non-report files / 2,462 lines / 286 baseline-or-final files.
 
-**Current execution state at this pre-push snapshot:** commit/push/PR/new CI
-pending. The roadmap will be updated with actual PR/run results before merge.
-No native compilation, new remote-CI success or merge is inferred from the
-initial local test ledger.
+At that pre-push snapshot commit/push/PR/new CI were pending. The following
+ledger records the actual later runs; no remote success or merge is inferred
+from the original local tests.
 Existing main workflows can deploy the site and refresh the private test draft
 after merge; no public app-release intent file, manual release, new provider,
 paid service or legal approval is added. Provider permissions/legal adoption,
 current hardware and deployed-origin live audible playback remain open even if
 all applicable PR checks pass.
+
+### PR #197 — first remote results and root-cause fixes
+
+Pushed **`7ca24a075fd850b2c41a6cc2694f565a0bc604fa`** to the assigned branch and
+opened [PR #197](https://github.com/99ggprooo00-code/DHUN/pull/197). Actual first runs:
+
+| Run | Actual result on initial PR head | Root cause / disposition |
+| --- | --- | --- |
+| [CI PR 40635056354](https://github.com/99ggprooo00-code/DHUN/actions/runs/40635056354), push 40635014929 | Failed in shared JVM tests | `MarkdownParserTest`: expected 3 Support rows, got 9. Generated Kotlin compiled; stale assertion failed. Verify exact implemented labels/order, full cells and retention/failure statements, not merely a new numeric count. |
+| [Build APK 40635056383](https://github.com/99ggprooo00-code/DHUN/actions/runs/40635056383) | **Success** | Android debug build/unit coupling passed on GitHub; not device/audio evidence. |
+| [test-release 40635056412](https://github.com/99ggprooo00-code/DHUN/actions/runs/40635056412) | Failed | APK passed; Windows shared JVM theme/regression step hit the same stale Support-table assertion before MSI packaging. AAB/publication jobs correctly skipped for PR. |
+| [website 40635056345](https://github.com/99ggprooo00-code/DHUN/actions/runs/40635056345) | Build and Lighthouse **passed**, browser **failed** | 144 measurements / three console failures from live `saavn.sumit.co` CORS refusals. The app handled failover; the UI harness depended on live community services. Deployment/served checks correctly skipped for PR. |
+
+GitHub check annotations and the browser step log posted by the existing workflow
+were read. Raw run-log archives are unreachable from this environment; no hidden
+log contents or unexecuted native pass is invented.
+
+**Proper corrections, not waived checks:**
+
+- Native parser test pins all nine existing controls, four nonempty columns and
+  relevant retention/failure cells. No control removed or legal disclosure weakened.
+- Browser UI contexts use narrow test-only configured-wrapper `/api/` interception:
+  explicit network refusal for layout/keyboard/sample flows, and HTTP 503 for a
+  separate negative case. Local assets, service workers, unrelated origins, CSP,
+  geometry/accessibility and unexpected console/page-error predicates stay intact.
+  Seven fixture tests and two Python harness guards verify scope/wiring/failures.
+  No successful catalogue/audio/CORS support is inferred from these fixtures.
+- The HTTP fixture exposed a genuine Home disclosure bug: fictional rows after
+  HTTP/shape failures left the source badge idle because only network errors set
+  sample mode. A bounded `noteFailure` call labels every Home fallback. The HTTP
+  browser case asserts the no-audio sample notice **and** that an HTTP detail
+  refusal stays HTTP 503, even for a demo id; no fake successful album is inserted.
+- First HTTP-only layout fixture was the wrong scenario for the intended
+  network-only entity fallback: local run 138 measurements / 7 failures, not a
+  pass. Correct scenario separation fixed the harness. The HTTP check then hit
+  a network-idle wait while failover cancels in-flight losers; explicit visible
+  badge/error-state waits replaced global network quiescence, not a longer timeout.
+
+**Local corrected executions:** root check **165/0/0** (8,989.506076 ms, build/icons/
+20 docs pass); site rules **59/0/0**; full unrestricted Chromium **146 measurements,
+0 notes, 0 failures**, exit 0 (83.259 s). Narrowed diagnostic runs are not counted
+as the full pass. Python discovery already passes **495 tests / 7.559 s** including
+the two new harness guards. After final ledger/inventory edits, full Python
+was rerun: **495 tests / 7.708 s, OK**. Final scan: **755 paths** (753 tracked +
+2 untracked), **729 text / 26 binary exclusions**, **270 matching files / 2,471
+lines / 287 baseline-or-final files**; audit self-references excluded.
+The original 106-file manifest now includes four justified test/fixture paths:
+**110 files = 104 modified + 6 created, 0 deleted**, always compared to the task's
+starting revision, not to a later clean commit.
+
+**Current state:** corrected source/tests and evidence ready for validation/push;
+fresh final-head remote CI/package/site confirmation is still required. No merge
+has happened. Independent legal/hardware/deployed-audio gates above remain open.

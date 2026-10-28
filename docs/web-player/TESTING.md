@@ -80,6 +80,17 @@ are the authority; read the file before relying on a specific behaviour.
 Its triggers are path-scoped: changes to `website/**`, `app-web/**` and the named
 scripts start it. A change to the Android or desktop code does not.
 
+The browser UI measurements use `website/tests/catalogue-fixture.mjs` to abort
+only the configured wrapper `/api/` requests. This exercises the real network
+failure → labelled silent-sample path without calling community APIs. A separate
+controlled HTTP 503 case checks that fictional Home rows stay explicitly labelled
+and that an HTTP detail error is not replaced by a successful demo album. The
+seven fixture unit tests prove interception scope, explicit failures, preserved
+context/service-worker options and error propagation. Unexpected console/page
+errors, local assets, CSP and all geometry/accessibility gates remain unchanged.
+The initial PR #197 browser run accidentally called live wrappers and failed on
+CORS console messages; that was not deployed-origin or audible-playback proof.
+
 ## 5. What is not tested
 
 - **Audio.** No check listens to a stream. The player is tested against a fake
@@ -87,8 +98,10 @@ scripts start it. A change to the Android or desktop code does not.
 - **Firefox, Safari, Edge.** Not run in CI.
 - **Real phones and touch.** Viewports are emulated.
 - **Screen readers.** No recorded pass.
-- **The community catalogue.** The tests use fixtures. The live service is not
-  called by the suite. A live check is a manual step, recorded in
+- **The community catalogue.** Unit contracts use fixtures; browser UI checks
+  use controlled network/HTTP failure responses, not a successful live service.
+  This does not establish provider availability, CORS permission or playback.
+  A live check is a manual step, recorded in
   [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) when done.
 - **Storage at scale.** The suite does not fill the browser's storage quota. Snapshot
   pruning is tested on small libraries (`library.test.mjs`).

@@ -1,5 +1,36 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-28 — PR #197: stale native table test, live-CORS layout dependency, unlabelled fallback
+
+**Observed:** initial commit `7ca24a0` passed local Python/JS/rendering but the new
+GitHub CI/MSI runs failed in `MarkdownParserTest.theSupportPageDataControlTableIsIntact`:
+expected 3 rows, got 9. The source correction documents nine existing controls;
+the JVM test's old count/three labels were stale. Fix: exact nine labels/order,
+all four nonempty columns and meaningful failure/retention cells. Do not delete
+real controls or merely change a numeric threshold. Native rerun is pending CI.
+
+**Browser:** website run `40635056345` measured 144 entries and failed on three
+live `saavn.sumit.co` CORS console messages; the harness had mixed live-service
+availability with UI measurements. Fix: narrow test-only wrapper API interception,
+controlled network refusal for real sample/keyboard/layout flows, explicit HTTP
+503 regression, seven fixture tests and two Python harness guards. Console/page
+error predicates, production CSP and rendering thresholds are unchanged. Full
+corrected local run: **146 measurements / 0 notes / 0 failures**.
+
+**Actual disclosure defect found by the HTTP fixture:** Home rendered fictional
+rows after every HTTP/shape failure but kept an idle Catalogue badge because
+`noteFailure` ran only for network errors. Call it whenever Home chooses samples;
+keep HTTP search/detail errors as real errors, not fictional success. Browser
+assertions cover labelled/no-audio Home and an HTTP 503 detail refusal even for
+a real demo id. No source/player/storage/auth/provider expansion.
+
+The first HTTP layout fixture was the wrong scenario for network-only entity
+fallback (138 measurements / 7 failures); corrected the fixture, not the HTTP
+semantics. An HTTP test then waited on global network-idle while failover cancels
+losers; wait for explicit visible badge/error states instead. Failed/partial
+runs are not counted as final success. Local root check remains 165/0; fixture
+rules 59/0. Actual final remote CI must still pass before merge.
+
 ## 2026-10-28 — copy/tests contradicted providers and real privacy controls
 
 **Observed in source, not a new playback incident:** root/native legal and site

@@ -26,6 +26,12 @@ scheduled probe run `40483966781` on the starting `main` reports
 `ENVIRONMENT_BLOCKED`; it is not a new PR regression or healthy playback.
 Permission, device and deployed-audio gates remain independent of PR merge.
 
+PR #197's initial Build APK passed; native JVM/MSI failed on the obsolete
+three-control Support-table test and browser UI checks failed on live-wrapper
+CORS messages. Root fixes and a Home HTTP-fallback disclosure fix pass the new
+146-measurement local browser run; fresh remote native/package/site results
+are still pending. Fixtures are not evidence that community CORS/audio works.
+
 ## 2026-10-11 — Settings overhaul (PR #158, supersedes older settings notes)
 
 The previously dormant audio quality, country, lyrics-enabled, accent-mode and explicit-content keys now have runtime readers; the Settings page exposes each only with its consumer. The backdrop brightness slider is also available alongside blur on blur-capable platforms. Desktop X now hides to tray only after AWT has successfully registered an icon; Ctrl+Q and tray Quit still exit. New tokenless lyrics sources are LRCLIB search and KuGou.

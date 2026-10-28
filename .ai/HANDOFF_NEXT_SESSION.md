@@ -24,6 +24,13 @@ claims. That was an unpublished snapshot; the newly authorised PR/CI follow-up
 is recorded separately in ROADMAP and audit 06. No later CI or merge is inferred
 from the original local evidence.
 
+**Publication follow-up:** PR [#197](https://github.com/99ggprooo00-code/DHUN/pull/197)
+is open; initial `7ca24a0` CI exposed the stale three-control JVM test and live
+wrapper-CORS coupling in the UI harness. Semantic nine-control assertions and
+controlled network/HTTP fixtures are now local fixes, plus an actual Home
+sample-label correction. Full new local browser run: 146/0/0. Fresh remote
+native/package/site confirmation is required before merge; see ROADMAP/audit 06.
+
 ## Archived handoff: PR #136 / B1/B2 state
 
 > **Read first (2026-10-16):** the web app is no longer described as a preview or
