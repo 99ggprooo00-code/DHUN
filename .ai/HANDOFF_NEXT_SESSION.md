@@ -24,12 +24,16 @@ claims. That was an unpublished snapshot; the newly authorised PR/CI follow-up
 is recorded separately in ROADMAP and audit 06. No later CI or merge is inferred
 from the original local evidence.
 
-**Publication follow-up:** PR [#197](https://github.com/99ggprooo00-code/DHUN/pull/197)
-is open; initial `7ca24a0` CI exposed the stale three-control JVM test and live
-wrapper-CORS coupling in the UI harness. Semantic nine-control assertions and
-controlled network/HTTP fixtures are now local fixes, plus an actual Home
-sample-label correction. Full new local browser run: 146/0/0. Fresh remote
-native/package/site confirmation is required before merge; see ROADMAP/audit 06.
+**Verified source / pre-merge follow-up:** PR [#197](https://github.com/99ggprooo00-code/DHUN/pull/197)
+contains `7ca24a0` + root-fix `626d8fe`. At `626d8fe`, **9 checks succeeded,
+5 expected PR-only checks skipped; CLEAN/MERGEABLE**. Both CI contexts passed
+shared/Android/desktop/probe tests/compilation, AAB compile and API-24 lint.
+APK/MSI and hosted-Windows install-over/data preservation passed; site build,
+Lighthouse and full Chromium **146/0/0** passed. Local Python/JS/site tests:
+**495 / 165 / 59**. See audit 06 §12 for run URLs and initial failure causes.
+The final documentation-only record must be checked at its own current PR head
+before normal merge; read the PR event for the actual merge state. No physical
+sound, deployed-origin audio, provider permission or legal adoption is implied.
 
 ## Archived handoff: PR #136 / B1/B2 state
 

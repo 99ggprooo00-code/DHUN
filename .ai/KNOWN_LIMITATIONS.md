@@ -20,17 +20,23 @@ before completion or lack uniform error feedback; this audit corrects notices,
 not the handlers. Logs may contain paths/IDs/URLs and need redaction review.
 Later paragraphs below are dated records; do not promote historical failures or
 counts to a fresh runtime verdict. No Java toolchain is available in this audit sandbox.
-The owner has now authorised a checked PR/merge; native compile/test evidence
-must come from its new CI, not this toolchain-limited local run. The existing
+The owner authorised a checked PR/merge. Native compilation/tests are now
+verified in new GitHub CI for `626d8fe` (PR #197; audit 06 §12), not in this
+local toolchain-limited sandbox. Shared JVM, Robolectric, desktop/probe JVM,
+APK/AAB compilation and both API-24 lint gates passed; hosted Windows MSI
+packaging/install-over/data preservation passed. These are not physical sound,
+uninstall/deletion-failure, device or deployed-origin audio acceptance. The existing
 scheduled probe run `40483966781` on the starting `main` reports
 `ENVIRONMENT_BLOCKED`; it is not a new PR regression or healthy playback.
 Permission, device and deployed-audio gates remain independent of PR merge.
 
-PR #197's initial Build APK passed; native JVM/MSI failed on the obsolete
-three-control Support-table test and browser UI checks failed on live-wrapper
-CORS messages. Root fixes and a Home HTTP-fallback disclosure fix pass the new
-146-measurement local browser run; fresh remote native/package/site results
-are still pending. Fixtures are not evidence that community CORS/audio works.
+PR #197's initial native/MSI stale three-control test and live-wrapper CORS
+harness failures are resolved: exact nine-control semantics, controlled failure
+fixtures and a real Home sample-disclosure fix. At source `626d8fe`, all nine
+applicable checks passed (five expected PR-only skips); CI browser 146/0/0,
+Lighthouse and site checks passed. Recheck any later closeout head before merge.
+Fixtures are not evidence that community CORS/audio works; the independent
+permission/hardware/deployed-audio gates remain open.
 
 ## 2026-10-11 — Settings overhaul (PR #158, supersedes older settings notes)
 

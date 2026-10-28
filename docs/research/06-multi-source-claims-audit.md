@@ -121,7 +121,7 @@ Additional providers need evidence. Implementation/provider/capability differenc
 | `app-web/src/js/api.js` opening/instance comments | Public catalogue; sends no identifier; every host the same MIT project/free/CORS-open | Unverified / incomplete | Comments scope actual requests and unknown per-host provenance/rights; logic unchanged | Actual fetch and primary terms | High | Request/CSP tests; no invented host audit |
 | `site.js` extraction/offline/closing/source citations | No token, every-client failure, guaranteed check coverage, impossible browser storage, two nonexistent abbreviated ADR paths | Incomplete / unverified | Native/visitor-ID/attempt/evidence scopes; valid long ADR paths; no universal guarantee | Source/research | High | Evidence-path regression test, built/served checks |
 | `DhunAppInfo.kt` KDoc | Stale hard-coded Android/MSI versions presented as current | Outdated | Explain metadata roles, preserve runtime values/tokens | Platform build info | Medium | KDoc-only diff; legal token tests |
-| `AboutLegalScreen.kt` draft date | Draft appears legally “effective” | Legally sensitive | Not-in-force / Last updated labels only | Legal status/schema | High | Source assertion; native compilation not run |
+| `AboutLegalScreen.kt` draft date | Draft appears legally “effective” | Legally sensitive | Not-in-force / Last updated labels only | Legal status/schema | High | Initial local source assertion; later native compilation/tests in §12 |
 | `app-web/src/js/version.js`, `src/sw.js` | Changed shell/legal files would retain old cache namespace | Incomplete | Local browser `3.0.1`; unchanged storage key/schema and channel | Future authorised deployment | Medium | Build/SW/version tests; local offline + erase check |
 | Site footer report link; browser sample notice | 42.5 px standalone “Issues” target; sample disclosure spilled at phone width | UI verification finding | Longer report-link label; one `overflow-wrap` property; thresholds not weakened | Real local Chromium | Medium | First full browser 20 findings → final 144 measurements / zero failures |
 | `website/budget-baseline.json` | Necessary new disclosures exceeded old 5% ratchet on two routes | Intended documented growth | Regenerate weights, retain 5% and 60 KiB limits | Final built pages | Medium | 32 quality checks, HTML, lossless/deterministic build |
@@ -131,9 +131,9 @@ Additional providers need evidence. Implementation/provider/capability differenc
 
 | Surface | Current implementation / evidence | Not established / not implemented |
 | --- | --- | --- |
-| Native Android | Kotlin Multiplatform / Compose; `YouTubeMusicProvider`, InnerTube metadata, own-client stream resolver, Media3; local library/history/lyrics/download/cache and device controls | No provider OAuth, Spotify/JioSaavn music adapter or capability registry. No new native compile/device/audio acceptance in this audit. Permissions remain unresolved. |
-| Native desktop JVM | Same native YouTube path; own-client primary, optional **user-installed** yt-dlp fallback; VLCJ/system libVLC; Windows primary target | NewPipe is a recovery watch, not production primary/fallback. Linux/macOS hardware acceptance unverified. Hosted/static tests are not Windows/VLC sound proof. |
-| Browser | Separate dependency-free ES modules; JioSaavn through three wrapper hosts, HTML audio; local library/export/import; installed offline shell; labelled silent samples | **Partial** integration, not native parity or catalogue federation. No YouTube, Spotify, audio downloads, EQ or lyric provider. Local render/erase verified, deployed-origin live catalogue and audible sound unverified. |
+| Native Android | Kotlin Multiplatform / Compose; `YouTubeMusicProvider`, InnerTube metadata, own-client stream resolver, Media3; local library/history/lyrics/download/cache and device controls | No provider OAuth, Spotify/JioSaavn music adapter or capability registry. New native compile/unit/lint checks passed in PR #197 (§12); device/audio acceptance remains open. Permissions remain unresolved. |
+| Native desktop JVM | Same native YouTube path; own-client primary, optional **user-installed** yt-dlp fallback; VLCJ/system libVLC; Windows primary target | NewPipe is a recovery watch, not production primary/fallback. Linux/macOS hardware acceptance unverified. Hosted Windows JVM/MSI/install-over passed (§12), not Windows/VLC sound proof. |
+| Browser | Separate dependency-free ES modules; JioSaavn through three wrapper hosts, HTML audio; local library/export/import; installed offline shell; labelled silent samples | **Partial** integration, not native parity or catalogue federation. No YouTube, Spotify, audio downloads, EQ or lyric provider. Local/CI render/erase verified with controlled failures; deployed-origin live catalogue and audible sound unverified. |
 | Spotify, all builds | Product **Planned**, implementation **Deferred**, research updated | No adapter, SDK, OAuth, account dashboard verification, tokens, playback or active traffic; no platform route or public-scale promise approved. |
 | Further music providers | Evidence-based intake direction | No implementation or selection inferred from lyrics providers, three wrapper mirrors, upstream API features or a Watch/Jamendo proposal. |
 
@@ -262,7 +262,7 @@ HTML+CSS absolute ceiling remain unchanged. Inlined CSS size is unchanged.
 | `/features/` | 48,143 B | **51,401 B** |
 | `/ui/` | 58,069 B | **59,646 B** |
 
-**Not tested / not approved:** native Gradle/JVM/Android compilation or tests (no Java), Android device/Windows VLC sound,
+**Initial local validation limits (later native CI/install-over evidence is in §12):** native Gradle/JVM/Android compilation or tests (no local Java), Android device/Windows VLC sound,
 install/upgrade/uninstall/deletion failures, Linux/macOS hardware, Firefox/Safari, live provider API/audio from the deployed
 origin, production OAuth/Premium/Spotify access, packet captures/provider logs/retention, complete licence/SBOM/legal review,
 Lighthouse, raw canonical-origin HTML/CSP digests or new GitHub Actions checks. Local samples and offline shell are not audio
@@ -520,6 +520,54 @@ The original 106-file manifest now includes four justified test/fixture paths:
 **110 files = 104 modified + 6 created, 0 deleted**, always compared to the task's
 starting revision, not to a later clean commit.
 
-**Current state:** corrected source/tests and evidence ready for validation/push;
-fresh final-head remote CI/package/site confirmation is still required. No merge
-has happened. Independent legal/hardware/deployed-audio gates above remain open.
+### Corrected source head — all remote checks verified
+
+Pushed **`626d8fee22bf743927efd745660756d8ebe33376`**. GitHub's complete PR rollup,
+not just one watcher, reports **9 successful checks, 5 expected skips,
+CLEAN / MERGEABLE**, no pending/failure/cancellation at this source head.
+The PR watcher finished before duplicate push CI did; the latter was separately
+watched through completion rather than accidentally treated as already green.
+
+| New run / evidence | Verified result |
+| --- | --- |
+| [PR CI 40637088449](https://github.com/99ggprooo00-code/DHUN/actions/runs/40637088449) | **Success, 7m40s**. Every step passed: Python helpers, PowerShell syntax, shared JVM, Robolectric, Android debug + AAB compile, app/shared API-24 lint, probe compile/classification tests, desktop compile/JVM tests. No skipped test step. |
+| [Push CI 40637078977](https://github.com/99ggprooo00-code/DHUN/actions/runs/40637078977) | **Success, 12m7s**, same full test/build/lint chain; independently verified, not hidden by the duplicate check name. |
+| [Build APK 40637088594](https://github.com/99ggprooo00-code/DHUN/actions/runs/40637088594) | **Success, 2m44s**, debug artifact build/upload; not device/sound proof. |
+| [test-release 40637088462](https://github.com/99ggprooo00-code/DHUN/actions/runs/40637088462) | **Success**: plan, APK (2m48s), Windows MSI (9m12s). Windows JVM theme/regression, jpackage, identity/checksum/provenance and install-over/userdata-preservation steps all passed on a disposable hosted runner. |
+| [website 40637088483](https://github.com/99ggprooo00-code/DHUN/actions/runs/40637088483) | **Success**: build 27s; full pinned-Chromium browser 1m55s; Lighthouse three samples/route with median gate 2m5s, actual measurement step succeeded (not skipped). |
+| [Browser step log 6461325364](https://github.com/99ggprooo00-code/DHUN/issues/150#issuecomment-6461325364) | Existing CI evidence channel explicitly ends **146 measurements, 0 notes, 0 failures, exit 0**. Source fixture scope, console/page-error predicates and security are unchanged. |
+
+Expected PR-only skips are `aab` artifact job (AAB **compilation** still passed in
+CI), public/private release publication, Pages deploy and served-origin smoke.
+These are not fake passes or waived tests: their existing event/input conditions
+do not permit PR publication. No workflow, release-intent or public native-app release-version
+change was added. Local root/project-prefix smoke was also rerun after the Home
+fix and passed against the current app bytes. Actual prefixed build had 14
+resolving base-scoped targets; all 16 root artifact files were byte-identical
+when restored. Local Python remains 495, app JS 165, site rule/fixture tests 59.
+
+The old CLI's PR-body edit failed on deprecated classic-project GraphQL fields;
+the same authorised metadata update succeeded through `gh api` REST PATCH. This
+was a tooling compatibility issue, not a reason to modify CI or repository policy.
+
+**Pre-merge closeout state:** this last record changes documentation/inventory
+only and records completed source verification. Its own pushed PR head must be
+re-read and all applicable checks green before the explicitly authorised normal
+merge. No auto/admin bypass, merge event or deployment result is fabricated in
+this record. The PR/workflow event is authoritative for subsequent publication.
+Independent provider permission/legal adoption, physical hardware/audible
+playback, deployed-origin live audio and remaining bounded implementation/design
+gates remain open; compilation/hosted install evidence does not close them.
+
+**Final documentation closeout validation:** after the verified source runs, all
+six initial closeout records were checked with **495 Python tests / 7.862 s, OK**
+and **51 local fragment links / 0 broken anchors**. Matrix 05 now explicitly
+separates local toolchain absence from the new remote compile/test evidence.
+The final inventory/manifest remains cumulative from starting `12498ca`; later
+clean commits do not erase created-file or validation provenance.
+
+After the matrix clarification and final rescan, full Python was rerun again:
+**495 tests / 7.342 s, OK**; fragment check **51 / 0 broken**. Final inventory:
+**755 tracked paths / 0 untracked, 729 text / 26 binary exclusions, 270 matching
+non-report files / 2,474 lines / 287 baseline-or-final files**. No source/runtime
+or workflow changed in this documentation-only closeout.

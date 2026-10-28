@@ -45,7 +45,12 @@ desktop [`Main.kt`](../../app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.k
 [`SettingsScreen.kt`](../../shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt),
 browser [`api.js`](../../app-web/src/js/api.js), [`library.js`](../../app-web/src/js/library.js),
 [`player.js`](../../app-web/src/js/player.js), [`sw.js`](../../app-web/src/sw.js).
-Current test commands/results and unavailable native toolchain are in [06](06-multi-source-claims-audit.md).
+Current commands/results are in [06](06-multi-source-claims-audit.md). Local Java
+is unavailable, but the authorised PR #197 follow-up (§12) verifies source
+`626d8fe` with new shared/Android/desktop/probe CI, APK/AAB compile, API-24 lint,
+Windows MSI/install-over and browser/Lighthouse checks. All applicable checks
+passed; no physical sound or deployed-origin live audio is inferred. Browser
+UI checks use controlled network/HTTP failures, not live-provider acceptance.
 A source path or unit-test result is **not** new on-device audible playback proof.
 
 ### Upstream possibilities — not implemented integrations

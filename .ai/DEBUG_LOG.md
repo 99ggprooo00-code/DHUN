@@ -7,7 +7,8 @@ GitHub CI/MSI runs failed in `MarkdownParserTest.theSupportPageDataControlTableI
 expected 3 rows, got 9. The source correction documents nine existing controls;
 the JVM test's old count/three labels were stale. Fix: exact nine labels/order,
 all four nonempty columns and meaningful failure/retention cells. Do not delete
-real controls or merely change a numeric threshold. Native rerun is pending CI.
+real controls or merely change a numeric threshold. Resolved by the fresh
+Linux/shared and Windows regression runs for `626d8fe` (audit 06 §12).
 
 **Browser:** website run `40635056345` measured 144 entries and failed on three
 live `saavn.sumit.co` CORS console messages; the harness had mixed live-service
@@ -29,7 +30,10 @@ fallback (138 measurements / 7 failures); corrected the fixture, not the HTTP
 semantics. An HTTP test then waited on global network-idle while failover cancels
 losers; wait for explicit visible badge/error states instead. Failed/partial
 runs are not counted as final success. Local root check remains 165/0; fixture
-rules 59/0. Actual final remote CI must still pass before merge.
+rules 59/0. Actual source-head PR/push native CI, APK/MSI and website checks
+now all pass for `626d8fe`; 9 successes / 5 expected PR-only skips. Windows
+install-over/data preservation passed on the hosted runner. The final
+bookkeeping head must still be checked before normal merge.
 
 ## 2026-10-28 — copy/tests contradicted providers and real privacy controls
 

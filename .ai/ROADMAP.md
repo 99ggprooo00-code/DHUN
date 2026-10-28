@@ -21,18 +21,27 @@ records discrepancies, corrections, all file changes, fresh primary research,
 validation and remaining gates. Existing native cache/history controls and
 browser data flows are reflected truthfully; no wholesale source/ID migration.
 
-**Publication follow-up / exact next step:** [PR #197](https://github.com/99ggprooo00-code/DHUN/pull/197)
-opened from assigned-branch commit `7ca24a0`. Its initial Build APK, website build
-and Lighthouse passed; shared JVM/Windows MSI failed on the obsolete 3-row
-Support-table test (the corrected page has nine real controls). Browser failed
-on three live-wrapper CORS console messages. Both causes are fixed locally:
-semantic native table assertions; controlled network/HTTP fixtures without gate
-relaxation; actual Home sample-label fix exposed by HTTP failure. New fixture
-unit tests pass (59 total site rules); full local browser has 146 measurements,
-zero notes/failures. **Next: push these fixes, inspect fresh native/site/package
-CI and only merge once all applicable final-head checks pass.** No all-green
-remote claim yet. Current files: native MarkdownParserTest, app-web main, browser
-harness/fixtures/tests, audit/inventory and state records.
+**Verified completion / pre-merge closeout:** [PR #197](https://github.com/99ggprooo00-code/DHUN/pull/197)
+contains alignment commit `7ca24a0` and root-fix commit `626d8fe`. At source head
+`626d8fee22bf743927efd745660756d8ebe33376`, GitHub reports **9 successful checks,
+5 expected PR-only skips, CLEAN/MERGEABLE**, no failed/pending/cancelled check.
+Both push CI `40637078977` and PR CI `40637088449` passed every native test/build/
+lint step. Build APK `40637088594`, APK/MSI packaging `40637088462`, and website
+build/Chromium/Lighthouse `40637088483` passed. Windows install-over/data
+preservation passed on a disposable hosted runner, not physical playback.
+
+| Requested work | Verified state |
+| --- | --- |
+| Inspect, research, correct authoritative/dependent surfaces and preserve history | Done; audit 06 + full inventory, 110-file manifest |
+| Root-cause fixes for native table test, live-CORS UI coupling and Home sample label | Done; exact controls/retention, controlled failure fixtures and real HTTP-error regression |
+| Local current code | 495 Python, 165 app JS, 59 site rule/fixture tests, 146 Chromium measurements / zero failures; generation/HTML/claims/quality/links/root-prefix smoke pass |
+| Commit/push/PR and source CI | Done on assigned branch; actual source-head runs above, not an inferred pass |
+
+**Exact final action:** this documentation-only closeout records verified source
+results. Re-read PR #197's current head and **all** check outcomes (including both
+CI contexts) after its push; merge only if that final head is fully green and
+GitHub allows normal merging. No auto/admin bypass. Merge/deployment result is
+the PR/workflow event, not an event fabricated in this pre-merge record.
 
 Starting main remains `12498ca`. Its separately scheduled probe `40483966781`
 reports `ENVIRONMENT_BLOCKED`, not healthy playback. Branch-protection inspection
@@ -42,10 +51,9 @@ is denied (HTTP 403); normal GitHub merge enforcement is not bypassed.
 current-device and real-origin audio evidence, then bounded deletion/logging and
 provider identity/capability/auth/player/migration design. These remain open;
 merging this alignment does not authorise a provider or public app release.
-Last actual CI errors: stale native table assertion and live-CORS browser
-coupling, fixed locally; fresh remote confirmation pending. Original pre-push
-checks passed 493 Python/165 JS/52 site rules; added fixture/harness regressions
-are recorded in audit 06 §12, not misreported as part of that earlier run.
+Last actual CI errors were the stale native assertion and live-CORS harness
+coupling; both are resolved by the green source-head runs. No new implementation
+phase, provider, recurring service or public app release is authorised by merge.
 
 
 ## Historical sessions and earlier active-task snapshots
