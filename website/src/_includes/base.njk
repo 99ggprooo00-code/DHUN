@@ -37,7 +37,7 @@
     scripts/website_quality.py asserts every one of those omissions, so this
     comment cannot drift from the JSON below it. -#}
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DHUN","applicationCategory":"MultimediaApplication","operatingSystem":"Android 7.0+, Windows, any modern browser","isAccessibleForFree":true,"license":"{{ site.licence }}","url":"{{ site.url }}/","codeRepository":"{{ site.repo }}"}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DHUN","applicationCategory":"MultimediaApplication","operatingSystem":"Android 7.0+, Windows, experimental browser client","description":"{{ site.description }}","isAccessibleForFree":true,"license":"{{ site.licence }}","url":"{{ site.url }}/","codeRepository":"{{ site.repo }}"}
 </script>
 <link rel="icon" href="{{ favicon.dataUri }}" type="image/svg+xml">
 {#- One request per route: the stylesheet the page needs is inlined here from
@@ -111,12 +111,20 @@
           <li><a href="{{ '/features/' | sitePath }}">Features</a></li>
           <li><a href="{{ '/ui/' | sitePath }}">Interface</a></li>
           <li><a href="{{ site.repo }}" rel="noopener">Source</a></li>
-          <li><a href="{{ site.issues }}" rel="noopener">Issues</a></li>
+          <li><a href="{{ site.issues }}" rel="noopener">Report an issue</a></li>
           <li><a href="{{ site.changelog }}" rel="noopener">Changelog</a></li>
           <li><a href="{{ site.publicReleasePage }}" rel="noopener">Public pre-release</a></li>
+          <li><a href="{{ site.nativeTerms }}" rel="noopener">Native Terms draft</a></li>
+          <li><a href="{{ site.nativePrivacy }}" rel="noopener">Native Privacy draft</a></li>
+          <li><a href="{{ '/app/#/about/terms' | sitePath }}">Browser Terms draft</a></li>
+          <li><a href="{{ '/app/#/about/privacy' | sitePath }}">Browser Privacy draft</a></li>
         </ul>
       </nav>
     </div>
+    <!-- docs/PRD.md §1; docs/research/05-source-capability-matrix.md; ADR-010 amendment 2026-10-28 -->
+    <p class="footer-note" data-product-direction>{{ site.providerSummary }}</p>
+    <p class="footer-note"><a href="{{ site.productDirection }}" rel="noopener">Product direction</a> ·
+      <a href="{{ site.providerMatrix }}" rel="noopener">Provider status and evidence</a></p>
     <p class="footer-note footer-independence">{{ site.footer.independence }}</p>
     <p class="footer-note">{{ site.footer.builtWith }}</p>
 

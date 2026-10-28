@@ -1,5 +1,7 @@
 /**
- * Single source of copy and links for the whole site.
+ * Site copy/link inputs (page front matter also supplies metadata).
+ * Product direction: docs/PRD.md §1; provider evidence: research/05.
+ * This file is not an independent product-vision authority.
  *
  * Everything a translator would need to touch lives here, so i18n stays
  * additive later (Part A §7) — but no i18n is built in v1.
@@ -25,12 +27,18 @@ export default {
   licence: `${REPO}/blob/main/LICENSE`,
   thirdParty: `${REPO}/blob/main/THIRD_PARTY.md`,
   plan: `${REPO}/blob/main/.ai/WEBSITE_PLAN.md`,
+  productDirection: `${REPO}/blob/main/docs/PRD.md`,
+  providerMatrix: `${REPO}/blob/main/docs/research/05-source-capability-matrix.md`,
+  nativeTerms: `${REPO}/blob/main/legal/terms.md`,
+  nativePrivacy: `${REPO}/blob/main/legal/privacy.md`,
+  providerSummary:
+    "DHUN is a free, open-source, cross-platform, multi-source music client. YouTube / YouTube Music is the first implementation priority. Native Android/desktop currently use YouTube Music; the separate experimental browser build uses JioSaavn through unofficial wrappers. Spotify is planned, not implemented, and deferred pending technical, account/Premium, policy, legal, playback, privacy and cost checks. Other sources may be evaluated; platform capabilities can differ.",
   publicReleasePage: PUBLIC_RELEASE,
   releases: `${REPO}/releases`,
 
-  title: "DHUN — a YouTube Music client with no sign-in",
+  title: "DHUN — free, open-source, multi-source music client",
   description:
-    "DHUN is a free, open-source YouTube Music client for Android and Windows. No sign-in, no cookies, no ads, no telemetry — and downloads that stay on your device.",
+    "DHUN is a free, open-source, multi-source music client. Native YouTube Music first; experimental browser JioSaavn today. Spotify planned, not implemented.",
   ogType: "website",
 
   // The navigation the shell renders. Three destinations and one external link,
@@ -68,14 +76,14 @@ export default {
     { label: "NO ADS", source: "No advertising or analytics dependency in any module" },
   ],
 
-  h1: "Music without an account.",
+  h1: "One music client. A multi-source direction.",
   lead:
-    "DHUN plays YouTube Music on Android and Windows through its own tokenless extraction chain. There is no sign-in to create, no cookie to hand over, and no PO token to solve — and what you save for offline listening stays on your device.",
-  leadSource: "ADR-001 (extraction engine), ADR-003 (staged identity chain), ADR-006 (offline downloads)",
+    "Free, open-source and cross-platform. YouTube / YouTube Music is the first implementation priority, with Spotify planned, not implemented. Today the native Android and desktop clients use YouTube Music; the separate experimental browser client uses JioSaavn through unofficial community wrappers. Different builds can have different capabilities.",
+  leadSource: "docs/PRD.md §1; ADR-010 amendment 2026-10-28; docs/research/05-source-capability-matrix.md",
   ctaPrimary: { href: "/app/", label: "Open the web app" },
   ctaSecondary: { href: REPO, label: "Source on GitHub", external: true },
   ctaNote:
-    "DHUN's web app runs at /app/ — the same glass shell, navigation and keyboard shortcuts as the Android and Windows builds, installable from this page and usable offline once it has loaded, with your likes, playlists and history kept in this browser. It reads JioSaavn through three community deployments of the same open-source API and moves to the next when one refuses; when none answers it names what each host said and falls back to a labelled sample catalogue whose rows carry no audio.",
+    "Try the separate browser client at /app/: a local browser library and cached offline interface, not offline music. It has no audio downloads, equaliser or lyric provider, and no YouTube or Spotify playback. Three unofficial JioSaavn wrapper instances provide failover for one catalogue family; failures and silent samples are labelled. Live catalogue access and audible playback from the deployed origin remain unverified.",
   ctaNoteSource:
     "ADR-008 amendment 2026-10-09 (2) (deployment); app-web/src (service worker, keyboard shortcuts, api.js)",
 
@@ -110,7 +118,7 @@ export default {
       caption:
         "Full-screen player sheet with blurred artwork backdrop, seek scrubber, shuffle, previous, play, next, and repeat transport, and queue and lyrics actions.",
       appHref: "/app/#/?player=open",
-      appLabel: "Open Full player in the app",
+      appLabel: "Open browser player (different tools)",
     },
     "lyrics-phone": {
       id: "mock-lyrics",
@@ -140,7 +148,7 @@ export default {
       caption:
         "Up next queue and Related sheet inside the full player with drag-to-reorder handles and active track indicator.",
       appHref: "/app/#/?player=open&ptab=queue",
-      appLabel: "Open Up next queue in the app",
+      appLabel: "Open browser queue (no Related tab)",
     },
     "search-phone": {
       id: "mock-search-phone",
@@ -183,7 +191,7 @@ export default {
       alt: "DHUN Android Library Downloads tab showing storage usage bar, Clear all action, and a downloaded track row with delete button",
       badge: "Captured on Android phone · DHUN v1.00.001",
       caption:
-        "Library Downloads tab showing device storage usage bar, Clear all control, and offline track management. This screen exists on Android and Windows only: a browser has no equivalent of ADR-006's device-side store, so the web build at /app/ has no Downloads tab.",
+        "Native Library Downloads with storage usage, Clear all and offline tracks. The current browser build has no audio download/offline-audio implementation or Downloads tab; this is not a claim that all browser storage is impossible.",
       // No appHref: the web build has no Downloads screen to open. A link here
       // would land on Playlists under a caption that promises Downloads, which
       // is the sort of mismatch this site exists not to make.
@@ -216,7 +224,7 @@ export default {
       caption:
         "Settings & Equalizer with Dark and Light modes, six accent palettes, cache cap, About & Legal entry, presets, preamp, and 5-band sliders.",
       appHref: "/app/#/settings",
-      appLabel: "Open Settings in the app",
+      appLabel: "Open browser settings (no equaliser)",
     },
     "desktop-window": {
       id: "mock-desktop-window",
@@ -231,7 +239,7 @@ export default {
       caption:
         "Windows desktop window (Compose Multiplatform JVM) with wide four-column grids and bottom mini-player with volume slider.",
       appHref: "/app/#/home",
-      appLabel: "Open Desktop layout in the app",
+      appLabel: "Open browser wide layout (not native desktop)",
     },
   },
 
@@ -249,7 +257,7 @@ export default {
       { label: "Up Next Queue", detail: "Queue tab with a track counter — opens once a track is playing", href: "/app/#/?player=open&ptab=queue", cta: "Launch /app/ Queue" },
       { label: "Library — Playlists, Liked Songs & History", detail: "Your playlists, Liked Songs and what you have played — kept in this browser, with no account", href: "/app/#/library/playlists", cta: "Launch /app/ Library" },
       { label: "Settings", detail: "Dark, Light and System themes, six accents, volume, repeat and shuffle, plus export, import and erase", href: "/app/#/settings", cta: "Launch /app/ Settings" },
-      { label: "About, Privacy & Legal", detail: "This build's own privacy policy, terms and licences — bundled, with no request leaving the page", href: "/app/#/about/privacy", cta: "Launch /app/ About & Legal" },
+      { label: "About, Privacy & Legal", detail: "Browser-specific Privacy and Terms drafts, licences and help — bundled, not legal approval", href: "/app/#/about/privacy", cta: "Launch /app/ About & Legal" },
     ],
   },
 
@@ -301,17 +309,17 @@ export default {
     ],
   },
 
-  // Platform strip: what actually ships, with the honest status of each.
+  // Platform strip: code targets, not hardware-acceptance or playback guarantees.
   platforms: [
     {
       name: "Android",
-      detail: "Android 7.0 (API 24) and newer",
-      status: "primary target",
+      detail: "Android 7.0 (API 24)+; YouTube Music integration",
+      status: "primary target; hardware gates open",
       source: "minSdk = 24 in app-android/build.gradle.kts",
     },
     {
       name: "Windows",
-      detail: "Desktop client, needs a system VLC install",
+      detail: "YouTube Music native client; needs system VLC",
       status: "hardware-gated",
       source: "Phase 12 desktop native surface; S3 desktop checklist still open",
     },
@@ -321,7 +329,16 @@ export default {
       status: "never hardware-verified",
       source: "MASTER_PROMPT §1 — free via the JVM build; the S3 checklists cover Android and Windows",
     },
+    {
+      name: "Browser",
+      detail: "JioSaavn through unofficial wrappers; shell-only offline",
+      status: "experimental; deployed playback unverified",
+      source: "app-web/src/js/api.js; docs/web-player/IMPLEMENTATION-STATUS.md",
+    },
   ],
+
+  // Browser is a separate implementation, not a native feature-parity claim.
+  browserStatusSource: "docs/web-player/IMPLEMENTATION-STATUS.md; app-web/src/js/api.js",
 
   // 4-up stat row. Every cell is footnoted under the row.
   stats: [
@@ -334,13 +351,13 @@ export default {
     {
       id: "a",
       text:
-        "DHUN has no sign-in, no account system and no cookie jar. Playback and metadata use the project's own InnerTube client chain, and the desktop fallback talks to a user-provided yt-dlp binary — nothing authenticates as you.",
+        "Current builds require no DHUN or provider sign-in. Native YouTube requests use session visitor identifiers without a user account; browser JioSaavn API fetch omits credentials. Providers still see network/request data. Planned providers may require accounts or subscriptions; no Spotify integration exists today.",
       source: "ADR-001, ADR-003",
     },
     {
       id: "b",
       text:
-        "The whole project is GPL-3.0: the app, the shared Kotlin modules and this site. There is no paid tier, no trial and no account to upsell.",
+        "DHUN software is GPL-3.0, with no paid DHUN tier. This does not license third-party music, artwork, lyrics, streams, APIs or trademarks, or guarantee permission or zero future provider cost.",
       source: "LICENSE, THIRD_PARTY.md",
     },
     {
@@ -357,39 +374,39 @@ export default {
     },
   ],
 
-  // The three feature sections on the front page.
+  // Native feature sections; browser limitations are disclosed next to them.
   features: [
     {
       id: "no-sign-in",
       kicker: "NO SIGN-IN",
       title: "Nothing to log into.",
       body:
-        "Search, browse, playlists, lyrics and playback all work anonymously. DHUN never shows a sign-in wall, never keeps a session cookie, and does not solve a PO token or run BotGuard attestation to play a track.",
+        "Native search, browse, lyrics and playback use an unofficial YouTube Music path without user sign-in, cookie import, PO tokens or BotGuard attestation. This is not anonymity or a playback guarantee: YouTube receives requests and session visitor identifiers.",
       source: "ADR-001 (own client chain, no cookies), ADR-003 (staged identity waves)",
       mock: "mock-player-phone",
       mockFile: "mockups/player-phone.njk",
       points: [
         "Metadata comes from the project's own thin InnerTube client — no third-party API key.",
-        "Playback resolution walks a staged chain of anonymous player clients.",
-        "Session corroboration is fail-open: no token, no block.",
+        "Native playback resolution walks a staged chain of guest player identities.",
+        "Session corroboration is fail-open; upstream services may still refuse playback.",
       ],
       why:
-        "Why there is no sign-in at all: a signed-in client needs a session — a cookie jar, a PO token, BotGuard attestation — and DHUN has no server of its own to authenticate against. The extraction chain is deliberately tokenless by design, so the anonymous path is not a limitation the app works around; it is the only path the app has.",
+        "This describes the current native integration, not a universal rule that a client cannot authenticate without a backend. Planned providers need their own account, policy and privacy design before implementation; no account feature is added by this page.",
       whySource: "ADR-001 (own tokenless client chain), ADR-003 (staged identity waves)",
     },
     {
       id: "offline",
       kicker: "OFFLINE",
-      title: "Downloads that survive the app closing.",
+      title: "Native downloads that survive the app closing.",
       body:
-        "Save a track and it is written to app-private storage with a resumable range download, then served from disk ahead of the network on every later play — including with no connection at all.",
+        "Native Android/desktop code supports resumable downloads and offline-first audio from device storage. Browser offline support is the interface only, with no audio downloads. Provider permissions for extraction, persistent downloads and caching remain unresolved; this feature description is not authorisation to download.",
       source: "ADR-006 (persistent offline downloads: schema v3, range-resume engine, offline-first routing)",
       mock: "mock-downloads-phone",
       mockFile: "mockups/downloads-phone.njk",
       points: [
         "Range-resume download engine — an interrupted save continues where it stopped.",
-        "Offline-first routing: a downloaded track never hits the network to start.",
-        "Deleting the app deletes the downloads with it; nothing is written to shared storage.",
+        "Native audio resolution prefers a saved download; artwork and lyrics may still request the network.",
+        "Android app-private data and packaged desktop userdata have different removal paths; unpackaged data/temp logs may remain. See Privacy draft.",
       ],
     },
     {
@@ -412,8 +429,8 @@ export default {
   risk: {
     title: "This is borrowed time, and we say so.",
     paragraphs: [
-      "DHUN streams from YouTube Music by talking to YouTube directly. YouTube actively enforces PO tokens and SABR on those endpoints, and a hand-rolled extractor is what stopped ViMusic, RiMusic, InnerTune and OuterTune. DHUN's answer is not \"solved\" — it is a maintenance contract: its own sequential player-client chain, a pinned recovery watch on NewPipe Extractor that is deliberately not the primary engine, and a daily CI drill that resolves a real track and checks the audio bytes.",
-      "When that chain breaks, playback breaks until it is patched. That is the honest cost of a client with no sign-in, and it is the reason the public build is labelled unverified rather than stable.",
+      "The native YouTube Music path is borrowed time: an unofficial InnerTube client, staged stream-resolver waves, optional user-provided desktop yt-dlp fallback, NewPipe recovery watch and a daily health drill. Upstream changes or gating can break it; no provider permission or legal compliance is established. ADR-010 retains but does not expand extraction-based audio features.",
+      "Browser JioSaavn depends separately on community wrappers, CDN and browser/CORS rules. JioSaavn terms restrict unofficial/automated access; wrapper/content permissions remain unresolved. Neither a disclaimer nor a software licence resolves this. The public build remains unverified, not stable.",
     ],
     source: "ADR-001, MASTER_PROMPT §2 (the doctrine)",
     link: { href: `${REPO}/blob/main/docs/decisions/ADR-001-extraction-engine.md`, label: "Read ADR-001" },
@@ -446,7 +463,7 @@ export default {
   closing: {
     title: "Read it, try /app/, or build it yourself.",
     body:
-      "The whole project is GPL-3.0 source. You can inspect every screen in the live app right now, or view the public pre-release and its warnings on GitHub Releases. If a claim on this site is wrong, the honesty tests in the repository fail the build — and you can check them.",
+      "The project is GPL-3.0 source. Inspect the separate browser interface, native screenshots, or public pre-release warnings. Automated claims checks catch specified regressions; they do not prove every statement, playback or legal compliance.",
     source: "scripts/test_website_claims.py",
   },
 
@@ -454,13 +471,13 @@ export default {
   ui: {
     h1: "Real captures, shared tokens, and the live /app/ interface.",
     lead:
-      "DHUN's screens are built from one Compose design system — the same colour tokens, shapes, spacing scale and type ramp on Android and Windows. Below are ten real captures from Android phone and Windows desktop builds alongside direct deep links into the running app and the token values compiled into the app.",
+      "Ten historical Android/Windows captures show the native Compose design. Shared tokens do not make the separate browser feature-identical: native YouTube Music and browser JioSaavn differ. Browser links compare current equivalents, not every native tool.",
     source:
       "shared/src/commonMain/kotlin/dev/dhun/design/ (DhunAppearance, DhunShapes, DhunSpacing, DhunTypography) and .../ui/ (home, search, browse, library, player, settings, legal)",
     whyNoShots: {
       title: "Provenance and content safety",
       body:
-        "All ten captures were taken on an Android phone and a Windows desktop running DHUN, stripped of EXIF, XMP, ICC and PNG text chunks prior to commit, and had third-party album artwork and lyrics blurred so no unpermitted copyrighted art is redistributed in Git.",
+        "The provenance record dates these ten native captures and records metadata stripping and artwork/lyric blurring. Those precautions are not content permission or legal clearance; no new hardware capture is claimed here.",
       source: ".ai/WEBSITE_PLAN.md Part A §9; docs/verification/SCREENSHOT_PROVENANCE.md",
     },
     surfaces: [
@@ -512,9 +529,9 @@ export default {
         kicker: "ANDROID · SYNCED LYRICS",
         title: "Synced lyrics overlay",
         body:
-          "Tapping the CC toggle in the full player opens synced lyrics fetched from LRCLIB (falling back to YouTube Music lyrics and cached locally in SQLDelight), highlighting the active timestamped line as playback progresses.",
+          "Native CC opens available lyrics with active-line highlighting. Current sources are configurable YouTube Music, LRCLIB and KuGou, with local cache and per-song choices; this historical capture does not prove live availability.",
         points: [
-          "LRCLIB timestamped LRC lines with YouTube Music fallback",
+          "Native configurable sources and local lyric cache; no browser lyric service",
           "Active line highlighted against a frosted dark overlay card",
           "Supports Devanagari and Latin scripts with local caching",
         ],
@@ -568,11 +585,11 @@ export default {
         kicker: "ANDROID · LIBRARY HISTORY",
         title: "Library — History",
         body:
-          "Listening history is recorded purely on-device to seed Home recommendations and chronological Today/Earlier sections, with a confirmation-backed Clear all action that deletes every row from the local database.",
+          "Native history is stored locally for recommendations and chronology. Track IDs used for playback/related requests still leave the device. Clear history targets local rows, not third-party logs; feedback needs platform validation.",
         points: [
           "Chronological play history grouped by recency",
-          "Confirmation-backed Clear all with honest failure reporting",
-          "Never uploaded or synced outside your device",
+          "Confirmation-backed library clear; Settings clear feedback has known gaps",
+          "No automatic history-database sync; provider requests are separate",
         ],
         mockFile: "mockups/history-phone.njk",
       },
@@ -582,9 +599,9 @@ export default {
         kicker: "ANDROID · SETTINGS & EQUALIZER",
         title: "Settings, Equalizer & Legal",
         body:
-          "Settings groups Appearance (Dark/Light and six accent palettes), Downloads cache cap, About & Legal (Privacy Policy, Terms, GPL-3.0 & Apache-2.0 licences, Third-Party Notices, Support, Security Reporting), and the built-in Equalizer with presets and preamp.",
+          "Native Settings exposes appearance, a streamed-audio cache cap separate from downloads, About & Legal draft/reference pages, and platform equalisation. This historical capture is not a browser settings inventory.",
         points: [
-          "Dark and Light themes plus Violet, Amber, Teal, Rose, Sky, and Lime accents",
+          "Historical native appearance controls; current shared tokens listed above",
           "In-app About & Legal pages rendered offline from bundled Markdown",
           "Equalizer with genre presets, preamp slider, and per-band dB controls",
         ],
@@ -614,7 +631,7 @@ export default {
     contract: {
       title: "Every screenshot on this site, its provenance, and its live /app/ route",
       body:
-        "Every figure on this site is a real capture from an Android phone or Windows desktop running DHUN, converted to metadata-stripped WebP and paired with a deep link into the live app.",
+        "These are dated native captures, not current browser screenshots. Provenance and optional browser-comparison links are separate; absent browser features have no equivalent link.",
       rows: [
         { id: "mock-home-phone", surface: "Android Home, portrait (android-home-portrait.webp)", page: "/, /ui/" },
         { id: "mock-player-phone", surface: "Android FullPlayer (android-full-player.webp)", page: "/, /ui/" },
@@ -631,7 +648,7 @@ export default {
         { id: "mock-widget", surface: "Android home screen with the Quick Play 4×2 launcher widget" },
       ],
       plannedNote:
-        "One launcher-level capture remains planned in the §9 backlog (the Android home-screen Quick Play widget outside the app). Every in-app surface is captured above.",
+        "The dated §9 screenshot backlog leaves one launcher-widget capture planned. These historical captures do not cover every current native screen.",
       source: ".ai/WEBSITE_PLAN.md Part A §9 (backlog, machine-checked both ways)",
     },
   },
@@ -639,7 +656,7 @@ export default {
   chain: {
     title: "How the extraction chain works — and how it breaks",
     lede:
-      "DHUN talks to YouTube's own endpoints with no account and no token. That is a choice with a maintenance bill, and the repository pays it in the open rather than in a support inbox.",
+      "Native clients use unofficial YouTube endpoints without user sign-in or PO-token input, but reuse visitor identifiers. This chain is not the JioSaavn browser path or a permission/availability guarantee.",
     stages: [
       {
         title: "Metadata",
@@ -662,18 +679,18 @@ export default {
       {
         title: "Recovery watch",
         body:
-          "NewPipe Extractor stays pinned and watched, deliberately outside the active chain: it re-enters as an option when the daily drill goes green on it. No local fork, no patched copy to maintain.",
+          "NewPipe Extractor is pinned as a recovery watch, outside the active chain. A green probe is not an automatic production switch, provider permission or device acceptance.",
         source: "ADR-001",
       },
       {
         title: "The daily drill",
         body:
-          "extraction-health.yml runs a live playback probe once a day, resolves a real track, checks the audio bytes, and opens or closes a rot-drill issue when the answer changes.",
+          "extraction-health.yml schedules daily attempts to resolve a track and check audio bytes, with rot-drill issue handling. A configured probe is not a new successful run or hardware/legal acceptance.",
         source: "ADR-001; extraction-health.yml",
       },
     ],
     cost:
-      "When the chain breaks, playback breaks until it is patched — for everyone at once, with no server-side fix to deploy. That is the honest cost of a client with no sign-in, and the reason the public build is labelled unverified rather than stable.",
+      "Upstream changes or network gating can break playback; effects differ by build/network. DHUN has no server-side repair path. Probe results, actual device playback and provider permission remain separate gates.",
   },
 
   // /features — what only the desktop build can do, and what it needs.
@@ -709,9 +726,9 @@ export default {
       title: "Playing it",
       items: [
         { text: "Queue engine with shuffle, repeat and a reorderable queue panel", source: "Phase 06/08", path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/PlayerTabs.kt" },
-        { text: "Next-track pre-buffering and an isolated temp cache", source: "ADR-005", path: "docs/decisions/ADR-005.md" },
+        { text: "Next-track pre-buffering and an isolated temp cache", source: "ADR-005", path: "docs/decisions/ADR-005-next-track-prebuffering-and-temp-cache.md" },
         { text: "Full player with a real blurred-artwork backdrop, tabs and a play disc", source: "ui/player/FullPlayer.kt", path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt" },
-        { text: "Synced lyrics: LRCLIB, then YouTube Music lyrics, then the local cache", source: "Phase 11", path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/SyncedLyrics.kt" },
+        { text: "Native lyrics from configurable YouTube Music, LRCLIB and KuGou sources, with local cache and per-song choices", source: "Phase 11", path: "shared/src/commonMain/kotlin/dev/dhun/ui/player/SyncedLyrics.kt" },
         { text: "Sleep timer that cycles through durations and can be turned off", source: "presentation/player/PlayerViewModel.kt", path: "shared/src/commonMain/kotlin/dev/dhun/presentation/player/PlayerViewModel.kt" },
       ],
     },
@@ -721,13 +738,13 @@ export default {
         { text: "Equaliser with genre presets, a preamp and per-band gain, −20 dB to +20 dB", source: "player/equalizer/EqualizerBands.kt", path: "shared/src/commonMain/kotlin/dev/dhun/player/equalizer/EqualizerBands.kt (COUNT = 10)" },
         { text: "Desktop equalisation uses libVLC's own 10-band geometry", source: "player/equalizer/VlcEqualizerCommand.kt", path: "shared/src/commonMain/kotlin/dev/dhun/player/equalizer/VlcEqualizerCommand.kt" },
         { text: "Android equalisation binds android.media.audiofx to the live audio session", source: "app-android/.../equalizer/AndroidEqualizerEngine.kt", path: "app-android/src/main/kotlin/dev/dhun/android/equalizer/AndroidEqualizerEngine.kt" },
-        { text: "Settings for appearance, resume-on-launch, capped download cache, and offline About & Legal pages", source: "ui/settings/SettingsScreen.kt", path: "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt" },
+        { text: "Native Settings for appearance, resume-on-launch, separate streamed-audio cache and downloads, history/cache controls and offline legal drafts", source: "ui/settings/SettingsScreen.kt", path: "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt" },
       ],
     },
     {
       title: "Keeping it",
       items: [
-        { text: "Persistent offline downloads that resume after the app closes", source: "ADR-006", path: "docs/decisions/ADR-006.md" },
+        { text: "Persistent offline downloads that resume after the app closes", source: "ADR-006", path: "docs/decisions/ADR-006-offline-music-downloads-architecture.md" },
         { text: "Library → Downloads keeps its own filter tab, storage bar and offline badges", source: "Phase 10", path: "shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt" },
         { text: "Quick Play home-screen widget, sized to a 4×2 launcher slot", source: "app-android AndroidManifest.xml", path: "app-android/src/main/AndroidManifest.xml (DhunQuickPlayWidgetProvider)" },
         { text: "Theme modes with accent ramps read from the shared design system", source: "DhunAppearance", path: "shared/src/commonMain/kotlin/dev/dhun/design/DhunAppearance.kt" },
@@ -745,21 +762,21 @@ export default {
   ],
 
   notInDhun: [
-    { text: "No accounts and no cross-device sync — there is no server to sync through.", source: "ADR-001" },
+    { text: "No provider sign-in or cross-device library sync is implemented. No DHUN server exists; future account designs need separate approval.", source: "ADR-001" },
     { text: "No import from Spotify, YouTube Music or any other service's library export.", source: "not implemented anywhere in the tree" },
     {
-      text: "No iOS build. Android and Windows are the native targets; the browser is served by the web app at /app/, which is the same interface rather than a second native client.",
+      text: "No iOS build. Android and Windows are the primary native targets. The separate browser client at /app/ uses JioSaavn and is not feature-identical to native; Linux/macOS JVM builds remain hardware-unverified.",
       source: "docs/decisions/ADR-008-browser-web-player-target.md (2026-10-16 amendment), app-web/README.md",
     },
     { text: "No published audio-quality figure. DHUN makes no bitrate, lossless or FLAC claim of any kind.", source: "no verified number exists in the repository" },
     { text: "No casting, no Android Auto, no CarPlay.", source: "not implemented anywhere in the tree" },
-    { text: "No recommendation engine of its own: related tracks and the radio come from the same anonymous endpoints as everything else.", source: "ADR-001, Phase 15 endless-radio" },
+    { text: "Native recommendations use listening history and YouTube related/radio requests, not a DHUN cloud model. Browser shelves are JioSaavn queries, not the native recommendation backend.", source: "ADR-001, Phase 15 endless-radio" },
     { text: "No store channel and no store-signed release; only a public pre-release is available for testing.", source: "app-android/.../keystores/dhun-test.p12, docs/releases/v1.00.002.md" },
   ],
 
   install: {
     permissions:
-      "Android permissions: internet, notifications, media playback and downloads as foreground services (each declared only while it is running), wake lock, and a one-shot battery-optimisation exemption dialog. No contacts, SMS, location, camera, microphone, shared storage, overlay or accessibility access. The full list is in the app manifest, one file in the repository.",
+      "Android permissions: internet, notifications, media playback and download foreground services, wake lock, and an optional battery-optimisation exemption request. No contacts, SMS, location, camera, microphone, shared storage, overlay or accessibility access. The full list is in the app manifest, one file in the repository.",
     source: "app-android/src/main/AndroidManifest.xml",
     privacy:
       "No analytics, no telemetry, no crash reporting, no advertising SDK. This website loads nothing from a third-party origin — no CDN, no font service, no analytics script.",
@@ -770,7 +787,7 @@ export default {
     licence:
       "DHUN is free software under the GNU General Public License v3.0, and so is this site.",
     independence:
-      "DHUN is not affiliated with, endorsed by or connected to YouTube or Google. YouTube Music is a trademark of Google LLC; song metadata and artwork belong to their respective owners and are fetched at runtime, never bundled.",
+      "DHUN is not affiliated with, endorsed by or authorised by YouTube, Google, JioSaavn or Spotify. Their names and trademarks belong to their owners. The software licence does not grant music, artwork, lyrics, stream or API rights. Terms and Privacy remain drafts, not legal approval.",
     builtWith: "Built with Eleventy. No client-side JavaScript, no cookies, no tracking.",
   },
 };

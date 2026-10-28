@@ -1,3 +1,165 @@
+# 05 — Source capability, platform and evidence matrix
+
+**Current ledger: 2026-10-28.** Supersedes this document's 2026-10-20 matrix,
+which mixed upstream API possibilities with DHUN implementation using
+“Supported”, omitted native audio/lyrics/artwork storage and left Spotify
+Terms/SDK details unexamined. Those were not runtime acceptance records.
+The original matrix is preserved in §6 below; other original dated research
+remains under the historical sections of [03](03-youtube-youtube-music.md), [04](04-spotify.md) and [02](02-baseline-audit-2026-10-20.md).
+
+**Authoritative product direction and vocabulary:** [PRD §1](../PRD.md#1-product-definition-and-source-of-truth).
+DHUN is free, open-source, cross-platform and multi-source; YouTube / YouTube
+Music first, Spotify Planned, implementation Deferred. Other sources require
+value/feasibility/permission/maintenance/privacy/platform/licence evidence.
+This ledger describes actual differences; it does not grant provider permission.
+
+Evidence: **[R]** source inspected; **[T]** tests run with command/date in
+[06](06-multi-source-claims-audit.md); **[H]** older dated hardware/runtime record,
+not repeated here; **[P]** current primary provider text read, not DHUN code;
+**[U]** unverified. Product direction, Implemented, Partial, Planned, Deferred,
+Blocked, Research required and Unavailable have the meanings in PRD §1.
+
+## 1. Capability matrix
+
+### Current DHUN integrations — code and verification, not availability promises
+
+| Capability | Native Android — YouTube Music | Native desktop JVM — YouTube Music | Browser — JioSaavn wrappers |
+| --- | --- | --- | --- |
+| Integration status | Implemented paths [R]; historical residential playback [H]; current hardware acceptance still open | Implemented paths [R]; Windows primary desktop target [H]; Linux/macOS hardware unverified [U] | Partial: source/unit evidence [R,T]; live catalogue and audible deployed-origin playback unverified [U] |
+| Search/catalogue/browse | InnerTube [R] | InnerTube [R] | Three unofficial wrapper instances for **one catalogue family**, not three independent sources [R] |
+| Playback | Own-client resolver → Media3 [R]; no user OAuth | Own-client resolver → VLCJ/system libVLC; optional user-installed yt-dlp fallback; NewPipe watch only [R] | Wrapper stream URL → HTML audio [R]; CORS/media/autoplay/service constraints; samples silent |
+| Queue / repeat / shuffle | Native queue [R] | Native queue [R] | In-memory browser queue [R,T]; not a universal cross-provider queue |
+| Accounts / provider writes | No provider sign-in, OAuth or provider playlist/library writes [R] | Same [R] | No provider sign-in, OAuth or provider writes [R] |
+| Local likes / playlists / history | SQLDelight [R] | SQLDelight [R] | `localStorage` `dhun.web.v3`, metadata snapshots, export/import/erase [R,T] |
+| Offline audio | Implemented resumable downloads + offline-first routing [R]; permission/policy unresolved | Same plus whole-track audio cache/prebuffer [R]; permission/policy unresolved | Unavailable: no audio downloads or SW audio caching [R]; normal browser cache is not a DHUN offline feature |
+| Lyrics | YouTube Music/LRCLIB/KuGou configurable source order, SQLDelight cache, saved matches, local TTML/transliteration [R] | Same [R] | Unavailable: no lyric provider/request [R] |
+| Equaliser | System AudioEffect binding [R]; device-dependent | libVLC ten-band [R] | Unavailable: no EQ [R] |
+| Privacy controls | Settings history/recording, lyrics and platform audio-cache controls; download removal [R]; outcome feedback gaps remain | Same, with platform callback [R] | Export/import/erase library; erase **keeps settings and shell cache** [R,T] |
+| YouTube in browser / JioSaavn in native | No native JioSaavn adapter | No native JioSaavn adapter | No YouTube API, extraction or IFrame integration; D2 unchanged [R] |
+| Spotify (any capability) | Planned; execution Deferred; no adapter/auth/SDK/runtime [R] | Same [R] | Same project-level intent; no platform route approved [R] |
+
+Source trace: [`MusicProvider.kt`](../../shared/src/commonMain/kotlin/dev/dhun/provider/MusicProvider.kt),
+native [`Entities.kt`](../../shared/src/commonMain/kotlin/dev/dhun/core/Entities.kt),
+Android [`AppModule.kt`](../../app-android/src/main/kotlin/dev/dhun/android/di/AppModule.kt),
+desktop [`Main.kt`](../../app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt),
+[`SettingsScreen.kt`](../../shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt),
+browser [`api.js`](../../app-web/src/js/api.js), [`library.js`](../../app-web/src/js/library.js),
+[`player.js`](../../app-web/src/js/player.js), [`sw.js`](../../app-web/src/sw.js).
+Current commands/results are in [06](06-multi-source-claims-audit.md). Local Java
+is unavailable, but the authorised PR #197 follow-up (§12) verifies source
+`626d8fe` with new shared/Android/desktop/probe CI, APK/AAB compile, API-24 lint,
+Windows MSI/install-over and browser/Lighthouse checks. All applicable checks
+passed; no physical sound or deployed-origin live audio is inferred. Browser
+UI checks use controlled network/HTTP failures, not live-provider acceptance.
+A source path or unit-test result is **not** new on-device audible playback proof.
+
+### Upstream possibilities — not implemented integrations
+
+| Surface | Provider-documented capability [P] | DHUN status / gate |
+| --- | --- | --- |
+| YouTube Data API | Metadata/search/playlist resources; quota, key/project and OAuth where applicable | Research required; no official Data API path. Not a raw audio URL API. [03](03-youtube-youtube-music.md) |
+| YouTube visible IFrame | Queue/load/play/pause/seek; visible player, Referer/size/branding/autoplay requirements | Proposed Watch mode only, not approved implementation; D2/current CSP remain. No hidden/background/offline-audio parity. |
+| Spotify Web API | Search/metadata/user library/playlist operations, limited by access mode/scopes; player commands control a Spotify device | Planned / Deferred. Metadata ≠ remote control ≠ audio. Premium owner, five-user development limit, policy/permissions and access/scale gates. [04](04-spotify.md) |
+| Spotify Web Playback SDK | Eligible Premium browser Connect playback; DRM/browser/autoplay and commercial-approval limits | Planned / Deferred; not HTML-audio URLs; third-party runtime/privacy/CSP decision required |
+| Spotify Android App Remote | Controls the installed Spotify app, which owns playback/cache/network | Planned / Deferred; not Media3/direct PCM; Beta SDK and platform/account/licensing verification required |
+| Spotify desktop / offline | No direct JVM/libVLC audio route established; Terms restrict copying/ripping with narrow conditional exceptions | Research required; no download authorisation or desktop route implied |
+
+## 2. Cost, hosting, authentication and privacy
+
+| Build / candidate | Current recipients and local data [R] | Cost / authorisation / unknowns |
+| --- | --- | --- |
+| Native YouTube Music | YouTube/Google: query, IDs, client version/country/language/headers, returned in-memory visitor identifiers; media/art requests. Library, queue restore, history/searches, lyrics/matches, settings in SQLDelight; persistent audio/artwork plus segment/whole-track/prebuffer caches | No DHUN backend or mandatory provider subscription in code. Unofficial extraction/download/background/metadata policy applicability and content permissions unresolved; not “free therefore permitted.” |
+| Native lyrics | LRCLIB: artist/title/album/duration/manual queries and version User-Agent. KuGou: lyric queries/candidate IDs/access keys/downloads when selected. On-device ICU transliteration / local TTML sends no extra service request | API accessibility/software licences are not lyric rights. Retention and permissions unestablished; no paid translation/recognition service adopted. |
+| Native diagnostics / OS integration | Local Android Logcat/playback details and desktop startup log; OS/JVM/path/stack/IDs/URLs may be present. Notifications, widgets and system media surfaces can show title/artwork | No automatic uploader found. Optional public GitHub issue submissions are user-chosen third-party processing; redact first. Settings clearing is not universal erase-all. |
+| Browser JioSaavn | `saavn.dev`, `saavn.sumit.co`, `saavnx.vercel.app` receive queries/IDs; failover can contact several. `*.saavncdn.com` receives audio/art requests. API uses `credentials: omit`, `cache: no-store`. Local snapshots blank stream URLs; SW caches shell only; browser media policy separate | Three separate operators and hosting/CDN logs beyond DHUN control. JioSaavn Terms restrict unofficial/automated access; wrapper deployment permissions/retention unresolved. No support contract/uptime promise. |
+| Hosting / voluntary reports | GitHub Pages receives page/app/update requests; GitHub processes issues/releases | No DHUN-operated server. Zero app telemetry does not mean host/provider has no logs. Hosting entitlement/availability not guaranteed forever. |
+| Spotify — future only | No current requests or tokens. A proposed OAuth/SDK integration would disclose scopes/account/library/playback/network data and need secure token lifecycle, disconnect/delete and clear notices | Premium owner is a recurring prerequisite; eligible listener Premium and scale/commercial approval separate. Current D4 disallows new recurring costs. No account/dashboard, price, agreement, quota approval or SDK/GPL compatibility verified. |
+
+Native deletion controls remove only their stated local stores; automatic lyric
+cache clear keeps explicit song choices. Packaged desktop data is next to the
+launcher (`userdata`); unpackaged OS data and temp logs may survive uninstall.
+Browser erase keeps settings; origin site-data controls remove remaining local
+storage/cache/registration, not third-party logs. No blanket “nothing leaves”,
+“everything is deleted” or encryption guarantee is justified.
+
+Primary evidence accessed 2026-10-28: [YouTube Terms](https://www.youtube.com/static?template=terms),
+[API policies](https://developers.google.com/youtube/terms/developer-policies),
+[Google Privacy](https://policies.google.com/privacy),
+[JioSaavn Terms](https://www.jiosaavn.com/corporate/terms/) and
+[Privacy](https://www.jiosaavn.com/corporate/privacy/),
+[Spotify Policy](https://developer.spotify.com/policy) and
+[Terms](https://developer.spotify.com/terms). Wrapper project
+[identifies itself as unofficial](https://github.com/sumitkolhe/jiosaavn-api);
+its code licence is not a content agreement. No retention schedule for each
+wrapper was established; reviewing targeted clauses is not legal review.
+
+## 3. Cross-platform compatibility
+
+**Architecture finding: the provider seams are real, but not multi-provider-ready.**
+
+- Native `MusicProvider` imports InnerTube `SearchFilter`, uses `videoId`/browse
+  IDs; `Track`, stream resolution, lyrics/download/queue/recommendation callers
+  and SQLDelight keys assume that identity. `YouTubeMusicProvider` is the only
+  implementation. No capability declaration/registry/auth interface exists.
+- Browser `api.js` has one normalised JioSaavn catalogue family and wrapper
+  failover; entity/snapshot keys and playback URLs are not a provider-scoped
+  federated model. Source failover ≠ catalogue aggregation.
+- Keep native KMP/Compose and separate JS browser. Share a vocabulary/contracts
+  conceptually, not a framework rewrite or forced identical providers. Media3,
+  VLCJ, HTML audio, a visible IFrame, Spotify Connect and App Remote have different
+  state/control/audio ownership. OAuth/security/storage differs per platform.
+- Separate follow-up before any second adapter: provider-scoped stable IDs and
+  user-data migration plan; capability/status/region/account restrictions;
+  source-aware search/browse/queue/library/lyrics/download routing; explicit
+  player/auth/lifecycle/error adapters; least-privilege scopes/token storage;
+  privacy/retention/revocation; offline eligibility and permissions; fixtures and
+  hardware/deployed-origin tests. D5 remains **design only**, not completed code.
+- Existing Settings clear operations have incomplete pending/error semantics.
+  Correct disclosures now; fix handlers in a bounded code task with failure/retry
+  tests, not a broad player rewrite or silent data migration in this audit.
+
+## 4. Risk register (provider-specific)
+
+Judged impact/likelihood, not measured legal outcomes. Engineering mitigation
+is not permission. D1–D6 and the 2026-10-28 amendment remain traceable in ADR-010.
+
+| ID | Risk / scope | Impact / likelihood | Evidence / current boundary | Next dependency |
+| --- | --- | --- | --- | --- |
+| R1 | Native unofficial extraction/audio/background policy applicability | High / unresolved legal outcome | YouTube Terms and policy §§III.I.7/9/14 [P]; existing path retained without expansion | Permission/legal review; no claim of compliance |
+| R2 | YouTube resolver/client changes and network gating | High / recurring | Own-client resolver + daily drill + historical residential checks [R,H] | Dated current probe/hardware results; distinguish runner gating from parser failure |
+| R3 | Official YouTube API quotas unsuitable for a broad public client by default | High if adopted / usage-dependent | 100 search calls/day, 10,000 other units [P]; not implemented | Approved API/credential/quota design, no backend assumed |
+| R4 | Credential or scope leakage in future official providers | High / design-dependent | No user OAuth today [R]; client IDs are not secrets, bearer/refresh tokens are | Platform threat model, secure storage, no secrets in source/logs |
+| R5 | YouTube IFrame adds visible player and third-party runtime/network | Medium / certain if adopted | Current CSP/D2 prohibit silent adoption [R]; official controls exist [P] | Explicit owner decision, privacy/CSP/Referer and real-origin tests |
+| R6 | Spotify §III.5 multi-service integration and §§III.7/11/13 restrictions | High / applicability unresolved | Primary Policy [P]; separation is not automatic approval | Provider clarification/permitted scope/legal review before adapter |
+| R7 | Spotify Premium/account/access/scale conflicts with $0/student constraints | High / known gate | Premium owner, 5 users; extended access organisations/250k MAU criteria [P] | Owner account/funding authority later; no recurring cost now |
+| R8 | Spotify endpoint, field, SDK and quota changes | Medium / recurring | February migration + July **25 client IDs**, shared developer quota [P] | Fresh recheck, endpoint contract and error tests before implementation |
+| R9 | Community wrappers disappear/rate-limit/change/CORS fails | High / plausible | Failover, shape checks, errors, silent labelled samples [R,T] | Live catalogue and audible deployed-origin validation; never make tests fake success |
+| R10 | JioSaavn unofficial access and wrapper/content permissions | High / unresolved legal outcome | Terms “Your Use of JioSaavn” restrict unofficial/automated interfaces [P]; no agreement found | Operator/provider permission and legal review; disclosure not cure |
+| R11 | Native metadata/lyrics/artwork retention and local diagnostics privacy | High / applicability unknown | Indefinite local records vs API §III.E.4 [R,P]; paths/IDs/URLs in diagnostics | Lifecycle/rights review; diagnostic redaction; deletion feedback fix |
+| R12 | Download/cache/offline rights and release licence-notice completeness | High / unresolved | Native audio storage [R]; provider terms [P]; notices not resolved/transitive SBOM | Permissions, resolved artifact/licence/NOTICE review before publication |
+
+## 5. Unresolved items
+
+1. Existing native and browser provider permissions/policy/legal questions; no
+   lawyer approval, operator contract or adopted legal policy exists in this audit.
+2. Current hardware and deployed-origin audible catalogue playback; native
+   compilation cannot be inferred from static Python/JS tests.
+3. Secure account/capability/identity/player architecture and migration design;
+   no second native source or Spotify runtime is built.
+4. Provider/operator retention/deletion, logs/redaction, distribution-notice
+   completeness and legal controller/private contact remain open.
+5. Spotify feasibility and owner account/recurring-cost/access decisions remain
+   gates, not permission to purchase Premium or promise public support. See
+   [04 current recheck](04-spotify.md) for primary links and exact unknowns.
+
+
+## 6. Historical matrix — 2026-10-20 (superseded)
+
+> Preserved verbatim below as dated research, **not current product scope,
+> implemented capability, permission or a new test result**. “Supported” in the
+> original table mixed upstream possibilities with code; §§1–5 above supersede
+> it. Current vocabulary lives in PRD §1.
+
 # 05 — Source capability matrix, cost, privacy, cross-platform, and risk register
 
 **Date:** 2026-10-20. **Companion documents:** [02 — baseline audit](02-baseline-audit-2026-10-20.md),

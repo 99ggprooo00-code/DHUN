@@ -1,5 +1,18 @@
 # RISK_REGISTER
 
+## Current provider risk ledger — 2026-10-28
+
+[Matrix 05 §4](../docs/research/05-source-capability-matrix.md#4-risk-register-provider-specific)
+is the current detailed R1–R12 ledger; [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth)
+owns product direction. High unresolved risks: native extraction/offline/background
+and retention permissions; browser JioSaavn Terms restricting unofficial access,
+community availability and unestablished operator retention; Spotify §III.5,
+Premium/account/5-user/scale/licence/cost gates; incomplete provider-scoped IDs,
+capabilities/auth/player boundaries; local deletion feedback, diagnostics and
+resolved release-notice coverage. Disclosure/owner risk acceptance is not permission.
+No new provider, recurring cost or compliance conclusion follows from this update.
+Earlier operational risks and retirement dates below remain historical evidence.
+
 Reconciled 2026-09-16 (re-baseline, base `d555959`). Standing risks
 first; retired risks at the bottom (kept, not deleted).
 

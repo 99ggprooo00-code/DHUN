@@ -14,26 +14,31 @@ privacy and terms texts are in `app-web/src/js/data/web-legal.js`.
 | `saavn.dev`, `saavn.sumit.co`, `saavnx.vercel.app` | Search text, song/album/artist/playlist ids, page numbers. Standard request headers, sent by the browser. No cookies (`credentials: omit`). | To read the catalogue. |
 | `*.saavncdn.com` | The audio and artwork request for a URL the catalogue returned. | To play and show a track. |
 
-Nothing else is requested. The page loads no fonts, scripts, analytics, tags,
+No other third-party runtime is requested by app code. GitHub Pages still serves
+the interface and updates; voluntary issues go to GitHub. The page loads no fonts, scripts, analytics, tags,
 embeds or advertising from any other origin. This is enforced by the CSP (see
 [TRD.md](TRD.md) §2) and checked by `scripts/test_app_web.py` and by the
 `website_claims.py` rules over the shipped dependency graph.
 
 The browser's own requests for those origins reveal the visitor's IP address to
-those origins, as any web request does. The build does not add identifiers.
+those origins, as any web request does. The build adds no tracking identifier,
+not a promise that providers cannot identify requests. Failover may send the
+same query/IDs to several independent operators; API uses `cache: no-store`.
+Media/images and referrer/cache/headers are browser-managed; no packet audit here.
 
 ## 2. What is stored on the device
 
 One key in `localStorage`: `dhun.web.v3` (see [DATA-SCHEMA.md](DATA-SCHEMA.md)).
-It holds likes, playlists, history, recent searches, a copy of track display
-fields, and settings. Nothing is stored in cookies, `IndexedDB` or a server.
+It holds likes, playlists, history, recent searches, referenced track-display
+snapshots (including artwork URLs, blanked stream URLs), and settings;
+unreferenced snapshots are pruned. SW caches shell only, browser media caching is separate. Nothing is stored in cookies, `IndexedDB` or a server.
 
 The visitor can:
 
 - **See** its contents on the Library screen. The raw record is visible only
   through the browser's own storage tools.
 - **Export** it: Settings → This browser → Export library.
-- **Delete** it: Settings → This browser → "Erase everything in this browser"
+- **Delete** it: Settings → This browser → "Erase library"
   asks for confirmation before it removes likes, playlists, history, snapshots
   and recent searches. It keeps the settings. A single playlist can be deleted
   from its own screen. The browser's site-data controls for the origin also
@@ -41,11 +46,11 @@ The visitor can:
 
 ## 3. What the project does not hold
 
-- No server that receives the visitor's library, searches or plays.
+- No **DHUN-operated** server that receives the library, searches or plays; wrapper/CDN/hosting requests are still third-party processing.
 - No account, login, email or password.
 - No analytics, telemetry, crash reporting or advertising identifier. The build
   has no code that sends any of these.
-- No copy of catalogue responses kept by the project.
+- No server-side catalogue mirror; local metadata snapshots still exist.
 
 Whether the three catalogue services keep logs of requests is **not known** to
 the project. It is the services' own policy and is not verified.
@@ -84,7 +89,10 @@ not under this repository's control on GitHub Pages.
 
 ## 7. Secrets
 
-No API key, token or credential is required or stored. `scripts/test_repo_health.py`
+No user API key/token/account credential is required or stored by this build.
+Returned signed media URLs are access-bearing/transient, not user OAuth tokens.
+Spotify is planned/deferred with no auth or traffic; future secure-token and
+privacy design is not implemented. `scripts/test_repo_health.py`
 checks the repository for committed secrets.
 
 ## 8. Known weaknesses
@@ -99,12 +107,15 @@ checks the repository for committed secrets.
 
 ## 9. Policy questions open
 
-- **YouTube developer policies** (§III.I.14, §III.I.07 and related clauses) govern
-  the native YouTube path, which is not part of the browser build. Recorded in
+- **YouTube developer policies** (§III.I.14, §III.I.07 and related clauses) raise
+  unresolved applicability/permission questions for the native path, not browser JioSaavn. Recorded in
   [`docs/research/03-youtube-youtube-music.md`](../research/03-youtube-youtube-music.md).
 - Not used by the browser build, but the **Spotify developer policy** governs the planned source (§III.5 and others). Not used here, and recorded in `docs/research/04-spotify.md`.
-- **Community catalogue terms.** Not reviewed. Recorded as F5 in the baseline
-  audit.
+- **Community catalogue permissions.** Targeted [JioSaavn Terms](https://www.jiosaavn.com/corporate/terms/)
+  clauses re-read 2026-10-28 restrict unofficial/automated access. Required
+  permissions, wrapper-specific terms/retention and content rights remain
+  unresolved; [JioSaavn Privacy](https://www.jiosaavn.com/corporate/privacy/)
+  does not prove each independent wrapper's practices. This is not legal review.
 
 The project treats these as open risks. It does not claim compliance with any of
 them.

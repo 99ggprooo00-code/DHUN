@@ -1,5 +1,10 @@
 # 02 — Baseline and repository audit (2026-10-20)
 
+> **Historical baseline.** Preserve its 2026-10-20 findings and test outcomes.
+> Current corrections/validation are in [06](06-multi-source-claims-audit.md),
+> current capability status in [05](05-source-capability-matrix.md), and latest
+> direction in [PRD §1](../PRD.md#1-product-definition-and-source-of-truth).
+
 **Scope.** What the repository was, and what was verified, before the multi-source
 research and the proposed provider architecture. This is a snapshot. Its source of
 truth is the repository itself at the commit below; the commands are reproducible.

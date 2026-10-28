@@ -12,8 +12,8 @@ the browser. Evidence labels follow
 |---|---|---|
 | Browser is a target at all | Reopened as a feasibility gate, then as a separate client. | [ADR-008](../decisions/ADR-008-browser-web-player-target.md) (with its 2026-10-09 amendment) |
 | Catalogue for the browser | JioSaavn, through three public community wrappers. No DHUN server. | [PROVIDER-INTEGRATION.md](PROVIDER-INTEGRATION.md) §1; ADR-008 |
-| YouTube in the browser | Not used. The web build does not embed the YouTube IFrame player (recorded decision D2). The owner's words on D2 were "It was primarily meant to be yt music client so do accordingly", and the recorded reading is that the owner did not want web features compromised. **That reading is open to confirmation** (see [PRD.md](PRD.md) §8). | [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md) |
-| Spotify in the browser | Not used, planned in the native design, deferred (owner decision D3). | ADR-010, and research not used by the browser, see `docs/research/04-spotify.md` |
+| YouTube in the browser | Not used. The web build does not embed the YouTube IFrame player (recorded decision D2). The owner's words on D2 were "It was primarily meant to be yt music client so do accordingly", and the recorded reading is that the owner did not want web features compromised. **Historical interpretation, superseded 2026-10-28:** multi-source direction with YouTube first is settled; D2/no-IFrame remains, Watch mode only proposed. | [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md) |
+| Spotify in the browser | Not used; planned project source, execution deferred pending all feasibility gates (D3/D4). | ADR-010, and research not used by the browser, see `docs/research/04-spotify.md` |
 | Where the web documents live | `docs/web-player/`, one set, checked by the docs gate. | [`02-baseline-audit-2026-10-20.md`](../research/02-baseline-audit-2026-10-20.md) §4 |
 
 ## 2. Research documents that bear on the browser
@@ -43,7 +43,7 @@ not these records.
 
 | ID | Question | Why it matters to the browser | Status |
 |---|---|---|---|
-| RQ-W1 | What are the terms of the three JioSaavn community wrappers, and do they permit this use? | The whole catalogue depends on them. | Open. Not reviewed. Baseline F5. |
+| RQ-W1 | What are the terms of the three JioSaavn community wrappers, and do they permit this use? | The whole catalogue depends on them. | Open. JioSaavn Terms targeted clauses re-read 2026-10-28 restrict unofficial access; independent wrapper permissions/retention not established. Not legal review. Baseline F5. |
 | RQ-W2 | How long do stream URLs stay valid after the catalogue returns them? | A long-open queue could hold expired URLs. | Open. Not measured. |
 | RQ-W3 | Do the three origins return the shapes the code expects, today? | The shape check fails closed, but the answer is not recorded. | Open. Not recorded. |
 | RQ-W4 | Are there browser-appropriate sources with a support contract and no client secret? | A contracted source would remove the largest risk. | Open. No research entry yet. Any candidate needs its own entry and an ADR. |

@@ -1,6 +1,6 @@
 """Repository hygiene checks that run in CI with the other scripts/test_*.py suites.
 
-Every check works on the git index (`git ls-files`) or on tracked Markdown and
+Every check works on tracked + non-ignored untracked worktree files or Markdown and
 workflow text. None needs the network, Gradle, Node or a browser. A failure
 names the file and the rule. It never prints a matched secret value.
 """
@@ -30,7 +30,7 @@ SECRET_PATTERNS = {
 # The web build used to ship YouTube's public InnerTube client key inside
 # `app-web/src/js/source.js` (not a project credential — see
 # .ai/DEPENDENCY_AUDIT.md, 2026-10-10). The rebuilt web app reads JioSaavn's
-# public API, which needs no key, so nothing in the repository is allowed to
+# unofficial wrapper API, which needs no user key, so nothing in the repository is allowed to
 # match a secret pattern outside this (now empty) allowlist.
 ALLOWED_PUBLIC_VALUES = {}
 
@@ -44,7 +44,7 @@ GENERATED_SEGMENTS = {"__pycache__", "node_modules", ".gradle", ".kotlin", "test
 
 def tracked_files():
     out = subprocess.run(
-        ["git", "ls-files", "-z"], cwd=ROOT, check=True, capture_output=True
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=ROOT, check=True, capture_output=True
     ).stdout
     return [p for p in out.decode("utf-8").split("\0") if p]
 

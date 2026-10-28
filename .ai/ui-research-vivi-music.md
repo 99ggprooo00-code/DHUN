@@ -1,5 +1,11 @@
 # UI research — `vivizzz007/vivi-music` (reference only, no fork)
 
+> **Applicability note — 2026-10-28:** dated reference/attribution research,
+> not renewed permission to copy code, a requested UI rewrite, or a complete
+> resolved-licence review. The old instruction below is retained as history.
+> Current scope and [multi-source direction](../docs/PRD.md#1-product-definition-and-source-of-truth)
+> govern; software licensing never grants third-party content/service rights.
+
 Standing user instruction (2026-09-06): *"you can do these both with proper
 planning and research for ui if (https://github.com/vivizzz007/vivi-music)
 has ui codes visible then copy from there (no forking)."*

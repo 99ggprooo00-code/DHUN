@@ -1,5 +1,10 @@
 # DHUN — Prompt Sequence (rewritten, feasible)
 
+> **HISTORICAL phase prompts (labelled 2026-10-28), not a current build order.**
+> Read [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth), MASTER,
+> current ROADMAP and latest ADR amendments first. Do not rebuild completed
+> phases, narrow DHUN to one provider, or promise native/browser parity from these prompts.
+
 > The 14-phase contract lives in [MASTER_PROMPT.md](MASTER_PROMPT.md).
 > This file is the **operational prompt sequence**: a full audit of the
 > original 30-phase prompt set (the one that said "first create a github repo

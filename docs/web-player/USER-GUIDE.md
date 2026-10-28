@@ -1,5 +1,11 @@
 # Using DHUN in a browser
 
+DHUN's [multi-source direction](../PRD.md#1-product-definition-and-source-of-truth)
+prioritises YouTube Music, but this separate experimental browser build currently
+uses unofficial JioSaavn wrappers/CDN. Spotify is planned/deferred, not available.
+Live catalogue and audible deployed-origin playback are unverified; provider
+permission is unresolved. Terms/Privacy in About are drafts, not legal approval.
+
 The web counterpart of [`docs/INSTALL.md`](../INSTALL.md). The browser build needs
 no install and no account. It is at:
 
@@ -17,7 +23,7 @@ connection to play music. It does not need one to open.
 ## Your library
 
 Likes, playlists and history are kept **in this browser, on this device**. Nothing
-is uploaded. You can:
+is uploaded as a library to DHUN; searches/IDs/media requests still go to third parties. You can:
 
 - **Like** a song, or **add** it to a playlist, from the song's menu.
 - See everything in **Library** (Playlists, Liked songs, Recently played).
@@ -25,8 +31,8 @@ is uploaded. You can:
   the file somewhere safe.
 - **Import** a file you exported earlier (Settings → This browser → Import
   library). This replaces the library in this browser.
-- **Erase** the library (Settings → This browser → Erase everything in this
-  browser). This removes likes, playlists and history, and keeps your settings.
+- **Erase** the library (Settings → This browser → Erase library). This removes likes, playlists and history, and keeps your settings.
+  Settings and shell cache remain; clear this origin's site data to remove those too.
   It cannot be undone. Export first if you may want it back.
 
 Each browser keeps its own library. A library exported on one device can be

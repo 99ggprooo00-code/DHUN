@@ -1,12 +1,11 @@
 /**
- * The source seam: JioSaavn's public catalogue, read from the browser.
+ * The source seam: one JioSaavn catalogue via unofficial community wrappers.
  *
- * WHY THIS SOURCE. The web build used to talk to YouTube Music through
- * InnerTube. That endpoint refuses a browser's player request often enough that
- * the app spent most of its life showing an error it could not act on, and no
- * amount of client code changes what the origin allows. JioSaavn publishes
- * ordinary HTTPS audio and cover URLs that a browser can fetch directly, which
- * is the difference between "a player with an error state" and "a player".
+ * HISTORICAL CONTEXT. This browser build replaced an InnerTube path whose
+ * player requests were refused in earlier browser evidence. The current code
+ * attempts wrapper-provided HTTPS media/cover URLs. This is not proof of live
+ * catalogue/audio success at the deployed origin, or of access/content rights.
+ * Native YouTube Music and planned Spotify are separate integrations/statuses.
  *
  * WHAT THIS MODULE OWNS. Three things, and nothing else:
  *
@@ -19,38 +18,33 @@
  *      happened, so the interface can say "the API answered 429" rather than
  *      "something went wrong".
  *
- * WHAT IT DOES NOT DO. It sends no identifier, stores nothing, and calls no
- * DHUN server — there is no DHUN server. The request goes from this tab to the
- * catalogue the visitor's browser can already reach.
+ * REQUEST/PRIVACY BOUNDARY. No DHUN-operated backend or DHUN account/tracker
+ * identifier is added here. Queries and catalogue IDs do leave this tab; IP,
+ * browser-managed headers and third-party logs remain outside DHUN control.
+ * Fetch omits credentials and uses no-store. Library metadata snapshots are
+ * persisted elsewhere; media/art requests use browser-managed behaviour.
  *
- * THE API IS UNOFFICIAL. `saavn.dev` is a community wrapper around JioSaavn, not
- * an official endpoint with a support contract. That is the honest limit of this
- * source and the app says so in Settings and About; the failure taxonomy below
- * is what makes the limit visible instead of mysterious when it bites.
+ * THE API IS UNOFFICIAL. There is no provider/operator agreement or support
+ * contract established in this repository. JioSaavn's interface/access terms,
+ * wrapper permissions and operator retention remain unresolved review gates.
+ * Settings/About/Privacy disclose the actual services; errors are not success.
+
  */
 
 /**
  * The instances this build will talk to, in the order it tries them.
  *
- * WHY A LIST. Until this round the build had one origin — `saavn.dev` — and the
- * deployed page showed the sample catalogue whenever that instance was down,
- * rate-limiting or refusing a cross-origin request. That is not a rare event:
- * every instance in this family is a community deployment of the same MIT
- * project (sumitkolhe/jiosaavn-api), run on free hosting, with no support
- * contract (ADR-008 boundary 1). One hostname is a single point of failure for
- * the whole web app.
+ * WHY A LIST. Failover among three hosts for ONE catalogue family, not a
+ * multi-source music implementation. ENDPOINTS and unwrap() define the assumed
+ * common contract, tested with fixtures. Do not claim every host runs the same
+ * MIT project/version, has the same operator, is CORS-open or is free/available
+ * without dated evidence. See research 05 and browser PROVIDER-INTEGRATION.
  *
- * Each entry below speaks the *same* contract — the paths in `ENDPOINTS` and the
- * `{success, data}` envelope `unwrap()` reads — so the seam does not need three
- * adapters. The first is the documented instance; the second is the reference
- * project's own deployment; the third is another recent deployment that
- * documents itself as CORS-open. All three are named in the Content-Security-
- * Policy (`src/index.html`), in Settings, and in the privacy page, because a
- * request to an origin a visitor was not told about would be a different kind of
- * dishonesty.
- *
- * Adding a fourth is a deliberate act: it needs the same contract, a line in the
- * CSP, and a sentence in `scripts/test_app_web.py`'s allowlist.
+ * All configured hosts are named in CSP, Settings and Privacy. Failover may
+ * disclose the query/ID to more than one operator. Adding/replacing a host
+ * requires permission/privacy/security and contract evidence plus coordinated
+ * source, CSP, disclosure and test changes; no automatic expansion is approved.
+
  */
 export const API_SOURCES = Object.freeze([
   { id: "saavn", origin: "https://saavn.dev", label: "saavn.dev" },

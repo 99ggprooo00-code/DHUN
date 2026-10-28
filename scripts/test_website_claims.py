@@ -47,8 +47,8 @@ class ForbiddenClaims(unittest.TestCase):
         and the caveat that comes with it is required elsewhere."""
         pages = {
             "/": page(
-                "<p>DHUN's web app runs at /app/ and talks to YouTube Music "
-                "directly from your browser.</p>"
+                "<p>DHUN's web app runs at /app/ and reads JioSaavn "
+                "through unofficial wrappers from your browser.</p>"
             )
         }
         self.assertEqual([], claims.forbidden_claim_violations(pages))
@@ -149,7 +149,7 @@ class ForbiddenClaims(unittest.TestCase):
         """The rule is about denying a surface, not about the word "browser".
 
         The site has to be able to say the web app exists, at /app/, in a
-        browser, and that it talks to YouTube from there.
+        browser, and that it reads unofficial JioSaavn wrappers from there.
         """
         pages = {
             "/features/": page(
@@ -417,3 +417,47 @@ class CopyCheckedAgainstTheCode(unittest.TestCase):
         self.write(root, "app-android/build.gradle.kts", 'implementation("io.sentry:sentry-android:7.0.0")\n')
         violations = claims.telemetry_claim_violations({"/": claim_in_meta}, root)
         self.assertTrue(any("Sentry" in v for v in violations), violations)
+
+
+class PlannedProvidersAreNotImplementedClaims(unittest.TestCase):
+    """Future direction and current support are deliberately not a word ban."""
+
+    def test_allows_explicit_future_status_and_non_affiliation(self):
+        for text in (
+            "Spotify is planned, not implemented.",
+            "Spotify — planned, execution deferred pending policy/Premium feasibility.",
+            "Spotify: research required before implementation.",
+            "Apple Music is a candidate under evaluation, not a shipped integration.",
+            "DHUN is not affiliated with YouTube, Google, JioSaavn or Spotify.",
+            "No YouTube or Spotify playback is implemented in the browser.",
+            "No Spotify adapter, OAuth or SDK exists.",
+            "The research file is docs/research/04-spotify.md.",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual([], claims.forbidden_claims_in(text))
+
+    def test_rejects_current_support_even_next_to_future_words_or_no_ads(self):
+        for text in (
+            "Spotify is implemented.",
+            "DHUN supports Spotify.",
+            "Spotify playback is available.",
+            "Spotify is planned but already streams.",
+            "No ads, DHUN supports Spotify.",
+            "Spotify is planned. Spotify playback works today.",
+            "Spotify planned, playback works today.",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(claims.forbidden_claims_in(text), text)
+
+    def test_support_is_not_excused_by_a_plan_in_a_different_sentence(self):
+        self.assertTrue(claims.forbidden_claims_in("Spotify is available. Further providers are planned."))
+
+    def test_native_youtube_and_real_browser_jiosaavn_are_not_banned_words(self):
+        text = "Native Android uses YouTube Music. The browser currently reads JioSaavn via unofficial wrappers."
+        self.assertEqual([], claims.forbidden_claims_in(text))
+
+
+class ProviderPlatformClaims(unittest.TestCase):
+    def test_current_browser_youtube_claim_is_rejected_not_all_youtube_words(self):
+        self.assertTrue(claims.forbidden_claims_in("The web app talks to YouTube Music directly."))
+        self.assertEqual([], claims.forbidden_claims_in("The web app does not use YouTube Music. Native does."))

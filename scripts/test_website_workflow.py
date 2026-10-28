@@ -365,6 +365,26 @@ class BrowserHarnessSurvivesAndDiagnoses(unittest.TestCase):
         self.assertIn("GITHUB_STEP_SUMMARY", self.src, "the uncapped channel must be used")
         self.assertIn("appendFileSync", self.src)
 
+    def test_app_measurements_use_controlled_catalogue_failure_not_live_services(self):
+        self.assertIn('from "./catalogue-fixture.mjs"', self.src)
+        app_checks = self.src[self.src.index("async function checkWebApp(browser)") : self.src.index("async function guard(")]
+        self.assertNotIn("await browser.newContext(", app_checks)
+        self.assertIn("await newAppContext(browser,", app_checks)
+        self.assertIn('report.source.kind !== "sample"', app_checks)
+        self.assertIn("!report.sampleNotice?.visible", app_checks)
+        fixture = (REPO_ROOT / "website/tests/catalogue-fixture.mjs").read_text(encoding="utf-8")
+        self.assertIn("API_SOURCES", fixture)
+        self.assertIn("status: 503", fixture)
+        self.assertNotIn("addInitScript", fixture, "drive the real app, not injected runtime state")
+
+    def test_app_console_and_page_error_gates_are_not_weakened_for_provider_outages(self):
+        app_check = self.body_of(self.src, "checkWebApp")
+        for landmark in ('page.on("console"', 'page.on("pageerror"', 'consoleErrors.push', 'pageErrors.push', 'if (consoleErrors.length)', 'if (pageErrors.length)'):
+            self.assertIn(landmark, app_check)
+        self.assertIn('const NETWORK_NOISE = /Failed to load resource|net::ERR_|ERR_NAME_NOT_RESOLVED/i;', self.src)
+        self.assertIn('fail(`web app ${label} console`', app_check)
+        self.assertIn('fail(`web app ${label} unhandled`', app_check)
+
     def test_the_guard_records_and_the_annotations_always_run(self):
         guard = self.body_of(self.src, "guard")
         self.assertRegex(guard, r"catch\s*\(error\)")

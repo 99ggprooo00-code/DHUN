@@ -4,13 +4,18 @@
 
 ## 1. Current architecture and surface boundaries
 
+Product identity and status terms come from [PRD §1](PRD.md#1-product-definition-and-source-of-truth):
+DHUN is multi-source by direction, YouTube / YouTube Music first, Spotify planned
+and deferred, with build-specific capabilities. This TRD describes implementation,
+not approval of provider use.
+
 | Surface | Current implementation | Contract |
 |---|---|---|
-| Android app | Kotlin / Compose Multiplatform shared UI + Android host; Media3 playback | Primary production app; lifecycle, audio focus, media session and device behavior require Android verification |
+| Android app | Kotlin / Compose Multiplatform shared UI + Android host; Media3 playback | Experimental primary native app; lifecycle, audio focus, media session and device behavior require Android verification |
 | Desktop app | Kotlin/JVM + Compose Multiplatform; VLCJ playback; Windows integrations | Native desktop client; test Windows-specific tray, SMTC, jump lists and single-instance behavior on Windows |
 | Shared core | `shared/`, common domain, provider, player, UI, persistence | Keep UI independent of InnerTube/provider implementation details |
 | Marketing website | Static Eleventy project under `website/`, zero client-side JavaScript; its `css/tokens.css` is **generated** from the web app's token sheet by `tools/sync-tokens.mjs` | Content/navigation/download discovery and the way into the app; no playback, no account backend, and since 2026-10-16 the application's own shell (glass app bar, bottom navigation/rail, docked app bar) rather than a generic marketing header |
-| Web app | Dependency-free ES modules under `app-web/`: a real app shell, installable PWA, offline shell, keyboard shortcuts, persisted library | Playback depends on YouTube's origin allowing a cross-origin request from a static page, so failures are surfaced as states; the labelled demo catalogue is the last resort, never a silent substitute for real results |
+| Web app | Dependency-free ES modules under `app-web/`: a real app shell, installable PWA, offline shell, keyboard shortcuts, persisted library | JioSaavn through three unofficial community API instances and its CDN; browser/CORS and service failures are surfaced as states. Labelled silent samples are the last resort. No YouTube or Spotify playback; deployed-origin audible playback unverified |
 
 No custom DHUN backend is part of the current architecture. Local persistence is used for library/history/preferences/download metadata; the audio cache is not the same thing as persistent user downloads.
 
@@ -30,7 +35,7 @@ No custom DHUN backend is part of the current architecture. Local persistence is
 1. **Presentation:** Compose screens/components, dialogs, responsive layouts, accessibility semantics, loading/empty/error states.
 2. **Presentation state/use cases:** ViewModels and observable state; action results must be represented explicitly rather than swallowed by `runCatching`.
 3. **Domain:** Track/artist/album/playlist/history/download/playback models and deterministic rules.
-4. **Provider:** source-neutral metadata/search/stream resolution/lyrics/related-track interfaces and normalized DTOs.
+4. **Provider:** existing metadata/search/stream/lyrics seams and normalized DTOs. Source neutrality is a goal, not completed: `MusicProvider` imports InnerTube `SearchFilter`, uses video/browse IDs and has no capability declarations (ADR-010 D5).
 5. **Playback:** `DhunPlayer`, queue manager, platform engine adapters; keep queue, current track, seek position and playback state consistent.
 6. **Persistence:** SQLDelight/repository layer for durable local data; separate volatile stream/audio cache from user-owned downloads.
 7. **Platform adapters:** Android lifecycle/audio focus/media session/permissions; desktop filesystem/VLCJ/SMTC/tray; browser limitations explicitly represented.
@@ -74,7 +79,7 @@ The intended visual identity is **translucent frosted glass** with artwork-led c
 
 ## 7. Data, network and privacy
 
-- Normalize external data at provider boundaries and use namespaced stable IDs.
+- Normalize external data at provider boundaries. Provider-scoped stable IDs and storage migration are required before adding a second native source; current Track/SQLDelight keys are still YouTube-shaped. Do not migrate user data during documentation alignment.
 - Handle timeout, offline, cancellation, rate limiting, unsupported formats, unavailable lyrics, malformed responses and upstream changes distinctly.
 - Use bounded retries with backoff; never retry destructive operations automatically.
 - Persist only what the feature needs. No account or cloud-sync schema unless separately approved.

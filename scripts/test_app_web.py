@@ -594,7 +594,15 @@ class HonestyIsInTheRenderedCopy(unittest.TestCase):
         that the browser enforces. A source scan alone would pass a module that
         builds its origin at run time.
         """
-        sources = "\n".join(_js_sources().values())
+        files = _js_sources()
+        # Two primary policy links are documentation, not runtime destinations.
+        # Exempt exact Markdown link targets only: a fetch(), script or different
+        # JioSaavn URL is still caught, and connect-src remains exact below.
+        legal = files["data/web-legal.js"]
+        for policy in ("https://www.jiosaavn.com/corporate/terms/", "https://www.jiosaavn.com/corporate/privacy/"):
+            legal = legal.replace(f"]({policy})", "](documented-policy)")
+        files["data/web-legal.js"] = legal
+        sources = "\n".join(files.values())
         origins = set(re.findall(r"https://([a-z0-9*.-]+)", sources + self.index_html))
         self.assertNotIn("dhun", " ".join(origins).lower(), "a DHUN-operated origin would be a backend")
         # The catalogue instances the build ships, read out of `api.js` rather
@@ -622,6 +630,11 @@ class HonestyIsInTheRenderedCopy(unittest.TestCase):
             )
         self.assertIn("https://*.saavncdn.com", connect)
         self.assertNotIn("github", connect)
+        self.assertEqual(
+            declared | {"*.saavncdn.com"},
+            set(re.findall(r"https://([a-z0-9*.-]+)", connect)),
+            "legal policy links must not widen runtime connect-src",
+        )
 
     def test_the_source_of_every_row_is_on_screen(self) -> None:
         """The badge exists, and it names the two possible catalogues."""

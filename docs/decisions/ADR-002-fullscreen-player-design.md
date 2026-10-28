@@ -1,5 +1,14 @@
 # ADR-002: Full-Screen Now Playing — frosted-glass design contract (Apple clarity × ViMusic immersion)
 
+> **Dated applicability amendment — 2026-10-28:** accepted visual decisions
+> remain; the context table's “source-neutral” and “UI never sees InnerTube”
+> assertions are not a current neutrality guarantee. `MusicProvider` still
+> imports InnerTube `SearchFilter` and browse/video ID assumptions reach models,
+> storage and callers. Provider-scoped identity/capability/player/auth and
+> migration work is design-only (ADR-010 D5). No native-stack rewrite is implied.
+> [PRD §1](../PRD.md#1-product-definition-and-source-of-truth) owns intent;
+> [matrix §3](../research/05-source-capability-matrix.md#3-cross-platform-compatibility) owns the current gap ledger.
+
 ## Status
 Accepted design contract, updated 2026-10-09. Implementation remains **incremental polish
 on existing Phase 08/11 code**, not a greenfield player. This ADR does not reorder

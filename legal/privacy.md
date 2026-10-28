@@ -1,7 +1,7 @@
 ---
 id: privacy
 title: Privacy Policy
-effectiveDate: 2026-10-15
+effectiveDate: 2026-10-28
 status: draft
 ---
 
@@ -20,11 +20,19 @@ Every factual sentence below carries a status tag:
 
 ## 1. Summary
 
-{{appTitle}} ({{appTitleDevanagari}}) is a free, open-source music player for
-Android and Windows. It has no account system, no server of its own, no
-analytics, no advertising and no crash reporting. **[source]**
+{{appTitle}} ({{appTitleDevanagari}}) is a free, open-source, cross-platform,
+multi-source music client by direction. YouTube / YouTube Music is the first
+implementation priority; this page describes the **native Android/desktop**
+build, which currently uses YouTube Music. The browser build uses JioSaavn and
+is described separately in section 8. Spotify is planned and deferred, with no
+adapter, OAuth, SDK, token storage or Spotify requests in either build. No
+hypothetical Spotify data flow is active. **[source]**
 
-Everything it remembers about you is stored on your device. When you search,
+The native build has no DHUN account system, DHUN server, analytics, advertising
+or crash-reporting integration found in its source. **[source]**
+
+The library, settings and caches DHUN persists are local. This does not mean
+providers receive no data. When you search,
 browse or play, the app talks directly to YouTube and, when lyrics are enabled,
 to configured lyric providers including LRCLIB and KuGou — and those requests reveal your IP address to those services, as any
 internet request does. **[source]**
@@ -42,7 +50,10 @@ in with a placeholder address.
 
 ## 3. Data stored only on your device
 
-Nothing in this section leaves your device by the app's own design. **[source]**
+The database is not uploaded as a library or synced to a DHUN service. However,
+saved identifiers and track metadata can be reused for provider requests (including
+recommendations, artwork, lyrics and playback). Local storage is not a claim that
+these values never leave the device. **[source]**
 
 | Data | Where it lives |
 | --- | --- |
@@ -53,17 +64,28 @@ Nothing in this section leaves your device by the app's own design. **[source]**
 | Queue and now-playing position | local SQLite database |
 | Cached lyrics, explicit per-song lyric choices (including local TTML imports), timing offsets and romanization preferences | local SQLite database |
 | Settings (theme, accent, cache size, backdrop) | local SQLite database |
-| Downloaded audio and saved artwork | Android: the app's private files directory. Windows: the per-user install folder. |
-| Streamed-audio cache (size-capped) | Android: the app cache directory |
-| Desktop startup log | Windows: the per-user install folder, or the system temp folder if that is unavailable |
+| Download records, downloaded audio and saved artwork | Records in SQLite; Android app-private files; packaged desktop `userdata/downloads` next to the launcher |
+| Streamed-audio / prebuffer cache (separate from persistent downloads) | Android app cache (Media3 segments); desktop `cache/audio` under the data directory (whole tracks, temporary and partial files) |
+| Artwork cache and widget/OS media metadata | Image-loader/platform caches; titles/artwork can appear on notifications, lock screens, widgets, shortcuts and desktop media controls |
+| Desktop startup log | `dhun-startup.log` in the data directory; system temp fallback |
 
 Android sets `allowBackup="false"`, `hasFragileUserData="false"` and
 `usesCleartextTraffic="false"` in its manifest, so the system backup mechanism
 does not copy this data off the device. **[source]**
 
-**Not audited line by line:** the exact contents of the desktop startup log and of
-the in-app "Playback details" text. Do not assume they are free of personal data
-before you share one. **[maintainer]**
+**Desktop locations:** packaged builds use `<installDir>/userdata`; unpackaged
+builds use `%APPDATA%/DHUN` (Windows), `~/Library/Application Support/DHUN` (macOS)
+or `$XDG_DATA_HOME/dhun` / `~/.local/share/dhun` (Linux). Platform hardware and
+uninstall behaviour have not been newly verified in this audit. **[source]**
+
+**Diagnostics are local, not automatically uploaded.** Desktop startup failures
+write timestamps, exceptions/stack traces, OS/JVM versions and user/install/working
+paths, which may contain an OS username. Android Logcat and playback details can
+include track identifiers, resolver identity/outcome and error text; artwork
+failures can log URLs. Redaction is not proven for every exception or external
+yt-dlp message. Inspect and redact logs before voluntarily posting a GitHub issue.
+DHUN does not send them automatically. Public issues are processed by GitHub and
+can be read by others. **[source]**
 
 ### Listening-history controls
 
@@ -84,15 +106,24 @@ control how those parties process it.
 
 | Recipient | What the app sends | When |
 | --- | --- | --- |
-| YouTube / Google | Search terms; track, album, artist and playlist identifiers; the client name and version; the country code from settings; and a visitor identifier that YouTube returns and the app then reuses | Browsing, searching, resolving playback **[source]** |
+| YouTube / Google | Search terms; track, album, artist and playlist identifiers; the client name and version; the country code from settings; and visitor identifiers returned by YouTube and reused in memory during the client process (including `X-Goog-Visitor-Id` for applicable requests) | Browsing, searching, resolving playback **[source]** |
 | YouTube / Google | Ordinary media requests, which include your IP address | Playing or downloading a track **[source]** |
 | YouTube / Google | Requests for artwork, which include your IP address | Showing artwork **[source]** |
 | YouTube / Google | Current track identifier for lyrics | When lyrics are enabled and this configured source is used **[source]** |
-| LRCLIB (`lrclib.net`) | Track title, artist, album and duration; manual match-search query | When lyrics are enabled, no saved/cache result satisfies the request, and this configured source is tried; also explicit match searches **[source]** |
+| LRCLIB (`lrclib.net`) | Track title, artist, album and duration; manual match-search query; a DHUN version/project User-Agent | When lyrics are enabled, no saved/cache result satisfies the request, and this configured source is tried; also explicit match searches **[source]** |
 | KuGou (`lyrics.kugou.com`) | Track title, artist and duration; returned candidate identifiers for lyric download | When lyrics are enabled and this configured source is tried; also explicit match searches **[source]** |
 
-Also: every network request carries your IP address and a user-agent string, as
-with any internet request. **[source]**
+Recipients see your network address and request headers (including a client or
+transport User-Agent where supplied); media requests can include signed URLs and
+range headers. YouTube homepage/watch/player-JavaScript requests also discover
+client version and signature timestamp. No packet capture was performed here;
+response headers and provider retention are not exhaustively verified. **[source]**
+
+DHUN does not control providers' logging, retention, deletion or subsequent use.
+For Google's stated practices see [Google Privacy Policy](https://policies.google.com/privacy).
+LRCLIB, KuGou and other service operators have their own practices; their
+retention schedules and content permissions have not been established here.
+**[third-party] [legal]**
 
 ### Lyrics controls and on-device romanization
 
@@ -124,8 +155,11 @@ The app does not send a {{appTitle}} account identifier, because there is no
 account. No HTTP client in the source installs a cookie plugin, and the
 extraction design uses no cookies and no PO tokens. **[source]**
 
-**Not verified:** the exact headers the OkHttp engine adds on Android, and the
-exact contents of every response YouTube returns. **[source]**
+Android metadata/download clients use Ktor/OkHttp; desktop metadata uses Ktor/CIO
+and some media/artwork paths use platform networking. Absence of cookie import
+or sign-in does not mean absence of YouTube visitor identifiers or server logs.
+Exact transport-added headers and every third-party response are not verified.
+**[source]**
 
 ### Developer-only exception
 
@@ -172,12 +206,17 @@ user's local application data folder. **[source]**
 
 - **Android:** uninstalling removes the app-private database, downloads and
   caches. **[source]**
-- **Windows:** the data lives in the per-user install folder, so an uninstall
-  removes it. Upgrades are designed to preserve it; the hosted upgrade check
-  passed in CI, but that check is packaging-only and does not prove behaviour on a
-  user machine. **[source] [runtime]**
-- **In app:** you can clear your downloads, your listening history and your recent
-  searches. Each is described on the Support & Feedback page. **[source]**
+- **Packaged Windows:** the installer is designed to remove its managed
+  `userdata` on uninstall and preserve it on upgrade. Packaging tests do not
+  prove every user's filesystem outcome. Unpackaged OS-convention data and
+  system-temp logs may remain and require manual deletion. Linux/macOS removal
+  has not been hardware-verified. **[source]**
+- **In app:** clear downloads, listening/search history, automatic lyrics cache
+  and, when the platform callback is available, audio cache. Saved lyric choices
+  survive automatic-cache clearing; select **Use automatic** per song to remove
+  a choice. Reset settings is not erase-all. Completion/failure feedback is not
+  uniformly implemented for all Settings clear actions; verify the result.
+  See Support & Feedback for scope and remaining limits. **[source]**
 - **Export:** no general data-export feature exists. **[source]**
 - **Account deletion:** not applicable — there is no {{appTitle}} account.
   **[source]**
@@ -192,15 +231,28 @@ The marketing site is static: its only `<script>` elements are JSON-LD data
 blocks, and it loads nothing from a third-party origin. GitHub, as the host,
 processes requests under its own policies. **[source]**
 
-The web app at `/app/` is the same client in a browser. It has no account and no
-service of its own: your library — playlists, likes and history — is stored in
-that browser's local storage, and clearing site data removes it. It sets a strict
-Content-Security-Policy whose `connect-src` allows only its own origin and the
-YouTube Music origin, and it sends no telemetry. When you play or search, it
-requests YouTube directly from your browser, which reveals your IP address to
-YouTube exactly as browsing there would; a browser may refuse that request and
-the app then says so instead of pretending otherwise. A service worker caches the
-app's own files so it opens offline; it caches no audio. **[source]**
+The web app at `/app/` is a **separate browser client** of the same product,
+not the native YouTube client compiled for browsers. Search/catalogue/stream
+resolution requests go to `saavn.dev`, `saavn.sumit.co` and
+`saavnx.vercel.app`, unofficial community JioSaavn wrappers; audio/artwork are
+restricted by CSP to `*.saavncdn.com`. Failover may send the same query/IDs to
+multiple wrapper operators. API fetch uses `credentials: "omit"` and `cache: "no-store"`; browser media,
+image, header and cache behaviour remain browser-managed. No YouTube or Spotify
+API, embed or playback requests are implemented in this browser build. **[source]**
+
+Likes, playlists, history, recent searches, referenced track snapshots (including
+artwork URLs but no persisted stream URL) and settings live in browser
+`localStorage` under `dhun.web.v3`. Export/import use a user-chosen JSON file.
+Erasing the library keeps settings and the offline interface cache; clearing the
+origin's site data removes those too. The service worker caches the shell, no
+cross-origin audio or API responses. The browser may separately cache media.
+There is no browser audio-download, lyrics, equaliser, account or telemetry
+integration. **[source]**
+
+Requests disclose network/request data to those operators; DHUN cannot delete
+their logs. GitHub Pages processes hosting requests. Read the browser's own
+Privacy and Terms drafts in About for build-specific detail; nothing here
+establishes provider authorisation or retention guarantees. **[source] [legal]**
 
 ## 9. Open questions
 
@@ -210,7 +262,8 @@ app's own files so it opens offline; it caches no audio. **[source]**
 2. Review lyric providers' current content rights, retention and rate-limit terms
    before adding new providers or external translation services.
    **[maintainer]**
-3. Decide whether the desktop yt-dlp fallback needs its own disclosure.
+3. Review the existing desktop yt-dlp disclosure and diagnostic redaction against
+   the version users actually install.
    **[maintainer]**
 4. Name the jurisdictions the project intends to serve, so the correct notices can
    be drafted by a lawyer. **[maintainer] [legal]**

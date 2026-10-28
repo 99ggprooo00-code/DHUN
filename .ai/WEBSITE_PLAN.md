@@ -1,5 +1,22 @@
 # DHUN website — build plan (Option A marketing site)
 
+## Current authority and generation map — 2026-10-28
+
+[PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth) owns the vision;
+this plan is an implementation/history record. DHUN is multi-source, YouTube
+first, Spotify planned/deferred. Native YouTube Music ≠ browser JioSaavn;
+plans ≠ current playback support. Preserve shell-only browser offline limits,
+provider restrictions, non-affiliation and DRAFT legal status.
+
+Edit `website/src/_data/site.js`, page front matter and `_includes/base.njk`, then
+run the normal build to regenerate tracked `website/dist/`; never fix output only.
+There are four HTML pages (home/features/interface/404), no separate adopted legal
+or download page. Shared footer links to native source drafts and browser About
+routes. Native Markdown → legal generator → Kotlin (+ excluded JS parity fixture);
+browser legal is its own `web-legal.js` corpus. See the [pipeline/audit](../docs/research/06-multi-source-claims-audit.md).
+Metadata (title/description/OG/Twitter/JSON-LD), visible copy, source/status
+links and claims tests must all agree. Preserve old Part A/B rationale below as dated history.
+
 > **Part A below is the plan of record for the `website/` workstream and
 > supersedes the Option-B framing of the material preserved as Part B.** It is
 > amended, not rewritten, by the dated section at the foot of the file:

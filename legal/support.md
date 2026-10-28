@@ -1,7 +1,7 @@
 ---
 id: support
 title: Support & Feedback
-effectiveDate: 2026-10-10
+effectiveDate: 2026-10-28
 status: draft
 ---
 
@@ -23,8 +23,9 @@ time. **[source]**
 - [Read the source](https://github.com/99ggprooo00-code/DHUN) — DHUN is
   GPL-3.0; every claim on these pages can be checked against the code.
 
-When you report a playback or download problem, the fastest path is to include
-the app's own log lines and your build's version, shown on the About page.
+When you report a playback or download problem, include the source/provider, platform, build version (About), steps and the visible
+error. Share only a minimal, redacted diagnostic excerpt if needed; logs can
+contain paths, track identifiers and URLs.
 
 **Never include** cookies, tokens, signed media URLs or account credentials in an
 issue. **[source]**
@@ -35,15 +36,18 @@ There is no {{appTitle}} account, so there is no account data to request,
 correct, export or delete. **[source]**
 
 The data this app keeps is on your device, and you control it directly — see
-*Your data controls* below. Uninstalling the app removes its private database,
-downloads and caches. **[source]**
+*Your data controls* below. Android uninstall removes app-private data; packaged desktop uninstall is
+designed to remove managed data, but unpackaged data and temp logs may remain.
+See Privacy for paths and verification limits. **[source]**
 
-Requests about data held by YouTube or Google must go to Google. This app cannot
+Requests about data held by YouTube/Google, LRCLIB, KuGou, the browser
+JioSaavn wrapper/CDN operators or GitHub must go to the relevant operator. This app cannot
 make that request on your behalf, and clearing your local history does not delete
 anything they hold. **[source] [legal]**
 
 A privacy contact address is **not yet published.** Until the maintainer provides
-one, use the public issue tracker and keep technical detail out of it.
+one, the issue tracker can request a private contact channel without personal or
+sensitive information; it is public, not a confidential privacy channel.
 **[maintainer]**
 
 ## Your data controls
@@ -55,15 +59,26 @@ code, not from a design document. **[source]**
 | --- | --- | --- | --- |
 | Clear downloads | Library → Downloads | Downloaded audio files, saved artwork, leftover partial files, and the download records | Your playlists, favourites, history and cached lyrics |
 | Clear history | Library → History | Every listening-history row in the local database | Your downloads, playlists, favourites and recent searches |
-| Clear recent searches | Search → recent searches | Every saved recent search term | Your history, playlists and favourites |
+| Clear recent searches / Clear search history | Search → recent searches; Settings → Privacy & History | Saved recent search terms | History, playlists, favourites and other caches |
+| Clear play history | Settings → Privacy & History | Local listening-history rows | Saved playlists, likes, downloads and queue restoration |
+| Clear audio cache | Settings → Storage, Cache & Data, when the platform callback is available | Attempts to remove streamed-audio cache; files in use/failures may remain | Persistent downloads, library and lyrics |
+| Clear lyrics cache | Settings → Lyrics & Providers | Automatic cached lyrics | Explicit per-song choices, local TTML imports, offsets and other library data |
+| Use automatic | Player → lyrics match picker, per song | Saved lyric choice for that song | Automatic cache and other songs' choices |
+| Record listening history | Settings → Privacy & History | Off prevents new local history entries; does not erase existing entries | Provider requests, queue restore, searches and caches |
+| Reset settings to defaults | Settings → About, Privacy & Legal | Resets preferences | Library, downloads, history, caches and saved lyric choices |
 
-All three ask for confirmation before they run. If a clear fails, the app says
-so and keeps the confirmation open so you can retry — it does not claim success
-after a failure. **[source]**
+Bulk clears ask for confirmation. **Not all Settings clears wait for completion
+or expose errors uniformly.** Audio clearing reports bytes/failure, but its
+confirmation closes immediately; lyrics and Settings history clears are launched
+asynchronously without a full pending/error contract. Recheck the affected data;
+report failures rather than assuming deletion succeeded. Fixing those handlers is
+a separate implementation task, not a privacy guarantee. **[source]**
 
-**Controls that do not exist:** there is no way to clear the streamed-audio cache
-from the UI (only to cap its size), and the lyrics cache has a clear method in
-code with no screen wired to it. Neither is offered here. **[source]**
+There is no general native data export or erase-all control, and no provider
+account disconnect/delete flow because no provider account is connected. None
+of these local controls deletes third-party logs. The separate browser app has
+its own Settings export/import/erase controls and browser-specific drafts.
+**[source]**
 
 ## Security problems
 

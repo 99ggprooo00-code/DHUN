@@ -1,5 +1,9 @@
 # ADR-010: Multi-source provider direction — capability model, YouTube primary, Spotify planned
 
+> **Read the [2026-10-28 amendment](#amendment--2026-10-28-multi-source-product-direction-and-evidence-gates) with D1–D6.**
+> Original owner quotations and dated analysis below are preserved, not a current
+> single-source definition or permission to load new third-party runtime.
+
 ## Status
 
 **ACCEPTED for the owner's delegated decisions D1, D2, D4, D6 (2026-10-20). D3 accepted as
@@ -221,3 +225,61 @@ popular music), it stays out. Reopen if the owner wants a free Creative Commons 
 - Matrix, cost, privacy, cross-platform, risks: [05](../research/05-source-capability-matrix.md)
 - Existing: [ADR-001](ADR-001-extraction-engine.md), [ADR-006](ADR-006-offline-music-downloads-architecture.md), [ADR-008](ADR-008-browser-web-player-target.md), [ADR-009](ADR-009-marketing-site.md)
 - Web documentation: [docs/web-player/](../web-player/README.md)
+
+
+## Amendment — 2026-10-28: multi-source product direction and evidence gates
+
+**Status: owner-directed clarification, accepted for documentation/instruction
+alignment; not a new adapter, legal approval, budget or architecture rewrite.**
+DHUN has always been intended as multi-source, not a YouTube Music-only product.
+[PRD §1](../PRD.md#1-product-definition-and-source-of-truth) is the authoritative
+vision; this ADR records decisions and their history rather than duplicating it.
+The native KMP/Compose architecture and separate dependency-free JS browser remain.
+
+- **D1 stands:** maintain the existing native YouTube/YouTube Music path as first
+  priority without expanding extraction-based audio features. Source, historical
+  playback, current health and legal permission are separate evidence. Extraction,
+  background playback, persistent audio/lyrics/artwork/metadata storage and
+  downloads have unresolved permission/policy risks. Owner acceptance and a
+  disclaimer do not confer compliance. No funded legal review is invented.
+- **D2 current runtime stands:** browser uses JioSaavn via three unofficial wrapper
+  instances; current CSP/no-third-party-runtime and no-IFrame remain. Native and
+  browser need not use identical providers/features. The earlier “primarily yt
+  music client” intent question is resolved by **multi-source product, YouTube
+  first**, not an order to replace JioSaavn or secretly add YouTube runtime.
+  The 2026-10-21 Watch-mode plan remains a **proposal**. Explicit authorisation
+  must precede adding a third-party script/CSP or live runtime spike, not follow it.
+  Official IFrame controls include queues and seeking: the earlier blanket
+  loss-of-queue/seek wording is too strong. They do not provide raw audio or
+  hidden/background/offline parity; visibility/Referer/branding/autoplay and
+  deployed-origin feasibility need separate design/tests.
+- **D3 stands:** Spotify is **Planned**, with implementation **Deferred**; this is
+  project-level intent, not approval of any native/browser route. No code, SDK,
+  OAuth, tokens or active Spotify traffic. Technical, account/Premium, policy,
+  legal, playback, privacy, licence and cost gates must pass. Premium alone or
+  UI/source separation does not resolve policy §III.5's multi-service restriction.
+  Current development access also limits users and public scale; July 2026
+  increased client IDs to 25 while sharing quotas per developer account.
+- **D4 stands:** $0/noncommercial constraint; no new backend, paid hosting,
+  mandatory subscription or other recurring service is authorised. Do not buy
+  Premium, use someone else's credentials or assume extended access will be granted.
+- **D5 stays design-only:** native `MusicProvider` still imports InnerTube filters
+  and assumes video/browse IDs; entity/database/queue/download/lyrics callers and
+  browser snapshots are source-shaped. Provider-scoped IDs, migration,
+  capability/error/account/player contracts need a separate bounded design before
+  adding a provider. This audit corrects its KDoc, not interfaces or user data.
+- **D6 stands:** any future account/dashboard/legal agreement decisions belong to
+  the owner with verified prerequisites. Never request credentials/tokens in chat
+  or commit them. Controller/private contacts and draft adoption are uncompleted.
+- **Other providers:** evaluate value, permissions, maintenance, privacy, platform,
+  licence and cost evidence; no automatic acceptance. Prior Jamendo decision is
+  historical and unchanged. Existing JioSaavn is not newly approved by this audit:
+  its current Terms restrict unofficial/automated interfaces, and wrapper/content
+  permissions and retention remain unresolved. Preserve functionality pending an
+  explicit rollout/removal decision; disclosures do not cure the risk.
+
+Current primary-source rechecks are in [03](../research/03-youtube-youtube-music.md),
+[04](../research/04-spotify.md) and [05](../research/05-source-capability-matrix.md),
+all dated 2026-10-28. The [repository-wide audit](../research/06-multi-source-claims-audit.md)
+records changes, regressions/validation and ordered follow-up. No commit, push,
+release publication or broad application rewrite is part of this authorisation.

@@ -1,5 +1,14 @@
 # Screenshot Provenance & Metadata Verification (`2026-10-11`)
 
+> **Applicability note — 2026-10-28:** preserve these dated captures, sizes and
+> original deep-link observations as historical evidence. They do not prove
+> current device acceptance or native/browser parity. The browser has no lyric
+> service, audio downloads, equaliser or native Windows integration; old links
+> below are not current feature promises. Metadata stripping/blurring is a
+> precaution, not permission to redistribute third-party content or legal review.
+> [Current direction/status](../PRD.md#1-product-definition-and-source-of-truth);
+> [current website/README corrections and validation](../research/06-multi-source-claims-audit.md).
+
 ## 1. Staging Source
 
 - **Staging repository:** `https://github.com/99ggprooo00-code/dhun-screenshot-staging`

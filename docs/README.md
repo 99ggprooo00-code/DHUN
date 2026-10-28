@@ -1,6 +1,12 @@
 # DHUN documentation index
 
-These documents describe the current Kotlin Multiplatform product, the static marketing website, and the browser build that ships at `/app/` — the same interface in a browser, not a mock-up and not a second native client. The record for that workstream is in [`web-player/`](web-player/README.md). Read these alongside the live source, accepted ADRs, and current verification evidence; where a document and the code disagree, the code is the truth and the document is a bug to fix in the same change.
+> **Start here:** [authoritative product direction and status vocabulary](PRD.md#1-product-definition-and-source-of-truth),
+> [provider capability matrix](research/05-source-capability-matrix.md),
+> [ADR-010 and amendments](decisions/ADR-010-multi-source-provider-direction.md),
+> and [2026-10-28 alignment audit](research/06-multi-source-claims-audit.md).
+> Code is evidence of current behaviour, not a redefinition of the multi-source vision.
+
+These documents describe the current Kotlin Multiplatform product, the static marketing website, and the separate browser build at `/app/` — a real client sharing design tokens, not the native code or all its features. Native currently uses YouTube Music; browser JioSaavn; Spotify remains planned/deferred. The record for that workstream is in [`web-player/`](web-player/README.md). Read these alongside the live source, accepted ADRs, and current verification evidence; current code is evidence of behaviour, while owner direction/PRD controls intent. Investigate conflicts instead of turning an implementation gap into a new product definition.
 
 ## Product and design specifications
 
@@ -21,7 +27,7 @@ The browser build and the site that publishes it have their own architecture, st
 - [Implementation status](web-player/IMPLEMENTATION-STATUS.md) — what is verified and by what, what is not, and the release gate. **Currently: ships, not verified for release.**
 - [Known limitations](web-player/KNOWN-LIMITATIONS.md) — what is unproven, unsupported or awkward, for a reader deciding whether to rely on it.
 - [Development guide](web-player/DEVELOPMENT-GUIDE.md) — how to run, test, build and deploy, in the repository as it actually is.
-- [Release gate](web-player/IMPLEMENTATION-STATUS.md) — the one thing standing between the build and a release claim, stated with what would close it.
+- [Release gate](web-player/IMPLEMENTATION-STATUS.md) — playback, provider-permission and other prerequisites for a release claim, stated with what would close it.
 
 ## Binding references
 

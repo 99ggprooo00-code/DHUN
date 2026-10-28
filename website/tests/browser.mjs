@@ -49,6 +49,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { newAppContext } from "./catalogue-fixture.mjs";
 
 import {
   anchorLandingProblem,
@@ -1551,9 +1552,12 @@ async function checkPrint(browser) {
 // marketing site's — it is a JavaScript application, not a static document,
 // and it is noindex: it must boot, it must name the data source that answered
 // it, nothing unhandled may throw, and it must not overflow. Which catalogue
-// answered (live or sample) is recorded, not gated: on a runner with no
-// upstream, the app falls back and says so, and that fallback is the correct
-// behaviour.
+// answered is controlled here: every configured catalogue API receives an
+// explicit test-only network refusal, so the real app must render its labelled sample
+// fallback. The original live calls made layout/console checks depend on CORS
+// and upstream availability. No live-service/playback success is inferred;
+// API contracts/failover have their own unit fixtures and live acceptance is
+// separately gated. Console/page-error checks below are not relaxed.
 //
 // Every check below drives the app that is actually deployed: routes the shell
 // parses, controls the visitor presses, and markup the renderer emits. The
@@ -1601,7 +1605,7 @@ async function checkWebApp(browser) {
   ];
   for (const scheme of SCHEMES) {
     for (const viewport of viewports) {
-      const context = await browser.newContext({
+      const context = await newAppContext(browser, {
         viewport: { width: viewport.width, height: viewport.height },
         colorScheme: scheme,
       });
@@ -1638,7 +1642,7 @@ async function checkWebApp(browser) {
           : "no source badge on screen";
         record(
           `web app ${label}`,
-          `mounted, ${report.navItems} nav item(s), ${report.title ? report.title : "no title"}, ${source}`,
+          `mounted, ${report.navItems} nav item(s), ${report.title ? report.title : "no title"}, ${source}; controlled network-refusal fixture, not live catalogue evidence`,
         );
       }
       if (report.themeOnApp) {
@@ -1652,7 +1656,9 @@ async function checkWebApp(browser) {
       }
       if (!report.source || !report.source.visible || !report.source.kind) {
         fail(`web app ${label}`, "the app does not name the data source behind what is on screen — the source badge is absent or unlabelled");
-      } else if (report.source.kind === "sample" && !report.sampleNotice?.visible) {
+      } else if (report.source.kind !== "sample") {
+        fail(`web app ${label}`, `controlled network-refusal fixture must produce the labelled sample fallback, got ${report.source.kind}`);
+      } else if (!report.sampleNotice?.visible) {
         fail(
           `web app ${label}`,
           `the sample catalogue answered (${report.source.label || "unlabelled"}), so the page must say those rows are fictional and have no audio, and this one does not`,
@@ -1693,6 +1699,45 @@ async function checkWebApp(browser) {
   }
 }
 
+/** HTTP failures are not network-offline success or playable sample data. */
+async function checkWebAppHttpOutage(browser) {
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 }, colorScheme: "dark" }, { kind: "http" });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(String(error.message || error)));
+  page.on("console", (message) => {
+    if (message.type() === "error" && !NETWORK_NOISE.test(message.text())) errors.push(message.text());
+  });
+  try {
+    // Failover intentionally cancels in-flight losers. Read the actual UI
+    // contract, not global network-idle bookkeeping for mocked HTTP responses.
+    await page.goto(url("/app/#/home"), { waitUntil: "load" });
+    await page.locator('.dhun-source-badge[data-kind="sample"]').waitFor({ timeout: 10000 });
+    const home = await page.evaluate(webAppReport);
+    if (home.source?.kind !== "sample" || !home.sampleNotice?.visible) {
+      fail("/app/ HTTP outage Home", "all catalogue requests returned controlled HTTP 503, but fictional rows were not explicitly labelled as samples");
+    } else {
+      record("/app/ HTTP outage Home", "controlled HTTP 503 still labels fictional Home rows as Sample catalogue with the no-audio notice");
+    }
+    // This id exists in the demo corpus. An HTTP error must remain an error,
+    // not be replaced by a fictional album as if the service had answered it.
+    await page.goto(url("/app/#/album/demo-al-1"), { waitUntil: "load" });
+    await page.getByText("The catalogue answered 503", { exact: true }).waitFor({ timeout: 10000 });
+    const detail = await page.evaluate(() => ({
+      text: document.querySelector("#dhun-view")?.textContent || "",
+      hero: Boolean(document.querySelector(".dhun-hero--entity")),
+    }));
+    if (detail.hero || !detail.text.includes("The catalogue answered 503")) {
+      fail("/app/ HTTP outage detail", "HTTP 503 must remain visible and must not invent a successful sample album");
+    } else {
+      record("/app/ HTTP outage detail", "HTTP 503 is visible; a demo id does not turn an HTTP refusal into a successful album");
+    }
+    if (errors.length) fail("/app/ HTTP outage unexpected errors", errors.join(" | ").slice(0, 600));
+  } finally {
+    await context.close();
+  }
+}
+
 /**
  * The app is installable and opens offline — measured, not claimed.
  *
@@ -1705,7 +1750,7 @@ async function checkWebApp(browser) {
  * visitor would see.
  */
 async function checkWebAppOffline(browser) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
   const page = await context.newPage();
   const label = "/app/ offline";
   await page.goto(url("/app/#/home"), { waitUntil: "load" });
@@ -1765,7 +1810,7 @@ function entityOutlineReport() {
 }
 
 async function checkWebAppEntity(browser) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: SCHEMES[0] });
+  const context = await newAppContext(browser, { viewport: { width: 1280, height: 900 }, colorScheme: SCHEMES[0] });
   const page = await context.newPage();
   const label = "/app/ album heading";
   const href = await openFirstCard(page);
@@ -1795,7 +1840,7 @@ async function checkWebAppEntity(browser) {
  * opening the player as soon as a track starts.
  */
 async function checkWebAppDeepLink(browser) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
   const page = await context.newPage();
   const label = "/app/ player deep link";
   await page.goto(url("/app/#/?player=open"), { waitUntil: "load" });
@@ -1937,7 +1982,7 @@ async function checkWebAppContrast(browser) {
     // The app is dark-first and does not follow the OS, so the theme is chosen
     // through its own control — never by seeding storage, which would test the
     // seed instead of the control.
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const context = await newAppContext(browser, { viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     const label = `/app/ contrast (${scheme})`;
     const failuresBefore = failures.length;
@@ -1988,7 +2033,7 @@ async function checkWebAppContrast(browser) {
  * `document.activeElement` — which is why this check presses the keys.
  */
 async function checkWebAppDialogs(browser) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
   const page = await context.newPage();
   const label = "/app/ dialog focus";
   const active = () =>
@@ -2129,7 +2174,7 @@ async function checkWebAppAxe(browser) {
     "#/about/terms",
     "#/album/unknown-id",
   ];
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
   const page = await context.newPage();
 
   const scan = async (label) => {
@@ -2197,7 +2242,7 @@ async function checkWebAppAxe(browser) {
  * survives until the next page load is not a playlist.
  */
 async function checkWebAppLibrary(browser) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 }, colorScheme: SCHEMES[0] });
   const page = await context.newPage();
   const label = "/app/ local playlist";
 
@@ -2342,7 +2387,7 @@ const TOKEN_FOR_BACKGROUND = {
 
 async function checkWebAppAppearance(browser) {
   for (const scheme of SCHEMES) {
-    const context = await browser.newContext({
+    const context = await newAppContext(browser, {
       viewport: { width: 1280, height: 800 },
       colorScheme: scheme,
     });
@@ -2407,7 +2452,7 @@ async function checkWebAppAppearance(browser) {
 
 async function checkAxe(browser) {
   for (const scheme of SCHEMES) {
-    const context = await browser.newContext({
+    const context = await newAppContext(browser, {
       viewport: { width: 1280, height: 800 },
       colorScheme: scheme,
     });
@@ -2446,7 +2491,7 @@ async function captureScreenshots(browser) {
   ];
   for (const scheme of SCHEMES) {
     for (const shot of shots) {
-      const context = await browser.newContext({ viewport: shot.viewport, colorScheme: scheme });
+      const context = await newAppContext(browser, { viewport: shot.viewport, colorScheme: scheme });
       for (const route of ROUTES) {
         const page = await context.newPage();
         await page.goto(url(route), { waitUntil: "load" });
@@ -2458,6 +2503,83 @@ async function captureScreenshots(browser) {
     }
   }
   record("screenshots", "full-page captures written to tests/screenshots (CI artifact, never committed)");
+}
+
+/** The five browser-owned legal pages, not the generated native fixture.
+ * A local render/erase test with synthetic data and external requests blocked.
+ * This is deliberately not live catalogue, audible playback or legal approval.
+ */
+async function checkWebLegal(browser) {
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 }, colorScheme: "dark" });
+  const page = await context.newPage();
+  const external = [];
+  await context.route("**/*", (route) => {
+    if (new URL(route.request().url()).origin !== new URL(BASE).origin) {
+      external.push(route.request().url().split("?")[0]);
+      return route.abort();
+    }
+    return route.continue();
+  });
+  try {
+    const cases = [
+      ["about", [/multi-source music client/, /Spotify is a planned additional source, not implemented/, /browser client, currently using JioSaavn/]],
+      ["privacy", [/DRAFT/, /credentials: "omit"/, /keeps settings/, /No lyric request, YouTube request or Spotify request is implemented/]],
+      ["terms", [/DRAFT/, /software GPL grants no rights/, /unofficial or automated interfaces/]],
+      ["licences", [/no new grant/, /not establish permission/]],
+      ["support", [/DRAFT/, /keeps settings and the shell cache/]],
+    ];
+    for (const [id, patterns] of cases) {
+      await page.goto(`${BASE}/app/#/about/${id}`, { waitUntil: "networkidle" });
+      await page.waitForFunction((id) => document.querySelector('.dhun-about-nav [aria-current="page"]')?.getAttribute("href") === `#/about/${id}`, id);
+      const body = (await page.locator(".dhun-prose").innerText()).replace(/\s+/g, " ");
+      const missing = patterns.filter((pattern) => !pattern.test(body));
+      if (missing.length || /\{\{[a-zA-Z][a-zA-Z0-9]*\}\}/.test(body)) {
+        fail(`/app/ legal ${id}`, `missing scoped text or unresolved token: ${missing.join(", ")}`);
+      } else {
+        record(`/app/ legal ${id}`, "browser-owned scope/status/rights text renders, no unresolved tokens");
+      }
+      if (id === "about") {
+        const { WEB_VERSION } = await import("../../app-web/src/js/version.js");
+        if (!body.includes(WEB_VERSION)) fail("/app/ legal version", "About does not show this build's version");
+        else record("/app/ legal version", `About shows ${WEB_VERSION}; platform/channel remain build-derived`);
+      }
+    }
+    if (external.length) fail("/app/ legal requests", "opening bundled legal pages attempted an external request");
+    else record("/app/ legal requests", "opening the five bundled pages made no external request");
+
+    // Disposable context, fictional metadata only; never touch a user's library.
+    await page.evaluate(async () => {
+      const { emptyLibrary, createStorage, toggleLike, rememberPlay, rememberSearch, createPlaylist, normaliseLibrary } = await import("./js/library.js");
+      const song = { id: "audit-local-only", title: "Synthetic audit row", artist: "Test", stream: "", image: "" };
+      let library = toggleLike(emptyLibrary(), song).library;
+      library = rememberPlay(library, song);
+      library = rememberSearch(library, "synthetic local audit query");
+      library = createPlaylist(library, "Synthetic audit playlist").library;
+      library.settings = { ...library.settings, theme: "light", accent: "amber", volume: 0.25 };
+      createStorage().save(normaliseLibrary(library));
+    });
+    await page.goto(`${BASE}/app/#/settings`);
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator('[data-action="clear-library"]').waitFor();
+    const before = await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+      return { library: JSON.parse(localStorage.getItem("dhun.web.v3")), caches: await caches.keys() };
+    });
+    await page.getByRole("button", { name: "Erase library", exact: true }).click();
+    const dialog = await page.locator('.dhun-sheet[role="dialog"]').innerText();
+    if (!/Settings and the offline shell cache remain/.test(dialog)) fail("/app/ erase disclosure", "confirmation does not state what remains");
+    await page.locator('[data-action="confirm-clear-library"]').click();
+    const after = await page.evaluate(async () => ({ library: JSON.parse(localStorage.getItem("dhun.web.v3")), caches: await caches.keys() }));
+    const settingsRetained = Object.keys(before.library.settings).length === Object.keys(after.library.settings).length && Object.entries(before.library.settings).every(([key, value]) => after.library.settings[key] === value);
+    const scopes = ["likes", "playlists", "history", "recentSearches"];
+    if (!scopes.every((key) => before.library[key].length > 0 && after.library[key].length === 0) || !before.caches.length || Object.keys(after.library.snapshots).length || !settingsRetained || !before.caches.every((key) => after.caches.includes(key))) {
+      fail("/app/ erase scope", `synthetic fixture: likes ${before.library.likes.length}→${after.library.likes.length}, snapshots ${Object.keys(after.library.snapshots).length}, settings same=${settingsRetained}, caches ${before.caches.length}→${after.caches.length}, retained=${before.caches.every((key) => after.caches.includes(key))}`);
+    } else {
+      record("/app/ erase scope", "actual confirmation clears synthetic library/snapshots, retains settings and installed shell cache");
+    }
+  } finally {
+    await context.close();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2495,6 +2617,7 @@ const CHECKS = [
   ["print", () => checkPrint(browser)],
   ["axe", () => checkAxe(browser)],
   ["web app", () => checkWebApp(browser)],
+  ["/app/ HTTP outage", () => checkWebAppHttpOutage(browser)],
   ["appearance", () => checkWebAppAppearance(browser)],
   ["entity outline", () => checkWebAppEntity(browser)],
   ["player deep link", () => checkWebAppDeepLink(browser)],
@@ -2503,6 +2626,7 @@ const CHECKS = [
   ["/app/ contrast", () => checkWebAppContrast(browser)],
   ["/app/ axe", () => checkWebAppAxe(browser)],
   ["/app/ dialog focus", () => checkWebAppDialogs(browser)],
+  ["/app/ legal and erase scope", () => checkWebLegal(browser)],
   ["screenshots", () => captureScreenshots(browser)],
 ];
 

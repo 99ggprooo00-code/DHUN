@@ -155,10 +155,10 @@ class SuiteSize(DocsCopyMixin, unittest.TestCase):
 
     def test_a_stale_suite_size_is_a_finding(self) -> None:
         root = self.copy_docs()
-        self.edit(root, "IMPLEMENTATION-STATUS.md", "160 assertions", "9 assertions")
+        self.edit(root, "IMPLEMENTATION-STATUS.md", f"{docs.declared_test_count()} assertions", "9 assertions")
         problems = docs.check(root)
         self.assertTrue(
-            any("9 assertions" in problem and "160 test(s)" in problem for problem in problems),
+            any("9 assertions" in problem and f"{docs.declared_test_count()} test(s)" in problem for problem in problems),
             problems,
         )
 

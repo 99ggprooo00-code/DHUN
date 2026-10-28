@@ -1,5 +1,10 @@
 ## DHUN beta — private draft
 
+> **Current scope (2026-10-28):** this rolling channel contains native builds of the
+> [multi-source DHUN product](../PRD.md#1-product-definition-and-source-of-truth), currently using
+> YouTube Music. Spotify is planned and deferred, not included. Browser JioSaavn is a separate
+> static build; native features here do not imply browser parity. Provider permissions remain unresolved.
+
 This is a collaborator-only, rolling development build of DHUN's `main` branch. A successful `main` build replaces it automatically when app source/build files change; documentation-only merges do not publish a new artifact. PR builds remain run-scoped Actions artifacts. This private test channel includes a **Settings → Test tools → Theme catalogue** preview; ordinary development and public-release builds do not show the entry. An old restored catalogue route is discarded when a public Android build starts. It is not stable, store-ready, or intended for daily use.
 
 ### Assets

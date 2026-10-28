@@ -284,7 +284,10 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       state.home = { status: "ready", rails, error: null };
     } else {
       const error = failures[0] ?? new SourceError(FAILURE_KIND.shape, "every shelf came back empty", { url: API_ORIGIN });
-      if (error instanceof SourceError && NETWORK_KINDS.has(error.kind)) noteFailure(error);
+      // Every row below is fictional, including after HTTP/shape failures.
+      // Always label that fallback; this does not turn an HTTP detail/search
+      // error into a successful response (withFallback keeps that distinction).
+      noteFailure(error);
       state.home = { status: "sample", rails: demoHome(), error };
     }
     if (state.route.name === "home") renderView();
@@ -684,8 +687,8 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       });
     } else if (sheet?.kind === "clear-library") {
       markup = components.sheet({
-        title: "Erase everything in this browser?",
-        subtitle: "Likes, playlists and history are deleted. This cannot be undone.",
+        title: "Erase this browser's library?",
+        subtitle: "Likes, playlists, history, searches and snapshots are deleted. Settings and the offline shell cache remain. This cannot be undone.",
         body: html`<div class="dhun-menu">
           <button type="button" class="dhun-menu-row dhun-menu-row--danger" data-action="confirm-clear-library">${icon("Delete", { size: 20 })}<span>Erase my library</span></button>
           <button type="button" class="dhun-menu-row" data-action="close-sheet">${icon("Close", { size: 20 })}<span>Cancel</span></button>

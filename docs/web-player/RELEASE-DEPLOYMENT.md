@@ -1,5 +1,12 @@
 # Release and deployment — DHUN Web (`/app/`)
 
+> **2026-10-28 local revision:** browser shell/cache version `3.0.1` carries
+> corrected legal/status/erase-scope copy so installed clients can refresh it
+> when a future authorised deployment occurs. No schema/storage-key/native
+> release version or release channel changed; no publication is authorised here.
+> Product direction: [PRD §1](../PRD.md#1-product-definition-and-source-of-truth).
+> Playback, provider permission, legal adoption and full notice coverage remain gates.
+
 The web counterpart of [`docs/releases/`](../releases/). The browser build has no
 installer, no store listing and no signing key. A "release" is a merge to `main`
 that the site workflow publishes. The native release policy is in
@@ -10,9 +17,9 @@ apply to the browser build except where it says so.
 
 | Identifier | Value | Where it lives |
 |---|---|---|
-| Web version | `3.0.0` | `app-web/src/js/version.js` (`WEB_VERSION`) |
+| Web version | `3.0.1` | `app-web/src/js/version.js` (`WEB_VERSION`) |
 | Build label | `web (static, no backend)` | `app-web/src/js/version.js` (`BUILD_LABEL`) |
-| Service worker cache | `dhun-web-v3.0.0` | `app-web/src/sw.js` (`DEFAULT_CACHE`), and `cacheName()` in `version.js` |
+| Service worker cache | `dhun-web-v3.0.1` | `app-web/src/sw.js` (`DEFAULT_CACHE`), and `cacheName()` in `version.js` |
 | Release channel shown in legal text | `web (static build)`, platform `browser` | `app-web/src/js/legal.js` (`WEB_APP_INFO`) |
 | Storage key | `dhun.web.v3` | `app-web/src/js/library.js` (`STORAGE_KEY`); a version change here is a data change |
 

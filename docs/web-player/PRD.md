@@ -2,8 +2,9 @@
 
 This is the web counterpart of [`docs/PRD.md`](../PRD.md). It states what the
 browser build is for, who it is for, and what it must and must not do. Where the
-native PRD and this one disagree, this one governs the browser build; the native
-PRD governs Android and Windows. The architecture that realises these
+project PRD and this one disagree on product intent, [project PRD §1](../PRD.md#1-product-definition-and-source-of-truth)
+governs. This document scopes browser-specific requirements/capabilities; it does
+not redefine DHUN's multi-source direction. The architecture that realises these
 requirements is in [ARCHITECTURE.md](ARCHITECTURE.md); the limits a visitor can
 meet are in [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md).
 
@@ -14,13 +15,12 @@ browser, and keep a small personal library (likes, playlists, history, settings)
 on that device. It is a free, open-source, static web application published with
 the project's marketing site at `/app/`.
 
-The owner's statement on the web build (2026-10-20, recorded verbatim) is: "It was
-primarily meant to be yt music client so do accordingly." The layout and flow
-follow that intent: a home of shelves, a search with typed results, album, artist
-and playlist pages, a persistent player bar, and a library. The catalogue behind
-it is JioSaavn, not YouTube. How the owner's statement and the recorded decision
-D2 fit together is open; see §8 and
-[ADR-010](../decisions/ADR-010-multi-source-provider-direction.md).
+DHUN's multi-source direction prioritises YouTube / YouTube Music, with Spotify
+planned and deferred, not implemented. The browser currently uses JioSaavn via
+unofficial wrappers; native currently uses YouTube Music. Platform capabilities
+may differ. The earlier “primarily yt music client” ambiguity is resolved by the
+2026-10-28 [ADR-010 amendment](../decisions/ADR-010-multi-source-provider-direction.md),
+not by adding a YouTube IFrame or replacing working browser features.
 
 ## 2. Users
 
@@ -60,7 +60,7 @@ D2 fit together is open; see §8 and
 | W-10 | The shell opens without a network connection; music does not. | Built (shell cache). |
 | W-11 | Installable as a standalone app where the browser offers it. | Manifest present; install prompt wired. Not verified on every browser. |
 | W-12 | Media keys and the operating system's media panel show the current track where the browser supports the Media Session API. | Built, with feature detection. |
-| W-13 | Audio download, offline audio, equaliser, lyrics and cross-device sync | Not offered, because a browser cannot do these honestly with this design. |
+| W-13 | Audio download, offline audio, equaliser, lyrics and cross-device sync | Unavailable in this build; no provider/permissions/player design for them is approved. |
 | W-14 | Sample rows, used only when the catalogue cannot be reached, are labelled as samples and carry no audio. | Built. |
 
 ## 5. Non-goals
@@ -69,8 +69,8 @@ D2 fit together is open; see §8 and
   embed the YouTube IFrame player and does not call YouTube's APIs. This follows
   the owner's decision D2 in [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md).
   The native YouTube path is not part of this build.
-- No Spotify in the browser, and Spotify remains a planned source in the native
-  design, deferred and not removed (owner decision D3, ADR-010).
+- No Spotify implementation in this browser or native build. Spotify is a planned
+  project source with execution deferred (D3/D4); account/Premium alone is not policy or public-access approval.
 - No accounts, sign-in, cloud sync, or server-side storage.
 - No analytics, telemetry, advertising or third-party script.
 - No promise that the catalogue will remain available. It is a community-run
@@ -108,8 +108,6 @@ a success measure for this build.
   [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md)).
 - Whether any second catalogue source is added to the browser build. Any such
   source needs its own research entry and an ADR before code.
-- **The owner's D2 wording.** The recorded decision is no YouTube IFrame player on
-  the web. The owner's words ("primarily meant to be yt music client so do
-  accordingly") can be read as asking for the opposite. The owner should confirm
-  which reading is intended. The recorded reading is in
-  [DECISIONS-AND-CHANGES.md](DECISIONS-AND-CHANGES.md) §1.
+- Whether a permitted visible YouTube Watch-mode proposal warrants explicit approval
+  for third-party runtime/CSP/consent and a deployed-origin spike. It is not current
+  work or an unresolved product-identity question; D2 remains unchanged.

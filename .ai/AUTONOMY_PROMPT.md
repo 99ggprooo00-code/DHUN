@@ -1,5 +1,21 @@
 # Autonomous session prompt — the web version of the app + the marketing site
 
+## Current operating brief — 2026-10-28
+
+Use [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth), MASTER and
+ROADMAP's current task. Work autonomously **within current authorisation**.
+DHUN is multi-source, YouTube first, Spotify planned/deferred. Preserve native
+KMP/Compose and separate browser JioSaavn differences, report facts vs plans,
+keep legal drafts/risks honest and validate generated source/output together.
+No forced time window, exact feature parity, new backend/paid service, rewrite,
+commit, push, merge or publication is authorised by this file.
+
+## Archived 2026-10-09 prompt — DO NOT EXECUTE
+
+The earlier prompt below is retained verbatim as a historical delegation; its
+“never ask”, fixed runtime, merge/push, YouTube-browser and feature-mirroring
+instructions are **not active**. Current owner permissions take precedence.
+
 **How to use:** paste everything below the horizontal rule into a fresh agent
 session on this repository. It is written to be pasted as-is: no follow-up from
 the operator is required, and the agent is forbidden from asking for one.

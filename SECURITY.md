@@ -27,4 +27,4 @@ Please include, when you can: the affected version or commit, the platform (Andr
 
 In scope: DHUN's app code, release tooling, and the website in this repository.
 
-Out of scope: YouTube, Google, and LRCLIB services and their availability or policies. Report those to their operators.
+Out of scope: third-party YouTube/Google, LRCLIB, KuGou, JioSaavn/CDN and community-wrapper services and their availability or policies. Report service issues to the relevant operators. Spotify is planned, not an active integration. DHUN still owns defects in its handling of third-party data.

@@ -1,5 +1,59 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-28 — PR #197: stale native table test, live-CORS layout dependency, unlabelled fallback
+
+**Observed:** initial commit `7ca24a0` passed local Python/JS/rendering but the new
+GitHub CI/MSI runs failed in `MarkdownParserTest.theSupportPageDataControlTableIsIntact`:
+expected 3 rows, got 9. The source correction documents nine existing controls;
+the JVM test's old count/three labels were stale. Fix: exact nine labels/order,
+all four nonempty columns and meaningful failure/retention cells. Do not delete
+real controls or merely change a numeric threshold. Resolved by the fresh
+Linux/shared and Windows regression runs for `626d8fe` (audit 06 §12).
+
+**Browser:** website run `40635056345` measured 144 entries and failed on three
+live `saavn.sumit.co` CORS console messages; the harness had mixed live-service
+availability with UI measurements. Fix: narrow test-only wrapper API interception,
+controlled network refusal for real sample/keyboard/layout flows, explicit HTTP
+503 regression, seven fixture tests and two Python harness guards. Console/page
+error predicates, production CSP and rendering thresholds are unchanged. Full
+corrected local run: **146 measurements / 0 notes / 0 failures**.
+
+**Actual disclosure defect found by the HTTP fixture:** Home rendered fictional
+rows after every HTTP/shape failure but kept an idle Catalogue badge because
+`noteFailure` ran only for network errors. Call it whenever Home chooses samples;
+keep HTTP search/detail errors as real errors, not fictional success. Browser
+assertions cover labelled/no-audio Home and an HTTP 503 detail refusal even for
+a real demo id. No source/player/storage/auth/provider expansion.
+
+The first HTTP layout fixture was the wrong scenario for network-only entity
+fallback (138 measurements / 7 failures); corrected the fixture, not the HTTP
+semantics. An HTTP test then waited on global network-idle while failover cancels
+losers; wait for explicit visible badge/error states instead. Failed/partial
+runs are not counted as final success. Local root check remains 165/0; fixture
+rules 59/0. Actual source-head PR/push native CI, APK/MSI and website checks
+now all pass for `626d8fe`; 9 successes / 5 expected PR-only skips. Windows
+install-over/data preservation passed on the hosted runner. The final
+bookkeeping head must still be checked before normal merge.
+
+## 2026-10-28 — copy/tests contradicted providers and real privacy controls
+
+**Observed in source, not a new playback incident:** root/native legal and site
+metadata defined a single-source product or described browser YouTube, while
+current browser code uses three unofficial JioSaavn wrapper instances. Legal
+tests required cache controls to be absent even though Settings wires them.
+The generator documentation also called its excluded native JS parity fixture
+the browser policy. Fix: authoritative PRD + platform-specific drafts, corrected
+pipeline, source contracts and semantic/mutation checks; [audit 06](../docs/research/06-multi-source-claims-audit.md)
+contains exact results. Remaining Settings completion/error gaps are recorded,
+not silently fixed by prose. No Java here means no native compile claim; old
+CI, hardware and deployed-origin results below are dated, not today's evidence.
+
+**Local rendering follow-through:** Chromium measured a 42.5 px footer report
+link and sample-notice text overflow; label/wrapping-only fixes retain thresholds.
+The final full run has 144 measurements, zero findings, including five browser
+legal pages and actual synthetic-library erase/settings/shell retention. This
+is not a deployed-origin audio, native compilation or legal acceptance result.
+
 ## 2026-10-19 — a byte-identical palette mirror that failed AA; a playlist the app made and could not open
 
 **1. The web's palette was a *correct* mirror of a token that is not legible at the size it is used.** `tokens.test.mjs` asserts that `tokens.css` carries the same colour literals as `DhunAppearance.kt`; it passes, and it would have passed whatever those literals were. Reading the rendered app instead — every text node, both themes, seven routes, with the translucent backdrop composited — found **15 failing styles in light, 0 in dark**, all of them the light theme's `textTertiary = 0x8C1A1714` at **3.87–3.95:1**: the track duration (11px/600), the bottom-nav labels, the entity sub-meta, the section hint (12px) and the Settings contract body (12px mono). The app's own `DhunThemeContrastTest.kt:49` documents that token at **3.0:1, "AA large text / UI labels"** — and then the app uses it for 11px labels, so the app's own token violates the app's own rule. Measured light alpha ramp: `.949 → 14.41:1`, `.749 → 7.53:1`, `.549 → 3.84:1`. Those five web roles moved to secondary (7.53:1). *Lesson: a provenance test is not a legibility test. Mirroring proves where a colour came from; only a rendered audit proves a person can read it. The gate that can see this is now in the browser job (386 text nodes × 7 routes × 2 themes), and its decision function is unit-tested in `rules.mjs` so it is provable without a browser.*

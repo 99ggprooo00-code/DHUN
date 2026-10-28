@@ -1,5 +1,10 @@
 # DHUN Web — known limitations
 
+**Direction/status (2026-10-28):** [project PRD §1](../PRD.md#1-product-definition-and-source-of-truth)
+is multi-source, YouTube first; this browser currently uses JioSaavn via
+unofficial wrappers. Spotify is planned/deferred, not implemented. Platform
+capabilities may differ; no current IFrame/SDK/CSP change is approved.
+
 What a visitor can actually meet at `/app/`, and what the build deliberately does
 not do. Every item is either enforced by a gate or visible in the interface; none
 is an aspiration.
@@ -22,7 +27,9 @@ is an aspiration.
   naming the query, never as a spinner that never ends.
 - **The API is unofficial and so is the licence situation.** The app states what
   it calls; it does not claim the service's content is licensed for it. See
-  `#/about/terms`.
+  `#/about/terms`. JioSaavn Terms, re-read 2026-10-28, restrict unofficial/
+  automated access absent separate permission; wrapper/content permissions and
+  retention remain unresolved. A disclaimer and software licence are not approval.
 
 ## The sample catalogue
 
@@ -79,7 +86,7 @@ absent rather than stubbed:
 - **The keyboard map is global to the page.** It is not taken from text fields
   and not from combinations the browser owns, but a browser extension can take
   those keys first.
-- **The app is one tab.** It refuses to boot inside another page's frame and says
+- **The app must be top-level.** It refuses to boot inside another page's frame and says
   why; `frame-ancestors` cannot be sent from a static host.
 
 ## Not verified

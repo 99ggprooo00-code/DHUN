@@ -1,13 +1,18 @@
 ---
 id: open-source-licenses
 title: Open-Source Licenses
-effectiveDate: 2026-10-15
+effectiveDate: 2026-10-28
 status: reference
 ---
 
 {{appTitle}} itself is licensed under the GNU General Public License v3.0. Its
 full text is reproduced below, followed by the full text of the other licences
 this repository carries.
+
+These software licences do not license third-party music, artwork, lyrics,
+streams, APIs or trademarks, or approve a provider integration. The licence list
+is not a completed legal/distribution review; referenced-but-unbundled notices
+must be checked against the resolved release artifacts. **[legal]**
 
 The dependency-by-dependency list — what each library is and what it is used
 for — is on the **Third-Party Notices** page.

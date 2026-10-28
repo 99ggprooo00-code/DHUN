@@ -1,5 +1,13 @@
 # ADR-001: Extraction engine selection after the 2026-08/09 YouTube breakage wave
 
+> **Current applicability note (2026-10-28):** preserve this dated decision and its
+> original status/amendments. [PRD §1](../PRD.md#1-product-definition-and-source-of-truth)
+> governs product direction (multi-source, YouTube first, Spotify planned/deferred).
+> [ADR-010's 2026-10-28 amendment](ADR-010-multi-source-provider-direction.md)
+> clarifies current native/browser scope, design-only capabilities and no expansion
+> or implied provider permission. Architecture acceptance is not authorisation to
+> download content; historical B1/single-source framing is not a current vision.
+
 ## Status
 Accepted (2026-09-01) — supersedes the MASTER_PROMPT.md doctrine table's
 "NewPipe Extractor as THE extraction engine" in the interim, until the rot

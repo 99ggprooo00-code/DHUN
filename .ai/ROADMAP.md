@@ -1,5 +1,68 @@
 # CURRENT ACTIVE TASK
 
+## CURRENT ACTIVE TASK — 2026-10-28: multi-source alignment audit
+
+**Scope:** repository-wide documentation/legal/metadata/instruction/research/test
+alignment, not application rewrite or a new provider. The owner's explicit
+follow-up authorises verification, commit/push to `arena/5ced2dbe-dhun`, PR and
+autonomous merge only after this work and all applicable PR checks are complete.
+No public app release, backend, paid service or Spotify implementation is authorised;
+normal existing main-branch site/private-test-draft workflows are not disabled.
+
+**Direction:** [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth)
+is authoritative. YouTube/YouTube Music first, Spotify planned and execution
+deferred; native currently YouTube Music, browser currently JioSaavn via three
+unofficial wrapper instances. Capabilities/evidence differ; don't claim plans
+as supported providers. Latest [ADR-010 amendment](../docs/decisions/ADR-010-multi-source-provider-direction.md)
+preserves D1–D6, current CSP and design-only provider work.
+
+**Work / evidence:** [audit 06](../docs/research/06-multi-source-claims-audit.md)
+records discrepancies, corrections, all file changes, fresh primary research,
+validation and remaining gates. Existing native cache/history controls and
+browser data flows are reflected truthfully; no wholesale source/ID migration.
+
+**Verified completion / pre-merge closeout:** [PR #197](https://github.com/99ggprooo00-code/DHUN/pull/197)
+contains alignment commit `7ca24a0` and root-fix commit `626d8fe`. At source head
+`626d8fee22bf743927efd745660756d8ebe33376`, GitHub reports **9 successful checks,
+5 expected PR-only skips, CLEAN/MERGEABLE**, no failed/pending/cancelled check.
+Both push CI `40637078977` and PR CI `40637088449` passed every native test/build/
+lint step. Build APK `40637088594`, APK/MSI packaging `40637088462`, and website
+build/Chromium/Lighthouse `40637088483` passed. Windows install-over/data
+preservation passed on a disposable hosted runner, not physical playback.
+
+| Requested work | Verified state |
+| --- | --- |
+| Inspect, research, correct authoritative/dependent surfaces and preserve history | Done; audit 06 + full inventory, 110-file manifest |
+| Root-cause fixes for native table test, live-CORS UI coupling and Home sample label | Done; exact controls/retention, controlled failure fixtures and real HTTP-error regression |
+| Local current code | 495 Python, 165 app JS, 59 site rule/fixture tests, 146 Chromium measurements / zero failures; generation/HTML/claims/quality/links/root-prefix smoke pass |
+| Commit/push/PR and source CI | Done on assigned branch; actual source-head runs above, not an inferred pass |
+
+**Exact final action:** this documentation-only closeout records verified source
+results. Re-read PR #197's current head and **all** check outcomes (including both
+CI contexts) after its push; merge only if that final head is fully green and
+GitHub allows normal merging. No auto/admin bypass. Merge/deployment result is
+the PR/workflow event, not an event fabricated in this pre-merge record.
+
+Starting main remains `12498ca`. Its separately scheduled probe `40483966781`
+reports `ENVIRONMENT_BLOCKED`, not healthy playback. Branch-protection inspection
+is denied (HTTP 403); normal GitHub merge enforcement is not bypassed.
+
+**Independent follow-up gates:** provider permission/legal and resolved notices,
+current-device and real-origin audio evidence, then bounded deletion/logging and
+provider identity/capability/auth/player/migration design. These remain open;
+merging this alignment does not authorise a provider or public app release.
+Last actual CI errors were the stale native assertion and live-CORS harness
+coupling; both are resolved by the green source-head runs. No new implementation
+phase, provider, recurring service or public app release is authorised by merge.
+
+
+## Historical sessions and earlier active-task snapshots
+
+All dated tasks/results below describe their sessions. They are not live
+instructions to merge, migrate stacks, choose a single-source identity or load
+a YouTube IFrame. The multi-source intent question is now resolved; Watch mode
+remains only a proposal, with permission required before runtime/CSP/spike work.
+
 ## Session `arena/488bcaa0-dhun` — master-prompt foundation: baseline, source research, proposed provider ADR (2026-10-20)
 
 **Uploaded input:** `DHUN MASTER AGENT PROMPT.md` (1,320 lines). Its initial context was verified, not

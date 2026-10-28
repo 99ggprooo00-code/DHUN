@@ -23,11 +23,47 @@ GPL-3.0-compatible. Reused code gets: project, file, license, commit, date.
 | ICU4J 76.1 (`com.ibm.icu:icu4j`, Android + desktop) | Unicode License V3 plus upstream third-party notices (GPL-compatible permissive terms) | on-device lyric transliteration; not translation; no lyrics sent to a service. Upstream [release-76-1 license](https://github.com/unicode-org/icu/blob/release-76-1/LICENSE), reviewed 2026-10-15; full verbatim notices in `LICENSES/ICU4J-76.1.txt` and bundled legal pages | 2026-10-15 |
 | Coil 3 | Apache-2.0 | images | Phase 06 |
 | ~~Kermit~~ (removed — no build reference or code usage remains; row kept for history) | Apache-2.0 | was: logging | Phase 02–? |
-| LRCLIB (API/service) | open API | synced lyrics source | Phase 11 |
+
 | JNA | dual LGPL-2.1 / EPL-1.0 | SMTC spike WinRT interop (desktop, Windows paths) | Phase 12 |
 | Material Design Icons (24px vector paths, embedded in `shared/.../design/DhunIcons.kt`) | Apache-2.0 | dependency-free UI iconography; paths adapted from the Material Icons set | Icon pass |
 | Robolectric (test-only) / JUnit4 (test-only) / androidx-test (test-only) | MIT / EPL-1.0 / Apache-2.0 | unit-test runtimes; ship in no artifact | Phase 03+ |
 | vivi-music (`vivizzz007/vivi-music`) | GPL-3.0 (+ musixmatch-only exception) | **UI reference only** — read in place via the GitHub API for design research; no fork, no vendored copy, nothing copied yet. Any future adaptation must stay GPL-3.0, be attributed here, and exclude the musixmatch module. See `.ai/ui-research-vivi-music.md` | UI research 2026-09-06 |
+
+## External services (not bundled software licences)
+
+| Service | Current use | Rights / privacy limits |
+| --- | --- | --- |
+| YouTube / YouTube Music (Google) | Native catalogue, artwork, stream resolution/delivery and some lyrics | Unofficial InnerTube access; no affiliation/permission asserted. YouTube Terms/API-policy extraction, background/audio, caching and download questions remain unresolved. |
+| LRCLIB (`lrclib.net`) | Native automatic/manual lyric matching; artist/title/album/duration/query and DHUN version User-Agent | Openly reachable service is not a grant of lyric rights; retention and permissions need review. |
+| KuGou (`lyrics.kugou.com`) | Existing native lyric search/candidate/download requests when selected by source priority | Queries, track/candidate IDs and access keys go to KuGou; not a user-account token. Content rights and service practices unestablished. |
+| JioSaavn via `saavn.dev`, `saavn.sumit.co`, `saavnx.vercel.app`; `*.saavncdn.com` | Separate browser catalogue wrappers and audio/artwork CDN, not native music sources | Community-run unofficial services, not three providers. Wrapper software licences do not authorise music or API use. JioSaavn's Terms restrict unofficial/automated access; required permission and wrapper terms/retention unresolved. |
+| GitHub / GitHub Pages | Repository, static hosting, releases and voluntary public reports | GitHub processes hosting/report requests; no automatic DHUN diagnostic uploader found. |
+| Spotify | Planned additional source only | No SDK, OAuth, tokens, adapter, API or playback in current builds. All technical/account/policy/legal/playback/cost gates apply first. |
+
+Software GPL and dependency licences do **not** cover third-party music,
+artwork, lyrics, streams, APIs or trademarks. DHUN is not affiliated with,
+endorsed by or authorised by YouTube, Google, JioSaavn or Spotify. A provider
+name in this notice is disclosure, not an approved integration.
+
+Primary terms re-read on 2026-10-28:
+[YouTube Terms](https://www.youtube.com/static?template=terms),
+[YouTube API policies](https://developers.google.com/youtube/terms/developer-policies),
+[JioSaavn Terms](https://www.jiosaavn.com/corporate/terms/), and
+[Spotify policy](https://developer.spotify.com/policy). This is not legal review.
+[Provider research and the matrix](docs/research/README.md) distinguish code,
+provider documentation, policy concerns and unknowns. Browser-specific notices
+are in `app-web/src/js/data/web-legal.js`; native dependency disclosures are not
+browser runtime dependencies.
+
+## Distribution review still required
+
+This hand-maintained table is **not a complete resolved/transitive SBOM**. The
+bundle includes GPL, Apache, Boost and ICU4J texts, but some MIT/BSD/LGPL
+and dependency-specific copyright/NOTICE texts are currently referenced rather
+than bundled individually. Verify the actual release dependency graph and
+required notices, NewPipe/yt-dlp obligations and libVLC/system-distribution
+boundary before publishing; do not claim completed licence compliance. Existing
+verbatim licence texts and grants are unchanged by this audit.
 
 ## Build-time and CI-only additions — 2026-10-08 (marketing site)
 

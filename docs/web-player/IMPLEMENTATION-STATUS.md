@@ -1,13 +1,18 @@
 # DHUN Web — status and evidence
 
-> **Status: the build ships and works; it is NOT VERIFIED FOR RELEASE.**
-> Last updated: 2026-10-20.
+> **Status: Partial integration; source/unit evidence, NOT VERIFIED FOR RELEASE.**
+> Reconciled 2026-10-28; exact fresh commands/results in [audit 06](../research/06-multi-source-claims-audit.md).
 
-Two facts set that status, and both are named in "Not verified" below: nobody has
-heard audio come out of the **deployed** origin, and the catalogue this build
-reads is a community-run wrapper with no support contract. Everything else is
-either implemented and unit-tested, or measured in a real browser on every pull
-request, or both.
+DHUN is multi-source by direction ([PRD §1](../PRD.md#1-product-definition-and-source-of-truth)),
+YouTube Music first; native currently uses YouTube Music, this separate browser
+uses unofficial JioSaavn wrappers. Spotify is planned/deferred, not implemented.
+The interface and test paths exist; live catalogue and audible deployed-origin
+playback remain unverified. Permissions, legal adoption and notice completeness
+are separate release gates, not cured by passing geometry/unit checks.
+
+The table identifies the code/gates that check each behaviour. A gate existing
+is not proof that it ran in this session; use audit 06's exact execution ledger.
+Earlier recorded CI/browser evidence is dated, not a new canonical-origin check.
 
 ## What is verified, and by what
 
@@ -18,7 +23,7 @@ table cannot quietly describe a build that has moved on.
 | Claim | Evidence |
 |---|---|
 | The build assembles from the sources, and every module is reachable from `main.js` | `app-web/tools/build.mjs` — it fails on an unreachable module or a shell entry that is not in the build |
-| 160 assertions over the pure modules pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
+| 165 assertions over the pure modules pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
 | The web build is a real app, not a preview: regions before the module runs, a strict CSP, `noindex`, no third-party asset, no downloads surface, a labelled sample catalogue | `scripts/test_app_web.py` |
 | Every screen renders one `h1`, resets focus to it after navigation, and titles the document | `website/tests/browser.mjs` (`entity outline`, `/app/ dialog focus`) |
 | Rendered contrast meets 4.5:1 / 3:1 on every visible line, in both themes | `website/tests/browser.mjs` (`/app/ contrast`) |
@@ -53,7 +58,9 @@ table cannot quietly describe a build that has moved on.
   listened to the app with a screen reader.
 - **A person's judgement of the look.** CI measures geometry, contrast and
   semantics. It does not see whether the result is pleasant to use.
-- **The service's terms.** This build reads a community wrapper around JioSaavn.
+- **Permission and legal review.** Targeted JioSaavn Terms clauses were re-read
+  on 2026-10-28 and restrict unofficial/automated access absent separate permission.
+  This build still reads community wrappers.
   Whether that is permitted, and what must be disclosed, is an open question for
   the project and for a lawyer — not something the code can settle. The app says
   what it calls and where, and makes no claim of authorisation.
@@ -63,14 +70,15 @@ table cannot quietly describe a build that has moved on.
 The checklist below is the definition of done. A ticked box means the claim was
 verified and this file names the evidence; an unticked box means it was not.
 
-- [x] **The interface ships and is reachable** — the site and `/app/` are live at
-  `https://99ggprooo00-code.github.io/DHUN/`, and `scripts/website_smoke.py`
-  re-reads the served bytes after every publish.
-- [x] **The code is unit-tested** — `cd app-web && npm test` → 160 pass;
-  `python3 -m unittest discover -s scripts -p 'test_*.py'` → 466 tests OK, the
-  web app's source-level rules included.
-- [x] **The rendered pages are measured in a real browser** — `website/tests/browser.mjs`
-  runs on every pull request and prints its numbers as check annotations.
+- [x] **Publication path exists** — `.github/workflows/website.yml` assembles
+  site + `/app/`, and `scripts/website_smoke.py` checks served bytes after an
+  authorised deployment. No fresh deployment/canonical-origin verification is
+  asserted by this audit.
+- [x] **The code is unit-tested** — `cd app-web && npm test` → 165 pass;
+  baseline Python suite (2026-10-28 before alignment): 466 tests OK. Fresh
+  expanded-suite results are recorded in audit 06, not inferred from this count.
+- [x] **Browser checks are configured** — `website/tests/browser.mjs` runs
+  locally/CI against an assembled artifact, not proof of sound at the deployed origin.
 - [x] **No paid infrastructure and no DHUN server** — static GitHub Pages, one
   third-party API called from the tab, no function, no database, no proxy.
 - [x] **No tracking** — no analytics, telemetry or crash reporting; the CSP names
@@ -78,8 +86,11 @@ verified and this file names the evidence; an unticked box means it was not.
 - [x] **The limits are visible in the product** — the source badge, the sample
   catalogue notice, the failure states, `Settings → Catalogue`, and
   [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md).
-- [x] **Licensing and attribution** — `LICENSE` (GPL-3.0-or-later),
-  `THIRD_PARTY.md`, and the licences page rendered from the bundle.
+- [x] **Software licence/notices are displayed** — repository `LICENSE`,
+  `THIRD_PARTY.md` and browser licences page; grants/verbatim texts unchanged.
+- [ ] **Provider permission, legal adoption and complete release notices** —
+  unresolved; GPL is not a music/content/API licence, and the dependency table
+  is not a completed resolved/transitive distribution review.
 - [ ] **A real catalogue answers the deployed page** — unverified; see above.
 - [ ] **At least one track is heard to play** — unverified; this is the gate.
 - [ ] **A second browser, and an Android phone, are measured** — not done.
@@ -88,9 +99,10 @@ verified and this file names the evidence; an unticked box means it was not.
 
 ## How to move it forward
 
-In order; nothing below the first line matters until it is done.
+In dependency order; permission/legal and technical validation are independent
+gates, neither makes the other unnecessary.
 
-1. Open the deployed `/app/` in a real browser on a real network. Search, play a
+1. Resolve provider permission/legal/notice prerequisites; also open the deployed `/app/` in a real browser on a real network. Search, play a
    track, and write down exactly what happened — sound, or the sentence the app
    showed.
 2. If it refused, keep the refusal verbatim. A CORS, 429 or "no stream" answer is

@@ -1,5 +1,13 @@
 # ADR-009 — A static marketing site is the only public web property
 
+> **Current applicability note (2026-10-28):** preserve this dated decision and its
+> original status/amendments. [PRD §1](../PRD.md#1-product-definition-and-source-of-truth)
+> governs product direction (multi-source, YouTube first, Spotify planned/deferred).
+> [ADR-010's 2026-10-28 amendment](ADR-010-multi-source-provider-direction.md)
+> clarifies current native/browser scope, design-only capabilities and no expansion
+> or implied provider permission. Architecture acceptance is not authorisation to
+> download content; historical B1/single-source framing is not a current vision.
+
 - **Status:** PROPOSED (written by the `arena/fc918d37-dhun` session, 2026-10-08,
   on the user's explicit instruction to build the site; **not** an architecture
   change to the app, and it does not widen ADR-008)

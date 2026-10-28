@@ -1,5 +1,66 @@
 # 03 — YouTube / YouTube Music: source research
 
+## Current recheck — 2026-10-28
+
+**Product direction:** [PRD §1](../PRD.md#1-product-definition-and-source-of-truth)
+is authoritative: DHUN is multi-source, YouTube / YouTube Music first, Spotify
+planned and deferred. This research does not redefine the product as YouTube-only.
+**Evidence:** `[P]` primary text read on this date; `[R]` repository inspection;
+`[H]` earlier dated runtime/hardware record; `[U]` unverified. No live extraction,
+packet capture, hardware playback or legal advice is supplied by this recheck.
+
+### Implementation corrections
+
+- **Native Android and desktop:** own InnerTube catalogue client; own-client
+  staged-wave stream resolver is primary on **both**. Desktop optionally falls
+  back to a user-installed `YtDlpStreamResolver`; Android does not. NewPipe stays
+  a non-production recovery watch. `YouTubeMusicProvider.forAndroid/forDesktop`
+  and DI/platform startup wiring establish this; the old summary below that
+  implies desktop yt-dlp primary is superseded. `[R]`
+- **Browser:** JioSaavn via three unofficial wrapper instances, not YouTube.
+  Historical B1/InnerTube browser failures do not prove the JioSaavn build works,
+  or prove that every official YouTube embed is impossible. No IFrame or YouTube
+  API call exists in the current browser. `[R]`
+- Native audio downloads, Media3 segment cache, desktop whole-track/LRU cache,
+  artwork, SQLDelight library/history/lyrics and saved lyric choices all exist.
+  This is not metadata-only local storage. No code change in this audit expands
+  extraction, downloads or caching. `[R]`
+
+### Official options, limits and policy questions
+
+| Surface / issue | Primary-source evidence (read 2026-10-28) | Implication for DHUN, not a legal opinion |
+| --- | --- | --- |
+| YouTube Data API | [Quota calculator](https://developers.google.com/youtube/data/determine_quota_cost), updated 2026-10-15, gives **100 `search.list` calls/day**, **100 `videos.insert` calls/day**, **10,000 units/day for other endpoints**, reset midnight Pacific; search/insert have their own 1-unit-per-call buckets, each extra page costs another request. `[P]` | Do not import the older 100-units-per-search assumption. DHUN has no official Data API integration or allocated project quota. This is not a music stream-URL API. Default quota, exact endpoint/scopes, credentials and any quota-extension process need a design/recheck before adoption. No paid hosting/key purchase authorised; fee/extension guarantees not established. |
+| IFrame controls | [IFrame API](https://developers.google.com/youtube/iframe_api_reference), queue/loading and playback sections: `cueVideoById`, `loadVideoById`, `cuePlaylist`, `loadPlaylist`, play/pause, `seekTo`. Example loads `https://www.youtube.com/iframe_api`. `[P]` | A visible player **can queue and seek**. Earlier blanket “cannot preserve queue/seek” reasoning overstates a technical limit. It does not expose raw audio to Media3/libVLC/`<audio>`, grant offline download rights, or allow hiding the player. No DHUN IFrame implementation or proof of deployed compatibility. |
+| Embed requirements | [Required Minimum Functionality](https://developers.google.com/youtube/terms/required-minimum-functionality), identity, size, autoplay, player attributes and overlays: identify client via Referer (or specified platform alternative), minimum 200×200 viewport, visible autoplay conditions, no obscuring overlays/branding changes. `[P]` | A Watch-mode proposal needs visible layout, consent/privacy/CSP/script/origin review and real-platform testing. It cannot be silently adopted as an audio-only parity substitute. D2 and current CSP remain unchanged. No user approval to add the script. |
+| Downloading, automation, circumvention | [YouTube Terms](https://www.youtube.com/static?template=terms), permissions/restrictions, re-read 2026-10-28. `[P]` | Express authorisation/permission restrictions are material to unofficial retrieval and persistent downloads. Personal/noncommercial use or GPL is not a blanket exception. Applicability/permissions and local law require review. |
+| Extraction, audio and background | [API Developer Policies](https://developers.google.com/youtube/terms/developer-policies) §§III.I.14 (non-API retrieval), I.7 (audio/video separation), I.9 (background player), I.1 (substitute UX), I.13 (geographic circumvention); no ad/player interference. `[P]` | Material unresolved risk for the native InnerTube/resolver, background audio and downloads. Do not pronounce either compliance or a final legal finding of violation. ADR-010 D1 retains the existing code without expansion; owner acceptance is not permission. |
+| Stored metadata | Same policy §III.E.4: most authorised/non-authorised API metadata needs refresh/deletion within 30 days, with specific exceptions and consent/reauthorisation conditions. `[P]` | Current library/lyrics/cache retention is not such a lifecycle. Whether each unofficial datum is covered, and what rights permit audio/artwork/lyrics storage, need separate review; do not call all storage prohibited or all “temporary therefore allowed.” |
+| No sign-in is not no data | [Google Privacy Policy](https://policies.google.com/privacy), information collected section: IP, identifiers, device/browser and activity data. `[P]`; actual `InnerTubeClient` reuses Google-issued in-memory `visitorData` and headers. `[R]` | Native policy must disclose requests/visitor IDs and provider retention unknowns. This is not a claim every field listed in Google's general policy is sent by DHUN. No user OAuth or imported cookies exists. |
+
+### Open gates and next work
+
+1. Legal/permission assessment of existing unofficial audio, background playback,
+   download/cache and metadata lifecycles; no fabricated funded counsel or approval.
+2. Continue permitted maintenance/health validation and dated residential hardware
+   evidence within D1; don't add features under the guise of “YouTube first.”
+3. Any official API or visible Watch-mode option needs a distinct proposal,
+   source/capability/credential/privacy plan and owner authorisation **before**
+   adding third-party runtime/CSP changes, followed by deployed-origin tests.
+4. No official general YouTube Music catalogue or timed-lyrics API was established
+   by these pages. Lack of evidence is not an exhaustive claim that none can exist.
+   Do not add credentials, account data or a backend to fill that research gap.
+
+The original §8 below remains a historical question list; current decisions are
+[ADR-010 and its dated amendment](../decisions/ADR-010-multi-source-provider-direction.md).
+
+---
+
+## Historical research record — 2026-10-20
+
+> Retained as dated evidence, not a current implementation order or legal conclusion.
+> The 2026-10-28 recheck above supersedes conflicting present-tense claims below.
+
 **Date of research:** 2026-10-20. **Scope:** what the official YouTube surfaces allow
 Dhun to do, what the existing native and web code does, and where they conflict.
 **Source of truth for policy:** the primary pages listed in §7, read on the access
